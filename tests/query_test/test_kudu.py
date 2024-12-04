@@ -980,14 +980,13 @@ class TestShowCreateTable(KuduTestSuite):
       # TODO we should move these tests to a query.test file so that we can have better
       # way to compare the output against different hive versions
       assert output.startswith("CREATE EXTERNAL TABLE")
-      assert "TBLPROPERTIES ('external.table.purge'='TRUE', " in output
+      assert "'external.table.purge'='TRUE', " in output
       # We have made sure that the output starts with CREATE EXTERNAL TABLE, now we can
       # change it to "CREATE TABLE" to make it easier to compare rest of the str
       output = output.replace("CREATE EXTERNAL TABLE", "CREATE TABLE")
       # We should also remove the additional tbl property external.table.purge so that we
       # can compare the rest of output
-      output = output.replace("TBLPROPERTIES ('external.table.purge'='TRUE', ",
-                              "TBLPROPERTIES (")
+      output = output.replace("'external.table.purge'='TRUE', ", "")
     assert output == \
         textwrap.dedent(show_create_sql.format(**format_args)).strip()
 
@@ -1005,8 +1004,8 @@ class TestShowCreateTable(KuduTestSuite):
         )
         PARTITION BY HASH (c) PARTITIONS 3
         STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
-            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
+        TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'kudu.master_addresses'='{kudu_addr}')"""
+            .format(db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT PRIMARY KEY, d STRING NULL)
@@ -1021,8 +1020,8 @@ class TestShowCreateTable(KuduTestSuite):
         )
         PARTITION BY HASH (c) PARTITIONS 3, RANGE (c) (...)
         STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
-            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
+        TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'kudu.master_addresses'='{kudu_addr}')"""
+            .format(db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT ENCODING PLAIN_ENCODING, PRIMARY KEY (c))
@@ -1034,8 +1033,8 @@ class TestShowCreateTable(KuduTestSuite):
         )
         PARTITION BY HASH (c) PARTITIONS 3
         STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
-            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
+        TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'kudu.master_addresses'='{kudu_addr}')"""
+            .format(db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT COMPRESSION LZ4, d STRING, PRIMARY KEY(c, d))
@@ -1050,8 +1049,8 @@ class TestShowCreateTable(KuduTestSuite):
         )
         PARTITION BY HASH (c) PARTITIONS 3, HASH (d) PARTITIONS 3, RANGE (c, d) (...)
         STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
-            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
+        TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'kudu.master_addresses'='{kudu_addr}')"""
+            .format(db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT, d STRING, e INT NULL DEFAULT 10, PRIMARY KEY(c, d))
@@ -1066,8 +1065,8 @@ class TestShowCreateTable(KuduTestSuite):
         )
         PARTITION BY RANGE (c) (...)
         STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
-            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
+        TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'kudu.master_addresses'='{kudu_addr}')"""
+            .format(db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT PRIMARY KEY) STORED AS KUDU""",
@@ -1077,8 +1076,8 @@ class TestShowCreateTable(KuduTestSuite):
           PRIMARY KEY (c)
         )
         STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
-            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
+        TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'kudu.master_addresses'='{kudu_addr}')"""
+            .format(db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
         """
         CREATE TABLE {table} (c INT COMMENT 'Ab 1@' PRIMARY KEY) STORED AS KUDU""",
@@ -1088,8 +1087,8 @@ class TestShowCreateTable(KuduTestSuite):
           PRIMARY KEY (c)
         )
         STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
-            db=cursor.conn.db_name, p=self.column_properties,
+        TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'kudu.master_addresses'='{kudu_addr}')"""
+            .format(db=cursor.conn.db_name, p=self.column_properties,
             kudu_addr=KUDU_MASTER_HOSTS))
 
   @SkipIfKudu.hms_integration_enabled()
@@ -1101,7 +1100,7 @@ class TestShowCreateTable(KuduTestSuite):
         PARTITION BY HASH(c) PARTITIONS 3
         STORED AS KUDU"""
     # Long lines are unfortunate, but extra newlines will break the test.
-    show_create_sql_fmt = """
+    show_create_sql_fmt = ("""
         CREATE TABLE {db}.{{table}} (
           c INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
           d TIMESTAMP NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
@@ -1110,9 +1109,8 @@ class TestShowCreateTable(KuduTestSuite):
         )
         PARTITION BY HASH (c) PARTITIONS 3
         STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
-            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS)
-
+        TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'kudu.master_addresses'='{kudu_addr}')"""
+            .format(db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
     self.assert_show_create_equals(cursor,
       create_sql_fmt % ("2009-01-01 00:00:00.000001000"),
       show_create_sql_fmt % ("1230768000000001"))
@@ -1174,8 +1172,8 @@ class TestShowCreateTable(KuduTestSuite):
         )
         PARTITION BY HASH (c) PARTITIONS 3
         STORED AS KUDU
-        TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
-            db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
+        TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'kudu.master_addresses'='{kudu_addr}')"""
+            .format(db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
 
   def test_synchronized_kudu_table_with_show_create(self, cursor):
     # in this case we do exact match with the provided input since this is specifically

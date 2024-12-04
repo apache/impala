@@ -17,7 +17,8 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test1 (
 )
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # Simple JSON table
@@ -73,7 +74,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.json_test1 (
 )
 STORED AS JSONFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # simple table with all types
@@ -129,7 +130,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test2 (
 )
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # all types and partitioned
@@ -203,7 +204,7 @@ PARTITIONED BY (
 COMMENT 'This is a test'
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # With a table comment
@@ -232,7 +233,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test4 (
 COMMENT 'This is a test'
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # With the row format specified
@@ -265,7 +266,7 @@ WITH SERDEPROPERTIES ('line.delim'='\n', 'field.delim'=',',
                       'serialization.format'=',', 'escape.delim'='\\')
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # testing with parquet specified
@@ -291,7 +292,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test6 (
 )
 STORED AS PARQUET
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # with extra table properties and sequencefile
@@ -301,7 +302,8 @@ CREATE TABLE test7 (
   id INT COMMENT 'Add a comment'
 )
 STORED AS SEQUENCEFILE
-TBLPROPERTIES ('key3'='val3', 'key2'='val2', 'key1'='val1')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'key3'='val3',
+    'key2'='val2', 'key1'='val1')
 ---- RESULTS-HIVE
 CREATE TABLE show_create_table_test_db.test7 (
   year INT,
@@ -310,7 +312,8 @@ CREATE TABLE show_create_table_test_db.test7 (
 )
 STORED AS SEQUENCEFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('key3'='val3', 'key2'='val2', 'key1'='val1')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'key3'='val3',
+    'key2'='val2', 'key1'='val1')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.test7 (
   year INT,
@@ -319,7 +322,8 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test7 (
 )
 STORED AS SEQUENCEFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('key3'='val3', 'key2'='val2', 'key1'='val1', 'external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'key3'='val3',
+    'key2'='val2', 'key1'='val1', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # testing with rcfile specified
@@ -345,7 +349,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test8 (
 )
 STORED AS RCFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # Test create table as select
@@ -401,7 +405,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test_as_select (
 )
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 create table i_1687_p partitioned by (int_col) as
@@ -424,7 +428,7 @@ PARTITIONED BY (
 )
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- QUERY
 SHOW CREATE TABLE functional.allcomplextypes
@@ -530,7 +534,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test1 (id INT)
 SORT BY LEXICAL (id)
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ---- RESULTS-HIVE
 CREATE TABLE show_create_table_test_db.test1 (id INT)
 SORT BY LEXICAL (id)
@@ -549,7 +553,7 @@ PARTITIONED BY (x INT, y INT)
 SORT BY LEXICAL (id)
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ---- RESULTS-HIVE
 CREATE TABLE show_create_table_test_db.test1 (id INT)
 PARTITIONED BY (x INT, y INT)
@@ -592,7 +596,8 @@ CREATE TABLE iceberg_test1 (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='parquet',
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
     'write.parquet.row-group-size-bytes'='134217728',
@@ -605,7 +610,8 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test1 (
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE',
     'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -620,7 +626,8 @@ CREATE TABLE iceberg_test2 (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='parquet',
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
     'write.parquet.row-group-size-bytes'='134217728',
@@ -633,7 +640,8 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test2 (
   level STRING NULL
 )
 STORED AS ICEBERG
-TBLPROPERTIES ('external.table.purge'='TRUE',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE',
     'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -649,7 +657,8 @@ CREATE TABLE iceberg_test3 (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='parquet',
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
     'write.parquet.row-group-size-bytes'='134217728',
@@ -663,7 +672,8 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test3 (
   level STRING NULL
 )
 STORED AS ICEBERG
-TBLPROPERTIES ('external.table.purge'='TRUE',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE',
     'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -693,7 +703,8 @@ PARTITIONED BY SPEC (
   TRUNCATE(5, p4)
 )
 STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='parquet',
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
     'write.parquet.row-group-size-bytes'='134217728',
@@ -719,7 +730,8 @@ PARTITIONED BY SPEC (
   TRUNCATE(5, p4)
 )
 STORED AS ICEBERG
-TBLPROPERTIES ('external.table.purge'='TRUE',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE',
     'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -735,14 +747,16 @@ CREATE TABLE iceberg_test_orc (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='orc', 'iceberg.catalog'='hadoop.tables')
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'write.format.default'='orc', 'iceberg.catalog'='hadoop.tables')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test_orc (
   level STRING NULL
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='orc',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE', 'write.format.default'='orc',
 'engine.hive.enabled'='true', 'iceberg.catalog'='hadoop.tables')
 ====
 ---- CREATE_TABLE
@@ -766,14 +780,16 @@ CREATE TABLE iceberg_default_tbl_orc (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES ('write.format.default'='orc');
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'write.format.default'='orc');
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_default_tbl_orc (
   level STRING NULL
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('write.format.default'='orc',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'write.format.default'='orc',
 'engine.hive.enabled'='true', 'external.table.purge'='TRUE', 'table_type'='ICEBERG')
 ====
 ---- CREATE_TABLE
@@ -782,14 +798,16 @@ CREATE TABLE iceberg_hive_cat_explicit (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES ('iceberg.catalog'='hive.catalog');
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'iceberg.catalog'='hive.catalog');
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_hive_cat_explicit (
   level STRING NULL
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('write.format.default'='parquet', 'iceberg.catalog'='hive.catalog',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'write.format.default'='parquet', 'iceberg.catalog'='hive.catalog',
 'engine.hive.enabled'='true', 'external.table.purge'='TRUE', 'table_type'='ICEBERG')
 ====
 ---- CREATE_TABLE
@@ -799,7 +817,8 @@ CREATE TABLE iceberg_nullable_test (
   register_time DATE
 )
 STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='parquet',
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
     'write.parquet.row-group-size-bytes'='134217728',
@@ -814,7 +833,8 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_nullable_test (
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE',
     'write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -861,7 +881,8 @@ TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
 CREATE TABLE iceberg_ctas_ht
 PARTITIONED BY SPEC (bucket(5, id))
 STORED AS ICEBERG
-TBLPROPERTIES ('iceberg.catalog'='hadoop.tables')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'iceberg.catalog'='hadoop.tables')
 AS SELECT id, bool_col, bigint_col FROM functional.alltypes;
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_ctas_ht (
@@ -872,33 +893,38 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_ctas_ht (
 PARTITIONED BY SPEC (BUCKET(5, id))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE', 'write.format.default'='parquet',
 'engine.hive.enabled'='true', 'iceberg.catalog'='hadoop.tables')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_catalogs_hive (i int)
 PARTITIONED BY SPEC (bucket(3, i))
 STORED AS ICEBERG
-TBLPROPERTIES ('iceberg.catalog'='ice_hive_cat')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'iceberg.catalog'='ice_hive_cat')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_catalogs_hive (i INT NULL)
 PARTITIONED BY SPEC (BUCKET(3, i))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE', 'write.format.default'='parquet',
 'engine.hive.enabled'='true', 'table_type'='ICEBERG')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_catalogs_hadoop (i int)
 PARTITIONED BY SPEC (bucket(3, i))
 STORED AS ICEBERG
-TBLPROPERTIES ('iceberg.catalog'='ice_hadoop_cat')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'iceberg.catalog'='ice_hadoop_cat')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_catalogs_hadoop (i INT NULL)
 PARTITIONED BY SPEC (BUCKET(3, i))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE', 'write.format.default'='parquet',
 'engine.hive.enabled'='true', 'iceberg.catalog'='ice_hadoop_cat')
 ====
 ---- CREATE_TABLE
@@ -918,24 +944,26 @@ TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
 # specified.
 CREATE TABLE ice_explicit_v1 (i int)
 STORED AS ICEBERG
-TBLPROPERTIES('format-version'='1')
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE', 'format-version'='1')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.ice_explicit_v1 (i INT NULL)
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE', 'write.format.default'='parquet',
  'engine.hive.enabled'='true', 'table_type'='ICEBERG')
 ====
 ---- CREATE_TABLE
 # Creating V2 tables should set 'merge-on-read' write modes if no write mode is specified.
 CREATE TABLE ice_v2 (i int)
 STORED AS ICEBERG
-TBLPROPERTIES('format-version'='2')
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE', 'format-version'='2')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2 (i INT NULL)
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE', 'write.format.default'='parquet',
  'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='merge-on-read',
  'write.update.mode'='merge-on-read', 'write.merge.mode'='merge-on-read')
 ====
@@ -943,48 +971,56 @@ TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
 # Creating V2 tables should not set write mode if user specified any of it to any value.
 CREATE TABLE ice_v2_explicit_delete (i int)
 STORED AS ICEBERG
-TBLPROPERTIES('format-version'='2', 'write.delete.mode'='merge-on-read')
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'format-version'='2', 'write.delete.mode'='merge-on-read')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_delete (i INT NULL)
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE', 'write.format.default'='parquet',
  'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='merge-on-read')
 ====
 ---- CREATE_TABLE
 # Creating V2 tables should not set write mode if user specified any of it to any value.
 CREATE TABLE ice_v2_explicit_delete_2 (i int)
 STORED AS ICEBERG
-TBLPROPERTIES('format-version'='2', 'write.delete.mode'='copy-on-write')
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE', 'format-version'='2',
+    'write.delete.mode'='copy-on-write')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_delete_2 (i INT NULL)
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE', 'write.format.default'='parquet',
  'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.delete.mode'='copy-on-write')
 ====
 ---- CREATE_TABLE
 # Creating V2 tables should not set write mode if user specified any of it to any value.
 CREATE TABLE ice_v2_explicit_update (i int)
 STORED AS ICEBERG
-TBLPROPERTIES('format-version'='2', 'write.update.mode'='copy-on-write')
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'format-version'='2', 'write.update.mode'='copy-on-write')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_update (i INT NULL)
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE', 'write.format.default'='parquet',
  'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.update.mode'='copy-on-write')
 ====
 ---- CREATE_TABLE
 # Creating V2 tables should not set write mode if user specified any of it to any value.
 CREATE TABLE ice_v2_explicit_merge (i int)
 STORED AS ICEBERG
-TBLPROPERTIES('format-version'='2', 'write.merge.mode'='copy-on-write')
+TBLPROPERTIES('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'format-version'='2', 'write.merge.mode'='copy-on-write')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.ice_v2_explicit_merge (i INT NULL)
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE',
+    'external.table.purge'='TRUE', 'write.format.default'='parquet',
  'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.merge.mode'='copy-on-write')
 ====
 ---- CREATE_TABLE
@@ -995,7 +1031,8 @@ CREATE EXTERNAL TABLE show_create_table_test_db.bucketed_test (a INT, b STRING)
 CLUSTERED BY (a) INTO 4 BUCKETS
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('bucketing_version'='2', 'external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'bucketing_version'='2',
+    'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # Test create Bucketed Table
@@ -1005,5 +1042,6 @@ CREATE EXTERNAL TABLE show_create_table_test_db.bucketed_sort_test (a INT, b STR
 CLUSTERED BY (a) SORT BY LEXICAL (b) INTO 4 BUCKETS
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('bucketing_version'='2', 'external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'bucketing_version'='2',
+    'external.table.purge'='TRUE')
 ====

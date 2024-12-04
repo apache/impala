@@ -87,7 +87,6 @@ public class ToSqlUtils {
   @VisibleForTesting
   protected static final ImmutableSet<String> HIDDEN_TABLE_PROPERTIES = ImmutableSet.of(
       "EXTERNAL",
-      "TRANSLATED_TO_EXTERNAL",
       "comment",
       AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
       AlterTableSortByStmt.TBL_PROP_SORT_ORDER,

@@ -413,7 +413,7 @@ public class LocalCatalogTest {
       // tblproperties substring separately
       Assert.assertTrue("Synchronized Kudu tables in Hive-3 must contain external.table"
           + ".purge table property", output.contains("'external.table.purge'='TRUE'"));
-      Assert.assertFalse("Found internal property TRANSLATED_TO_EXTERNAL in table "
+      Assert.assertTrue("Found internal property TRANSLATED_TO_EXTERNAL in table "
           + "properties", output.contains("TRANSLATED_TO_EXTERNAL"));
     } else {
     // Assert on the generated SQL for the table, but not the table properties, since
