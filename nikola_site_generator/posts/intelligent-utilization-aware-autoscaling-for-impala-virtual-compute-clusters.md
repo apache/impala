@@ -7,7 +7,7 @@
 .. link:
 .. description:
 .. type: text
-.. author: Riza Suminto
+.. author: Kurt Deschler, Gokul Kolady, Abhishek Rawat, David Rorke, Andrew Sherman, Riza Suminto
 -->
 
 Sizing Virtual compute clusters for diverse and complex workloads is hard. Queries often require

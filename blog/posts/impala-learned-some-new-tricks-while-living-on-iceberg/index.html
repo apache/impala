@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html prefix="
+    " lang="en">
+<head>
+<meta name="keywords" content="hadoop, impala, sql, mpp, bi, big data, open source">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<title>Impala learned some new tricks while living on Iceberg | Apache Impala</title>
+<link href="../../assets/css/bootstrap.min.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/bootstrap-responsive.min.css" rel="stylesheet" type="text/css">
+<!-- order is significant to prevent overwriting of some bootstrap-defined css styles --><link href="../../assets/css/additional_styles.css" rel="stylesheet" type="text/css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script><meta content="#5670d4" name="theme-color">
+<link rel="canonical" href="https://impala.apache.org/blog/posts/impala-learned-some-new-tricks-while-living-on-iceberg/">
+<meta name="author" content="Zoltán Borók-Nagy">
+<link rel="prev" href="../impala-blog-coming-soon/" title="Impala Blog Coming Soon" type="text/html">
+<link rel="next" href="../efficient-handling-of-geometry-data-in-apache-impala-with-parquet-files/" title="Efficient handling of geometry data in Apache Impala with Parquet files" type="text/html">
+</head>
+<body id="index" class="home">
+    <div class="container">
+        <div class="masthead">
+                <header id="header"><h3 id="brand">
+
+            <span id="blog-title" class="muted">Apache Impala</span>
+    </h3>
+
+            <nav id="menu"><div class="navbar">
+        <div class="navbar-inner">
+            <div class="container">
+
+            <ul class="nav">
+<li><a href="https://impala.apache.org/index.html">Home</a></li>
+                <li><a href="https://impala.apache.org/downloads.html">Downloads</a></li>
+                <li><a href="https://impala.apache.org/overview.html">Overview</a></li>
+                <li class="active"><a href="https://impala.apache.org/blog/">Blog</a></li>
+                <li><a href="https://cwiki.apache.org/confluence/display/IMPALA/Contributing+to+Impala">Contribute</a></li>
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button">
+                    Source code</a>
+                    <ul class="dropdown-menu">
+<li>
+                            <a href="https://git-wip-us.apache.org/repos/asf/incubator-impala.git">
+                            Official source</a>
+                        </li>
+                        <li><a href="https://github.com/apache/incubator-impala">GitHub mirror</a></li>
+                    </ul>
+</li>
+                <li><a href="https://impala.apache.org/community.html">Community</a></li>
+                <li><a href="https://impala.apache.org/impala-docs.html">Documentation</a></li>
+            </ul>
+</div>
+<!-- container -->
+        </div>
+<!-- navbar-inner -->
+    </div>
+<!-- navbar -->
+    </nav></header>
+</div>
+<!-- masthead -->
+        <main id="content"><article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h3 class="p-name entry-title" itemprop="headline name"><a href="." class="u-url">Impala learned some new tricks while living on Iceberg</a></h3>
+
+        <div class="metadata">
+            <p class="byline author vcard">
+                <span class="byline-name fn">
+                        <a href="../../authors/zoltan-borok-nagy/">Zoltán Borók-Nagy</a>
+                </span>
+            </p>
+            <p class="dateline"><a href="." rel="bookmark"><time class="published dt-published" datetime="2023-10-09T08:00:00-03:00" itemprop="datePublished" title="2023-10-09 08:00">2023-10-09 08:00</time></a></p>
+        </div>
+    </header><div class="e-content entry-content" itemprop="articleBody text">
+    <p>Apache Impala is a high-performance distributed query engine
+specifically designed for lightning fast read operations. Apache Iceberg
+is a groundbreaking table format that introduces advanced features such
+as partition and schema evolution, data partitioning through transform
+functions, time-travel capabilities, and row-level deletes. Recognizing
+the significance of Iceberg, the Impala team has invested tremendous
+development efforts to provide comprehensive support for its features.
+This talk will cover the following key points:</p>
+<ul>
+<li>A brief overview of how Impala integrates with Iceberg</li>
+<li>The limitations of traditional table formats</li>
+<li>How Iceberg addresses these existing challenges and unlocks new possibilities</li>
+<li>An exploration of Impala’s new features and some insights into their implementation</li>
+</ul>
+<p>Iceberg has transformed Impala from being solely a query engine
+optimized for read operations into a robust data warehouse engine. With
+Iceberg, Impala now extends its support to include ACID write operations
+and table maintenance functions, enabling it to fulfill the role of a
+comprehensive and versatile data warehouse engine. Join us for this
+session to gain valuable insights into the integration between Impala
+and Iceberg, and discover the new functionalities of Impala.</p>
+<p>[<a href="https://impala.apache.org/gh-docs/mon_bigdata_impala_learned_some_new_tricks_while_living_on_iceberg-zoltan-borok-nagy.pdf">slides</a>]</p>
+<p><em>Appeared in <a href="https://communityovercode.org/past-sessions/community-over-code-na-2023/">https://communityovercode.org/past-sessions/community-over-code-na-2023/</a></em></p>
+    </div>
+    <aside class="postpromonav"><nav><ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/ccna23/" rel="tag">ccna23</a></li>
+        </ul>
+<ul class="pager hidden-print">
+<li class="previous">
+                <a href="../impala-blog-coming-soon/" rel="prev" title="Impala Blog Coming Soon">Previous post</a>
+            </li>
+            <li class="next">
+                <a href="../efficient-handling-of-geometry-data-in-apache-impala-with-parquet-files/" rel="next" title="Efficient handling of geometry data in Apache Impala with Parquet files">Next post</a>
+            </li>
+        </ul></nav></aside></article></main><footer id="footer"><p> </p>
+    <div class="navbar">
+      <div class="navbar-inner">
+        <div class="container">
+
+          <ul class="nav">
+<li><a href="https://www.apache.org/licenses/">License</a></li>
+            <li><a href="https://www.apache.org/foundation/sponsorship.html">Sponsorship</a></li>
+            <li><a href="https://www.apache.org/foundation/thanks.html">Thanks</a></li>
+            <li><a href="https://www.apache.org/security/">Security</a></li>
+            <li><a href="https://www.apache.org/">Apache Software Foundation</a></li>
+          </ul>
+</div>
+<!-- container -->
+      </div>
+<!-- navbar-inner -->
+    </div>
+<!-- navbar -->
+
+    <div class="footer">
+      <center>
+        <a href="https://www.apache.org/events/current-event.html">
+          <img src="https://www.apache.org/events/current-event-234x60.png"></a>
+      </center>
+      <p>Apache Impala, Impala, Apache, the Apache feather logo, and the Apache
+        Impala project logo are either registered trademarks or trademarks of The
+        Apache Software Foundation in the United States and other countries.
+      </p>
+    </div>
+<!-- footer -->
+
+      <p>Contents © 2016-2024         <a href="mailto:dev@impala.apache.org">Impala Dev</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+  </footer>
+</div>
+<!-- container -->
+</body>
+</html>

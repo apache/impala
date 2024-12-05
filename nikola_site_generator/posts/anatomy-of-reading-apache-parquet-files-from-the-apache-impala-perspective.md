@@ -7,6 +7,7 @@
 .. link:
 .. description:
 .. type: text
+.. author: Csaba Ringhofer, Daniel Becker
 -->
 
 Reading file formats efficiently is a crucial part of big data systems -

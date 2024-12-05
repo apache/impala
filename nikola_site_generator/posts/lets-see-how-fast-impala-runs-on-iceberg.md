@@ -7,6 +7,7 @@
 .. link:
 .. description:
 .. type: text
+.. author: Gabor Kaszab, Zoltán Borók-Nagy
 -->
 
 Apache Impala is a distributed massively parallel query engine designed for high-performance

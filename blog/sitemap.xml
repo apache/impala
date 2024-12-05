@@ -7,134 +7,202 @@
                         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
  <url>
   <loc>https://impala.apache.org/blog/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/2015/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/2016/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/2017/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/2023/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/2024/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/archive.html</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/authors/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/authors/abhishek-rawat/</loc>
-  <lastmod>2024-10-30T17:27:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/alex-behm/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/andrew-sherman/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/csaba-ringhofer/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/daniel-becker/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/authors/david-rorke/</loc>
-  <lastmod>2024-10-30T17:27:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/authors/gabor-kaszab/</loc>
-  <lastmod>2024-10-30T17:32:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/gokul-kolady/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/authors/impala-dev/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/kurt-deschler/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/marcel-kornacker/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/authors/michael-smith/</loc>
-  <lastmod>2024-10-30T17:27:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/mostafa-mokhtar/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/authors/noemi-pap-takacs/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/peter-rozsa/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/authors/riza-suminto/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/skye-wanderman-milne/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/authors/yida-wu/</loc>
-  <lastmod>2024-10-30T17:27:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/authors/zoltan-borok-nagy/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/categories/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/categories/cat_blogs/</loc>
-  <lastmod>2024-10-30T17:27:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/categories/cat_talks/</loc>
-  <lastmod>2024-10-30T17:32:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/categories/cceu24/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/categories/ccna23/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/categories/ccna24/</loc>
-  <lastmod>2024-10-30T17:32:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/categories/cidr15/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/categories/codegen/</loc>
-  <lastmod>2024-10-30T17:27:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/categories/meetup/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/index-1.html</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/anatomy-of-reading-apache-parquet-files-from-the-apache-impala-perspective/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/codegen-cache-for-low-latency-queries/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/posts/efficient-handling-of-geometry-data-in-apache-impala-with-parquet-files/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/healing-iceberg-tables-with-impala/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/impala-25-performance-overview/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/impala-a-modern-open-source-sql-engine-for-hadoop/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/impala-blog-coming-soon/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
+ </url>
+ <url>
+  <loc>https://impala.apache.org/blog/posts/impala-learned-some-new-tricks-while-living-on-iceberg/</loc>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/impalas-living-on-iceberg/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/intelligent-utilization-aware-autoscaling-for-impala-virtual-compute-clusters/</loc>
-  <lastmod>2024-10-30T17:30:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/lets-see-how-fast-impala-runs-on-iceberg/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/nested-types-in-impala/</loc>
-  <lastmod>2024-10-30T17:23:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
  <url>
   <loc>https://impala.apache.org/blog/posts/this-impala-not-only-reads-but-modifies-and-optimizes-iceberg-tables/</loc>
-  <lastmod>2024-10-30T17:26:00Z</lastmod>
+  <lastmod>2024-12-05T18:19:00Z</lastmod>
  </url>
 </urlset>

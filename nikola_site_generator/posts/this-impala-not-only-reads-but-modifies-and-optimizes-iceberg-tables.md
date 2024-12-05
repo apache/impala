@@ -7,6 +7,7 @@
 .. link:
 .. description:
 .. type: text
+.. author: Zoltán Borók-Nagy, Péter Rózsa, Noémi Pap-Takács
 -->
 
 Apache Impala is a distributed, massively parallel query engine for big data. Initially, it focused

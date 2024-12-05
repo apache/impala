@@ -1,0 +1,29 @@
+{#  -*- coding: utf-8 -*- #}
+{% extends 'index.tmpl' %}
+{% import 'feeds_translations_helper.tmpl' as feeds_translations with context %}
+
+{% block content_header %}
+    <header>
+        <h1>{{ title|e }}</h1>
+        {% if description %}
+        <p>{{ description }}</p>
+        {% endif %}
+        {% if subcategories %}
+        {{ messages('Subcategories:') }}
+        <ul>
+            {% for name, link in subcategories %}
+            <li><a href="{{ link }}">{{ name|e }}</a></li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <div class="metadata">
+{{ feeds_translations.feed_link(tag, kind) }}
+{{ feeds_translations.translation_link(kind) }}
+        </div>
+    </header>
+{% endblock %}
+
+{% block extra_head %}
+    {{ super() }}
+    {{ feeds_translations.head(tag, kind, rss_override=False) }}
+{% endblock %}

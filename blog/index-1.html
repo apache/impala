@@ -58,6 +58,68 @@
         <main id="content"><h3>All articles</h3>
 <div class="postindex">
     <hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/impala-25-performance-overview/" class="u-url">Impala 2.5 performance overview</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                <a href="authors/mostafa-mokhtar/">Mostafa Mokhtar</a>
+            </span></p>
+            <p class="dateline"><a href="posts/impala-25-performance-overview/" rel="bookmark"><time class="published dt-published" datetime="2016-05-24T23:00:00-07:00" title="2016-05-24 23:00">2016-05-24 23:00</time></a></p>
+        </div>
+    </header><div class="p-summary entry-summary">
+    <p>Impala has proven to be a high-performance analytics query engine since the beginning. Even as an
+initial production release in 2013, it demonstrated performance 2x faster than a traditional DBMS,
+and each subsequent release has continued to demonstrate the wide performance gap between Impala’s
+analytic-database architecture and SQL-on-Apache Hadoop alternatives. Today, we are excited to
+continue that track record via some important performance gains for Impala 2.5 (with more to come on
+the roadmap), summarized below.</p>
+
+<p>Overall, compared to Impala 2.3, in Impala 2.5:</p>
+
+<ul>
+<li>TPC-DS queries run on average 4.3x faster.</li>
+  <li>TPC-H queries run 2.2x faster on flat tables, and 1.71x faster on nested tables.</li>
+</ul>
+<div style="margin-bottom:5px">
+  <strong>
+    <a href="https://www.slideshare.net/slideshow/hug-meetup-impala-25-performance-overview/61689036" title="Hug meetup impala 2.5 performance overview" target="_blank">Hug meetup impala 2.5 performance
+overview</a>
+  </strong>
+  from
+  <strong>
+    <a href="https://www.slideshare.net/MostafaMokhtar1" target="_blank">Mostafa Mokhtar</a>
+  </strong>
+</div>
+    </div>
+    </article><hr>
+<article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/nested-types-in-impala/" class="u-url">Nested Types in Impala</a></h3>
+        <div class="metadata">
+            <p class="byline author vcard"><span class="byline-name fn">
+                <a href="authors/alex-behm/">Alex Behm</a>
+                <a href="authors/marcel-kornacker/">Marcel Kornacker</a>
+                <a href="authors/skye-wanderman-milne/">Skye Wanderman-Milne</a>
+            </span></p>
+            <p class="dateline"><a href="posts/nested-types-in-impala/" rel="bookmark"><time class="published dt-published" datetime="2015-03-24T23:00:00-07:00" title="2015-03-24 23:00">2015-03-24 23:00</time></a></p>
+        </div>
+    </header><div class="p-summary entry-summary">
+    <p>This document discusses nested data types in Impala, including structs, maps, and arrays. It
+provides an example schema using these types, describes Impala's SQL syntax extensions for querying
+nested data, and discusses techniques for advanced querying capabilities like correlated subqueries.
+The execution model materializes minimal nested structures in memory and uses new execution nodes to
+handle nested data types.</p>
+
+<div style="margin-bottom:5px">
+  <strong>
+    <a href="https://www.slideshare.net/slideshow/nested-types-in-impala-55344174/55344174" title="Nested Types in Impala" target="_blank">Nested Types in Impala</a>
+  </strong>
+  from
+  <strong>
+    <a href="https://www.slideshare.net/cloudera" target="_blank">Cloudera, Inc.</a>
+  </strong>
+</div>
+
+<p><i>Presented in Impala Meetup, PA, March 24th, 2015</i></p>
+    </div>
+    </article><hr>
 <article class="h-entry post-text"><header><h3 class="p-name entry-title"><a href="posts/impala-a-modern-open-source-sql-engine-for-hadoop/" class="u-url">Impala: A Modern, Open-Source SQL Engine for Hadoop</a></h3>
         <div class="metadata">
             <p class="byline author vcard"><span class="byline-name fn">
