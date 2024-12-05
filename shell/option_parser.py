@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env ambari-python-wrap
 # -*- coding: utf-8 -*-
 #
 # Licensed to the Apache Software Foundation (ASF) under one

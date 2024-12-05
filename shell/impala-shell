@@ -37,7 +37,7 @@ SHELL_HOME=${IMPALA_SHELL_HOME:-${SCRIPT_DIR}}
 export LC_CTYPE=${LC_CTYPE:-en_US.UTF-8}
 
 # Select python version; prefer 2, use 3 if 2's absent. Allow override with envvar
-PYTHON_EXE="${IMPALA_PYTHON_EXECUTABLE:-python}"
+PYTHON_EXE="${IMPALA_PYTHON_EXECUTABLE:-ambari-python-wrap}"
 if ! command -v "${PYTHON_EXE}" > /dev/null; then
   PYTHON_EXE=python3
 fi

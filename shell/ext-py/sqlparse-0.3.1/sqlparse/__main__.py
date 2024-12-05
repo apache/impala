@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env ambari-python-wrap
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2009-2018 the sqlparse authors and contributors

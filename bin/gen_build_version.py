@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env ambari-python-wrap
 # This uses system python to avoid a dependency on impala-python,
 # because this runs during the build.
 #

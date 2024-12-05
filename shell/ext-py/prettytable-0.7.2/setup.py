@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env ambari-python-wrap
 from setuptools import setup
 from prettytable import __version__ as version
 
