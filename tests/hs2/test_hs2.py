@@ -28,6 +28,9 @@ import random
 import threading
 import time
 import uuid
+import impala.dbapi as impyla
+
+from tests.common.impala_test_suite import IMPALAD_HOSTNAME, IMPALAD_HS2_HTTP_PORT
 
 try:
   from urllib.request import urlopen
@@ -1189,3 +1192,27 @@ class TestHS2(HS2TestSuite):
     # Run another query, which should fail since the session is closed.
     self.execute_statement("select 3", expected_error_prefix="Invalid session id",
         expected_status_code=TCLIService.TStatusCode.ERROR_STATUS)
+
+  def test_duplicate_headers(self):
+    """Test that if duplicate X-Forwarded-For headers are sent to Impala,
+     only the first is used"""
+    impyla_conn = impyla.connect(host=IMPALAD_HOSTNAME, port=IMPALAD_HS2_HTTP_PORT,
+                                 use_http_transport=True,
+                                 http_path="cliservice",
+                                 get_user_custom_headers_func=get_user_custom_headers)
+    cursor = impyla_conn.cursor(convert_types=False)
+    cursor.execute('select 1')
+    rows = cursor.fetchall()
+    assert rows == [(1,)]
+    profile = cursor.get_profile()
+    assert profile is not None
+    assert "Http Origin: value1" in profile
+    assert "Http Origin: value2" not in profile
+
+
+def get_user_custom_headers():
+  """Add duplicate X-Forwarded-For headers."""
+  return [
+    ("X-Forwarded-For", 'value1'),
+    ("X-Forwarded-For", 'value2')
+  ]
