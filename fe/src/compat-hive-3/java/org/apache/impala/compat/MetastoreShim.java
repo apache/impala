@@ -79,6 +79,7 @@ import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogBatchRequest;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogRequest;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.messaging.AlterPartitionsMessage;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.CommitTxnMessage;
 import org.apache.hadoop.hive.metastore.messaging.CommitCompactionMessage;
@@ -604,6 +605,39 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       throw new MetastoreNotificationException(e);
     }
     return updatedFields;
+  }
+
+  /**
+   *  This method extracts the table, partitions, and isTruncateOp fields from the
+   *  notification event and returns them in a AlterPartitionsInfo class object.
+   *
+   * @param event Metastore notification event,
+   * @return a AlterPartitionsInfo class object required for the reload event.
+   */
+  public static AlterPartitionsInfo getFieldsFromAlterPartitionsEvent(
+      NotificationEvent event) throws MetastoreNotificationException{
+    Preconditions.checkNotNull(event.getMessage());
+    AlterPartitionsMessage alterPartitionsMessage =
+        MetastoreEventsProcessor.getMessageDeserializer()
+            .getAlterPartitionsMessage(event.getMessage());
+    AlterPartitionsInfo alterPartitionsInfo = null;
+    try {
+      Iterator<Partition> partitionsIterator = Preconditions.checkNotNull(
+          alterPartitionsMessage.getPartitionObjs().iterator());
+      List<org.apache.hadoop.hive.metastore.api.Partition> partitionsAfter =
+          new ArrayList<>();
+      while (partitionsIterator.hasNext()) {
+        partitionsAfter.add(partitionsIterator.next());
+      }
+      org.apache.hadoop.hive.metastore.api.Table msTbl = Preconditions.checkNotNull(
+          alterPartitionsMessage.getTableObj());
+      boolean isTruncateOp = alterPartitionsMessage.getIsTruncateOp();
+      alterPartitionsInfo = new AlterPartitionsInfo(msTbl, partitionsAfter,
+          isTruncateOp);
+    } catch (Exception e) {
+      throw new MetastoreNotificationException(e);
+    }
+    return alterPartitionsInfo;
   }
 
   /**

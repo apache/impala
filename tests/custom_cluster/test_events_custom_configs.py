@@ -39,6 +39,8 @@ from tests.util.iceberg_util import IcebergCatalogs
 
 HIVE_SITE_HOUSEKEEPING_ON =\
     getenv('IMPALA_HOME') + '/fe/src/test/resources/hive-site-housekeeping-on'
+HIVE_SITE_ALTER_PARTITIONS_EVENT =\
+  getenv('IMPALA_HOME') + '/fe/src/test/resources/hive-site-events-config'
 TRUNCATE_TBL_STMT = 'truncate table'
 # The statestore heartbeat and topic update frequency (ms). Set low for testing.
 STATESTORE_RPC_FREQUENCY_MS = 100
@@ -1693,6 +1695,67 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
         assert EventProcessorUtils.get_last_synced_event_id() > event_id_before
         self.client.execute("""DROP DATABASE {} CASCADE""".format(unique_database))
         self.client.execute("""CREATE DATABASE {}""".format(unique_database))
+
+  @SkipIf.is_test_jdk
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal --hms_event_polling_interval_s=1 "
+                  "--debug_actions=catalogd_event_processing_delay:SLEEP@1000",
+    hive_conf_dir=HIVE_SITE_ALTER_PARTITIONS_EVENT)
+  def test_alter_partitions_event_from_metastore(self, unique_database):
+    tbl = unique_database + ".test_alter_partitions"
+    self.client.execute("create table {} (id int) partitioned by (year int)"
+      .format(tbl))
+
+    def _verify_alter_partitions_event(events):
+      event_found = False
+      for event in events:
+        if event.eventType == "ALTER_PARTITIONS":
+          event_found = True
+        else:
+          logging.debug("Found " + str(event))
+      return event_found
+
+    # Verify that test always generates single ALTER_PARTITIONS event
+    self.client.execute(
+      "insert into {} partition(year) values (0,2024), (1,2023), (2,2022)"
+      .format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self, 10)
+
+    # Case-I: compute stats from hive
+    parts_refreshed_before = EventProcessorUtils.get_int_metric("partitions-refreshed")
+    batch_events_before = EventProcessorUtils.get_int_metric("batch-events-created")
+    self.run_stmt_in_hive("analyze table {} compute statistics".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self, 10)
+    batch_events_after = EventProcessorUtils.get_int_metric("batch-events-created")
+    parts_refreshed_after = EventProcessorUtils.get_int_metric("partitions-refreshed")
+    assert batch_events_after == batch_events_before  # verify there are no new batches
+    assert parts_refreshed_after == parts_refreshed_before + 3
+
+    # Case-II: compute stats from impala
+    last_event_id = EventProcessorUtils.get_current_notification_id(self.hive_client)
+    self.client.execute("compute stats {}".format(tbl))
+    events_skipped_before = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    EventProcessorUtils.wait_for_event_processing(self, 10)
+    events = EventProcessorUtils.get_next_notification(self.hive_client, last_event_id)
+    # There will be COMMIT_TXN, ALLOC_WRITE_ID_EVENT, ALTER_PARTITIONS in any order
+    events_skipped_after = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    assert _verify_alter_partitions_event(events)
+    assert events_skipped_after > events_skipped_before
+
+    # Case-III: truncate table from Impala
+    last_event_id = EventProcessorUtils.get_current_notification_id(self.hive_client)
+    self.client.execute("truncate table {}".format(tbl))
+    events_skipped_before = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    EventProcessorUtils.wait_for_event_processing(self, 10)
+    events = EventProcessorUtils.get_next_notification(self.hive_client, last_event_id)
+    events_skipped_after = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    assert _verify_alter_partitions_event(events)
+    assert events_skipped_after > events_skipped_before
+
+    # Case-IV: Truncate table from Hive is currently generating single alter_partition
+    # events. HIVE-28668 will address it.
 
 
 @SkipIfFS.hive

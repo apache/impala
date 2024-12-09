@@ -842,4 +842,43 @@ public class Hive3MetastoreShimBase {
   public static boolean validateColumnName(String name) {
     return MetaStoreUtils.validateColumnName(name);
   }
+
+  /**
+   * Constructs a new AlterPartitionsInfo object.
+   */
+  public static class AlterPartitionsInfo {
+    private final org.apache.hadoop.hive.metastore.api.Table msTable;
+    private final List<org.apache.hadoop.hive.metastore.api.Partition> partitions;
+    private final boolean isTruncate;
+
+    public AlterPartitionsInfo(org.apache.hadoop.hive.metastore.api.Table msTable,
+        List<org.apache.hadoop.hive.metastore.api.Partition> partitions,
+        boolean isTruncate) {
+      this.msTable = msTable;
+      this.partitions = partitions;
+      this.isTruncate = isTruncate;
+    }
+
+    /**
+     * Returns the Thrift representation of the table.
+     */
+    public org.apache.hadoop.hive.metastore.api.Table getMsTable() {
+      return msTable;
+    }
+
+    /**
+     * Returns the list of Thrift partition objects affected by the reload.
+     * Can be null or empty if not applicable.
+     */
+    public List<org.apache.hadoop.hive.metastore.api.Partition> getPartitions() {
+      return partitions;
+    }
+
+    /**
+     * Returns true if the reload operation was due to a TRUNCATE TABLE.
+     */
+    public boolean isTruncate() {
+      return isTruncate;
+    }
+  }
 }

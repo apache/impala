@@ -451,6 +451,14 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   /**
    *   CDP Hive-3 only function.
    */
+  public static AlterPartitionsInfo getFieldsFromAlterPartitionsEvent(
+      NotificationEvent event) throws MetastoreNotificationException {
+    throw new UnsupportedOperationException("AlterPartitions event is not supported.");
+  }
+
+  /**
+   *   CDP Hive-3 only function.
+   */
   public static String getPartitionNameFromCommitCompactionEvent(
       NotificationEvent event) {
     throw new UnsupportedOperationException("CommitCompaction event is not supported.");

@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Map;
@@ -128,6 +129,7 @@ public class MetastoreEvents {
     DROP_DATABASE("DROP_DATABASE"),
     ALTER_DATABASE("ALTER_DATABASE"),
     ADD_PARTITION("ADD_PARTITION"),
+    ALTER_BATCH_PARTITIONS("ALTER_BATCH_PARTITIONS"),
     ALTER_PARTITION("ALTER_PARTITION"),
     ALTER_PARTITIONS("ALTER_PARTITIONS"),
     DROP_PARTITION("DROP_PARTITION"),
@@ -227,6 +229,8 @@ public class MetastoreEvents {
           return new DropPartitionEvent(catalogOpExecutor_, metrics, event);
         case ALTER_PARTITION:
           return new AlterPartitionEvent(catalogOpExecutor_, metrics, event);
+        case ALTER_PARTITIONS:
+          return new AlterPartitionsEvent(catalogOpExecutor_, metrics, event);
         case RELOAD:
           return new ReloadEvent(catalogOpExecutor_, metrics, event);
         case INSERT:
@@ -1365,6 +1369,52 @@ public class MetastoreEvents {
             + "on table {}.{}", dbName_, tblName_, e);
       }
       return false;
+    }
+
+    protected void processAlterPartitionEvent(boolean isTruncateOp,
+        List<org.apache.hadoop.hive.metastore.api.Partition> partitionsAfter)
+        throws CatalogException, MetastoreNotificationException {
+      // Reload the whole table if it's a transactional table or materialized view.
+      // Materialized views are treated as a special case because it's possible to
+      // receive partition event on MVs, but they are regular views in Impala. That
+      // cause problems on the reloading partition logic which expects it to be a
+      // HdfsTable.
+      if (AcidUtils.isTransactionalTable(msTbl_.getParameters())
+          || MetaStoreUtils.isMaterializedViewTable(msTbl_)) {
+        reloadTransactionalTable(partitionsAfter);
+      } else {
+        try {
+          // load file metadata only if storage descriptor of partitionAfter_ differs
+          // from sd of HdfsPartition. If the alter_partition event type is of truncate
+          // then force load the file metadata.
+          FileMetadataLoadOpts fileMetadataLoadOpts =
+              isTruncateOp ? FileMetadataLoadOpts.FORCE_LOAD :
+                  FileMetadataLoadOpts.LOAD_IF_SD_CHANGED;
+          reloadPartitions(partitionsAfter, fileMetadataLoadOpts, getEventDesc(),
+              false);
+        } catch (CatalogException e) {
+          throw new MetastoreNotificationException(
+              debugString("Refresh partitions on table {} failed. Event " +
+                  "processing cannot continue. Issue an invalidate command to reset " +
+                  "the event processor state.", getFullyQualifiedTblName(), e));
+        }
+      }
+    }
+
+    protected void reloadTransactionalTable(
+        List<org.apache.hadoop.hive.metastore.api.Partition> partitionsAfter)
+        throws CatalogException {
+      boolean incrementalRefresh =
+          BackendConfig.INSTANCE.getHMSEventIncrementalRefreshTransactionalTable();
+      if (incrementalRefresh) {
+        reloadPartitionsFromEvent(partitionsAfter, getEventDesc()
+            + " FOR TRANSACTIONAL TABLE");
+      } else {
+        boolean notSkipped = reloadTableFromCatalog(true);
+        if (!notSkipped) {
+          metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
+        }
+      }
     }
 
     @Override
@@ -2657,7 +2707,7 @@ public class MetastoreEvents {
 
     @Override
     protected MetastoreEventType getBatchEventType() {
-      return MetastoreEventType.ALTER_PARTITIONS;
+      return MetastoreEventType.ALTER_BATCH_PARTITIONS;
     }
 
     @Override
@@ -2721,32 +2771,7 @@ public class MetastoreEvents {
             getEventId());
         return;
       }
-      // Reload the whole table if it's a transactional table or materialized view.
-      // Materialized views are treated as a special case because it's possible to
-      // receive partition event on MVs, but they are regular views in Impala. That
-      // cause problems on the reloading partition logic which expects it to be a
-      // HdfsTable.
-      if (AcidUtils.isTransactionalTable(msTbl_.getParameters())
-          || MetaStoreUtils.isMaterializedViewTable(msTbl_)) {
-        reloadTransactionalTable();
-      } else {
-        // Refresh the partition that was altered.
-        Preconditions.checkNotNull(partitionAfter_);
-        try {
-          // load file metadata only if storage descriptor of partitionAfter_ differs
-          // from sd of HdfsPartition. If the alter_partition event type is of truncate
-          // then force load the file metadata.
-          FileMetadataLoadOpts fileMetadataLoadOpts =
-              isTruncateOp_ ? FileMetadataLoadOpts.FORCE_LOAD :
-                  FileMetadataLoadOpts.LOAD_IF_SD_CHANGED;
-          reloadPartitions(Arrays.asList(partitionAfter_), fileMetadataLoadOpts,
-              getEventDesc(), false);
-        } catch (CatalogException e) {
-          throw new MetastoreNotificationNeedsInvalidateException(
-              debugString("Refresh partition on table {} partition {} failed.",
-                  getFullyQualifiedTblName(), partName_), e);
-        }
-      }
+      processAlterPartitionEvent(isTruncateOp_, Arrays.asList(partitionAfter_));
     }
 
     @Override
@@ -2775,19 +2800,62 @@ public class MetastoreEvents {
           Arrays.asList(getTPartitionSpecFromHmsPartition(msTbl_, partitionAfter_)),
           partitionAfter_.getParameters());
     }
+  }
 
-    private void reloadTransactionalTable() throws CatalogException {
-      boolean incrementalRefresh =
-          BackendConfig.INSTANCE.getHMSEventIncrementalRefreshTransactionalTable();
-      if (incrementalRefresh) {
-        reloadPartitionsFromEvent(Collections.singletonList(partitionAfter_),
-            getEventDesc() + " FOR TRANSACTIONAL TABLE");
-      } else {
-        boolean notSkipped = reloadTableFromCatalog(true);
-        if (!notSkipped) {
-          metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
-        }
+  public static class AlterPartitionsEvent extends MetastoreTableEvent {
+    public static final String EVENT_TYPE = "ALTER_PARTITIONS";
+    // the list of partition objects of alter operation, as parsed from the
+    // NotificationEvent
+    private final List<org.apache.hadoop.hive.metastore.api.Partition> partitionsAfter_;
+    private final boolean isTruncateOp_;
+
+    /**
+     * Prevent instantiation from outside should use MetastoreEventFactory instead
+     */
+    private AlterPartitionsEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
+        NotificationEvent event) throws MetastoreNotificationException {
+      super(catalogOpExecutor, metrics, event);
+      Preconditions.checkState(getEventType().equals(
+          MetastoreEventType.ALTER_PARTITIONS));
+      try {
+        MetastoreShim.AlterPartitionsInfo alterPartitionsInfo =
+            MetastoreShim.getFieldsFromAlterPartitionsEvent(event);
+        msTbl_ = alterPartitionsInfo.getMsTable();
+        partitionsAfter_ = alterPartitionsInfo.getPartitions();
+        isTruncateOp_ = alterPartitionsInfo.isTruncate();
+      } catch (Exception e) {
+        throw new MetastoreNotificationException(
+            debugString("Unable to parse the alter partition message"), e);
       }
+    }
+
+    @Override
+    public void processTableEvent() throws MetastoreNotificationException,
+        CatalogException {
+      if (partitionsAfter_.isEmpty()) {
+        metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
+        warnLog("Not processing the alter partitions event {} as no partitions are " +
+            "received in the event.", getEventId());
+        return;
+      }
+      if (isSelfEvent()) {
+        infoLog("Not processing the event as it is a self-event");
+        return;
+      }
+
+      if (isOlderEvent(partitionsAfter_.get(0))) {
+        infoLog("Not processing the alter partition event {} as it is an older event",
+            getEventId());
+        return;
+      }
+      processAlterPartitionEvent(isTruncateOp_, partitionsAfter_);
+    }
+
+    @Override
+    public SelfEventContext getSelfEventContext() {
+      return new SelfEventContext(dbName_, tblName_,
+          Arrays.asList(getTPartitionSpecFromHmsPartition(msTbl_,
+              partitionsAfter_.get(0))), partitionsAfter_.get(0).getParameters());
     }
   }
 

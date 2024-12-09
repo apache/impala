@@ -95,6 +95,11 @@ elif VARIANT == 'housekeeping_on':
   CONFIG.update({
     'hive.metastore.housekeeping.threads.on': 'true',
   })
+elif VARIANT == 'events_config_change':
+  # HMS config change needed for HIVE-27746 to emit ALTER_PARTITIONS event
+  CONFIG.update({
+    'hive.metastore.alterPartitions.notification.v2.enabled': 'true',
+  })
 
 # HBase-related configs.
 # Impala processes need to connect to zookeeper on INTERNAL_LISTEN_HOST for HBase.
