@@ -282,3 +282,25 @@ SELECT * FROM ice_optimize;
 ---- TYPES
 INT,BOOLEAN,DATE,DOUBLE,STRING
 ====
+---- QUERY
+# Regression test for IMPALA-13598.
+# OPTIMIZE table with many partitions (with low mem_limit).
+# Then we also check the number of files to verify that
+# the inputs of the writers are actually sorted(/clustered).
+CREATE TABLE ice_tpch_many_parts
+PARTITIONED BY SPEC(truncate(1000, l_orderkey))
+STORED BY ICEBERG
+AS SELECT * FROM tpch_parquet.lineitem
+WHERE l_orderkey % 2 = 0;
+
+INSERT INTO ice_tpch_many_parts
+SELECT * FROM tpch_parquet.lineitem WHERE l_orderkey % 2 = 1;
+
+SET MEM_LIMIT=600m;
+OPTIMIZE TABLE ice_tpch_many_parts;
+SELECT count(*) FROM $DATABASE.ice_tpch_many_parts.`files`;
+---- RESULTS
+6001
+---- TYPES
+BIGINT
+====

@@ -199,7 +199,7 @@ public class OptimizeStmt extends DmlStatementBase {
 
   public DataSink createDataSink() {
     TableSink tableSink = TableSink.create(table_, TableSink.Op.INSERT,
-        partitionKeyExprs_, resultExprs_, new ArrayList<>(), false, false,
+        partitionKeyExprs_, resultExprs_, new ArrayList<>(), false, true,
         new Pair<>(sortColumns_, sortingOrder_), -1, null,
         maxTableSinks_);
     return tableSink;
