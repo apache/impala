@@ -31,7 +31,7 @@
 # Ref: https://gerrit-review.googlesource.com/Documentation/cmd-review.html
 #
 # Dependencies:
-# ssh, pip, virtualenv
+# ssh, pip, venv
 #
 # TODO: generalise to other warnings
 # * clang-tidy
@@ -44,14 +44,14 @@ from os import environ
 import os.path
 import re
 from subprocess import check_call, check_output, DEVNULL, Popen, PIPE
-import virtualenv
+import venv
 
-FLAKE8_VERSION = "3.9.2"
+FLAKE8_VERSION = "7.1.1"
 FLAKE8_DIFF_VERSION = "0.2.2"
 
 VENV_PATH = "gerrit_critic_venv"
 VENV_BIN = os.path.join(VENV_PATH, "bin")
-PIP_PATH = os.path.join(VENV_BIN, "pip")
+PIP_PATH = os.path.join(VENV_BIN, "pip3")
 FLAKE8_DIFF_PATH = os.path.join(VENV_BIN, "flake8-diff")
 
 # Limit on length of lines in source files.
@@ -123,8 +123,9 @@ THRIFT_WARNING_SUFFIX = (" might break the compatibility between impalad and "
 
 def setup_virtualenv():
   """Set up virtualenv with flake8-diff."""
-  virtualenv.cli_run([VENV_PATH])
+  venv.create(VENV_PATH, with_pip=True, system_site_packages=True)
   check_call([PIP_PATH, "install",
+              "wheel",
               "flake8=={0}".format(FLAKE8_VERSION),
               "flake8-diff=={0}".format(FLAKE8_DIFF_VERSION)])
 
@@ -150,7 +151,7 @@ def get_flake8_comments(base_revision, revision):
   flake8_diff_proc = Popen(
       [FLAKE8_DIFF_PATH, "--standard-flake8-output", "--color", "off", base_revision,
        revision],
-      stdin=PIPE, stdout=PIPE, stderr=PIPE, env=flake8_env)
+      stdin=PIPE, stdout=PIPE, stderr=PIPE, env=flake8_env, universal_newlines=True)
   stdout, stderr = flake8_diff_proc.communicate()
   # Ignore the return code since it will be non-zero if any violations are found. We want
   # to continue in that case. Instead check stderr for any errors.
@@ -406,7 +407,8 @@ def post_review_to_gerrit(review_input):
   proc = Popen(["ssh", "-p", environ["GERRIT_PORT"],
                 "impala-public-jenkins@" + environ["GERRIT_HOST"], "gerrit", "review",
                 "--project", environ["GERRIT_PROJECT"], "--json",
-                "{0},{1}".format(change_num, patch_num)], stdin=PIPE)
+                "{0},{1}".format(change_num, patch_num)], stdin=PIPE,
+                universal_newlines=True)
   proc.communicate(json.dumps(review_input))
   if proc.returncode != 0:
     raise Exception("Error posting review to gerrit.")
@@ -445,7 +447,7 @@ if __name__ == "__main__":
     review_input["message"] = (
         "gerrit-auto-critic failed. You can reproduce it locally using command:\n\n"
         "  python3 bin/jenkins/critique-gerrit-review.py --dryrun\n\n"
-        "To run it, you might need a virtual env with virtualenv installed.")
+        "To run it, you might need a virtual env with Python3's venv installed.")
   print(json.dumps(review_input, indent=True))
   if not args.dryrun:
     post_review_to_gerrit(review_input)

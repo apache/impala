@@ -659,7 +659,7 @@ class TestKuduPartitioning(KuduTestSuite):
     # the number of rows.
     res = []
     kudu_table_sink = "KuduTableSink"
-    total_num_rows_re = re.compile("TotalNumRows:.*\(([0-9]+)\)")
+    total_num_rows_re = re.compile(r"TotalNumRows:.*\(([0-9]+)\)")
 
     within_kudu_table_sink_section = False
     for line in profile.splitlines():
