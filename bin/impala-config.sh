@@ -237,6 +237,7 @@ export IMPALA_THRIFT_PY_VERSION=0.16.0-p7
 unset IMPALA_THRIFT_PY_URL
 
 # Find system python versions for testing
+# TODO : Need to change folllowing python to ambari-python-wrap ?
 export IMPALA_SYSTEM_PYTHON2="${IMPALA_SYSTEM_PYTHON2_OVERRIDE-$(command -v python2)}"
 export IMPALA_SYSTEM_PYTHON3="${IMPALA_SYSTEM_PYTHON3_OVERRIDE-$(command -v python3)}"
 
