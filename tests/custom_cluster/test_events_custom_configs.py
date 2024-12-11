@@ -1323,8 +1323,8 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
         "insert into {} partition(p) values (0,0),(1,1),(2,2)".format(test_tbl))
     self.client.execute("select * from {}".format(test_tbl))
     EventProcessorUtils.wait_for_event_processing(self)
-    log_regex = r"Invalidated objects in cache: \[partition %s:p=\d \(id=%%d\)\]" \
-        % test_tbl
+    log_regex = r"Invalidated objects in cache: \[partition {}:p={}"\
+      .format(test_tbl, '%d')
     self.assert_impalad_log_contains('INFO', log_regex % 0, expected_count=1,
         timeout_s=20)
     self.assert_impalad_log_contains('INFO', log_regex % 1, expected_count=1,
