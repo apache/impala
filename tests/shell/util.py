@@ -371,7 +371,7 @@ def get_dev_impala_shell_executable():
     return os.path.join(IMPALA_HOME, "shell/build",
         "impala-shell-" + IMPALA_LOCAL_BUILD_VERSION, "impala-shell"), True
 
-
+# TODO: ambari-python-wrap testing
 def create_impala_shell_executable_dimension(dev_only=False):
   _, include_pypi = get_dev_impala_shell_executable()
   dimensions = []

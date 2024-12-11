@@ -30,9 +30,8 @@ PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/bin
 PYTHONPATH=${PYTHONPATH}:${SHELL_HOME}/gen-py
 
 THRIFT_PY_ROOT="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT_PY_VERSION}"
-# TODO : Need to change folllowing python to ambari-python-wrap ?
 export LD_LIBRARY_PATH=":$(PYTHONPATH=${PYTHONPATH} \
-  python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
+  ambari-python-wrap "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
   --print-ld-library-path)"
 
 IMPALA_PY_DIR="$(dirname "$0")/../infra/python"
@@ -48,8 +47,7 @@ for PYTHON_LIB_DIR in ${THRIFT_PY_ROOT}/python/lib{64,}; do
 done
 
 # Note that this uses the external system python executable
-# TODO : Need to change folllowing python to ambari-python-wrap ?
-PYTHONPATH=${PYTHONPATH} python "${IMPALA_PY_DIR}/bootstrap_virtualenv.py"
+PYTHONPATH=${PYTHONPATH} ambari-python-wrap "${IMPALA_PY_DIR}/bootstrap_virtualenv.py"
 
 # Enable remote debugging if port was specified via environment variable
 if [[ ${IMPALA_SHELL_DEBUG_PORT:-0} -ne 0 ]]; then

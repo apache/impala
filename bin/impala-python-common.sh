@@ -23,11 +23,9 @@ set -euo pipefail
 setup_report_build_error
 
 . $IMPALA_HOME/bin/set-pythonpath.sh
-# TODO : Need to change folllowing python to ambari-python-wrap ?
-export LD_LIBRARY_PATH="$(python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
+export LD_LIBRARY_PATH="$(ambari-python-wrap "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
   --print-ld-library-path)"
 
 PY_DIR="$(dirname "$0")/../infra/python"
 PY_ENV_DIR="${PY_DIR}/env-gcc${IMPALA_GCC_VERSION}"
-# TODO : Need to change folllowing python to ambari-python-wrap ?
-python "$PY_DIR/bootstrap_virtualenv.py"
+ambari-python-wrap "$PY_DIR/bootstrap_virtualenv.py"

@@ -237,10 +237,37 @@ export IMPALA_THRIFT_PY_VERSION=0.16.0-p7
 unset IMPALA_THRIFT_PY_URL
 
 # Find system python versions for testing
-# TODO : Need to change folllowing python to ambari-python-wrap ?
-export IMPALA_SYSTEM_PYTHON2="${IMPALA_SYSTEM_PYTHON2_OVERRIDE-$(command -v python2)}"
-export IMPALA_SYSTEM_PYTHON3="${IMPALA_SYSTEM_PYTHON3_OVERRIDE-$(command -v python3)}"
 
+if command -v python2 >/dev/null || [ -n "$IMPALA_SYSTEM_PYTHON2_OVERRIDE" ]; then
+  export IMPALA_SYSTEM_PYTHON2="${IMPALA_SYSTEM_PYTHON2_OVERRIDE-$(command -v python2)}"
+fi
+
+if command -v ambari-python-wrap >/dev/null || [ -n "$IMPALA_SYSTEM_PYTHON3_OVERRIDE" ]; then
+    # Extract major python version from ambari-python-wrap
+    PYTHON_VER=$($(command -v ambari-python-wrap) --version 2>&1 | tr -s '[:blank:]' . | cut -d '.' -f2)
+
+    if printf "%s" "$PYTHON_VER" | grep "^[23]$" >/dev/null && [ "$PYTHON_VER" -eq 3 ] 2>/dev/null && [ -z "$IMPALA_SYSTEM_PYTHON3_OVERRIDE" ]; then
+        mkdir -p /tmp/acceldata-python/
+        \rm -f /tmp/acceldata-python/python3
+        # CMakeLists.txt expects the binary to match exactly python3, so we create a symlink
+        ln -sv "$(command -v ambari-python-wrap)" /tmp/acceldata-python/python3
+        export IMPALA_SYSTEM_PYTHON3="/tmp/acceldata-python/python3"
+    else 
+        export IMPALA_SYSTEM_PYTHON3="$IMPALA_SYSTEM_PYTHON3_OVERRIDE"
+    fi
+fi
+
+if [ -z "$IMPALA_SYSTEM_PYTHON2" ] && [ -z "$IMPALA_SYSTEM_PYTHON3" ]; then
+    printf "Python 2 was not found in PATH\n" >&2
+    printf "ambari-python-wrap not found in PATH.\n" >&2
+    printf "Neither IMPALA_SYSTEM_PYTHON2_OVERRIDE or IMPALA_SYSTEM_PYTHON3_OVERRIDE have been set\n" >&2
+    printf "At least one of these must be true to continue bulding impala\n" >&2
+    exit 1
+elif [ -z "$IMPALA_SYSTEM_PYTHON3" ]; then
+    printf "Skipping configuration for python 3\n"
+elif [ -z "$IMPALA_SYSTEM_PYTHON2" ]; then
+    printf "Skipping configuration for python 2\n"
+fi
 # Additional Python versions to use when building the impala-shell prebuilt tarball
 # via make_shell_tarball.sh. That tarball includes precompiled packages, so it can be
 # used without additional system dependencies needed for pip install.
