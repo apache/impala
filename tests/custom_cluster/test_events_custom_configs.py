@@ -1469,6 +1469,29 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     assert '1\t00%3A00%3A00' in res.data
     assert '2\t00%253A00%253A00' in res.data
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal",
+    disable_log_buffering=True, cluster_size=1)
+  def test_bulk_alter_partitions(self, unique_database):
+    test_tbl = unique_database + ".bulk_alter_partitions"
+    self.client.execute("create table {} (id int) partitioned by (p int)"
+        .format(test_tbl))
+    self.run_stmt_in_hive("SET hive.exec.dynamic.partition.mode=nonstrict; "
+        "insert into {} partition(p) values (0,0),(1,1),(2,2)".format(test_tbl))
+    self.client.execute("select * from {}".format(test_tbl))
+    self.client.execute("compute incremental stats {}".format(test_tbl))
+    self.client.execute("drop incremental stats {} partition(p>=0)".format(test_tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    log_regex = r"HMS alterPartitions done on {}/{} partitions of table {}" \
+        .format(3, 3, test_tbl)
+    # we see the above twice, once for compute stats and second for drop stats
+    self.assert_catalogd_log_contains('INFO', log_regex, expected_count=2, timeout_s=20)
+    self.client.execute("alter table {} partition(p>=0) set cached in 'testPool'"
+        .format(test_tbl))
+    self.assert_catalogd_log_contains('INFO', log_regex, expected_count=3, timeout_s=20)
+
 
 @SkipIfFS.hive
 class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):

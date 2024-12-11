@@ -2741,14 +2741,17 @@ public class CatalogOpExecutor {
           return;
         }
 
+        // List of partitions that were modified as part of this operation.
+        List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
         for (HdfsPartition partition : partitions) {
           if (partition.getPartitionStatsCompressed() != null) {
             HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
             partBuilder.dropPartitionStats();
-            applyAlterPartition(table, partBuilder, catalogTimeline);
-            hdfsTbl.updatePartition(partBuilder);
+            modifiedParts.add(partBuilder);
           }
         }
+        bulkAlterPartitions(table, modifiedParts, null, UpdatePartitionMethod.IN_PLACE,
+            catalogTimeline);
       }
       loadTableMetadata(table, modification.newVersionNumber(),
           /*reloadFileMetadata=*/false,
@@ -6155,6 +6158,8 @@ public class CatalogOpExecutor {
         // partitions.
         Collection<? extends FeFsPartition> parts =
             FeCatalogUtils.loadAllPartitions(hdfsTable);
+        // List of partitions that were modified as part of this operation.
+        List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
         for (FeFsPartition fePartition: parts) {
           // TODO(todd): avoid downcast
           HdfsPartition partition = (HdfsPartition) fePartition;
@@ -6185,14 +6190,11 @@ public class CatalogOpExecutor {
               }
             }
 
-            // Update the partition metadata.
-            try {
-              applyAlterPartition(tbl, partBuilder, catalogTimeline);
-            } finally {
-              ((HdfsTable) tbl).markDirtyPartition(partBuilder);
-            }
+            modifiedParts.add(partBuilder);
           }
         }
+        bulkAlterPartitions(tbl, modifiedParts, null, UpdatePartitionMethod.MARK_DIRTY,
+            catalogTimeline);
       } else {
         loadFileMetadata = true;
       }
@@ -6211,19 +6213,19 @@ public class CatalogOpExecutor {
       if (tbl.getNumClusteringCols() > 0) {
         Collection<? extends FeFsPartition> parts =
             FeCatalogUtils.loadAllPartitions(hdfsTable);
+        // List of partitions that were modified as part of this operation.
+        List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
         for (FeFsPartition fePartition: parts) {
           // TODO(todd): avoid downcast
           HdfsPartition partition = (HdfsPartition) fePartition;
           if (partition.isMarkedCached()) {
             HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
             HdfsCachingUtil.removePartitionCacheDirective(partBuilder);
-            try {
-              applyAlterPartition(tbl, partBuilder, catalogTimeline);
-            } finally {
-              ((HdfsTable) tbl).markDirtyPartition(partBuilder);
-            }
+            modifiedParts.add(partBuilder);
           }
         }
+        bulkAlterPartitions(tbl, modifiedParts, null, UpdatePartitionMethod.MARK_DIRTY,
+            catalogTimeline);
       } else {
         loadFileMetadata = true;
       }
