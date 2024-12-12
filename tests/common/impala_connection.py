@@ -22,6 +22,7 @@
 from __future__ import absolute_import, division, print_function
 import abc
 from future.utils import with_metaclass
+import getpass
 import logging
 import re
 import time
@@ -29,6 +30,7 @@ import time
 from beeswaxd.BeeswaxService import QueryState
 import impala.dbapi as impyla
 import impala.error as impyla_error
+import impala.hiveserver2 as hs2
 import tests.common
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import (
@@ -958,3 +960,128 @@ def create_connection(host_port, use_kerberos=False, protocol=BEESWAX,
 def create_ldap_connection(host_port, user, password, use_ssl=False):
   return BeeswaxConnection(host_port=host_port, user=user, password=password,
                            use_ssl=use_ssl)
+
+
+class MinimalHS2OperationHandle(OperationHandle):
+  def __str__(self):
+    return op_handle_to_query_id(self.get_handle())
+
+
+class MinimalHS2Connection(ImpalaConnection):
+  """
+  Connection to Impala using the HiveServer2 (HS2) protocol.
+
+  This class does not use Impyla's DB-API cursors. Instead, it is built directly on the
+  HS2 RPC layer to support manipulating one operation from multiple connections
+  concurrently.
+
+  This class is designed to be minimalistic to facilitate testing. Each method is mapped
+  to only one Thrift RPC.
+  """
+  def __init__(self, host_port, user=None):
+    self.__host_port = host_port
+    host, port = host_port.split(":")
+    self.__conn = hs2.connect(host, port, auth_mechanism='NOSASL')
+    self.__user = user if user is not None else getpass.getuser()
+    self.__session = self.__conn.open_session(self.__user)
+
+  def connect(self):
+    pass  # Do nothing
+
+  def close(self):
+    LOG.info("-- closing connection to: %s" % self.__host_port)
+    try:
+      self.__session.close()
+    finally:
+      self.__conn.close()
+
+  def execute(self, sql_stmt):  # noqa: U100
+    raise NotImplementedError()
+
+  def execute_async(self, sql_stmt):
+    hs2_operation = self.__session.execute(sql_stmt)
+    operation_handle = MinimalHS2OperationHandle(hs2_operation.handle, sql_stmt)
+    LOG.info("Started query {0}".format(operation_handle))
+    return operation_handle
+
+  def __get_operation(self, operation_handle):
+    return hs2.Operation(self.__session, operation_handle.get_handle())
+
+  def fetch(self, sql_stmt, operation_handle, max_rows=-1):  # noqa: U100
+    """
+    Fetch the results of the query. It will block the current connection if the results
+    are not available yet.
+    """
+    LOG.info("-- fetching results from: {0}".format(operation_handle))
+    return self.__get_operation(operation_handle).fetch(max_rows=max_rows)
+
+  def fetch_error(self, operation_handle):
+    """
+    Fetch the error of the query.
+    """
+    try:
+      self.fetch(None, operation_handle)
+      assert False, "Failed to catch the error of the query."
+    except Exception as exc:
+      return exc
+
+  def get_state(self, operation_handle):
+    return self.__get_operation(operation_handle).get_status()
+
+  def wait_for(self, operation_handle, timeout_s=60):
+    """
+    Wait until the query is in a terminal state.
+    """
+    start_time = time.time()
+    while True:
+      operation_state = self.get_state(operation_handle)
+      if operation_state not in ("PENDING_STATE", "INITIALIZED_STATE", "RUNNING_STATE"):
+        return operation_state
+      if time.time() - start_time > timeout_s:
+        raise Exception("Timed out waiting for the query")
+      time.sleep(0.1)
+
+  def cancel(self, operation_handle):
+    LOG.info("-- canceling operation: {0}".format(operation_handle))
+    return self.__get_operation(operation_handle).cancel()
+
+  def close_query(self, operation_handle):
+    LOG.info("-- closing query for operation handle: {0}".format(operation_handle))
+    return self.__get_operation(operation_handle).close()
+
+  def state_is_finished(self, operation_handle):  # noqa: U100
+    raise NotImplementedError()
+
+  def get_log(self, operation_handle):
+    return self.__get_operation(operation_handle).get_log()
+
+  def set_configuration_option(self, name, value):  # noqa: U100
+    raise NotImplementedError()
+
+  def clear_configuration(self):
+    raise NotImplementedError()
+
+  def get_default_configuration(self):
+    raise NotImplementedError()
+
+  def get_host_port(self):
+    return self.__host_port
+
+  def get_test_protocol(self):
+    return HS2
+
+  def handle_id(self, operation_handle):  # noqa: U100
+    return str(operation_handle)
+
+  def get_admission_result(self, operation_handle):  # noqa: U100
+    raise NotImplementedError()
+
+  def get_impala_exec_state(self, operation_handle):  # noqa: U100
+    raise NotImplementedError()
+
+  def get_runtime_profile(self, operation_handle,  # noqa: U100
+                          profile_format=TRuntimeProfileFormat.STRING):  # noqa: U100
+    raise NotImplementedError()
+
+  def wait_for_admission_control(self, operation_handle, timeout_s=60):  # noqa: U100
+    raise NotImplementedError()

@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <chrono>
+
 #include "exprs/utility-functions.h"
 #include <gutil/strings/substitute.h>
 #include "common/compiler-util.h"
@@ -33,6 +35,9 @@
 #include "common/names.h"
 
 using namespace strings;
+using namespace std;
+
+const chrono::milliseconds SLEEP_UNINTERRUPTIBLE_INTERVAL_MS{200};
 
 namespace impala {
 
@@ -164,9 +169,21 @@ StringVal UtilityFunctions::Uuid(FunctionContext* ctx) {
   return GenUuid(ctx);
 }
 
-BooleanVal UtilityFunctions::Sleep(FunctionContext* ctx, const IntVal& milliseconds ) {
+BooleanVal UtilityFunctions::Sleep(FunctionContext* ctx, const IntVal& milliseconds) {
   if (milliseconds.is_null) return BooleanVal::null();
-  SleepForMs(milliseconds.val);
+  for (auto remaining_sleep_duration = chrono::milliseconds(milliseconds.val);
+      remaining_sleep_duration > chrono::milliseconds(0);) {
+    if (ctx->IsQueryCancelled()) {
+      return BooleanVal(true);
+    }
+    auto start = chrono::steady_clock::now();
+    auto expected_sleep_duration =
+        min(remaining_sleep_duration, SLEEP_UNINTERRUPTIBLE_INTERVAL_MS);
+    SleepForMs(expected_sleep_duration.count());
+    auto actual_sleep_duration =
+        chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start);
+    remaining_sleep_duration -= actual_sleep_duration;
+  }
   return BooleanVal(true);
 }
 

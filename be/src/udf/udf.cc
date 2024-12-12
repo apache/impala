@@ -104,6 +104,11 @@ class RuntimeState {
     return false;
   }
 
+  bool is_cancelled() const {
+    assert(false);
+    return false;
+  }
+
   bool LogError(const std::string& error) {
     assert(false);
     return false;
@@ -321,6 +326,10 @@ FunctionContext::UniqueId FunctionContext::query_id() const {
   id.lo = impl_->state_->query_id().lo;
 #endif
   return id;
+}
+
+bool FunctionContext::IsQueryCancelled() const {
+  return impl_->state_->is_cancelled();
 }
 
 bool FunctionContext::has_error() const {

@@ -21,13 +21,16 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 import pytest
+from threading import Thread
 from time import sleep
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.common.test_dimensions import add_mandatory_exec_option
 from tests.common.test_vector import ImpalaTestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
 from tests.util.cancel_util import cancel_query_and_validate_state
 from tests.verifiers.metric_verifier import MetricVerifier
+from tests.common.impala_connection import MinimalHS2Connection
 
 # PRIMARY KEY for lineitem
 LINEITEM_PK = 'l_orderkey, l_partkey, l_suppkey, l_linenumber'
@@ -218,6 +221,30 @@ class TestCancellation(ImpalaTestSuite):
       # Plan text may be strangely formatted.
       assert k == 'Plan' or '\n\n' not in v, \
         "Profile contains repeating newlines: %s %s" % (k, v)
+
+  def test_interrupt_sleep(self):
+    query = "SELECT sleep(100000) FROM functional.alltypes;"
+    with MinimalHS2Connection(IMPALAD_HS2_HOST_PORT) as cancel_client:
+      query_handle = cancel_client.execute_async(query)
+      assert cancel_client.wait_for(query_handle) == "FINISHED_STATE"
+
+      class FetchInAnotherConnection:
+        def __call__(self):
+          with MinimalHS2Connection(IMPALAD_HS2_HOST_PORT) as fetch_client:
+            self.error = fetch_client.fetch_error(query_handle)
+
+      fetch_in_another_connection = FetchInAnotherConnection()
+      fetch_thread = Thread(target=fetch_in_another_connection)
+      fetch_thread.start()
+      sleep(1)  # Wait for another thread to start fetching.
+      cancel_client.cancel(query_handle)
+      # Timeout for join() needs to be longer than SLEEP_UNINTERRUPTIBLE_INTERVAL_MS.
+      fetch_thread.join(3)
+      assert not fetch_thread.is_alive(), "Failed to terminate the fetching thread."
+      assert "Cancelled" in str(fetch_in_another_connection.error)
+      assert "Invalid or unknown query handle" in str(
+          cancel_client.fetch_error(query_handle))
+
 
   def teardown_method(self, method):
     # For some reason it takes a little while for the query to get completely torn down
