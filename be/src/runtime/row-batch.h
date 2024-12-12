@@ -366,8 +366,7 @@ class RowBatch {
   /// less than the deserialized size.
   static int64_t GetSerializedSize(const OutboundRowBatch& batch);
   static int64_t GetDeserializedSize(const OutboundRowBatch& batch);
-  static int64_t GetDeserializedSize(const RowBatchHeaderPB& header,
-      const kudu::Slice& tuple_offsets);
+  static int64_t GetDeserializedSize(const RowBatchHeaderPB& header);
 
   int ALWAYS_INLINE num_rows() const { return num_rows_; }
   int ALWAYS_INLINE capacity() const { return capacity_; }

@@ -46,7 +46,7 @@ class SpinLock {
   }
 
   /// Verify that the lock is held.
-  void DCheckLocked() { DCHECK(l_.IsHeld()); }
+  void DCheckLocked() const { DCHECK(l_.IsHeld()); }
 
  private:
   /// The underlying SpinLock from gutil.

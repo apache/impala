@@ -177,9 +177,11 @@ struct TransmitDataCtx {
   /// has been responded to. Not owned.
   kudu::rpc::RpcContext* rpc_context;
 
+  /// Memory needed by the batch after deserialization.
+  int64_t deserialized_size;
+
   TransmitDataCtx(const TransmitDataRequestPB* request, TransmitDataResponsePB* response,
-      kudu::rpc::RpcContext* rpc_context)
-    : request(request), response(response), rpc_context(rpc_context) { }
+      kudu::rpc::RpcContext* rpc_context);
 };
 
 /// Context for an EndDataStream() RPC. This structure is constructed when the RPC is
@@ -288,6 +290,8 @@ class KrpcDataStreamMgr : public CacheLineAligned {
   /// Waits for maintenance thread and sender response thread pool to finish.
   ~KrpcDataStreamMgr();
 
+  int num_deserialization_threads() const { return num_deserialization_threads_; }
+
  private:
   friend class KrpcDataStreamRecvr;
   friend class DataStreamTest;
@@ -319,6 +323,9 @@ class KrpcDataStreamMgr : public CacheLineAligned {
     /// Monotonic timestamp when this task was enqueued, in nanoseconds.
     int64_t enqueue_time_ns;
   };
+
+  /// Sets the number of threads in deserialize_pool_.
+  const int num_deserialization_threads_;
 
   /// Set of threads which deserialize buffered row batches, and deliver them to their
   /// receivers. Used only if RPCs were deferred when their channel's batch queue was

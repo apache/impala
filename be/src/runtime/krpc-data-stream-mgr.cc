@@ -60,7 +60,8 @@ DEFINE_int32(datastream_sender_timeout_ms, 120000, "(Advanced) The time, in ms, 
     "elapse  before a plan fragment will time-out trying to send the initial row batch.");
 DEFINE_int32(datastream_service_num_deserialization_threads, 16,
     "Number of threads for deserializing RPC requests deferred due to the receiver "
-    "not ready or the soft limit of the receiver is reached.");
+    "not ready or the soft limit of the receiver is reached. "
+    "If 0, it will be set to number of CPU cores.");
 DEFINE_int32(datastream_service_deserialization_queue_size, 10000,
     "Number of deferred RPC requests that can be enqueued before being processed by a "
     "deserialization thread.");
@@ -69,10 +70,13 @@ using std::mutex;
 namespace impala {
 
 KrpcDataStreamMgr::KrpcDataStreamMgr(MetricGroup* metrics)
-  : deserialize_pool_("data-stream-mgr", "deserialize",
-      FLAGS_datastream_service_num_deserialization_threads,
-      FLAGS_datastream_service_deserialization_queue_size,
-      boost::bind(&KrpcDataStreamMgr::DeserializeThreadFn, this, _1, _2)) {
+  : num_deserialization_threads_(
+    FLAGS_datastream_service_num_deserialization_threads > 0
+        ? FLAGS_datastream_service_num_deserialization_threads : CpuInfo::num_cores()),
+    deserialize_pool_("data-stream-mgr", "deserialize",
+        num_deserialization_threads_,
+        FLAGS_datastream_service_deserialization_queue_size,
+        boost::bind(&KrpcDataStreamMgr::DeserializeThreadFn, this, _1, _2)) {
   MetricGroup* dsm_metrics = metrics->GetOrCreateChildGroup("datastream-manager");
   num_senders_waiting_ =
       dsm_metrics->AddGauge("senders-blocked-on-recvr-creation", 0L);
@@ -472,5 +476,12 @@ KrpcDataStreamMgr::~KrpcDataStreamMgr() {
   LOG(INFO) << "Waiting for deserialization thread pool...";
   deserialize_pool_.Join();
 }
+
+TransmitDataCtx::TransmitDataCtx(
+    const TransmitDataRequestPB* request, TransmitDataResponsePB* response,
+    kudu::rpc::RpcContext* rpc_context)
+  : request(request), response(response), rpc_context(rpc_context),
+    deserialized_size(RowBatch::GetDeserializedSize(request->row_batch_header())) { }
+
 
 } // namespace impala

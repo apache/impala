@@ -393,11 +393,9 @@ void RowBatch::SetMemTracker(MemTracker* new_tracker) {
   mem_tracker_ = new_tracker;
 }
 
-int64_t RowBatch::GetDeserializedSize(const RowBatchHeaderPB& header,
-    const kudu::Slice& tuple_offsets) {
-  DCHECK_EQ(tuple_offsets.size() % sizeof(int32_t), 0);
-  return header.uncompressed_size() +
-      (tuple_offsets.size() / sizeof(int32_t)) * sizeof(Tuple*);
+int64_t RowBatch::GetDeserializedSize(const RowBatchHeaderPB& header) {
+  return header.uncompressed_size()
+      + header.num_rows() * header.num_tuples_per_row() * sizeof(Tuple*);
 }
 
 int64_t RowBatch::GetDeserializedSize(const OutboundRowBatch& batch) {
