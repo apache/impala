@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<allocations>
+  <queue name="root">
+    <groupQueryLimit>
+      <group>support</group>
+      <totalCount>6</totalCount>
+    </groupQueryLimit>
+    <userQueryLimit>
+      <user>howard</user>
+      <totalCount>4</totalCount>
+    </userQueryLimit>
+    <userQueryLimit>
+      <user>*</user>
+      <totalCount>8</totalCount>
+    </userQueryLimit>
+
+    <queue name="group-set-small">
+      <userQueryLimit>
+        <user>howard</user>
+        <totalCount>100</totalCount>
+      </userQueryLimit>
+      <userQueryLimit>
+        <user>*</user>
+        <totalCount>12</totalCount>
+      </userQueryLimit>
+      <groupQueryLimit>
+        <group>support</group>
+        <totalCount>10</totalCount>
+      </groupQueryLimit>
+    </queue>
+  </queue>
+</allocations>

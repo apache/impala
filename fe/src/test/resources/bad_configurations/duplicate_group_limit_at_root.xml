@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<allocations>
+    <queue name="root">
+        <groupQueryLimit>
+            <group>it</group>
+            <totalCount>2</totalCount>
+        </groupQueryLimit>
+        <groupQueryLimit>
+            <group>it</group>
+            <totalCount>3</totalCount>
+        </groupQueryLimit>
+    </queue>
+</allocations>

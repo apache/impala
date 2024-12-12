@@ -26,12 +26,16 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.commons.logging.impl.Log4JLogger;
+import org.apache.log4j.AppenderSkeleton;
+import org.apache.log4j.spi.LoggingEvent;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -47,7 +51,6 @@ import static org.apache.impala.yarn.server.resourcemanager.scheduler.fair.
     AllocationFileLoaderService.addQueryLimits;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.StringUtils;
 
 import org.apache.impala.yarn.server.resourcemanager.scheduler.fair.AllocationFileLoaderService;
 
@@ -120,12 +123,12 @@ public class TestRequestPoolService {
    */
   private void createPoolService(String allocationFile, String llamaConfFile)
       throws Exception {
-    allocationConfFile_ = tempFolder.newFile("fair-scheduler-temp-file.xml");
+    allocationConfFile_ = tempFolder.newFile();
     Files.copy(getClasspathFile(allocationFile), allocationConfFile_);
 
     String llamaConfPath = null;
     if (llamaConfFile != null) {
-      llamaConfFile_ = tempFolder.newFile("llama-conf-temp-file.xml");
+      llamaConfFile_ = tempFolder.newFile();
       Files.copy(getClasspathFile(llamaConfFile), llamaConfFile_);
       llamaConfPath = llamaConfFile_.getAbsolutePath();
     }
@@ -162,7 +165,7 @@ public class TestRequestPoolService {
 
   @After
   public void cleanUp() throws Exception {
-    if (poolService_ != null) poolService_.stop();
+    if (poolService_ != null && poolService_.isRunning()) poolService_.stop();
   }
 
   /**
@@ -219,6 +222,108 @@ public class TestRequestPoolService {
     checkPoolAcls("root.queueA", asList("userA", "userB", "userZ"), EMPTY_LIST);
     checkPoolAcls("root.queueB", asList("userB", "root"), asList("userA", "userZ"));
     checkPoolAcls("root.queueD", asList("userB", "userA"), asList("userZ"));
+  }
+
+  /**
+   * @return true if any string in the list contains the given substring.
+   */
+  private static boolean containsSubstring(List<String> list, String substring) {
+    for (String str : list) {
+      if (str.contains(substring)) { return true; }
+    }
+    return false;
+  }
+
+  /**
+   * Test that the correct exceptions that are thrown when the fair-scheduler
+   * configuration file contains errors.
+   */
+  @Test
+  public void testBadConfiguration() {
+    List<String> bad_configs = Arrays.asList(
+        "duplicate_user_limit_at_leaf.xml",
+        "duplicate_user_limit_at_root.xml",
+        "duplicate_group_limit_at_leaf.xml",
+        "duplicate_group_limit_at_root.xml"
+    );
+    // The expected errors from the config files in bad_configs, above.
+    List<String> expected_errors = Arrays.asList(
+        "Duplicate entry for user 'alice' in pool 'root.group-set-small' has multiple "
+            + "values 4 and 5",
+        "Duplicate entry for user 'alice' in pool 'root' has multiple values 4 and 5",
+        "Duplicate entry for group 'it' in pool 'root.group-set-small' has multiple "
+            + "values 2 and 3",
+        "Duplicate entry for group 'it' in pool 'root' has multiple values 2 and 3");
+    for (int i = 0; i < bad_configs.size(); i++) {
+      String config = bad_configs.get(i);
+      String expected_error = expected_errors.get(i);
+      try {
+        createPoolService("bad_configurations/" + config, LLAMA_CONFIG_FILE);
+        Assert.fail("should have got exception");
+      } catch (Exception e) {
+        Assert.assertTrue(e.getMessage().contains(expected_error));
+      }
+    }
+  }
+
+  /**
+   * A log appender that stores log messages, and allows them to be read.
+   */
+  private static class ReadableAppender extends AppenderSkeleton {
+    List<String> messages = new ArrayList<>();
+    @Override
+    protected void append(LoggingEvent loggingEvent) {
+      messages.add(loggingEvent.getMessage().toString());
+    }
+
+    public List<String> getMessages() { return messages; }
+
+    @Override
+    public void close() {}
+
+    @Override
+    public boolean requiresLayout() {
+      return false;
+    }
+  }
+
+  /**
+   * Test the warnings that are produced after the fair-scheduler file has been read.
+   */
+  @Test
+  public void testVerifyConfiguration() throws Exception {
+    // Capture log messages
+    Log log = LogFactory.getLog(AllocationFileLoaderService.class.getName());
+    Log4JLogger log4JLogger = (Log4JLogger) log;
+    ReadableAppender logAppender = new ReadableAppender();
+    log4JLogger.getLogger().addAppender(logAppender);
+
+    try {
+      List<String> expected_messages = Arrays.asList(
+          "Completed loading allocation file",
+          "Potential misconfiguration in queue 'root.group-set-small': the user limit " +
+              "for 'howard' of 100 is greater than the root limit 4 and so will have " +
+              "no effect",
+          "Potential misconfiguration in queue 'root.group-set-small': the user limit " +
+              "for '*' of 12 is greater than the root limit 8 and so will have no effect",
+          "Potential misconfiguration in queue 'root.group-set-small': the group " +
+              "limit for 'support' of 10 is greater than the root limit 6 and so will " +
+              "have no effect",
+          "Potential misconfiguration in queue 'root.group-set-small': no " +
+              "aclSubmitApps permissions were found, this will prevent query " +
+              "submission on this queue");
+
+      createPoolService(
+          "bad_configurations/warnings-fair-scheduler-test.xml", LLAMA_CONFIG_FILE);
+
+      List<String> messages = logAppender.getMessages();
+
+      // Check for expected warnings
+      for (String expected_warning : expected_messages) {
+        Assert.assertTrue("missing message: " + expected_warning + " in " + messages,
+            containsSubstring(messages, expected_warning));
+      }
+    } finally { log4JLogger.getLogger().removeAppender(logAppender); }
   }
 
   /**
@@ -496,7 +601,6 @@ public class TestRequestPoolService {
     Map<String, Integer> parsed3 = doQueryLimitParsing(xmlString3, "group");
     Assert.assertEquals(expected3, parsed3);
   }
-
 
   /**
    * Unit test for doQueryLimitParsing() error cases.

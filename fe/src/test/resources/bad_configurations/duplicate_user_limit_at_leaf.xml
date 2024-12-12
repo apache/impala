@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<allocations>
+    <queue name="root">
+        <queue name="group-set-small">
+            <userQueryLimit>
+                <user>alice</user>
+                <totalCount>4</totalCount>
+            </userQueryLimit>
+            <userQueryLimit>
+                <user>alice</user>
+                <totalCount>5</totalCount>
+            </userQueryLimit>
+        </queue>
+    </queue>
+</allocations>
