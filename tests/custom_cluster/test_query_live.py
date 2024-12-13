@@ -24,6 +24,7 @@ from getpass import getuser
 from signal import SIGRTMIN
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import DEFAULT_KRPC_PORT
+from tests.util.retry import retry
 from tests.util.workload_management import assert_query
 from time import sleep
 
@@ -34,8 +35,14 @@ class TestQueryLive(CustomClusterTestSuite):
   def setup_method(self, method):
     super(TestQueryLive, self).setup_method(method)
     self.wait_for_wm_init_complete()
-    # Wait few seconds until sys.impala_query_live is queryable.
-    self.wait_for_table_to_appear('sys', 'impala_query_live', 30)
+
+    # Wait until sys.impala_query_live is available in the coordinator's catalog cache.
+    def table_exists(last_iteration):
+      catalog_objs = self.cluster.get_first_impalad() \
+          .service.read_debug_webpage("catalog?json")
+      return "impala_query_live" in catalog_objs
+
+    assert retry(func=table_exists, max_attempts=5, sleep_time_s=3, backoff=1)
 
   def assert_describe_extended(self):
     describe_ext_result = self.execute_query('describe extended sys.impala_query_live')
