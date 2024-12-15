@@ -38,6 +38,7 @@
 #include "thirdparty/datasketches/MurmurHash3.h"
 #include "util/debug-util.h"
 #include "util/parse-util.h"
+#include "util/time.h"
 
 DECLARE_int64(min_buffer_size);
 
@@ -54,6 +55,10 @@ using namespace strings;
 DEFINE_bool_hidden(tuple_cache_ignore_query_options, false,
     "If true, don't compute TQueryOptionsHash for tuple caching to allow testing tuple "
     "caching failure modes.");
+
+DEFINE_bool_hidden(tuple_cache_query_options_random_seed, false,
+    "Inject randomness into the TQueryOptionsHash to force zero hits. This is for "
+    "testing only.");
 
 DEFINE_string_hidden(tuple_cache_exempt_query_options, "",
     "A comma-separated list of additional query options to exclude from the tuple cache "
@@ -1511,7 +1516,13 @@ TQueryOptionsHash impala::QueryOptionsResultHash(const TQueryOptions& query_opti
     exempt = Split(FLAGS_tuple_cache_exempt_query_options, ",", SkipEmpty());
   }
 
-  HashState hash{QUERY_OPTION_HASH_SEED, QUERY_OPTION_HASH_SEED};
+  uint64_t seed = QUERY_OPTION_HASH_SEED;
+  // To allow testing scenarios with zero hits, the random seed flags incorporates the
+  // current time into the query option hash.
+  if (FLAGS_tuple_cache_query_options_random_seed) {
+    seed = static_cast<uint64_t>(MonotonicNanos());
+  }
+  HashState hash{seed, seed};
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL) \
   if (query_options.__isset.NAME && exempt.count(#NAME) == 0) \
     HashQueryOptionValue(query_options.NAME, hash);

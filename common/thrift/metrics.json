@@ -120,6 +120,46 @@
     "key": "impala.tuple-cache.halted"
   },
   {
+    "description": "The total number of Tuple Cache that halted writing due to backpressure",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Tuple Cache Halted Writing Due to Backpressure",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.tuple-cache.backpressure-halted"
+  },
+  {
+    "description": "The total number of Tuple Cache syncs to disk that failed",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Tuple Cache Failed Syncs",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.tuple-cache.failed-syncs"
+  },
+  {
+    "description": "The total number of Tuple Cache syncs to disk dropped due to backpressure",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Tuple Cache Dropped Syncs",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.tuple-cache.dropped-syncs"
+  },
+  {
+    "description": "The total outstanding bytes of Tuple Cache Writes",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Outstanding Tuple Cache Writes total bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala.tuple-cache.outstanding-writes-bytes"
+  },
+  {
     "description": "The number of in-use Tuple Cache Entries",
     "contexts": [
       "IMPALAD"

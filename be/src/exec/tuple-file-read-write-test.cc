@@ -246,7 +246,13 @@ TEST_F(TupleFileReadWriteTest, TestExceedMaxFileSize) {
   // Limit the file to 20 bytes
   size_t max_size = 20;
 
-  TupleFileWriter writer(path, tracker(), profile(), max_size);
+  TupleFileWriter writer(path, tracker(), profile(),
+     [max_size] (size_t requested_size) {
+       if (requested_size > max_size) {
+         return Status("exceed the maximum file size");
+       }
+       return Status::OK();
+     });
 
   Status status = writer.Open(runtime_state());
   ASSERT_OK(status);
@@ -279,7 +285,13 @@ TEST_F(TupleFileReadWriteTest, TestExactMaxFileSize) {
   // Now, run the same thing with the max size set to the number of bytes written.
   string path2 = Path("exact-max-size-file");
   filesystem::remove(path2);
-  TupleFileWriter limited_writer(path2, tracker(), profile(), max_size);
+  TupleFileWriter limited_writer(path2, tracker(), profile(),
+      [max_size] (size_t requested_size) {
+        if (requested_size > max_size) {
+          return Status("exceed the maximum file size");
+        }
+        return Status::OK();
+      });
 
   status = limited_writer.Open(runtime_state());
   ASSERT_OK(status);

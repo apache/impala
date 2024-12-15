@@ -19,6 +19,7 @@
 
 #include <boost/filesystem.hpp>
 
+#include "common/constant-strings.h"
 #include "common/logging.h"
 #include "exec/tuple-file-reader.h"
 #include "exec/tuple-text-file-reader.h"
@@ -53,6 +54,20 @@ DEFINE_string(tuple_cache_eviction_policy, "LRU",
     "Either 'LRU' (default) or 'LIRS' (experimental)");
 DEFINE_string(tuple_cache_debug_dump_dir, "",
     "Directory for dumping the intermediate query result tuples for debugging purpose.");
+
+DEFINE_uint32(tuple_cache_sync_pool_size, 10,
+    "(Advanced) Size of the thread pool syncing cache files to disk asynchronously. "
+    "If set to 0, cache files are flushed sychronously.");
+DEFINE_uint32(tuple_cache_sync_pool_queue_depth, 1000,
+    "(Advanced) Maximum queue depth for the thread pool syncing cache files to disk");
+
+static const string OUTSTANDING_WRITE_LIMIT_MSG =
+  "(Advanced) Limit on the size of outstanding tuple cache writes. " +
+  Substitute(MEM_UNITS_HELP_MSG, "the process memory limit");
+DEFINE_string(tuple_cache_outstanding_write_limit, "1GB",
+    OUTSTANDING_WRITE_LIMIT_MSG.c_str());
+DEFINE_uint32(tuple_cache_outstanding_write_chunk_bytes, 128 * 1024,
+    "(Advanced) Chunk size for incrementing the outstanding tuple cache write size");
 
 // Global feature flag for tuple caching. If false, enable_tuple_cache cannot be true
 // and the coordinator cannot produce plans with TupleCacheNodes. The tuple_cache
@@ -91,31 +106,47 @@ static string ConstructTupleCacheDebugDumpPath() {
 }
 
 TupleCacheMgr::TupleCacheMgr(MetricGroup* metrics)
-  : TupleCacheMgr(FLAGS_tuple_cache, FLAGS_tuple_cache_eviction_policy, metrics, 0) {}
+  : TupleCacheMgr(FLAGS_tuple_cache, FLAGS_tuple_cache_eviction_policy, metrics,
+        /* debug_pos */ 0, FLAGS_tuple_cache_sync_pool_size,
+        FLAGS_tuple_cache_sync_pool_queue_depth,
+        FLAGS_tuple_cache_outstanding_write_limit,
+        FLAGS_tuple_cache_outstanding_write_chunk_bytes) {}
 
-TupleCacheMgr::TupleCacheMgr(string cache_config, string eviction_policy_str,
-    MetricGroup* metrics, uint8_t debug_pos)
+TupleCacheMgr::TupleCacheMgr(
+    string cache_config, string eviction_policy_str, MetricGroup* metrics,
+    uint8_t debug_pos, uint32_t sync_pool_size, uint32_t sync_pool_queue_depth,
+    string outstanding_write_limit_str, uint32_t outstanding_write_chunk_bytes)
   : cache_config_(move(cache_config)),
     eviction_policy_str_(move(eviction_policy_str)),
+    outstanding_write_limit_str_(move(outstanding_write_limit_str)),
     cache_debug_dump_dir_(ConstructTupleCacheDebugDumpPath()),
     debug_pos_(debug_pos),
+    sync_pool_size_(sync_pool_size),
+    sync_pool_queue_depth_(sync_pool_queue_depth),
+    outstanding_write_chunk_bytes_(outstanding_write_chunk_bytes),
     tuple_cache_hits_(metrics->AddCounter("impala.tuple-cache.hits", 0)),
     tuple_cache_misses_(metrics->AddCounter("impala.tuple-cache.misses", 0)),
     tuple_cache_skipped_(metrics->AddCounter("impala.tuple-cache.skipped", 0)),
     tuple_cache_halted_(metrics->AddCounter("impala.tuple-cache.halted", 0)),
+    tuple_cache_backpressure_halted_(
+        metrics->AddCounter("impala.tuple-cache.backpressure-halted", 0)),
     tuple_cache_entries_evicted_(
         metrics->AddCounter("impala.tuple-cache.entries-evicted", 0)),
+    tuple_cache_failed_sync_(metrics->AddCounter("impala.tuple-cache.failed-syncs", 0)),
+    tuple_cache_dropped_sync_(metrics->AddCounter("impala.tuple-cache.dropped-syncs", 0)),
     tuple_cache_entries_in_use_(
         metrics->AddGauge("impala.tuple-cache.entries-in-use", 0)),
     tuple_cache_entries_in_use_bytes_(
         metrics->AddGauge("impala.tuple-cache.entries-in-use-bytes", 0)),
     tuple_cache_tombstones_in_use_(
         metrics->AddGauge("impala.tuple-cache.tombstones-in-use", 0)),
+    tuple_cache_outstanding_writes_bytes_(
+        metrics->AddGauge("impala.tuple-cache.outstanding-writes-bytes", 0)),
     tuple_cache_entry_size_stats_(metrics->RegisterMetric(
         new HistogramMetric(MetricDefs::Get("impala.tuple-cache.entry-sizes"),
             STATS_MAX_TUPLE_CACHE_ENTRY_SIZE, 3))) {}
 
-Status TupleCacheMgr::Init() {
+Status TupleCacheMgr::Init(int64_t process_bytes_limit) {
   if (cache_config_.empty()) {
     LOG(INFO) << "Tuple Cache is disabled.";
     return Status::OK();
@@ -183,12 +214,36 @@ Status TupleCacheMgr::Init() {
         eviction_policy_str_));
   }
 
+  // The outstanding write limit can either be a specific value, or it can be a
+  // percentage of the process bytes limit. If the process bytes limit is zero,
+  // a percentage is not allowed.
+  outstanding_write_limit_ = ParseUtil::ParseMemSpec(outstanding_write_limit_str_,
+      &is_percent, process_bytes_limit);
+  if (outstanding_write_limit_ <= 0) {
+    CLEAN_EXIT_WITH_ERROR(
+        Substitute("Invalid tuple cache outstanding write limit configuration: $0.",
+            FLAGS_tuple_cache_outstanding_write_limit));
+  }
+
+  // Setting sync_pool_size == 0 results in synchronous flushing to disk. This is
+  // mainly used for backend tests
+  if (sync_pool_size_ > 0) {
+    sync_thread_pool_.reset(new ThreadPool<string>("tuple-cache-mgr", "sync-worker",
+        sync_pool_size_, sync_pool_queue_depth_,
+        [this] (int thread_id, const string& filename) {
+          this->SyncFileToDisk(filename);
+        }));
+    RETURN_IF_ERROR(sync_thread_pool_->Init());
+  }
+
   cache_.reset(NewCache(policy, capacity, "Tuple_Cache"));
 
   RETURN_IF_ERROR(cache_->Init());
 
   LOG(INFO) << "Tuple Cache initialized at " << cache_dir_
-            << " with capacity " << PrettyPrinter::Print(capacity, TUnit::BYTES);
+            << " with capacity " << PrettyPrinter::Print(capacity, TUnit::BYTES)
+            << " and outstanding write limit: "
+            << PrettyPrinter::Print(outstanding_write_limit_, TUnit::BYTES);
   enabled_ = true;
   return Status::OK();
 }
@@ -207,35 +262,40 @@ Status TupleCacheMgr::Init() {
 //                             again, if found return it (IsAvailableForWrite()=false),
 //                             else create a new entry (IsAvailableForWrite()=true).
 //
-//                          entry found
-// Lookup(acquire_state=true)   --->      [ ... ] returns any of the states below
+//                         entry found
+// Lookup(acquire_state=true) ---> [ ... ] returns any of the states below
 //          |
 //          | entry absent: create new entry
-//          v               CompleteWrite
-//   [ IN_PROGRESS, false ]     --->      [ COMPLETE, true ]
+//          v            CompleteWrite                     SyncFileToDisk
+//   [ IN_PROGRESS, false ]   ---> [ COMPLETE_UNSYNCED, true ] ---> [ COMPLETE, true ]
 //          |
 //          | AbortWrite
-//          v              tombstone=true
-//   [ IN_PROGRESS, false ]     --->      [ TOMBSTONE, false ]
+//          v            tombstone=true
+//   [ IN_PROGRESS, false ]   ---> [ TOMBSTONE, false ]
 //          |
 //          | tombstone=false
 //          v
 //   [ IN_PROGRESS, false ] Scheduled for eviction, will be deleted once ref count=0.
 //
 
-enum class TupleCacheState { IN_PROGRESS, TOMBSTONE, COMPLETE };
+enum class TupleCacheState { IN_PROGRESS, TOMBSTONE, COMPLETE_UNSYNCED, COMPLETE };
 
 // An entry consists of a TupleCacheEntry followed by a C-string for the path.
 struct TupleCacheEntry {
   std::atomic<TupleCacheState> state{TupleCacheState::IN_PROGRESS};
-  size_t size = 0;
+  // Charge in the cache when there is a file associated with this entry. This is zero for
+  // TOMBSTONE and IN_PROGRESS before the first UpdateWriteSize call, but those states
+  // still have a base charge in the cache. During IN_PROGRESS, this is a reservation that
+  // exceeds the current size of the file.
+  size_t charge = 0;
 };
 
 struct TupleCacheMgr::Handle {
   Cache::UniqueHandle cache_handle;
   bool is_writer = false;
+  // Minimum charge to use if this entry becomes a TOMBSTONE
+  size_t base_charge = 0;
 };
-
 
 void TupleCacheMgr::HandleDeleter::operator()(Handle* ptr) const { delete ptr; }
 
@@ -244,22 +304,37 @@ static uint8_t* getHandleData(const Cache* cache, TupleCacheMgr::Handle* handle)
   return cache->Value(handle->cache_handle).mutable_data();
 }
 
-static TupleCacheState GetState(const Cache* cache, TupleCacheMgr::Handle* handle) {
-  uint8_t* data = getHandleData(cache, handle);
+TupleCacheState TupleCacheMgr::GetState(TupleCacheMgr::Handle* handle) const {
+  uint8_t* data = getHandleData(cache_.get(), handle);
   return reinterpret_cast<TupleCacheEntry*>(data)->state;
 }
 
 // Returns true if state was updated.
-static bool UpdateState(const Cache* cache, TupleCacheMgr::Handle* handle,
+bool TupleCacheMgr::UpdateState(TupleCacheMgr::Handle* handle,
     TupleCacheState requiredState, TupleCacheState newState) {
-  uint8_t* data = getHandleData(cache, handle);
+  uint8_t* data = getHandleData(cache_.get(), handle);
   return reinterpret_cast<TupleCacheEntry*>(data)->
       state.compare_exchange_strong(requiredState, newState);
 }
 
-static void UpdateSize(Cache* cache, TupleCacheMgr::Handle* handle, size_t size) {
-  uint8_t* data = getHandleData(cache, handle);
-  reinterpret_cast<TupleCacheEntry*>(data)->size = size;
+size_t TupleCacheMgr::GetCharge(TupleCacheMgr::Handle* handle) const {
+  uint8_t* data = getHandleData(cache_.get(), handle);
+  return reinterpret_cast<TupleCacheEntry*>(data)->charge;
+}
+
+void TupleCacheMgr::UpdateWriteSize(TupleCacheMgr::Handle* handle,
+    size_t charge) {
+  uint8_t* data = getHandleData(cache_.get(), handle);
+  // We can only adjust the cache charge while an entry is IN_PROGRESS
+  DCHECK(TupleCacheState::IN_PROGRESS == GetState(handle));
+  TupleCacheEntry* entry = reinterpret_cast<TupleCacheEntry*>(data);
+  int64_t diff = charge - entry->charge;
+  entry->charge = charge;
+  cache_->UpdateCharge(handle->cache_handle, charge);
+  if (diff < 0) {
+    DCHECK_LE(-diff, tuple_cache_outstanding_writes_bytes_->GetValue());
+  }
+  tuple_cache_outstanding_writes_bytes_->Increment(diff);
 }
 
 static Cache::UniquePendingHandle CreateEntry(
@@ -282,8 +357,8 @@ static Cache::UniquePendingHandle CreateEntry(
 }
 
 // If the entry exists, the Handle pins it so it doesn't go away, but the entry may be in
-// any state (IN PROGRESS, TOMBSTONE, COMPLETE). If the entry doesn't exist and
-// acquire_write is true, it's created with the state IN_PROGRESS.
+// any state (IN PROGRESS, TOMBSTONE, COMPLETE_UNSYNCED, COMPLETE). If the entry doesn't
+// exist and acquire_write is true, it's created with the state IN_PROGRESS.
 TupleCacheMgr::UniqueHandle TupleCacheMgr::Lookup(
     const Slice& key, bool acquire_write) {
   if (!enabled_) return nullptr;
@@ -319,6 +394,7 @@ TupleCacheMgr::UniqueHandle TupleCacheMgr::Lookup(
       VLOG_FILE << "Tuple Cache Entry created for " << path;
       handle->cache_handle = move(chandle);
       handle->is_writer = true;
+      handle->base_charge = sizeof(TupleCacheEntry) + path.size() + 1;
     }
   }
 
@@ -327,43 +403,121 @@ TupleCacheMgr::UniqueHandle TupleCacheMgr::Lookup(
 
 bool TupleCacheMgr::IsAvailableForRead(UniqueHandle& handle) const {
   if (!handle || !handle->cache_handle) return false;
-  return TupleCacheState::COMPLETE == GetState(cache_.get(), handle.get());
+  TupleCacheState state = GetState(handle.get());
+  return TupleCacheState::COMPLETE_UNSYNCED == state ||
+      TupleCacheState::COMPLETE == state;
 }
 
 bool TupleCacheMgr::IsAvailableForWrite(UniqueHandle& handle) const {
   if (!handle || !handle->cache_handle) return false;
-  return handle->is_writer &&
-      TupleCacheState::IN_PROGRESS == GetState(cache_.get(), handle.get());
+  return handle->is_writer && TupleCacheState::IN_PROGRESS == GetState(handle.get());
 }
 
 void TupleCacheMgr::CompleteWrite(UniqueHandle handle, size_t size) {
   DCHECK(enabled_);
   DCHECK(handle != nullptr && handle->cache_handle != nullptr);
+  DCHECK(handle->is_writer);
   DCHECK_LE(size, MaxSize());
   DCHECK_GE(size, 0);
+  if (sync_pool_size_ > 0 &&
+      sync_thread_pool_->GetQueueSize() >= sync_pool_queue_depth_) {
+    // The sync_thread_pool_ has reached its max queue size. This should almost never
+    // happen, as the outstanding writes limit should kick in before this is overwhelmed.
+    // If it does happen, bail out.
+    AbortWrite(move(handle), false);
+    tuple_cache_dropped_sync_->Increment(1);
+    return;
+  }
   VLOG_FILE << "Tuple Cache: Complete " << GetPath(handle) << " (" << size << ")";
-  CHECK(UpdateState(cache_.get(), handle.get(),
-      TupleCacheState::IN_PROGRESS, TupleCacheState::COMPLETE));
-  UpdateSize(cache_.get(), handle.get(), size);
-  cache_->UpdateCharge(handle->cache_handle, size);
+  UpdateWriteSize(handle.get(), size);
+  CHECK(UpdateState(handle.get(),
+      TupleCacheState::IN_PROGRESS, TupleCacheState::COMPLETE_UNSYNCED));
   tuple_cache_entries_in_use_bytes_->Increment(size);
   tuple_cache_entry_size_stats_->Update(size);
+  // When the sync_pool_size_ is 0, there is no thread pool and this does the sync
+  // directly. This is used for backend tests to avoid race conditions.
+  if (sync_pool_size_ > 0) {
+    // Offer the cache key to the thread pool.
+    bool success = sync_thread_pool_->Offer(cache_->Key(handle->cache_handle).ToString());
+    if (!success) {
+      // The queue is full, so evict this entry
+      VLOG_FILE << "Tuple Cache: Sync thread pool queue full. Evicting "
+                << GetPath(handle);
+      cache_->Erase(cache_->Key(handle->cache_handle));
+      tuple_cache_dropped_sync_->Increment(1);
+    }
+  } else {
+    SyncFileToDisk(cache_->Key(handle->cache_handle).ToString());
+  }
 }
 
 void TupleCacheMgr::AbortWrite(UniqueHandle handle, bool tombstone) {
   DCHECK(enabled_);
   DCHECK(handle != nullptr && handle->cache_handle != nullptr);
+  DCHECK(handle->is_writer);
   if (tombstone) {
     VLOG_FILE << "Tuple Cache: Tombstone " << GetPath(handle);
     tuple_cache_tombstones_in_use_->Increment(1);
-    CHECK(UpdateState(cache_.get(), handle.get(),
+    // We update the write size to 0 to remove the existing cache charge
+    // (and decrement the outstanding writes counter)
+    UpdateWriteSize(handle.get(), 0);
+    CHECK(UpdateState(handle.get(),
         TupleCacheState::IN_PROGRESS, TupleCacheState::TOMBSTONE));
+    // We want the tombstone cache entry to have a base charge, so set that now
+    // (without counting towards the outstanding writes).
+    cache_->UpdateCharge(handle->cache_handle, handle->base_charge);
   } else {
     // Remove the cache entry. Leaves state IN_PROGRESS so entry won't be reused until
     // successfully evicted.
-    DCHECK(TupleCacheState::IN_PROGRESS == GetState(cache_.get(), handle.get()));
+    DCHECK(TupleCacheState::IN_PROGRESS == GetState(handle.get()));
     cache_->Erase(cache_->Key(handle->cache_handle));
   }
+}
+
+Status TupleCacheMgr::RequestWriteSize(UniqueHandle* handle, size_t new_size) {
+  // The handle better be from a writer
+  DCHECK((*handle)->is_writer);
+
+  uint8_t* data = getHandleData(cache_.get(), handle->get());
+  size_t cur_charge = reinterpret_cast<TupleCacheEntry*>(data)->charge;
+  if (new_size > cur_charge) {
+    // Need to increase the charge, which can fail
+    // 1. There is a maximum size for any given entry
+    // 2. There is a maximum amount of outstanding writes (i.e. dirty buffers)
+    // The chunk size limits the frequency of incrementing the counter in the cache
+    // itself. The chunk size is disabled for unit tests to have exact counter values.
+    // The chunk size does not impact enforcement of the maximum entry size.
+
+    // An individual entry cannot exceed the MaxSize()
+    if (new_size > MaxSize()) {
+      tuple_cache_halted_->Increment(1);
+      return Status(TErrorCode::TUPLE_CACHE_ENTRY_SIZE_LIMIT_EXCEEDED, MaxSize());
+    }
+
+    size_t new_charge = new_size;
+    if (outstanding_write_chunk_bytes_ != 0) {
+      new_charge = ((new_size / outstanding_write_chunk_bytes_) + 1) *
+          outstanding_write_chunk_bytes_;
+      // The chunk size should not change the behavior of the MaxSize(), so limit the
+      // new_charge to MaxSize() if it would otherwise exceed it.
+      if (new_charge > MaxSize()) {
+        new_charge = MaxSize();
+      }
+    }
+    int64_t diff = new_charge - cur_charge;
+    DCHECK_GT(new_charge, cur_charge);
+    DCHECK_GE(new_charge, new_size);
+
+    // Limit the total outstanding writes to avoid excessive dirty buffers for the OS
+    if (tuple_cache_outstanding_writes_bytes_->GetValue() + diff >
+        outstanding_write_limit_) {
+      tuple_cache_backpressure_halted_->Increment(1);
+      return Status(TErrorCode::TUPLE_CACHE_OUTSTANDING_WRITE_LIMIT_EXCEEDED,
+          outstanding_write_limit_);
+    }
+    UpdateWriteSize(handle->get(), new_charge);
+  }
+  return Status::OK();
 }
 
 const char* TupleCacheMgr::GetPath(UniqueHandle& handle) const {
@@ -426,9 +580,22 @@ void TupleCacheMgr::EvictedEntry(Slice key, Slice value) {
     DCHECK(tuple_cache_entries_in_use_bytes_ != nullptr);
     tuple_cache_entries_evicted_->Increment(1);
     tuple_cache_entries_in_use_->Increment(-1);
-    tuple_cache_entries_in_use_bytes_->Increment(-entry->size);
     DCHECK_GE(tuple_cache_entries_in_use_->GetValue(), 0);
-    DCHECK_GE(tuple_cache_entries_in_use_bytes_->GetValue(), 0);
+    // entries_in_use_bytes is incremented only when the entry reaches the
+    // COMPLETE_UNSYNCED state
+    if (TupleCacheState::COMPLETE_UNSYNCED == entry->state ||
+        TupleCacheState::COMPLETE == entry->state) {
+      tuple_cache_entries_in_use_bytes_->Increment(-entry->charge);
+      DCHECK_GE(tuple_cache_entries_in_use_bytes_->GetValue(), 0);
+    }
+    // Outstanding write bytes are accumulated during IN_PROGRESS, and remain set until
+    // the transition from COMPLETE_UNSYNCED to COMPLETE.
+    if (TupleCacheState::COMPLETE_UNSYNCED == entry->state ||
+        TupleCacheState::IN_PROGRESS == entry->state) {
+      DCHECK(tuple_cache_outstanding_writes_bytes_ != nullptr);
+      DCHECK_GE(tuple_cache_outstanding_writes_bytes_->GetValue(), entry->charge);
+      tuple_cache_outstanding_writes_bytes_->Increment(-entry->charge);
+    }
   } else {
     DCHECK(tuple_cache_tombstones_in_use_ != nullptr);
     tuple_cache_tombstones_in_use_->Increment(-1);
@@ -464,5 +631,67 @@ Status TupleCacheMgr::DeleteExistingFiles() const {
     }
   }
   return Status::OK();
+}
+
+void TupleCacheMgr::SyncFileToDisk(const string& cache_key) {
+  Cache::UniqueHandle pos = cache_->Lookup(cache_key);
+  // The entry can be evicted while waiting to be synced to disk. If the entry no longer
+  // exists, there is nothing to do.
+  if (pos == nullptr) return;
+  UniqueHandle handle{new Handle()};
+  handle->cache_handle = move(pos);
+  // If the entry has a state other than COMPLETE_UNSYNCED, it could have been
+  // evicted and recreated. There is nothing to do.
+  if (TupleCacheState::COMPLETE_UNSYNCED != GetState(handle.get())) {
+    return;
+  }
+  bool success = true;
+  // Some unit tests don't create a real file when testing the TupleCacheMgr, so
+  // only do the sync if there is a backing file
+  bool has_backing_file = !(debug_pos_ & DebugPos::NO_FILES);
+  if (has_backing_file) {
+    // Open the cache file associated with this key, then call Sync() on it, and
+    // close it.
+    std::string file_path = GetPath(handle);
+    std::unique_ptr<kudu::RWFile> file_to_sync;
+    kudu::RWFileOptions opts;
+    opts.mode = kudu::Env::OpenMode::MUST_EXIST;
+    kudu::Status s = kudu::Env::Default()->NewRWFile(opts, file_path, &file_to_sync);
+    if (!s.ok()) {
+      LOG(WARNING) << Substitute("SyncFileToDisk: Failed to open file $0: $1", file_path,
+          s.ToString());
+      success = false;
+    } else {
+      s = file_to_sync->Sync();
+      if (!s.ok()) {
+        LOG(WARNING) << Substitute("SyncFileToDisk: Failed to sync file $0: $1",
+            file_path, s.ToString());
+        success = false;
+      }
+      // Close the file even if Sync() fails
+      s = file_to_sync->Close();
+      if (!s.ok()) {
+        LOG(WARNING) << Substitute("SyncFileToDisk: Failed to close file $0: $1",
+            file_path, s.ToString());
+        success = false;
+      }
+    }
+  }
+  if (success) {
+    bool update_succeeded = UpdateState(handle.get(),
+        TupleCacheState::COMPLETE_UNSYNCED, TupleCacheState::COMPLETE);
+    if (update_succeeded) {
+      tuple_cache_outstanding_writes_bytes_->Increment(-GetCharge(handle.get()));
+    }
+    // Only crash for a failed state change on debug builds. The sync completed
+    // and the state change doesn't really impact external behavior. It isn't
+    // worth crashing on a release build.
+    DCHECK(update_succeeded);
+  } else {
+    // In case of any error, erase this cache entry
+    VLOG_FILE << "Tuple Cache: SyncFileToDisk failed. Evicting " << GetPath(handle);
+    cache_->Erase(cache_->Key(handle->cache_handle));
+    tuple_cache_failed_sync_->Increment(1);
+  }
 }
 } // namespace impala

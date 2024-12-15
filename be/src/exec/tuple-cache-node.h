@@ -66,6 +66,9 @@ private:
   RuntimeProfile::Counter* num_hits_counter_ = nullptr;
   /// Number of results that were too large for the cache
   RuntimeProfile::Counter* num_halted_counter_ = nullptr;
+  /// Number of results that were halted due to backpressure (i.e. hitting the
+  /// outstanding writes limit)
+  RuntimeProfile::Counter* num_backpressure_halted_counter_ = nullptr;
   /// Number of results that skip the cache due to a tombstone
   RuntimeProfile::Counter* num_skipped_counter_ = nullptr;
 

@@ -18,6 +18,7 @@
 #pragma once
 
 #include <fstream>
+#include <functional>
 #include <limits>
 #include <memory>
 
@@ -37,6 +38,8 @@ class RowBatch;
 class RuntimeState;
 class TupleReadWriteTest;
 
+using RequestWriteSizeCb = std::function<Status (size_t)>;
+
 /// The TupleFileWriter is used to serialize a stream of RowBatches to a local file
 /// for the tuple cache. It uses the standard RowBatch serialization used for KRPC
 /// data streams (i.e. RowBatch::Serialize()). The files can be read back using the
@@ -48,9 +51,10 @@ class TupleReadWriteTest;
 /// Commit(), it runs Abort() and any associated file is deleted. The user can
 /// proactively call Abort() to delete any associated files, but it is not required.
 ///
-/// The TupleFileWriter enforces a maximum file size and will fail Write() calls that
-/// would exceed this limit. It provides a way for the caller to get how many bytes
-/// have been written for accounting purposes.
+/// The TupleFileWriter calls the request_write_size_cb requesting a new write size
+/// before each write and will fail Write() if this callback returns an error.
+/// It provides a way for the caller to get how many bytes have been written for
+/// accounting purposes.
 ///
 /// Currently, the TupleFileWriter does not embed the actual tuple layout into the
 /// file. It relies on the corresponding TupleFileReader reading with the same
@@ -59,7 +63,7 @@ class TupleReadWriteTest;
 class TupleFileWriter {
 public:
   TupleFileWriter(std::string path, MemTracker* parent, RuntimeProfile* profile,
-      size_t max_file_size = std::numeric_limits<size_t>::max());
+      RequestWriteSizeCb request_write_size_cb = nullptr);
   ~TupleFileWriter();
 
   Status Open(RuntimeState* state);
@@ -68,8 +72,6 @@ public:
   // If Write() returns a non-OK Status, it is not recoverable and the caller should not
   // call Write() or Commit().
   Status Write(RuntimeState* state, RowBatch* row_batch);
-
-  bool ExceededMaxSize() const { return exceeded_max_size_; }
 
   // Number of bytes written to file. Must be called before Commit/Abort.
   size_t BytesWritten() const;
@@ -102,10 +104,8 @@ private:
   RuntimeProfile::Counter* serialize_timer_;
   // Total bytes written
   RuntimeProfile::Counter* bytes_written_;
-  // Maximum size for the resulting file
-  size_t max_file_size_;
-  // True if the file reached the maximum size
-  bool exceeded_max_size_ = false;
+  // Callback to request an increase to the write size
+  RequestWriteSizeCb request_write_size_cb_;
 
   // This writes to a temporary file, only moving it into the final location with
   // Commit(). tmp_file_ is the file abstraction used for writing the temporary file.

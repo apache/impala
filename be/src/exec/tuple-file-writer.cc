@@ -39,7 +39,8 @@ namespace impala {
 static const char* UNIQUE_PATH_SUFFIX = ".%%%%";
 
 TupleFileWriter::TupleFileWriter(
-    std::string path, MemTracker* parent, RuntimeProfile* profile, size_t max_file_size)
+    std::string path, MemTracker* parent, RuntimeProfile* profile,
+    RequestWriteSizeCb request_write_size_cb)
   : path_(move(path)),
     temp_suffix_(filesystem::unique_path(UNIQUE_PATH_SUFFIX).string()),
     tracker_(new MemTracker(-1, "TupleFileWriter", parent)),
@@ -49,7 +50,7 @@ TupleFileWriter::TupleFileWriter(
     serialize_timer_(profile ? ADD_TIMER(profile, "TupleCacheSerializeTime") : nullptr),
     bytes_written_(profile ?
         ADD_COUNTER(profile, "TupleCacheBytesWritten", TUnit::BYTES) : nullptr),
-    max_file_size_(max_file_size) {}
+    request_write_size_cb_(move(request_write_size_cb)) {}
 
 TupleFileWriter::~TupleFileWriter() {
   if (state_ != State::Uninitialized) {
@@ -135,11 +136,11 @@ Status TupleFileWriter::Write(RuntimeState* state, RowBatch* row_batch) {
   for (auto slice : slices) {
     num_bytes_to_write += slice.size();
   }
-  if (BytesWritten() + num_bytes_to_write > max_file_size_) {
-    exceeded_max_size_ = true;
-    return Status(
-        Substitute("Write of size $0 would cause $1 to exceed the maximum file size $2",
-            num_bytes_to_write, TempPath(), max_file_size_));
+
+  if (request_write_size_cb_ != nullptr) {
+    // If the request_write_size_cb is set, call it before writing to get permission.
+    // It will return a not-OK status if this writer should stop.
+    RETURN_IF_ERROR(request_write_size_cb_(BytesWritten() + num_bytes_to_write));
   }
 
   RETURN_IF_ERROR(DebugAction(state->query_options(), "TUPLE_FILE_WRITER_WRITE"));
@@ -187,7 +188,7 @@ Status TupleFileWriter::Commit(RuntimeState* state) {
 
   RETURN_IF_ERROR(DebugAction(state->query_options(), "TUPLE_FILE_WRITER_COMMIT"));
 
-  KUDU_RETURN_IF_ERROR(tmp_file_->Sync(), "Failed to sync cache file");
+  // Sync() is called asychnronously by TupleCacheMgr's sync thread pool.
   KUDU_RETURN_IF_ERROR(tmp_file_->Close(), "Failed to close cache file");
 
   std::string src = TempPath();

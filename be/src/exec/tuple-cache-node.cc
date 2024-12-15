@@ -60,6 +60,8 @@ Status TupleCacheNode::Prepare(RuntimeState* state) {
   num_hits_counter_ = ADD_COUNTER(runtime_profile(), "NumTupleCacheHits", TUnit::UNIT);
   num_halted_counter_ =
       ADD_COUNTER(runtime_profile(), "NumTupleCacheHalted", TUnit::UNIT);
+  num_backpressure_halted_counter_ =
+      ADD_COUNTER(runtime_profile(), "NumTupleCacheBackpressureHalted", TUnit::UNIT);
   num_skipped_counter_ =
       ADD_COUNTER(runtime_profile(), "NumTupleCacheSkipped", TUnit::UNIT);
 
@@ -128,7 +130,10 @@ Status TupleCacheNode::Open(RuntimeState* state) {
     }
   } else if (tuple_cache_mgr->IsAvailableForWrite(handle_)) {
     writer_ = make_unique<TupleFileWriter>(tuple_cache_mgr->GetPath(handle_),
-        mem_tracker(), runtime_profile(), tuple_cache_mgr->MaxSize());
+        mem_tracker(), runtime_profile(),
+        [this, tuple_cache_mgr] (size_t new_size) {
+            return tuple_cache_mgr->RequestWriteSize(&this->handle_, new_size);
+        });
     Status status = writer_->Open(state);
     if (!status.ok()) {
       LOG(WARNING) << "Could not write cache entry for "
@@ -282,18 +287,23 @@ Status TupleCacheNode::GetNext(
       // If there was an error or we exceeded the file size limit, stop caching but
       // continue reading from the child node.
       if (!status.ok()) {
-        if (writer_->ExceededMaxSize()) {
+        bool set_tombstone = false;
+        if (status.code() == TErrorCode::TUPLE_CACHE_ENTRY_SIZE_LIMIT_EXCEEDED) {
           VLOG_FILE << "Tuple Cache entry for " << combined_key_
                     << " hit the maximum file size: " << status.GetDetail();
           COUNTER_ADD(num_halted_counter_, 1);
-          tuple_cache_mgr->IncrementMetric(TupleCacheMgr::MetricType::HALTED);
-          writer_->Abort();
-          tuple_cache_mgr->AbortWrite(move(handle_), true);
+          set_tombstone = true;
+        } else if (status.code() ==
+            TErrorCode::TUPLE_CACHE_OUTSTANDING_WRITE_LIMIT_EXCEEDED) {
+          VLOG_FILE << "Tuple Cache entry for " << combined_key_
+                    << " hit the outstanding writes limit: " << status.GetDetail();
+          COUNTER_ADD(num_backpressure_halted_counter_, 1);
         } else {
+          // This is an unknown error (e.g. an IO error), so write a warning.
           LOG(WARNING) << "Unable to write cache file: " << status.GetDetail();
-          writer_->Abort();
-          tuple_cache_mgr->AbortWrite(move(handle_), false);
         }
+        writer_->Abort();
+        tuple_cache_mgr->AbortWrite(move(handle_), set_tombstone);
         writer_.reset();
       } else if (*eos) {
         // If we hit end of stream, then we can complete the cache entry

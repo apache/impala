@@ -494,7 +494,13 @@ error_codes = (
 
   ("TUPLE_CACHE_INCONSISTENCY", 160, "Inconsistent tuple cache found: $0."),
 
-  ("OAUTH_VERIFY_FAILED", 161, "Error verifying OAuth Token: $0.")
+  ("OAUTH_VERIFY_FAILED", 161, "Error verifying OAuth Token: $0."),
+
+  ("TUPLE_CACHE_ENTRY_SIZE_LIMIT_EXCEEDED", 162, "Exceeded the maximum size for a tuple "
+   "cache entry ($0 bytes)"),
+
+  ("TUPLE_CACHE_OUTSTANDING_WRITE_LIMIT_EXCEEDED", 163, "Outstanding tuple cache writes "
+   "exceeded the limit ($0 bytes)")
 )
 
 import sys

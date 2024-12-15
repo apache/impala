@@ -404,7 +404,7 @@ Status ExecEnv::Init() {
   }
 
   // Initialize the tuple cache
-  RETURN_IF_ERROR(tuple_cache_mgr_->Init());
+  RETURN_IF_ERROR(tuple_cache_mgr_->Init(bytes_limit));
 
   LOG(INFO) << "Admit memory limit: "
             << PrettyPrinter::Print(admit_mem_limit_, TUnit::BYTES);

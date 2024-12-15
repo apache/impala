@@ -24,6 +24,7 @@
 #include "runtime/bufferpool/buffer-pool.h"
 #include "util/cache/cache.h"
 #include "util/metrics.h"
+#include "util/thread-pool.h"
 
 namespace impala {
 
@@ -32,6 +33,8 @@ class TupleReader;
 
 // Declaration of the debug tuple cache bad postfix constant.
 extern const char* DEBUG_TUPLE_CACHE_BAD_POSTFIX;
+
+enum class TupleCacheState;
 
 /// The TupleCacheMgr maintains per-daemon settings and metadata for the tuple cache.
 /// This it used by the various TupleCacheNodes from queries to lookup the cache
@@ -58,14 +61,15 @@ public:
   ~TupleCacheMgr() = default;
 
   // Initialize the TupleCacheMgr. Must be called before any of the other APIs.
-  Status Init() WARN_UNUSED_RESULT;
+  // The process_bytes_limit is used to scale a percentage value for the outstanding
+  // writes limit. If it is set to 0, a percentage value is not allowed.
+  Status Init(int64_t process_bytes_limit = 0) WARN_UNUSED_RESULT;
 
   /// Enum for metric type.
   enum class MetricType {
     HIT,
     MISS,
     SKIPPED,
-    HALTED,
   };
 
   struct DebugDumpCacheMetaData {
@@ -108,6 +112,12 @@ public:
   // queries.
   void AbortWrite(UniqueHandle handle, bool tombstone);
 
+  // Request an increase to the outstanding write size. This should be called before
+  // writing more data to a tuple cache file. If the new_size exceeds the maximum size
+  // for a cache entry, this returns TUPLE_CACHE_ENTRY_SIZE_LIMIT_EXCEEDED. This returns
+  // TUPLE_CACHE_OUTSTANDING_WRITE_LIMIT_EXCEEDED if it hits the outstanding writes limit.
+  Status RequestWriteSize(UniqueHandle* handle, size_t new_size);
+
   /// Get path to read/write.
   const char* GetPath(UniqueHandle&) const;
 
@@ -125,9 +135,6 @@ public:
         break;
       case MetricType::SKIPPED:
         tuple_cache_skipped_->Increment(1);
-        break;
-      case MetricType::HALTED:
-        tuple_cache_halted_->Increment(1);
         break;
     }
   }
@@ -161,35 +168,69 @@ public:
   TupleCacheMgr& operator=(const TupleCacheMgr&) = delete;
 
   friend class TupleCacheMgrTest;
+  FRIEND_TEST(TupleCacheMgrTest, TestRequestWriteSize);
+  FRIEND_TEST(TupleCacheMgrTest, TestOutstandingWriteLimit);
+  FRIEND_TEST(TupleCacheMgrTest, TestOutstandingWriteLimitConcurrent);
+  FRIEND_TEST(TupleCacheMgrTest, TestOutstandingWriteChunkSize);
+  FRIEND_TEST(TupleCacheMgrTest, TestDroppedSyncs);
 
   // Constructor for tests
   enum DebugPos {
     FAIL_ALLOCATE = 1 << 0,
     FAIL_INSERT   = 1 << 1,
+    NO_FILES      = 1 << 2,
   };
-  TupleCacheMgr(string cache_config, string eviction_policy_str,
-      MetricGroup* metrics, uint8_t debug_pos);
+  TupleCacheMgr(string cache_config, string eviction_policy_str, MetricGroup* metrics,
+      uint8_t debug_pos, uint32_t sync_pool_size, uint32_t sync_pool_queue_depth,
+      string outstanding_write_limit_str, uint32_t outstanding_write_chunk_bytes);
 
   // Delete any existing files in the cache directory to start fresh
   Status DeleteExistingFiles() const;
 
+  // Sync file for cache key to disk
+  void SyncFileToDisk(const std::string& cache_key);
+
+  // Get the current state for a cache handle
+  TupleCacheState GetState(Handle* handle) const;
+
+  // Update a handle's state to newState, verifying that it matches the requredState.
+  // If the update fails, return false.
+  bool UpdateState(Handle* handle, TupleCacheState requiredState,
+      TupleCacheState newState);
+
+  // Get the current charge for this handle.
+  size_t GetCharge(Handle* handle) const;
+
+  // Update the current charge for this handle and adjust the outstanding writes
+  // counter accordingly.
+  void UpdateWriteSize(Handle* handle, size_t charge);
+
   const std::string cache_config_;
   const std::string eviction_policy_str_;
+  const std::string outstanding_write_limit_str_;
 
   std::string cache_dir_;
   std::string cache_debug_dump_dir_;
   bool enabled_ = false;
   uint8_t debug_pos_;
+  uint32_t sync_pool_size_;
+  uint32_t sync_pool_queue_depth_;
+  uint32_t outstanding_write_chunk_bytes_;
+  int64_t outstanding_write_limit_ = 0;
 
   /// Metrics for the tuple cache in the daemon level.
   IntCounter* tuple_cache_hits_;
   IntCounter* tuple_cache_misses_;
   IntCounter* tuple_cache_skipped_;
   IntCounter* tuple_cache_halted_;
+  IntCounter* tuple_cache_backpressure_halted_;
   IntCounter* tuple_cache_entries_evicted_;
+  IntCounter* tuple_cache_failed_sync_;
+  IntCounter* tuple_cache_dropped_sync_;
   IntGauge* tuple_cache_entries_in_use_;
   IntGauge* tuple_cache_entries_in_use_bytes_;
   IntGauge* tuple_cache_tombstones_in_use_;
+  IntGauge* tuple_cache_outstanding_writes_bytes_;
 
   /// Statistics for the tuple cache sizes allocated.
   HistogramMetric* tuple_cache_entry_size_stats_;
@@ -206,6 +247,9 @@ public:
   /// An in-memory presentation for metadata of tuple caches for debug verification.
   /// The key is the key of the tuple cache.
   std::unordered_map<std::string, DebugDumpCacheMetaData> debug_dump_caches_metadata_;
+
+  /// Thread pool for syncing files to disk
+  std::unique_ptr<ThreadPool<std::string>> sync_thread_pool_;
 };
 
 }
