@@ -20,6 +20,7 @@
 
 #include <map>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include "common/logging.h"
@@ -72,7 +73,8 @@ class HashRing {
   /// insert the node into the map at the hash location. In the event of a hash collision,
   /// the map will be set to the minimum of the current value and the new value.
   /// Nodes must be unique.
-  void AddNode(const IpAddr& node);
+  void AddNode(const IpAddr& node,
+      std::string_view scheduling_seed = std::string_view());
 
   /// This removes the specified node from the hashring. This removes all elements that
   /// reference this node. Nodes must be unique.

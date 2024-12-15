@@ -21,6 +21,7 @@
 #include <iostream>
 
 #include "common/init.h"
+#include "gutil/strings/substitute.h"
 #include "scheduling/hash-ring.h"
 #include "scheduling/cluster-membership-test-util.h"
 #include "scheduling/scheduler-test-util.h"
@@ -33,6 +34,9 @@
 
 DEFINE_int32(num_hosts, 10, "Number of hosts for simulation");
 DEFINE_int32(num_replicas, 10, "Replication factor for hashring");
+DEFINE_bool(use_scheduling_seeds, false,
+    "If true, simulate using strings like 'executor_1_of_8' as scheduling seeds. "
+    "If false, use IP addresses as scheduling seeds.");
 
 namespace impala {
 
@@ -55,7 +59,13 @@ public:
     HashRing hashring(num_replicas);
     for (int host_idx = 0; host_idx < num_hosts; host_idx++) {
       IpAddr node = test::HostIdxToIpAddr(host_idx);
-      hashring.AddNode(node);
+      if (FLAGS_use_scheduling_seeds) {
+        std::string scheduling_seed =
+            Substitute("executor_$0_of_$1", host_idx, num_hosts);
+        hashring.AddNode(node, scheduling_seed);
+      } else {
+        hashring.AddNode(node);
+      }
     }
     int64_t end_nanos = MonotonicNanos();
     map<IpAddr, uint64_t> distribution;

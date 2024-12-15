@@ -84,4 +84,10 @@ message BackendDescriptorPB {
   // The pretty-printed string representation of program version and build version for
   // this backend.
   optional string version = 14;
+
+  // Unique identifier of an executor within a single executor group (e.g. 3rd out of 8
+  // executors). This is used for consistently scheduling scan ranges. This is unique
+  // within an executor group, but executors in different executor groups can use the
+  // same identifier.
+  optional string scheduling_seed = 15;
 }

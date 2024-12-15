@@ -19,6 +19,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <iostream>
+#include <optional>
 
 #include "scheduling/hash-ring.h"
 #include "testutil/gtest-util.h"
@@ -39,9 +40,11 @@ class HashRingTest : public ::testing::Test {
   // Verify the specified hash ring has the appropriate number of nodes and replicas.
   // This assumes no collisions. If there are collisions, the total replicas will be
   // smaller than expected.
-  void VerifyCounts(const HashRing& hash_ring, uint32_t num_nodes) {
-    EXPECT_EQ(hash_ring.GetNumNodes(), num_nodes);
-    EXPECT_EQ(hash_ring.GetTotalReplicas(), num_nodes * hash_ring.GetNumReplicas());
+  void VerifyCounts(const HashRing& hash_ring, uint32_t expected_num_nodes,
+      std::optional<uint32_t> expected_num_replicas = std::nullopt) {
+    EXPECT_EQ(hash_ring.GetNumNodes(), expected_num_nodes);
+    EXPECT_EQ(hash_ring.GetTotalReplicas(),
+        expected_num_replicas.value_or(expected_num_nodes * hash_ring.GetNumReplicas()));
   }
 
   // Verify that the allocations that GetDistributionMap() returns for each node
@@ -203,6 +206,18 @@ TEST_F(HashRingTest, Collisions) {
   HashRing h(replication);
   for (const IpAddr& addr : multiple_addresses) h.AddNode(addr);
   VerifyCounts(h, 1000);
+}
+
+TEST_F(HashRingTest, SchedulingSeed) {
+  const uint32_t replication = 10;
+  vector<IpAddr> basic_addresses;
+  GetBasicNetworkAddresses(basic_addresses);
+  HashRing h(replication);
+  // Add the nodes to the hashring with a single scheduling seed. This will cause all of
+  // the nodes to collide.
+  for (const IpAddr& addr : basic_addresses) h.AddNode(addr, "abc123");
+  // All the ip addresses were added, but they all collide.
+  VerifyCounts(h, basic_addresses.size(), replication);
 }
 
 TEST_F(HashRingTest, MaxMinRatio) {

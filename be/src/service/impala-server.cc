@@ -328,6 +328,13 @@ DEFINE_string(executor_groups, "",
     "contains at least that number of executors for the group will it be considered "
     "healthy for admission. Currently only a single group may be specified.");
 
+DEFINE_string(scheduling_seed, "",
+    "Unique identifier for this executor within its executor group. This is used for "
+    "consistent scheduling. If not specified, this uses the executor's IP address. "
+    "To have consistent scheduling across different executor groups, this can be set "
+    "so that executor 1 out of 8 on executor group A has the same value as executor 1"
+    "out of 8 on executor group B.");
+
 DEFINE_int32(num_expected_executors, 20,
     "The number of executors that are expected to "
     "be available for the execution of a single query. This value is used during "
@@ -2663,6 +2670,7 @@ void ImpalaServer::BuildLocalBackendDescriptorInternal(BackendDescriptorPB* be_d
     be_desc->set_process_start_time(CurrentTimeString());
   }
   be_desc->set_version(GetBuildVersion(/* compact */ true));
+  be_desc->set_scheduling_seed(FLAGS_scheduling_seed);
 }
 
 void ImpalaServer::ConnectionStart(

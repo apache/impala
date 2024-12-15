@@ -40,14 +40,17 @@ HashRing::HashRing(const HashRing& hash_ring)
   }
 }
 
-void HashRing::AddNode(const IpAddr& node) {
+void HashRing::AddNode(const IpAddr& node, std::string_view scheduling_seed_in) {
   // This node should not already be in the set.
   std::pair<NodeIterator, bool> node_pair = nodes_.insert(node);
   // 'second' tells whether a new element was inserted. It must be true.
   DCHECK(node_pair.second) << "Failed to add: " << node;
   NodeIterator node_it = node_pair.first;
-  // Generate multiple hashes of the IpAddr by using the hash as a seed to a PRNG.
-  uint32_t hash = HashUtil::Hash(node.data(), node.length(), 0);
+  // If the scheduling seed argument is empty, use the IP address
+  std::string_view scheduling_seed = scheduling_seed_in;
+  if (scheduling_seed.empty()) scheduling_seed = node;
+  uint32_t hash = HashUtil::Hash(scheduling_seed.data(), scheduling_seed.length(), 0);
+  // Generate multiple hashes for the node by using the hash as a seed to a PRNG.
   pcg32 prng(hash);
   for (uint32_t i = 0; i < num_replicas_; i++) {
     uint32_t hash_val = prng();

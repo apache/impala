@@ -95,7 +95,9 @@ void ExecutorGroup::AddExecutor(const BackendDescriptorPB& be_desc) {
     return;
   }
   if (be_descs.empty()) {
-    executor_ip_hash_ring_.AddNode(be_desc.ip_address());
+    // Use the 'scheduling_seed' for hashing to allow different executor groups to
+    // schedule the same way.
+    executor_ip_hash_ring_.AddNode(be_desc.ip_address(), be_desc.scheduling_seed());
   }
   be_descs.push_back(be_desc);
 
