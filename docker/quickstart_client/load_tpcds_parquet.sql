@@ -188,7 +188,7 @@ CREATE EXTERNAL TABLE tpcds_raw.customer (
   c_birth_country STRING,
   c_login STRING,
   c_email_address STRING,
-  c_last_review_date STRING
+  c_last_review_date_sk STRING
 )
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 WITH SERDEPROPERTIES ('field.delim'='|', 'serialization.format'='|')
@@ -808,7 +808,7 @@ CREATE TABLE tpcds_parquet.customer (
   c_birth_country STRING,
   c_login STRING,
   c_email_address STRING,
-  c_last_review_date STRING
+  c_last_review_date_sk STRING
 )
 STORED AS PARQUET;
 CREATE TABLE tpcds_parquet.customer_address (

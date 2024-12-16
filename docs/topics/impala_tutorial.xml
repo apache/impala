@@ -250,7 +250,7 @@ Welcome to the Impala shell. Press TAB twice to see a list of available commands
 | c_birth_country        | string |         |
 | c_login                | string |         |
 | c_email_address        | string |         |
-| c_last_review_date     | string |         |
+| c_last_review_date_sk  | string |         |
 +------------------------+--------+---------+
 [localhost:21000] > select count(*) from customer;
 +----------+
@@ -724,7 +724,7 @@ create external table customer
     c_birth_country           string,
     c_login                   string,
     c_email_address           string,
-    c_last_review_date        string
+    c_last_review_date_sk     string
 )
 row format delimited fields terminated by '|'
 location '/user/hive/tpcds/customer';

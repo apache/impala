@@ -1121,7 +1121,7 @@ show table stats store_sales;
 | c_birth_country        | STRING | -1               | -1     | -1       | -1       |
 | c_login                | STRING | -1               | -1     | -1       | -1       |
 | c_email_address        | STRING | -1               | -1     | -1       | -1       |
-| c_last_review_date     | STRING | -1               | -1     | -1       | -1       |
+| c_last_review_date_sk  | STRING | -1               | -1     | -1       | -1       |
 +------------------------+--------+------------------+--------+----------+----------+
 
 show column stats store_sales;
@@ -1196,7 +1196,7 @@ show column stats customer;
 | c_birth_country        | STRING | 205              | -1     | 20       | 8.4001 |
 | c_login                | STRING | 1                | -1     | 0        | 0      |
 | c_email_address        | STRING | 94492            | -1     | 46       | 26.485 |
-| c_last_review_date     | STRING | 349              | -1     | 7        | 6.7561 |
+| c_last_review_date_sk  | STRING | 349              | -1     | 7        | 6.7561 |
 +------------------------+--------+------------------+--------+----------+--------+
 
 show column stats store_sales;

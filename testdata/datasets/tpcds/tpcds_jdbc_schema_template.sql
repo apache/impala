@@ -308,7 +308,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {jdbc_db_name}.customer (
   c_birth_country STRING,
   c_login STRING,
   c_email_address STRING,
-  c_last_review_date STRING
+  c_last_review_date_sk STRING
 )
 STORED AS JDBC
 TBLPROPERTIES (

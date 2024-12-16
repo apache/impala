@@ -451,7 +451,7 @@ CREATE TABLE {target_db_name}.customer (
   c_birth_country STRING,
   c_login STRING,
   c_email_address STRING,
-  c_last_review_date STRING
+  c_last_review_date_sk STRING
 )
 PARTITION BY HASH (c_customer_sk) PARTITIONS {buckets}
 STORED AS KUDU

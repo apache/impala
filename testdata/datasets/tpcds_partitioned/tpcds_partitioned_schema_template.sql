@@ -391,7 +391,7 @@ SELECT
   c_birth_country,
   c_login,
   c_email_address,
-  CAST(c_last_review_date AS INT)
+  CAST(c_last_review_date_sk AS INT)
 FROM tpcds{scale_factor}.{table_name};
 ====
 ---- DATASET

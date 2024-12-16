@@ -22,7 +22,7 @@ SELECT c_customer_id,
        c_birth_country,
        c_login,
        c_email_address,
-       c_last_review_date,
+       c_last_review_date_sk,
        ctr_total_return
 FROM customer_total_return ctr1,
      customer_address,
@@ -45,7 +45,7 @@ ORDER BY c_customer_id,
          c_birth_country,
          c_login,
          c_email_address,
-         c_last_review_date,
+         c_last_review_date_sk,
          ctr_total_return
 LIMIT 100;
 ---- PLAN
@@ -54,11 +54,11 @@ Per-Host Resource Estimates: Memory=429MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=428.81MB mem-reservation=27.44MB thread-reservation=9 runtime-filters-memory=7.00MB
 PLAN-ROOT SINK
-|  output exprs: c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date, ctr_total_return
+|  output exprs: c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date_sk, ctr_total_return
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 18:TOP-N [LIMIT=100]
-|  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, c_preferred_cust_flag ASC, c_birth_day ASC, c_birth_month ASC, c_birth_year ASC, c_birth_country ASC, c_login ASC, c_email_address ASC, c_last_review_date ASC, ctr_total_return ASC
+|  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, c_preferred_cust_flag ASC, c_birth_day ASC, c_birth_month ASC, c_birth_year ASC, c_birth_country ASC, c_login ASC, c_email_address ASC, c_last_review_date_sk ASC, ctr_total_return ASC
 |  mem-estimate=20.64KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=15 row-size=211B cardinality=100
 |  in pipelines: 18(GETNEXT), 07(OPEN)
@@ -239,11 +239,11 @@ Per-Host Resource Estimates: Memory=504MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
-|  output exprs: c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date, ctr_total_return
+|  output exprs: c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date_sk, ctr_total_return
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 32:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, c_preferred_cust_flag ASC, c_birth_day ASC, c_birth_month ASC, c_birth_year ASC, c_birth_country ASC, c_login ASC, c_email_address ASC, c_last_review_date ASC, ctr_total_return ASC
+|  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, c_preferred_cust_flag ASC, c_birth_day ASC, c_birth_month ASC, c_birth_year ASC, c_birth_country ASC, c_login ASC, c_email_address ASC, c_last_review_date_sk ASC, ctr_total_return ASC
 |  limit: 100
 |  mem-estimate=41.67KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=15 row-size=211B cardinality=100
@@ -252,7 +252,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reservation=2 runtime-filters-memory=3.00MB
 18:TOP-N [LIMIT=100]
-|  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, c_preferred_cust_flag ASC, c_birth_day ASC, c_birth_month ASC, c_birth_year ASC, c_birth_country ASC, c_login ASC, c_email_address ASC, c_last_review_date ASC, ctr_total_return ASC
+|  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, c_preferred_cust_flag ASC, c_birth_day ASC, c_birth_month ASC, c_birth_year ASC, c_birth_country ASC, c_login ASC, c_email_address ASC, c_last_review_date_sk ASC, ctr_total_return ASC
 |  mem-estimate=20.64KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=15 row-size=211B cardinality=100
 |  in pipelines: 18(GETNEXT), 07(OPEN)
@@ -524,11 +524,11 @@ Per-Host Resource Estimates: Memory=236MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
-|  output exprs: c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date, ctr_total_return
+|  output exprs: c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date_sk, ctr_total_return
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 32:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, c_preferred_cust_flag ASC, c_birth_day ASC, c_birth_month ASC, c_birth_year ASC, c_birth_country ASC, c_login ASC, c_email_address ASC, c_last_review_date ASC, ctr_total_return ASC
+|  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, c_preferred_cust_flag ASC, c_birth_day ASC, c_birth_month ASC, c_birth_year ASC, c_birth_country ASC, c_login ASC, c_email_address ASC, c_last_review_date_sk ASC, ctr_total_return ASC
 |  limit: 100
 |  mem-estimate=41.67KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=15 row-size=211B cardinality=100
@@ -538,7 +538,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reservation=1
 18:TOP-N [LIMIT=100]
-|  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, c_preferred_cust_flag ASC, c_birth_day ASC, c_birth_month ASC, c_birth_year ASC, c_birth_country ASC, c_login ASC, c_email_address ASC, c_last_review_date ASC, ctr_total_return ASC
+|  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, c_preferred_cust_flag ASC, c_birth_day ASC, c_birth_month ASC, c_birth_year ASC, c_birth_country ASC, c_login ASC, c_email_address ASC, c_last_review_date_sk ASC, ctr_total_return ASC
 |  mem-estimate=20.64KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=15 row-size=211B cardinality=100
 |  in pipelines: 18(GETNEXT), 07(OPEN)

@@ -371,8 +371,11 @@ where c_current_cdemo_sk < 100 group by c_birth_country;
 ---- TYPES
 STRING, BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumPages): 30
-aggregation(SUM, NumStatsFilteredPages): 27
+aggregation(SUM, NumPages): 6
+aggregation(SUM, NumRowGroups): 20
+aggregation(SUM, NumRowGroupsWithPageIndex): 20
+aggregation(SUM, NumStatsFilteredPages): 3
+aggregation(SUM, NumStatsFilteredRowGroups): 19
 ====
 ---- QUERY
 # IMPALA-10345: Impala hits DCHECK in parquet-column-stats.inline.h

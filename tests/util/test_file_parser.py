@@ -433,9 +433,6 @@ def load_tpc_queries(workload, include_stress_queries=False, query_name_filters=
     test_cases = parse_query_test_file(file_path)
     for test_case in test_cases:
       query_sql = remove_comments(test_case["QUERY"])
-      if workload == "tpcds_partitioned":
-        # replace old columns names from old TPC-DS spec with a new one.
-        query_sql = query_sql.replace("c_last_review_date", "c_last_review_date_sk")
 
       if re.match(filter_regex, test_case["QUERY_NAME"]):
         query_name_match = query_name_pattern.search(test_case["QUERY_NAME"])

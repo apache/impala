@@ -376,7 +376,7 @@ c_birth_year              int
 c_birth_country           string
 c_login                   string
 c_email_address           string
-c_last_review_date        string
+c_last_review_date_sk     string
 primary key (c_customer_sk) DISABLE NOVALIDATE RELY
 foreign key (c_current_addr_sk) references {db_name}{db_suffix}.customer_address (ca_address_sk) DISABLE NOVALIDATE RELY
 foreign key (c_current_cdemo_sk) references {db_name}{db_suffix}.customer_demographics (cd_demo_sk) DISABLE NOVALIDATE RELY

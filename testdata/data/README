@@ -620,17 +620,17 @@ if (r ... ) location.offset = -1;
 
 customer_multiblock_page_index.parquet
 Parquet file that contains multiple blocks in a single file Needed to test IMPALA-10310.
-In order to generate this file, execute the following instruments:
-// use 1.11.0 to generate page index
-1. export HIVE_AUX_JARS_PATH=/path/parquet-hadoop-1.11.0.jar
-// in hive shell
-2. SET parquet.block.size=8192;         // use little block size
-3. SET parquet.page.row.count.limit=10; // little page row count generate multi pages
-4. CREATE TABLE customer_multiblock_page_index_6
+In order to generate this file, execute the following instruments in beeline
+(Beeline version 3.1.3000.7.3.1.0-160 by Apache Hive):
+1. SET parquet.block.size=8192;         // use little block size
+2. SET parquet.page.row.count.limit=10; // little page row count generate multi pages
+3. CREATE TABLE customer_multiblock_page_index_6
    STORED AS PARQUET
    TBLPROPERTIES('parquet.compression'='SNAPPY')
    AS SELECT * FROM tpcds.customer
-   WHERE c_current_cdemo_sk IS NOT NULL ORDER BY c_current_cdemo_sk LIMIT 2000;
+   WHERE c_current_cdemo_sk IS NOT NULL
+   ORDER BY c_current_cdemo_sk, c_customer_sk
+   LIMIT 2000;
 generated file will contains multi blocks, multi pages per block.
 
 customer_nested_multiblock_multipage.parquet
