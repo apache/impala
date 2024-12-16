@@ -25,14 +25,14 @@ CREATE TABLE iceberg_hadoop_catalogs_with_id(
 PARTITIONED BY SPEC(label)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='ice_hadoop_cat',
-'iceberg.table_identifier'='org.db.tbl');
+'iceberg.table_identifier'='org.$DATABASE.tbl');
 DESCRIBE FORMATTED iceberg_hadoop_catalogs_with_id;
 ---- RESULTS: VERIFY_IS_SUBSET
-'Location:           ','$NAMENODE/test-warehouse/ice_hadoop_cat/org/db/tbl','NULL'
+'Location:           ','$NAMENODE/test-warehouse/ice_hadoop_cat/org/$DATABASE/tbl','NULL'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','ice_hadoop_cat      '
-'','iceberg.table_identifier','org.db.tbl          '
-'','name                ','org.db.tbl          '
+'','iceberg.table_identifier','org.$DATABASE.tbl'
+'','name                ','org.$DATABASE.tbl'
 ---- TYPES
 string, string, string
 ====
@@ -47,7 +47,7 @@ STRING,DECIMAL
 ---- QUERY
 SHOW FILES IN iceberg_hadoop_catalogs_with_id;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/ice_hadoop_cat/org/db/tbl/data/label=ice/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/ice_hadoop_cat/org/$DATABASE/tbl/data/label=ice/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
@@ -55,18 +55,18 @@ STRING, STRING, STRING, STRING
 CREATE EXTERNAL TABLE iceberg_hadoop_cat_with_id_ext
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='ice_hadoop_cat',
-'iceberg.table_identifier'='org.db.tbl');
+'iceberg.table_identifier'='org.$DATABASE.tbl');
 ---- RESULTS
 'Table has been created.'
 ====
 ---- QUERY
 DESCRIBE FORMATTED iceberg_hadoop_cat_with_id_ext;
 ---- RESULTS: VERIFY_IS_SUBSET
-'Location:           ','$NAMENODE/test-warehouse/ice_hadoop_cat/org/db/tbl','NULL'
+'Location:           ','$NAMENODE/test-warehouse/ice_hadoop_cat/org/$DATABASE/tbl','NULL'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','ice_hadoop_cat      '
-'','iceberg.table_identifier','org.db.tbl          '
-'','name                ','org.db.tbl          '
+'','iceberg.table_identifier','org.$DATABASE.tbl'
+'','name                ','org.$DATABASE.tbl'
 ---- TYPES
 string, string, string
 ====
