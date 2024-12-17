@@ -220,8 +220,10 @@ CONFIG.update({
   'datanucleus.autoCreateSchema': 'false',
   'datanucleus.fixedDatastore': 'false',
   'datanucleus.metadata.validate': 'false',
+  'datanucleus.connectionPool.maxPoolSize': 30,
   'javax.jdo.option.ConnectionUserName': 'hiveuser',
   'javax.jdo.option.ConnectionPassword': 'password',
+  'hikaricp.connectionTimeout': 60000,
 })
 if db_type == 'postgres':
   CONFIG.update({

@@ -32,7 +32,7 @@ from RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
 
 
-LOG = logging.getLogger('impala_connection')
+LOG = logging.getLogger(__name__)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
 # All logging needs to be either executable SQL or a SQL comment (prefix with --).
@@ -274,10 +274,12 @@ class ImpylaHS2Connection(ImpalaConnection):
   TODO: implement support for kerberos, SSL, etc.
   """
   def __init__(self, host_port, use_kerberos=False, is_hive=False,
-               use_http_transport=False, http_path=""):
+               use_http_transport=False, http_path="", use_ssl=False,
+               collect_profile_and_log=True):
     self.__host_port = host_port
     self.__use_http_transport = use_http_transport
     self.__http_path = http_path
+    self.__use_ssl = use_ssl
     if use_kerberos:
       raise NotImplementedError("Kerberos support not yet implemented")
     # Impyla connection and cursor is initialised in connect(). We need to reuse the same
@@ -289,6 +291,7 @@ class ImpylaHS2Connection(ImpalaConnection):
     # Query options to send along with each query.
     self.__query_options = {}
     self._is_hive = is_hive
+    self._collect_profile_and_log = not is_hive and collect_profile_and_log
 
   def set_configuration_option(self, name, value):
     self.__query_options[name] = str(value)
@@ -309,7 +312,8 @@ class ImpylaHS2Connection(ImpalaConnection):
       conn_kwargs['auth_mechanism'] = 'PLAIN'
     self.__impyla_conn = impyla.connect(host=host, port=int(port),
                                         use_http_transport=self.__use_http_transport,
-                                        http_path=self.__http_path, **conn_kwargs)
+                                        http_path=self.__http_path,
+                                        use_ssl=self.__use_ssl, **conn_kwargs)
     # Get the default query options for the session before any modifications are made.
     self.__cursor = self.__impyla_conn.cursor(convert_types=False)
     self.__default_query_options = {}
@@ -345,7 +349,7 @@ class ImpylaHS2Connection(ImpalaConnection):
     return self.__cursor.fetchall()
 
   def close_query(self, operation_handle):
-    LOG.info("-- closing query for operation handle: {0}".format(operation_handle))
+    self.log_handle(operation_handle, 'closing query for operation')
     operation_handle.get_handle().close_operation()
 
   def execute(self, sql_stmt, user=None, profile_format=TRuntimeProfileFormat.STRING,
@@ -392,57 +396,68 @@ class ImpylaHS2Connection(ImpalaConnection):
       raise
 
   def cancel(self, operation_handle):
-    LOG.info("-- canceling operation: {0}".format(operation_handle))
+    self.log_handle(operation_handle, 'canceling operation')
     cursor = operation_handle.get_handle()
     return cursor.cancel_operation(reset_state=False)
 
   def get_query_id(self, operation_handle):
-    """Return the string representation of the query id."""
-    guid_bytes = \
-        operation_handle.get_handle()._last_operation.handle.operationId.guid
+    """Return the string representation of the query id.
+    Return empty string if handle is already canceled or closed."""
+    last_op = operation_handle.get_handle()._last_operation
+    if last_op is None:
+      return ""
+    guid_bytes = last_op.handle.operationId.guid
     # hex_codec works on bytes, so this needs to a decode() to get back to a string
     hi_str = codecs.encode(guid_bytes[7::-1], 'hex_codec').decode()
     lo_str = codecs.encode(guid_bytes[16:7:-1], 'hex_codec').decode()
     return "{0}:{1}".format(hi_str, lo_str)
 
+  def handle_id_for_logging(self, operation_handle):
+    query_id = self.get_query_id(operation_handle)
+    return query_id if query_id else str(operation_handle)
+
+  def log_handle(self, handle, message):
+    handle_id = self.handle_id_for_logging(handle)
+    LOG.info("-- {0}: {1}".format(handle_id, message))
+
   def get_state(self, operation_handle):
-    LOG.info("-- getting state for operation: {0}".format(operation_handle))
+    handle_id = self.handle_id_for_logging(operation_handle)
+    LOG.info("-- getting state for operation: {0}".format(handle_id))
     cursor = operation_handle.get_handle()
     return cursor.status()
 
   def state_is_finished(self, operation_handle):
-    LOG.info("-- checking finished state for operation: {0}".format(operation_handle))
+    self.log_handle(operation_handle, 'checking finished state for operation')
     cursor = operation_handle.get_handle()
     # cursor.status contains a string representation of one of
     # TCLIService.TOperationState.
     return cursor.status() == "FINISHED_STATE"
 
   def get_exec_summary(self, operation_handle):
-    LOG.info("-- getting exec summary operation: {0}".format(operation_handle))
+    self.log_handle(operation_handle, 'getting exec summary operation')
     cursor = operation_handle.get_handle()
     # summary returned is thrift, not string.
     return cursor.get_summary()
 
   def get_runtime_profile(self, operation_handle, profile_format):
-    LOG.info("-- getting runtime profile operation: {0}".format(operation_handle))
+    self.log_handle(operation_handle, 'getting runtime profile operation')
     cursor = operation_handle.get_handle()
     return cursor.get_profile(profile_format=profile_format)
 
   def wait_for_finished_timeout(self, operation_handle, timeout):
-    LOG.info("-- waiting for query to reach FINISHED state: {0}".format(operation_handle))
+    self.log_handle(operation_handle, 'waiting for query to reach FINISHED state')
     raise NotImplementedError("Not yet implemented for HS2 - states differ from beeswax")
 
   def wait_for_admission_control(self, operation_handle):
-    LOG.info("-- waiting for completion of the admission control processing of the "
-        "query: {0}".format(operation_handle))
+    self.log_handle(operation_handle, 'waiting for completion of the admission control')
     raise NotImplementedError("Not yet implemented for HS2 - states differ from beeswax")
 
   def get_admission_result(self, operation_handle):
-    LOG.info("-- getting the admission result: {0}".format(operation_handle))
+    self.log_handle(operation_handle, 'getting the admission result')
     raise NotImplementedError("Not yet implemented for HS2 - states differ from beeswax")
 
   def get_log(self, operation_handle):
-    LOG.info("-- getting log for operation: {0}".format(operation_handle))
+    self.log_handle(operation_handle, 'getting log for operation')
     # HS2 includes non-error log messages that we need to filter out.
     cursor = operation_handle.get_handle()
     lines = [line for line in cursor.get_log().split('\n')
@@ -450,7 +465,7 @@ class ImpylaHS2Connection(ImpalaConnection):
     return '\n'.join(lines)
 
   def fetch(self, sql_stmt, handle, max_rows=-1):
-    LOG.info("-- fetching results from: {0}".format(handle))
+    self.log_handle(handle, 'fetching results')
     return self.__fetch_results(handle, max_rows)
 
   def __fetch_results(self, handle, max_rows=-1,
@@ -471,7 +486,7 @@ class ImpylaHS2Connection(ImpalaConnection):
       else:
         result_tuples = cursor.fetchmany(max_rows)
 
-    if not self._is_hive:
+    if not self._is_hive and self._collect_profile_and_log:
       log = self.get_log(handle)
       profile = self.get_runtime_profile(handle, profile_format=profile_format)
     else:
@@ -520,16 +535,19 @@ class ImpylaHS2ResultSet(object):
 
 
 def create_connection(host_port, use_kerberos=False, protocol='beeswax',
-    is_hive=False):
+    is_hive=False, use_ssl=False, collect_profile_and_log=True):
   if protocol == 'beeswax':
-    c = BeeswaxConnection(host_port=host_port, use_kerberos=use_kerberos)
+    c = BeeswaxConnection(host_port=host_port, use_kerberos=use_kerberos,
+                          use_ssl=use_ssl)
   elif protocol == 'hs2':
     c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos,
-        is_hive=is_hive)
+        is_hive=is_hive, use_ssl=use_ssl,
+        collect_profile_and_log=collect_profile_and_log)
   else:
     assert protocol == 'hs2-http'
     c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos,
-        is_hive=is_hive, use_http_transport=True, http_path='cliservice')
+        is_hive=is_hive, use_http_transport=True, http_path='cliservice',
+        use_ssl=use_ssl, collect_profile_and_log=collect_profile_and_log)
 
   # A hook in conftest sets tests.common.current_node. Skip for Hive connections since
   # Hive cannot modify client_identifier at runtime.

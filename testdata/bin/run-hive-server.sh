@@ -159,7 +159,8 @@ export KUDU_SKIP_HMS_PLUGIN_VALIDATION=${KUDU_SKIP_HMS_PLUGIN_VALIDATION:-1}
 # To debug log4j2 loading issues, add to HADOOP_CLIENT_OPTS:
 #   -Dorg.apache.logging.log4j.simplelog.StatusLogger.level=TRACE
 if [[ ${START_METASTORE} -eq 1 && -z $HMS_PID ]]; then
-  HADOOP_CLIENT_OPTS="-Xmx2024m -Dhive.log.file=hive-metastore.log" hive \
+  HADOOP_CLIENT_OPTS="-Xmx2024m  -Dhive.log.dir=${LOGDIR} \
+      -Dhive.log.file=hive-metastore.log" hive \
       --service metastore -p $HIVE_METASTORE_PORT >> ${LOGDIR}/hive-metastore.out 2>&1 &
 
   # Wait for the Metastore to come up because HiveServer2 relies on it being live.
@@ -194,7 +195,8 @@ if [[ ${START_HIVESERVER} -eq 1 && -z $HS2_PID ]]; then
   # Starts a HiveServer2 instance on the port specified by the HIVE_SERVER2_THRIFT_PORT
   # environment variable. HADOOP_HEAPSIZE should be set to at least 2048 to avoid OOM
   # when loading ORC tables like widerow.
-  HADOOP_CLIENT_OPTS="-Xmx2048m -Dhive.log.file=hive-server2.log" hive \
+  HADOOP_CLIENT_OPTS="-Xmx2048m -Dhive.log.dir=${LOGDIR} \
+      -Dhive.log.file=hive-server2.log" hive \
       --service hiveserver2 >> ${LOGDIR}/hive-server2.out 2>&1 &
 
   # Wait for the HiveServer2 service to come up because callers of this script
