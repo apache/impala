@@ -27,9 +27,11 @@ from tests.common.skip import (
     SkipIfBuildType,
     SkipIfDockerizedCluster)
 from tests.common.test_dimensions import (
+    FILE_FORMAT_TO_STORED_AS_MAP,
     add_mandatory_exec_option,
     create_single_exec_option_dimension,
     is_supported_insert_format)
+
 
 class TestTpcdsQuery(ImpalaTestSuite):
   @classmethod
@@ -40,9 +42,9 @@ class TestTpcdsQuery(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestTpcdsQuery, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and
-        v.get_value('table_format').compression_codec in ['none', 'snap'] and
-        v.get_value('table_format').compression_type != 'record')
+        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu']
+        and v.get_value('table_format').compression_codec in ['none', 'snap']
+        and v.get_value('table_format').compression_type != 'record')
     add_mandatory_exec_option(cls, 'decimal_v2', 0)
 
     if cls.exploration_strategy() != 'exhaustive':
@@ -345,9 +347,9 @@ class TestTpcdsDecimalV2Query(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestTpcdsDecimalV2Query, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and
-        v.get_value('table_format').compression_codec in ['none', 'snap'] and
-        v.get_value('table_format').compression_type != 'record')
+        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu']
+        and v.get_value('table_format').compression_codec in ['none', 'snap']
+        and v.get_value('table_format').compression_type != 'record')
 
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on the execution time for these tests in core by running only
@@ -704,11 +706,17 @@ class TestTpcdsInsert(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         is_supported_insert_format(v.get_value('table_format')))
 
-  def test_tpcds_partitioned_insert(self, vector):
-    self.run_test_case('partitioned-insert', vector)
+  def create_test_file_vars(self, vector):
+    stored_as = FILE_FORMAT_TO_STORED_AS_MAP[vector.get_value('table_format').file_format]
+    return {'$FILE_FORMAT': stored_as}
 
-  def test_expr_insert(self, vector):
-    self.run_test_case('expr-insert', vector)
+  def test_tpcds_partitioned_insert(self, vector, unique_database):
+    self.run_test_case('partitioned-insert', vector, unique_database,
+        test_file_vars=self.create_test_file_vars(vector))
+
+  def test_expr_insert(self, vector, unique_database):
+    self.run_test_case('expr-insert', vector, unique_database,
+        test_file_vars=self.create_test_file_vars(vector))
 
 
 class TestTpcdsUnmodified(ImpalaTestSuite):
@@ -720,9 +728,9 @@ class TestTpcdsUnmodified(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestTpcdsUnmodified, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and
-        v.get_value('table_format').compression_codec in ['none', 'snap'] and
-        v.get_value('table_format').compression_type != 'record')
+        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu']
+        and v.get_value('table_format').compression_codec in ['none', 'snap']
+        and v.get_value('table_format').compression_type != 'record')
 
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on the execution time for these tests in core by running only

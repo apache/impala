@@ -253,7 +253,7 @@ do
            "test execution time)"
       echo "[-testexhaustive] : Run tests in 'exhaustive' mode, which significantly"\
            "increases test execution time. ONLY APPLIES to suites with workloads:"\
-           "functional-query, targeted-stress"
+           "functional-query, targeted-stress, tpcds-insert"
       echo "[-testdata] : Loads test data. Implied as true if -snapshot_file is"\
            "specified. If -snapshot_file is not specified, data will be regenerated."
       echo "[-snapshot_file <file name>] : Load test data from a snapshot file"

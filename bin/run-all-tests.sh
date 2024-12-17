@@ -193,7 +193,8 @@ TIMEOUT_PID=$!
 COMMON_PYTEST_ARGS="--maxfail=${MAX_PYTEST_FAILURES} --exploration_strategy=core"`
     `" --workload_exploration_strategy="`
         `"functional-query:${EXPLORATION_STRATEGY},"`
-        `"targeted-stress:${EXPLORATION_STRATEGY}"
+        `"targeted-stress:${EXPLORATION_STRATEGY},"`
+        `"tpcds-insert:${EXPLORATION_STRATEGY}"
 if [[ "${EXPLORATION_STRATEGY}" == "core" ]]; then
   # Skip the stress test in core - all stress tests are in exhaustive and
   # pytest startup takes a significant amount of time.

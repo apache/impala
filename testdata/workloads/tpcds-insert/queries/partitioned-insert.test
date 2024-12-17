@@ -1,23 +1,21 @@
 ====
----- QUERY: TPCDS-SS-INSERT-SETUP1
-DROP TABLE IF EXISTS store_sales_insert
-====
 ---- QUERY: TPCDS-SS-INSERT-SETUP2
-CREATE TABLE store_sales_insert LIKE store_sales
+CREATE TABLE store_sales_insert LIKE tpcds.store_sales
+STORED AS $FILE_FORMAT
 ---- RESULTS
 'Table has been created.'
 ====
 ---- QUERY: TPCDS-SS-INSERT-DAY
 # Insert a day's worth of data
 INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_sold_date_sk)
-SELECT * FROM store_sales
+SELECT * FROM tpcds.store_sales
 WHERE ss_sold_date_sk = 2451239
 ---- RESULTS
 ss_sold_date_sk=2451239: 847
 ====
 ---- QUERY: TPCDS-SS-INSERT-MONTH
 INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_sold_date_sk)
-SELECT * FROM store_sales
+SELECT * FROM tpcds.store_sales
 WHERE ss_sold_date_sk >= 2451270 and ss_sold_date_sk <= 2451299
 ---- RESULTS
 ss_sold_date_sk=2451270: 822
@@ -53,7 +51,7 @@ ss_sold_date_sk=2451299: 703
 ====
 ---- QUERY: TPCDS-SS-INSERT-QUARTER
 INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_sold_date_sk)
-SELECT * FROM store_sales
+SELECT * FROM tpcds.store_sales
 WHERE ss_sold_date_sk >= 2451423 and ss_sold_date_sk <= 2451544
 ---- RESULTS
 ss_sold_date_sk=2451423: 1881
@@ -181,7 +179,7 @@ ss_sold_date_sk=2451544: 3046
 ====
 ---- QUERY: TPCDS-SS-INSERT-YEAR
 INSERT OVERWRITE TABLE store_sales_insert PARTITION (ss_sold_date_sk)
-SELECT * FROM store_sales
+SELECT * FROM tpcds.store_sales
 WHERE ss_sold_date_sk >= 2451545 and ss_sold_date_sk < 2451911
 ---- RESULTS
 ss_sold_date_sk=2451545: 2743
