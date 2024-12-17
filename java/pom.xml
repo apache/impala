@@ -59,6 +59,7 @@ under the License.
     <kudu.version>${env.IMPALA_KUDU_VERSION}</kudu.version>
     <slf4j.version>${env.IMPALA_SLF4J_VERSION}</slf4j.version>
     <commons-io.version>${env.IMPALA_COMMONS_IO_VERSION}</commons-io.version>
+    <commons-lang3.version>${env.IMPALA_COMMONS_LANG3_VERSION}</commons-lang3.version>
     <reload4j.version>${env.IMPALA_RELOAD4j_VERSION}</reload4j.version>
     <junit.version>${env.IMPALA_JUNIT_VERSION}</junit.version>
     <!-- Beware compatibility requirements with Thrift and
@@ -262,6 +263,12 @@ under the License.
         <groupId>org.apache.avro</groupId>
         <artifactId>avro</artifactId>
         <version>${avro.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>${commons-lang3.version}</version>
       </dependency>
 
       <!-- Override httpcore from libthrift to a later maintenance version. Noticed
