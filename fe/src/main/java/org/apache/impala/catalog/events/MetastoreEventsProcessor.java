@@ -37,7 +37,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
-import org.apache.commons.lang.exception.ExceptionUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient.NotificationFilter;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
@@ -1087,7 +1087,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       String msg = "Event processing needs a invalidate command to resolve the state";
       LOG.error(msg, ex);
       eventProcessorErrorMsg_ = LocalDateTime.now().toString() + '\n' + msg + '\n' +
-          ExceptionUtils.getFullStackTrace(ex);
+          ExceptionUtils.getStackTrace(ex);
       tryAutoGlobalInvalidateOnFailure();
     } catch (Exception ex) {
       // There are lot of Preconditions which can throw RuntimeExceptions when we
@@ -1097,7 +1097,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       String msg = "Unexpected exception received while processing event";
       LOG.error(msg, ex);
       eventProcessorErrorMsg_ = LocalDateTime.now().toString() + '\n' + msg + '\n' +
-          ExceptionUtils.getFullStackTrace(ex);
+          ExceptionUtils.getStackTrace(ex);
       dumpEventInfoToLog(currentEvent_);
       tryAutoGlobalInvalidateOnFailure();
     }

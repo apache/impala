@@ -260,7 +260,6 @@ export APACHE_OZONE_VERSION=1.4.0
 # Java dependencies that are not also runtime components. Declaring versions here allows
 # other branches to override them in impala-config-branch.sh for cleaner patches.
 export IMPALA_BOUNCY_CASTLE_VERSION=1.78
-export IMPALA_COMMONS_IO_VERSION=2.6
 export IMPALA_COMMONS_LANG3_VERSION=3.17.0
 export IMPALA_COS_VERSION=3.1.0-8.0.8
 export IMPALA_DERBY_VERSION=10.14.2.0

@@ -3497,7 +3497,7 @@ public class CatalogOpExecutor {
     try {
       Database db = metastoreClient.getDatabase(dbName);
       if (!db.isSetParameters()) return false;
-      return org.apache.commons.lang.StringUtils
+      return org.apache.commons.lang3.StringUtils
           .isNotEmpty(db.getParameters().get("repl.source.for"));
     } catch (TException tException) {
       throw new CatalogException(

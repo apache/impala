@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang.exception.ExceptionUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.hive.metastore.api.AddPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.AddPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
@@ -1273,7 +1273,7 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
       String errMsg = String.format(SYNC_TABLE_LATEST_EVENT_ID_ERR_MSG,
           tbl.getFullName(), apiName);
       LOG.error("{}. Exception stacktrace: {} ", errMsg,
-          ExceptionUtils.getFullStackTrace(e));
+          ExceptionUtils.getStackTrace(e));
       rethrowException(e, apiName);
     }
   }
@@ -1298,7 +1298,7 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
       String errMsg = String.format(SYNC_DB_LATEST_EVENT_ID_ERR_MSG,
               db.getName(), apiName);
       LOG.error("{}. Exception stacktrace: {} ", errMsg,
-          ExceptionUtils.getFullStackTrace(e));
+          ExceptionUtils.getStackTrace(e));
       rethrowException(e, apiName);
     }
   }

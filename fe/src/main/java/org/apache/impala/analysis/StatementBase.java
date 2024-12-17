@@ -21,7 +21,7 @@ import java.util.Collections;
 import java.util.List;
 
 import java.util.Optional;
-import org.apache.commons.lang.NotImplementedException;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;

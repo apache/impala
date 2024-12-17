@@ -19,7 +19,7 @@ package org.apache.impala.util;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;

@@ -18,7 +18,7 @@
 package org.apache.impala.customservice;
 
 import static org.junit.Assert.assertEquals;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import org.apache.impala.analysis.AnalyzeKuduDDLTest;
 import org.apache.impala.analysis.AuditingKuduTest;

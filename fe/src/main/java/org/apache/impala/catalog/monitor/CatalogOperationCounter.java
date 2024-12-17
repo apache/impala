@@ -17,7 +17,7 @@
 
 package org.apache.impala.catalog.monitor;
 
-import org.apache.commons.lang.mutable.MutableLong;
+import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.impala.thrift.TOperationUsageCounter;
 import org.apache.impala.thrift.TTableName;
 
