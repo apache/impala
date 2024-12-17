@@ -44,8 +44,7 @@ www/c3/*
 www/Chart*
 www/d3.v3.min.js
 www/d3.v5.min.js
-www/DataTables*/*
-www/datatables-*.*
+www/datatables/*
 www/favicon.ico
 www/highlight/*
 www/icons/*

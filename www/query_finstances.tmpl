@@ -18,6 +18,10 @@ under the License.
 -->
 
 {{> www/common-header.tmpl }}
+
+<link rel="stylesheet" type="text/css" href="{{ __common__.host-url }}/www/datatables/extensions/dataTables.rowGroup-1.5.1.min.css"/>
+<script type="text/javascript" src="{{ __common__.host-url }}/www/datatables/extensions/dataTables.rowGroup-1.5.1.min.js"></script>
+
 {{> www/query_detail_tabs.tmpl }}
 <br/>
 {{?backend_instances}}
@@ -97,6 +101,9 @@ $(document).ready(() => {
                      {data: 'current_state'},
                      {data: 'done'},
                      {data: 'time_since_last_heard_from'}],
+        "rowGroup": {
+          dataSrc : "fragment_name"
+        },
         "order": [[ 0, "desc" ]],
         "pageLength": 100
     });
