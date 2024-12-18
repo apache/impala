@@ -45,6 +45,30 @@ public class MathUtilTest {
   }
 
   @Test
+  public void testSaturatingMultiplyCardinality() {
+    long[] validCard = {0, 1, 2, Long.MAX_VALUE / 2, Long.MAX_VALUE};
+    long unknown = -1;
+
+    // Case 1: both argument is valid.
+    for (long c1 : validCard) {
+      for (long c2 : validCard) {
+        assertEquals(c1 + " * " + c2, MathUtil.saturatingMultiply(c1, c2),
+            MathUtil.saturatingMultiplyCardinalites(c1, c2));
+      }
+    }
+    // Case 2: One argument is valid, the other is unknown.
+    for (long c : validCard) {
+      assertEquals(c + " * " + unknown, unknown,
+          MathUtil.saturatingMultiplyCardinalites(c, unknown));
+      assertEquals(unknown + " * " + c, unknown,
+          MathUtil.saturatingMultiplyCardinalites(unknown, c));
+    }
+    // Case 3: both argument is unknown.
+    assertEquals(unknown + " * " + unknown, unknown,
+        MathUtil.saturatingMultiplyCardinalites(unknown, unknown));
+  }
+
+  @Test
   public void testSaturatingAdd() {
     // No overflow
     assertEquals(1234, MathUtil.saturatingAdd(1200, 34));

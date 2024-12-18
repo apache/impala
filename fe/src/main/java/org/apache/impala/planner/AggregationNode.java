@@ -297,7 +297,7 @@ public class AggregationNode extends PlanNode {
         numGroups =
             estimateNumGroups(aggInfo.getGroupingExprs(), aggInputCardinality_, this);
       }
-      Preconditions.checkState(numGroups >= -1, numGroups);
+      Preconditions.checkState(numGroups >= -1, "numGroups is invalid: %s", numGroups);
 
       if (LOG.isTraceEnabled()) {
         LOG.trace("{} aggPhase={} aggInputCardinality={} aggIdx={} numGroups={} "
@@ -340,7 +340,7 @@ public class AggregationNode extends PlanNode {
     if (groupingExprs.isEmpty()) {
       return NON_GROUPING_AGG_NUM_GROUPS;
     } else {
-      return lowerNumGroupsByInputCardinality(preaggNumGroup, aggInputCardinality);
+      return smallestValidCardinality(preaggNumGroup, aggInputCardinality);
     }
   }
 
@@ -400,7 +400,10 @@ public class AggregationNode extends PlanNode {
       }
     }
 
-    List<Pair<Long, List<Expr>>> knownCardinalities = new ArrayList<>();
+    // List of <outputCardinality, groupingExpressions> pairs.
+    // Note that outputCardinality can be -1.
+    List<Pair<Long, List<Expr>>> knownCardinalitySources = new ArrayList<>();
+
     if (tupleIdToExprs.isEmpty()) {
       Preconditions.checkState(exprsWithUniqueTupleId.size() == groupingExprs.size(),
           "Missing expression after TupleId analysis! Expect %s but found %s",
@@ -416,7 +419,7 @@ public class AggregationNode extends PlanNode {
         for (TupleId id : childNode.getTupleIds()) {
           List<Expr> exprs = tupleIdToExprs.get(id);
           if (exprs != null) {
-            knownCardinalities.add(Pair.create(childNode.getCardinality(), exprs));
+            knownCardinalitySources.add(Pair.create(childNode.getCardinality(), exprs));
             tupleIdToExprs.remove(id);
           }
         }
@@ -433,18 +436,36 @@ public class AggregationNode extends PlanNode {
     }
 
     long numGroups = 1;
-    if (!exprsWithUniqueTupleId.isEmpty()) {
-      numGroups = estimateNumGroups(exprsWithUniqueTupleId, aggInputCardinality);
-    }
-    for (Pair<Long, List<Expr>> entry : knownCardinalities) {
+    for (Pair<Long, List<Expr>> entry : knownCardinalitySources) {
       // Pick the minimum between NDV multiple of the expressions vs cardinality
       // of tuple.
-      long numGroupFromCommonTuple = Math.min(
-          entry.getFirst(), estimateNumGroups(entry.getSecond(), aggInputCardinality));
-      numGroups = Math.min(aggInputCardinality,
-          MathUtil.saturatingMultiply(numGroups, numGroupFromCommonTuple));
+      long tupleCard = entry.getFirst();
+      long tupleNdv = estimateNumGroups(entry.getSecond(), aggInputCardinality);
+      long numGroupFromCommonTuple = smallestValidCardinality(tupleCard, tupleNdv);
+      if (numGroupFromCommonTuple < 0) {
+        // Can not reason about tuple cardinality.
+        // Fallback to the original estimation logic by moving all exprs to
+        // exprsWithUniqueTupleId.
+        exprsWithUniqueTupleId.addAll(entry.getSecond());
+      } else {
+        numGroups =
+            MathUtil.saturatingMultiplyCardinalites(numGroups, numGroupFromCommonTuple);
+      }
     }
-    return numGroups;
+    // numGroups should be non-negative at this point.
+    Preconditions.checkState(numGroups > -1, numGroups);
+
+    if (!exprsWithUniqueTupleId.isEmpty()) {
+      long numGroupsForUniqueTuples =
+          estimateNumGroups(exprsWithUniqueTupleId, aggInputCardinality);
+      if (numGroupsForUniqueTuples < 0) {
+        numGroups = -1;
+      } else {
+        numGroups =
+            MathUtil.saturatingMultiplyCardinalites(numGroups, numGroupsForUniqueTuples);
+      }
+    }
+    return smallestValidCardinality(numGroups, aggInputCardinality);
   }
 
   /**
@@ -457,26 +478,12 @@ public class AggregationNode extends PlanNode {
     Preconditions.checkArgument(
         !groupingExprs.isEmpty(), "groupingExprs must not be empty");
     long numGroups = Expr.getNumDistinctValues(groupingExprs);
-    if (numGroups == -1) {
-      // A worst-case cardinality_ is better than an unknown cardinality_.
-      // Note that this will still be -1 if the child's cardinality is unknown.
-      return aggInputCardinality;
-    }
-    // We have a valid estimate of the number of groups. Cap it at number of input
-    // rows because an aggregation cannot increase the cardinality_.
-    if (aggInputCardinality >= 0) {
-      numGroups = Math.min(aggInputCardinality, numGroups);
-    }
-    return lowerNumGroupsByInputCardinality(numGroups, aggInputCardinality);
-  }
-
-  private static long lowerNumGroupsByInputCardinality(
-      long numGroups, long aggInputCardinality) {
-    if (aggInputCardinality >= 0) {
-      return Math.min(numGroups, aggInputCardinality);
-    } else {
-      return numGroups;
-    }
+    // Return the least & valid cardinality between numGroups vs aggInputCardinality.
+    // Grouping aggregation cannot increase output cardinality.
+    // Also, worst-case output cardinality is better than an unknown output cardinality.
+    // Note that this will still be -1 (unknown) if both numGroups
+    // and aggInputCardinality is unknown.
+    return smallestValidCardinality(numGroups, aggInputCardinality);
   }
 
   /**

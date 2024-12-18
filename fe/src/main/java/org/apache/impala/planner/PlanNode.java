@@ -748,10 +748,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   protected long capCardinalityAtLimit(long cardinality) {
-    if (hasLimit()) {
-      return capCardinalityAtLimit(cardinality, limit_);
-    }
-    return cardinality;
+    return smallestValidCardinality(cardinality, limit_);
   }
 
   // Default implementation of computing the total data processed in bytes.
@@ -759,10 +756,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     Preconditions.checkState(hasValidStats());
     return ProcessingCost.basicCost(getDisplayLabel(), getInputCardinality(),
         ExprUtil.computeExprsTotalCost(getConjuncts()));
-  }
-
-  public static long capCardinalityAtLimit(long cardinality, long limit) {
-    return cardinality == -1 ? limit : Math.min(cardinality, limit);
   }
 
   /**
@@ -1410,4 +1403,22 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * need to explicitly enable it.
    */
   public boolean isTupleCachingImplemented() { return false; }
+
+  /**
+   * Return the least between 'cardinality1' and 'cardinality2'
+   * that is not a negative number (unknown).
+   * Can return -1 if both number is less than 0.
+   * Both argument should not be < -1.
+   */
+  protected static long smallestValidCardinality(long cardinality1, long cardinality2) {
+    Preconditions.checkArgument(
+        cardinality1 >= -1, "cardinality1 is invalid: %s", cardinality1);
+    Preconditions.checkArgument(
+        cardinality2 >= -1, "cardinality2 is invalid: %s", cardinality2);
+    if (cardinality1 >= 0) {
+      if (cardinality2 >= 0) return Math.min(cardinality1, cardinality2);
+      return cardinality1;
+    }
+    return Math.max(-1, cardinality2);
+  }
 }

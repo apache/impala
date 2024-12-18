@@ -17,6 +17,7 @@
 
 package org.apache.impala.util;
 
+import com.google.common.base.Preconditions;
 import com.google.common.math.LongMath;
 
 public class MathUtil {
@@ -30,6 +31,19 @@ public class MathUtil {
     } catch (ArithmeticException e) {
       return a < 0 != b < 0 ? Long.MIN_VALUE : Long.MAX_VALUE;
     }
+  }
+
+  // Multiply two cardinality numbers like saturatingMultiply() but with additional
+  // precondition check that both must be a valid cardinality value.
+  // Return -1 if any argument is -1.
+  public static long saturatingMultiplyCardinalites(
+      long cardinality1, long cardinality2) {
+    Preconditions.checkArgument(
+        cardinality1 >= -1, "cardinality1 is invalid: %s", cardinality1);
+    Preconditions.checkArgument(
+        cardinality2 >= -1, "cardinality2 is invalid: %s", cardinality2);
+    if (cardinality1 == -1 || cardinality2 == -1) return -1;
+    return saturatingMultiply(cardinality1, cardinality2);
   }
 
   // Add two numbers. If the add would overflow, return either Long.MAX_VALUE if both are

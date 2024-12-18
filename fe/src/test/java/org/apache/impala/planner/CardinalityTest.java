@@ -1311,4 +1311,27 @@ public class CardinalityTest extends PlannerTestBase {
         expected * CARDINALITY_TOLERANCE);
   }
 
+  @Test
+  public void testSmallestValidCardinality() {
+    long[] validCard = {0, 1, Long.MAX_VALUE};
+    long unknown = -1;
+
+    // Case 1: both argument is valid.
+    for (long c1 : validCard) {
+      for (long c2 : validCard) {
+        assertEquals(c1 + " vs " + c2, Math.min(c1, c2),
+            PlanNode.smallestValidCardinality(c1, c2));
+      }
+    }
+    // Case 2: One argument is valid, the other is unknown.
+    for (long c : validCard) {
+      assertEquals(
+          c + " vs " + unknown, c, PlanNode.smallestValidCardinality(c, unknown));
+      assertEquals(
+          unknown + " vs " + c, c, PlanNode.smallestValidCardinality(unknown, c));
+    }
+    // Case 3: both argument is unknown.
+    assertEquals(unknown + " vs " + unknown, unknown,
+        PlanNode.smallestValidCardinality(unknown, unknown));
+  }
 }

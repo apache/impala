@@ -125,7 +125,7 @@ public class SortNode extends PlanNode {
       PlanNodeId id, PlanNode input, SortInfo info, long offset, long limit,
       boolean includeTies) {
     long topNBytesLimit = queryOptions.topn_bytes_limit;
-    long topNCardinality = capCardinalityAtLimit(input.cardinality_, limit);
+    long topNCardinality = smallestValidCardinality(input.cardinality_, limit);
     long estimatedTopNMaterializedSize =
         info.estimateTopNMaterializedSize(topNCardinality, offset);
 
@@ -221,7 +221,7 @@ public class SortNode extends PlanNode {
     Preconditions.checkState(!hasLimit());
     Preconditions.checkState(!hasOffset());
     long topNBytesLimit = analyzer.getQueryOptions().topn_bytes_limit;
-    long topNCardinality = capCardinalityAtLimit(getChild(0).cardinality_, limit);
+    long topNCardinality = smallestValidCardinality(getChild(0).cardinality_, limit);
     long estimatedTopNMaterializedSize =
         info_.estimateTopNMaterializedSize(topNCardinality, offset_);
 
@@ -302,7 +302,7 @@ public class SortNode extends PlanNode {
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     if (isTypeTopN() && includeTies_) {
-      cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_, limitWithTies_);
+      cardinality_ = smallestValidCardinality(getChild(0).cardinality_, limitWithTies_);
     } else {
       cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_);
     }

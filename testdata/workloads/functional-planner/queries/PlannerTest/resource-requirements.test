@@ -4252,6 +4252,497 @@ Per-Instance Resources: mem-estimate=88.47MB mem-reservation=8.00MB thread-reser
    tuple-ids=2 row-size=16B cardinality=6.00M
    in pipelines: 02(GETNEXT)
 ====
+# IMPALA-13622: TPC-H Q18 with tpch.customer replaced with tpch_avro.customer
+# that does not have stats. This meant to test that none of cardinality estimation code
+# for AggregationNode return cardinality or numGroups less than -1.
+# All preconditions in AggregationNode.java should pass.
+ select
+  c_name,
+  c_custkey,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice,
+  sum(l_quantity)
+from
+  tpch_avro.customer,
+  tpch.orders,
+  tpch.lineitem
+where
+  o_orderkey in (
+    select
+      l_orderkey
+    from
+      tpch.lineitem
+    group by
+      l_orderkey
+    having
+      sum(l_quantity) > 300
+    )
+  and c_custkey = o_custkey
+  and o_orderkey = l_orderkey
+group by
+  c_name,
+  c_custkey,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice
+order by
+  o_totalprice desc,
+  o_orderdate
+limit 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=138.50MB Threads=5
+Per-Host Resource Estimates: Memory=2.46GB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_avro.customer
+Analyzed query: SELECT c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice,
+sum(l_quantity) FROM tpch_avro.customer, tpch.orders, tpch.lineitem LEFT SEMI
+JOIN (SELECT l_orderkey FROM tpch.lineitem GROUP BY l_orderkey HAVING
+sum(l_quantity) > CAST(300 AS DECIMAL(5,0))) `$a$1` (`$c$1`) ON o_orderkey =
+`$a$1`.`$c$1` WHERE TRUE AND c_custkey = o_custkey AND o_orderkey = l_orderkey
+GROUP BY c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice ORDER BY
+o_totalprice DESC, o_orderdate ASC LIMIT CAST(100 AS TINYINT)
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=2.46GB mem-reservation=138.50MB thread-reservation=5 runtime-filters-memory=4.00MB
+PLAN-ROOT SINK
+|  output exprs: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice, sum(l_quantity)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+09:TOP-N [LIMIT=100]
+|  order by: o_totalprice DESC, o_orderdate ASC
+|  mem-estimate=7.23KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7 row-size=74B cardinality=100
+|  in pipelines: 09(GETNEXT), 08(OPEN)
+|
+08:AGGREGATE [FINALIZE]
+|  output: sum(l_quantity)
+|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=74B cardinality=600.12K
+|  in pipelines: 08(GETNEXT), 02(OPEN)
+|
+07:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: o_orderkey = l_orderkey
+|  runtime filters: RF000[bloom] <- l_orderkey
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  tuple-ids=2,1,0 row-size=82B cardinality=600.12K
+|  in pipelines: 02(GETNEXT), 04(OPEN)
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: sum(l_quantity)
+|  |  group by: l_orderkey
+|  |  having: sum(l_quantity) > CAST(300 AS DECIMAL(5,0))
+|  |  mem-estimate=53.68MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=24B cardinality=156.34K
+|  |  in pipelines: 04(GETNEXT), 03(OPEN)
+|  |
+|  03:SCAN HDFS [tpch.lineitem]
+|     HDFS partitions=1/1 files=1 size=718.94MB
+|     stored statistics:
+|       table: rows=6.00M size=718.94MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.07M
+|     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+|     tuple-ids=3 row-size=16B cardinality=6.00M
+|     in pipelines: 03(GETNEXT)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: o_custkey = c_custkey
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF002[bloom] <- c_custkey
+|  mem-estimate=2.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2,1,0 row-size=82B cardinality=5.76M
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+|--00:SCAN HDFS [tpch_avro.customer]
+|     HDFS partitions=1/1 files=1 size=23.05MB
+|     stored statistics:
+|       table: rows=unavailable size=23.05MB
+|       columns: unavailable
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=1
+|     tuple-ids=0 row-size=20B cardinality=unavailable
+|     in pipelines: 00(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF004[bloom] <- o_orderkey
+|  mem-estimate=113.80MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2,1 row-size=62B cardinality=5.76M
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpch.orders]
+|     HDFS partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000[bloom] -> o_orderkey, RF002[bloom] -> o_custkey
+|     stored statistics:
+|       table: rows=1.50M size=162.56MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+|     tuple-ids=1 row-size=46B cardinality=1.50M
+|     in pipelines: 01(GETNEXT)
+|
+02:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF000[bloom] -> tpch.lineitem.l_orderkey, RF004[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=2 row-size=16B cardinality=6.00M
+   in pipelines: 02(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=253.75MB Threads=11
+Per-Host Resource Estimates: Memory=2.71GB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_avro.customer
+Analyzed query: SELECT c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice,
+sum(l_quantity) FROM tpch_avro.customer, tpch.orders, tpch.lineitem LEFT SEMI
+JOIN (SELECT l_orderkey FROM tpch.lineitem GROUP BY l_orderkey HAVING
+sum(l_quantity) > CAST(300 AS DECIMAL(5,0))) `$a$1` (`$c$1`) ON o_orderkey =
+`$a$1`.`$c$1` WHERE TRUE AND c_custkey = o_custkey AND o_orderkey = l_orderkey
+GROUP BY c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice ORDER BY
+o_totalprice DESC, o_orderdate ASC LIMIT CAST(100 AS TINYINT)
+
+F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice, sum(l_quantity)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+17:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: o_totalprice DESC, o_orderdate ASC
+|  limit: 100
+|  mem-estimate=25.26KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7 row-size=74B cardinality=100
+|  in pipelines: 09(GETNEXT)
+|
+F06:PLAN FRAGMENT [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=138.23MB mem-reservation=34.00MB thread-reservation=1
+09:TOP-N [LIMIT=100]
+|  order by: o_totalprice DESC, o_orderdate ASC
+|  mem-estimate=7.23KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7 row-size=74B cardinality=100
+|  in pipelines: 09(GETNEXT), 16(OPEN)
+|
+16:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_quantity)
+|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=74B cardinality=600.12K
+|  in pipelines: 16(GETNEXT), 02(OPEN)
+|
+15:EXCHANGE [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)]
+|  mem-estimate=10.23MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=74B cardinality=600.12K
+|  in pipelines: 02(GETNEXT)
+|
+F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=2.23GB mem-reservation=144.75MB thread-reservation=1 runtime-filters-memory=4.00MB
+08:AGGREGATE [STREAMING]
+|  output: sum(l_quantity)
+|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=74B cardinality=600.12K
+|  in pipelines: 02(GETNEXT)
+|
+07:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
+|  hash predicates: o_orderkey = l_orderkey
+|  runtime filters: RF000[bloom] <- l_orderkey
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=2,1,0 row-size=82B cardinality=600.12K
+|  in pipelines: 02(GETNEXT), 14(OPEN)
+|
+|--14:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(l_quantity)
+|  |  group by: l_orderkey
+|  |  having: sum(l_quantity) > CAST(300 AS DECIMAL(5,0))
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=24B cardinality=156.34K
+|  |  in pipelines: 14(GETNEXT), 03(OPEN)
+|  |
+|  13:EXCHANGE [HASH(l_orderkey)]
+|  |  mem-estimate=10.08MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=24B cardinality=1.56M
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=139.84MB mem-reservation=42.00MB thread-reservation=2
+|  04:AGGREGATE [STREAMING]
+|  |  output: sum(l_quantity)
+|  |  group by: l_orderkey
+|  |  mem-estimate=51.51MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=24B cardinality=1.56M
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  03:SCAN HDFS [tpch.lineitem, RANDOM]
+|     HDFS partitions=1/1 files=1 size=718.94MB
+|     stored statistics:
+|       table: rows=6.00M size=718.94MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.07M
+|     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+|     tuple-ids=3 row-size=16B cardinality=6.00M
+|     in pipelines: 03(GETNEXT)
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_custkey = c_custkey
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF002[bloom] <- c_custkey
+|  mem-estimate=2.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2,1,0 row-size=82B cardinality=5.76M
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+|--12:EXCHANGE [BROADCAST]
+|  |  mem-estimate=23.98KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=0 row-size=20B cardinality=unavailable
+|  |  in pipelines: 00(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.09MB mem-reservation=8.00MB thread-reservation=2
+|  00:SCAN HDFS [tpch_avro.customer, RANDOM]
+|     HDFS partitions=1/1 files=1 size=23.05MB
+|     stored statistics:
+|       table: rows=unavailable size=23.05MB
+|       columns: unavailable
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=1
+|     tuple-ids=0 row-size=20B cardinality=unavailable
+|     in pipelines: 00(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  runtime filters: RF004[bloom] <- o_orderkey
+|  mem-estimate=37.93MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2,1 row-size=62B cardinality=5.76M
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+|--11:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=10.10MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=46B cardinality=1.50M
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=90.59MB mem-reservation=10.00MB thread-reservation=2 runtime-filters-memory=2.00MB
+|  01:SCAN HDFS [tpch.orders, RANDOM]
+|     HDFS partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000[bloom] -> o_orderkey, RF002[bloom] -> o_custkey
+|     stored statistics:
+|       table: rows=1.50M size=162.56MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+|     tuple-ids=1 row-size=46B cardinality=1.50M
+|     in pipelines: 01(GETNEXT)
+|
+10:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=10.06MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=16B cardinality=6.00M
+|  in pipelines: 02(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=91.23MB mem-reservation=11.00MB thread-reservation=2 runtime-filters-memory=3.00MB
+02:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF000[bloom] -> tpch.lineitem.l_orderkey, RF004[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=2 row-size=16B cardinality=6.00M
+   in pipelines: 02(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=443.75MB Threads=16
+Per-Host Resource Estimates: Memory=3.23GB
+Analyzed query: SELECT c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice,
+sum(l_quantity) FROM tpch_avro.customer, tpch.orders, tpch.lineitem LEFT SEMI
+JOIN (SELECT l_orderkey FROM tpch.lineitem GROUP BY l_orderkey HAVING
+sum(l_quantity) > CAST(300 AS DECIMAL(5,0))) `$a$1` (`$c$1`) ON o_orderkey =
+`$a$1`.`$c$1` WHERE TRUE AND c_custkey = o_custkey AND o_orderkey = l_orderkey
+GROUP BY c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice ORDER BY
+o_totalprice DESC, o_orderdate ASC LIMIT CAST(100 AS TINYINT)
+
+F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice, sum(l_quantity)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+17:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: o_totalprice DESC, o_orderdate ASC
+|  limit: 100
+|  mem-estimate=48.11KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7 row-size=74B cardinality=100
+|  in pipelines: 09(GETNEXT)
+|
+F06:PLAN FRAGMENT [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)] hosts=3 instances=6
+Per-Instance Resources: mem-estimate=138.46MB mem-reservation=34.00MB thread-reservation=1
+09:TOP-N [LIMIT=100]
+|  order by: o_totalprice DESC, o_orderdate ASC
+|  mem-estimate=7.23KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7 row-size=74B cardinality=100
+|  in pipelines: 09(GETNEXT), 16(OPEN)
+|
+16:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_quantity)
+|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=74B cardinality=600.12K
+|  in pipelines: 16(GETNEXT), 02(OPEN)
+|
+15:EXCHANGE [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)]
+|  mem-estimate=10.46MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=74B cardinality=600.12K
+|  in pipelines: 02(GETNEXT)
+|
+F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
+Per-Instance Resources: mem-estimate=139.95MB mem-reservation=34.00MB thread-reservation=1
+08:AGGREGATE [STREAMING]
+|  output: sum(l_quantity)
+|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=74B cardinality=600.12K
+|  in pipelines: 02(GETNEXT)
+|
+07:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
+|  hash-table-id=00
+|  hash predicates: o_orderkey = l_orderkey
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=2,1,0 row-size=82B cardinality=600.12K
+|  in pipelines: 02(GETNEXT), 14(OPEN)
+|
+|--F08:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
+|  |  Per-Instance Resources: mem-estimate=28.16MB mem-reservation=20.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l_orderkey
+|  |  runtime filters: RF000[bloom] <- l_orderkey
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  |
+|  14:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(l_quantity)
+|  |  group by: l_orderkey
+|  |  having: sum(l_quantity) > CAST(300 AS DECIMAL(5,0))
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=24B cardinality=156.34K
+|  |  in pipelines: 14(GETNEXT), 03(OPEN)
+|  |
+|  13:EXCHANGE [HASH(l_orderkey)]
+|  |  mem-estimate=10.16MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=24B cardinality=1.56M
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+|  Per-Instance Resources: mem-estimate=122.66MB mem-reservation=42.00MB thread-reservation=1
+|  04:AGGREGATE [STREAMING]
+|  |  output: sum(l_quantity)
+|  |  group by: l_orderkey
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=24B cardinality=1.56M
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  03:SCAN HDFS [tpch.lineitem, RANDOM]
+|     HDFS partitions=1/1 files=1 size=718.94MB
+|     stored statistics:
+|       table: rows=6.00M size=718.94MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.07M
+|     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
+|     tuple-ids=3 row-size=16B cardinality=6.00M
+|     in pipelines: 03(GETNEXT)
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=01
+|  hash predicates: o_custkey = c_custkey
+|  fk/pk conjuncts: assumed fk/pk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2,1,0 row-size=82B cardinality=5.76M
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+|--F09:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
+|  |  Per-Instance Resources: mem-estimate=2.00GB mem-reservation=69.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: c_custkey
+|  |  runtime filters: RF002[bloom] <- c_custkey
+|  |  mem-estimate=2.00GB mem-reservation=68.00MB spill-buffer=2.00MB thread-reservation=0
+|  |
+|  12:EXCHANGE [BROADCAST]
+|  |  mem-estimate=23.98KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=0 row-size=20B cardinality=unavailable
+|  |  in pipelines: 00(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=32.09MB mem-reservation=8.00MB thread-reservation=1
+|  00:SCAN HDFS [tpch_avro.customer, RANDOM]
+|     HDFS partitions=1/1 files=1 size=23.05MB
+|     stored statistics:
+|       table: rows=unavailable size=23.05MB
+|       columns: unavailable
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=0
+|     tuple-ids=0 row-size=20B cardinality=unavailable
+|     in pipelines: 00(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash-table-id=02
+|  hash predicates: l_orderkey = o_orderkey
+|  fk/pk conjuncts: l_orderkey = o_orderkey
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2,1 row-size=62B cardinality=5.76M
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+|--F10:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
+|  |  Per-Instance Resources: mem-estimate=46.10MB mem-reservation=36.00MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: o_orderkey
+|  |  runtime filters: RF004[bloom] <- o_orderkey
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |
+|  11:EXCHANGE [HASH(o_orderkey)]
+|  |  mem-estimate=10.10MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=46B cardinality=1.50M
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
+|  Per-Instance Resources: mem-estimate=89.17MB mem-reservation=8.00MB thread-reservation=1
+|  01:SCAN HDFS [tpch.orders, RANDOM]
+|     HDFS partitions=1/1 files=1 size=162.56MB
+|     runtime filters: RF000[bloom] -> o_orderkey, RF002[bloom] -> o_custkey
+|     stored statistics:
+|       table: rows=1.50M size=162.56MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.18M
+|     mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
+|     tuple-ids=1 row-size=46B cardinality=1.50M
+|     in pipelines: 01(GETNEXT)
+|
+10:EXCHANGE [HASH(l_orderkey)]
+|  mem-estimate=10.12MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=16B cardinality=6.00M
+|  in pipelines: 02(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
+Per-Instance Resources: mem-estimate=88.47MB mem-reservation=8.00MB thread-reservation=1
+02:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF000[bloom] -> tpch.lineitem.l_orderkey, RF004[bloom] -> l_orderkey
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=2 row-size=16B cardinality=6.00M
+   in pipelines: 02(GETNEXT)
+====
 # Unpartitioned HDFS insert
 insert into table functional.alltypesnopart
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
