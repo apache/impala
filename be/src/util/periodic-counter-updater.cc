@@ -47,16 +47,16 @@ void PeriodicCounterUpdater::Init() {
   // Create two singletons, which will live until the process terminates.
   instance_ = new PeriodicCounterUpdater(FLAGS_periodic_counter_update_period_ms);
 
-  instance_->update_thread_.reset(
-      new thread(boost::bind(&PeriodicCounterUpdater::UpdateLoop, instance_, instance_)));
+  ABORT_IF_ERROR(Thread::Create("common", "periodic-counter-updater",
+      &PeriodicCounterUpdater::UpdateLoop, instance_, instance_,
+      &instance_->update_thread_));
 
   system_instance_ =
       new PeriodicCounterUpdater(FLAGS_periodic_system_counter_update_period_ms);
 
-  system_instance_->update_thread_.reset(
-      new thread(boost::bind(&PeriodicCounterUpdater::UpdateLoop, system_instance_,
-          system_instance_)));
-
+  ABORT_IF_ERROR(Thread::Create("common", "periodic-system-counter-updater",
+      &PeriodicCounterUpdater::UpdateLoop, system_instance_, system_instance_,
+      &system_instance_->update_thread_));
 }
 
 void PeriodicCounterUpdater::RegisterUpdateFunction(UpdateFn update_fn, bool is_system) {
