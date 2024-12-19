@@ -17,14 +17,19 @@
 
 #include "runtime/timestamp-value.h"
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #include "exprs/timestamp-functions.h"
 #include "exprs/timezone_db.h"
 #include "runtime/datetime-simple-date-format-parser.h"
+#include "runtime/exec-env.h"
 #include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.inline.h"
+#include "service/frontend.h"
 
 #include "common/names.h"
 
+using boost::algorithm::starts_with;
 using boost::date_time::not_a_date_time;
 using boost::gregorian::date;
 using boost::gregorian::date_duration;
@@ -155,6 +160,32 @@ void TimestampValue::UtcToLocal(const Timezone& local_tz,
   }
 }
 
+void TimestampValue::HiveLegacyUtcToLocal(const Timezone& local_tz) {
+  DCHECK(HasDateAndTime());
+  int64_t utc_time_millis;
+  if (UNLIKELY(!FloorUtcToUnixTimeMillis(&utc_time_millis))) {
+    SetToInvalidDateTime();
+    return;
+  }
+
+  string tz = local_tz.name();
+  static constexpr std::string_view zoneinfo = "/usr/share/zoneinfo/";
+  if (starts_with(tz, zoneinfo)) {
+    tz = tz.substr(zoneinfo.size());
+  }
+
+  TCivilTime cs;
+  Status status = ExecEnv::GetInstance()->frontend()->HiveLegacyTimezoneConvert(
+      tz, utc_time_millis, &cs);
+  if (UNLIKELY(!status.ok())) {
+    // This would result in log spam. However it should be impossible to fail.
+    LOG(ERROR) << "Timezone " << tz << " cannot be used with legacy Hive conversion.";
+    return;
+  }
+  date_ = boost::gregorian::date(cs.year, cs.month, cs.day);
+  time_ = time_duration(cs.hour, cs.minute, cs.second, time_.fractional_seconds());
+}
+
 void TimestampValue::LocalToUtc(const Timezone& local_tz,
     TimestampValue* pre_utc_if_repeated, TimestampValue* post_utc_if_repeated) {
   DCHECK(HasDateAndTime());
@@ -224,14 +255,6 @@ TimestampValue TimestampValue::UnixTimeToLocal(
     return TimestampValue(
         boost::gregorian::date(to_cs.year(), to_cs.month(), to_cs.day()),
         boost::posix_time::time_duration(to_cs.hour(), to_cs.minute(), to_cs.second()));
-  }
-}
-
-TimestampValue TimestampValue::FromUnixTime(time_t unix_time, const Timezone* local_tz) {
-  if (local_tz != UTCPTR) {
-    return UnixTimeToLocal(unix_time, *local_tz);
-  } else {
-    return UtcFromUnixTimeTicks<1>(unix_time);
   }
 }
 

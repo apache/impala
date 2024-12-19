@@ -587,10 +587,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   }
 
   /// Evaluates the min/max predicates of the 'scan_node_' using the parquet::Statistics
-  /// of 'row_group'. 'file_metadata' is used to determine the ordering that was used to
-  /// compute the statistics. Sets 'skip_row_group' to true if the row group can be
-  /// skipped, 'false' otherwise.
-  Status EvaluateStatsConjuncts(const parquet::FileMetaData& file_metadata,
+  /// of 'row_group'. Sets 'skip_row_group' to true if the row group can be skipped,
+  /// 'false' otherwise.
+  Status EvaluateStatsConjuncts(
       const parquet::RowGroup& row_group, bool* skip_row_group) WARN_UNUSED_RESULT;
 
   /// Advances 'row_group_idx_' to the next non-empty row group and initializes
@@ -601,12 +600,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   Status NextRowGroup() WARN_UNUSED_RESULT;
 
   /// Evaluates the overlap predicates of the 'scan_node_' using the parquet::Statistics
-  /// of 'row_group'. 'file_metadata' is used to determine the ordering that was used to
-  /// compute the statistics. Sets 'skip_row_group' to true if the row group can be
-  /// skipped, 'false' otherwise.
+  /// of 'row_group'. Sets 'skip_row_group' to true if the row group can be skipped,
+  /// 'false' otherwise.
   Status EvaluateOverlapForRowGroup(
-    const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
-    bool* skip_row_group);
+      const parquet::RowGroup& row_group, bool* skip_row_group);
 
   /// Return true if filter 'minmax_filter' of fitler id 'filter_id' is too close to
   /// column min/max stats available at the target desc entry targets[0] in
@@ -631,12 +628,12 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
       SchemaNode** schema_node_ptr = nullptr);
 
   /// Create a ColumnStatsReader object for a column chunk described by a schema
-  /// path in a slot descriptor 'slot_desc'. 'file_metadata', 'row_group', 'node',
-  /// and 'col_type' provide extra data needed.
+  /// path in a slot descriptor 'slot_desc'. 'row_group', 'node', and 'col_type' provide
+  /// extra data needed.
   /// On return:
   ///   A column chunk stats reader ('ColumnStatsReader') is returned.
-  ColumnStatsReader CreateStatsReader(const parquet::FileMetaData& file_metadata,
-      const parquet::RowGroup& row_group, SchemaNode* node, const ColumnType& col_type);
+  ColumnStatsReader CreateStatsReader(const parquet::RowGroup& row_group,
+      SchemaNode* node, const ColumnType& col_type);
 
   /// Return the overlap predicate descs from the HDFS scan plan.
   const vector<TOverlapPredicateDesc>& GetOverlapPredicateDescs();
@@ -944,6 +941,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// then we skip to row index 'skip_to_row'.
   Status SkipRowsForColumns(const vector<ParquetColumnReader*>& column_readers,
       int64_t* num_rows_to_skip, int64_t* skip_to_row);
+
+  /// Returns whether Hive legacy zone conversion should be used for transforming
+  /// timestamps based on file metadata and configuration.
+  bool GetHiveZoneConversionLegacy() const;
 };
 
 } // namespace impala

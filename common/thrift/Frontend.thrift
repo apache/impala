@@ -1092,3 +1092,17 @@ struct TWrappedHttpResponse {
   5: optional string content
   6: optional string content_type
 }
+
+// Captures civil time - local time in a specific time zone - mirroring
+// cctz::civil_second. Used to serialize Java timezone conversions back to C++ code.
+// Omits subsecond measurements because
+// - matches cctz::civil_second; no known timezone libraries have subsecond adjustments
+// - Java timezone conversion is only accurate to milliseconds, but we use nanoseconds
+struct TCivilTime {
+  1: required i32 year
+  2: required i32 month
+  3: required i32 day
+  4: required i32 hour
+  5: required i32 minute
+  6: required i32 second
+}

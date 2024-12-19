@@ -19,6 +19,8 @@
 
 #include "exprs/timezone_db.h"
 #include "runtime/raw-value.inline.h"
+#include "runtime/timestamp-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "testutil/gtest-util.h"
 
 #include "common/names.h"

@@ -1,0 +1,34 @@
+====
+---- QUERY
+SET timezone="Asia/Singapore";
+SELECT * FROM t;
+---- RESULTS
+1899-12-31 16:00:00
+1899-12-31 16:00:00
+1899-12-31 17:04:35
+2020-04-08 05:17:05.215000000
+2020-04-08 05:17:05.215000000
+====
+---- QUERY
+SET timezone="Asia/Singapore";
+SET convert_legacy_hive_parquet_utc_timestamps=true;
+SELECT * FROM t;
+---- RESULTS
+1899-12-31 22:55:25
+1899-12-31 22:55:25
+1900-01-01 00:00:00
+2020-04-08 13:17:05.215000000
+2020-04-08 13:17:05.215000000
+====
+---- QUERY
+SET timezone="Asia/Singapore";
+SET convert_legacy_hive_parquet_utc_timestamps=true;
+SET use_legacy_hive_timestamp_conversion=true;
+SELECT * FROM t;
+---- RESULTS
+1899-12-31 22:55:25
+1900-01-01 00:00:00
+1900-01-01 00:00:00
+2020-04-08 13:17:05.215000000
+2020-04-08 13:17:05.215000000
+====

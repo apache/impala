@@ -764,7 +764,7 @@ public:
   ParquetTimestampDecoder() {}
 
   ParquetTimestampDecoder( const parquet::SchemaElement& e, const Timezone* timezone,
-      bool convert_int96_timestamps);
+      bool convert_int96_timestamps, bool hive_legacy_conversion);
 
   bool NeedsConversion() const { return timezone_ != nullptr; }
 
@@ -798,7 +798,13 @@ public:
 
   void ConvertToLocalTime(TimestampValue* v) const {
     DCHECK(timezone_ != nullptr);
-    if (v->HasDateAndTime()) v->UtcToLocal(*timezone_);
+    if (v->HasDateAndTime()) {
+      if (hive_legacy_conversion_) {
+        v->HiveLegacyUtcToLocal(*timezone_);
+      } else {
+        v->UtcToLocal(*timezone_);
+      }
+    }
   }
 
   /// Timezone conversion of min/max stats need some extra logic because UTC->local
@@ -831,6 +837,9 @@ private:
   /// INT64 decoding. INT64 with nanosecond precision (and reduced range) is also planned
   /// to be implemented once it is added in Parquet (PARQUET-1387).
   Precision precision_ = NANO;
+
+  /// Use Hive legacy-compatible conversion with Java DateFormat.
+  bool hive_legacy_conversion_ = false;
 };
 
 template <>

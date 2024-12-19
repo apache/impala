@@ -37,8 +37,11 @@
 #include "exprs/timezone_db.h"
 #include "exprs/timestamp-functions.h"
 #include "runtime/datetime-simple-date-format-parser.h"
+#include "runtime/test-env.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
+#include "service/fe-support.h"
+#include "service/frontend.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 #include "util/pretty-printer.h"
@@ -49,118 +52,120 @@
 using std::random_device;
 using std::mt19937;
 using std::uniform_int_distribution;
-using std::thread;
 
 using namespace impala;
 using namespace datetime_parse_util;
 
 // Benchmark tests for timestamp time-zone conversions
 /*
-Machine Info: Intel(R) Core(TM) i5-6600 CPU @ 3.30GHz
+Machine Info: 12th Gen Intel(R) Core(TM) i9-12900K
 
 UtcToUnixTime:             Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                            (glibc)               7.98     8.14      8.3         1X         1X         1X
-                      (Google/CCTZ)               17.9     18.2     18.5      2.24X      2.24X      2.23X
-                            (boost)                301      306      311      37.7X      37.5X      37.5X
+                            (glibc)                 12     12.1     12.2         1X         1X         1X
+                      (Google/CCTZ)               25.2     25.5     25.5       2.1X      2.11X      2.09X
+                            (boost)                635      643      646        53X      53.3X      52.9X
 
 LocalToUnixTime:           Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                            (glibc)              0.717    0.732    0.745         1X         1X         1X
-                      (Google/CCTZ)               15.3     15.5     15.8      21.3X      21.2X      21.2X
+                            (glibc)              0.739    0.745    0.745         1X         1X         1X
+                      (Google/CCTZ)               23.2     23.4     23.7      31.4X      31.4X      31.7X
 
 FromUtc:                   Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                            (boost)                1.6     1.63     1.67         1X         1X         1X
-                      (Google/CCTZ)               14.5     14.8     15.2      9.06X      9.09X      9.11X
+                            (boost)               2.59      2.6      2.6         1X         1X         1X
+                      (Google/CCTZ)               24.4     24.7     24.9      9.45X       9.5X      9.58X
 
 ToUtc:                     Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                            (boost)               1.63     1.67     1.68         1X         1X         1X
-                      (Google/CCTZ)                8.7      8.9     9.05      5.34X      5.34X      5.38X
+                            (boost)                2.6     2.64     2.65         1X         1X         1X
+                      (Google/CCTZ)               13.5     13.6     13.7       5.2X      5.16X      5.18X
 
 UtcToLocal:                Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                            (glibc)               2.68     2.75      2.8         1X         1X         1X
-                      (Google/CCTZ)                 15     15.2     15.5      5.59X      5.55X      5.53X
+                            (glibc)               4.42     4.42     4.44         1X         1X         1X
+                      (Google/CCTZ)               25.6     26.6       27      5.78X      6.01X      6.08X
+                              (JVM)              0.511    0.596      0.6     0.115X     0.135X     0.135X
 
 UnixTimeToLocalPtime:      Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                            (glibc)               2.69     2.75      2.8         1X         1X         1X
-                      (Google/CCTZ)               14.8     15.1     15.4       5.5X      5.49X      5.52X
+                            (glibc)               4.51     4.53     4.53         1X         1X         1X
+                      (Google/CCTZ)               23.7     24.1     24.4      5.25X      5.32X       5.4X
 
 UnixTimeToUtcPtime:        Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                            (glibc)                 17     17.6     17.9         1X         1X         1X
-                      (Google/CCTZ)               6.45     6.71     6.81     0.379X     0.382X      0.38X
-                        (fast path)               25.1       26     26.4      1.47X      1.48X      1.48X
-                        (day split)               48.6     50.3     51.3      2.85X      2.87X      2.86X
+                            (glibc)               24.8     25.1     25.6         1X         1X         1X
+                      (Google/CCTZ)               13.9       14     14.1     0.562X     0.557X     0.553X
+                        (fast path)               54.3     54.8     55.4      2.19X      2.18X      2.17X
+                        (day split)                196      199      200      7.89X      7.92X      7.81X
 
 UtcFromUnixTimeMicros:     Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                  (sec split (old))               17.9     18.7     19.1         1X         1X         1X
-                        (day split)                111      116      118      6.21X      6.19X      6.19X
+                  (sec split (old))               30.1       31     31.7         1X         1X         1X
+                        (day split)                526      532      534      17.5X      17.2X      16.9X
 
 FromUnixTimeNanos:         Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                  (sec split (old))               18.7     19.5     19.8         1X         1X         1X
-                  (sec split (new))                104      108      110      5.58X      5.55X      5.57X
+                  (sec split (old))               36.8     37.5       39         1X         1X         1X
+                  (sec split (new))                319      323      324      8.68X      8.61X      8.33X
 
 FromSubsecondUnixTime:     Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                              (old)               18.7     18.7     18.7         1X         1X         1X
-                              (new)               73.5     74.1     74.1      3.94X      3.96X      3.96X
+                              (old)               37.1       38     38.7         1X         1X         1X
+                              (new)                175      175      177      4.71X       4.6X      4.59X
 
 Number of threads: 8
 
 UtcToUnixTime:
-             (glibc) elapsed time: 1s020ms
-       (Google/CCTZ) elapsed time: 144ms
-             (boost) elapsed time: 10ms
-cctz speedup: 7.0784
-boost speedup: 95.1732
+             (glibc) elapsed time: 793ms
+       (Google/CCTZ) elapsed time: 152ms
+             (boost) elapsed time: 3ms
+cctz speedup: 5.20977
+boost speedup: 260.517
 
 LocalToUnixTime:
-             (glibc) elapsed time: 18s050ms
-       (Google/CCTZ) elapsed time: 212ms
-speedup: 84.9949
+             (glibc) elapsed time: 21s750ms
+       (Google/CCTZ) elapsed time: 242ms
+speedup: 89.6388
 
 FromUtc:
-             (boost) elapsed time: 1s519ms
-       (Google/CCTZ) elapsed time: 263ms
-speedup: 5.77003
+             (boost) elapsed time: 1s298ms
+       (Google/CCTZ) elapsed time: 279ms
+speedup: 4.64642
 
 ToUtc:
-             (boost) elapsed time: 1s674ms
-       (Google/CCTZ) elapsed time: 325ms
-speedup: 5.13874
+             (boost) elapsed time: 1s436ms
+       (Google/CCTZ) elapsed time: 496ms
+speedup: 2.89263
 
 UtcToLocal:
-             (glibc) elapsed time: 4s862ms
-       (Google/CCTZ) elapsed time: 263ms
-speedup: 18.4253
+             (glibc) elapsed time: 4s565ms
+       (Google/CCTZ) elapsed time: 260ms
+               (JVM) elapsed time: 2s507ms
+cctz speedup: 17.5058
+jvm speedup: 1.82038
 
 UnixTimeToLocalPtime:
-             (glibc) elapsed time: 4s856ms
-       (Google/CCTZ) elapsed time: 259ms
-speedup: 18.7398
+             (glibc) elapsed time: 4s576ms
+       (Google/CCTZ) elapsed time: 268ms
+speedup: 17.0547
 
 UnixTimeToUtcPtime:
-             (glibc) elapsed time: 928ms
-       (Google/CCTZ) elapsed time: 282ms
-         (fast path) elapsed time: 90ms
-cctz speedup: 3.28187
-fast path speedup: 10.2951
+             (glibc) elapsed time: 478ms
+       (Google/CCTZ) elapsed time: 123ms
+         (fast path) elapsed time: 25ms
+cctz speedup: 3.87304
+fast path speedup: 18.9835
 */
 
 vector<TimestampValue> AddTestDataDateTimes(int n, const string& startstr) {
@@ -223,11 +228,11 @@ public:
     }
 
     // Create and start threads.
-    vector<unique_ptr<thread>> threads(num_of_threads);
+    vector<unique_ptr<std::thread>> threads(num_of_threads);
     StopWatch sw;
     sw.Start();
     for (int i = 0; i < num_of_threads; ++i) {
-      threads[i] = make_unique<thread>(
+      threads[i] = make_unique<std::thread>(
           run_test, batch_size, test_data[i].get());
     }
 
@@ -401,6 +406,13 @@ TimestampValue cctz_utc_to_local(const TimestampValue& ts_value) {
     }
   }
   return TimestampValue(d, t);
+}
+
+// JVM
+TimestampValue jvm_utc_to_local(const TimestampValue& ts_value) {
+  TimestampValue result = ts_value;
+  result.HiveLegacyUtcToLocal(*PTR_CCTZ_LOCAL_TZ);
+  return result;
 }
 
 
@@ -603,8 +615,7 @@ TimestampValue old_split_utc_from_unix_time_nanos(const SplitNanoAndSecond& unix
 TimestampValue new_split_utc_from_unix_time_nanos(const SplitNanoAndSecond& unix_time) {
   // The TimestampValue version is used as it is hard to reproduce the same logic without
   // accessing private members.
-  return TimestampValue::FromUnixTimeNanos(unix_time.seconds, unix_time.nanos,
-      &TimezoneDatabase::GetUtcTimezone());
+  return TimestampValue::FromUnixTimeNanos(unix_time.seconds, unix_time.nanos, UTCPTR);
 }
 
 TimestampValue from_subsecond_unix_time_old(const double& unix_time) {
@@ -621,8 +632,7 @@ TimestampValue from_subsecond_unix_time_new(const double& unix_time) {
   const double ONE_BILLIONTH = 0.000000001;
   int64_t unix_time_whole = unix_time;
   int64_t nanos = (unix_time - unix_time_whole) / ONE_BILLIONTH;
-  return TimestampValue::FromUnixTimeNanos(
-      unix_time_whole, nanos, &TimezoneDatabase::GetUtcTimezone());
+  return TimestampValue::FromUnixTimeNanos(unix_time_whole, nanos, UTCPTR);
 }
 
 //
@@ -698,7 +708,11 @@ TimestampVal cctz_to_utc(const TimestampVal& ts_val) {
 
 
 int main(int argc, char* argv[]) {
-  CpuInfo::Init();
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
+  impala::InitFeSupport();
+  TestEnv test_env;
+  CHECK(test_env.Init().ok());
+
   cout << Benchmark::GetMachineInfo() << endl;
 
   ABORT_IF_ERROR(TimezoneDatabase::Initialize());
@@ -783,9 +797,12 @@ int main(int argc, char* argv[]) {
       tsvalue_data;
   TestData<TimestampValue, TimestampValue, cctz_utc_to_local> cctz_utc_to_local_data =
       tsvalue_data;
+  TestData<TimestampValue, TimestampValue, jvm_utc_to_local> jvm_utc_to_local_data =
+      tsvalue_data;
 
   glibc_utc_to_local_data.add_to_benchmark(bm_utc_to_local, "(glibc)");
   cctz_utc_to_local_data.add_to_benchmark(bm_utc_to_local, "(Google/CCTZ)");
+  jvm_utc_to_local_data.add_to_benchmark(bm_utc_to_local, "(JVM)");
   cout << bm_utc_to_local.Measure() << endl;
 
   bail_if_results_dont_match(vector<const vector<TimestampValue>*>{
@@ -795,7 +812,7 @@ int main(int argc, char* argv[]) {
   vector<time_t> time_data;
   for (const TimestampValue& tsvalue: tsvalue_data) {
     time_t unix_time;
-    tsvalue.ToUnixTime(&TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    tsvalue.ToUnixTime(UTCPTR, &unix_time);
     time_data.push_back(unix_time);
   }
 
@@ -859,7 +876,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < tsvalue_data.size(); ++i) {
     const TimestampValue& tsvalue = tsvalue_data[i];
     time_t unix_time;
-    tsvalue.ToUnixTime(&TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    tsvalue.ToUnixTime(UTCPTR, &unix_time);
     int micros = (i * 1001) % MICROS_PER_SEC; // add some sub-second part
     microsec_data.push_back(unix_time * MICROS_PER_SEC + micros);
   }
@@ -885,7 +902,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < tsvalue_data.size(); ++i) {
     const TimestampValue& tsvalue = tsvalue_data[i];
     time_t unix_time;
-    tsvalue.ToUnixTime(&TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    tsvalue.ToUnixTime(UTCPTR, &unix_time);
     int nanos = (i * 1001) % NANOS_PER_SEC; // add some sub-second part
     nanosec_data.push_back(SplitNanoAndSecond {unix_time, nanos} );
   }
@@ -911,7 +928,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < tsvalue_data.size(); ++i) {
     const TimestampValue& tsvalue = tsvalue_data[i];
     time_t unix_time;
-    tsvalue.ToUnixTime(&TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    tsvalue.ToUnixTime(UTCPTR, &unix_time);
     double nanos = (i * 1001) % NANOS_PER_SEC; // add some sub-second part
     double_data.push_back((double)unix_time + nanos / NANOS_PER_SEC);
   }
@@ -979,7 +996,10 @@ int main(int argc, char* argv[]) {
         num_of_threads, BATCH_SIZE, tsvalue_data, "(glibc)");
     m2 = cctz_utc_to_local_data.measure_multithreaded_elapsed_time(
         num_of_threads, BATCH_SIZE, tsvalue_data, "(Google/CCTZ)");
-    cout << "speedup: " << double(m1)/double(m2) << endl;
+    m3 = jvm_utc_to_local_data.measure_multithreaded_elapsed_time(
+        num_of_threads, BATCH_SIZE, tsvalue_data, "(JVM)");
+    cout << "cctz speedup: " << double(m1)/double(m2) << endl;
+    cout << "jvm speedup: " << double(m1)/double(m3) << endl;
 
     // UnixTimeToLocalPtime
     cout << endl << "UnixTimeToLocalPtime:" << endl;

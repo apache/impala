@@ -255,7 +255,8 @@ bool ParquetTimestampDecoder::GetTimestampInfoFromSchema(const parquet::SchemaEl
 }
 
 ParquetTimestampDecoder::ParquetTimestampDecoder(const parquet::SchemaElement& e,
-    const Timezone* timezone, bool convert_int96_timestamps) {
+    const Timezone* timezone, bool convert_int96_timestamps,
+    bool hive_legacy_conversion) : hive_legacy_conversion_(hive_legacy_conversion) {
   bool needs_conversion = false;
   bool valid_schema = GetTimestampInfoFromSchema(e, precision_, needs_conversion);
   DCHECK(valid_schema); // Invalid schemas should be rejected in an earlier step.
@@ -267,7 +268,15 @@ void ParquetTimestampDecoder::ConvertMinStatToLocalTime(TimestampValue* v) const
   DCHECK(timezone_ != nullptr);
   if (!v->HasDateAndTime()) return;
   TimestampValue repeated_period_start;
-  v->UtcToLocal(*timezone_, &repeated_period_start);
+  if (hive_legacy_conversion_) {
+    // Hive legacy conversion does not have efficient tools for identifying repeated
+    // periods, so subtract a day to ensure we cover all possible repeated periods
+    // (such as switching from UTC- to UTC+ near the international date line).
+    v->HiveLegacyUtcToLocal(*timezone_);
+    v->Subtract(boost::posix_time::hours(24));
+  } else {
+    v->UtcToLocal(*timezone_, &repeated_period_start);
+  }
   if (repeated_period_start.HasDateAndTime()) *v = repeated_period_start;
 }
 
@@ -275,7 +284,15 @@ void ParquetTimestampDecoder::ConvertMaxStatToLocalTime(TimestampValue* v) const
   DCHECK(timezone_ != nullptr);
   if (!v->HasDateAndTime()) return;
   TimestampValue repeated_period_end;
-  v->UtcToLocal(*timezone_, nullptr, &repeated_period_end);
+  if (hive_legacy_conversion_) {
+    // Hive legacy conversion does not have efficient tools for identifying repeated
+    // periods, so add a day to ensure we cover all possible repeated periods
+    // (such as switching from UTC- to UTC+ near the international date line).
+    v->HiveLegacyUtcToLocal(*timezone_);
+    v->Add(boost::posix_time::hours(24));
+  } else {
+    v->UtcToLocal(*timezone_, nullptr, &repeated_period_end);
+  }
   if (repeated_period_end.HasDateAndTime()) *v = repeated_period_end;
 }
 }

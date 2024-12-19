@@ -21,6 +21,8 @@
 #include <queue>
 #include <stack>
 
+#include <boost/algorithm/string.hpp>
+#include <boost/range/adaptor/transformed.hpp>
 #include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
 
@@ -53,6 +55,9 @@
 
 #include "common/names.h"
 
+using boost::adaptors::transformed;
+using boost::algorithm::iequals;
+using boost::algorithm::join;
 using std::move;
 using std::sort;
 using namespace impala;
@@ -564,14 +569,13 @@ Status HdfsParquetScanner::ResolveSchemaForStatFiltering(SlotDescriptor* slot_de
 }
 
 ColumnStatsReader HdfsParquetScanner::CreateStatsReader(
-    const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
-    SchemaNode* node, const ColumnType& col_type) {
+    const parquet::RowGroup& row_group, SchemaNode* node, const ColumnType& col_type) {
   DCHECK(node);
 
   int col_idx = node->col_idx;
   DCHECK_LT(col_idx, row_group.columns.size());
 
-  const vector<parquet::ColumnOrder>& col_orders = file_metadata.column_orders;
+  const vector<parquet::ColumnOrder>& col_orders = file_metadata_.column_orders;
   const parquet::ColumnOrder* col_order =
       col_idx < col_orders.size() ? &col_orders[col_idx] : nullptr;
 
@@ -585,8 +589,7 @@ ColumnStatsReader HdfsParquetScanner::CreateStatsReader(
   return stat_reader;
 }
 
-Status HdfsParquetScanner::EvaluateStatsConjuncts(
-    const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
+Status HdfsParquetScanner::EvaluateStatsConjuncts(const parquet::RowGroup& row_group,
     bool* skip_row_group) {
   *skip_row_group = false;
 
@@ -623,7 +626,7 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     }
 
     ColumnStatsReader stats_reader =
-        CreateStatsReader(file_metadata, row_group, node, slot_desc->type());
+        CreateStatsReader(row_group, node, slot_desc->type());
 
     bool all_nulls = false;
     if (stats_reader.AllNulls(&all_nulls) && all_nulls) {
@@ -686,8 +689,7 @@ bool HdfsParquetScanner::FilterAlreadyDisabledOrOverlapWithColumnStats(
 }
 
 Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
-    const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
-    bool* skip_row_group) {
+    const parquet::RowGroup& row_group, bool* skip_row_group) {
   *skip_row_group = false;
 
   if (!state_->query_options().parquet_read_statistics) return Status::OK();
@@ -764,7 +766,7 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
       break;
     }
     ColumnStatsReader stats_reader =
-        CreateStatsReader(file_metadata, row_group, node, slot_desc->type());
+        CreateStatsReader(row_group, node, slot_desc->type());
 
     bool all_nulls = false;
     if (stats_reader.AllNulls(&all_nulls) && all_nulls) {
@@ -926,8 +928,7 @@ Status HdfsParquetScanner::NextRowGroup() {
 
     // Evaluate row group statistics with stats conjuncts.
     bool skip_row_group_on_stats;
-    RETURN_IF_ERROR(
-        EvaluateStatsConjuncts(file_metadata_, row_group, &skip_row_group_on_stats));
+    RETURN_IF_ERROR(EvaluateStatsConjuncts(row_group, &skip_row_group_on_stats));
     if (skip_row_group_on_stats) {
       COUNTER_ADD(num_stats_filtered_row_groups_counter_, 1);
       continue;
@@ -935,8 +936,7 @@ Status HdfsParquetScanner::NextRowGroup() {
 
     // Evaluate row group statistics with min/max filters.
     bool skip_row_group_on_minmax;
-    RETURN_IF_ERROR(
-      EvaluateOverlapForRowGroup(file_metadata_, row_group, &skip_row_group_on_minmax));
+    RETURN_IF_ERROR(EvaluateOverlapForRowGroup(row_group, &skip_row_group_on_minmax));
     if (skip_row_group_on_minmax) {
       COUNTER_ADD(num_minmax_filtered_row_groups_counter_, 1);
       continue;
@@ -1487,7 +1487,7 @@ Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
     }
 
     ColumnStatsReader stats_reader =
-        CreateStatsReader(file_metadata_, row_group, node, slot_desc->type());
+        CreateStatsReader(row_group, node, slot_desc->type());
 
     DCHECK_LT(col_idx, row_group.columns.size());
     const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
@@ -1570,7 +1570,7 @@ Status HdfsParquetScanner::EvaluatePageIndex() {
     }
     int col_idx = node->col_idx;;
     ColumnStatsReader stats_reader =
-        CreateStatsReader(file_metadata_, row_group, node, slot_desc->type());
+        CreateStatsReader(row_group, node, slot_desc->type());
 
     DCHECK_LT(col_idx, row_group.columns.size());
     const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
@@ -2826,6 +2826,13 @@ Status HdfsParquetScanner::ProcessFooter() {
 
   RETURN_IF_ERROR(ParquetMetadataUtils::ValidateFileVersion(file_metadata_, filename()));
 
+  if (VLOG_FILE_IS_ON) {
+    VLOG_FILE << "Parquet metadata for " << filename() << " created by "
+              << file_metadata_.created_by << ":\n"
+              << join(file_metadata_.key_value_metadata | transformed(
+                  [](parquet::KeyValue kv) { return kv.key + "=" + kv.value; }), "\n");
+  }
+
   // IMPALA-3943: Do not throw an error for empty files for backwards compatibility.
   if (file_metadata_.num_rows == 0) {
     // Warn if the num_rows is inconsistent with the row group metadata.
@@ -3157,8 +3164,41 @@ ParquetTimestampDecoder HdfsParquetScanner::CreateTimestampDecoder(
       state_->query_options().convert_legacy_hive_parquet_utc_timestamps &&
       state_->local_time_zone() != UTCPTR;
 
-  return ParquetTimestampDecoder(element, state_->local_time_zone(),
-      timestamp_conversion_needed_for_int96_timestamps);
+  const Timezone* timezone = state_->local_time_zone();
+  bool hive_legacy_conversion = false;
+  if (timestamp_conversion_needed_for_int96_timestamps && GetHiveZoneConversionLegacy()) {
+    VLOG_FILE << "Using Hive legacy timezone conversion";
+    hive_legacy_conversion = true;
+  }
+
+  return ParquetTimestampDecoder(element, timezone,
+      timestamp_conversion_needed_for_int96_timestamps, hive_legacy_conversion);
+}
+
+bool HdfsParquetScanner::GetHiveZoneConversionLegacy() const {
+  string writer_zone_conversion_legacy;
+  string writer_time_zone;
+  for (const parquet::KeyValue& kv : file_metadata_.key_value_metadata) {
+    if (kv.key == "writer.zone.conversion.legacy") {
+      writer_zone_conversion_legacy = kv.value;
+    } else if (kv.key == "writer.time.zone") {
+      writer_time_zone = kv.value;
+    }
+  }
+
+  if (writer_zone_conversion_legacy != "") {
+    return iequals(writer_zone_conversion_legacy, "true");
+  }
+
+  // There are no explicit meta about the legacy conversion.
+  if (writer_time_zone != "") {
+    // There is meta about the timezone thus we can infer that when the file was written,
+    // the new APIs were used.
+    return false;
+  }
+
+  // There is no (relevant) metadata in the file, use the configuration.
+  return state_->query_options().use_legacy_hive_timestamp_conversion;
 }
 
 void HdfsParquetScanner::UpdateCompressedPageSizeCounter(int64_t compressed_page_size) {

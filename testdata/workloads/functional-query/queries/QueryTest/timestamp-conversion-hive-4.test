@@ -1,0 +1,28 @@
+====
+---- QUERY
+SET timezone="Asia/Kuala_Lumpur";
+SELECT * FROM hive_kuala_lumpur_legacy;
+---- RESULTS
+1899-12-31 16:00:00
+1909-12-31 17:00:00
+1934-12-31 16:40:00
+1939-12-31 16:40:00
+1941-12-31 16:30:00
+1943-12-31 15:00:00
+1969-01-28 16:30:00
+1999-12-31 16:00:00
+====
+---- QUERY
+SET timezone="Asia/Kuala_Lumpur";
+SET convert_legacy_hive_parquet_utc_timestamps=true;
+SELECT * FROM hive_kuala_lumpur_legacy;
+---- RESULTS
+1900-01-01 00:00:00
+1910-01-01 00:00:00
+1935-01-01 00:00:00
+1940-01-01 00:00:00
+1942-01-01 00:00:00
+1944-01-01 00:00:00
+1969-01-29 00:00:00
+2000-01-01 00:00:00
+====

@@ -157,7 +157,8 @@ Frontend::Frontend() {
   };
 
   JniMethodDescriptor staticMethods[] = {
-    {"getSecretFromKeyStore", "([B)Ljava/lang/String;", &get_secret_from_key_store_}
+    {"getSecretFromKeyStore", "([B)Ljava/lang/String;", &get_secret_from_key_store_},
+    {"hiveLegacyTimezoneConvert", "([BJ)[B", &hive_legacy_timezone_convert_}
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
@@ -435,4 +436,13 @@ Status Frontend::GetSecretFromKeyStore(const string& secret_key, string* secret)
   secret_key_t.__set_value(secret_key);
   return JniUtil::CallStaticJniMethod(fe_class_, get_secret_from_key_store_, secret_key_t,
       secret);
+}
+
+Status Frontend::HiveLegacyTimezoneConvert(
+    const string& timezone, long utc_time_millis, TCivilTime* local_time) {
+  TStringLiteral timezone_t;
+  timezone_t.__set_value(timezone);
+  return JniCall::static_method(fe_class_, hive_legacy_timezone_convert_)
+      .with_thrift_arg(timezone_t).with_primitive_arg(utc_time_millis)
+      .Call(local_time);
 }

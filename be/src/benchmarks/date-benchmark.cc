@@ -26,6 +26,8 @@
 #include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/date-parse-util.h"
 #include "runtime/timestamp-parse-util.h"
+#include "runtime/timestamp-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 

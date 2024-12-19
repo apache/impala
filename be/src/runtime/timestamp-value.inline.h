@@ -77,6 +77,15 @@ inline TimestampValue TimestampValue::UtcFromUnixTimeLimitedRangeNanos(
   return UtcFromUnixTimeTicks<NANOS_PER_SEC>(unix_time_nanos);
 }
 
+inline TimestampValue TimestampValue::FromUnixTime(time_t unix_time,
+    const Timezone* local_tz) {
+  if (local_tz != UTCPTR) {
+    return UnixTimeToLocal(unix_time, *local_tz);
+  } else {
+    return UtcFromUnixTimeTicks<1>(unix_time);
+  }
+}
+
 inline TimestampValue TimestampValue::FromUnixTimeNanos(time_t unix_time, int64_t nanos,
     const Timezone* local_tz) {
   unix_time =

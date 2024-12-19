@@ -249,6 +249,10 @@ class Frontend {
   /// Get secret from jceks key store for the input secret_key.
   Status GetSecretFromKeyStore(const string& secret_key, string* secret);
 
+  /// Convert UTC UNIX time (in millis) to target timezone using Hive legacy conversion.
+  Status HiveLegacyTimezoneConvert(
+      const string& timezone, long utc_time_millis, TCivilTime* local_time);
+
  private:
   jclass fe_class_; // org.apache.impala.service.JniFrontend class
   jobject fe_;  // instance of org.apache.impala.service.JniFrontend
@@ -292,6 +296,7 @@ class Frontend {
   jmethodID commit_kudu_txn_; // JniFrontend.commitKuduTransaction()
   jmethodID convertTable; // JniFrontend.convertTable
   jmethodID get_secret_from_key_store_; // JniFrontend.getSecretFromKeyStore()
+  jmethodID hive_legacy_timezone_convert_; // JniFrontend.hiveLegacyTimezoneConvert()
 
   // Only used for testing.
   jmethodID build_test_descriptor_table_id_; // JniFrontend.buildTestDescriptorTable()

@@ -977,6 +977,15 @@ enum TImpalaQueryOptions {
   // If True, account for probability of having duplicate grouping key exist in multiple
   // nodes during preaggreation.
   ESTIMATE_DUPLICATE_IN_PREAGG = 185
+
+  // When true and CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS is also enabled, TIMESTAMP
+  // conversion to local time will fallback to the timestamp conversion method from Hive
+  // 3.0 and earlier if not specified in the file. This matches the Hive option
+  // 'hive.parquet.timestamp.legacy.conversion.enabled', which defaults to true. Impala
+  // defaults to false because conversion is ~50x slower than Impala's default conversion
+  // method and they produce the same results for modern time periods (post 1970, and in
+  // most instances before that).
+  USE_LEGACY_HIVE_TIMESTAMP_CONVERSION = 186
 }
 
 // The summary of a DML statement.

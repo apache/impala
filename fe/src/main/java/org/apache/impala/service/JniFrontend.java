@@ -54,6 +54,7 @@ import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TBuildTestDescriptorTableParams;
 import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCivilTime;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDescribeDbParams;
 import org.apache.impala.thrift.TDescribeResult;
@@ -115,11 +116,14 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.lang.IllegalArgumentException;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.GregorianCalendar;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -806,6 +810,29 @@ public class JniFrontend {
       throw new InternalException(e.getMessage());
     }
     return secret;
+  }
+
+  /**
+   * Performs Hive legacy-compatible timezone conversion
+   */
+  public static byte[] hiveLegacyTimezoneConvert(byte[] timezoneT, long utc_time_millis)
+      throws ImpalaException {
+    final TStringLiteral timezone = new TStringLiteral();
+    JniUtil.deserializeThrift(protocolFactory_, timezone, timezoneT);
+    // TimeZone.getTimeZone defaults to GMT if it doesn't recognize the timezone.
+    Calendar c = new GregorianCalendar(TimeZone.getTimeZone(timezone.getValue()));
+    c.setTimeInMillis(utc_time_millis);
+
+    final TCivilTime civilTime = new TCivilTime(
+        // Normalize month so January starts at 1.
+        c.get(Calendar.YEAR), c.get(Calendar.MONTH)+1, c.get(Calendar.DAY_OF_MONTH),
+        c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), c.get(Calendar.SECOND));
+    try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
+      return serializer.serialize(civilTime);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
   }
 
   public String validateSaml2Bearer(byte[] serializedRequest) throws ImpalaException{

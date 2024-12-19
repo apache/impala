@@ -1,0 +1,46 @@
+====
+---- QUERY
+SET timezone=PST;
+SELECT * FROM employee_hive_3_1_3_us_pacific;
+---- TYPES
+INT,TIMESTAMP
+---- RESULTS
+1,1880-01-01 07:52:58
+2,1884-01-01 08:00:00
+3,1990-01-01 08:00:00
+====
+---- QUERY
+SET timezone=PST;
+SET convert_legacy_hive_parquet_utc_timestamps=true;
+SELECT * FROM employee_hive_3_1_3_us_pacific;
+---- TYPES
+INT,TIMESTAMP
+---- RESULTS
+1,1880-01-01 00:00:00
+2,1884-01-01 00:00:00
+3,1990-01-01 00:00:00
+====
+---- QUERY
+SET timezone=PST;
+SET convert_legacy_hive_parquet_utc_timestamps=true;
+SET use_legacy_hive_timestamp_conversion=true;
+SELECT * FROM employee_hive_3_1_3_us_pacific;
+---- TYPES
+INT,TIMESTAMP
+---- RESULTS
+1,1880-01-01 00:00:00
+2,1884-01-01 00:00:00
+3,1990-01-01 00:00:00
+====
+---- QUERY
+SET timezone=UTC;
+SET convert_legacy_hive_parquet_utc_timestamps=true;
+SET use_legacy_hive_timestamp_conversion=true;
+SELECT * FROM employee_hive_3_1_3_us_pacific;
+---- TYPES
+INT,TIMESTAMP
+---- RESULTS
+1,1880-01-01 07:52:58
+2,1884-01-01 08:00:00
+3,1990-01-01 08:00:00
+====

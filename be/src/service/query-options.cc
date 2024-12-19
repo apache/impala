@@ -1330,6 +1330,10 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_estimate_duplicate_in_preagg(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::USE_LEGACY_HIVE_TIMESTAMP_CONVERSION: {
+        query_options->__set_use_legacy_hive_timestamp_conversion(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

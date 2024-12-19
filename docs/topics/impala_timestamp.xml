@@ -264,6 +264,43 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
         </p>
 
         <p>
+          Hive versions prior to 3.1 wrote Parquet files in local time using Java's
+          SimpleDateFormat. That method has some cases that differ from both Impala's
+          method and the default method used in Hive 3.1.2+ that are based on the
+          <xref href="https://www.iana.org/time-zones" format="html" scope="external">
+          IANA Time Zone Database</xref>. Hive 4 added the
+          <codeph>writer.zone.conversion.legacy</codeph> Parquet file metadata property
+          to identify which method was used to write the file (controlled by
+          <codeph>hive.parquet.timestamp.write.legacy.conversion.enabled</codeph>). When
+          the Parquet file was written by Parquet Java (<codeph>parquet-mr</codeph>), Hive -
+          and Impala's behavior when
+          <codeph>convert_legacy_hive_parquet_utc_timestamps</codeph> is
+          <codeph>true</codeph> - are:
+          <ul>
+            <li>
+              If <codeph>writer.zone.conversion.legacy</codeph> is present, use the legacy
+              conversion method if true, use the newer method if false.
+            </li>
+            <li>
+              If <codeph>writer.zone.conversion.legacy</codeph> is not present but
+              <codeph>writer.time.zone</codeph> is, we can infer the file was written by
+              Hive 3.1.2+ using new APIs and use the newer method.
+            </li>
+            <li>
+              Otherwise assume it was written by an earlier Hive release. In that case
+              Hive will select conversion method based on
+              <codeph>hive.parquet.timestamp.legacy.conversion.enabled</codeph> (defaults
+              to <codeph>true</codeph>). <keyword keyref="impala45"/> adds the query
+              option <codeph>use_legacy_hive_timestamp_conversion</codeph> to select this
+              behavior. It defaults to <codeph>false</codeph> because conversion is ~50x
+              slower than Impala's default conversion method and they produce the same
+              results for modern time periods (post 1970, and in most instances before
+              that).
+            </li>
+          </ul>
+        </p>
+
+        <p>
           Hive currently cannot write <codeph>INT64</codeph> <codeph>TIMESTAMP</codeph> values.
         </p>
         <p>

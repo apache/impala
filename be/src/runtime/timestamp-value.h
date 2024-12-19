@@ -296,6 +296,11 @@ class TimestampValue {
       TimestampValue* start_of_repeated_period = nullptr,
       TimestampValue* end_of_repeated_period = nullptr);
 
+  /// Converts from UTC to 'local_tz' time zone in-place. The caller must ensure the
+  /// TimestampValue this function is called upon has both a valid date and time. Uses
+  /// Java Calendar for conversion to match Hive's legacy conversion process.
+  void HiveLegacyUtcToLocal(const Timezone& local_tz);
+
   /// Converts from 'local_tz' to UTC time zone in-place. The caller must ensure the
   /// TimestampValue this function is called upon has both a valid date and time.
   ///
