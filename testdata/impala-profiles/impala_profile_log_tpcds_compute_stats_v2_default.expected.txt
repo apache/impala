@@ -513,12 +513,12 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
       [0] Instance 874b65988023a32b:71d209e900000000 (host=tarmstrong-Precision-7540:27000)
       Last report received time[0]: 2021-02-09 08:53:03.675
        - MemoryUsage[0] (500.000ms): 8.00 KB, 8.00 KB, 8.00 KB
-      Fragment Instance Lifecycle Event Timeline[0]: 1s208ms
-         - Prepare Finished: 891.562us (891.562us)
-         - Open Finished: 1s183ms (1s182ms)
-         - First Batch Produced: 1s194ms (11.546ms)
-         - First Batch Sent: 1s196ms (1.082ms)
-         - ExecInternal Finished: 1s208ms (12.648ms)
+      Fragment Instance Lifecycle Event Timeline:
+         - Prepare Finished: 891.562us
+         - Open Finished: 1s183ms
+         - First Batch Produced: 1s194ms
+         - First Batch Sent: 1s196ms
+         - ExecInternal Finished: 1s208ms
        - AverageThreadTokens: 0.00
        - BytesAssigned: 0
        - CompletionTime: 1s247ms
@@ -555,13 +555,13 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
          - RowsSentRate: 701.10 K/sec
          - TotalTime: 2.601ms
       EXCHANGE_NODE (id=4):(Total: 1s154ms, non-child: 4.187ms, % non-child: 0.36%)
-        Node Lifecycle Event Timeline[0]: 1s208ms
-           - Open Started: 51.273ms (51.273ms)
-           - Open Finished: 1s183ms (1s132ms)
-           - First Batch Requested: 1s183ms (25.306us)
-           - First Batch Returned: 1s194ms (11.541ms)
-           - Last Batch Returned: 1s206ms (11.991ms)
-           - Closed: 1s208ms (1.711ms)
+        Node Lifecycle Event Timeline:
+           - Open Started: 51.273ms
+           - Open Finished: 1s183ms
+           - First Batch Requested: 1s183ms
+           - First Batch Returned: 1s194ms
+           - Last Batch Returned: 1s206ms
+           - Closed: 1s208ms
          - ConvertRowBatchTime: 1.709ms
          - InactiveTotalTime: 1s150ms
          - PeakMemoryUsage: 1000.00 KB (1024000)
@@ -627,78 +627,22 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
       Last report received time[4-7]: 2021-02-09 08:53:03.675
        - MemoryUsage[0] (500.000ms): 30.97 KB, 30.97 KB, 2.23 MB
        - ThreadUsage[0] (500.000ms): 1, 1, 1
-      Fragment Instance Lifecycle Event Timeline[0]: 1s199ms
-         - Prepare Finished: 9.319ms (9.319ms)
-         - Open Finished: 1s180ms (1s171ms)
-         - First Batch Produced: 1s180ms (56.379us)
-         - First Batch Sent: 1s180ms (25.630us)
-         - ExecInternal Finished: 1s199ms (19.087ms)
-      Fragment Instance Lifecycle Event Timeline[1]: 1s201ms
-         - Prepare Finished: 9.319ms (9.319ms)
-         - Open Finished: 1s180ms (1s171ms)
-         - First Batch Produced: 1s180ms (60.722us)
-         - First Batch Sent: 1s180ms (40.555us)
-         - ExecInternal Finished: 1s201ms (20.592ms)
-      Fragment Instance Lifecycle Event Timeline[2]: 1s201ms
-         - Prepare Finished: 13.196ms (13.196ms)
-         - Open Finished: 1s181ms (1s167ms)
-         - First Batch Produced: 1s181ms (60.527us)
-         - First Batch Sent: 1s181ms (43.214us)
-         - ExecInternal Finished: 1s201ms (19.769ms)
-      Fragment Instance Lifecycle Event Timeline[3]: 1s199ms
-         - Prepare Finished: 21.292ms (21.292ms)
-         - Open Finished: 1s180ms (1s159ms)
-         - First Batch Produced: 1s180ms (57.789us)
-         - First Batch Sent: 1s180ms (39.978us)
-         - ExecInternal Finished: 1s199ms (18.846ms)
-      Fragment Instance Lifecycle Event Timeline[4]: 1s198ms
-         - Prepare Finished: 1.121ms (1.121ms)
-         - Open Finished: 1s183ms (1s182ms)
-         - First Batch Produced: 1s183ms (43.818us)
-         - First Batch Sent: 1s183ms (25.883us)
-         - ExecInternal Finished: 1s198ms (14.434ms)
-      Fragment Instance Lifecycle Event Timeline[5]: 1s198ms
-         - Prepare Finished: 3.848ms (3.848ms)
-         - Open Finished: 1s183ms (1s179ms)
-         - First Batch Produced: 1s183ms (52.235us)
-         - First Batch Sent: 1s183ms (36.362us)
-         - ExecInternal Finished: 1s198ms (15.194ms)
-      Fragment Instance Lifecycle Event Timeline[6]: 1s197ms
-         - Prepare Finished: 12.230ms (12.230ms)
-         - Open Finished: 1s183ms (1s171ms)
-         - First Batch Produced: 1s183ms (60.463us)
-         - First Batch Sent: 1s183ms (32.628us)
-         - ExecInternal Finished: 1s197ms (14.152ms)
-      Fragment Instance Lifecycle Event Timeline[7]: 1s200ms
-         - Prepare Finished: 12.775ms (12.775ms)
-         - Open Finished: 1s186ms (1s173ms)
-         - First Batch Produced: 1s186ms (41.109us)
-         - First Batch Sent: 1s186ms (27.478us)
-         - ExecInternal Finished: 1s200ms (14.440ms)
-      Fragment Instance Lifecycle Event Timeline[8]: 1s204ms
-         - Prepare Finished: 34.481ms (34.481ms)
-         - Open Finished: 1s186ms (1s152ms)
-         - First Batch Produced: 1s186ms (63.682us)
-         - First Batch Sent: 1s186ms (40.819us)
-         - ExecInternal Finished: 1s204ms (18.074ms)
-      Fragment Instance Lifecycle Event Timeline[9]: 1s203ms
-         - Prepare Finished: 42.591ms (42.591ms)
-         - Open Finished: 1s186ms (1s144ms)
-         - First Batch Produced: 1s186ms (69.931us)
-         - First Batch Sent: 1s186ms (46.787us)
-         - ExecInternal Finished: 1s203ms (16.231ms)
-      Fragment Instance Lifecycle Event Timeline[10]: 1s205ms
-         - Prepare Finished: 42.591ms (42.591ms)
-         - Open Finished: 1s186ms (1s143ms)
-         - First Batch Produced: 1s186ms (64.679us)
-         - First Batch Sent: 1s186ms (33.532us)
-         - ExecInternal Finished: 1s205ms (18.804ms)
-      Fragment Instance Lifecycle Event Timeline[11]: 1s205ms
-         - Prepare Finished: 50.498ms (50.498ms)
-         - Open Finished: 1s187ms (1s136ms)
-         - First Batch Produced: 1s187ms (50.358us)
-         - First Batch Sent: 1s187ms (28.799us)
-         - ExecInternal Finished: 1s205ms (17.688ms)
+      Fragment Instance Lifecycle Event Timeline Summary :
+         - Prepare Finished (50.498ms):
+            Min: 1.121ms, Avg: 21.105ms, Max: 50.498ms, Count: 12
+            HistogramCount: 4, 3, 1, 1, 3
+         - Open Finished (1s187ms):
+            Min: 1s180ms, Avg: 1s183ms, Max: 1s187ms, Count: 12
+            HistogramCount: 4, 0, 3, 0, 5
+         - First Batch Produced (1s187ms):
+            Min: 1s180ms, Avg: 1s183ms, Max: 1s187ms, Count: 12
+            HistogramCount: 4, 0, 3, 0, 5
+         - First Batch Sent (1s187ms):
+            Min: 1s180ms, Avg: 1s183ms, Max: 1s187ms, Count: 12
+            HistogramCount: 4, 0, 3, 0, 5
+         - ExecInternal Finished (1s205ms):
+            Min: 1s197ms, Avg: 1s201ms, Max: 1s205ms, Count: 12
+            HistogramCount: 3, 2, 3, 1, 3
        - AverageThreadTokens: mean=1.00 min=1.00 max=1.00
        - BytesAssigned: mean=0 min=0 max=0
        - CompletionTime: mean=1s242ms min=1s237ms max=1s247ms
@@ -745,90 +689,25 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
          - TotalTime: mean=15.504ms min=11.856ms max=19.007ms
          - UncompressedRowBatchSize: mean=3.12 KB (3192) min=2.56 KB (2625) max=3.69 KB (3780)
       AGGREGATION_NODE (id=3) [12 instances]:(Total: 1s078ms, non-child: 4.091ms, % non-child: 0.38%)
-        Node Lifecycle Event Timeline[0]: 1s198ms
-           - Open Started: 97.335ms (97.335ms)
-           - Open Finished: 1s180ms (1s083ms)
-           - First Batch Requested: 1s180ms (20.882us)
-           - First Batch Returned: 1s180ms (45.469us)
-           - Last Batch Returned: 1s198ms (18.004ms)
-           - Closed: 1s198ms (91.614us)
-        Node Lifecycle Event Timeline[1]: 1s199ms
-           - Open Started: 97.336ms (97.336ms)
-           - Open Finished: 1s180ms (1s082ms)
-           - First Batch Requested: 1s180ms (24.205us)
-           - First Batch Returned: 1s180ms (57.179us)
-           - Last Batch Returned: 1s199ms (19.207ms)
-           - Closed: 1s199ms (90.315us)
-        Node Lifecycle Event Timeline[2]: 1s200ms
-           - Open Started: 97.342ms (97.342ms)
-           - Open Finished: 1s181ms (1s083ms)
-           - First Batch Requested: 1s181ms (25.369us)
-           - First Batch Returned: 1s181ms (56.910us)
-           - Last Batch Returned: 1s199ms (18.694ms)
-           - Closed: 1s200ms (88.529us)
-        Node Lifecycle Event Timeline[3]: 1s198ms
-           - Open Started: 97.345ms (97.345ms)
-           - Open Finished: 1s180ms (1s083ms)
-           - First Batch Requested: 1s180ms (24.634us)
-           - First Batch Returned: 1s180ms (53.645us)
-           - Last Batch Returned: 1s197ms (17.543ms)
-           - Closed: 1s198ms (141.682us)
-        Node Lifecycle Event Timeline[4]: 1s196ms
-           - Open Started: 101.907ms (101.907ms)
-           - Open Finished: 1s183ms (1s081ms)
-           - First Batch Requested: 1s183ms (20.669us)
-           - First Batch Returned: 1s183ms (41.095us)
-           - Last Batch Returned: 1s196ms (12.507ms)
-           - Closed: 1s196ms (116.106us)
-        Node Lifecycle Event Timeline[5]: 1s196ms
-           - Open Started: 101.910ms (101.910ms)
-           - Open Finished: 1s183ms (1s081ms)
-           - First Batch Requested: 1s183ms (26.277us)
-           - First Batch Returned: 1s183ms (49.744us)
-           - Last Batch Returned: 1s196ms (13.328ms)
-           - Closed: 1s196ms (90.392us)
-        Node Lifecycle Event Timeline[6]: 1s195ms
-           - Open Started: 101.924ms (101.924ms)
-           - Open Finished: 1s183ms (1s081ms)
-           - First Batch Requested: 1s183ms (23.064us)
-           - First Batch Returned: 1s183ms (57.064us)
-           - Last Batch Returned: 1s195ms (11.779ms)
-           - Closed: 1s195ms (122.173us)
-        Node Lifecycle Event Timeline[7]: 1s200ms
-           - Open Started: 101.921ms (101.921ms)
-           - Open Finished: 1s186ms (1s084ms)
-           - First Batch Requested: 1s186ms (29.063us)
-           - First Batch Returned: 1s186ms (38.678us)
-           - Last Batch Returned: 1s199ms (13.658ms)
-           - Closed: 1s200ms (124.149us)
-        Node Lifecycle Event Timeline[8]: 1s202ms
-           - Open Started: 122.660ms (122.660ms)
-           - Open Finished: 1s186ms (1s063ms)
-           - First Batch Requested: 1s186ms (46.917us)
-           - First Batch Returned: 1s186ms (60.380us)
-           - Last Batch Returned: 1s202ms (15.713ms)
-           - Closed: 1s202ms (90.718us)
-        Node Lifecycle Event Timeline[9]: 1s201ms
-           - Open Started: 122.681ms (122.681ms)
-           - Open Finished: 1s186ms (1s063ms)
-           - First Batch Requested: 1s186ms (26.927us)
-           - First Batch Returned: 1s186ms (65.865us)
-           - Last Batch Returned: 1s201ms (14.984ms)
-           - Closed: 1s201ms (94.386us)
-        Node Lifecycle Event Timeline[10]: 1s205ms
-           - Open Started: 122.676ms (122.676ms)
-           - Open Finished: 1s186ms (1s063ms)
-           - First Batch Requested: 1s186ms (36.408us)
-           - First Batch Returned: 1s186ms (60.028us)
-           - Last Batch Returned: 1s204ms (18.392ms)
-           - Closed: 1s205ms (168.330us)
-        Node Lifecycle Event Timeline[11]: 1s203ms
-           - Open Started: 122.686ms (122.686ms)
-           - Open Finished: 1s187ms (1s064ms)
-           - First Batch Requested: 1s187ms (23.976us)
-           - First Batch Returned: 1s187ms (47.235us)
-           - Last Batch Returned: 1s203ms (16.034ms)
-           - Closed: 1s203ms (99.695us)
+        Node Lifecycle Event Timeline Summary :
+           - Open Started (122.686ms):
+              Min: 97.335ms, Avg: 107.310ms, Max: 122.686ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - Open Finished (1s187ms):
+              Min: 1s180ms, Avg: 1s183ms, Max: 1s187ms, Count: 12
+              HistogramCount: 4, 0, 3, 0, 5
+           - First Batch Requested (1s187ms):
+              Min: 1s180ms, Avg: 1s183ms, Max: 1s187ms, Count: 12
+              HistogramCount: 4, 0, 3, 0, 5
+           - First Batch Returned (1s187ms):
+              Min: 1s180ms, Avg: 1s183ms, Max: 1s187ms, Count: 12
+              HistogramCount: 4, 0, 3, 0, 5
+           - Last Batch Returned (1s204ms):
+              Min: 1s195ms, Avg: 1s199ms, Max: 1s204ms, Count: 12
+              HistogramCount: 3, 2, 3, 2, 2
+           - Closed (1s205ms):
+              Min: 1s195ms, Avg: 1s199ms, Max: 1s205ms, Count: 12
+              HistogramCount: 3, 2, 3, 2, 2
          - InactiveTotalTime: mean=0.000ns min=0.000ns max=0.000ns
          - PeakMemoryUsage: mean=2.15 MB (2249856) min=2.15 MB (2249856) max=2.15 MB (2249856)
          - RowsReturned: mean=152 (152) min=125 (125) max=180 (180)
@@ -878,90 +757,25 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
              - TotalTime: mean=0.000ns min=0.000ns max=0.000ns
              - Travel: mean=0 (0) min=0 (0) max=0 (0)
       EXCHANGE_NODE (id=2) [12 instances]:(Total: 1s074ms, non-child: 337.628us, % non-child: 0.03%)
-        Node Lifecycle Event Timeline[0]: 1s180ms
-           - Open Started: 97.338ms (97.338ms)
-           - Open Finished: 1s092ms (995.404ms)
-           - First Batch Requested: 1s094ms (1.644ms)
-           - First Batch Returned: 1s180ms (85.633ms)
-           - Last Batch Returned: 1s180ms (638.000ns)
-           - Closed: 1s180ms (354.274us)
-        Node Lifecycle Event Timeline[1]: 1s180ms
-           - Open Started: 97.338ms (97.338ms)
-           - Open Finished: 1s093ms (995.902ms)
-           - First Batch Requested: 1s094ms (1.737ms)
-           - First Batch Returned: 1s179ms (84.907ms)
-           - Last Batch Returned: 1s179ms (835.000ns)
-           - Closed: 1s180ms (383.884us)
-        Node Lifecycle Event Timeline[2]: 1s181ms
-           - Open Started: 97.344ms (97.344ms)
-           - Open Finished: 1s092ms (995.498ms)
-           - First Batch Requested: 1s094ms (1.802ms)
-           - First Batch Returned: 1s180ms (86.038ms)
-           - Last Batch Returned: 1s180ms (683.000ns)
-           - Closed: 1s181ms (419.046us)
-        Node Lifecycle Event Timeline[3]: 1s180ms
-           - Open Started: 97.346ms (97.346ms)
-           - Open Finished: 1s094ms (997.471ms)
-           - First Batch Requested: 1s096ms (1.694ms)
-           - First Batch Returned: 1s179ms (83.459ms)
-           - Last Batch Returned: 1s179ms (1.132us)
-           - Closed: 1s180ms (369.462us)
-        Node Lifecycle Event Timeline[4]: 1s183ms
-           - Open Started: 101.909ms (101.909ms)
-           - Open Finished: 1s094ms (992.867ms)
-           - First Batch Requested: 1s096ms (1.500ms)
-           - First Batch Returned: 1s183ms (87.094ms)
-           - Last Batch Returned: 1s183ms (461.000ns)
-           - Closed: 1s183ms (387.179us)
-        Node Lifecycle Event Timeline[5]: 1s183ms
-           - Open Started: 101.912ms (101.912ms)
-           - Open Finished: 1s094ms (992.217ms)
-           - First Batch Requested: 1s095ms (1.821ms)
-           - First Batch Returned: 1s182ms (86.814ms)
-           - Last Batch Returned: 1s182ms (723.000ns)
-           - Closed: 1s183ms (296.293us)
-        Node Lifecycle Event Timeline[6]: 1s183ms
-           - Open Started: 101.926ms (101.926ms)
-           - Open Finished: 1s094ms (992.232ms)
-           - First Batch Requested: 1s095ms (1.758ms)
-           - First Batch Returned: 1s182ms (86.912ms)
-           - Last Batch Returned: 1s182ms (714.000ns)
-           - Closed: 1s183ms (377.941us)
-        Node Lifecycle Event Timeline[7]: 1s186ms
-           - Open Started: 101.923ms (101.923ms)
-           - Open Finished: 1s094ms (992.160ms)
-           - First Batch Requested: 1s095ms (1.896ms)
-           - First Batch Returned: 1s185ms (89.904ms)
-           - Last Batch Returned: 1s185ms (1.094us)
-           - Closed: 1s186ms (313.367us)
-        Node Lifecycle Event Timeline[8]: 1s186ms
-           - Open Started: 122.664ms (122.664ms)
-           - Open Finished: 1s106ms (984.221ms)
-           - First Batch Requested: 1s108ms (1.745ms)
-           - First Batch Returned: 1s185ms (77.330ms)
-           - Last Batch Returned: 1s185ms (1.503us)
-           - Closed: 1s186ms (436.231us)
-        Node Lifecycle Event Timeline[9]: 1s186ms
-           - Open Started: 122.683ms (122.683ms)
-           - Open Finished: 1s106ms (984.204ms)
-           - First Batch Requested: 1s108ms (1.731ms)
-           - First Batch Returned: 1s186ms (77.528ms)
-           - Last Batch Returned: 1s186ms (1.166us)
-           - Closed: 1s186ms (445.964us)
-        Node Lifecycle Event Timeline[10]: 1s186ms
-           - Open Started: 122.677ms (122.677ms)
-           - Open Finished: 1s107ms (984.449ms)
-           - First Batch Requested: 1s109ms (1.887ms)
-           - First Batch Returned: 1s186ms (77.012ms)
-           - Last Batch Returned: 1s186ms (742.000ns)
-           - Closed: 1s186ms (383.513us)
-        Node Lifecycle Event Timeline[11]: 1s187ms
-           - Open Started: 122.687ms (122.687ms)
-           - Open Finished: 1s106ms (984.266ms)
-           - First Batch Requested: 1s108ms (1.612ms)
-           - First Batch Returned: 1s186ms (78.285ms)
-           - Last Batch Returned: 1s186ms (648.000ns)
-           - Closed: 1s187ms (373.159us)
+        Node Lifecycle Event Timeline Summary :
+           - Open Started (122.687ms):
+              Min: 97.338ms, Avg: 107.312ms, Max: 122.687ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - Open Finished (1s107ms):
+              Min: 1s092ms, Avg: 1s098ms, Max: 1s107ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - First Batch Requested (1s109ms):
+              Min: 1s094ms, Avg: 1s099ms, Max: 1s109ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - First Batch Returned (1s186ms):
+              Min: 1s179ms, Avg: 1s183ms, Max: 1s186ms, Count: 12
+              HistogramCount: 4, 0, 3, 0, 5
+           - Last Batch Returned (1s186ms):
+              Min: 1s179ms, Avg: 1s183ms, Max: 1s186ms, Count: 12
+              HistogramCount: 4, 0, 3, 0, 5
+           - Closed (1s187ms):
+              Min: 1s180ms, Avg: 1s183ms, Max: 1s187ms, Count: 12
+              HistogramCount: 4, 0, 3, 0, 5
          - ConvertRowBatchTime: mean=143.207us min=116.119us max=165.560us
          - InactiveTotalTime: mean=1s073ms min=1s061ms max=1s081ms
          - PeakMemoryUsage: mean=104.00 KB (106496) min=104.00 KB (106496) max=104.00 KB (106496)
@@ -1039,78 +853,22 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
       Last report received time[4-7]: 2021-02-09 08:53:03.675
        - MemoryUsage[0] (500.000ms): 2.27 MB, 2.28 MB
        - ThreadUsage[0] (500.000ms): 1, 1
-      Fragment Instance Lifecycle Event Timeline[0]: 1s119ms
-         - Prepare Finished: 776.677us (776.677us)
-         - Open Finished: 107.969ms (107.192ms)
-         - First Batch Produced: 1s111ms (1s003ms)
-         - First Batch Sent: 1s111ms (4.642us)
-         - ExecInternal Finished: 1s119ms (7.500ms)
-      Fragment Instance Lifecycle Event Timeline[1]: 1s120ms
-         - Prepare Finished: 750.321us (750.321us)
-         - Open Finished: 108.355ms (107.604ms)
-         - First Batch Produced: 1s113ms (1s005ms)
-         - First Batch Sent: 1s113ms (2.594us)
-         - ExecInternal Finished: 1s120ms (6.616ms)
-      Fragment Instance Lifecycle Event Timeline[2]: 1s120ms
-         - Prepare Finished: 5.058ms (5.058ms)
-         - Open Finished: 108.602ms (103.544ms)
-         - First Batch Produced: 1s111ms (1s002ms)
-         - First Batch Sent: 1s111ms (4.379us)
-         - ExecInternal Finished: 1s120ms (8.868ms)
-      Fragment Instance Lifecycle Event Timeline[3]: 1s119ms
-         - Prepare Finished: 6.184ms (6.184ms)
-         - Open Finished: 108.312ms (102.128ms)
-         - First Batch Produced: 1s111ms (1s003ms)
-         - First Batch Sent: 1s111ms (4.522us)
-         - ExecInternal Finished: 1s119ms (8.434ms)
-      Fragment Instance Lifecycle Event Timeline[4]: 1s110ms
-         - Prepare Finished: 926.288us (926.288us)
-         - Open Finished: 106.313ms (105.387ms)
-         - First Batch Produced: 1s092ms (986.536ms)
-         - First Batch Sent: 1s092ms (3.002us)
-         - ExecInternal Finished: 1s110ms (17.926ms)
-      Fragment Instance Lifecycle Event Timeline[5]: 1s110ms
-         - Prepare Finished: 995.460us (995.460us)
-         - Open Finished: 106.829ms (105.833ms)
-         - First Batch Produced: 1s088ms (981.238ms)
-         - First Batch Sent: 1s088ms (6.404us)
-         - ExecInternal Finished: 1s110ms (22.492ms)
-      Fragment Instance Lifecycle Event Timeline[6]: 1s110ms
-         - Prepare Finished: 1.207ms (1.207ms)
-         - Open Finished: 106.859ms (105.651ms)
-         - First Batch Produced: 1s089ms (982.651ms)
-         - First Batch Sent: 1s089ms (5.604us)
-         - ExecInternal Finished: 1s110ms (20.593ms)
-      Fragment Instance Lifecycle Event Timeline[7]: 1s111ms
-         - Prepare Finished: 1.155ms (1.155ms)
-         - Open Finished: 106.859ms (105.703ms)
-         - First Batch Produced: 1s090ms (983.811ms)
-         - First Batch Sent: 1s090ms (5.116us)
-         - ExecInternal Finished: 1s111ms (20.702ms)
-      Fragment Instance Lifecycle Event Timeline[8]: 1s180ms
-         - Prepare Finished: 14.345ms (14.345ms)
-         - Open Finished: 129.210ms (114.865ms)
-         - First Batch Produced: 1s172ms (1s043ms)
-         - First Batch Sent: 1s172ms (4.312us)
-         - ExecInternal Finished: 1s180ms (7.848ms)
-      Fragment Instance Lifecycle Event Timeline[9]: 1s187ms
-         - Prepare Finished: 22.586ms (22.586ms)
-         - Open Finished: 129.209ms (106.623ms)
-         - First Batch Produced: 1s173ms (1s044ms)
-         - First Batch Sent: 1s173ms (5.257us)
-         - ExecInternal Finished: 1s187ms (13.841ms)
-      Fragment Instance Lifecycle Event Timeline[10]: 1s183ms
-         - Prepare Finished: 29.265ms (29.265ms)
-         - Open Finished: 129.406ms (100.140ms)
-         - First Batch Produced: 1s174ms (1s045ms)
-         - First Batch Sent: 1s174ms (3.828us)
-         - ExecInternal Finished: 1s183ms (8.310ms)
-      Fragment Instance Lifecycle Event Timeline[11]: 1s183ms
-         - Prepare Finished: 30.377ms (30.377ms)
-         - Open Finished: 130.655ms (100.277ms)
-         - First Batch Produced: 1s176ms (1s046ms)
-         - First Batch Sent: 1s176ms (4.263us)
-         - ExecInternal Finished: 1s183ms (6.345ms)
+      Fragment Instance Lifecycle Event Timeline Summary :
+         - Prepare Finished (30.377ms):
+            Min: 750.321us, Avg: 9.469ms, Max: 30.377ms, Count: 12
+            HistogramCount: 8, 0, 1, 1, 2
+         - Open Finished (130.655ms):
+            Min: 106.313ms, Avg: 114.881ms, Max: 130.655ms, Count: 12
+            HistogramCount: 8, 0, 0, 0, 4
+         - First Batch Produced (1s176ms):
+            Min: 1s088ms, Avg: 1s125ms, Max: 1s176ms, Count: 12
+            HistogramCount: 4, 4, 0, 0, 4
+         - First Batch Sent (1s176ms):
+            Min: 1s088ms, Avg: 1s125ms, Max: 1s176ms, Count: 12
+            HistogramCount: 4, 4, 0, 0, 4
+         - ExecInternal Finished (1s187ms):
+            Min: 1s110ms, Avg: 1s138ms, Max: 1s187ms, Count: 12
+            HistogramCount: 8, 0, 0, 0, 4
        - AverageThreadTokens: mean=1.00 min=1.00 max=1.00
        - BytesAssigned: mean=16.41 MB (17209364) min=15.76 MB (16526332) max=21.12 MB (22147452)
        - CompletionTime: mean=1s242ms min=1s237ms max=1s247ms
@@ -1157,90 +915,25 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
          - TotalTime: mean=11.165ms min=4.530ms max=21.640ms
          - UncompressedRowBatchSize: mean=3.12 KB (3192) min=2.97 KB (3045) max=3.30 KB (3381)
       AGGREGATION_NODE (id=1) [12 instances]:(Total: 1s014ms, non-child: 6.511ms, % non-child: 0.64%)
-        Node Lifecycle Event Timeline[0]: 1s112ms
-           - Open Started: 106.397ms (106.397ms)
-           - Open Finished: 107.945ms (1.547ms)
-           - First Batch Requested: 107.973ms (28.268us)
-           - First Batch Returned: 1s111ms (1s003ms)
-           - Last Batch Returned: 1s112ms (1.187ms)
-           - Closed: 1s112ms (66.335us)
-        Node Lifecycle Event Timeline[1]: 1s115ms
-           - Open Started: 106.397ms (106.397ms)
-           - Open Finished: 108.335ms (1.937ms)
-           - First Batch Requested: 108.357ms (22.466us)
-           - First Batch Returned: 1s113ms (1s005ms)
-           - Last Batch Returned: 1s115ms (2.166ms)
-           - Closed: 1s115ms (96.464us)
-        Node Lifecycle Event Timeline[2]: 1s112ms
-           - Open Started: 106.406ms (106.406ms)
-           - Open Finished: 108.580ms (2.174ms)
-           - First Batch Requested: 108.606ms (25.499us)
-           - First Batch Returned: 1s111ms (1s002ms)
-           - Last Batch Returned: 1s112ms (1.135ms)
-           - Closed: 1s112ms (78.714us)
-        Node Lifecycle Event Timeline[3]: 1s112ms
-           - Open Started: 106.408ms (106.408ms)
-           - Open Finished: 108.293ms (1.884ms)
-           - First Batch Requested: 108.315ms (22.392us)
-           - First Batch Returned: 1s111ms (1s003ms)
-           - Last Batch Returned: 1s112ms (1.145ms)
-           - Closed: 1s112ms (60.110us)
-        Node Lifecycle Event Timeline[4]: 1s094ms
-           - Open Started: 104.756ms (104.756ms)
-           - Open Finished: 106.290ms (1.534ms)
-           - First Batch Requested: 106.318ms (27.368us)
-           - First Batch Returned: 1s092ms (986.530ms)
-           - Last Batch Returned: 1s094ms (1.284ms)
-           - Closed: 1s094ms (81.417us)
-        Node Lifecycle Event Timeline[5]: 1s089ms
-           - Open Started: 104.761ms (104.761ms)
-           - Open Finished: 106.805ms (2.044ms)
-           - First Batch Requested: 106.832ms (26.994us)
-           - First Batch Returned: 1s088ms (981.233ms)
-           - Last Batch Returned: 1s089ms (1.126ms)
-           - Closed: 1s089ms (89.130us)
-        Node Lifecycle Event Timeline[6]: 1s090ms
-           - Open Started: 104.768ms (104.768ms)
-           - Open Finished: 106.839ms (2.070ms)
-           - First Batch Requested: 106.863ms (23.945us)
-           - First Batch Returned: 1s089ms (982.645ms)
-           - Last Batch Returned: 1s090ms (1.187ms)
-           - Closed: 1s090ms (72.378us)
-        Node Lifecycle Event Timeline[7]: 1s092ms
-           - Open Started: 104.768ms (104.768ms)
-           - Open Finished: 106.839ms (2.070ms)
-           - First Batch Requested: 106.863ms (24.031us)
-           - First Batch Returned: 1s090ms (983.806ms)
-           - Last Batch Returned: 1s091ms (1.240ms)
-           - Closed: 1s092ms (92.113us)
-        Node Lifecycle Event Timeline[8]: 1s173ms
-           - Open Started: 127.057ms (127.057ms)
-           - Open Finished: 129.170ms (2.112ms)
-           - First Batch Requested: 129.215ms (44.625us)
-           - First Batch Returned: 1s172ms (1s043ms)
-           - Last Batch Returned: 1s173ms (1.019ms)
-           - Closed: 1s173ms (60.683us)
-        Node Lifecycle Event Timeline[9]: 1s174ms
-           - Open Started: 127.057ms (127.057ms)
-           - Open Finished: 129.181ms (2.124ms)
-           - First Batch Requested: 129.215ms (33.860us)
-           - First Batch Returned: 1s173ms (1s044ms)
-           - Last Batch Returned: 1s174ms (1.231ms)
-           - Closed: 1s174ms (66.953us)
-        Node Lifecycle Event Timeline[10]: 1s178ms
-           - Open Started: 127.058ms (127.058ms)
-           - Open Finished: 129.379ms (2.320ms)
-           - First Batch Requested: 129.410ms (31.019us)
-           - First Batch Returned: 1s174ms (1s045ms)
-           - Last Batch Returned: 1s178ms (4.068ms)
-           - Closed: 1s178ms (64.504us)
-        Node Lifecycle Event Timeline[11]: 1s178ms
-           - Open Started: 127.081ms (127.081ms)
-           - Open Finished: 130.624ms (3.542ms)
-           - First Batch Requested: 130.659ms (35.576us)
-           - First Batch Returned: 1s176ms (1s046ms)
-           - Last Batch Returned: 1s178ms (1.365ms)
-           - Closed: 1s178ms (80.565us)
+        Node Lifecycle Event Timeline Summary :
+           - Open Started (127.081ms):
+              Min: 104.756ms, Avg: 112.743ms, Max: 127.081ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - Open Finished (130.624ms):
+              Min: 106.290ms, Avg: 114.857ms, Max: 130.624ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - First Batch Requested (130.659ms):
+              Min: 106.318ms, Avg: 114.885ms, Max: 130.659ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - First Batch Returned (1s176ms):
+              Min: 1s088ms, Avg: 1s125ms, Max: 1s176ms, Count: 12
+              HistogramCount: 4, 4, 0, 0, 4
+           - Last Batch Returned (1s178ms):
+              Min: 1s089ms, Avg: 1s127ms, Max: 1s178ms, Count: 12
+              HistogramCount: 4, 4, 0, 0, 4
+           - Closed (1s178ms):
+              Min: 1s089ms, Avg: 1s127ms, Max: 1s178ms, Count: 12
+              HistogramCount: 4, 4, 0, 0, 4
          - InactiveTotalTime: mean=0.000ns min=0.000ns max=0.000ns
          - PeakMemoryUsage: mean=2.02 MB (2122880) min=2.02 MB (2122880) max=2.02 MB (2122880)
          - RowsReturned: mean=152 (152) min=145 (145) max=161 (161)
@@ -1313,90 +1006,25 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
         Hdfs Read Thread Concurrency Bucket[2]: 0:50% 1:50% 2:0% 3:0% 4:0% 5:0% 6:0% 7:0% 8:0% 9:0% 10:0% 11:0% 12:0% 13:0% 14:0% 15:0% 16:0% 17:0% 18:0% 19:0% 20:0% 21:0% 22:0% 23:0% 24:0% 25:0% 26:0%
         Table Name[0-11]: tpcds_parquet.store_sales
          - BytesReadSeries[0] (500.000ms): 0, 4.99 MB
-        Node Lifecycle Event Timeline[0]: 1s111ms
-           - Open Started: 106.400ms (106.400ms)
-           - Open Finished: 107.093ms (692.793us)
-           - First Batch Requested: 107.982ms (888.746us)
-           - First Batch Returned: 207.163ms (99.181ms)
-           - Last Batch Returned: 1s111ms (904.176ms)
-           - Closed: 1s111ms (108.280us)
-        Node Lifecycle Event Timeline[1]: 1s113ms
-           - Open Started: 106.400ms (106.400ms)
-           - Open Finished: 107.243ms (842.150us)
-           - First Batch Requested: 108.370ms (1.127ms)
-           - First Batch Returned: 207.593ms (99.223ms)
-           - Last Batch Returned: 1s111ms (903.994ms)
-           - Closed: 1s113ms (1.780ms)
-        Node Lifecycle Event Timeline[2]: 1s111ms
-           - Open Started: 106.407ms (106.407ms)
-           - Open Finished: 107.419ms (1.011ms)
-           - First Batch Requested: 108.614ms (1.195ms)
-           - First Batch Returned: 207.163ms (98.548ms)
-           - Last Batch Returned: 1s111ms (904.067ms)
-           - Closed: 1s111ms (119.007us)
-        Node Lifecycle Event Timeline[3]: 1s111ms
-           - Open Started: 106.410ms (106.410ms)
-           - Open Finished: 107.307ms (896.928us)
-           - First Batch Requested: 108.320ms (1.013ms)
-           - First Batch Returned: 208.144ms (99.823ms)
-           - Last Batch Returned: 1s111ms (903.161ms)
-           - Closed: 1s111ms (154.581us)
-        Node Lifecycle Event Timeline[4]: 1s092ms
-           - Open Started: 104.760ms (104.760ms)
-           - Open Finished: 105.390ms (629.875us)
-           - First Batch Requested: 106.326ms (936.485us)
-           - First Batch Returned: 207.640ms (101.314ms)
-           - Last Batch Returned: 1s092ms (885.039ms)
-           - Closed: 1s092ms (121.362us)
-        Node Lifecycle Event Timeline[5]: 1s088ms
-           - Open Started: 104.763ms (104.763ms)
-           - Open Finished: 105.742ms (979.351us)
-           - First Batch Requested: 106.839ms (1.096ms)
-           - First Batch Returned: 207.640ms (100.800ms)
-           - Last Batch Returned: 1s087ms (880.267ms)
-           - Closed: 1s088ms (107.980us)
-        Node Lifecycle Event Timeline[6]: 1s089ms
-           - Open Started: 104.770ms (104.770ms)
-           - Open Finished: 105.709ms (939.264us)
-           - First Batch Requested: 106.873ms (1.163ms)
-           - First Batch Returned: 207.639ms (100.766ms)
-           - Last Batch Returned: 1s089ms (881.723ms)
-           - Closed: 1s089ms (106.855us)
-        Node Lifecycle Event Timeline[7]: 1s090ms
-           - Open Started: 104.770ms (104.770ms)
-           - Open Finished: 105.744ms (974.104us)
-           - First Batch Requested: 106.873ms (1.128ms)
-           - First Batch Returned: 207.639ms (100.766ms)
-           - Last Batch Returned: 1s090ms (882.848ms)
-           - Closed: 1s090ms (115.451us)
-        Node Lifecycle Event Timeline[8]: 1s172ms
-           - Open Started: 127.061ms (127.061ms)
-           - Open Finished: 128.033ms (971.953us)
-           - First Batch Requested: 129.224ms (1.191ms)
-           - First Batch Returned: 237.792ms (108.568ms)
-           - Last Batch Returned: 1s172ms (934.429ms)
-           - Closed: 1s172ms (382.034us)
-        Node Lifecycle Event Timeline[9]: 1s173ms
-           - Open Started: 127.061ms (127.061ms)
-           - Open Finished: 128.027ms (965.864us)
-           - First Batch Requested: 129.224ms (1.197ms)
-           - First Batch Returned: 240.150ms (110.926ms)
-           - Last Batch Returned: 1s173ms (933.103ms)
-           - Closed: 1s173ms (341.816us)
-        Node Lifecycle Event Timeline[10]: 1s174ms
-           - Open Started: 127.061ms (127.061ms)
-           - Open Finished: 128.134ms (1.073ms)
-           - First Batch Requested: 129.417ms (1.283ms)
-           - First Batch Returned: 237.455ms (108.037ms)
-           - Last Batch Returned: 1s174ms (937.175ms)
-           - Closed: 1s174ms (119.496us)
-        Node Lifecycle Event Timeline[11]: 1s176ms
-           - Open Started: 127.083ms (127.083ms)
-           - Open Finished: 129.197ms (2.113ms)
-           - First Batch Requested: 130.671ms (1.473ms)
-           - First Batch Returned: 237.374ms (106.703ms)
-           - Last Batch Returned: 1s176ms (939.430ms)
-           - Closed: 1s176ms (121.753us)
+        Node Lifecycle Event Timeline Summary :
+           - Open Started (127.083ms):
+              Min: 104.760ms, Avg: 112.745ms, Max: 127.083ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - Open Finished (129.197ms):
+              Min: 105.390ms, Avg: 113.753ms, Max: 129.197ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - First Batch Requested (130.671ms):
+              Min: 106.326ms, Avg: 114.894ms, Max: 130.671ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - First Batch Returned (240.150ms):
+              Min: 207.163ms, Avg: 217.783ms, Max: 240.150ms, Count: 12
+              HistogramCount: 8, 0, 0, 0, 4
+           - Last Batch Returned (1s176ms):
+              Min: 1s087ms, Avg: 1s125ms, Max: 1s176ms, Count: 12
+              HistogramCount: 4, 4, 0, 0, 4
+           - Closed (1s176ms):
+              Min: 1s088ms, Avg: 1s125ms, Max: 1s176ms, Count: 12
+              HistogramCount: 4, 4, 0, 0, 4
          - FooterProcessingTime: (Avg: 5.955ms ; Min: 1.208ms ; Max: 110.662ms ; Sum: 10s862ms ; Number of samples: 1824)
          - InitialRangeActualReservation: (Avg: 128.00 KB (131072) ; Min: 128.00 KB (131072) ; Max: 128.00 KB (131072) ; Sum: 228.00 MB (239075328) ; Number of samples: 1824)
          - InitialRangeIdealReservation: (Avg: 112.28 KB (114975) ; Min: 64.00 KB (65536) ; Max: 128.00 KB (131072) ; Sum: 200.00 MB (209715200) ; Number of samples: 1824)
@@ -1890,12 +1518,12 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
       [0] Instance 504e9a5d292585e8:7c56749700000000 (host=tarmstrong-Precision-7540:27000)
       Last report received time[0]: 2021-02-09 08:53:08.375
        - MemoryUsage[0] (500.000ms): 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB
-      Fragment Instance Lifecycle Event Timeline[0]: 4s434ms
-         - Prepare Finished: 33.298ms (33.298ms)
-         - Open Finished: 4s434ms (4s400ms)
-         - First Batch Produced: 4s434ms (602.083us)
-         - First Batch Sent: 4s434ms (77.650us)
-         - ExecInternal Finished: 4s434ms (128.282us)
+      Fragment Instance Lifecycle Event Timeline:
+         - Prepare Finished: 33.298ms
+         - Open Finished: 4s434ms
+         - First Batch Produced: 4s434ms
+         - First Batch Sent: 4s434ms
+         - ExecInternal Finished: 4s434ms
        - AverageThreadTokens: 0.00
        - BytesAssigned: 0
        - CompletionTime: 4s476ms
@@ -1932,13 +1560,13 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
          - RowsSentRate: 10.71 K/sec
          - TotalTime: 93.354us
       AGGREGATION_NODE (id=3):(Total: 4s237ms, non-child: 3.372ms, % non-child: 0.08%)
-        Node Lifecycle Event Timeline[0]: 4s434ms
-           - Open Started: 197.977ms (197.977ms)
-           - Open Finished: 4s434ms (4s236ms)
-           - First Batch Requested: 4s434ms (49.765us)
-           - First Batch Returned: 4s434ms (595.782us)
-           - Last Batch Returned: 4s434ms (626.000ns)
-           - Closed: 4s434ms (166.794us)
+        Node Lifecycle Event Timeline:
+           - Open Started: 197.977ms
+           - Open Finished: 4s434ms
+           - First Batch Requested: 4s434ms
+           - First Batch Returned: 4s434ms
+           - Last Batch Returned: 4s434ms
+           - Closed: 4s434ms
          - InactiveTotalTime: 0.000ns
          - PeakMemoryUsage: 34.17 KB (34992)
          - RowsReturned: 1 (1)
@@ -1951,13 +1579,13 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
            - RowsReturned: 1 (1)
            - TotalTime: 0.000ns
       EXCHANGE_NODE (id=2):(Total: 4s233ms, non-child: 416.507us, % non-child: 0.01%)
-        Node Lifecycle Event Timeline[0]: 4s434ms
-           - Open Started: 197.981ms (197.981ms)
-           - Open Finished: 4s315ms (4s117ms)
-           - First Batch Requested: 4s315ms (80.529us)
-           - First Batch Returned: 4s431ms (116.291ms)
-           - Last Batch Returned: 4s431ms (685.000ns)
-           - Closed: 4s434ms (2.198ms)
+        Node Lifecycle Event Timeline:
+           - Open Started: 197.981ms
+           - Open Finished: 4s315ms
+           - First Batch Requested: 4s315ms
+           - First Batch Returned: 4s431ms
+           - Last Batch Returned: 4s431ms
+           - Closed: 4s434ms
          - ConvertRowBatchTime: 67.503us
          - InactiveTotalTime: 4s233ms
          - PeakMemoryUsage: 392.00 KB (401408)
@@ -2035,78 +1663,22 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
       Last report received time[4-7]: 2021-02-09 08:53:08.375
        - MemoryUsage[0] (500.000ms): 12.01 KB, 8.04 MB, 8.04 MB, 8.28 MB, 8.21 MB, 8.36 MB, 8.04 MB, 8.04 MB, 8.04 MB
        - ThreadUsage[0] (500.000ms): 1, 1, 1, 1, 1, 1, 1, 1, 1
-      Fragment Instance Lifecycle Event Timeline[0]: 4s330ms
-         - Prepare Finished: 1.158ms (1.158ms)
-         - Open Finished: 4s329ms (4s328ms)
-         - First Batch Produced: 4s329ms (31.906us)
-         - First Batch Sent: 4s329ms (122.841us)
-         - ExecInternal Finished: 4s330ms (623.646us)
-      Fragment Instance Lifecycle Event Timeline[1]: 4s320ms
-         - Prepare Finished: 1.184ms (1.184ms)
-         - Open Finished: 4s319ms (4s318ms)
-         - First Batch Produced: 4s319ms (31.710us)
-         - First Batch Sent: 4s319ms (190.570us)
-         - ExecInternal Finished: 4s320ms (655.298us)
-      Fragment Instance Lifecycle Event Timeline[2]: 4s328ms
-         - Prepare Finished: 9.033ms (9.033ms)
-         - Open Finished: 4s326ms (4s317ms)
-         - First Batch Produced: 4s326ms (26.453us)
-         - First Batch Sent: 4s326ms (144.470us)
-         - ExecInternal Finished: 4s328ms (2.040ms)
-      Fragment Instance Lifecycle Event Timeline[3]: 4s321ms
-         - Prepare Finished: 9.878ms (9.878ms)
-         - Open Finished: 4s320ms (4s310ms)
-         - First Batch Produced: 4s320ms (25.675us)
-         - First Batch Sent: 4s321ms (162.439us)
-         - ExecInternal Finished: 4s321ms (581.751us)
-      Fragment Instance Lifecycle Event Timeline[4]: 4s427ms
-         - Prepare Finished: 2.566ms (2.566ms)
-         - Open Finished: 4s426ms (4s424ms)
-         - First Batch Produced: 4s426ms (41.370us)
-         - First Batch Sent: 4s427ms (207.460us)
-         - ExecInternal Finished: 4s427ms (607.753us)
-      Fragment Instance Lifecycle Event Timeline[5]: 4s431ms
-         - Prepare Finished: 2.677ms (2.677ms)
-         - Open Finished: 4s431ms (4s428ms)
-         - First Batch Produced: 4s431ms (19.415us)
-         - First Batch Sent: 4s431ms (140.035us)
-         - ExecInternal Finished: 4s431ms (564.231us)
-      Fragment Instance Lifecycle Event Timeline[6]: 4s424ms
-         - Prepare Finished: 3.906ms (3.906ms)
-         - Open Finished: 4s423ms (4s419ms)
-         - First Batch Produced: 4s423ms (24.758us)
-         - First Batch Sent: 4s423ms (154.196us)
-         - ExecInternal Finished: 4s424ms (575.241us)
-      Fragment Instance Lifecycle Event Timeline[7]: 4s424ms
-         - Prepare Finished: 25.170ms (25.170ms)
-         - Open Finished: 4s423ms (4s398ms)
-         - First Batch Produced: 4s423ms (24.670us)
-         - First Batch Sent: 4s423ms (150.068us)
-         - ExecInternal Finished: 4s424ms (614.776us)
-      Fragment Instance Lifecycle Event Timeline[8]: 4s368ms
-         - Prepare Finished: 969.067us (969.067us)
-         - Open Finished: 4s367ms (4s366ms)
-         - First Batch Produced: 4s367ms (20.446us)
-         - First Batch Sent: 4s367ms (111.063us)
-         - ExecInternal Finished: 4s368ms (591.764us)
-      Fragment Instance Lifecycle Event Timeline[9]: 4s361ms
-         - Prepare Finished: 1.160ms (1.160ms)
-         - Open Finished: 4s360ms (4s359ms)
-         - First Batch Produced: 4s360ms (27.553us)
-         - First Batch Sent: 4s360ms (147.832us)
-         - ExecInternal Finished: 4s361ms (680.699us)
-      Fragment Instance Lifecycle Event Timeline[10]: 4s357ms
-         - Prepare Finished: 5.190ms (5.190ms)
-         - Open Finished: 4s356ms (4s351ms)
-         - First Batch Produced: 4s356ms (34.650us)
-         - First Batch Sent: 4s356ms (165.947us)
-         - ExecInternal Finished: 4s357ms (827.343us)
-      Fragment Instance Lifecycle Event Timeline[11]: 4s363ms
-         - Prepare Finished: 5.305ms (5.305ms)
-         - Open Finished: 4s361ms (4s356ms)
-         - First Batch Produced: 4s361ms (23.021us)
-         - First Batch Sent: 4s361ms (120.230us)
-         - ExecInternal Finished: 4s363ms (1.129ms)
+      Fragment Instance Lifecycle Event Timeline Summary :
+         - Prepare Finished (25.170ms):
+            Min: 969.067us, Avg: 5.683ms, Max: 25.170ms, Count: 12
+            HistogramCount: 9, 2, 0, 0, 1
+         - Open Finished (4s431ms):
+            Min: 4s319ms, Avg: 4s370ms, Max: 4s431ms, Count: 12
+            HistogramCount: 4, 3, 1, 0, 4
+         - First Batch Produced (4s431ms):
+            Min: 4s319ms, Avg: 4s370ms, Max: 4s431ms, Count: 12
+            HistogramCount: 4, 3, 1, 0, 4
+         - First Batch Sent (4s431ms):
+            Min: 4s319ms, Avg: 4s370ms, Max: 4s431ms, Count: 12
+            HistogramCount: 4, 3, 1, 0, 4
+         - ExecInternal Finished (4s431ms):
+            Min: 4s320ms, Avg: 4s371ms, Max: 4s431ms, Count: 12
+            HistogramCount: 4, 3, 1, 0, 4
        - AverageThreadTokens: mean=1.00 min=1.00 max=1.00
        - BytesAssigned: mean=16.41 MB (17209364) min=15.76 MB (16526332) max=21.12 MB (22147452)
        - CompletionTime: mean=4s417ms min=4s366ms max=4s476ms
@@ -2153,90 +1725,25 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
          - TotalTime: mean=768.837us min=491.747us max=2.006ms
          - UncompressedRowBatchSize: mean=22.18 KB (22712) min=22.18 KB (22712) max=22.18 KB (22712)
       AGGREGATION_NODE (id=1) [12 instances]:(Total: 4s027ms, non-child: 167.993ms, % non-child: 4.17%)
-        Node Lifecycle Event Timeline[0]: 4s329ms
-           - Open Started: 310.016ms (310.016ms)
-           - Open Finished: 4s329ms (4s019ms)
-           - First Batch Requested: 4s329ms (28.571us)
-           - First Batch Returned: 4s329ms (25.986us)
-           - Last Batch Returned: 4s329ms (295.000ns)
-           - Closed: 4s329ms (326.862us)
-        Node Lifecycle Event Timeline[1]: 4s319ms
-           - Open Started: 310.017ms (310.017ms)
-           - Open Finished: 4s319ms (4s009ms)
-           - First Batch Requested: 4s319ms (43.335us)
-           - First Batch Returned: 4s319ms (26.328us)
-           - Last Batch Returned: 4s319ms (576.000ns)
-           - Closed: 4s319ms (558.228us)
-        Node Lifecycle Event Timeline[2]: 4s326ms
-           - Open Started: 310.028ms (310.028ms)
-           - Open Finished: 4s326ms (4s016ms)
-           - First Batch Requested: 4s326ms (34.690us)
-           - First Batch Returned: 4s326ms (21.651us)
-           - Last Batch Returned: 4s326ms (352.000ns)
-           - Closed: 4s326ms (340.013us)
-        Node Lifecycle Event Timeline[3]: 4s321ms
-           - Open Started: 310.032ms (310.032ms)
-           - Open Finished: 4s320ms (4s010ms)
-           - First Batch Requested: 4s320ms (31.483us)
-           - First Batch Returned: 4s320ms (21.327us)
-           - Last Batch Returned: 4s320ms (438.000ns)
-           - Closed: 4s321ms (342.613us)
-        Node Lifecycle Event Timeline[4]: 4s427ms
-           - Open Started: 348.276ms (348.276ms)
-           - Open Finished: 4s426ms (4s078ms)
-           - First Batch Requested: 4s426ms (64.897us)
-           - First Batch Returned: 4s426ms (23.842us)
-           - Last Batch Returned: 4s426ms (364.000ns)
-           - Closed: 4s427ms (415.811us)
-        Node Lifecycle Event Timeline[5]: 4s431ms
-           - Open Started: 348.276ms (348.276ms)
-           - Open Finished: 4s431ms (4s082ms)
-           - First Batch Requested: 4s431ms (26.319us)
-           - First Batch Returned: 4s431ms (16.148us)
-           - Last Batch Returned: 4s431ms (250.000ns)
-           - Closed: 4s431ms (258.362us)
-        Node Lifecycle Event Timeline[6]: 4s424ms
-           - Open Started: 348.283ms (348.283ms)
-           - Open Finished: 4s423ms (4s075ms)
-           - First Batch Requested: 4s423ms (31.223us)
-           - First Batch Returned: 4s423ms (20.186us)
-           - Last Batch Returned: 4s423ms (345.000ns)
-           - Closed: 4s424ms (349.576us)
-        Node Lifecycle Event Timeline[7]: 4s424ms
-           - Open Started: 348.378ms (348.378ms)
-           - Open Finished: 4s423ms (4s075ms)
-           - First Batch Requested: 4s423ms (22.104us)
-           - First Batch Returned: 4s423ms (20.276us)
-           - Last Batch Returned: 4s423ms (336.000ns)
-           - Closed: 4s424ms (353.433us)
-        Node Lifecycle Event Timeline[8]: 4s368ms
-           - Open Started: 371.062ms (371.062ms)
-           - Open Finished: 4s367ms (3s996ms)
-           - First Batch Requested: 4s367ms (24.187us)
-           - First Batch Returned: 4s367ms (17.535us)
-           - Last Batch Returned: 4s367ms (281.000ns)
-           - Closed: 4s368ms (222.881us)
-        Node Lifecycle Event Timeline[9]: 4s360ms
-           - Open Started: 372.319ms (372.319ms)
-           - Open Finished: 4s360ms (3s988ms)
-           - First Batch Requested: 4s360ms (43.642us)
-           - First Batch Returned: 4s360ms (21.507us)
-           - Last Batch Returned: 4s360ms (338.000ns)
-           - Closed: 4s360ms (301.447us)
-        Node Lifecycle Event Timeline[10]: 4s356ms
-           - Open Started: 373.400ms (373.400ms)
-           - Open Finished: 4s356ms (3s982ms)
-           - First Batch Requested: 4s356ms (44.683us)
-           - First Batch Returned: 4s356ms (26.979us)
-           - Last Batch Returned: 4s356ms (584.000ns)
-           - Closed: 4s356ms (371.094us)
-        Node Lifecycle Event Timeline[11]: 4s362ms
-           - Open Started: 373.405ms (373.405ms)
-           - Open Finished: 4s361ms (3s988ms)
-           - First Batch Requested: 4s361ms (28.432us)
-           - First Batch Returned: 4s361ms (18.969us)
-           - Last Batch Returned: 4s361ms (335.000ns)
-           - Closed: 4s362ms (306.643us)
+        Node Lifecycle Event Timeline Summary :
+           - Open Started (373.405ms):
+              Min: 310.016ms, Avg: 343.624ms, Max: 373.405ms, Count: 12
+              HistogramCount: 4, 0, 0, 4, 4
+           - Open Finished (4s431ms):
+              Min: 4s319ms, Avg: 4s370ms, Max: 4s431ms, Count: 12
+              HistogramCount: 4, 3, 1, 0, 4
+           - First Batch Requested (4s431ms):
+              Min: 4s319ms, Avg: 4s370ms, Max: 4s431ms, Count: 12
+              HistogramCount: 4, 3, 1, 0, 4
+           - First Batch Returned (4s431ms):
+              Min: 4s319ms, Avg: 4s370ms, Max: 4s431ms, Count: 12
+              HistogramCount: 4, 3, 1, 0, 4
+           - Last Batch Returned (4s431ms):
+              Min: 4s319ms, Avg: 4s370ms, Max: 4s431ms, Count: 12
+              HistogramCount: 4, 3, 1, 0, 4
+           - Closed (4s431ms):
+              Min: 4s319ms, Avg: 4s371ms, Max: 4s431ms, Count: 12
+              HistogramCount: 4, 3, 1, 0, 4
          - InactiveTotalTime: mean=0.000ns min=0.000ns max=0.000ns
          - PeakMemoryUsage: mean=133.17 KB (136368) min=133.17 KB (136368) max=133.17 KB (136368)
          - RowsReturned: mean=1 (1) min=1 (1) max=1 (1)
@@ -2273,90 +1780,25 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
         Hdfs Read Thread Concurrency Bucket[3,7-8,10]: 0:87.5% 1:12.5% 2:0% 3:0% 4:0% 5:0% 6:0% 7:0% 8:0% 9:0% 10:0% 11:0% 12:0% 13:0% 14:0% 15:0% 16:0% 17:0% 18:0% 19:0% 20:0% 21:0% 22:0% 23:0% 24:0% 25:0% 26:0%
         Table Name[0-11]: tpcds_parquet.store_sales
          - BytesReadSeries[0] (500.000ms): 0, 2.64 MB, 5.58 MB, 9.44 MB, 12.27 MB, 15.03 MB, 17.80 MB, 21.56 MB, 25.69 MB
-        Node Lifecycle Event Timeline[0]: 4s329ms
-           - Open Started: 310.021ms (310.021ms)
-           - Open Finished: 310.751ms (729.882us)
-           - First Batch Requested: 310.978ms (226.858us)
-           - First Batch Returned: 335.053ms (24.075ms)
-           - Last Batch Returned: 4s329ms (3s994ms)
-           - Closed: 4s329ms (230.641us)
-        Node Lifecycle Event Timeline[1]: 4s319ms
-           - Open Started: 310.021ms (310.021ms)
-           - Open Finished: 310.944ms (923.058us)
-           - First Batch Requested: 311.156ms (212.721us)
-           - First Batch Returned: 327.973ms (16.816ms)
-           - Last Batch Returned: 4s319ms (3s991ms)
-           - Closed: 4s319ms (124.618us)
-        Node Lifecycle Event Timeline[2]: 4s326ms
-           - Open Started: 310.030ms (310.030ms)
-           - Open Finished: 310.817ms (787.245us)
-           - First Batch Requested: 310.975ms (158.365us)
-           - First Batch Returned: 325.707ms (14.731ms)
-           - Last Batch Returned: 4s326ms (4s000ms)
-           - Closed: 4s326ms (135.204us)
-        Node Lifecycle Event Timeline[3]: 4s320ms
-           - Open Started: 310.033ms (310.033ms)
-           - Open Finished: 310.924ms (890.811us)
-           - First Batch Requested: 311.127ms (203.196us)
-           - First Batch Returned: 327.978ms (16.850ms)
-           - Last Batch Returned: 4s320ms (3s992ms)
-           - Closed: 4s320ms (90.116us)
-        Node Lifecycle Event Timeline[4]: 4s426ms
-           - Open Started: 348.280ms (348.280ms)
-           - Open Finished: 349.163ms (882.740us)
-           - First Batch Requested: 349.413ms (249.352us)
-           - First Batch Returned: 378.564ms (29.151ms)
-           - Last Batch Returned: 4s426ms (4s048ms)
-           - Closed: 4s426ms (115.346us)
-        Node Lifecycle Event Timeline[5]: 4s431ms
-           - Open Started: 348.280ms (348.280ms)
-           - Open Finished: 350.279ms (1.998ms)
-           - First Batch Requested: 350.515ms (235.744us)
-           - First Batch Returned: 378.901ms (28.386ms)
-           - Last Batch Returned: 4s431ms (4s052ms)
-           - Closed: 4s431ms (90.681us)
-        Node Lifecycle Event Timeline[6]: 4s423ms
-           - Open Started: 348.285ms (348.285ms)
-           - Open Finished: 349.319ms (1.033ms)
-           - First Batch Requested: 349.547ms (228.277us)
-           - First Batch Returned: 378.476ms (28.928ms)
-           - Last Batch Returned: 4s423ms (4s045ms)
-           - Closed: 4s423ms (86.989us)
-        Node Lifecycle Event Timeline[7]: 4s423ms
-           - Open Started: 348.380ms (348.380ms)
-           - Open Finished: 349.232ms (852.068us)
-           - First Batch Requested: 349.429ms (196.884us)
-           - First Batch Returned: 381.953ms (32.524ms)
-           - Last Batch Returned: 4s423ms (4s041ms)
-           - Closed: 4s423ms (98.043us)
-        Node Lifecycle Event Timeline[8]: 4s367ms
-           - Open Started: 371.066ms (371.066ms)
-           - Open Finished: 371.955ms (889.224us)
-           - First Batch Requested: 372.215ms (259.767us)
-           - First Batch Returned: 401.941ms (29.725ms)
-           - Last Batch Returned: 4s367ms (3s965ms)
-           - Closed: 4s367ms (90.329us)
-        Node Lifecycle Event Timeline[9]: 4s360ms
-           - Open Started: 372.321ms (372.321ms)
-           - Open Finished: 373.136ms (814.689us)
-           - First Batch Requested: 373.343ms (207.192us)
-           - First Batch Returned: 419.884ms (46.540ms)
-           - Last Batch Returned: 4s360ms (3s940ms)
-           - Closed: 4s360ms (103.462us)
-        Node Lifecycle Event Timeline[10]: 4s356ms
-           - Open Started: 373.402ms (373.402ms)
-           - Open Finished: 374.211ms (809.152us)
-           - First Batch Requested: 374.419ms (208.373us)
-           - First Batch Returned: 405.330ms (30.910ms)
-           - Last Batch Returned: 4s355ms (3s950ms)
-           - Closed: 4s356ms (365.034us)
-        Node Lifecycle Event Timeline[11]: 4s361ms
-           - Open Started: 373.407ms (373.407ms)
-           - Open Finished: 374.252ms (845.372us)
-           - First Batch Requested: 374.453ms (200.225us)
-           - First Batch Returned: 413.791ms (39.338ms)
-           - Last Batch Returned: 4s361ms (3s947ms)
-           - Closed: 4s361ms (107.905us)
+        Node Lifecycle Event Timeline Summary :
+           - Open Started (373.407ms):
+              Min: 310.021ms, Avg: 343.627ms, Max: 373.407ms, Count: 12
+              HistogramCount: 4, 0, 0, 4, 4
+           - Open Finished (374.252ms):
+              Min: 310.751ms, Avg: 344.582ms, Max: 374.252ms, Count: 12
+              HistogramCount: 4, 0, 0, 4, 4
+           - First Batch Requested (374.453ms):
+              Min: 310.975ms, Avg: 344.798ms, Max: 374.453ms, Count: 12
+              HistogramCount: 4, 0, 0, 4, 4
+           - First Batch Returned (419.884ms):
+              Min: 325.707ms, Avg: 372.963ms, Max: 419.884ms, Count: 12
+              HistogramCount: 4, 0, 4, 0, 4
+           - Last Batch Returned (4s431ms):
+              Min: 4s319ms, Avg: 4s370ms, Max: 4s431ms, Count: 12
+              HistogramCount: 4, 3, 1, 0, 4
+           - Closed (4s431ms):
+              Min: 4s319ms, Avg: 4s370ms, Max: 4s431ms, Count: 12
+              HistogramCount: 4, 3, 1, 0, 4
          - FooterProcessingTime: (Avg: 1.661ms ; Min: 144.950us ; Max: 35.064ms ; Sum: 3s030ms ; Number of samples: 1824)
          - InitialRangeActualReservation: (Avg: 8.01 MB (8403339) ; Min: 8.00 MB (8388608) ; Max: 8.31 MB (8716288) ; Sum: 14.28 GB (15327690752) ; Number of samples: 1824)
          - InitialRangeIdealReservation: (Avg: 112.28 KB (114975) ; Min: 64.00 KB (65536) ; Max: 128.00 KB (131072) ; Sum: 200.00 MB (209715200) ; Number of samples: 1824)

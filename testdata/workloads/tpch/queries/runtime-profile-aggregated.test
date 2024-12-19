@@ -21,7 +21,7 @@ row_regex: .*BytesRead: mean=.* min=.* max=.*
 # Info string from aggregated scan node.
 row_regex: .*Table Name\[0-3\]: tpch.*lineitem.*
 # Timeline from aggregated scan node
-row_regex: .*Node Lifecycle Event Timeline\[.*\]: .*
+row_regex: .*Node Lifecycle Event Timeline.*
 # Summary stats counter from aggregated scan node
 row_regex: .*InitialRangeActualReservation: .*Avg:.*Min.*Max.*
 # Time series form aggregated scan node.

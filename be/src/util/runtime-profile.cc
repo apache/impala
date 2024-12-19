@@ -2774,41 +2774,143 @@ void AggregatedRuntimeProfile::PrettyPrintSubclassCounters(
       }
     }
   }
-  // Legacy profile did not show aggregated event sequences.
-  if (verbosity >= Verbosity::DEFAULT) {
-    // Print all the event timers as the following:
-    // <EventKey>[instance index] Timeline: 2s719ms
-    //     - Event 1: 6.522us (6.522us)
-    //     - Event 2: 2s288ms (2s288ms)
-    //     - Event 3: 2s410ms (121.138ms)
-    // The times in parentheses are the time elapsed since the last event.
-    lock_guard<SpinLock> l(event_sequence_lock_);
-    for (const auto& entry : event_sequence_map_) {
-      const AggEventSequence& seq = entry.second;
-      vector<const string*> labels(seq.labels.size());
-      for (const auto& lab_entry : seq.labels) {
-        labels[lab_entry.second] = &lab_entry.first;
+
+  {
+    // Legacy profile did not show aggregated event sequences.
+    // In case of Verbosity::DEFAULT, only the first instance's timestamps were being
+    // printed. A better alternative would be to print a single summarized entry
+    // for each event.
+    // In case of Verbosity::EXTENDED or greater, along with the summarized entry,
+    // event sequences from all instances are included.
+
+    // Create working copies of event sequences to minimize the time spin lock is held.
+    vector<AggEventSequence> agg_event_sequences;
+    string event_sequence_name;
+    size_t es_count = 0;
+    {
+      lock_guard<SpinLock> l(event_sequence_lock_);
+      if (!event_sequence_map_.empty()) {
+        event_sequence_name = event_sequence_map_.begin()->first;
+        es_count = event_sequence_map_.size();
+        agg_event_sequences.reserve(es_count);
+        std::transform(event_sequence_map_.begin(), event_sequence_map_.end(),
+            std::back_inserter(agg_event_sequences),
+            [](const std::pair<string, AggEventSequence>& pair) { return pair.second; });
       }
-      for (int idx = 0; idx < seq.label_idxs.size(); ++idx) {
-        DCHECK_EQ(seq.label_idxs[idx].size(), seq.timestamps[idx].size());
-        int64_t last = seq.timestamps[idx].empty() ? 0 : seq.timestamps[idx].back();
-        stream << prefix << "  " << entry.first << "[" << idx << "]: "
-             << PrettyPrinter::Print(last, TUnit::TIME_NS)
-             << endl;
-        int64_t prev = 0L;
-        for (int j = 0; j < seq.label_idxs[idx].size(); ++j) {
-          const string& label = *labels[seq.label_idxs[idx][j]];
-          int64_t ts = seq.timestamps[idx][j];
-          stream << prefix << "     - " << label << ": "
-                 << PrettyPrinter::Print(ts, TUnit::TIME_NS) << " ("
-                 << PrettyPrinter::Print(ts - prev, TUnit::TIME_NS) << ")"
-                 << endl;
-          prev = ts;
+    }
+    if (verbosity >= Verbosity::EXTENDED) {
+      // Print all the event timers as the following:
+      // <EventKey>[instance index] Timeline: 2s719ms
+      //     - Event 1: 6.522us (6.522us)
+      //     - Event 2: 2s288ms (2s288ms)
+      //     - Event 3: 2s410ms (121.138ms)
+      // The times in parentheses are the time elapsed since the last event.
+      for (const auto& seq : agg_event_sequences) {
+        vector<const string*> labels(seq.labels.size());
+        for (const auto& lab_entry : seq.labels) {
+          labels[lab_entry.second] = &lab_entry.first;
+        }
+        for (int idx = 0; idx < seq.label_idxs.size(); ++idx) {
+          DCHECK_EQ(seq.label_idxs[idx].size(), seq.timestamps[idx].size());
+          int64_t last = seq.timestamps[idx].empty() ? 0 : seq.timestamps[idx].back();
+          stream << prefix << "  " << event_sequence_name << "[" << idx << "]: "
+              << PrettyPrinter::Print(last, TUnit::TIME_NS)
+              << endl;
+          int64_t prev = 0L;
+          for (int j = 0; j < seq.label_idxs[idx].size(); ++j) {
+            const string& label = *labels[seq.label_idxs[idx][j]];
+            int64_t ts = seq.timestamps[idx][j];
+            stream << prefix << "     - " << label << ": "
+                   << PrettyPrinter::Print(ts, TUnit::TIME_NS) << " ("
+                   << PrettyPrinter::Print(ts - prev, TUnit::TIME_NS) << ")"
+                   << endl;
+            prev = ts;
+          }
         }
       }
-      // Showing an event sequence per instance is too verbose for the default mode,
-      // so just show first.
-      if (verbosity < Verbosity::EXTENDED) break;
+    } else if (verbosity >= Verbosity::DEFAULT) {
+      // For the summarized entry,
+      // If there are less instances then 'json_profile_event_timestamp_limit',
+      // all timestamps are printed in list form.
+      // Otherwise, aggregate stats of timestamps would be displayed.
+      Document doc(kArrayType);
+      Value event_sequence_json(kObjectType);
+      for (AggEventSequence& agg_event_sequence : agg_event_sequences) {
+        // Aggregate timestamps across instances into timestamps within the JSON
+        agg_event_sequence.ToJson(event_sequence_json, &doc);
+        if (event_sequence_json.HasMember("events") &&
+            event_sequence_json["events"].Size() > 0) {
+          const Value& events_json = event_sequence_json["events"];
+          if(events_json[0].HasMember("ts_stat")) {
+            // When number of instances > json_profile_event_timestamp_limit,
+
+            // Node Lifecycle Event Timeline Summary
+            //   - Open Started (1s846ms):
+            //     Min: 806.934ms, Avg: 1s245ms, Max: 1s846ms, Count: 12
+            //     HistogramCount: 4, 4, 0, 0, 4
+            stream << prefix << "  " << event_sequence_name << " Summary :\n";
+            ostringstream count_summary_line;
+            for (int i = 0; i < events_json.Size(); ++i) {
+              const Value& count_list = events_json[i]["ts_stat"]["count"];
+              const size_t bucket_size = count_list.Size();
+              const int64_t min_ts = events_json[i]["ts_stat"]["min"][0].GetInt64();
+              const int64_t max_ts = events_json[i]["ts_stat"]["max"][bucket_size - 1]
+                  .GetInt64();
+              const Value& avg_list = events_json[i]["ts_stat"]["avg"];
+
+              stream << prefix << "     - " << events_json[i]["label"].GetString()
+                  << " (" << PrettyPrinter::Print(max_ts, TUnit::TIME_NS) << "):\n";
+
+              size_t count = count_list[0].GetUint64();
+              size_t total_inst_count = count;
+              double avg_ts = avg_list[0].GetDouble() * count;
+
+              count_summary_line << count;
+
+              for (size_t j = 1; j < bucket_size; j++) {
+                count = count_list[j].GetUint64();
+                count_summary_line << ", " << count;
+                total_inst_count += count;
+                avg_ts += (avg_list[j].GetDouble() * count);
+              }
+              avg_ts = avg_ts / total_inst_count;
+
+              stream << prefix << "        ";
+              stream << "Min: " << PrettyPrinter::Print(min_ts, TUnit::TIME_NS);
+              stream << ", Avg: " << PrettyPrinter::Print(avg_ts, TUnit::TIME_NS);
+              stream << ", Max: " << PrettyPrinter::Print(max_ts, TUnit::TIME_NS);
+              stream << ", Count: " << total_inst_count << "\n";
+              stream << prefix << "        ";
+              stream << "HistogramCount: " << count_summary_line.str() << "\n";
+
+              count_summary_line.str("");
+            }
+          } else {
+            // When number of instances <= json_profile_event_timestamp_limit
+            // or
+            // When number of instances == 0
+
+            // Node Lifecycle Event Timeline :
+            // - Open Started: 2s850ms, 3s850ms, 4s150ms, 5s850ms
+            // - Open Finished: 4s094ms, 5s850ms, 6s150ms, 7s850ms
+            // - First Batch Requested: 8s094ms, 9s850ms, 10s150ms, 11s850ms
+            // - First Batch Returned:  ... ... ... ... ... ...
+            // - ... ... ... ... ... ... ... ...
+            stream << prefix << "  " << event_sequence_name << ":\n";
+            for (int i = 0; i < events_json.Size(); ++i) {
+              stream << prefix << "     - " << events_json[i]["label"].GetString()
+                  << ": ";
+              const Value& ts_list = events_json[i]["ts_list"];
+              for (size_t j = 0; j < ts_list.Size() - 1; j++) {
+                stream << PrettyPrinter::Print(ts_list[j].GetInt64(), TUnit::TIME_NS)
+                    << ", ";
+              }
+              stream << PrettyPrinter::Print(ts_list[ts_list.Size() - 1].GetInt64(),
+                  TUnit::TIME_NS) << "\n";
+            }
+          }
+        }
+      }
     }
   }
 
@@ -3137,7 +3239,7 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value& event_sequence_js
         if (inst_count_list[division_idx] == 0) {
           min_ts_stat.PushBack(0, allocator);
           max_ts_stat.PushBack(0, allocator);
-          avg_ts_stat.PushBack(0, allocator);
+          avg_ts_stat.PushBack(0.0, allocator);
           inst_count_stat.PushBack(0, allocator);
         } else {
           avg_ts_list[division_idx] /= inst_count_list[division_idx];
