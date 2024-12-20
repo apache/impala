@@ -89,6 +89,9 @@ class Frontend {
       const string* pattern, const TSessionState* session,
       TGetTablesResult* metadata_table_names);
 
+  /// Return list of catalog info strings
+  Status GetCatalogInfo(TGetCatalogInfoResult* catalog_info);
+
   /// Return all databases matching the optional argument 'pattern'.
   /// If pattern is NULL, match all databases otherwise match only those databases that
   /// match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
@@ -264,6 +267,7 @@ class Frontend {
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
   jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache(byte[][])
   jmethodID update_membership_id_; // JniFrontend.updateExecutorMembership()
+  jmethodID get_catalog_info_; // JniFrontend.getCatalogInfo()
   jmethodID get_catalog_metrics_id_; // JniFrontend.getCatalogMetrics()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID get_metadata_table_names_id_; // JniFrontend.getMetadataTableNames

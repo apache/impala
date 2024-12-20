@@ -376,7 +376,9 @@ public interface FeIcebergTable extends FeFsTable {
     if (getTTableStats().getNum_rows() < 0) {
       getTTableStats().setNum_rows(Utils.calculateNumRows(this));
     }
-    getTTableStats().setTotal_file_bytes(Utils.calculateFileSizeInBytes(this));
+    if (getTTableStats().getTotal_file_bytes() <= 0) {
+      getTTableStats().setTotal_file_bytes(Utils.calculateFileSizeInBytes(this));
+    }
   }
 
   static void setIcebergStorageDescriptor(

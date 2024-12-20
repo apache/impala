@@ -16,15 +16,26 @@
 // under the License.
 package org.apache.impala.service;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Objects;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.List;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.fs.Path;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.local.CatalogdMetaProvider;
+import org.apache.impala.catalog.local.IcebergMetaProvider;
 import org.apache.impala.catalog.local.LocalCatalog;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.thrift.TException;
@@ -48,8 +59,14 @@ public abstract class FeCatalogManager {
    * configuration.
    */
   public static FeCatalogManager createFromBackendConfig() {
-    if (BackendConfig.INSTANCE.getBackendCfg().use_local_catalog) {
-      return new LocalImpl();
+    TBackendGflags cfg = BackendConfig.INSTANCE.getBackendCfg();
+    if (cfg.use_local_catalog) {
+      if (!cfg.catalogd_deployed) {
+        // Currently Iceberg REST Catalog is the only implementation.
+        return new IcebergRestCatalogImpl();
+      } else {
+        return new LocalImpl();
+      }
     } else {
       return new CatalogdImpl();
     }
@@ -152,6 +169,80 @@ public abstract class FeCatalogManager {
     @Override
     TUpdateCatalogCacheResponse updateCatalogCache(TUpdateCatalogCacheRequest req) {
       return PROVIDER.updateCatalogCache(req);
+    }
+  }
+
+  /**
+   * Implementation which creates LocalCatalog instances and uses an Iceberg REST
+   * Catalog.
+   * TODO(boroknagyz): merge with LocalImpl
+   */
+  private static class IcebergRestCatalogImpl extends FeCatalogManager {
+    private static IcebergMetaProvider PROVIDER;
+
+    @Override
+    public synchronized FeCatalog getOrCreateCatalog() {
+      if (PROVIDER == null) {
+        try {
+          PROVIDER = initProvider();
+        } catch (IOException e) {
+          throw new IllegalStateException("Create IcebergMetaProvider failed", e);
+        }
+      }
+      return new LocalCatalog(PROVIDER, null);
+    }
+
+    IcebergMetaProvider initProvider() throws IOException {
+      TBackendGflags flags = BackendConfig.INSTANCE.getBackendCfg();
+      String catalogConfigDir = flags.catalog_config_dir;
+      Preconditions.checkState(catalogConfigDir != null &&
+          !catalogConfigDir.isEmpty());
+      List<String> files = listFiles(catalogConfigDir);
+      Preconditions.checkState(files.size() == 1,
+          String.format("Expected number of files in directory %s is one, found %d files",
+              catalogConfigDir, files.size()));
+      String configFile = catalogConfigDir + Path.SEPARATOR + files.get(0);
+      Properties props = readPropertiesFile(configFile);
+      // In the future we can expect different catalog types, but currently we only
+      // support Iceberg REST Catalogs.
+      checkPropertyValue(configFile, props, "connector.name", "iceberg");
+      checkPropertyValue(configFile, props, "iceberg.catalog.type", "rest");
+      return new IcebergMetaProvider(props);
+    }
+
+    private List<String> listFiles(String dirPath) {
+      File dir = new File(dirPath);
+      Preconditions.checkState(dir.exists() && dir.isDirectory());
+      return Stream.of(dir.listFiles())
+          .filter(file -> !file.isDirectory())
+          .map(File::getName)
+          .collect(Collectors.toList());
+    }
+
+    private Properties readPropertiesFile(String file) throws IOException {
+      Properties props = new Properties();
+      props.load(new FileInputStream(file));
+      return props;
+    }
+
+    private void checkPropertyValue(String configFile, Properties props, String key,
+        String expectedValue) {
+      if (!props.containsKey(key)) {
+        throw new IllegalStateException(String.format(
+            "Expected property %s was not specified in config file %s.", key,
+            configFile));
+      }
+      String actualValue = props.getProperty(key);
+      if (!Objects.equals(actualValue, expectedValue)) {
+        throw new IllegalStateException(String.format(
+            "Expected value of '%s' is '%s', but found '%s' in config file %s",
+            key, expectedValue, actualValue, configFile));
+      }
+    }
+
+    @Override
+    TUpdateCatalogCacheResponse updateCatalogCache(TUpdateCatalogCacheRequest req) {
+      return null;
     }
   }
 

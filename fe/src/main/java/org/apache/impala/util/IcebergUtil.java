@@ -131,6 +131,12 @@ public class IcebergUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergUtil.class);
 
+  public static final String ICEBERG_REST_URI = "iceberg_rest_uri";
+  public static final String ICEBERG_REST_USER_ID = "iceberg_rest_user_id";
+  public static final String ICEBERG_REST_USER_SECRET = "iceberg_rest_user_secret";
+  public static final String ICEBERG_REST_WAREHOUSE_LOCATION =
+      "iceberg_rest_warehouse_location";
+
   /**
    * Returns the corresponding catalog implementation for 'feTable'.
    */
@@ -1227,7 +1233,9 @@ public class IcebergUtil {
         CatalogProperties.FILE_IO_IMPL, CatalogProperties.IO_MANIFEST_CACHE_ENABLED,
         CatalogProperties.IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS,
         CatalogProperties.IO_MANIFEST_CACHE_MAX_TOTAL_BYTES,
-        CatalogProperties.IO_MANIFEST_CACHE_MAX_CONTENT_LENGTH));
+        CatalogProperties.IO_MANIFEST_CACHE_MAX_CONTENT_LENGTH,
+        ICEBERG_REST_URI, ICEBERG_REST_USER_ID, ICEBERG_REST_USER_SECRET,
+        ICEBERG_REST_WAREHOUSE_LOCATION));
 
     for (String key : configKeys) {
       String val = conf.get("iceberg." + key);

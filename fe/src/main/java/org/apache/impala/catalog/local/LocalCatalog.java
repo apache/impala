@@ -89,6 +89,10 @@ public class LocalCatalog implements FeCatalog {
     defaultKuduMasterHosts_ = defaultKuduMasterHosts;
   }
 
+  public String getProviderURI() {
+    return metaProvider_.getURI();
+  }
+
   @Override
   public List<? extends FeDb> getDbs(PatternMatcher matcher) {
     loadDbs();

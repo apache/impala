@@ -396,6 +396,10 @@ public class CatalogdMetaProvider implements MetaProvider {
         .build();
   }
 
+  public String getURI() {
+    return "Catalogd (URI TODO)";
+  }
+
   public CacheStats getCacheStats() {
     return cache_.stats();
   }

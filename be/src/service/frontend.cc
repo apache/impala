@@ -121,6 +121,7 @@ Frontend::Frontend() {
     {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
     {"updateCatalogCache", "([B)[B", &update_catalog_cache_id_},
     {"updateExecutorMembership", "([B)V", &update_membership_id_},
+    {"getCatalogInfo", "()[B", &get_catalog_info_},
     {"getCatalogMetrics", "()[B", &get_catalog_metrics_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"getMetadataTableNames", "([B)[B", &get_metadata_table_names_id_},
@@ -256,6 +257,10 @@ Status Frontend::GetMetadataTableNames(const string& db, const string& table_nam
   if (session != nullptr) params.__set_session(*session);
   return JniUtil::CallJniMethod(fe_, get_metadata_table_names_id_, params,
       metadata_table_names);
+}
+
+Status Frontend::GetCatalogInfo(TGetCatalogInfoResult* catalog_info) {
+  return JniUtil::CallJniMethod(fe_, get_catalog_info_, catalog_info);
 }
 
 Status Frontend::GetDbs(const string* pattern, const TSessionState* session,

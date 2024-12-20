@@ -20,6 +20,24 @@ under the License.
 
 <h2>Catalog</h2>
 
+{{?info}}
+<h3>Info</h3>
+<table class='table table-bordered table-hover'>
+  <tr>
+    <th>Value</th>
+  </tr>
+{{/info}}
+{{#info}}
+  <tr>
+    <td><tt>{{value}}</tt></td>
+  </tr>
+{{/info}}
+{{?info}}
+</table>
+{{/info}}
+
+
+
 {{?has_large_tables}}
 <div class="card">
   <div class="card-header">

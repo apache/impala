@@ -318,4 +318,8 @@ struct TBackendGflags {
   143: required string injected_group_members_debug_only
 
   144: required i32 hms_event_sync_sleep_interval_ms
+
+  145: required bool catalogd_deployed
+
+  146: required string catalog_config_dir
 }

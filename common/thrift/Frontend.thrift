@@ -104,6 +104,11 @@ struct TGetTablesResult {
   1: list<string> tables
 }
 
+// getCatalogInfo returns a list of catalog info strings
+struct TGetCatalogInfoResult {
+  1: list<string> info
+}
+
 // Arguments to getTableMetrics, which returns the metrics of a specific table.
 struct TGetTableMetricsParams {
   1: required CatalogObjects.TTableName table_name

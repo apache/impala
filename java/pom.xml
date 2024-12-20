@@ -408,6 +408,7 @@ under the License.
   <modules>
     <module>datagenerator</module>
     <module>puffin-data-generator</module>
+    <module>iceberg-rest-catalog-test</module>
     <module>executor-deps</module>
     <module>ext-data-source</module>
     <module>../fe</module>

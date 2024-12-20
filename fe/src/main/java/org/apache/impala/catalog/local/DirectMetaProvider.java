@@ -85,6 +85,10 @@ class DirectMetaProvider implements MetaProvider {
     initMsClientPool();
   }
 
+  public String getURI() {
+    return "HMS (URI TODO)";
+  }
+
   private static synchronized void initMsClientPool() {
     // Lazy-init the metastore client pool based on the backend configuration.
     // TODO(todd): this should probably be a process-wide singleton.

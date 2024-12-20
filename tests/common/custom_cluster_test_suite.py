@@ -603,6 +603,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         expected_subscribers += 1
       if "--enable_catalogd_ha" in options:
         expected_subscribers += 1
+      elif "--no_catalogd" in options:
+        expected_subscribers -= 1
 
     if wait_for_backends:
       statestored.service.wait_for_live_subscribers(expected_subscribers,

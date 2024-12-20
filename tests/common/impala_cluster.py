@@ -93,9 +93,11 @@ def post_data(url, data):
 # * The docker minicluster with one container per process connected to a user-defined
 #   bridge network.
 class ImpalaCluster(object):
-  def __init__(self, docker_network=None, use_admission_service=False):
+  def __init__(self, docker_network=None, use_admission_service=False,
+      deploy_catalogd=True):
     self.docker_network = docker_network
     self.use_admission_service = use_admission_service
+    self.deploy_catalogd = deploy_catalogd
     self.refresh()
 
   @classmethod
@@ -231,7 +233,7 @@ class ImpalaCluster(object):
       # process to write a minidump.
       assert len(self.impalads) >= expected_num_impalads
       assert self.statestored is not None
-      assert self.catalogd is not None
+      if (self.deploy_catalogd): assert self.catalogd is not None
 
     sleep_interval = 0.5
     # Wait for each webserver to be ready.
@@ -274,7 +276,7 @@ class ImpalaCluster(object):
           expected_num=num_impalads, actual_num=len(self.impalads))
     if not self.statestored:
       msg += "statestored failed to start.\n"
-    if not self.catalogd:
+    if self.deploy_catalogd and not self.catalogd:
       msg += "catalogd failed to start.\n"
     if msg:
       raise RuntimeError(msg)

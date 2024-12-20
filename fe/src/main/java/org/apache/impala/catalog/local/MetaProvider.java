@@ -57,6 +57,7 @@ import com.google.errorprone.annotations.Immutable;
  */
 public interface MetaProvider {
 
+  String getURI();
   /**
    * Get the authorization policy. This acts as a repository of authorization
    * metadata.

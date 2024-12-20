@@ -993,6 +993,24 @@ void ImpalaHttpHandler::CatalogHandler(const Webserver::WebRequest& req,
     return;
   }
 
+  TGetCatalogInfoResult catalog_info;
+  status = server_->exec_env_->frontend()->GetCatalogInfo(&catalog_info);
+
+  if (!status.ok()) {
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    return;
+  }
+
+  Value info(kArrayType);
+  for (const string& str: catalog_info.info) {
+    Value str_val(str.c_str(), document->GetAllocator());
+    Value value(kObjectType);
+    value.AddMember("value", str_val, document->GetAllocator());
+    info.PushBack(value, document->GetAllocator());
+  }
+  document->AddMember("info", info, document->GetAllocator());
+
   Value databases(kArrayType);
   for (const TDatabase& db: get_dbs_result.dbs) {
     Value database(kObjectType);

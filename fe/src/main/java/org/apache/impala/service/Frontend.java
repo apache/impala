@@ -130,6 +130,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeSystemTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.local.LocalCatalog;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ImpaladTableUsageTracker;
@@ -174,6 +175,7 @@ import org.apache.impala.thrift.TClientRequest;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TCommentOnParams;
+import org.apache.impala.thrift.TConvertTableRequest;
 import org.apache.impala.thrift.TCopyTestCaseReq;
 import org.apache.impala.thrift.TCounter;
 import org.apache.impala.thrift.TCreateDropRoleParams;
@@ -185,28 +187,28 @@ import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TErrorCode;
-import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TDescribeTableParams;
-import org.apache.impala.thrift.TIcebergDmlFinalizeParams;
-import org.apache.impala.thrift.TIcebergOperation;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TExplainResult;
 import org.apache.impala.thrift.TFinalizeParams;
 import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.thrift.TGetCatalogInfoResult;
 import org.apache.impala.thrift.TGetCatalogMetricsResult;
 import org.apache.impala.thrift.TGetTableHistoryResult;
 import org.apache.impala.thrift.TGetTableHistoryResultItem;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
+import org.apache.impala.thrift.TIcebergDmlFinalizeParams;
+import org.apache.impala.thrift.TIcebergOperation;
+import org.apache.impala.thrift.TIcebergOptimizationMode;
+import org.apache.impala.thrift.TIcebergOptimizeParams;
 import org.apache.impala.thrift.TImpalaQueryOptions;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TMetadataOpRequest;
-import org.apache.impala.thrift.TConvertTableRequest;
-import org.apache.impala.thrift.TIcebergOptimizationMode;
-import org.apache.impala.thrift.TIcebergOptimizeParams;
 import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TPoolConfig;
@@ -549,8 +551,8 @@ public class Frontend {
     impaladTableUsageTracker_ = ImpaladTableUsageTracker.createFromConfig(
         BackendConfig.INSTANCE);
     queryHookManager_ = QueryEventHookManager.createFromConfig(BackendConfig.INSTANCE);
-    if (!isBackendTest) {
-      TBackendGflags cfg = BackendConfig.INSTANCE.getBackendCfg();
+    TBackendGflags cfg = BackendConfig.INSTANCE.getBackendCfg();
+    if (!isBackendTest && cfg.catalogd_deployed) {
       metaStoreClientPool_ = new MetaStoreClientPool(1, cfg.initial_hms_cnxn_timeout_s);
       if (MetastoreShim.getMajorVersion() > 2) {
         transactionKeepalive_ = new TransactionKeepalive(metaStoreClientPool_);
@@ -1116,6 +1118,20 @@ public class Frontend {
       for (FeDb db : getCatalog().getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
         resp.num_dbs++;
         resp.num_tables += db.getAllTableNames().size();
+      }
+    }
+    return resp;
+  }
+
+  public TGetCatalogInfoResult getCatalogInfo() {
+    TGetCatalogInfoResult resp = new TGetCatalogInfoResult();
+    resp.setInfo(Lists.newArrayList());
+    if (BackendConfig.INSTANCE.getBackendCfg().use_local_catalog) {
+      resp.info.add("Catalog Type: Local");
+      FeCatalog catalog = getCatalog();
+      String provider = ((LocalCatalog)catalog).getProviderURI();
+      if (provider != null && !provider.isEmpty()) {
+        resp.info.add("Provider: " + provider);
       }
     }
     return resp;

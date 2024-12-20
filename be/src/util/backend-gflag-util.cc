@@ -114,6 +114,8 @@ DECLARE_bool(enable_json_scanner);
 DECLARE_bool(iceberg_allow_datafiles_in_table_location_only);
 DECLARE_bool(iceberg_always_allow_merge_on_read_operations);
 DECLARE_bool(enable_reading_puffin_stats);
+DECLARE_bool(catalogd_deployed);
+DECLARE_string(catalog_config_dir);
 DECLARE_int32(catalog_operation_log_size);
 DECLARE_string(hostname);
 DECLARE_bool(allow_catalog_cache_op_from_masked_users);
@@ -478,6 +480,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
       FLAGS_iceberg_always_allow_merge_on_read_operations);
   cfg.__set_enable_reading_puffin_stats(
       FLAGS_enable_reading_puffin_stats);
+  cfg.__set_catalogd_deployed(FLAGS_catalogd_deployed);
+  cfg.__set_catalog_config_dir(FLAGS_catalog_config_dir);
   cfg.__set_max_filter_error_rate_from_full_scan(
       FLAGS_max_filter_error_rate_from_full_scan);
   cfg.__set_catalog_operation_log_size(FLAGS_catalog_operation_log_size);

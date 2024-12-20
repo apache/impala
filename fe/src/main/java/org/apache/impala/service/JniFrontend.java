@@ -57,12 +57,14 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCivilTime;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDescribeDbParams;
+import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TDescribeTableParams;
 import org.apache.impala.thrift.TDescriptorTable;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.thrift.TGetAllHadoopConfigsResponse;
+import org.apache.impala.thrift.TGetCatalogInfoResult;
 import org.apache.impala.thrift.TGetCatalogMetricsResult;
 import org.apache.impala.thrift.TGetDataSrcsParams;
 import org.apache.impala.thrift.TGetDataSrcsResult;
@@ -72,10 +74,8 @@ import org.apache.impala.thrift.TGetFunctionsParams;
 import org.apache.impala.thrift.TGetFunctionsResult;
 import org.apache.impala.thrift.TGetHadoopConfigRequest;
 import org.apache.impala.thrift.TGetHadoopConfigResponse;
-import org.apache.impala.thrift.TGetHadoopGroupsRequest;
-import org.apache.impala.thrift.TGetHadoopGroupsResponse;
-import org.apache.impala.thrift.TGetTableHistoryResult;
 import org.apache.impala.thrift.TGetMetadataTablesParams;
+import org.apache.impala.thrift.TGetTableHistoryResult;
 import org.apache.impala.thrift.TGetTablesParams;
 import org.apache.impala.thrift.TGetTablesResult;
 import org.apache.impala.thrift.TLoadDataReq;
@@ -85,14 +85,13 @@ import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TQueryCompleteContext;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowGrantPrincipalParams;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
 import org.apache.impala.thrift.TStringLiteral;
-import org.apache.impala.thrift.TDescribeHistoryParams;
-import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
@@ -255,6 +254,17 @@ public class JniFrontend {
     try {
       TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(metrics);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  public byte[] getCatalogInfo() throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    TGetCatalogInfoResult info = frontend_.getCatalogInfo();
+    try {
+      TSerializer serializer = new TSerializer(protocolFactory_);
+      return serializer.serialize(info);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }

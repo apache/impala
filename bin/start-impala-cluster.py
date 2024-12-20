@@ -169,6 +169,9 @@ parser.add_option("--enable_catalogd_ha", dest="enable_catalogd_ha",
                   action="store_true", default=False,
                   help="If true, enables CatalogD HA - the cluster will be launched "
                   "with two catalogd instances as Active-Passive HA pair.")
+parser.add_option("--no_catalogd", dest="no_catalogd",
+                  action="store_true", default=False,
+                  help="If true, there will be no CatalogD.")
 parser.add_option("--jni_frontend_class", dest="jni_frontend_class",
                   action="store", default="",
                   help="Use a custom java frontend interface.")
@@ -753,7 +756,8 @@ class MiniClusterOperations(object):
   """
   def get_cluster(self):
     """Return an ImpalaCluster instance."""
-    return ImpalaCluster(use_admission_service=options.enable_admission_service)
+    return ImpalaCluster(use_admission_service=options.enable_admission_service,
+        deploy_catalogd=not options.no_catalogd)
 
   def kill_all_daemons(self, force=False):
     kill_matching_processes(["catalogd", "impalad", "statestored", "admissiond"], force)
@@ -789,7 +793,9 @@ class MiniClusterOperations(object):
                            " for more details.")
 
   def start_catalogd(self):
-    if options.enable_catalogd_ha:
+    if options.no_catalogd:
+      num_catalogd = 0
+    elif options.enable_catalogd_ha:
       num_catalogd = 2
     else:
       num_catalogd = 1

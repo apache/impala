@@ -291,6 +291,10 @@ DEFINE_bool(is_coordinator, true, "If true, this Impala daemon can accept and co
     "queries from clients. If false, it will refuse client connections.");
 DEFINE_bool(is_executor, true, "If true, this Impala daemon will execute query "
     "fragments.");
+
+DEFINE_bool(catalogd_deployed, true, "If false, Impala daemon doesn't expect Catalog "
+    "Daemon to be present.");
+
 DEFINE_string(executor_groups, "",
     "List of executor groups, separated by comma. Each executor group specification can "
     "optionally contain a minimum size, separated by a ':', e.g. --executor_groups "
@@ -576,7 +580,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   ABORT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env_->metrics()));
 
   // Register the catalog update callback if running in a real cluster as a coordinator.
-  if ((!TestInfo::is_test() || TestInfo::is_be_cluster_test()) && FLAGS_is_coordinator) {
+  if ((!TestInfo::is_test() || TestInfo::is_be_cluster_test()) && FLAGS_is_coordinator &&
+      FLAGS_catalogd_deployed) {
     auto catalog_cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
         vector<TTopicDelta>* topic_updates) {
       CatalogUpdateCallback(state, topic_updates);
@@ -1695,6 +1700,7 @@ void ImpalaServer::CloseClientRequestState(const QueryHandle& query_handle) {
 }
 
 Status ImpalaServer::UpdateCatalogMetrics() {
+  if (!FLAGS_catalogd_deployed) return Status::OK();
   TGetCatalogMetricsResult metrics;
   RETURN_IF_ERROR(exec_env_->frontend()->GetCatalogMetrics(&metrics));
   ImpaladMetrics::CATALOG_NUM_DBS->SetValue(metrics.num_dbs);
@@ -2233,8 +2239,7 @@ bool ImpalaServer::IsAuthorizedProxyUser(const string& user) {
       != authorized_proxy_group_config_.end();
 }
 
-void ImpalaServer::CatalogUpdateVersionInfo::UpdateCatalogVersionMetrics()
-{
+void ImpalaServer::CatalogUpdateVersionInfo::UpdateCatalogVersionMetrics() {
   ImpaladMetrics::CATALOG_VERSION->SetValue(catalog_version);
   ImpaladMetrics::CATALOG_OBJECT_VERSION_LOWER_BOUND->SetValue(
       catalog_object_version_lower_bound);
@@ -2245,6 +2250,7 @@ void ImpalaServer::CatalogUpdateVersionInfo::UpdateCatalogVersionMetrics()
 void ImpalaServer::CatalogUpdateCallback(
     const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {
+  DCHECK(FLAGS_catalogd_deployed);
   StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
       incoming_topic_deltas.find(CatalogServer::IMPALA_CATALOG_TOPIC);
   if (topic == incoming_topic_deltas.end()) return;
@@ -2304,6 +2310,7 @@ static inline void MarkTimelineEvent(RuntimeProfile::EventSequence* timeline,
 
 void ImpalaServer::WaitForCatalogUpdate(const int64_t catalog_update_version,
     const TUniqueId& catalog_service_id, RuntimeProfile::EventSequence* timeline) {
+  DCHECK(FLAGS_catalogd_deployed);
   unique_lock<mutex> unique_lock(catalog_version_lock_);
   // Wait for the update to be processed locally.
   VLOG_QUERY << "Waiting for catalog version: " << catalog_update_version
@@ -3138,6 +3145,12 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
   RETURN_IF_ERROR(exec_env_->StartStatestoreSubscriberService());
 
   kudu::Version target_schema_version;
+
+  if (FLAGS_enable_workload_mgmt && !FLAGS_catalogd_deployed) {
+    // TODO(IMPALA-13830): Enable workload management in lightweight deployments.
+    return Status("Workload management needs CatalogD to be deployed.");
+  }
+
   if (FLAGS_is_coordinator) {
     if (FLAGS_enable_workload_mgmt) {
       ABORT_IF_ERROR(workloadmgmt::ParseSchemaVersionFlag(&target_schema_version));

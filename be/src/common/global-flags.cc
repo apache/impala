@@ -430,6 +430,9 @@ DEFINE_bool(iceberg_always_allow_merge_on_read_operations, false, "Impala can on
     "executing DELETE, UPDATE and MERGE operations on Iceberg tables even if the table "
     "property is 'copy-on-write'.");
 
+DEFINE_string(catalog_config_dir, "", "Directory of configuration files of external "
+    "catalogs, e.g. Iceberg REST Catalog.");
+
 // Host and port of Statestore Service
 DEFINE_string(state_store_host, "localhost",
     "hostname where StatestoreService is running");
