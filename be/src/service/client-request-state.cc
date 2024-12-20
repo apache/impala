@@ -349,8 +349,13 @@ Status ClientRequestState::Exec() {
       break;
     }
     case TStmtType::ADMIN_FN:
-      DCHECK(exec_req.admin_request.type == TAdminRequestType::SHUTDOWN);
-      RETURN_IF_ERROR(ExecShutdownRequest());
+      if (exec_req.admin_request.type == TAdminRequestType::SHUTDOWN) {
+        RETURN_IF_ERROR(ExecShutdownRequest());
+      } else if (exec_req.admin_request.type == TAdminRequestType::EVENT_PROCESSOR) {
+        RETURN_IF_ERROR(ExecEventProcessorCmd());
+      } else {
+        DCHECK(false);
+      }
       break;
     case TStmtType::CONVERT:
       DCHECK(exec_req.__isset.convert_table_request);
@@ -1091,6 +1096,24 @@ Status ClientRequestState::ExecShutdownRequest() {
   Status shutdown_status(resp.status());
   RETURN_IF_ERROR(shutdown_status);
   SetResultSet({ImpalaServer::ShutdownStatusToString(resp.shutdown_status())});
+  return Status::OK();
+}
+
+Status ClientRequestState::ExecEventProcessorCmd() {
+  catalog_op_executor_.reset(
+      new CatalogOpExecutor(ExecEnv::GetInstance(), frontend_, server_profile_));
+  const TEventProcessorCmdParams& params =
+      exec_request().admin_request.event_processor_cmd_params;
+  TSetEventProcessorStatusRequest request;
+  TSetEventProcessorStatusResponse response;
+  request.__set_params(params);
+  request.__set_header(GetCatalogServiceRequestHeader());
+  Status rpc_status = catalog_op_executor_->SetEventProcessorStatus(request, &response);
+  if (!rpc_status.ok()) {
+    VLOG_QUERY << "SetEventProcessorStatus failed: " << rpc_status.msg().msg();
+    return rpc_status;
+  }
+  SetResultSet({response.info});
   return Status::OK();
 }
 

@@ -454,6 +454,17 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     VLOG_RPC << "GetLatestCompactions(): response=" << ThriftDebugStringNoThrow(resp);
   }
 
+  void SetEventProcessorStatus(TSetEventProcessorStatusResponse& resp,
+      const TSetEventProcessorStatusRequest& req) override {
+    VLOG_RPC << "SetEventProcessorStatus(): request=" << ThriftDebugString(req);
+    Status status = AcceptRequest(req.protocol_version);
+    if (status.ok()) {
+      status = catalog_server_->catalog()->SetEventProcessorStatus(req, &resp);
+    }
+    if (!status.ok()) LOG(ERROR) << status.GetDetail();
+    VLOG_RPC << "SetEventProcessorStatus(): response=" << ThriftDebugStringNoThrow(resp);
+  }
+
  private:
   CatalogServer* catalog_server_;
   string server_address_;

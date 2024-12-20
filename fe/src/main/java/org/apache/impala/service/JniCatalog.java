@@ -64,6 +64,7 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TEventProcessorCmdParams;
 import org.apache.impala.thrift.TGetCatalogDeltaRequest;
 import org.apache.impala.thrift.TGetCatalogDeltaResponse;
 import org.apache.impala.thrift.TGetCatalogServerMetricsResponse;
@@ -83,6 +84,7 @@ import org.apache.impala.thrift.TGetTablesResult;
 import org.apache.impala.thrift.TLogLevel;
 import org.apache.impala.thrift.TPrioritizeLoadRequest;
 import org.apache.impala.thrift.TResetMetadataRequest;
+import org.apache.impala.thrift.TSetEventProcessorStatusRequest;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TTableUsage;
 import org.apache.impala.thrift.TUniqueId;
@@ -524,6 +526,19 @@ public class JniCatalog {
     String shortDesc = "Getting event processor summary";
     return execAndSerialize(
         "getEventProcessorSummary", shortDesc, catalog_::getEventProcessorSummary);
+  }
+
+  public byte[] setEventProcessorStatus(byte[] thriftParams)
+      throws ImpalaException, TException {
+    TSetEventProcessorStatusRequest request = new TSetEventProcessorStatusRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, thriftParams);
+    String shortDesc = request.params.action + " event processor";
+    if (request.params.isSetEvent_id()) {
+      shortDesc += " at event id " + request.params.event_id;
+    }
+    return execAndSerialize(
+        "setEventProcessorStatus", shortDesc,
+        () -> catalog_.setEventProcessorStatus(request.params));
   }
 
   public void updateTableUsage(byte[] req) throws ImpalaException, TException {

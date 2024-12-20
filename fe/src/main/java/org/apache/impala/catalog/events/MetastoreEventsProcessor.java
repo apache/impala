@@ -607,6 +607,15 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     DISABLED // event processor is not configured to run
   }
 
+  // supported commands for :event_processor(), e.g.
+  //   :event_processor('pause');
+  //   :event_processor('start', -1);
+  public enum EventProcessorCmdType {
+    PAUSE,
+    START,
+    STATUS,
+  }
+
   // current status of this event processor
   private EventProcessorStatus eventProcessorStatus_ = EventProcessorStatus.STOPPED;
 

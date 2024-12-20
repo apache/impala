@@ -556,6 +556,7 @@ struct TShutdownParams {
 // The type of administrative function to be executed.
 enum TAdminRequestType {
   SHUTDOWN = 0
+  EVENT_PROCESSOR = 1
 }
 
 // Parameters for administrative function statement. This is essentially a tagged union
@@ -565,6 +566,7 @@ struct TAdminRequest {
 
   // The below member corresponding to 'type' should be set.
   2: optional TShutdownParams shutdown_params
+  3: optional CatalogService.TEventProcessorCmdParams event_processor_cmd_params
 }
 
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)

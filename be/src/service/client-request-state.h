@@ -873,6 +873,9 @@ class ClientRequestState {
   /// Executes a shut down request.
   Status ExecShutdownRequest() WARN_UNUSED_RESULT;
 
+  /// Executes a command on EventProcessor.
+  Status ExecEventProcessorCmd() WARN_UNUSED_RESULT;
+
   /// Core logic of Wait(). Does not update operation_state_/query_status_.
   Status WaitInternal() WARN_UNUSED_RESULT;
 

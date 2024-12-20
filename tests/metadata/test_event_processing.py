@@ -17,6 +17,8 @@
 from __future__ import absolute_import, division, print_function
 from subprocess import check_call
 import pytest
+import re
+import time
 
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -205,3 +207,83 @@ class TestEventProcessing(ImpalaTestSuite):
           break
         return row[1].rstrip()
     return None
+
+  def _exec_and_check_ep_cmd(self, cmd, expected_status):
+    cmd_output = self.execute_query(cmd).get_data()
+    match = re.search(
+      r"EventProcessor status: %s. LastSyncedEventId: \d+. LatestEventId: \d+." %
+      expected_status,
+      cmd_output)
+    assert match, cmd_output
+    assert EventProcessorUtils.get_event_processor_status() == expected_status
+    return cmd_output
+
+  @pytest.mark.execute_serially
+  def test_event_processor_cmds(self, unique_database):
+    ###########################################################################
+    # 1. Test normal PAUSE and RESUME. Also check the STATUS command.
+    self._exec_and_check_ep_cmd(":event_processor('pause')", "PAUSED")
+    self._exec_and_check_ep_cmd(":event_processor('status')", "PAUSED")
+    self._exec_and_check_ep_cmd(":event_processor('start')", "ACTIVE")
+    self._exec_and_check_ep_cmd(":event_processor('status')", "ACTIVE")
+
+    # Make sure the CREATE_DATABASE event for 'unique_database' is processed
+    EventProcessorUtils.wait_for_event_processing(self)
+
+    ###########################################################################
+    # 2. Test failure of restarting at an older event id when status is ACTIVE
+    last_synced_event_id = EventProcessorUtils.get_last_synced_event_id()
+    e = self.execute_query_expect_failure(
+        self.client, ":event_processor('start', %d)" % (last_synced_event_id / 2))
+    assert "EventProcessor is active. Failed to set last synced event id from " +\
+        str(last_synced_event_id) + " back to " + str(int(last_synced_event_id / 2)) +\
+        ". Please pause EventProcessor first." in str(e)
+
+    ###########################################################################
+    # 3. Test restarting to the latest event id
+    self._exec_and_check_ep_cmd(":event_processor('pause')", "PAUSED")
+    # Create some HMS events
+    for i in range(3):
+      self.run_stmt_in_hive("create table %s.tbl_%d(i int)" % (unique_database, i))
+    latest_event_id = EventProcessorUtils.get_current_notification_id(self.hive_client)
+    # Wait some time for EP to update its latest event id
+    time.sleep(2)
+    # Restart to the latest event id
+    self._exec_and_check_ep_cmd(":event_processor('start', -1)", "ACTIVE")
+    assert EventProcessorUtils.get_last_synced_event_id() == latest_event_id
+    # Verify the new events are skipped so Impala queries should fail
+    for i in range(3):
+      self.execute_query_expect_failure(
+          self.client, "describe %s.tbl_%d" % (unique_database, i))
+
+    ###########################################################################
+    # 4. Test setting back the last synced event id after pausing EP
+    self._exec_and_check_ep_cmd(":event_processor('pause')", "PAUSED")
+    # Restart to the previous last synced event id to process the missing HMS events
+    self._exec_and_check_ep_cmd(
+        ":event_processor('start', %d)" % last_synced_event_id, "ACTIVE")
+    EventProcessorUtils.wait_for_event_processing(self)
+    # Tables should be visible now
+    for i in range(3):
+      self.execute_query_expect_success(
+          self.client, "describe %s.tbl_%d" % (unique_database, i))
+
+    ###########################################################################
+    # 5. Test unknown commands
+    e = self.execute_query_expect_failure(self.client, ":event_processor('bad_cmd')")
+    assert "Unknown command: BAD_CMD. Supported commands: PAUSE, START, STATUS" in str(e)
+
+    ###########################################################################
+    # 6. Test illegal event id
+    e = self.execute_query_expect_failure(self.client, ":event_processor('start', -2)")
+    assert "Illegal event id -2. Should be >= -1" in str(e)
+
+    ###########################################################################
+    # 7. Test restarting on a future event id
+    cmd_output = self._exec_and_check_ep_cmd(
+        ":event_processor('start', %d)" % (latest_event_id + 2), "ACTIVE")
+    warning = ("Target event id %d is larger than the latest event id %d. Some future "
+               "events will be skipped.") % (latest_event_id + 2, latest_event_id)
+    assert warning in cmd_output
+    # The cleanup method will drop 'unique_database' and tables in it, which generates
+    # more than 2 self-events. It's OK for EP to skip them.

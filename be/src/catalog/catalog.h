@@ -155,6 +155,10 @@ class Catalog {
   /// Returns all Hadoop configurations in key, value form in result.
   Status GetAllHadoopConfigs(TGetAllHadoopConfigsResponse* result);
 
+  /// Update the status of EventProcessor.
+  Status SetEventProcessorStatus(
+      const TSetEventProcessorStatusRequest& req, TSetEventProcessorStatusResponse* resp);
+
  private:
   jobject catalog_;  // instance of org.apache.impala.service.JniCatalog
   jmethodID update_metastore_id_;  // JniCatalog.updateMetaastore()
@@ -182,6 +186,7 @@ class Catalog {
   jmethodID get_null_partition_name_id_; // JniCatalog.getNullPartitionName()
   jmethodID get_latest_compactions_id_; // JniCatalog.getLatestCompactions()
   jmethodID get_hadoop_configs_id_;  // JniCatalog.getAllHadoopConfigs()
+  jmethodID set_event_processor_status_id_; // JniCatalog.setEventProcessorStatus()
 };
 
 }

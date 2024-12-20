@@ -26,6 +26,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAdminRequest;
 import org.apache.impala.thrift.TAdminRequestType;
+import org.apache.impala.thrift.TEventProcessorCmdParams;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TShutdownParams;
 
@@ -36,8 +37,8 @@ import com.google.common.base.Preconditions;
  * Represents an administrative function call, e.g. ": shutdown('hostname:123')".
  *
  * This "admin statement" framework provides a way to expand the set of supported admin
- * statements without modifying the SQL grammar. For now, the only supported function is
- * shutdown(), so the logic in here is not generic.
+ * statements without modifying the SQL grammar. For now, the only supported functions are
+ * shutdown() and event_processor(), so the logic in here is not generic.
  */
 public class AdminFnStmt extends StatementBase {
   // Name of the function. Validated during analysis.
@@ -46,6 +47,8 @@ public class AdminFnStmt extends StatementBase {
   // Arguments to the function. Always non-null.
   private final List<Expr> params_;
 
+  private TAdminRequestType type_;
+
   // Parameters for the shutdown() command.
   // Address of the backend to shut down, If 'backend_' is null, that means the current
   // server. If 'backend_.port' is 0, we assume the backend has the same port as this
@@ -53,6 +56,13 @@ public class AdminFnStmt extends StatementBase {
   private TNetworkAddress backend_;
   // Deadline in seconds. -1 if no deadline specified.
   private long deadlineSecs_;
+
+  // Parameters for the event_processor() command
+  // Currently supported actions: pause, start
+  private String action_;
+  // Event id to start at. Defaults to reusing the last synced event id.
+  // Set to -1 for using the latest event id.
+  private long event_id_ = 0;
 
   public AdminFnStmt(String fnName, List<Expr> params) {
     this.fnName_ = fnName;
@@ -72,10 +82,17 @@ public class AdminFnStmt extends StatementBase {
 
   public TAdminRequest toThrift() throws InternalException {
     TAdminRequest result = new TAdminRequest();
-    result.type = TAdminRequestType.SHUTDOWN;
-    result.shutdown_params = new TShutdownParams();
-    if (backend_ != null) result.shutdown_params.setBackend(backend_);
-    if (deadlineSecs_ != -1) result.shutdown_params.setDeadline_s(deadlineSecs_);
+    result.type = type_;
+    if (type_ == TAdminRequestType.SHUTDOWN) {
+      result.shutdown_params = new TShutdownParams();
+      if (backend_ != null) result.shutdown_params.setBackend(backend_);
+      if (deadlineSecs_ != -1) result.shutdown_params.setDeadline_s(deadlineSecs_);
+    } else if (type_ == TAdminRequestType.EVENT_PROCESSOR) {
+      result.event_processor_cmd_params = new TEventProcessorCmdParams(action_);
+      if (event_id_ != 0) result.event_processor_cmd_params.setEvent_id(event_id_);
+    } else {
+      Preconditions.checkState(false, "Unsupported TAdminRequest type %s", type_);
+    }
     return result;
   }
 
@@ -83,11 +100,24 @@ public class AdminFnStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     for (Expr param : params_) param.analyze(analyzer);
-    // Only shutdown is supported.
-    if (fnName_.toLowerCase().equals("shutdown")) {
+    if (fnName_.equalsIgnoreCase("shutdown")) {
+      type_ = TAdminRequestType.SHUTDOWN;
       analyzeShutdown(analyzer);
+    } else if (fnName_.equalsIgnoreCase("event_processor")) {
+      type_ = TAdminRequestType.EVENT_PROCESSOR;
+      analyzeEventProcessorCmd(analyzer);
     } else {
       throw new AnalysisException("Unknown admin function: " + fnName_);
+    }
+  }
+
+  private void registerPrivReq(Analyzer analyzer) {
+    AuthorizationConfig authzConfig = analyzer.getAuthzConfig();
+    if (authzConfig.isEnabled()) {
+      // Only admins (i.e. user with ALL privilege on server) can execute admin functions.
+      String authzServer = authzConfig.getServerName();
+      Preconditions.checkNotNull(authzServer);
+      analyzer.registerPrivReq(builder -> builder.onServer(authzServer).all().build());
     }
   }
 
@@ -96,13 +126,7 @@ public class AdminFnStmt extends StatementBase {
    * shutdown('host:port'), shutdown(deadline), shutdown('host:port', deadline).
    */
   private void analyzeShutdown(Analyzer analyzer) throws AnalysisException {
-    AuthorizationConfig authzConfig = analyzer.getAuthzConfig();
-    if (authzConfig.isEnabled()) {
-      // Only admins (i.e. user with ALL privilege on server) can execute admin functions.
-      String authzServer = authzConfig.getServerName();
-      Preconditions.checkNotNull(authzServer);
-      analyzer.registerPrivReq(builder -> builder.onServer(authzServer).all().build());
-    }
+    registerPrivReq(analyzer);
 
     // TODO: this parsing and type checking logic is specific to the command, similar to
     // handling of other top-level commands. If we add a lot more of these functions we
@@ -161,5 +185,20 @@ public class AdminFnStmt extends StatementBase {
       }
     }
     return result;
+  }
+
+  private void analyzeEventProcessorCmd(Analyzer analyzer) throws AnalysisException {
+    registerPrivReq(analyzer);
+
+    if (params_.isEmpty() || params_.size() > 2) {
+      throw new AnalysisException("event_processor() takes 1 or 2 arguments: " + toSql());
+    }
+    if (!(params_.get(0) instanceof StringLiteral)) {
+      throw new AnalysisException("First argument of event_processor() should be STRING");
+    }
+    action_ = ((StringLiteral)params_.get(0)).getStringValue().toUpperCase();
+    if (params_.size() > 1) {
+      event_id_ = params_.get(1).evalToInteger(analyzer, "event_id");
+    }
   }
 }

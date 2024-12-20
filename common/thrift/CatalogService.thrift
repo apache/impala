@@ -754,6 +754,24 @@ struct TUpdateTableUsageResponse {
   1: optional Status.TStatus status
 }
 
+struct TEventProcessorCmdParams {
+  // See allowed actions in Java enum MetastoreEventsProcessor.EventProcessorCmdType.
+  // Use string type instead of enum to avoid incompatible thrift changes in the future.
+  1: required string action
+  2: optional i64 event_id
+}
+
+struct TSetEventProcessorStatusRequest {
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
+  2: optional TCatalogServiceRequestHeader header
+  3: required TEventProcessorCmdParams params
+}
+
+struct TSetEventProcessorStatusResponse {
+  1: required Status.TStatus status
+  2: optional string info
+}
+
 // The CatalogService API
 service CatalogService {
   // Executes a DDL request and returns details on the result of the operation.
@@ -794,4 +812,8 @@ service CatalogService {
 
   // Gets the latest compactions.
   TGetLatestCompactionsResponse GetLatestCompactions(1: TGetLatestCompactionsRequest req);
+
+  // Update the status of EventProcessor.
+  TSetEventProcessorStatusResponse SetEventProcessorStatus(
+      1: TSetEventProcessorStatusRequest req);
 }

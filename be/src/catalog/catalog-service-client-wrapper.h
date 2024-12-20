@@ -123,6 +123,14 @@ class CatalogServiceClientWrapper : public CatalogServiceClient {
     *send_done = true;
     recv_GetLatestCompactions(_return);
   }
+
+  void SetEventProcessorStatus(TSetEventProcessorStatusResponse& _return,
+      const TSetEventProcessorStatusRequest& req, bool* send_done) {
+    DCHECK(!*send_done);
+    send_SetEventProcessorStatus(req);
+    *send_done = true;
+    recv_SetEventProcessorStatus(_return);
+  }
 #pragma clang diagnostic pop
 };
 

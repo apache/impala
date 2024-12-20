@@ -78,6 +78,7 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.catalog.events.MetastoreNotificationFetchException;
+import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.events.SelfEventContext;
 import org.apache.impala.catalog.metastore.CatalogHmsUtils;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
@@ -107,6 +108,8 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogUpdateResult;
 import org.apache.impala.thrift.TDataSource;
 import org.apache.impala.thrift.TDatabase;
+import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TEventProcessorCmdParams;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 import org.apache.impala.thrift.TFunction;
@@ -126,6 +129,8 @@ import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TResetMetadataRequest;
+import org.apache.impala.thrift.TSetEventProcessorStatusResponse;
+import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TSystemTableName;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
@@ -3734,6 +3739,82 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public TEventProcessorMetricsSummaryResponse getEventProcessorSummary() {
     return metastoreEventProcessor_.getEventProcessorSummary();
+  }
+
+  public TSetEventProcessorStatusResponse setEventProcessorStatus(
+      TEventProcessorCmdParams params) {
+    TSetEventProcessorStatusResponse resp = new TSetEventProcessorStatusResponse();
+    if (metastoreEventProcessor_ instanceof NoOpEventProcessor) {
+      resp.setStatus(new TStatus(TErrorCode.GENERAL,
+          Lists.newArrayList("EventProcessor is disabled")));
+      return resp;
+    }
+    MetastoreEventsProcessor.EventProcessorCmdType cmdType;
+    try {
+      cmdType = MetastoreEventsProcessor.EventProcessorCmdType.valueOf(params.action);
+    } catch (IllegalArgumentException e) {
+      String msg = "Unknown command: " + params.action + ". Supported commands: " +
+          Arrays.stream(MetastoreEventsProcessor.EventProcessorCmdType.values())
+              .map(Enum::name)
+              .collect(Collectors.joining(", "));
+      resp.setStatus(new TStatus(TErrorCode.GENERAL, Lists.newArrayList(msg)));
+      return resp;
+    }
+    MetastoreEventsProcessor ep = (MetastoreEventsProcessor) metastoreEventProcessor_;
+    StringBuilder info = new StringBuilder();
+    if (cmdType == MetastoreEventsProcessor.EventProcessorCmdType.PAUSE) {
+      ep.pause();
+    } else if (cmdType == MetastoreEventsProcessor.EventProcessorCmdType.START) {
+      if (!startEventProcessorHelper(params, ep, resp, info)) {
+        // 'resp' is updated in startEventProcessorHelper() for errors.
+        return resp;
+      }
+    }
+    info.append(String.format("EventProcessor status: %s. LastSyncedEventId: %d. " +
+        "LatestEventId: %d.",
+        ep.getStatus(), ep.getLastSyncedEventId(), ep.getLatestEventId()));
+    resp.setStatus(new TStatus(TErrorCode.OK, Collections.emptyList()));
+    resp.setInfo(info.toString());
+    return resp;
+  }
+
+  private boolean startEventProcessorHelper(TEventProcessorCmdParams params,
+      MetastoreEventsProcessor ep, TSetEventProcessorStatusResponse resp,
+      StringBuilder warnings) {
+    if (!params.isSetEvent_id()) {
+      if (ep.getStatus() != EventProcessorStatus.ACTIVE) {
+        ep.start(ep.getLastSyncedEventId());
+      }
+      return true;
+    }
+    if (params.getEvent_id() < -1) {
+      String msg = "Illegal event id " + params.getEvent_id() + ". Should be >= -1";
+      resp.setStatus(new TStatus(TErrorCode.GENERAL, Lists.newArrayList(msg)));
+      return false;
+    }
+    if (params.getEvent_id() == -1) {
+      ep.start(ep.getLatestEventId());
+      return true;
+    }
+    long lastSyncedEventId = ep.getLastSyncedEventId();
+    if (params.getEvent_id() < lastSyncedEventId
+        && ep.getStatus() == EventProcessorStatus.ACTIVE) {
+      String err = "EventProcessor is active. Failed to set last synced event id " +
+          "from " + lastSyncedEventId + " back to " + params.getEvent_id() +
+          ". Please pause EventProcessor first.";
+      resp.setStatus(new TStatus(TErrorCode.GENERAL, Lists.newArrayList(err)));
+      return false;
+    }
+    long latestEventId = ep.getLatestEventId();
+    if (params.getEvent_id() > latestEventId) {
+      String warning = String.format("Target event id %d is larger than the latest " +
+          "event id %d. Some future events will be skipped.",
+          params.getEvent_id(), latestEventId);
+      LOG.warn(warning);
+      warnings.append(warning).append("\n");
+    }
+    ep.start(params.getEvent_id());
+    return true;
   }
 
   /**

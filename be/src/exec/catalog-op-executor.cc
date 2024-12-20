@@ -475,3 +475,19 @@ Status CatalogOpExecutor::GetLatestCompactions(
   RETURN_IF_ERROR(rpc_status.status);
   return Status::OK();
 }
+
+Status CatalogOpExecutor::SetEventProcessorStatus(
+    const TSetEventProcessorStatusRequest& req,
+    TSetEventProcessorStatusResponse* result) {
+  int attempt = 0; // Used for debug action only.
+  CatalogServiceConnection::RpcStatus rpc_status =
+      CatalogServiceConnection::DoRpcWithRetry(env_->catalogd_client_cache(),
+          *ExecEnv::GetInstance()->GetCatalogdAddress(),
+          &CatalogServiceClientWrapper::SetEventProcessorStatus, req,
+          FLAGS_catalog_client_connection_num_retries,
+          FLAGS_catalog_client_rpc_retry_interval_ms,
+          [&attempt]() { return CatalogRpcDebugFn(&attempt); }, result);
+  RETURN_IF_ERROR(rpc_status.status);
+  if (result->status.status_code != TErrorCode::OK) return Status(result->status);
+  return Status::OK();
+}

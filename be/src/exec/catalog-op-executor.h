@@ -88,6 +88,10 @@ class CatalogOpExecutor {
   Status GetLatestCompactions(
       const TGetLatestCompactionsRequest& req, TGetLatestCompactionsResponse* result);
 
+  /// Makes an RPC to the catalog server to update the status of EventProcessor.
+  Status SetEventProcessorStatus(const TSetEventProcessorStatusRequest& req,
+      TSetEventProcessorStatusResponse* result);
+
   /// Set in Exec(), returns a pointer to the TDdlExecResponse of the DDL execution.
   /// If called before Exec(), this will return NULL. Only set if the
   /// TCatalogOpType is DDL.
