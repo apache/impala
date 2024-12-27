@@ -44,10 +44,13 @@ from os import environ
 import os.path
 import re
 from subprocess import check_call, check_output, DEVNULL, Popen, PIPE
+import sys
 import venv
+
 
 FLAKE8_VERSION = "7.1.1"
 FLAKE8_DIFF_VERSION = "0.2.2"
+PYPARSING_VERSION = "3.1.4"
 
 VENV_PATH = "gerrit_critic_venv"
 VENV_BIN = os.path.join(VENV_PATH, "bin")
@@ -126,8 +129,12 @@ def setup_virtualenv():
   venv.create(VENV_PATH, with_pip=True, system_site_packages=True)
   check_call([PIP_PATH, "install",
               "wheel",
-              "flake8=={0}".format(FLAKE8_VERSION),
-              "flake8-diff=={0}".format(FLAKE8_DIFF_VERSION)])
+              f"flake8=={FLAKE8_VERSION}",
+              f"flake8-diff=={FLAKE8_DIFF_VERSION}",
+              f"pyparsing=={PYPARSING_VERSION}"])
+  # Add the libpath of the installed venv to import pyparsing
+  sys.path.append(os.path.join(VENV_PATH, f"lib/python{sys.version_info.major}."
+                                          f"{sys.version_info.minor}/site-packages/"))
 
 
 def get_comment_input(message, line_number=0, side=COMMENT_REVISION_SIDE,
@@ -253,106 +260,110 @@ def add_misc_comments_for_line(comments, line, curr_file, curr_line_num, dryrun=
         curr_line_num, context_line=line, dryrun=dryrun))
 
 
+def compare_thrift_structs(curr_file, old_structs, curr_structs, comments):
+  # Skip if the file is removed or new
+  if old_structs is None or curr_structs is None:
+    return
+  # Adding new structs is OK. Compare fields of existing structs.
+  for struct_name, old_fields in old_structs.items():
+    if struct_name not in curr_structs:
+      print(f"Removed struct {struct_name}")
+      continue
+    curr_fields = curr_structs[struct_name]
+    for fid, old_field in old_fields.items():
+      if fid not in curr_fields:
+        if old_field.qualifier == 'required':
+          comments[curr_file].append(get_comment_input(
+            f"Deleting required field '{old_field.name}' of {struct_name}"
+            + THRIFT_WARNING_SUFFIX,
+            old_field.line_num, COMMENT_PARENT_SIDE))
+        continue
+      curr_field = curr_fields.pop(fid)
+      if curr_field.name != old_field.name:
+        comments[curr_file].append(get_comment_input(
+          f"Renaming field '{old_field.name}' to '{curr_field.name}' in {struct_name}"
+          + THRIFT_WARNING_SUFFIX,
+          curr_field.line_num))
+        continue
+      if curr_field.qualifier != old_field.qualifier:
+        comments[curr_file].append(get_comment_input(
+          f"Changing field '{old_field.name}' from {old_field.qualifier} to "
+          f"{curr_field.qualifier} in {struct_name}" + THRIFT_WARNING_SUFFIX,
+          curr_field.line_num))
+        continue
+      if curr_field.type != old_field.type:
+        comments[curr_file].append(get_comment_input(
+          f"Changing type of field '{old_field.name}' from {old_field.type} to "
+          f"{curr_field.type} in {struct_name}" + THRIFT_WARNING_SUFFIX,
+          curr_field.line_num))
+    if len(curr_fields) > 0:
+      for new_field in curr_fields.values():
+        if new_field.qualifier == 'required':
+          comments[curr_file].append(get_comment_input(
+            f"Adding a required field '{new_field.name}' in {struct_name}"
+            + THRIFT_WARNING_SUFFIX,
+            new_field.line_num))
+  new_struct_names = curr_structs.keys() - old_structs.keys()
+  if len(new_struct_names) > 0:
+    print(f"New structs {new_struct_names}")
+
+
+def compare_thrift_enums(curr_file, old_enums, curr_enums, comments):
+  # Skip if the file is removed or new
+  if old_enums is None or curr_enums is None:
+    return
+  for enum_name, old_items in old_enums.items():
+    if enum_name not in curr_enums:
+      print(f"Removed enum {enum_name}")
+      continue
+    curr_items = curr_enums[enum_name]
+    for value, old_item in old_items.items():
+      if value not in curr_items:
+        comments[curr_file].append(get_comment_input(
+          f"Removing the enum item {enum_name}.{old_item.name}={value}"
+          + THRIFT_WARNING_SUFFIX,
+          old_item.line_num, COMMENT_PARENT_SIDE))
+        continue
+      if curr_items[value].name != old_item.name:
+        comments[curr_file].append(get_comment_input(
+          f"Enum item {old_item.name}={value} changed to "
+          f"{curr_items[value].name}={value} in {enum_name}. This"
+          + THRIFT_WARNING_SUFFIX,
+          curr_items[value].line_num))
+
+
+def extract_thrift_defs_of_revision(revision, file_name):
+  """Extract a dict of thrift structs from pyparsing.ParseResults"""
+  # Importing thrift_parser depends on pyparsing being installed in setup_virtualenv().
+  from thrift_parser import extract_thrift_defs
+  try:
+    contents = check_output(["git", "show", f"{revision}:{file_name}"],
+                            universal_newlines=True)
+  except Exception as e:
+    # Usually it's due to file doesn't exist in that revision
+    print(f"Failed to read {file_name} of revision {revision}: {e}")
+    return None, None
+  return extract_thrift_defs(contents)
+
+
 def get_catalog_compatibility_comments(base_revision, revision, dryrun=False):
   """Get comments on Thrift/FlatBuffers changes that might break the communication
   between impalad and catalogd/statestore"""
   comments = defaultdict(lambda: [])
 
   diff = check_output(
-      ["git", "diff", "-U0", "{0}..{1}".format(base_revision, revision),
-       "--", "common/thrift"],
+      ["git", "diff", "--name-only", "{0}..{1}".format(base_revision, revision),
+       "--", "common/thrift/*.thrift"],
       universal_newlines=True)
-  curr_file = None
-  check_source_file = False
-  has_concerns = False
-  in_enum_clause = False
-  is_thrift_file = False
-  # Line numbers in the old file and in the new file
-  old_line_num = 0
-  new_line_num = 0
-  for diff_line in diff.splitlines():
-    if diff_line.startswith("--- "):
+  for curr_file in diff.splitlines():
+    if os.path.basename(curr_file) in EXCLUDE_THRIFT_FILES:
       continue
-    elif diff_line.startswith("+++ "):
-      # Start of diff for a file. Add a comment for the previous file if has concerns.
-      if curr_file and check_source_file and has_concerns:
-        comments[curr_file].append(get_comment_input(THRIFT_FILE_COMMENT))
-      # Strip off "+++ b/" to get the file path.
-      curr_file = diff_line[6:]
-      check_source_file = False
-      has_concerns = False
-      in_enum_clause = False
-      is_thrift_file = os.path.splitext(curr_file)[1] == ".thrift"
-      if is_thrift_file and os.path.basename(curr_file) not in EXCLUDE_THRIFT_FILES:
-        check_source_file = True
-    elif check_source_file and diff_line.startswith("@@ "):
-      # Figure out the starting line of the hunk. Examples:
-      #  @@ -932,0 +933,5 @@ enum TImpalaQueryOptions {
-      #  @@ -55,0 +56 @@ enum TPlanNodeType {
-      #  @@ -109 +109 @@ struct THdfsTableSink {
-      # We want to extract the start line for the added lines
-      match = RANGE_RE.match(diff_line)
-      if not match:
-        raise Exception("Pattern did not match diff line:\n{0}".format(diff_line))
-      old_line_num = int(match.group(1))
-      new_line_num = int(match.group(2))
-      in_enum_clause = match.group(3).startswith("enum ")
-    elif check_source_file and diff_line.startswith("-"):
-      # Check if deleting/modifying a required field
-      change = diff_line[1:].strip()
-      if in_enum_clause and not change.startswith("//"):
-        has_concerns = True
-        comments[curr_file].append(get_comment_input(
-          "Modifying/deleting this enum item" + THRIFT_WARNING_SUFFIX,
-          old_line_num, COMMENT_PARENT_SIDE, diff_line, dryrun))
-      elif REQUIRED_FIELD_RE.match(change):
-        has_concerns = True
-        comments[curr_file].append(get_comment_input(
-          "Modifying/deleting this required field" + THRIFT_WARNING_SUFFIX,
-          old_line_num, COMMENT_PARENT_SIDE, diff_line, dryrun))
-      elif OPTIONAL_FIELD_RE.match(change):
-        # Removing an optional field should be OK unless the field number is reused by
-        # a new optional field. Add a general comment on the file.
-        has_concerns = True
-      old_line_num += 1
-    elif is_thrift_file and diff_line.startswith("+"):
-      change = diff_line[1:].strip()
-      # Check includes in Thrift files
-      match = INCLUDE_FILE_RE.match(change)
-      # Case 1: a target file includes a whitelist file, E.g. Frontend.thrift includes
-      # LineageGraph.thrift. Future changes in LineageGraph.thrift might impact
-      # Frontend.thrift so
-      #  - LineageGraph.thrift should be removed from the whitelist (i.e.
-      #    EXCLUDE_THRIFT_FILES) if it will be used in impalad and catalogd.
-      #  - Or developers should make sure the included new fields are read/write only
-      #    in impalads or only in catalogd.
-      if match and check_source_file and match.group(1) in EXCLUDE_THRIFT_FILES:
-        comments[curr_file].append(get_comment_input(
-            "Future changes in {0} might break the compatibility between impalad and "
-            "catalogd/statestore. Please remove {0} from EXCLUDE_THRIFT_FILES in "
-            "bin/jenkins/critique-gerrit-review.py or make sure the new fields are "
-            "read/write only in impalads or only in catalogd".format(match.group(1)),
-            new_line_num, context_line=diff_line, dryrun=dryrun))
-      # Case 2: A whitelist file includes a target file, e.g. PlanNodes.thrift includes
-      # Data.thrift. Note that PlanNodes.thrift is supposed to be used inside impalad.
-      # Data.thrift is used in both impalad and catalogd. We should ensure new fields
-      # included from Data.thrift are not set from catalogd.
-      elif (match and not check_source_file
-          and match.group(1) not in EXCLUDE_THRIFT_FILES):
-        comments[curr_file].append(get_comment_input(
-            "Thrift objects in the current file are supposed to be used inside "
-            "impalads. Please make sure new fields includes from {} are not set by "
-            "catalogd.".format(match.group(1)),
-            new_line_num, context_line=diff_line, dryrun=dryrun))
-      elif check_source_file:
-        if REQUIRED_FIELD_RE.match(change):
-          has_concerns = True
-          comments[curr_file].append(get_comment_input(
-              "Modifying/adding this required field" + THRIFT_WARNING_SUFFIX,
-              new_line_num, context_line=diff_line, dryrun=dryrun))
-      new_line_num += 1
-  if curr_file and check_source_file and has_concerns:
-    comments[curr_file].append(get_comment_input(THRIFT_FILE_COMMENT))
+    print(f"Parsing {curr_file}")
+    curr_structs, curr_enums = extract_thrift_defs_of_revision(revision, curr_file)
+    old_structs, old_enums = extract_thrift_defs_of_revision(base_revision, curr_file)
+    compare_thrift_structs(curr_file, old_structs, curr_structs, comments)
+    compare_thrift_enums(curr_file, old_enums, curr_enums, comments)
+
   merge_comments(
       comments, get_flatbuffers_compatibility_comments(base_revision, revision))
   return comments
