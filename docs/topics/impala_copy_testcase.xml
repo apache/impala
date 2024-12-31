@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_copy_testcase" rev="4.3.0 IMPALA-11901">
+  <title>Copy Testcase Statements</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Copy Testcase"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="ETL"/>
+      <data name="Category" value="Ingest"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>The <codeph>COPY TESTCASE</codeph> statement allows users to export table or view metadata
+      involved in a query, allowing developers to replay the metadata in a local cluster for testing
+      and debugging purposes.</p>
+  </conbody>
+  <concept id="concept_erz_l3j_wdc">
+    <title>Exporting Metadata to a File</title>
+    <conbody>
+      <p>Use the following syntax to dump
+        metadata:<codeblock id="codeblock_bzf_g3j_wdc">COPY TESTCASE TO &lt;hdfs/s3 dirpath> &lt;query stmt></codeblock></p>
+      <p><b>Example:</b><codeblock id="codeblock_e4t_p3j_wdc">COPY TESTCASE TO '/tmp' SELECT * FROM functional_parquet.alltypes;
+</codeblock></p>
+      <p><b>Output:</b><codeblock id="codeblock_u44_r3j_wdc">
++--------------------------------------------------------------------------------------+
+| Test case data output path                                                           |
++--------------------------------------------------------------------------------------+
+| hdfs://localhost:20500/tmp/impala-testcase-data-f41f7b14-dfc8-408b-ac3b-ef49fc3e0a83 |
++--------------------------------------------------------------------------------------+
+</codeblock></p>
+    </conbody>
+  </concept>
+  <concept id="concept_d1v_3sp_wdc">
+    <title>Loading Metadata into a Target Cluster</title>
+    <conbody>
+      <p>To load the previously exported metadata, use the following
+        syntax:<codeblock id="codeblock_hkg_ksp_wdc">COPY TESTCASE FROM &lt;hdfs/s3 testcase file path></codeblock></p>
+      <p><b>Example:</b><codeblock id="codeblock_hrq_lsp_wdc">COPY TESTCASE FROM '/tmp/impala-testcase-data-f41f7b14-dfc8-408b-ac3b-ef49fc3e0a83';</codeblock></p>
+      <p><b>Output:</b><codeblock id="codeblock_oqg_nsp_wdc">
++----------------------------------------------------------------------------------------------------------------+
+| summary                                                                                                        |
++----------------------------------------------------------------------------------------------------------------+
+| Testcase generated using Impala version 4.5.0-SNAPSHOT. 1 db(s), 1 table(s) and 0 view(s) imported for query:  |
+|                                                                                                                |
+| SELECT * FROM functional_parquet.alltypes                                                                      |
++----------------------------------------------------------------------------------------------------------------+
+</codeblock></p>
+    </conbody>
+  </concept>
+  <concept id="concept_tvd_psp_wdc">
+    <title>Using the Imported Metadata</title>
+    <conbody>
+      <p>To use the imported metadata in query planning, enable the planner testcase
+        mode:<codeblock id="codeblock_rzj_rsp_wdc">SET PLANNER_TESTCASE_MODE=true;</codeblock></p>
+      <p>You can now interact with the metadata using commands
+        like:<codeblock id="codeblock_g1r_ssp_wdc">SHOW COLUMN STATS functional_parquet.alltypes;</codeblock></p>
+    </conbody>
+  </concept>
+</concept>
