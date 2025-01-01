@@ -427,9 +427,13 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @classmethod
   def cleanup_db(cls, db_name, sync_ddl=1):
-    cls.client.execute("use default")
-    cls.client.set_configuration({'sync_ddl': sync_ddl})
-    cls.client.execute("drop database if exists `" + db_name + "` cascade")
+    # Create a new client to avoid polluting query options of existing clients.
+    client = cls.create_impala_client()
+    client.set_configuration({'sync_ddl': sync_ddl})
+    try:
+      client.execute("drop database if exists `" + db_name + "` cascade")
+    finally:
+      client.close()
 
   def __restore_query_options(self, query_options_changed, impalad_client):
     """

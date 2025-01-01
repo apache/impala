@@ -107,7 +107,7 @@ class TestComputeStats(ImpalaTestSuite):
     try:
       self.run_test_case('QueryTest/compute-stats-keywords', vector)
     finally:
-      self.cleanup_db("parquet")
+      self.cleanup_db("parquet", sync_ddl=0)
 
   def test_compute_stats_compression_codec(self, vector, unique_database):
     """IMPALA-8254: Tests that running compute stats with compression_codec set

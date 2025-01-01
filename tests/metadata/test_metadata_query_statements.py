@@ -196,10 +196,10 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
       self.__test_describe_db_cleanup()
 
   def __test_describe_db_cleanup(self):
-    self.cleanup_db('hive_test_desc_db')
-    self.cleanup_db('hive_test_desc_db2')
-    self.cleanup_db('impala_test_desc_db1')
-    self.cleanup_db('impala_test_desc_db2')
-    self.cleanup_db('impala_test_desc_db3')
-    self.cleanup_db('impala_test_desc_db4')
-    self.cleanup_db('impala_test_desc_db5')
+    self.cleanup_db('hive_test_desc_db', sync_ddl=0)
+    self.cleanup_db('hive_test_desc_db2', sync_ddl=0)
+    self.cleanup_db('impala_test_desc_db1', sync_ddl=0)
+    self.cleanup_db('impala_test_desc_db2', sync_ddl=0)
+    self.cleanup_db('impala_test_desc_db3', sync_ddl=0)
+    self.cleanup_db('impala_test_desc_db4', sync_ddl=0)
+    self.cleanup_db('impala_test_desc_db5', sync_ddl=0)
