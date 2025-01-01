@@ -339,6 +339,8 @@ class TestEventProcessingError(CustomClusterTestSuite):
       result = self.client.execute("describe formatted {}.{}"
           .format(unique_database, tbl_name))
       self.verify_owner_property(result, 'test-user')
+      result = self.client.execute("show partitions {}.{}"
+          .format(unique_database, tbl_name))
       assert "2024" in result.get_data()
 
   @SkipIfFS.hive
