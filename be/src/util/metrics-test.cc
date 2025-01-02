@@ -501,12 +501,12 @@ TEST_F(MetricsTest, PrometheusMetricNames) {
   EXPECT_EQ("impala_server_metric",
       MetricGroup::ImpalaToPrometheusName("impala-server-metric"));
 
-  // Test that . and - get transformed to _.
-  EXPECT_EQ("impala_metric_name_with_punctuation_",
-      MetricGroup::ImpalaToPrometheusName("metric-name.with-punctuation_"));
+  // Test that ".", "'" and "-" get transformed to _.
+  EXPECT_EQ("impala_metric__name__with_punctuation_",
+      MetricGroup::ImpalaToPrometheusName("metric-'name'.with-punctuation_"));
 
   // Other special characters are unmodified
-  EXPECT_EQ("impala_!@#$%*", MetricGroup::ImpalaToPrometheusName("!@#$%*"));
+  EXPECT_EQ("impala_!@#$%*:", MetricGroup::ImpalaToPrometheusName("!@#$%*:"));
 }
 
 void AssertPrometheus(const std::stringstream& val, const string& name,

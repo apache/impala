@@ -24,6 +24,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.parse_util import parse_duration_string_ms
 from datetime import datetime
 from multiprocessing import Process, Queue
+from prometheus_client.parser import text_string_to_metric_families
 from time import sleep, time
 import itertools
 import json
@@ -506,7 +507,7 @@ class TestWebPage(ImpalaTestSuite):
 
   def test_query_stmt(self):
     """Create a long select query then check if it is truncated in the response json."""
-    # The imput query is a select + 450 "x " long, which is long enough to get truncated.
+    # The input query is a select + 450 "x " long, which is long enough to get truncated.
     query = "select \"{0}\"".format("x " * 450)
     # The expected result query should be 253 long and contains the first 250
     # chars + "..."
@@ -515,7 +516,7 @@ class TestWebPage(ImpalaTestSuite):
     response_json = self.__run_query_and_get_debug_page(
       query, self.QUERIES_URL, expected_state=self.client.QUERY_STATES["FINISHED"])
     # Search the json for the expected value.
-    # The query can be in in_filght_queries even though it is in FINISHED state.
+    # The query can be in in_flight_queries even though it is in FINISHED state.
     for json_part in itertools.chain(
       response_json['completed_queries'], response_json['in_flight_queries']):
       if expected_result in json_part['stmt']:
@@ -842,7 +843,7 @@ class TestWebPage(ImpalaTestSuite):
         # the query is in the file.
         responses = self.get_and_check_status(
             self.ROOT_URL + download_link, query, self.IMPALAD_TEST_PORT)
-        # Check the query id is in the content of the reponse.
+        # Check the query id is in the content of the response.
         assert len(responses) == 1
         assert query_id in responses[0].text
       elif profile_format == 'Json':
@@ -870,6 +871,13 @@ class TestWebPage(ImpalaTestSuite):
     # check if metric shows up
     assert 'impala_statestore_subscriber_heartbeat_interval_time_min' in resp[0].text
 
+    for response in resp:
+      # Parse Prometheus text format using prometheus_client library.
+      for _ in text_string_to_metric_families(response.text):
+        # We have to loop through the result to force the lazy parsing function
+        # to parse every line.
+        continue
+
   def test_healthz_endpoint(self):
     """Test to check that the /healthz endpoint returns 200 OK."""
     for port in self.TEST_PORTS_WITH_SS:
@@ -882,11 +890,11 @@ class TestWebPage(ImpalaTestSuite):
     """Checks that the template files conform to the requirements for compatibility with
     the Apache Knox service definition."""
     # Matches all 'a' links with an 'href' that doesn't start with either '#' (which stays
-    # on the same page an so doesn't need to the hostname) or '{{ __common__.host-url }}'
+    # on the same page and so doesn't need to the hostname) or '{{ __common__.host-url }}'
     # Note that if we ever need to add a link that doesn't conform to this, we will
     # probably also have to change the Knox service definition.
     href_regex = "<(a|link) .*? href=['\"](?!({{ __common__.host-url }})|#)"
-    # Matches all 'script' tags that aren't absoluve urls.
+    # Matches all 'script' tags that aren't absolute urls.
     script_regex = "<script .*?src=['\"](?!({{ __common__.host-url }})|http)"
     # Matches all 'form' tags that are not followed by including the hidden inputs.
     form_regex = "<form [^{]*?>(?!{{>www/form-hidden-inputs.tmpl}})"
@@ -1128,7 +1136,7 @@ class TestWebPage(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_hadoop_varz_page(self):
-    """test for /hadoop-var to check availablity of haqoop configuration like
+    """test for /hadoop-var to check availability of hadoop configuration like
     hive warehouse dir, fs.defaultFS"""
     responses = self.get_and_check_status(self.HADOOP_VARZ_URL,
         "hive.metastore.warehouse.dir", ports_to_test=self.TEST_PORTS_WITHOUT_SS)
