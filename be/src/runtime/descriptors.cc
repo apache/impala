@@ -219,6 +219,7 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(
   escape_char_ = sd.escapeChar;
   block_size_ = sd.blockSize;
   file_format_ = sd.fileFormat;
+  json_binary_format_ = sd.jsonBinaryFormat;
   DecompressLocation(thrift_table, thrift_partition, &location_);
 }
 

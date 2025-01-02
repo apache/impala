@@ -4489,6 +4489,14 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/binary_tbl/000000_0.txt' OVE
 ---- DEPENDENT_LOAD
 insert overwrite table {db_name}{db_suffix}.{table_name}
 select id, string_col, binary_col from functional.{table_name};
+---- DEPENDENT_LOAD_JSON
+-- The hive version we currently depend on (without HIVE-21240) does not support writing
+-- binary fields to json files in base64 format by default, so we need to convert it
+-- manually. For the same reason, we also need to manually set the
+-- 'json.binary.format' property.
+alter table {db_name}{db_suffix}.{table_name} set serdeproperties ('json.binary.format'='base64');
+insert overwrite table {db_name}{db_suffix}.{table_name}
+select id, string_col, base64(binary_col) from functional.{table_name};
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (
@@ -4527,6 +4535,13 @@ select id, int_col, cast(string_col as binary),
        cast(case when id % 2 = 0 then date_string_col else NULL end as binary),
        year, month
     from functional.alltypes;
+---- DEPENDENT_LOAD_JSON
+insert overwrite table {db_name}{db_suffix}.{table_name} partition(year, month)
+select id, int_col, base64(cast(string_col as binary)),
+       base64(cast(case when id % 2 = 0 then date_string_col else NULL end as binary)),
+       year, month
+    from functional.alltypes;
+alter table {db_name}{db_suffix}.{table_name} partition(year) set serdeproperties ('json.binary.format'='base64');
 ---- CREATE_KUDU
 DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
 CREATE TABLE {db_name}{db_suffix}.{table_name} (

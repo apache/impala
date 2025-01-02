@@ -178,6 +178,13 @@ enum TBucketType {
   HASH = 1
 }
 
+// Options for JSON binary format to determine how binary data is encoded in JSON.
+enum TJsonBinaryFormat {
+  NONE = 0
+  BASE64 = 1
+  RAWSTRING = 2
+}
+
 struct TCompressionCodec {
   // Compression codec
   1: required THdfsCompression codec
@@ -357,6 +364,7 @@ struct THdfsStorageDescriptor {
   6: required byte quoteChar
   7: required THdfsFileFormat fileFormat
   8: required i32 blockSize
+  9: optional TJsonBinaryFormat jsonBinaryFormat
 }
 
 // Represents an HDFS partition

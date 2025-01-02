@@ -823,6 +823,10 @@ def generate_statements(output_name, test_vectors, sections,
         insert = None
         insert_hive = eval_section(section["DEPENDENT_LOAD_ACID"])
 
+      if file_format == 'json' and section["DEPENDENT_LOAD_JSON"]:
+        insert = None
+        insert_hive = eval_section(section["DEPENDENT_LOAD_JSON"])
+
       columns = eval_section(section['COLUMNS']).strip()
       partition_columns = section['PARTITION_COLUMNS'].strip()
       row_format = section['ROW_FORMAT'].strip()
@@ -1012,8 +1016,9 @@ def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU', 'COMMENT',
                          'DEPENDENT_LOAD', 'DEPENDENT_LOAD_KUDU', 'DEPENDENT_LOAD_HIVE',
-                         'DEPENDENT_LOAD_ACID', 'LOAD', 'ALTER', 'HBASE_COLUMN_FAMILIES',
-                         'TABLE_PROPERTIES', 'HBASE_REGION_SPLITS', 'HIVE_MAJOR_VERSION']
+                         'DEPENDENT_LOAD_ACID', 'DEPENDENT_LOAD_JSON', 'LOAD', 'ALTER',
+                         'HBASE_COLUMN_FAMILIES', 'TABLE_PROPERTIES',
+                         'HBASE_REGION_SPLITS', 'HIVE_MAJOR_VERSION']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 

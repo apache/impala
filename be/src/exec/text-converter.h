@@ -49,7 +49,7 @@ class TextConverter {
   /// strict_mode: If set, numerical overflow/underflow are considered to be parse
   /// errors.
   TextConverter(char escape_char, const std::string& null_col_val,
-      bool check_null = true, bool strict_mode = false);
+      bool check_null = true, bool strict_mode = false, bool decode_binary = true);
 
   /// Converts slot data, of length 'len',  into type of slot_desc,
   /// and writes the result into the tuples's slot.
@@ -101,6 +101,10 @@ class TextConverter {
   /// Indicates whether numerical overflow/underflow are considered to be parse
   /// errors.
   bool strict_mode_;
+  /// Indicates whether we should use base64 decoding for binary data.
+  /// Currently, this is only set to false when reading JSON tables with rawstring format
+  /// binary columns.
+  bool decode_binary_;
 };
 
 }

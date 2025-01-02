@@ -1940,14 +1940,16 @@ class TestErasureCoding(ImpalaTestSuite):
 
 
 class TestBinaryType(ImpalaTestSuite):
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestBinaryType, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(
-      lambda v: v.get_value('table_format').file_format != 'json')
 
   def test_binary_type(self, vector):
     self.run_test_case('QueryTest/binary-type', vector)
+
+  def test_json_binary_format(self, vector, unique_database):
+    if vector.get_value('table_format').file_format != 'json':
+      pytest.skip()
+    test_tbl = unique_database + '.binary_tbl'
+    self.clone_table('functional_json.binary_tbl', test_tbl, False, vector)
+    self.run_test_case('QueryTest/json-binary-format', vector, unique_database)
 
 
 class TestBinaryInComplexType(ImpalaTestSuite):

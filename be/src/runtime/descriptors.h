@@ -401,6 +401,7 @@ class HdfsPartitionDescriptor {
   int block_size() const { return block_size_; }
   const std::string& location() const { return location_; }
   int64_t id() const { return id_; }
+  TJsonBinaryFormat::type json_binary_format() const { return json_binary_format_; }
   std::string DebugString() const;
 
   /// It is safe to call the returned expr evaluators concurrently from multiple
@@ -437,6 +438,9 @@ class HdfsPartitionDescriptor {
 
   /// The format (e.g. text, sequence file etc.) of data in the files in this partition
   THdfsFileFormat::type file_format_;
+
+  /// The format for reading JSON binary columns, used only for JSON tables.
+  TJsonBinaryFormat::type json_binary_format_;
 };
 
 class HdfsTableDescriptor : public TableDescriptor {

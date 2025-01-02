@@ -1375,6 +1375,13 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_skip_unneeded_updates_col_limit(int32_t_val);
         break;
       }
+      case TImpalaQueryOptions::JSON_BINARY_FORMAT: {
+        TJsonBinaryFormat::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "Json binary format",
+            _TJsonBinaryFormat_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_json_binary_format(enum_type);
+        break;
+      }
       case TImpalaQueryOptions::MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR: {
         double double_val = 0.0f;
         RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveRange<double>(

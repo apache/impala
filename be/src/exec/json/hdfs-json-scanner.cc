@@ -125,7 +125,14 @@ Status HdfsJsonScanner::InitNewRange() {
     schema.push_back(scan_node_->hdfs_table()->GetColumnDesc(slot).name());
   }
 
-  text_converter_.reset(new TextConverter('\\', "", false, state_->strict_mode()));
+  auto json_binary_format = context_->partition_descriptor()->json_binary_format();
+  if (json_binary_format == TJsonBinaryFormat::NONE) {
+    json_binary_format = state_->query_options().json_binary_format;
+  }
+  bool decode_binary = json_binary_format == TJsonBinaryFormat::BASE64;
+
+  text_converter_.reset(new TextConverter('\\', "", false, state_->strict_mode(),
+      decode_binary));
   json_parser_.reset(new JsonParser<HdfsJsonScanner>(schema, this));
   json_parser_->ResetParser();
   return Status::OK();

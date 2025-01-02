@@ -778,6 +778,10 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   192: optional bool use_calcite_planner = false;
+
+  // See comment in ImpalaService.thrift
+  193: optional CatalogObjects.TJsonBinaryFormat json_binary_format =
+      TJsonBinaryFormat.NONE;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

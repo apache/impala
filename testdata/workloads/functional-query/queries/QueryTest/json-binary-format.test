@@ -1,0 +1,110 @@
+====
+---- QUERY
+# No property or query option set, scanning binary columns will throw an exception.
+# Refresh is needed for serdeproperties changes to take effect, see IMPALA-13748.
+alter table binary_tbl unset serdeproperties ('json.binary.format');
+refresh binary_tbl;
+set json_binary_format=none;
+select id, string_col, cast(binary_col as string) from binary_tbl
+---- CATCH
+No valid serde properties 'json.binary.format' or query option 'json_binary_format' ('base64' or 'rawstring') provided for scanning binary column of json table '$DATABASE.binary_tbl'.
+====
+---- QUERY
+# No binary column scanned, no exception thrown.
+set json_binary_format=none;
+select id, string_col from binary_tbl
+---- TYPES
+INT, STRING
+---- RESULTS:
+1,'ascii'
+2,'ascii'
+3,'null'
+4,'empty'
+5,'valid utf8'
+6,'valid utf8'
+7,'invalid utf8'
+8,'invalid utf8'
+====
+---- QUERY
+# No property set but query option set, scanning binary columns will use the query option.
+set json_binary_format=rawstring;
+select id, string_col, cast(binary_col as string) from binary_tbl
+---- TYPES
+INT, STRING, STRING
+---- RESULTS:
+1,'ascii','YmluYXJ5MQ=='
+2,'ascii','YmluYXJ5Mg=='
+3,'null','NULL'
+4,'empty',''
+5,'valid utf8','w6FydsOtenTFsXLFkXTDvGvDtnJmw7pyw7M='
+6,'valid utf8','5L2g5aW9aGVsbG8='
+7,'invalid utf8','AP8A/w=='
+8,'invalid utf8','/0QzIhEA'
+====
+---- QUERY
+# If the property is set, it takes precedence over the query option, even if the value is
+# invalid.
+alter table binary_tbl set serdeproperties ('json.binary.format'='foobar');
+refresh binary_tbl;
+set json_binary_format=rawstring;
+select id, string_col, cast(binary_col as string) from binary_tbl
+---- CATCH
+Invalid serde property 'json.binary.format' for scanning binary column of json table '$DATABASE.binary_tbl'. Valid values are 'base64' or 'rawstring'.
+====
+---- QUERY
+# Setting the property to 'base64', scanning binary columns will use base64 encoding,
+# rather than the query option 'rawstring'.
+alter table binary_tbl set serdeproperties ('json.binary.format'='base64');
+refresh binary_tbl;
+set json_binary_format=rawstring;
+select id, string_col, base64encode(cast(binary_col as string)) from binary_tbl
+---- TYPES
+INT, STRING, STRING
+---- RESULTS:
+1,'ascii','YmluYXJ5MQ=='
+2,'ascii','YmluYXJ5Mg=='
+3,'null','NULL'
+4,'empty',''
+5,'valid utf8','w6FydsOtenTFsXLFkXTDvGvDtnJmw7pyw7M='
+6,'valid utf8','5L2g5aW9aGVsbG8='
+7,'invalid utf8','AP8A/w=='
+8,'invalid utf8','/0QzIhEA'
+====
+---- QUERY
+# Unsetting the property and setting the query option to 'base64' will have the same
+# effect.
+alter table binary_tbl unset serdeproperties ('json.binary.format');
+refresh binary_tbl;
+set json_binary_format=base64;
+select id, string_col, base64encode(cast(binary_col as string)) from binary_tbl
+---- TYPES
+INT, STRING, STRING
+---- RESULTS:
+1,'ascii','YmluYXJ5MQ=='
+2,'ascii','YmluYXJ5Mg=='
+3,'null','NULL'
+4,'empty',''
+5,'valid utf8','w6FydsOtenTFsXLFkXTDvGvDtnJmw7pyw7M='
+6,'valid utf8','5L2g5aW9aGVsbG8='
+7,'invalid utf8','AP8A/w=='
+8,'invalid utf8','/0QzIhEA'
+====
+---- QUERY
+# Test scanning multiple json tables with different binary column formats
+# ('functional_json.binary_tbl' has 'base64').
+alter table binary_tbl set serdeproperties ('json.binary.format'='rawstring');
+refresh binary_tbl;
+select r.id, cast(r.binary_col as string), base64encode(cast(b.binary_col as string))
+from binary_tbl r join functional_json.binary_tbl b using (id)
+---- TYPES
+INT, STRING, STRING
+---- RESULTS:
+1,'YmluYXJ5MQ==','YmluYXJ5MQ=='
+2,'YmluYXJ5Mg==','YmluYXJ5Mg=='
+3,'NULL','NULL'
+4,'',''
+5,'w6FydsOtenTFsXLFkXTDvGvDtnJmw7pyw7M=','w6FydsOtenTFsXLFkXTDvGvDtnJmw7pyw7M='
+6,'5L2g5aW9aGVsbG8=','5L2g5aW9aGVsbG8='
+7,'AP8A/w==','AP8A/w=='
+8,'/0QzIhEA','/0QzIhEA'
+====

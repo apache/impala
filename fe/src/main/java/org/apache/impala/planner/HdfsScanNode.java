@@ -61,6 +61,7 @@ import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.IcebergFileDescriptor;
+import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
@@ -80,6 +81,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TFileSplitGeneratorSpec;
+import org.apache.impala.thrift.TJsonBinaryFormat;
 import org.apache.impala.thrift.THdfsFileSplit;
 import org.apache.impala.thrift.THdfsScanNode;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -218,7 +220,7 @@ public class HdfsScanNode extends ScanNode {
   private static final double COST_COEFFICIENT_COLUMNAR_PREDICATE_EVAL = 0.0281;
   private static final double COST_COEFFICIENT_NONCOLUMNAR_PREDICATE_EVAL = 0.0549;
 
-  //An estimate of the width of a row when the information is not available.
+  // An estimate of the width of a row when the information is not available.
   private double DEFAULT_ROW_WIDTH_ESTIMATE = 1.0;
 
   private final FeFsTable tbl_;
@@ -433,6 +435,13 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
+   * Returns true if this scan node contains JSON.
+   */
+  private boolean hasJson(Set<HdfsFileFormat> fileFormats) {
+    return fileFormats.contains(HdfsFileFormat.JSON);
+  }
+
+  /**
    * Returns true if the count(*) optimization can be applied to the query block
    * of this scan node.
    */
@@ -474,6 +483,10 @@ public class HdfsScanNode extends ScanNode {
       // Compute dictionary conjuncts only if the PARQUET_DICTIONARY_FILTERING query
       // option is set to true.
       computeDictionaryFilterConjuncts(analyzer);
+    }
+
+    if (hasJson(fileFormats_)) {
+      checkJsonBinaryFormat(analyzer);
     }
 
     computeMemLayout(analyzer);
@@ -536,13 +549,55 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
+   * Check if there are any binary columns in the table, and if so,
+   * check json binary format could be determined from properties or query options.
+   */
+  private void checkJsonBinaryFormat(Analyzer analyzer) throws ImpalaRuntimeException {
+    boolean hasBinaryColumns = false;
+    for (SlotDescriptor slotDesc : desc_.getSlots()) {
+      if (slotDesc.getType().isBinary()) {
+        hasBinaryColumns = true;
+        break;
+      }
+    }
+    if (!hasBinaryColumns) return;
+
+    TJsonBinaryFormat defaultFormat = analyzer.getQueryOptions().getJson_binary_format();
+    for (FeFsPartition partition : partitions_) {
+      TJsonBinaryFormat specificFormat = partition.getInputFormatDescriptor()
+          .getJsonBinaryFormat();
+      if (specificFormat == null) {
+        // Null indicates that the property is invalid.
+        throw new ImpalaRuntimeException(String.format("Invalid serde property " +
+            "'%s' for scanning binary column of json table '%s'%s. Valid values are " +
+            "'base64' or 'rawstring'.",
+            HdfsStorageDescriptor.JSON_BINARY_FORMAT, tbl_.getFullName(),
+            partition.getPartitionName().isEmpty() ? "" :
+            " partition '" + partition.getPartitionName() + "'"));
+      }
+
+      // If the property is not set, use the query option.
+      if (specificFormat == TJsonBinaryFormat.NONE) {
+        if (defaultFormat != TJsonBinaryFormat.NONE) continue;
+        // If the query option is not set either, throw an error.
+        throw new ImpalaRuntimeException(String.format("No valid serde properties " +
+            "'%s' or query option 'json_binary_format' ('base64' or 'rawstring') " +
+            "provided for scanning binary column of json table '%s'%s.",
+            HdfsStorageDescriptor.JSON_BINARY_FORMAT, tbl_.getFullName(),
+            partition.getPartitionName().isEmpty() ? "" :
+            " partition '" + partition.getPartitionName() + "'"));
+      }
+    }
+  }
+
+  /**
    * Throws NotImplementedException if we do not support scanning the partition.
    * Specifically:
    * 1) if the table schema contains a complex type and we need to scan
    * a partition that has a format for which we do not support complex types,
    * regardless of whether a complex-typed column is actually referenced
    * in the query.
-   * 2) if we are scanning compressed json file or the json scanner is disabled.
+   * 2) if the json scanner is disabled.
    */
   @Override
   protected void checkForSupportedFileFormats() throws NotImplementedException {

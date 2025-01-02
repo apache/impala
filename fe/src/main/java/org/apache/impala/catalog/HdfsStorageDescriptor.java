@@ -26,6 +26,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsStorageDescriptor;
+import org.apache.impala.thrift.TJsonBinaryFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +54,10 @@ public class HdfsStorageDescriptor {
 
   // Serde parameters that are recognized by table writers.
   private static final String BLOCK_SIZE = "blocksize";
+
+  // Hive JSON SerDe constants 'JsonSerDe.BINARY_FORMAT'.
+  // https://github.com/apache/hive/blob/63e6aa519273342eb75740d960ed3d42167326ea/serde/src/java/org/apache/hadoop/hive/serde2/JsonSerDe.java#L56
+  public static final String JSON_BINARY_FORMAT = "json.binary.format";
 
   // Important: don't change the ordering of these keys - if e.g. FIELD_DELIM is not
   // found, the value of LINE_DELIM is used, so LINE_DELIM must be found first.
@@ -89,6 +94,7 @@ public class HdfsStorageDescriptor {
   private final byte escapeChar_;
   private final byte quoteChar_;
   private final int blockSize_;
+  private final TJsonBinaryFormat jsonBinaryFormat_;
 
   /**
    * Returns a map from delimiter key to a single delimiter character,
@@ -165,7 +171,7 @@ public class HdfsStorageDescriptor {
 
   private HdfsStorageDescriptor(String tblName, HdfsFileFormat fileFormat, byte lineDelim,
       byte fieldDelim, byte collectionDelim, byte mapKeyDelim, byte escapeChar,
-      byte quoteChar, int blockSize) {
+      byte quoteChar, int blockSize, TJsonBinaryFormat jsonBinaryFormat) {
     this.fileFormat_ = fileFormat;
     this.lineDelim_ = lineDelim;
     this.fieldDelim_ = fieldDelim;
@@ -173,6 +179,7 @@ public class HdfsStorageDescriptor {
     this.mapKeyDelim_ = mapKeyDelim;
     this.quoteChar_ = quoteChar;
     this.blockSize_ = blockSize;
+    this.jsonBinaryFormat_ = jsonBinaryFormat;
 
     // You can set the escape character as a tuple or row delim.  Empirically,
     // this is ignored by hive.
@@ -226,6 +233,20 @@ public class HdfsStorageDescriptor {
       blockSize = Integer.parseInt(blockValue);
     }
 
+    TJsonBinaryFormat jsonBinaryFormat;
+    // TODO: IMPALA-13748, also consider table properties and table level serde properties
+    String specificFormat = parameters.get(JSON_BINARY_FORMAT);
+    if (specificFormat == null) {
+      jsonBinaryFormat = TJsonBinaryFormat.NONE;
+    } else if ("base64".equalsIgnoreCase(specificFormat)) {
+      jsonBinaryFormat = TJsonBinaryFormat.BASE64;
+    } else if ("rawstring".equalsIgnoreCase(specificFormat)) {
+      jsonBinaryFormat = TJsonBinaryFormat.RAWSTRING;
+    } else {
+      // Use null to indicate an invalid format.
+      jsonBinaryFormat = null;
+    }
+
     try {
       return INTERNER.intern(new HdfsStorageDescriptor(tblName,
           HdfsFileFormat.fromJavaClassName(
@@ -236,7 +257,7 @@ public class HdfsStorageDescriptor {
           delimMap.get(serdeConstants.MAPKEY_DELIM),
           delimMap.get(serdeConstants.ESCAPE_CHAR),
           delimMap.get(serdeConstants.QUOTE_CHAR),
-          blockSize));
+          blockSize, jsonBinaryFormat));
     } catch (IllegalArgumentException ex) {
       // Thrown by fromJavaClassName
       throw new InvalidStorageDescriptorException(ex);
@@ -248,18 +269,20 @@ public class HdfsStorageDescriptor {
     return INTERNER.intern(new HdfsStorageDescriptor(tableName,
         HdfsFileFormat.fromThrift(tDesc.getFileFormat()), tDesc.lineDelim,
         tDesc.fieldDelim, tDesc.collectionDelim, tDesc.mapKeyDelim, tDesc.escapeChar,
-        tDesc.quoteChar, tDesc.blockSize));
+        tDesc.quoteChar, tDesc.blockSize, tDesc.isSetJsonBinaryFormat() ?
+            tDesc.getJsonBinaryFormat() : null));
   }
 
   public THdfsStorageDescriptor toThrift() {
     return new THdfsStorageDescriptor(lineDelim_, fieldDelim_, collectionDelim_,
-        mapKeyDelim_, escapeChar_, quoteChar_, fileFormat_.toThrift(), blockSize_);
+        mapKeyDelim_, escapeChar_, quoteChar_, fileFormat_.toThrift(), blockSize_)
+        .setJsonBinaryFormat(jsonBinaryFormat_);
   }
 
   public HdfsStorageDescriptor cloneWithChangedFileFormat(HdfsFileFormat newFormat) {
     return INTERNER.intern(new HdfsStorageDescriptor(
         "<unknown>", newFormat, lineDelim_, fieldDelim_, collectionDelim_, mapKeyDelim_,
-        escapeChar_, quoteChar_, blockSize_));
+        escapeChar_, quoteChar_, blockSize_, jsonBinaryFormat_));
   }
 
   public byte getLineDelim() { return lineDelim_; }
@@ -269,11 +292,12 @@ public class HdfsStorageDescriptor {
   public byte getEscapeChar() { return escapeChar_; }
   public HdfsFileFormat getFileFormat() { return fileFormat_; }
   public int getBlockSize() { return blockSize_; }
+  public TJsonBinaryFormat getJsonBinaryFormat() { return jsonBinaryFormat_; }
 
   @Override
   public int hashCode() {
     return Objects.hash(blockSize_, collectionDelim_, escapeChar_, fieldDelim_,
-        fileFormat_, lineDelim_, mapKeyDelim_, quoteChar_);
+        fileFormat_, lineDelim_, mapKeyDelim_, quoteChar_, jsonBinaryFormat_);
   }
 
   @Override
@@ -290,6 +314,7 @@ public class HdfsStorageDescriptor {
     if (lineDelim_ != other.lineDelim_) return false;
     if (mapKeyDelim_ != other.mapKeyDelim_) return false;
     if (quoteChar_ != other.quoteChar_) return false;
+    if (jsonBinaryFormat_ != other.jsonBinaryFormat_) return false;
     return true;
   }
 }

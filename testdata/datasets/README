@@ -73,6 +73,7 @@ The schema template SQL files have the following format:
   DEPENDENT_LOAD_KUDU
   DEPENDENT_LOAD_HIVE
   DEPENDENT_LOAD_ACID
+  DEPENDENT_LOAD_JSON
       Statements to be executed during the "dependent load" phase. These statements
       are run after the initial (base table) load is complete.
 

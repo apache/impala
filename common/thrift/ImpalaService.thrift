@@ -1026,6 +1026,13 @@ enum TImpalaQueryOptions {
 
   // If True, use the Calcite planner for compilation
   USE_CALCITE_PLANNER = 191
+
+  // The default format for reading JSON binary columns, can be overridden by table
+  // property 'json.binary.format' (if set). The valid values are:
+  //   NONE - default value, means unspecified format, depends on the table property.
+  //   BASE64 - the json binary data is read as base64 encoded string.
+  //   RAWSTRING - the json binary data is read as raw string.
+  JSON_BINARY_FORMAT = 192
 }
 
 // The summary of a DML statement.

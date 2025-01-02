@@ -35,11 +35,12 @@
 using namespace impala;
 
 TextConverter::TextConverter(char escape_char, const string& null_col_val,
-    bool check_null, bool strict_mode)
+    bool check_null, bool strict_mode, bool decode_binary)
   : escape_char_(escape_char),
     null_col_val_(null_col_val),
     check_null_(check_null),
-    strict_mode_(strict_mode) {
+    strict_mode_(strict_mode),
+    decode_binary_(decode_binary) {
 }
 
 void TextConverter::UnescapeString(const char* src, char* dest, int* len,
