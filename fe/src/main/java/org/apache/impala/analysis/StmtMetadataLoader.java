@@ -140,8 +140,8 @@ public class StmtMetadataLoader {
    * Marks the start and end of metadata loading in 'timeline_' if it is non-NULL.
    * Must only be called once for a single statement.
    */
-  public StmtTableCache loadTables(StatementBase stmt) throws InternalException {
-    Set<TableName> requiredTables = collectTableCandidates(stmt);
+  public StmtTableCache loadTables(ParsedStatement stmt) throws InternalException {
+    Set<TableName> requiredTables = stmt.getTablesInQuery(this);
     return loadTables(requiredTables);
   }
 
@@ -366,7 +366,7 @@ public class StmtMetadataLoader {
    * and generating all possible table-path resolutions considered during analysis.
    * Uses 'sessionDb_' to construct the candidate tables with Path.getCandidateTables().
    */
-  private Set<TableName> collectTableCandidates(StatementBase stmt) {
+  public Set<TableName> collectTableCandidates(StatementBase stmt) {
     Preconditions.checkNotNull(stmt);
     List<TableRef> tblRefs = new ArrayList<>();
     // The information about whether table masking is supported is not available to

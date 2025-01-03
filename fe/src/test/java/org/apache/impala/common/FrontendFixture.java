@@ -30,6 +30,8 @@ import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.CreateTableStmt;
 import org.apache.impala.analysis.CreateViewStmt;
 import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.ParsedStatement;
+import org.apache.impala.analysis.ParsedStatementImpl;
 import org.apache.impala.analysis.ParseNode;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.QueryStmt;
@@ -53,6 +55,8 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.service.CatalogOpExecutor;
+import org.apache.impala.service.CompilerFactory;
+import org.apache.impala.service.CompilerFactoryImpl;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.testutil.TestUtils;
@@ -255,7 +259,8 @@ public class FrontendFixture {
     Preconditions.checkNotNull(db, "Test views must be created in an existing db.");
     // Do not analyze the stmt to avoid applying rewrites that would alter the view
     // definition. We want to model real views as closely as possible.
-    QueryStmt viewStmt = (QueryStmt) parseStmt(createViewStmt.getInlineViewDef());
+    QueryStmt viewStmt =
+        (QueryStmt) parseStmt(createViewStmt.getInlineViewDef()).getTopLevelNode();
     View dummyView = View.createTestView(db, createViewStmt.getTbl(), viewStmt);
     db.addTable(dummyView);
     testTables_.add(dummyView);
@@ -349,12 +354,12 @@ public class FrontendFixture {
   /**
    * Parse 'stmt' and return the root StatementBase.
    */
-  public StatementBase parseStmt(String stmt) {
+  public ParsedStatement parseStmt(String stmt) {
     try {
-      StatementBase node = Parser.parse(stmt);
-      assertNotNull(node);
-      return node;
-    } catch (AnalysisException e) {
+      ParsedStatement parsedStmt = new ParsedStatementImpl(stmt);
+      assertNotNull(parsedStmt.getTopLevelNode());
+      return parsedStmt;
+    } catch (ImpalaException e) {
       fail("Parser error:\n" + e.getMessage());
       throw new IllegalStateException(); // Keep compiler happy
     }
@@ -362,13 +367,14 @@ public class FrontendFixture {
 
   public AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx)
       throws ImpalaException {
-    StatementBase parsedStmt = Parser.parse(stmt, ctx.getQueryOptions());
+    CompilerFactory compilerFactory = new CompilerFactoryImpl();
+    ParsedStatement parsedStmt = new ParsedStatementImpl(stmt, ctx.getQueryOptions());
     User user = new User(TSessionStateUtil.getEffectiveUser(ctx.getQueryCtx().session));
     StmtMetadataLoader mdLoader = new StmtMetadataLoader(
         frontend_, ctx.getQueryCtx().session.database, null, user, null);
     StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
-    AnalysisResult analysisResult = ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache,
-        frontend_.getAuthzChecker());
+    AnalysisResult analysisResult = ctx.analyzeAndAuthorize(compilerFactory, parsedStmt,
+        stmtTableCache, frontend_.getAuthzChecker());
     Preconditions.checkState(analysisResult.getException() == null);
     return analysisResult;
   }

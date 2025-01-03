@@ -91,19 +91,20 @@ public class ExprRewriterTest extends AnalyzerTest {
   public void RewritesOk(String stmt, int expectedNumChanges,
       int expectedNumExprTrees) throws ImpalaException {
     // Analyze without rewrites since that's what we want to test here.
-    StatementBase parsedStmt = (StatementBase) ParsesOk(stmt);
+    ParsedStatement parsedStmt = ParsesOk(stmt);
     AnalyzesOkNoRewrite(parsedStmt);
+    StatementBase stmtBase = (StatementBase) parsedStmt.getTopLevelNode();
     exprToTrue_.reset();
-    parsedStmt.rewriteExprs(exprToTrue_);
+    stmtBase.rewriteExprs(exprToTrue_);
     Assert.assertEquals(expectedNumChanges, exprToTrue_.getNumChanges());
 
     // Verify that the Exprs were actually replaced.
     trueToFalse_.reset();
-    parsedStmt.rewriteExprs(trueToFalse_);
+    stmtBase.rewriteExprs(trueToFalse_);
     Assert.assertEquals(expectedNumExprTrees, trueToFalse_.getNumChanges());
 
     // Make sure the stmt can be successfully re-analyzed.
-    parsedStmt.reset();
+    stmtBase.reset();
     AnalyzesOkNoRewrite(parsedStmt);
   }
 
@@ -211,10 +212,11 @@ public class ExprRewriterTest extends AnalyzerTest {
 
   private void CheckNumChangesByEqualityDisjunctsToInRule(
       String stmt, int expectedNumChanges) throws ImpalaException {
-    StatementBase parsedStmt = (StatementBase) ParsesOk(stmt);
+    ParsedStatement parsedStmt = ParsesOk(stmt);
     AnalyzesOkNoRewrite(parsedStmt);
     ExprRewriter rewriter = new ExprRewriter(EqualityDisjunctsToInRule.INSTANCE);
-    parsedStmt.rewriteExprs(rewriter);
+    StatementBase stmtBase = (StatementBase) parsedStmt.getTopLevelNode();
+    stmtBase.rewriteExprs(rewriter);
     Assert.assertEquals(expectedNumChanges, rewriter.getNumChanges());
   }
 

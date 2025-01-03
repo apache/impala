@@ -45,12 +45,12 @@ public class ParserTest extends FrontendTestBase {
    * Also asserts that the first select-list expression is of given class.
    */
   public <C extends Expr> Object ParsesOk(String selectStmtSql, Class<C> cl) {
-    Object parseNode = ParsesOk(selectStmtSql);
-    if (!(parseNode instanceof SelectStmt)) {
+    ParsedStatement parseNode = ParsesOk(selectStmtSql);
+    if (!(parseNode.getTopLevelNode() instanceof SelectStmt)) {
       fail(String.format("Statement parsed ok but it is not a select stmt: %s",
           selectStmtSql));
     }
-    SelectStmt selectStmt = (SelectStmt) parseNode;
+    SelectStmt selectStmt = (SelectStmt) parseNode.getTopLevelNode();
     Expr firstExpr = selectStmt.getSelectList().getItems().get(0).getExpr();
     // Check the class of the first select-list expression.
     assertTrue(String.format(
@@ -269,7 +269,7 @@ public class ParserTest extends FrontendTestBase {
    * with the second tableRef because the first one cannot have hints).
    */
   private void TestJoinHints(String stmt, String... expectedHints) {
-    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
+    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt).getTopLevelNode();
     Preconditions.checkState(selectStmt.getTableRefs().size() > 1);
     List<String> actualHints = new ArrayList<>();
     assertTrue(selectStmt.getTableRefs().get(0).getJoinHints().isEmpty());
@@ -282,7 +282,7 @@ public class ParserTest extends FrontendTestBase {
   }
 
   private void TestTableHints(String stmt, String... expectedHints) {
-    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
+    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt).getTopLevelNode();
     Preconditions.checkState(selectStmt.getTableRefs().size() > 0);
     List<String> actualHints = new ArrayList<>();
     for (int i = 0; i < selectStmt.getTableRefs().size(); ++i) {
@@ -294,7 +294,7 @@ public class ParserTest extends FrontendTestBase {
   }
 
   private void TestTableAndJoinHints(String stmt, String... expectedHints) {
-    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
+    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt).getTopLevelNode();
     Preconditions.checkState(selectStmt.getTableRefs().size() > 0);
     List<String> actualHints = new ArrayList<>();
     for (int i = 0; i < selectStmt.getTableRefs().size(); ++i) {
@@ -312,7 +312,7 @@ public class ParserTest extends FrontendTestBase {
    * expected hints.
    */
   private void TestSelectListHints(String stmt, String... expectedHints) {
-    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
+    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt).getTopLevelNode();
     List<String> actualHints = new ArrayList<>();
     List<PlanHint> hints = selectStmt.getSelectList().getPlanHints();
     for (PlanHint hint: hints) actualHints.add(hint.toString());
@@ -341,7 +341,8 @@ public class ParserTest extends FrontendTestBase {
    */
   private void TestInsertStmtHints(String pattern, String hint, String... expectedHints) {
     for (InsertStmt.HintLocation loc: InsertStmt.HintLocation.values()) {
-      InsertStmt insertStmt = (InsertStmt) ParsesOk(InjectInsertHint(pattern, hint, loc));
+      InsertStmt insertStmt = (InsertStmt) ParsesOk(
+          InjectInsertHint(pattern, hint, loc)).getTopLevelNode();
       assertEquals(expectedHints, HintsToStrings(insertStmt.getPlanHints()));
     }
   }
@@ -360,7 +361,8 @@ public class ParserTest extends FrontendTestBase {
    * Parses stmt and checks that the CTAS hints stmt are the expected hints.
    */
   private void TestCtasHints(String stmt, String... expectedHints) {
-    CreateTableAsSelectStmt ctasStmt = (CreateTableAsSelectStmt) ParsesOk(stmt);
+    CreateTableAsSelectStmt ctasStmt =
+        (CreateTableAsSelectStmt) ParsesOk(stmt).getTopLevelNode();
     assertEquals(expectedHints, HintsToStrings(ctasStmt.getInsertStmt().getPlanHints()));
   }
 
@@ -1420,7 +1422,7 @@ public class ParserTest extends FrontendTestBase {
     // Should be parsed as 3 + (3!)
     // TODO: disabled b/c IMPALA-2149 - low precedence of prefix ! prevents this from
     // parsing in the expected way
-    SelectStmt stmt = (SelectStmt) ParsesOk("SELECT 3 + 3!");
+    SelectStmt stmt = (SelectStmt) ParsesOk("SELECT 3 + 3!").getTopLevelNode();
     Expr e = stmt.getSelectList().getItems().get(0).getExpr();
     assertTrue(e instanceof ArithmeticExpr);
     // ArithmeticExpr ae = (ArithmeticExpr) e;
@@ -1432,7 +1434,7 @@ public class ParserTest extends FrontendTestBase {
     //              ((ArithmeticExpr)ae.getChild(1)).getOp());
 
     // Test factorial associativity.
-    stmt = (SelectStmt) ParsesOk("SELECT 3! = 4");
+    stmt = (SelectStmt) ParsesOk("SELECT 3! = 4").getTopLevelNode();
     // Should be parsed as (3!) = (4)
     e = stmt.getSelectList().getItems().get(0).getExpr();
     assertTrue(e instanceof BinaryPredicate);
@@ -1441,7 +1443,7 @@ public class ParserTest extends FrontendTestBase {
     assertEquals(2, bp.getChildren().size());
 
     // Test != not broken
-    stmt = (SelectStmt) ParsesOk("SELECT 3 != 4");
+    stmt = (SelectStmt) ParsesOk("SELECT 3 != 4").getTopLevelNode();
     // Should be parsed as (3) != (4)
     e = stmt.getSelectList().getItems().get(0).getExpr();
     assertTrue(e instanceof BinaryPredicate);
@@ -1700,8 +1702,8 @@ public class ParserTest extends FrontendTestBase {
 
     // Test right associativity of NOT.
     for (String notStr : notStrs) {
-      SelectStmt stmt =
-          (SelectStmt) ParsesOk(String.format("select %s a != b", notStr));
+      SelectStmt stmt = (SelectStmt) ParsesOk(
+          String.format("select %s a != b", notStr)).getTopLevelNode();
       // The NOT should be applied on the result of a != b, and not on a only.
       Expr e = stmt.getSelectList().getItems().get(0).getExpr();
       assertTrue(e instanceof CompoundPredicate);

@@ -44,6 +44,7 @@ import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.MultiAggregateInfo.AggPhase;
 import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.QueryStmt;
@@ -80,7 +81,9 @@ import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.AnalyticEvalNode.LimitPushdownInfo;
 import org.apache.impala.planner.JoinNode.DistributionMode;
+import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.util.AcidUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,7 +100,7 @@ import com.google.common.collect.Sets;
  * such as local aggregations that are important for distributed execution.
  * The single-node plan needs to be wrapped in a plan fragment for it to be executable.
  */
-public class SingleNodePlanner {
+public class SingleNodePlanner implements SingleNodePlannerIntf {
   // Controls whether a distinct aggregation should be inserted before a join input.
   // If the size of the distinct values after aggregation is less than or equal to
   // the original input size multiplied by this threshold, the distinct agg should be
@@ -2358,5 +2361,36 @@ public class SingleNodePlanner {
           analyzer, unionStmt.getTupleId().asList(), result);
     }
     return result;
+  }
+
+  @Override
+  public DataSink createDataSink(ExprSubstitutionMap rootNodeSmap) {
+    QueryStmt queryStmt = ctx_.getQueryStmt();
+    queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
+    List<Expr> resultExprs = queryStmt.getResultExprs();
+    return ctx_.getAnalysisResult().getQueryStmt().createDataSink(resultExprs);
+  }
+
+  @Override
+  public List<String> getColLabels() {
+    return ctx_.getQueryStmt().getColLabels();
+  }
+
+  /**
+   * fetch the metadata for the result set
+   */
+  @Override
+  public TResultSetMetadata getTResultSetMetadata(ParsedStatement parsedStmt) {
+    LOG.trace("create result set metadata");
+    TResultSetMetadata metadata = new TResultSetMetadata();
+    QueryStmt queryStmt = (QueryStmt) parsedStmt.getTopLevelNode();
+    int colCnt = queryStmt.getColLabels().size();
+    for (int i = 0; i < colCnt; ++i) {
+      TColumn colDesc = new TColumn();
+      colDesc.columnName = queryStmt.getColLabels().get(i);
+      colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
+      metadata.addToColumns(colDesc);
+    }
+    return metadata;
   }
 }

@@ -36,6 +36,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.rewrite.ExprRewriter;
+import org.apache.impala.service.CompilerFactory;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TClientRequest;
 import org.apache.impala.thrift.TLineageGraph;
@@ -87,17 +88,26 @@ public class AnalysisContext {
   }
 
   static public class AnalysisResult {
+    // The wrapper for the parsed AST for a planner (e.g. original, Calcite).
+    private final ParsedStatement parsedStmt_;
+    // AST for original planner. This is retrievable via the parsedStmt_ variable
+    // but in its own variable for convenience. For the Calcite planner, this will be
+    // null.
     private final StatementBase stmt_;
     private final Analyzer analyzer_;
     private final ImpalaException exception_;
     private boolean userHasProfileAccess_ = true;
 
-    public AnalysisResult(StatementBase stmt, Analyzer analyzer) {
-      this(stmt, analyzer, null);
+    public AnalysisResult(ParsedStatement parsedStmt, Analyzer analyzer) {
+      this(parsedStmt, analyzer, null);
     }
 
-    public AnalysisResult(StatementBase stmt, Analyzer analyzer, ImpalaException e) {
-      stmt_ = stmt;
+    public AnalysisResult(ParsedStatement parsedStmt, Analyzer analyzer,
+        ImpalaException e) {
+      parsedStmt_ = parsedStmt;
+      stmt_ = parsedStmt_.getTopLevelNode() instanceof StatementBase
+          ? (StatementBase) parsedStmt_.getTopLevelNode()
+          : null;
       analyzer_ = analyzer;
       exception_ = e;
     }
@@ -105,7 +115,7 @@ public class AnalysisContext {
     public boolean isAlterTableStmt() { return stmt_ instanceof AlterTableStmt; }
     public boolean isAlterViewStmt() { return stmt_ instanceof AlterViewStmt; }
     public boolean isComputeStatsStmt() { return stmt_ instanceof ComputeStatsStmt; }
-    public boolean isQueryStmt() { return stmt_ instanceof QueryStmt; }
+    public boolean isQueryStmt() { return parsedStmt_.isQueryStmt(); }
     public boolean isSetOperationStmt() { return stmt_ instanceof SetOperationStmt; }
     public boolean isInsertStmt() { return stmt_ instanceof InsertStmt; }
     public boolean isMergeStmt() { return stmt_ instanceof MergeStmt; }
@@ -155,7 +165,7 @@ public class AnalysisContext {
     public boolean isDescribeDbStmt() { return stmt_ instanceof DescribeDbStmt; }
     public boolean isDescribeTableStmt() { return stmt_ instanceof DescribeTableStmt; }
     public boolean isResetMetadataStmt() { return stmt_ instanceof ResetMetadataStmt; }
-    public boolean isExplainStmt() { return stmt_.isExplain(); }
+    public boolean isExplainStmt() { return parsedStmt_.isExplain(); }
     public boolean isShowRolesStmt() { return stmt_ instanceof ShowRolesStmt; }
     public boolean isShowGrantPrincipalStmt() {
       return stmt_ instanceof ShowGrantPrincipalStmt;
@@ -440,6 +450,7 @@ public class AnalysisContext {
       return (KillQueryStmt) stmt_;
     }
 
+    public ParsedStatement getParsedStmt() { return parsedStmt_; }
     public StatementBase getStmt() { return stmt_; }
     public Analyzer getAnalyzer() { return analyzer_; }
     public ImpalaException getException() { return exception_; }
@@ -452,11 +463,11 @@ public class AnalysisContext {
 
   }
 
-  public AnalysisResult analyzeAndAuthorize(StatementBase stmt,
-      StmtTableCache stmtTableCache, AuthorizationChecker authzChecker)
-      throws ImpalaException {
-    return analyzeAndAuthorize(
-        stmt, stmtTableCache, authzChecker, false /*disableAuthorization*/);
+  public AnalysisResult analyzeAndAuthorize(CompilerFactory compilerFactory,
+      ParsedStatement parsedStmt, StmtTableCache stmtTableCache,
+      AuthorizationChecker authzChecker) throws ImpalaException {
+    return analyzeAndAuthorize(compilerFactory, parsedStmt,
+        stmtTableCache, authzChecker, false /*disableAuthorization*/);
   }
 
   /**
@@ -465,8 +476,9 @@ public class AnalysisContext {
    * AuthorizationExceptions take precedence over AnalysisExceptions so as not to
    * reveal the existence/absence of objects the user is not authorized to see.
    */
-  public AnalysisResult analyzeAndAuthorize(StatementBase stmt,
-      StmtTableCache stmtTableCache, AuthorizationChecker authzChecker,
+  public AnalysisResult analyzeAndAuthorize(CompilerFactory compilerFactory,
+      ParsedStatement parsedStmt, StmtTableCache stmtTableCache,
+      AuthorizationChecker authzChecker,
       boolean disableAuthorization) throws ImpalaException {
     // TODO: Clean up the creation/setting of the analysis result.
     catalog_ = stmtTableCache.catalog;
@@ -478,14 +490,16 @@ public class AnalysisContext {
             clientRequest.getRedacted_stmt() : clientRequest.getStmt(),
         queryCtx_.getSession(), Optional.of(timeline_));
     Preconditions.checkState(authzCtx != null);
-    AnalysisDriverImpl analysisDriver =
-        new AnalysisDriverImpl(this, stmt, stmtTableCache, authzCtx);
+    AnalysisDriver analysisDriver = compilerFactory.createAnalysisDriver(this,
+        parsedStmt, stmtTableCache, authzCtx);
 
     analysisResult_ = analysisDriver.analyze();
     authzChecker.postAnalyze(authzCtx);
     ImpalaException analysisException = analysisResult_.getException();
 
     // A statement that returns at most one row does not need to spool query results.
+    // IMPALA-13902: returnsAtMostOneRow should be in planner interface so it is
+    // accessible by the Calcite planner.
     if (analysisException == null && analysisResult_.getStmt() instanceof SelectStmt &&
         ((SelectStmt)analysisResult_.getStmt()).returnsAtMostOneRow()) {
       clientRequest.query_options.setSpool_query_results(false);
@@ -529,18 +543,23 @@ public class AnalysisContext {
    * stage.
    */
   public static class AnalysisDriverImpl implements AnalysisDriver {
+    // the stmt variables and Analyzer are not final variables because of the
+    // rewrite code. This should perhaps be refactored in the future.
+    private ParsedStatement parsedStmt_;
     private StatementBase stmt_;
     private Analyzer analyzer_;
     private final AnalysisContext ctx_;
     private final StmtTableCache stmtTableCache_;
     private final AuthorizationContext authzCtx_;
 
-    public AnalysisDriverImpl(AnalysisContext ctx, StatementBase stmt,
+    public AnalysisDriverImpl(AnalysisContext ctx, ParsedStatement parsedStmt,
         StmtTableCache stmtTableCache,
         AuthorizationContext authzCtx) {
-      Preconditions.checkNotNull(stmt);
+      Preconditions.checkNotNull(parsedStmt);
+      parsedStmt_ = parsedStmt;
       ctx_ = ctx;
-      stmt_ = stmt;
+      Preconditions.checkNotNull(parsedStmt.getTopLevelNode());
+      stmt_ = (StatementBase) parsedStmt.getTopLevelNode();
       stmtTableCache_ = stmtTableCache;
       authzCtx_ = authzCtx;
       analyzer_ = createAnalyzer(ctx_, stmtTableCache, authzCtx);
@@ -615,7 +634,7 @@ public class AnalysisContext {
           shouldReAnalyze = true;
         }
         if (!shouldReAnalyze) {
-          return new AnalysisResult(stmt_, analyzer_);
+          return new AnalysisResult(parsedStmt_, analyzer_);
         }
 
         // For SetOperationStmt we must replace the query statement with the rewritten
@@ -626,6 +645,7 @@ public class AnalysisContext {
             if (((SetOperationStmt) stmt_).hasRewrittenStmt()) {
               boolean isExplain = stmt_.isExplain();
               stmt_ = ((SetOperationStmt) stmt_).getRewrittenStmt();
+              parsedStmt_ = new ParsedStatementImpl(stmt_);
               if (isExplain) stmt_.setIsExplain();
             }
           }
@@ -634,9 +654,9 @@ public class AnalysisContext {
         reAnalyze(stmtTableCache_, authzCtx_, origResultTypes, origColLabels,
             /*collectPrivileges*/ false);
         Preconditions.checkState(!requiresSubqueryRewrite());
-        return new AnalysisResult(stmt_, analyzer_);
+        return new AnalysisResult(parsedStmt_, analyzer_);
       } catch (ImpalaException e) {
-        return new AnalysisResult(stmt_, analyzer_, e);
+        return new AnalysisResult(parsedStmt_, analyzer_, e);
       }
     }
 
@@ -725,6 +745,7 @@ public class AnalysisContext {
     public boolean isCreateTableAsSelectStmt() {
       return stmt_ instanceof CreateTableAsSelectStmt;
     }
+
     private boolean isZippingUnnestInSelectList(StatementBase stmt) {
       if (!(stmt instanceof SelectStmt)) return false;
       if (!stmt.analyzer_.getTableRefsFromUnnestExpr().isEmpty()) return true;

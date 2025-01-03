@@ -39,6 +39,7 @@ import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MergeCase;
 import org.apache.impala.analysis.MergeStmt;
+import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TupleId;
@@ -51,12 +52,14 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.CompilerFactory;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TMinmaxFilteringLevel;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.EventSequence;
@@ -101,9 +104,12 @@ public class Planner {
 
   private final PlannerContext ctx_;
 
-  public Planner(AnalysisResult analysisResult, TQueryCtx queryCtx,
-      EventSequence timeline) {
+  private final SingleNodePlannerIntf singleNodePlannerIntf_;
+
+  public Planner(CompilerFactory compilerFactory, AnalysisResult analysisResult,
+      TQueryCtx queryCtx, EventSequence timeline) throws ImpalaException {
     ctx_ = new PlannerContext(analysisResult, queryCtx, timeline);
+    singleNodePlannerIntf_ = compilerFactory.createSingleNodePlanner(ctx_);
   }
 
   public TQueryCtx getQueryCtx() { return ctx_.getQueryCtx(); }
@@ -127,9 +133,8 @@ public class Planner {
    *    that typically means there is a bug in analysis, or a broken/missing smap.
    */
   private List<PlanFragment> createPlanFragments() throws ImpalaException {
-    SingleNodePlanner singleNodePlanner = new SingleNodePlanner(ctx_);
     DistributedPlanner distributedPlanner = new DistributedPlanner(ctx_);
-    PlanNode singleNodePlan = singleNodePlanner.createSingleNodePlan();
+    PlanNode singleNodePlan = singleNodePlannerIntf_.createSingleNodePlan();
     ctx_.getTimeline().markEvent("Single node plan created");
     List<PlanFragment> fragments = null;
 
@@ -198,11 +203,7 @@ public class Planner {
       // Set up update sink for root fragment
       rootFragment.setSink(stmt.createDataSink());
     } else if (ctx_.isQuery()) {
-      QueryStmt queryStmt = ctx_.getQueryStmt();
-      queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
-      List<Expr> resultExprs = queryStmt.getResultExprs();
-      rootFragment.setSink(
-          ctx_.getAnalysisResult().getQueryStmt().createDataSink(resultExprs));
+      rootFragment.setSink(singleNodePlannerIntf_.createDataSink(rootNodeSmap));
     }
 
     // The check for disabling codegen uses estimates of rows per node so must be done
@@ -270,7 +271,8 @@ public class Planner {
           graph.addTargetColumnLabels(targetTable);
         }
       } else {
-        graph.addTargetColumnLabels(ctx_.getQueryStmt().getColLabels().stream()
+        List<String> colLabels = singleNodePlannerIntf_.getColLabels();
+        graph.addTargetColumnLabels(colLabels.stream()
             .map(col -> new ColumnLabel(col))
             .collect(Collectors.toList()));
       }
@@ -1036,6 +1038,10 @@ public class Planner {
     node.init(analyzer);
 
     inputFragment.setPlanRoot(node);
+  }
+
+  public TResultSetMetadata getTResultSetMetadata(ParsedStatement parsedStmt) {
+    return singleNodePlannerIntf_.getTResultSetMetadata(parsedStmt);
   }
 
   private PlanNode addMergeNode(PlanNode planNode, Analyzer analyzer)

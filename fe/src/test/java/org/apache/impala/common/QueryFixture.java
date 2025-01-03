@@ -27,6 +27,8 @@ import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ParsedStatement;
+import org.apache.impala.analysis.ParsedStatementImpl;
 import org.apache.impala.analysis.SelectStmt;
 import org.apache.impala.analysis.SqlParser;
 import org.apache.impala.analysis.SqlScanner;
@@ -34,6 +36,8 @@ import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
+import org.apache.impala.service.CompilerFactory;
+import org.apache.impala.service.CompilerFactoryImpl;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
@@ -62,7 +66,7 @@ public class QueryFixture {
    */
   public static class AnalysisFixture extends QueryFixture {
     protected AnalysisContext analysisCtx_;
-    protected StatementBase stmt_;
+    protected ParsedStatement stmt_;
     private AnalysisResult analysisResult_;
 
     public AnalysisFixture(AnalysisSessionFixture analysisFixture, String stmtSql) {
@@ -72,13 +76,14 @@ public class QueryFixture {
     public StatementBase analyze() throws AnalysisException {
       Preconditions.checkState(analysisCtx_ == null, "Already analyzed");
       try {
+        CompilerFactory compilerFactory = new CompilerFactoryImpl();
         stmt_ = parse();
         analysisCtx_ = makeAnalysisContext();
-        analysisResult_ = analysisCtx_.analyzeAndAuthorize(stmt_,
+        analysisResult_ = analysisCtx_.analyzeAndAuthorize(compilerFactory, stmt_,
             makeTableCache(stmt_), session_.frontend().getAuthzChecker());
         Preconditions.checkState(analysisResult_.getException() == null);
         Preconditions.checkNotNull(analysisResult_.getStmt());
-        return stmt_;
+        return (StatementBase) stmt_.getTopLevelNode();
       } catch (AnalysisException e) {
         // Tests may want to test analysis errors, else this exception will
         // fail the tests; no need to call fail() to accomplish that result.
@@ -102,7 +107,7 @@ public class QueryFixture {
      * Create a table cache for the target database, loading tables
      * needed for the given statement.
      */
-    protected StmtTableCache makeTableCache(StatementBase stmt) {
+    protected StmtTableCache makeTableCache(ParsedStatement stmt) {
       StmtMetadataLoader mdLoader =
          new StmtMetadataLoader(session_.frontend(), db_, null);
       try {
@@ -114,7 +119,7 @@ public class QueryFixture {
       }
     }
 
-    public StatementBase statement() { return stmt_; }
+    public StatementBase statement() { return (StatementBase) stmt_.getTopLevelNode(); }
     public Analyzer analyzer() {
       Preconditions.checkState(analysisResult_ != null, "Not yet analyzed");
       return analysisResult_.getAnalyzer();
@@ -192,8 +197,8 @@ public class QueryFixture {
     }
 
     public SelectStmt selectStmt() {
-      Preconditions.checkState(stmt_ != null, "Not yet analyzed");
-      return (SelectStmt) stmt_;
+      Preconditions.checkState(stmt_.getTopLevelNode() != null, "Not yet analyzed");
+      return (SelectStmt) stmt_.getTopLevelNode();
     }
 
     /**
@@ -248,13 +253,13 @@ public class QueryFixture {
     return TestUtils.createQueryContext(db_, user_, queryOptions_);
   }
 
-  public StatementBase parse() {
+  public ParsedStatement parse() {
     // TODO: Use the parser class when available
     SqlScanner input = new SqlScanner(new StringReader(stmtSql_));
     SqlParser parser = new SqlParser(input);
     parser.setQueryOptions(queryOptions_);
     try {
-      return (StatementBase) parser.parse().value;
+      return new ParsedStatementImpl((StatementBase) parser.parse().value);
     } catch (Exception e) {
       throw new IllegalStateException(e);
     }

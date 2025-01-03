@@ -19,6 +19,8 @@ package org.apache.impala.analysis;
 
 import java.util.Arrays;
 
+import org.apache.impala.analysis.ParsedStatement;
+import org.apache.impala.analysis.ParsedStatementImpl;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.User;
@@ -50,7 +52,7 @@ public class StmtMetadataLoaderTest {
       throws ImpalaException {
     try (ImpaladTestCatalog catalog = new ImpaladTestCatalog()) {
       Frontend fe = new Frontend(new NoopAuthorizationFactory(), catalog);
-      StatementBase stmt = Parser.parse(stmtStr);
+      ParsedStatement stmt = new ParsedStatementImpl(stmtStr);
       // Catalog is fresh and no tables are cached.
       validateUncached(stmt, fe, expectedNumLoadRequests, expectedNumCatalogUpdates,
           expectedDbs, expectedTables);
@@ -62,7 +64,7 @@ public class StmtMetadataLoaderTest {
   private void testNoLoad(String stmtStr) throws ImpalaException {
     try (ImpaladTestCatalog catalog = new ImpaladTestCatalog()) {
       Frontend fe = new Frontend(new NoopAuthorizationFactory(), catalog);
-      StatementBase stmt = Parser.parse(stmtStr);
+      ParsedStatement stmt = new ParsedStatementImpl(stmtStr);
       validateCached(stmt, fe, new String[]{}, new String[]{});
     }
   }
@@ -71,7 +73,7 @@ public class StmtMetadataLoaderTest {
       throws ImpalaException {
     try (ImpaladTestCatalog catalog = new ImpaladTestCatalog()) {
       Frontend fe = new Frontend(new NoopAuthorizationFactory(), catalog);
-      StatementBase stmt = Parser.parse(stmtStr);
+      ParsedStatement stmt = new ParsedStatementImpl(stmtStr);
       EventSequence timeline = new EventSequence("Test Timeline");
       StmtMetadataLoader mdLoader =
           new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, timeline);
@@ -110,7 +112,7 @@ public class StmtMetadataLoaderTest {
   }
 
   // Assume tables in the stmt are not acid tables.
-  private void validateUncached(StatementBase stmt, Frontend fe,
+  private void validateUncached(ParsedStatement stmt, Frontend fe,
       int expectedNumLoadRequests, int expectedNumCatalogUpdates,
       String[] expectedDbs, String[] expectedTables) throws InternalException {
     EventSequence timeline = new EventSequence("Test Timeline");
@@ -129,7 +131,7 @@ public class StmtMetadataLoaderTest {
     validateTables(stmtTableCache, expectedTables);
   }
 
-  private void validateCached(StatementBase stmt, Frontend fe,
+  private void validateCached(ParsedStatement stmt, Frontend fe,
       String[] expectedDbs, String[] expectedTables) throws InternalException {
     EventSequence timeline = new EventSequence("Test Timeline");
     StmtMetadataLoader mdLoader =

@@ -89,6 +89,7 @@ import org.apache.impala.analysis.GrantRevokePrivStmt;
 import org.apache.impala.analysis.GrantRevokeRoleStmt;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.OptimizeStmt;
+import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.ResetMetadataStmt;
@@ -2033,7 +2034,10 @@ public class Frontend {
     // and profiling.
     try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
       EventSequence timeline = new EventSequence("Query Compilation");
-      TExecRequest result = getTExecRequest(planCtx, timeline);
+      // a wrapper of the getTExecRequest is in the factory so the implementation
+      // can handle various planner fallback execution logic (e.g. allowing one
+      // planner, if execution fails, to call a different planner)
+      TExecRequest result = getTExecRequest(new CompilerFactoryImpl(), planCtx, timeline);
       timeline.markEvent("Planning finished");
       result.setTimeline(timeline.toThrift());
       result.setProfile(FrontendProfile.getCurrent().emitAsThrift());
@@ -2302,8 +2306,8 @@ public class Frontend {
     }
   }
 
-  private TExecRequest getTExecRequest(PlanCtx planCtx, EventSequence timeline)
-      throws ImpalaException {
+  private TExecRequest getTExecRequest(CompilerFactory compilerFactory,
+      PlanCtx planCtx, EventSequence timeline) throws ImpalaException {
     TQueryCtx queryCtx = planCtx.getQueryContext();
     addPlannerToProfile(PLANNER);
     LOG.info("Analyzing query: " + queryCtx.client_request.stmt + " db: "
@@ -2407,7 +2411,7 @@ public class Frontend {
       String retryMsg = "";
       while (true) {
         try {
-          req = doCreateExecRequest(planCtx, warnings, timeline);
+          req = doCreateExecRequest(compilerFactory, planCtx, warnings, timeline);
           markTimelineRetries(attempt, retryMsg, timeline);
           break;
         } catch (InconsistentMetadataFetchException e) {
@@ -2702,17 +2706,20 @@ public class Frontend {
     FrontendProfile.getCurrent().addChildrenProfile(profile);
   }
 
-  private TExecRequest doCreateExecRequest(PlanCtx planCtx,
-      List<String> warnings, EventSequence timeline) throws ImpalaException {
+  private TExecRequest doCreateExecRequest(CompilerFactory compilerFactory,
+      PlanCtx planCtx, List<String> warnings, EventSequence timeline)
+      throws ImpalaException {
     TQueryCtx queryCtx = planCtx.getQueryContext();
+
     // Parse stmt and collect/load metadata to populate a stmt-local table cache
-    StatementBase stmt = Parser.parse(
-        queryCtx.client_request.stmt, queryCtx.client_request.query_options);
+    ParsedStatement parsedStmt = compilerFactory.createParsedStatement(queryCtx);
+
     User user = new User(TSessionStateUtil.getEffectiveUser(queryCtx.session));
     StmtMetadataLoader metadataLoader = new StmtMetadataLoader(
         this, queryCtx.session.database, timeline, user, queryCtx.getQuery_id());
+
     //TODO (IMPALA-8788): should load table write ids in transaction context.
-    StmtTableCache stmtTableCache = metadataLoader.loadTables(stmt);
+    StmtTableCache stmtTableCache = metadataLoader.loadTables(parsedStmt);
     if (queryCtx.client_request.query_options.isSetDebug_action()) {
         DebugUtils.executeDebugAction(
             queryCtx.client_request.query_options.getDebug_action(),
@@ -2737,8 +2744,14 @@ public class Frontend {
 
     // Analyze and authorize stmt
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory_, timeline);
-    AnalysisResult analysisResult = analysisCtx.analyzeAndAuthorize(stmt, stmtTableCache,
-        authzChecker_.get(), planCtx.compilationState_.disableAuthorization());
+    AnalysisResult analysisResult = analysisCtx.analyzeAndAuthorize(compilerFactory,
+        parsedStmt, stmtTableCache, authzChecker_.get(),
+        planCtx.compilationState_.disableAuthorization());
+
+    // need to re-fetch the parsedStatement because analysisResult can rewrite the
+    // statement.
+    parsedStmt = analysisResult.getParsedStmt();
+
     Preconditions.checkState(analysisResult.getException() == null);
     if (!planCtx.compilationState_.disableAuthorization()) {
       LOG.info("Analysis and authorization finished.");
@@ -2747,7 +2760,6 @@ public class Frontend {
     } else {
       LOG.info("Analysis finished.");
     }
-    Preconditions.checkNotNull(analysisResult.getStmt());
     analysisResult.getAnalyzer().addWarnings(warnings);
     TExecRequest result = createBaseExecRequest(queryCtx, analysisResult);
     for (TableName table : stmtTableCache.tables.keySet()) {
@@ -2846,7 +2858,7 @@ public class Frontend {
             analysisResult.getConvertTableToIcebergStmt().toThrift());
         return result;
       } else if (analysisResult.isTestCaseStmt()) {
-        CopyTestCaseStmt testCaseStmt = ((CopyTestCaseStmt) stmt);
+        CopyTestCaseStmt testCaseStmt = ((CopyTestCaseStmt) analysisResult.getStmt());
         if (testCaseStmt.isTestCaseExport()) {
           result.setStmt_type(TStmtType.TESTCASE);
           result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
@@ -2890,9 +2902,10 @@ public class Frontend {
       // If unset, set MT_DOP to 0 to simplify the rest of the code.
       if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
 
+      Planner planner = new Planner(compilerFactory, analysisResult, queryCtx, timeline);
       // create TQueryExecRequest
       TQueryExecRequest queryExecRequest =
-          getPlannedExecRequest(planCtx, analysisResult, timeline);
+          getPlannedExecRequest(planner, queryCtx, planCtx, analysisResult, timeline);
 
       for (String column : analysisResult.getAnalyzer().joinColumns()) {
         result.addToJoin_columns(column);
@@ -2918,8 +2931,12 @@ public class Frontend {
       if (analysisResult.isQueryStmt()) {
         result.stmt_type = TStmtType.QUERY;
         result.query_exec_request.stmt_type = result.stmt_type;
+        // use the parsed statement from the analysis result because the
+        // rewriter may have changed the statement.
+        ParsedStatement analyzedStmt = analysisResult.getParsedStmt();
         // fill in the metadata
-        result.setResult_set_metadata(createQueryResultSetMetadata(analysisResult));
+        result.setResult_set_metadata(
+            planner.getTResultSetMetadata(analyzedStmt));
       } else if (analysisResult.isInsertStmt() ||
           analysisResult.isCreateTableAsSelectStmt()) {
         // For CTAS the overall TExecRequest statement type is DDL, but the
@@ -3107,33 +3124,13 @@ public class Frontend {
   }
 
   /**
-   * Add the metadata for the result set
-   */
-  private static TResultSetMetadata createQueryResultSetMetadata(
-      AnalysisResult analysisResult) {
-    LOG.trace("create result set metadata");
-    TResultSetMetadata metadata = new TResultSetMetadata();
-    QueryStmt queryStmt = analysisResult.getQueryStmt();
-    int colCnt = queryStmt.getColLabels().size();
-    for (int i = 0; i < colCnt; ++i) {
-      TColumn colDesc = new TColumn();
-      colDesc.columnName = queryStmt.getColLabels().get(i);
-      colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
-      metadata.addToColumns(colDesc);
-    }
-    return metadata;
-  }
-
-  /**
    * Get the TQueryExecRequest and use it to populate the query context
    */
-  private TQueryExecRequest getPlannedExecRequest(PlanCtx planCtx,
-      AnalysisResult analysisResult, EventSequence timeline)
+  private TQueryExecRequest getPlannedExecRequest(Planner planner, TQueryCtx queryCtx,
+      PlanCtx planCtx, AnalysisResult analysisResult, EventSequence timeline)
       throws ImpalaException {
     Preconditions.checkState(analysisResult.isQueryStmt() || analysisResult.isDmlStmt()
         || analysisResult.isCreateTableAsSelectStmt());
-    TQueryCtx queryCtx = planCtx.getQueryContext();
-    Planner planner = new Planner(analysisResult, queryCtx, timeline);
     TQueryExecRequest queryExecRequest = createExecRequest(planner, planCtx);
     if (planCtx.serializeDescTbl()) {
       queryCtx.setDesc_tbl_serialized(
@@ -3522,5 +3519,9 @@ public class Frontend {
         txn.close();
       }
     }
+  }
+
+  private CompilerFactory getCompilerFactory(PlanCtx ctx) {
+    return new CompilerFactoryImpl();
   }
 }

@@ -47,6 +47,8 @@ import org.apache.impala.rewrite.NormalizeExprsRule;
 import org.apache.impala.rewrite.SimplifyCastStringToTimestamp;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
+import org.apache.impala.service.CompilerFactory;
+import org.apache.impala.service.CompilerFactoryImpl;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -95,8 +97,9 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
       stmt_ = parse();
       analysisCtx_ = makeAnalysisContext();
       analyzer_ = AnalysisDriverImpl.createAnalyzer(analysisCtx_, makeTableCache(stmt_));
-      stmt_.analyze(analyzer_);
-      return stmt_;
+      StatementBase stmtBase = (StatementBase) stmt_.getTopLevelNode();
+      stmtBase.analyze(analyzer_);
+      return stmtBase;
     }
 
     @Override

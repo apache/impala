@@ -29,8 +29,11 @@ import java.util.function.Supplier;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisDriverImpl;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
+import org.apache.impala.analysis.AnalysisDriver;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.InsertStmt;
+import org.apache.impala.analysis.ParsedStatement;
+import org.apache.impala.analysis.ParsedStatementImpl;
 import org.apache.impala.analysis.ParseNode;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.StatementBase;
@@ -54,6 +57,8 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.service.CompilerFactory;
+import org.apache.impala.service.CompilerFactoryImpl;
 import org.apache.impala.service.FeCatalogManager;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.FrontendProfile;
@@ -179,7 +184,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
   /**
    * Parse 'stmt' and return the root StatementBase.
    */
-  public StatementBase ParsesOk(String stmt) {
+  public ParsedStatement ParsesOk(String stmt) {
     return feFixture_.parseStmt(stmt);
   }
 
@@ -272,15 +277,16 @@ public class FrontendTestBase extends AbstractFrontendTest {
   /**
    * Analyzes the given statement without performing rewrites or authorization.
    */
-  public StatementBase AnalyzesOkNoRewrite(StatementBase stmt) throws ImpalaException {
+  public StatementBase AnalyzesOkNoRewrite(ParsedStatement stmt) throws ImpalaException {
     try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
       AnalysisContext ctx = createAnalysisCtx();
       StmtMetadataLoader mdLoader =
           new StmtMetadataLoader(frontend_, ctx.getQueryCtx().session.database, null);
       StmtTableCache loadedTables = mdLoader.loadTables(stmt);
       Analyzer analyzer = AnalysisDriverImpl.createAnalyzer(ctx, loadedTables);
-      stmt.analyze(analyzer);
-      return stmt;
+      StatementBase stmtBase = (StatementBase) stmt.getTopLevelNode();
+      stmtBase.analyze(analyzer);
+      return stmtBase;
     }
   }
 
@@ -343,13 +349,15 @@ public class FrontendTestBase extends AbstractFrontendTest {
       throws ImpalaException {
     try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
       ctx.getQueryCtx().getClient_request().setStmt(stmt);
-      StatementBase parsedStmt = Parser.parse(stmt, ctx.getQueryOptions());
+      CompilerFactory compilerFactory = new CompilerFactoryImpl();
+      ParsedStatement parsedStmt =
+          compilerFactory.createParsedStatement(ctx.getQueryCtx());
       User user = new User(TSessionStateUtil.getEffectiveUser(ctx.getQueryCtx().session));
       StmtMetadataLoader mdLoader = new StmtMetadataLoader(
           fe, ctx.getQueryCtx().session.database, null, user, null);
       StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
-      AnalysisResult analysisResult =
-          ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache, fe.getAuthzChecker());
+      AnalysisResult analysisResult = ctx.analyzeAndAuthorize(compilerFactory, parsedStmt,
+          stmtTableCache, fe.getAuthzChecker());
       Preconditions.checkState(analysisResult.getException() == null);
       return analysisResult;
     }
