@@ -47,6 +47,7 @@ PATH_TO_REPLACE = {
     "agg-node-high-mem-estimate.test",
     "agg-node-low-mem-estimate.test",
     "agg-node-max-mem-estimate.test",
+    "aggregation-no-tuple-analysis.test",
     "processing-cost-plan-admission-slots.test",
     "tpcds-processing-cost.test",
   ]

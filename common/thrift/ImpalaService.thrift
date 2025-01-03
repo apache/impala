@@ -969,6 +969,10 @@ enum TImpalaQueryOptions {
   // tuple_cache_debug_dump_dir is specified and enable_tuple_cache_verification is set
   // to true.
   ENABLE_TUPLE_CACHE_VERIFICATION = 183
+
+  // If True, enable tuple analysis for both preaggregation and final aggregation node.
+  // Enabling this feature can lower cardinality estimate of multi-column grouping.
+  ENABLE_TUPLE_ANALYSIS_IN_AGGREGATE = 184
 }
 
 // The summary of a DML statement.

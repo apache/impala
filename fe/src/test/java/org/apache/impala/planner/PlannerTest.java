@@ -193,6 +193,14 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testAggregationNoTupleAnalysis() {
+    Set<PlannerTestOption> testOptions = tpcdsParquetTestOptions();
+    TQueryOptions options = tpcdsParquetQueryOptions();
+    runPlannerTestFile(
+        "aggregation-no-tuple-analysis", "tpcds_parquet", options, testOptions);
+  }
+
+  @Test
   public void testGroupingSets() {
     runPlannerTestFile("grouping-sets");
   }

@@ -120,7 +120,7 @@ public class AggregationNode extends PlanNode {
   // May set to true in computeStats() and will stay true during lifetime of this
   // AggregationNode.
   // TODO: IMPALA-13542
-  private boolean skipTupleBasedAnalysis_ = false;
+  private boolean skipTupleAnalysis_ = false;
 
   public AggregationNode(
       PlanNodeId id, PlanNode input, MultiAggregateInfo multiAggInfo, AggPhase aggPhase) {
@@ -276,7 +276,9 @@ public class AggregationNode extends PlanNode {
     // DistributedPlanner.java may transfer conjunct to merge phase aggregation later.
     // Keep skipping tuple-based analysis to maintain same number as single node plan.
     // TODO: IMPALA-13542
-    skipTupleBasedAnalysis_ |= !conjuncts_.isEmpty();
+    skipTupleAnalysis_ |= !conjuncts_.isEmpty();
+    skipTupleAnalysis_ |=
+        !analyzer.getQueryOptions().isEnable_tuple_analysis_in_aggregate();
 
     boolean unknownEstimate = false;
     aggClassNumGroups_ = Lists.newArrayList();
@@ -354,7 +356,7 @@ public class AggregationNode extends PlanNode {
     Preconditions.checkArgument(aggInputCardinality >= -1, aggInputCardinality);
     if (groupingExprs.isEmpty()) return NON_GROUPING_AGG_NUM_GROUPS;
     if (planNode instanceof AggregationNode
-        && ((AggregationNode) planNode).skipTupleBasedAnalysis_) {
+        && ((AggregationNode) planNode).skipTupleAnalysis_) {
       // This AggregationNode has been planned with non-empty conjunct before.
       // Skip tuple based to avoid severe underestimation.
       // TODO: IMPALA-13542

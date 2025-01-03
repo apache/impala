@@ -1322,6 +1322,10 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_long_polling_time_ms(int32_t_val);
         break;
       }
+      case TImpalaQueryOptions::ENABLE_TUPLE_ANALYSIS_IN_AGGREGATE: {
+        query_options->__set_enable_tuple_analysis_in_aggregate(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {
