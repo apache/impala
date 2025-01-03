@@ -1029,8 +1029,8 @@ class TestWebPage(ImpalaTestSuite):
     query = "select count(*) from functional_parquet.alltypes"
     delay_created_action = "impalad_load_tables_delay:SLEEP@1000"
 
-    response_json = self.get_queries()
-    assert response_json['num_in_flight_queries'] == 0
+    response_json = self.try_until("test baseline", self.get_queries,
+        lambda resp: resp['num_in_flight_queries'] == 0)
 
     # Start the query completely async. The server doesn't return a response until
     # the query has exited the CREATED state, so we need to get the query ID another way.
@@ -1067,7 +1067,6 @@ class TestWebPage(ImpalaTestSuite):
     # environments like ASAN.
     response_json = self.try_until("query cancellation", self.get_queries,
         lambda resp: resp['num_in_flight_queries'] == 0)
-    assert response_json['num_in_flight_queries'] == 0
     assert response_json['num_waiting_queries'] == 0
 
     expected_queries = [q for q in response_json['completed_queries']
@@ -1082,8 +1081,8 @@ class TestWebPage(ImpalaTestSuite):
     query = "select *, 1.0/0 from functional_parquet.alltypes limit 10"
     delay_created_action = "impalad_load_tables_delay:SLEEP@1000"
 
-    response_json = self.get_queries()
-    assert response_json['num_in_flight_queries'] == 0
+    response_json = self.try_until("test baseline", self.get_queries,
+        lambda resp: resp['num_in_flight_queries'] == 0)
 
     def run(queue, client, query):
       queue.put(client.execute_async(query))
@@ -1121,7 +1120,6 @@ class TestWebPage(ImpalaTestSuite):
     # slow environments like ASAN.
     response_json = self.try_until("query failure", self.get_queries,
         lambda resp: resp['num_in_flight_queries'] == 0)
-    assert response_json['num_in_flight_queries'] == 0
     assert response_json['num_waiting_queries'] == 0
 
     expected_queries = [q for q in response_json['completed_queries']
