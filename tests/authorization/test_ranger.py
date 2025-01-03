@@ -1420,6 +1420,257 @@ class TestRanger(CustomClusterTestSuite):
           .format(unique_database))
       TestRanger._remove_policy(unique_name)
 
+  def _test_select_calcite_frontend(self, unique_name):
+    grantee_user = "non_owner"
+    with self.create_impala_client(user=ADMIN) as admin_client, \
+      self.create_impala_client(user=grantee_user) as non_owner_client:
+      # Set the query option of 'use_calcite_planner' to 1 to use the Calcite planner.
+      non_owner_client.set_configuration({"use_calcite_planner": 1})
+      unique_database = unique_name + "_db"
+      unique_table = unique_name + "_tbl"
+      test_select_query = "select * from {0}.{1}".format(unique_database, unique_table)
+      error_msg_prefix = "User '{0}' does not have privileges to execute 'SELECT' on:" \
+          .format(grantee_user)
+      try:
+        # Set up a temporary database and a table.
+        admin_client.execute("drop database if exists {0} cascade"
+            .format(unique_database))
+        admin_client.execute("create database {0}".format(unique_database))
+        admin_client.execute("create table {0}.{1} (id int, bigint_col bigint)"
+            .format(unique_database, unique_table))
+        admin_client.execute("grant select on table functional.alltypes to user {0}"
+            .format(grantee_user))
+        admin_client.execute("refresh authorization")
+
+        # Even though the user 'grantee_user' was granted the SELECT privilege on the
+        # table 'functional.alltypes', the user still could not execute the query due to
+        # IMPALA-13767.
+        result = self.execute_query_expect_failure(non_owner_client,
+            "with t as (select * from functional.alltypes) select * from t")
+        assert "{0} default.t".format(error_msg_prefix) in str(result)
+
+        admin_client.execute("grant select (id) on table {0}.{1} to user {2}"
+            .format(unique_database, unique_table, grantee_user))
+        admin_client.execute("refresh authorization")
+
+        # Even though 'grantee_user' was already granted the SELECT privilege on the
+        # column 'id', 'grantee_user' still could not execute the query because the user
+        # does not have the SELECT privilege on the table, or the SELECT privilege on the
+        # column 'bigint_col'.
+        result = self.execute_query_expect_failure(non_owner_client, test_select_query)
+        assert "{0} {1}.{2}" \
+            .format(error_msg_prefix, unique_database, unique_table) in str(result)
+
+        admin_client.execute("grant select (bigint_col) on table {0}.{1} to user {2}"
+            .format(unique_database, unique_table, grantee_user))
+        admin_client.execute("refresh authorization")
+
+        # After 'grantee_user' is granted the SELECT privilege on the column
+        # 'bigint_col', the query could be executed.
+        non_owner_client.execute(test_select_query)
+      finally:
+        admin_client.execute("revoke select on table functional.alltypes from user {0}"
+            .format(grantee_user))
+        admin_client.execute("revoke select (id) on table {0}.{1} from user {2}"
+            .format(unique_database, unique_table, grantee_user))
+        admin_client.execute("revoke select (bigint_col) on table {0}.{1} from user {2}"
+            .format(unique_database, unique_table, grantee_user))
+        admin_client.execute("refresh authorization")
+        admin_client.execute("drop database if exists {0} cascade"
+            .format(unique_database))
+
+  def _test_view_on_view(self, use_calcite_planner,
+      v2_created_by_non_superuser, v1_created_by_non_superuser,
+      v2_name, v1_name,
+      # This denotes the columns on which the requesting user has to have the SELECT
+      # privilege in order to execute the SELECT query against the view v2.
+      priv_req_columns,
+      # This denotes the tables for which a frontend registers the masked privilege
+      # requests.
+      priv_req_masked_tables,
+      # This denotes the columns for which a frontend registers the masked privilege
+      # requests.
+      priv_req_masked_columns):
+    grantee_user = "non_owner"
+    with self.create_impala_client(user=ADMIN) as admin_client, \
+        self.create_impala_client(user=grantee_user) as non_owner_client:
+      if use_calcite_planner is True:
+        # Set the query option of 'use_calcite_planner' to 1 to use the Calcite planner.
+        non_owner_client.set_configuration({"use_calcite_planner": 1})
+      test_select_query = "select * from {0}".format(v2_name)
+      select_error_prefix = "User '{0}' does not have privileges to execute " \
+          "'SELECT' on:".format(grantee_user)
+      profile_error = "User {0} is not authorized to access the runtime profile " \
+          "or execution summary.".format(grantee_user)
+      try:
+        # Add the table property to simulate views created by a non-superuser.
+        if v2_created_by_non_superuser is True:
+          self.run_stmt_in_hive("alter view {0} set tblproperties "
+              "('Authorized' = 'false')".format(v2_name))
+          admin_client.execute("invalidate metadata {0}".format(v2_name))
+        if v1_created_by_non_superuser is True:
+          self.run_stmt_in_hive("alter view {0} set tblproperties "
+              "('Authorized' = 'false')".format(v1_name))
+          admin_client.execute("invalidate metadata {0}".format(v1_name))
+
+        result = self.execute_query_expect_failure(non_owner_client, test_select_query)
+        assert "{0} {1}" \
+            .format(select_error_prefix, v2_name) in str(result)
+
+        for column in priv_req_columns:
+          admin_client.execute("grant select ({0}) on table {1} to user {2}"
+              .format(column[1], column[0], grantee_user))
+        admin_client.execute("refresh authorization")
+        # Recall that by default the Impala client would always attempt to retrieve the
+        # runtime profile after query execution. The following verifies except for the
+        # case in which both views were created by a non-superuser, 'grantee_user' will
+        # not be able to retrieve the runtime profile even though the SELECT query could
+        # be executed. Note that no masked privilege request would be registered when
+        # both views were created by a non-superuser.
+        if v2_created_by_non_superuser is False or v1_created_by_non_superuser is False:
+          result = self.execute_query_expect_failure(non_owner_client, test_select_query)
+          assert profile_error in str(result)
+        else:
+          non_owner_client.execute(test_select_query)
+
+        # Once we grant to 'grantee_user' the privileges on the tables and columns for
+        # which the masked privilege requests were registered, query could be executed
+        # and the runtime profile could be retrieved.
+        for table in priv_req_masked_tables:
+          admin_client.execute("grant select on table {0} to user {1}"
+              .format(table, grantee_user))
+        for column in priv_req_masked_columns:
+          admin_client.execute("grant select ({0}) on table {1} to user {2}"
+              .format(column[1], column[0], grantee_user))
+        admin_client.execute("refresh authorization")
+        non_owner_client.execute(test_select_query)
+      finally:
+        for column in priv_req_columns:
+          admin_client.execute("revoke select ({0}) on table {1} from user {2}"
+              .format(column[1], column[0], grantee_user))
+        if v2_created_by_non_superuser is True:
+          self.run_stmt_in_hive("alter view {0} unset tblproperties ('Authorized')"
+              .format(v2_name))
+          admin_client.execute("invalidate metadata {0}".format(v2_name))
+        if v1_created_by_non_superuser is True:
+          self.run_stmt_in_hive("alter view {0} unset tblproperties ('Authorized')"
+              .format(v1_name))
+          admin_client.execute("invalidate metadata {0}".format(v1_name))
+        for table in priv_req_masked_tables:
+          admin_client.execute("revoke select on table {0} from user {1}"
+              .format(table, grantee_user))
+        for column in priv_req_masked_columns:
+          admin_client.execute("revoke select ({0}) on table {1} from user {2}"
+              .format(column[1], column[0], grantee_user))
+        admin_client.execute("refresh authorization")
+
+  def _test_view_on_view_all_configs(self, unique_name):
+    """
+    This verifies 4 possible combinations of the table property of 'Authorized' when a
+    view (v2) is defined on top of another view (v1) for both the classic planner and the
+    Calcite planner.
+    The expected behavior could be summarized as follows.
+    1. In order to execute the SELECT query against v2, the requesting user always has
+       to have the SELECT privilege on v2, or the SELECT privilege on the selected column
+       in v2.
+    2. For a view v that was created by a superuser, i.e., v does not have the table
+       property of 'Authorized' set to "false", privilege requests for the underlying
+       tables, views, and the columns of v would be registered as the masked ones,
+       meaning that the requesting user does not have to be granted the privileges on
+       those referenced resources by v to execute a query against v.
+    3. However, if there is any registered masked privilege request for any table or
+       column on which the requesting user does not have the privilege, the requesting
+       user will not be able to retrieve the runtime profile.
+    """
+    admin_client = self.create_impala_client(user=ADMIN)
+    unique_database = unique_name + "_db"
+    unique_table = unique_database + "." + unique_name + "_tbl"
+    unique_view_1 = unique_database + "." + unique_name + "_v1"
+    unique_view_2 = unique_database + "." + unique_name + "_v2"
+    planner_options = [True, False]
+    try:
+      # Set up a temporary database, a table, and 2 views.
+      admin_client.execute("drop database if exists {0} cascade"
+          .format(unique_database))
+      admin_client.execute("create database {0}".format(unique_database))
+      admin_client.execute("create table {0} (id int)".format(unique_table))
+      admin_client.execute("create view {0} as select * from {1}"
+          .format(unique_view_1, unique_table))
+      admin_client.execute("create view {0} as select * from {1}"
+          .format(unique_view_2, unique_view_1))
+
+      for use_calcite_planner in planner_options:
+        self._test_view_on_view(use_calcite_planner, False, False,
+            unique_view_2, unique_view_1,
+            [(unique_view_2, "id")],
+            [unique_view_1, unique_table],
+            [(unique_view_1, "id"), (unique_table, "id")])
+
+        self._test_view_on_view(use_calcite_planner, False, True,
+            unique_view_2, unique_view_1,
+            [(unique_view_2, "id")],
+            [unique_view_1, unique_table],
+            [(unique_view_1, "id"), (unique_table, "id")])
+
+        self._test_view_on_view(use_calcite_planner, True, False,
+            unique_view_2, unique_view_1,
+            [(unique_view_2, "id"), (unique_view_1, "id")],
+            [unique_table],
+            [(unique_table, "id")])
+
+        self._test_view_on_view(use_calcite_planner, True, True,
+            unique_view_2, unique_view_1,
+            [(unique_view_2, "id"), (unique_view_1, "id"), (unique_table, "id")],
+            [],
+            [])
+
+    finally:
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database))
+
+  def _test_table_masking_calcite_frontend(self, unique_name):
+    """
+    This verifies table masking is not yet supported by the Calcite planner.
+    """
+    grantee_user = "non_owner"
+    with self.create_impala_client(user=ADMIN) as admin_client, \
+        self.create_impala_client(user=grantee_user) as non_owner_client:
+      non_owner_client.set_configuration({"use_calcite_planner": 1})
+      database = "functional"
+      table_1 = "alltypes"
+      table_2 = "alltypestiny"
+      test_select_query_1 = "select id from {0}.{1}".format(database, table_1)
+      test_select_query_2 = "select id from {0}.{1}".format(database, table_2)
+      select_error = "UnsupportedFeatureException: Column masking and row filtering " \
+          "are not yet supported by the Calcite planner."
+
+      policy_cnt = 0
+      try:
+        TestRanger._add_column_masking_policy(
+          unique_name + str(policy_cnt), grantee_user, database, table_1, "id",
+          "CUSTOM", "id * 100")
+        policy_cnt += 1
+
+        admin_client.execute("grant select (id) on table {0}.{1} to user {2}"
+            .format(database, table_1, grantee_user))
+        result = self.execute_query_expect_failure(non_owner_client, test_select_query_1)
+        assert select_error in str(result)
+
+        TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), grantee_user, database, table_2, "id % 2 = 0")
+        policy_cnt += 1
+
+        admin_client.execute("grant select (id) on table {0}.{1} to user {2}"
+            .format(database, table_1, grantee_user))
+        result = self.execute_query_expect_failure(non_owner_client, test_select_query_2)
+        assert select_error in str(result)
+      finally:
+        admin_client.execute("revoke select (id) on table {0}.{1} from user {2}"
+            .format(database, table_1, grantee_user))
+        admin_client.execute("revoke select (id) on table {0}.{1} from user {2}"
+            .format(database, table_2, grantee_user))
+        for i in range(policy_cnt):
+          TestRanger._remove_policy(unique_name + str(i))
+
 
 class TestRangerIndependent(TestRanger):
   """
@@ -3361,3 +3612,23 @@ class TestRangerIcebergRestCatalog(TestRanger):
       finally:
         self._remove_policy("column-masking-for-airports_parquet")
         self._remove_policy("row-filtering-for-airports_parquet")
+
+
+@CustomClusterTestSuite.with_args(
+    start_args="--env_vars=USE_CALCITE_PLANNER=true",
+    impalad_args=IMPALAD_ARGS,
+    catalogd_args=CATALOGD_ARGS)
+class TestRangerWithCalcite(TestRanger):
+  """
+  Tests for verifying the behavior of the Calcite planner with respect to
+  authorization via the Ranger server.
+  """
+
+  def test_select_calcite_frontend(self, unique_name):
+    self._test_select_calcite_frontend(unique_name)
+
+  def test_view_on_view_all_configs(self, unique_name):
+    self._test_view_on_view_all_configs(unique_name)
+
+  def test_table_masking_calcite_frontend(self, unique_name):
+    self._test_table_masking_calcite_frontend(unique_name)

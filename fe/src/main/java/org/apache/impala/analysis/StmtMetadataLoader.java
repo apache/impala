@@ -79,6 +79,10 @@ public class StmtMetadataLoader {
   // Number of catalog topic updates received from the statestore.
   private int numCatalogUpdatesReceived_ = 0;
 
+  // Set to true if the query requires column masking or row filtering.
+  // We should remove this after IMPALA-14295 is resolved.
+  private boolean needsAnyTableMasksInQuery_ = false;
+
   /**
    * Contains all statement-relevant tables and database names as well as the latest
    * ImpaladCatalog. An entry in the tables map is guaranteed to point to a loaded
@@ -90,12 +94,14 @@ public class StmtMetadataLoader {
     public final FeCatalog catalog;
     public final Set<String> dbs;
     public final Map<TableName, FeTable> tables;
+    public final boolean needsAnyTableMasksInQuery_;
 
     public StmtTableCache(FeCatalog catalog, Set<String> dbs,
-        Map<TableName, FeTable> tables) {
+        Map<TableName, FeTable> tables, boolean needsAnyTableMasksInQuery) {
       this.catalog = Preconditions.checkNotNull(catalog);
       this.dbs = Preconditions.checkNotNull(dbs);
       this.tables = Preconditions.checkNotNull(tables);
+      this.needsAnyTableMasksInQuery_ = needsAnyTableMasksInQuery;
       validate();
     }
 
@@ -182,7 +188,8 @@ public class StmtMetadataLoader {
             loadedOrFailedTbls_.size()));
       }
       fe_.getImpaladTableUsageTracker().recordTableUsage(loadedOrFailedTbls_.keySet());
-      return new StmtTableCache(catalog, dbs_, loadedOrFailedTbls_);
+      return new StmtTableCache(catalog, dbs_, loadedOrFailedTbls_,
+          needsAnyTableMasksInQuery_);
     }
 
     if (timeline_ != null) timeline_.markEvent("Metadata load started");
@@ -299,7 +306,8 @@ public class StmtMetadataLoader {
       }
     }
     fe_.getImpaladTableUsageTracker().recordTableUsage(loadedOrFailedTbls_.keySet());
-    return new StmtTableCache(catalog, dbs_, loadedOrFailedTbls_);
+    return new StmtTableCache(catalog, dbs_, loadedOrFailedTbls_,
+        needsAnyTableMasksInQuery_);
   }
 
   /**
@@ -405,11 +413,15 @@ public class StmtMetadataLoader {
         SelectStmt stmt = tableMask.createColumnMaskStmt(
             col.getName(), col.getType(), /*authzCtx*/ null);
         if (stmt == null) continue;
+        needsAnyTableMasksInQuery_ = true;
         tableNames.addAll(collectTableCandidates(stmt));
       }
       // Use authzCtx=null to avoid audits and privilege checks.
       SelectStmt filterStmt = tableMask.createRowFilterStmt(/*authzCtx*/null);
-      if (filterStmt != null) tableNames.addAll(collectTableCandidates(filterStmt));
+      if (filterStmt != null) {
+        needsAnyTableMasksInQuery_ = true;
+        tableNames.addAll(collectTableCandidates(filterStmt));
+      }
     }
     return tableNames;
   }

@@ -39,16 +39,25 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
+import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
 import org.apache.impala.calcite.schema.ImpalaCalciteCatalogReader;
 import org.apache.impala.calcite.type.ImpalaTypeCoercionFactory;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.calcite.validate.ImpalaConformance;
+import org.apache.impala.catalog.FeCatalog;
+import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ParseException;
+import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.planner.PlannerContext;
 import org.apache.impala.planner.SingleNodePlannerIntf;
 import org.apache.impala.thrift.TQueryCtx;
@@ -70,7 +79,7 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
 
   public RelDataTypeFactory typeFactory_;
 
-  public SqlValidator sqlValidator_;
+  public ImpalaSqlValidatorImpl sqlValidator_;
 
   // CalciteCatalogReader is a context class that holds global information that
   // may be needed by the CalciteTable object
@@ -99,6 +108,11 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
   @Override
   public AnalysisResult analyze() {
     try {
+      if (stmtTableCache_.needsAnyTableMasksInQuery_) {
+        throw new UnsupportedFeatureException("Column masking and row filtering are " +
+            "not yet supported by the Calcite planner.");
+      }
+
       reader_ = CalciteMetadataHandler.createCalciteCatalogReader(stmtTableCache_,
           queryCtx_, queryCtx_.session.database);
       // When CalciteRelNodeConverter#convert() is called to convert the valid AST into a
@@ -112,7 +126,7 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
           stmtTableCache_, analyzer_);
 
       typeFactory_ = new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
-      sqlValidator_ = SqlValidatorUtil.newValidator(
+      sqlValidator_ = new ImpalaSqlValidatorImpl(
           ImpalaOperatorTable.getInstance(),
           reader_, typeFactory_,
           SqlValidator.Config.DEFAULT
@@ -121,8 +135,24 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
               .withIdentifierExpansion(true)
               .withConformance(ImpalaConformance.INSTANCE)
               .withTypeCoercionEnabled(true)
-              .withTypeCoercionFactory(new ImpalaTypeCoercionFactory())
-              );
+              .withTypeCoercionFactory(new ImpalaTypeCoercionFactory()),
+          analyzer_);
+
+      // Register the privilege requests for the tables directly referenced in the given
+      // query as well as those for the tables and columns referenced by the views.
+      // We do not pass stmtTableCache_.tables.keySet() to registerPrivReqsInTables()
+      // because given a table from stmtTableCache_.tables.keySet(), we do not know
+      // whether the table is referenced directly in the query or is referenced by a view
+      // in the query.
+      registerPrivReqsInTables(parsedStmt_.getTablesInQuery(/* loader */ null),
+          /* shouldMaskPrivChecks */ false, stmtTableCache_.catalog, sqlValidator_);
+
+      // sqlValidator_.validate() would also register privilege requests for the columns
+      // directly referenced in the query. We do this after the above call because in the
+      // case when some columns directly referenced in the query could not be resolved,
+      // we still need to register the privilege requests for tables and columns
+      // referenced by views assuming that those tables and columns referenced by views
+      // could be successfully resolved.
       validatedNode_ = sqlValidator_.validate(parsedStmt_.getParsedSqlNode());
       return new CalciteAnalysisResult(this);
     } catch (ImpalaException e) {
@@ -161,5 +191,81 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
 
   public ParsedStatement getParsedStmt() {
     return parsedStmt_;
+  }
+
+  /**
+   * This method registers the privilege requests for the tables referenced in the given
+   * query as well as the tables and columns referenced by the views in the given query.
+   */
+  private void registerPrivReqsInTables(Set<TableName> tableNamesInQuery,
+      boolean shouldMaskPrivChecks, FeCatalog catalog, ImpalaSqlValidatorImpl validator)
+      throws ParseException {
+
+    for (TableName tableName : tableNamesInQuery) {
+      FeTable feTable = registerTablePrivReq(tableName, catalog);
+
+      if (feTable instanceof FeView) {
+        String sql = ((FeView) feTable).getQueryStmt().toSql();
+        CalciteQueryParser queryParser = new CalciteQueryParser(sql);
+        SqlNode parsedSqlNode = queryParser.parse();
+        CalciteMetadataHandler.TableVisitor tableVisitor =
+            new CalciteMetadataHandler.TableVisitor(/* currentDb */ "default");
+        parsedSqlNode.accept(tableVisitor);
+
+        boolean childViewCreatedBySuperuser =
+            !PrivilegeRequestBuilder.isViewCreatedByNonSuperuser(feTable);
+        // Recall that 'shouldMaskPrivChecks' denotes whether we should mask the
+        // privilege requests during privilege request registration for the given
+        // TableName's. We should mask the privilege requests for a child view if
+        // 'shouldMaskPrivChecks' is true, or the child view was created by a superuser.
+        // This matches what the classic Impala frontend does. Refer to
+        // InlineViewRef#analyze() for what the classic Impala frontend does to analyze
+        // a regular view (or a view whose isCatalogView() evaluates to true) and to
+        // IMPALA-10122 (Part 2) for further details.
+        if (shouldMaskPrivChecks || childViewCreatedBySuperuser) {
+          // This sets 'maskPrivChecks_' of 'analyzer_' to true so that during the
+          // following calls to validator.validate() and registerTablePrivReq() in the
+          // recursive call, the privilege requests would be registered as masked ones,
+          // which allows the requesting user to SELECT the requested columns and tables
+          // even though the requesting user does not have the SELECT privilege on them.
+          analyzer_.setMaskPrivChecks(null);
+        }
+        // Register privilege requests for columns referenced by the child view.
+        validator.validate(parsedSqlNode);
+
+        // Recurse if 'feTable' is also a view. Note that the privilege requests for the
+        // tables referenced by 'feTable' will be registered within the recursive call.
+        registerPrivReqsInTables(tableVisitor.tableNames_,
+            shouldMaskPrivChecks || childViewCreatedBySuperuser, catalog, validator);
+
+        // Set 'maskPrivChecks_' back to false in this case because we do not know if
+        // other child views were created by a superuser too.
+        if (!shouldMaskPrivChecks && childViewCreatedBySuperuser) {
+          analyzer_.unsetMaskPrivChecks();
+        }
+      }
+    }
+  }
+
+  private FeTable registerTablePrivReq(TableName tableName, FeCatalog catalog) {
+    FeTable feTable = getFeTable(tableName, catalog);
+    if (feTable == null) {
+      analyzer_.registerPrivReq(builder -> {
+        builder.onTableUnknownOwner(tableName.getDb(), tableName.getTbl())
+            .allOf(Privilege.SELECT);
+        return builder.build();
+      });
+    } else {
+      analyzer_.registerAuthAndAuditEvent(feTable, Privilege.SELECT);
+    }
+    return feTable;
+  }
+
+  private FeTable getFeTable(TableName tableName, FeCatalog catalog) {
+    FeDb db = catalog.getDb(tableName.getDb());
+    if (db == null) {
+      return null;
+    }
+    return db.getTable(tableName.getTbl());
   }
 }

@@ -19,6 +19,8 @@ package org.apache.impala.analysis;
 
 import java.util.Set;
 
+import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
+
 /**
  * ParsedStatement interface that holds the parsed query statement.
  *
@@ -41,4 +43,8 @@ public interface ParsedStatement {
 
   // returns the sql string (could be rewritten)
   public String toSql();
+
+  // Could be overridden to handle an AuthorizationException thrown for a registered
+  // masked privilege request.
+  public void handleAuthorizationException(AnalysisResult analysisResult);
 }

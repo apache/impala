@@ -76,4 +76,10 @@ public class ParsedStatementImpl implements ParsedStatement {
   public String toSql() {
     return stmt_.toSql();
   }
+
+  @Override
+  public void handleAuthorizationException(
+      AnalysisContext.AnalysisResult analysisResult) {
+    stmt_.handleAuthorizationException(analysisResult);
+  }
 }

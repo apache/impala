@@ -26,6 +26,7 @@ import org.apache.impala.analysis.AnalysisDriver;
 import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.StmtMetadataLoader;
+import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TQueryCtx;
 
@@ -82,7 +83,16 @@ public class CalciteParsedStatement implements ParsedStatement {
     return sql_;
   }
 
+  @Override
+  public void handleAuthorizationException(
+      AnalysisContext.AnalysisResult analysisResult) {
+    // Do nothing.
+  }
+
   public SqlNode getParsedSqlNode() {
-    return parsedNode_;
+    // Return a clone of 'parsedNode_' to maintain the immutability of 'parsedNode_'.
+    // This prevents other instances, e.g.,
+    // 'sqlValidator_' in CalciteAnalysisDriver#analyze() from modifying 'parsedNode_'.
+    return parsedNode_.clone(parsedNode_);
   }
 }

@@ -189,7 +189,7 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
         if (!Strings.isNullOrEmpty(maskedReq.second)) {
           throw new AuthorizationException(maskedReq.second);
         } else {
-          analysisResult.getStmt().handleAuthorizationException(analysisResult);
+          analysisResult.getParsedStmt().handleAuthorizationException(analysisResult);
         }
         break;
       } finally {

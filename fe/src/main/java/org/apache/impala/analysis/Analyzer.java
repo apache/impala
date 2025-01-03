@@ -4183,6 +4183,10 @@ public class Analyzer {
     authErrorMsg_ = errMsg;
   }
 
+  public void unsetMaskPrivChecks() {
+    maskPrivChecks_ = false;
+  }
+
   public void setEnablePrivChecks(boolean value) { enablePrivChecks_ = value; }
   public void setIsStraightJoin() { isStraightJoin_ = true; }
   public boolean isStraightJoin() { return isStraightJoin_; }

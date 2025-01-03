@@ -87,12 +87,11 @@ public class CalciteDb extends AbstractSchema {
       RelDataType rowType = CalciteTable.buildColumnsForRelDataType(feTable);
       JavaTypeFactory typeFactory = (JavaTypeFactory) ImpalaTypeSystemImpl.TYPE_FACTORY;
       Type elementType = typeFactory.getJavaClass(rowType);
-      return new ViewTable(elementType, RelDataTypeImpl.proto(rowType),
-          ((FeView) feTable).getQueryStmt().toSql(),
+      return new ImpalaViewTable(elementType,
+          RelDataTypeImpl.proto(rowType), ((FeView) feTable).getQueryStmt().toSql(),
           /* schemaPath */ ImmutableList.of(),
-          /* viewPath */
-          ImmutableList.of(
-              feTable.getDb().getName().toLowerCase(), feTable.getName().toLowerCase()));
+          /* viewPath */ ImmutableList.of(feTable.getDb().getName().toLowerCase(),
+          feTable.getName().toLowerCase()), (FeView) feTable);
     }
 
     public CalciteDb build() {
