@@ -641,11 +641,6 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   initial_range_actual_reservation_stats_ =
       PROFILE_InitialRangeActualReservation.Instantiate(runtime_profile());
 
-  uncompressed_bytes_read_per_column_counter_ =
-      PROFILE_ParquetUncompressedBytesReadPerColumn.Instantiate(runtime_profile());
-  compressed_bytes_read_per_column_counter_ =
-      PROFILE_ParquetCompressedBytesReadPerColumn.Instantiate(runtime_profile());
-
   bytes_read_local_ = PROFILE_BytesReadLocal.Instantiate(runtime_profile());
   bytes_read_short_circuit_ =
       PROFILE_BytesReadShortCircuit.Instantiate(runtime_profile());
@@ -1259,15 +1254,21 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
   {
     shared_lock<shared_mutex> bytes_read_per_col_guard_read_lock(
         bytes_read_per_col_lock_);
-    for (const auto& bytes_read : bytes_read_per_col_) {
-      int64_t uncompressed_bytes_read = bytes_read.second.uncompressed_bytes_read.Load();
-      if (uncompressed_bytes_read > 0) {
-        uncompressed_bytes_read_per_column_counter_->UpdateCounter(
-            uncompressed_bytes_read);
-      }
-      int64_t compressed_bytes_read = bytes_read.second.compressed_bytes_read.Load();
-      if (compressed_bytes_read > 0) {
-        compressed_bytes_read_per_column_counter_->UpdateCounter(compressed_bytes_read);
+    if (!bytes_read_per_col_.empty()) {
+      auto uncompressed_bytes_counter =
+          PROFILE_ParquetUncompressedBytesReadPerColumn.Instantiate(runtime_profile());
+      auto compressed_bytes_counter =
+          PROFILE_ParquetCompressedBytesReadPerColumn.Instantiate(runtime_profile());
+      for (const auto& bytes_read : bytes_read_per_col_) {
+        int64_t uncompressed_bytes_read =
+            bytes_read.second.uncompressed_bytes_read.Load();
+        if (uncompressed_bytes_read > 0) {
+          uncompressed_bytes_counter->UpdateCounter(uncompressed_bytes_read);
+        }
+        int64_t compressed_bytes_read = bytes_read.second.compressed_bytes_read.Load();
+        if (compressed_bytes_read > 0) {
+          compressed_bytes_counter->UpdateCounter(compressed_bytes_read);
+        }
       }
     }
   }

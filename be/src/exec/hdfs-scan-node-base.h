@@ -785,10 +785,6 @@ class HdfsScanNodeBase : public ScanNode {
   RuntimeProfile::Counter* hdfs_open_file_timer_ = nullptr;
   RuntimeProfile::SummaryStatsCounter* initial_range_ideal_reservation_stats_ = nullptr;
   RuntimeProfile::SummaryStatsCounter* initial_range_actual_reservation_stats_ = nullptr;
-  RuntimeProfile::SummaryStatsCounter* compressed_bytes_read_per_column_counter_ =
-      nullptr;
-  RuntimeProfile::SummaryStatsCounter* uncompressed_bytes_read_per_column_counter_ =
-      nullptr;
 
   /// HDFS read thread concurrency bucket: bucket[i] refers to the number of sample
   /// taken where there are i concurrent hdfs read thread running. Created in Open().
