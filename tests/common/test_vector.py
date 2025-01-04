@@ -199,28 +199,32 @@ class ImpalaTestMatrix(object):
     else:
       raise ValueError('Unknown exploration strategy: %s' % exploration_strategy)
 
-  def embed_independent_exec_options(self, vector_values):
-    if not self.independent_exec_option_names:
-      return vector_values
+  def __deepcopy_vector_values(self, vector_values):
+    """Return a deepcopy of vector_values and merge exec options declared through
+    add_exec_option_dimension() into 'exec_option' dimension."""
     values = []
     exec_values = []
     exec_option = None
     for val in vector_values:
       if val.name == EXEC_OPTION_KEY:
+        # 'exec_option' is a map. We need to deepcopy the value for each vector.
         exec_option = deepcopy(val.value)
       elif val.name in self.independent_exec_option_names:
+        # save this to merge into exec_option later.
         exec_values.append(val)
       else:
         values.append(val)
-    assert exec_option is not None, (
-      "Must have '" + EXEC_OPTION_KEY + "' dimension previously declared!")
-    for val in exec_values:
-      exec_option[val.name] = val.value
-    values.append(ImpalaTestVector.Value(EXEC_OPTION_KEY, exec_option))
+    if self.independent_exec_option_names:
+      assert exec_option is not None, (
+        "Must have '" + EXEC_OPTION_KEY + "' dimension previously declared!")
+      for val in exec_values:
+        exec_option[val.name] = val.value
+    if exec_option:
+      values.append(ImpalaTestVector.Value(EXEC_OPTION_KEY, exec_option))
     return values
 
   def __generate_exhaustive_combinations(self):
-    return [ImpalaTestVector(self.embed_independent_exec_options(vec))
+    return [ImpalaTestVector(self.__deepcopy_vector_values(vec))
       for vec in product(*self.__extract_vector_values()) if self.is_valid(vec)]
 
   def __generate_pairwise_combinations(self):
@@ -231,7 +235,7 @@ class ImpalaTestMatrix(object):
     # results will be the same.
     if len(self.dimensions) == 1:
       return self.__generate_exhaustive_combinations()
-    return [ImpalaTestVector(self.embed_independent_exec_options(vec))
+    return [ImpalaTestVector(self.__deepcopy_vector_values(vec))
       for vec in all_pairs(self.__extract_vector_values(), filter_func=self.is_valid)]
 
   def add_constraint(self, constraint_func):

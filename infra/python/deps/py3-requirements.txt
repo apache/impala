@@ -30,3 +30,7 @@ pylint == 2.10.2
   platformdirs == 2.4.1
   typing-extensions == 3.10.0.2
 k5test==0.10.3
+
+# Below are needed only for dev
+flake8==3.9.2
+flake8-unused-arguments==0.0.13

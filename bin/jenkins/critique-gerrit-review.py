@@ -51,6 +51,7 @@ import venv
 FLAKE8_VERSION = "7.1.1"
 FLAKE8_DIFF_VERSION = "0.2.2"
 PYPARSING_VERSION = "3.1.4"
+FLAKE8_UNUSED_ARG_VERSION = "0.0.13"
 
 VENV_PATH = "gerrit_critic_venv"
 VENV_BIN = os.path.join(VENV_PATH, "bin")
@@ -131,7 +132,8 @@ def setup_virtualenv():
               "wheel",
               f"flake8=={FLAKE8_VERSION}",
               f"flake8-diff=={FLAKE8_DIFF_VERSION}",
-              f"pyparsing=={PYPARSING_VERSION}"])
+              f"pyparsing=={PYPARSING_VERSION}",
+              f"flake8-unused-arguments=={FLAKE8_UNUSED_ARG_VERSION}"])
   # Add the libpath of the installed venv to import pyparsing
   sys.path.append(os.path.join(VENV_PATH, f"lib/python{sys.version_info.major}."
                                           f"{sys.version_info.minor}/site-packages/"))
@@ -346,7 +348,7 @@ def extract_thrift_defs_of_revision(revision, file_name):
   return extract_thrift_defs(contents)
 
 
-def get_catalog_compatibility_comments(base_revision, revision, dryrun=False):
+def get_catalog_compatibility_comments(base_revision, revision):
   """Get comments on Thrift/FlatBuffers changes that might break the communication
   between impalad and catalogd/statestore"""
   comments = defaultdict(lambda: [])
@@ -451,7 +453,7 @@ if __name__ == "__main__":
   comments = get_flake8_comments(base_revision, revision)
   merge_comments(comments, get_misc_comments(base_revision, revision, args.dryrun))
   merge_comments(
-    comments, get_catalog_compatibility_comments(base_revision, revision, args.dryrun))
+    comments, get_catalog_compatibility_comments(base_revision, revision))
   merge_comments(comments, get_planner_tests_comments())
   review_input = {"comments": comments}
   if len(comments) > 0:
