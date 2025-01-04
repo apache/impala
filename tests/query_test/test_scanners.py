@@ -67,10 +67,23 @@ DEBUG_ACTION_DIMS = [None,
   '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
 
 # Trigger injected soft limit failures when scanner threads check memory limit.
-DEBUG_ACTION_DIMS.append('HDFS_SCANNER_THREAD_CHECK_SOFT_MEM_LIMIT:FAIL@0.5')
+DEBUG_ACTION_SCAN_MULTITHREAD = ['HDFS_SCANNER_THREAD_CHECK_SOFT_MEM_LIMIT:FAIL@0.5']
+DEBUG_ACTION_DIMS.extend(DEBUG_ACTION_SCAN_MULTITHREAD)
 
 MT_DOP_VALUES = [0, 1, 4]
 BATCH_SIZES = [0, 1, 16]
+
+
+def scan_multithread_constraint(vector):
+  opts = vector.get_value('exec_option')
+  if vector.get_value('mt_dop') and 'debug_action' in opts:
+    # DEBUG_ACTION_SCAN_MULTITHREAD exist inside HdfsScanNode (hdfs-scan-node.cc)
+    # code path. MT_DOP > 0 executes using HdfsScanNodeMt (hdfs-scan-node-mt.cc) rather
+    # than HdfsScanNode, and always start single scanner thread per ScanNode.
+    # Thus, no need to exercise DEBUG_ACTION_SCAN_MULTITHREAD.
+    return (vector.get_value('mt_dop') == 0
+        or opts['debug_action'] not in DEBUG_ACTION_SCAN_MULTITHREAD)
+  return True
 
 
 class TestScannersAllTableFormats(ImpalaTestSuite):
@@ -89,6 +102,7 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         batch_sizes=BATCH_SIZES, debug_action_options=DEBUG_ACTION_DIMS))
     add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
+    cls.ImpalaTestMatrix.add_constraint(scan_multithread_constraint)
 
   def test_scanners(self, vector):
     self.run_test_case('QueryTest/scanners', vector)
@@ -227,6 +241,7 @@ class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension(batch_sizes=[100]))
     add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
+    cls.ImpalaTestMatrix.add_constraint(scan_multithread_constraint)
 
   def test_limit(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 1
@@ -266,6 +281,7 @@ class TestScannersMixedTableFormats(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
         batch_sizes=BATCH_SIZES, debug_action_options=DEBUG_ACTION_DIMS))
     add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
+    cls.ImpalaTestMatrix.add_constraint(scan_multithread_constraint)
 
   def test_mixed_format(self, vector):
     self.run_test_case('QueryTest/mixed-format', vector)
