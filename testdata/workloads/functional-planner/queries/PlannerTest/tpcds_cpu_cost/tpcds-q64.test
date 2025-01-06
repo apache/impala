@@ -977,13 +977,13 @@ max-parallelism=1460 segment-costs=[14553075383, 7852642112] cpu-comparison-resu
 |  |  |
 |  |  F50:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=10 instances=10 (adjusted from 120)
 |  |  Per-Instance Resources: mem-estimate=15.92MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=10 segment-costs=[1165376, 4278] cpu-comparison-result=240 [max(10 (self) vs 240 (sum children))]
+|  |  max-parallelism=10 segment-costs=[16706552, 4278] cpu-comparison-result=240 [max(10 (self) vs 240 (sum children))]
 |  |  130:AGGREGATE [FINALIZE]
 |  |  |  output: sum:merge(cs_ext_list_price), sum:merge(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  |  group by: cs_item_sk
 |  |  |  having: sum(cs_ext_list_price) > CAST(2 AS DECIMAL(3,0)) * sum(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  |  |  tuple-ids=27 row-size=36B cardinality=36.02K cost=1065715
+|  |  |  tuple-ids=27 row-size=36B cardinality=36.02K cost=16606891
 |  |  |  in pipelines: 130(GETNEXT), 41(OPEN)
 |  |  |
 |  |  129:EXCHANGE [HASH(cs_item_sk)]
@@ -1730,13 +1730,13 @@ max-parallelism=1650 segment-costs=[5515620261, 16408784776] cpu-comparison-resu
 |  |
 |  F24:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=15.92MB mem-reservation=2.88MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[1165376, 4278] cpu-comparison-result=240 [max(10 (self) vs 240 (sum children))]
+|  max-parallelism=10 segment-costs=[16706552, 4278] cpu-comparison-result=240 [max(10 (self) vs 240 (sum children))]
 |  103:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(cs_ext_list_price), sum:merge(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  group by: cs_item_sk
 |  |  having: sum(cs_ext_list_price) > CAST(2 AS DECIMAL(3,0)) * sum(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=4 row-size=36B cardinality=36.02K cost=1065715
+|  |  tuple-ids=4 row-size=36B cardinality=36.02K cost=16606891
 |  |  in pipelines: 103(GETNEXT), 02(OPEN)
 |  |
 |  102:EXCHANGE [HASH(cs_item_sk)]
@@ -2528,13 +2528,13 @@ max-parallelism=1460 segment-costs=[14553075383, 7852642112] cpu-comparison-resu
 |  |  |
 |  |  F50:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=10 instances=10 (adjusted from 120)
 |  |  Per-Instance Resources: mem-estimate=15.92MB mem-reservation=2.88MB thread-reservation=1
-|  |  max-parallelism=10 segment-costs=[1165376, 4278] cpu-comparison-result=240 [max(10 (self) vs 240 (sum children))]
+|  |  max-parallelism=10 segment-costs=[16706552, 4278] cpu-comparison-result=240 [max(10 (self) vs 240 (sum children))]
 |  |  130:AGGREGATE [FINALIZE]
 |  |  |  output: sum:merge(cs_ext_list_price), sum:merge(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  |  group by: cs_item_sk
 |  |  |  having: sum(cs_ext_list_price) > CAST(2 AS DECIMAL(3,0)) * sum(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  |  |  tuple-ids=27 row-size=36B cardinality=36.02K cost=1065715
+|  |  |  tuple-ids=27 row-size=36B cardinality=36.02K cost=16606891
 |  |  |  in pipelines: 130(GETNEXT), 41(OPEN)
 |  |  |
 |  |  129:EXCHANGE [HASH(cs_item_sk)]
@@ -3281,13 +3281,13 @@ max-parallelism=1650 segment-costs=[5515620261, 16408784776] cpu-comparison-resu
 |  |
 |  F24:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=15.92MB mem-reservation=2.88MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[1165376, 4278] cpu-comparison-result=240 [max(10 (self) vs 240 (sum children))]
+|  max-parallelism=10 segment-costs=[16706552, 4278] cpu-comparison-result=240 [max(10 (self) vs 240 (sum children))]
 |  103:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(cs_ext_list_price), sum:merge(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  group by: cs_item_sk
 |  |  having: sum(cs_ext_list_price) > CAST(2 AS DECIMAL(3,0)) * sum(cr_refunded_cash + cr_reversed_charge + cr_store_credit)
 |  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=4 row-size=36B cardinality=36.02K cost=1065715
+|  |  tuple-ids=4 row-size=36B cardinality=36.02K cost=16606891
 |  |  in pipelines: 103(GETNEXT), 02(OPEN)
 |  |
 |  102:EXCHANGE [HASH(cs_item_sk)]

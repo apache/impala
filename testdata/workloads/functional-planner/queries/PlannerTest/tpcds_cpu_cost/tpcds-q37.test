@@ -21,7 +21,7 @@ Max Per-Host Resource Reservation: Memory=73.19MB Threads=1
 Per-Host Resource Estimates: Memory=15.46GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=15.46GB mem-reservation=73.19MB thread-reservation=1 runtime-filters-memory=3.00MB
-|  max-parallelism=1 segment-costs=[3569042618, 3746309, 300]
+|  max-parallelism=1 segment-costs=[1835847060, 3746309, 300]
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_current_price
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=300
@@ -35,7 +35,7 @@ PLAN-ROOT SINK
 07:AGGREGATE [FINALIZE]
 |  group by: i_item_id, i_item_desc, i_current_price
 |  mem-estimate=14.34GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=145B cardinality=360.00K cost=2261230622
+|  tuple-ids=4 row-size=145B cardinality=360.00K cost=528035064
 |  in pipelines: 07(GETNEXT), 01(OPEN)
 |
 06:HASH JOIN [INNER JOIN]
@@ -133,7 +133,7 @@ PLAN-ROOT SINK
 |
 F05:PLAN FRAGMENT [HASH(i_item_id,i_item_desc,i_current_price)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=32.38MB mem-reservation=8.50MB thread-reservation=1
-max-parallelism=10 segment-costs=[2404388, 3746309, 410] cpu-comparison-result=171 [max(10 (self) vs 171 (sum children))]
+max-parallelism=10 segment-costs=[61262587, 3746309, 410] cpu-comparison-result=171 [max(10 (self) vs 171 (sum children))]
 08:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC
 |  mem-estimate=14.12KB mem-reservation=0B thread-reservation=0
@@ -143,7 +143,7 @@ max-parallelism=10 segment-costs=[2404388, 3746309, 410] cpu-comparison-result=1
 14:AGGREGATE [FINALIZE]
 |  group by: i_item_id, i_item_desc, i_current_price
 |  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=4 row-size=145B cardinality=360.00K cost=2124936
+|  tuple-ids=4 row-size=145B cardinality=360.00K cost=60983135
 |  in pipelines: 14(GETNEXT), 01(OPEN)
 |
 13:EXCHANGE [HASH(i_item_id,i_item_desc,i_current_price)]
@@ -153,11 +153,11 @@ max-parallelism=10 segment-costs=[2404388, 3746309, 410] cpu-comparison-result=1
 |
 F03:PLAN FRAGMENT [HASH(inv_item_sk)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=374.01MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=310 segment-costs=[3091790738, 3537867] cpu-comparison-result=171 [max(160 (self) vs 171 (sum children))]
+max-parallelism=160 segment-costs=[1552568949, 3537867] cpu-comparison-result=171 [max(160 (self) vs 171 (sum children))]
 07:AGGREGATE [STREAMING]
 |  group by: i_item_id, i_item_desc, i_current_price
 |  mem-estimate=357.58MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=145B cardinality=360.00K cost=2261230622
+|  tuple-ids=4 row-size=145B cardinality=360.00K cost=722008833
 |  in pipelines: 01(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -208,7 +208,7 @@ max-parallelism=310 segment-costs=[3091790738, 3537867] cpu-comparison-result=17
 |
 |--F08:PLAN FRAGMENT [HASH(inv_item_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=34.43MB mem-reservation=18.00MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=310 segment-costs=[10666348] cpu-comparison-result=160 [max(160 (self) vs 14 (sum children))]
+|  |  max-parallelism=160 segment-costs=[10666348] cpu-comparison-result=160 [max(160 (self) vs 14 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: i_item_sk
@@ -316,7 +316,7 @@ PLAN-ROOT SINK
 |
 F05:PLAN FRAGMENT [HASH(i_item_id,i_item_desc,i_current_price)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=32.38MB mem-reservation=8.50MB thread-reservation=1
-max-parallelism=10 segment-costs=[2404388, 3746309, 410] cpu-comparison-result=171 [max(10 (self) vs 171 (sum children))]
+max-parallelism=10 segment-costs=[61262587, 3746309, 410] cpu-comparison-result=171 [max(10 (self) vs 171 (sum children))]
 08:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC
 |  mem-estimate=14.12KB mem-reservation=0B thread-reservation=0
@@ -326,7 +326,7 @@ max-parallelism=10 segment-costs=[2404388, 3746309, 410] cpu-comparison-result=1
 14:AGGREGATE [FINALIZE]
 |  group by: i_item_id, i_item_desc, i_current_price
 |  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=4 row-size=145B cardinality=360.00K cost=2124936
+|  tuple-ids=4 row-size=145B cardinality=360.00K cost=60983135
 |  in pipelines: 14(GETNEXT), 01(OPEN)
 |
 13:EXCHANGE [HASH(i_item_id,i_item_desc,i_current_price)]
@@ -336,11 +336,11 @@ max-parallelism=10 segment-costs=[2404388, 3746309, 410] cpu-comparison-result=1
 |
 F03:PLAN FRAGMENT [HASH(inv_item_sk)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=374.01MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=310 segment-costs=[3091790738, 3537867] cpu-comparison-result=171 [max(160 (self) vs 171 (sum children))]
+max-parallelism=160 segment-costs=[1552568949, 3537867] cpu-comparison-result=171 [max(160 (self) vs 171 (sum children))]
 07:AGGREGATE [STREAMING]
 |  group by: i_item_id, i_item_desc, i_current_price
 |  mem-estimate=357.58MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=145B cardinality=360.00K cost=2261230622
+|  tuple-ids=4 row-size=145B cardinality=360.00K cost=722008833
 |  in pipelines: 01(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -391,7 +391,7 @@ max-parallelism=310 segment-costs=[3091790738, 3537867] cpu-comparison-result=17
 |
 |--F08:PLAN FRAGMENT [HASH(inv_item_sk)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=34.43MB mem-reservation=18.00MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=310 segment-costs=[10666348] cpu-comparison-result=160 [max(160 (self) vs 14 (sum children))]
+|  |  max-parallelism=160 segment-costs=[10666348] cpu-comparison-result=160 [max(160 (self) vs 14 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: i_item_sk

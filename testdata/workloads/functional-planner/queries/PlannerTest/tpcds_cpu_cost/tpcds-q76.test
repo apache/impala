@@ -216,7 +216,7 @@ PLAN-ROOT SINK
 |
 F11:PLAN FRAGMENT [HASH(channel,col_name,d_year,d_qoy,i_category)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=19.63MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[453253, 640746, 225] cpu-comparison-result=185 [max(10 (self) vs 185 (sum children))]
+max-parallelism=10 segment-costs=[12578841, 640746, 225] cpu-comparison-result=185 [max(10 (self) vs 185 (sum children))]
 17:TOP-N [LIMIT=100]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
 |  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
@@ -227,7 +227,7 @@ max-parallelism=10 segment-costs=[453253, 640746, 225] cpu-comparison-result=185
 |  output: count:merge(*), sum:merge(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=70.56K cost=421426
+|  tuple-ids=11 row-size=74B cardinality=70.56K cost=12547014
 |  in pipelines: 26(GETNEXT), 01(OPEN), 06(OPEN), 11(OPEN)
 |
 25:EXCHANGE [HASH(channel,col_name,d_year,d_qoy,i_category)]
@@ -527,7 +527,7 @@ PLAN-ROOT SINK
 |
 F12:PLAN FRAGMENT [HASH(channel,col_name,d_year,d_qoy,i_category)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=19.63MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[453253, 640746, 225] cpu-comparison-result=190 [max(10 (self) vs 190 (sum children))]
+max-parallelism=10 segment-costs=[12578841, 640746, 225] cpu-comparison-result=190 [max(10 (self) vs 190 (sum children))]
 17:TOP-N [LIMIT=100]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
 |  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
@@ -538,7 +538,7 @@ max-parallelism=10 segment-costs=[453253, 640746, 225] cpu-comparison-result=190
 |  output: count:merge(*), sum:merge(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=11 row-size=74B cardinality=70.56K cost=421426
+|  tuple-ids=11 row-size=74B cardinality=70.56K cost=12547014
 |  in pipelines: 27(GETNEXT), 01(OPEN), 06(OPEN), 11(OPEN)
 |
 26:EXCHANGE [HASH(channel,col_name,d_year,d_qoy,i_category)]

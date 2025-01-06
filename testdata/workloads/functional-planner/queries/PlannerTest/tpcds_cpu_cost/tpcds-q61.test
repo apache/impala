@@ -329,7 +329,7 @@ Max Per-Host Resource Reservation: Memory=451.50MB Threads=42
 Per-Host Resource Estimates: Memory=1.04GB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[0, 0, 3] cpu-comparison-result=170 [max(1 (self) vs 170 (sum children))]
+|  max-parallelism=1 segment-costs=[8, 0, 3] cpu-comparison-result=170 [max(1 (self) vs 170 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: promotions, total, CAST(promotions AS DECIMAL(15,4)) / CAST(total AS DECIMAL(15,4)) * CAST(100 AS DECIMAL(3,0))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=3
@@ -360,11 +360,11 @@ PLAN-ROOT SINK
 |  |
 |  F16:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=96.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[0, 1] cpu-comparison-result=80 [max(1 (self) vs 80 (sum children))]
+|  max-parallelism=1 segment-costs=[8, 1] cpu-comparison-result=80 [max(1 (self) vs 80 (sum children))]
 |  44:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_ext_sales_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=15 row-size=16B cardinality=1 cost=0
+|  |  tuple-ids=15 row-size=16B cardinality=1 cost=8
 |  |  in pipelines: 44(GETNEXT), 25(OPEN)
 |  |
 |  43:EXCHANGE [UNPARTITIONED]
@@ -594,7 +594,7 @@ PLAN-ROOT SINK
 36:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=7 row-size=16B cardinality=1 cost=0
+|  tuple-ids=7 row-size=16B cardinality=1 cost=8
 |  in pipelines: 36(GETNEXT), 13(OPEN)
 |
 35:EXCHANGE [UNPARTITIONED]
@@ -861,7 +861,7 @@ Max Per-Host Resource Reservation: Memory=451.50MB Threads=42
 Per-Host Resource Estimates: Memory=1.04GB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[0, 0, 3] cpu-comparison-result=170 [max(1 (self) vs 170 (sum children))]
+|  max-parallelism=1 segment-costs=[8, 0, 3] cpu-comparison-result=170 [max(1 (self) vs 170 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: promotions, total, CAST(promotions AS DECIMAL(15,4)) / CAST(total AS DECIMAL(15,4)) * CAST(100 AS DECIMAL(3,0))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=3
@@ -892,11 +892,11 @@ PLAN-ROOT SINK
 |  |
 |  F16:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=96.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[0, 1] cpu-comparison-result=80 [max(1 (self) vs 80 (sum children))]
+|  max-parallelism=1 segment-costs=[8, 1] cpu-comparison-result=80 [max(1 (self) vs 80 (sum children))]
 |  44:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_ext_sales_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=15 row-size=16B cardinality=1 cost=0
+|  |  tuple-ids=15 row-size=16B cardinality=1 cost=8
 |  |  in pipelines: 44(GETNEXT), 25(OPEN)
 |  |
 |  43:EXCHANGE [UNPARTITIONED]
@@ -1126,7 +1126,7 @@ PLAN-ROOT SINK
 36:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=7 row-size=16B cardinality=1 cost=0
+|  tuple-ids=7 row-size=16B cardinality=1 cost=8
 |  in pipelines: 36(GETNEXT), 13(OPEN)
 |
 35:EXCHANGE [UNPARTITIONED]

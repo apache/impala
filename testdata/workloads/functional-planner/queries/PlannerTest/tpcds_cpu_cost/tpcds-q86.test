@@ -177,7 +177,7 @@ max-parallelism=10 segment-costs=[2733, 6626, 162] cpu-comparison-result=120 [ma
 |
 F03:PLAN FRAGMENT [HASH(CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_category) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(NULL) END,CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_class) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) END)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=47.38MB mem-reservation=7.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[6688, 6048, 3481] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+max-parallelism=10 segment-costs=[170416, 6048, 3481] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 06:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(3,4,5) IN (CAST(3 AS INT), CAST(4 AS INT), CAST(5 AS INT)), CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN sum(ws_net_paid) WHEN CAST(4 AS INT) THEN sum(ws_net_paid) WHEN CAST(5 AS INT) THEN sum(ws_net_paid) END), aggif(valid_tid(3,4,5) IN (CAST(3 AS INT), CAST(4 AS INT), CAST(5 AS INT)), CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(4 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(5 AS INT) THEN CAST(1 AS TINYINT) END), aggif(valid_tid(3,4,5) IN (CAST(3 AS INT), CAST(4 AS INT), CAST(5 AS INT)), CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(4 AS INT) THEN CAST(1 AS TINYINT) WHEN CAST(5 AS INT) THEN CAST(1 AS TINYINT) END)
 |  group by: CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN i_category WHEN CAST(4 AS INT) THEN i_category WHEN CAST(5 AS INT) THEN NULL END, CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN i_class WHEN CAST(4 AS INT) THEN NULL WHEN CAST(5 AS INT) THEN NULL END, CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN CAST(3 AS INT) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) END
@@ -196,7 +196,7 @@ max-parallelism=10 segment-costs=[6688, 6048, 3481] cpu-comparison-result=120 [m
 |    output: sum:merge(ws_net_paid)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
-|  tuple-ids=3N,4N,5N row-size=140B cardinality=1.00K cost=5861
+|  tuple-ids=3N,4N,5N row-size=140B cardinality=1.00K cost=169589
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
 12:EXCHANGE [HASH(CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_category) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(NULL) END,CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_class) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) END)]
@@ -354,7 +354,7 @@ max-parallelism=10 segment-costs=[2733, 6626, 162] cpu-comparison-result=120 [ma
 |
 F03:PLAN FRAGMENT [HASH(CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_category) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(NULL) END,CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_class) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) END)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=47.38MB mem-reservation=7.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[6688, 6048, 3481] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+max-parallelism=10 segment-costs=[170416, 6048, 3481] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 06:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(3,4,5) IN (CAST(3 AS INT), CAST(4 AS INT), CAST(5 AS INT)), CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN sum(ws_net_paid) WHEN CAST(4 AS INT) THEN sum(ws_net_paid) WHEN CAST(5 AS INT) THEN sum(ws_net_paid) END), aggif(valid_tid(3,4,5) IN (CAST(3 AS INT), CAST(4 AS INT), CAST(5 AS INT)), CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(4 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(5 AS INT) THEN CAST(1 AS TINYINT) END), aggif(valid_tid(3,4,5) IN (CAST(3 AS INT), CAST(4 AS INT), CAST(5 AS INT)), CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(4 AS INT) THEN CAST(1 AS TINYINT) WHEN CAST(5 AS INT) THEN CAST(1 AS TINYINT) END)
 |  group by: CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN i_category WHEN CAST(4 AS INT) THEN i_category WHEN CAST(5 AS INT) THEN NULL END, CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN i_class WHEN CAST(4 AS INT) THEN NULL WHEN CAST(5 AS INT) THEN NULL END, CASE valid_tid(3,4,5) WHEN CAST(3 AS INT) THEN CAST(3 AS INT) WHEN CAST(4 AS INT) THEN CAST(4 AS INT) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) END
@@ -373,7 +373,7 @@ max-parallelism=10 segment-costs=[6688, 6048, 3481] cpu-comparison-result=120 [m
 |    output: sum:merge(ws_net_paid)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
-|  tuple-ids=3N,4N,5N row-size=140B cardinality=1.00K cost=5861
+|  tuple-ids=3N,4N,5N row-size=140B cardinality=1.00K cost=169589
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
 12:EXCHANGE [HASH(CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_category) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(NULL) END,CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_class) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) END)]

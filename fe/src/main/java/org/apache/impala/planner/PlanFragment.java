@@ -631,49 +631,6 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     return result;
   }
 
-  /**
-   * Estimate the number of distinct values of exprs per fragment instance accounting
-   * for the likelihood of duplicate keys across fragment instances (see IMPALA-2945).
-   * We currently only use this estimate for CPU costing when CPC is enabled but we
-   * should use this approach more broadly for resource estimates because the approach
-   * in getPerInstanceNdv() ignores dups and can underestimate badly especially for low
-   * NDV.
-   */
-  public long getPerInstanceNdvForCpuCosting(long inputCardinality, List<Expr> exprs) {
-    Preconditions.checkState(inputCardinality > -1);
-
-    long result = 1;
-    int numInstances = getNumInstancesForCosting();
-    Preconditions.checkState(numInstances >= 0);
-    // TODO: Should we use AggregationNode.DEFAULT_SKEW_FACTOR when calculating
-    // per instance input cardinality here?
-    long perInstanceInputCardinality =
-        (long) Math.ceil(((double) inputCardinality / numInstances));
-    for (Expr expr : exprs) {
-      long exprGlobalNdv = expr.getNumDistinctValues();
-      if (exprGlobalNdv == -1) {
-        // A worst-case cardinality is better than an unknown cardinality.
-        exprGlobalNdv = inputCardinality;
-      }
-      // Estimate the per instance NDV for this expr accounting for the probability of
-      // duplicates
-      double probGivenValueIncludedInFragment = 1.0
-          - Math.pow(((double) (exprGlobalNdv - 1) / exprGlobalNdv),
-                perInstanceInputCardinality);
-      long exprPerInstanceNdv = (long) (probGivenValueIncludedInFragment * exprGlobalNdv);
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Expr per instance NDV: " + exprPerInstanceNdv
-            + ", expr: " + expr.debugString() + ", Input Cardinality: " + inputCardinality
-            + ", perInstanceInputCardinality: " + perInstanceInputCardinality);
-      }
-      // Include in combined NDV
-      result = PlanNode.checkedMultiply(result, exprPerInstanceNdv);
-    }
-
-    if (result > inputCardinality) result = inputCardinality;
-    return result;
-  }
-
   public TPlanFragment toThrift() {
     validateResourceProfiles();
     TPlanFragment result = new TPlanFragment();

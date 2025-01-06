@@ -255,7 +255,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(d_week_seq)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=24.18MB mem-reservation=7.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[41974, 30745, 16097] cpu-comparison-result=262 [max(10 (self) vs 262 (sum children))]
+max-parallelism=10 segment-costs=[944496, 30745, 16097] cpu-comparison-result=262 [max(10 (self) vs 262 (sum children))]
 17:SORT
 |  order by: d_week_seq1 ASC
 |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
@@ -286,7 +286,7 @@ max-parallelism=10 segment-costs=[41974, 30745, 16097] cpu-comparison-result=262
 |  |
 |  F10:PLAN FRAGMENT [HASH(d_week_seq)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=24.18MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[41974, 26273] cpu-comparison-result=131 [max(10 (self) vs 131 (sum children))]
+|  max-parallelism=10 segment-costs=[944496, 26273] cpu-comparison-result=131 [max(10 (self) vs 131 (sum children))]
 |  15:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash-table-id=01
 |  |  hash predicates: d_week_seq = date_dim.d_week_seq
@@ -329,7 +329,7 @@ max-parallelism=10 segment-costs=[41974, 30745, 16097] cpu-comparison-result=262
 |  |  output: sum:merge(CASE WHEN (d_day_name = 'Sunday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Monday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Tuesday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Wednesday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Thursday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Friday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Saturday') THEN sales_price ELSE NULL END)
 |  |  group by: d_week_seq
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16 row-size=116B cardinality=10.64K cost=35114
+|  |  tuple-ids=16 row-size=116B cardinality=10.64K cost=937636
 |  |  in pipelines: 24(GETNEXT), 09(OPEN), 10(OPEN)
 |  |
 |  23:EXCHANGE [HASH(d_week_seq)]
@@ -459,7 +459,7 @@ max-parallelism=10 segment-costs=[41974, 30745, 16097] cpu-comparison-result=262
 |  output: sum:merge(CASE WHEN (d_day_name = 'Sunday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Monday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Tuesday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Wednesday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Thursday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Friday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Saturday') THEN sales_price ELSE NULL END)
 |  group by: d_week_seq
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=116B cardinality=10.64K cost=35114
+|  tuple-ids=6 row-size=116B cardinality=10.64K cost=937636
 |  in pipelines: 20(GETNEXT), 01(OPEN), 02(OPEN)
 |
 19:EXCHANGE [HASH(d_week_seq)]
@@ -562,7 +562,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(d_week_seq)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=24.18MB mem-reservation=7.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[41974, 30745, 16097] cpu-comparison-result=262 [max(10 (self) vs 262 (sum children))]
+max-parallelism=10 segment-costs=[944496, 30745, 16097] cpu-comparison-result=262 [max(10 (self) vs 262 (sum children))]
 17:SORT
 |  order by: d_week_seq1 ASC
 |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
@@ -593,7 +593,7 @@ max-parallelism=10 segment-costs=[41974, 30745, 16097] cpu-comparison-result=262
 |  |
 |  F10:PLAN FRAGMENT [HASH(d_week_seq)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=24.18MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[41974, 26273] cpu-comparison-result=131 [max(10 (self) vs 131 (sum children))]
+|  max-parallelism=10 segment-costs=[944496, 26273] cpu-comparison-result=131 [max(10 (self) vs 131 (sum children))]
 |  15:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash-table-id=01
 |  |  hash predicates: d_week_seq = date_dim.d_week_seq
@@ -636,7 +636,7 @@ max-parallelism=10 segment-costs=[41974, 30745, 16097] cpu-comparison-result=262
 |  |  output: sum:merge(CASE WHEN (d_day_name = 'Sunday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Monday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Tuesday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Wednesday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Thursday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Friday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Saturday') THEN sales_price ELSE NULL END)
 |  |  group by: d_week_seq
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16 row-size=116B cardinality=10.64K cost=35114
+|  |  tuple-ids=16 row-size=116B cardinality=10.64K cost=937636
 |  |  in pipelines: 24(GETNEXT), 09(OPEN), 10(OPEN)
 |  |
 |  23:EXCHANGE [HASH(d_week_seq)]
@@ -766,7 +766,7 @@ max-parallelism=10 segment-costs=[41974, 30745, 16097] cpu-comparison-result=262
 |  output: sum:merge(CASE WHEN (d_day_name = 'Sunday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Monday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Tuesday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Wednesday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Thursday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Friday') THEN sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Saturday') THEN sales_price ELSE NULL END)
 |  group by: d_week_seq
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=116B cardinality=10.64K cost=35114
+|  tuple-ids=6 row-size=116B cardinality=10.64K cost=937636
 |  in pipelines: 20(GETNEXT), 01(OPEN), 02(OPEN)
 |
 19:EXCHANGE [HASH(d_week_seq)]

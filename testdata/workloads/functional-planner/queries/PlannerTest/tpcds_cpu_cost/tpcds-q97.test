@@ -130,7 +130,7 @@ Max Per-Host Resource Reservation: Memory=2.15GB Threads=53
 Per-Host Resource Estimates: Memory=48.64GB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[0, 0] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
+|  max-parallelism=1 segment-costs=[25, 0] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -139,7 +139,7 @@ PLAN-ROOT SINK
 |  output: sum:merge(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NULL THEN 1 ELSE 0 END), sum:merge(CASE WHEN ssci.customer_sk IS NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END), sum:merge(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END)
 |  limit: 100
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=1 cost=0
+|  tuple-ids=8 row-size=24B cardinality=1 cost=25
 |  in pipelines: 17(GETNEXT), 09(OPEN)
 |
 16:EXCHANGE [UNPARTITIONED]
@@ -318,7 +318,7 @@ Max Per-Host Resource Reservation: Memory=2.15GB Threads=53
 Per-Host Resource Estimates: Memory=48.64GB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[0, 0] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
+|  max-parallelism=1 segment-costs=[25, 0] cpu-comparison-result=240 [max(1 (self) vs 240 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -327,7 +327,7 @@ PLAN-ROOT SINK
 |  output: sum:merge(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NULL THEN 1 ELSE 0 END), sum:merge(CASE WHEN ssci.customer_sk IS NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END), sum:merge(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END)
 |  limit: 100
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=1 cost=0
+|  tuple-ids=8 row-size=24B cardinality=1 cost=25
 |  in pipelines: 17(GETNEXT), 09(OPEN)
 |
 16:EXCHANGE [UNPARTITIONED]

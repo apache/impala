@@ -267,12 +267,12 @@ max-parallelism=20 segment-costs=[155192524, 803] cpu-comparison-result=210 [max
 |  |
 |  F13:PLAN FRAGMENT [HASH(ctr2.ctr_state)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=10.13MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[159, 5] cpu-comparison-result=90 [max(10 (self) vs 90 (sum children))]
+|  max-parallelism=10 segment-costs=[1935, 5] cpu-comparison-result=90 [max(10 (self) vs 90 (sum children))]
 |  33:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ctr_total_return)
 |  |  group by: ctr2.ctr_state
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=13 row-size=30B cardinality=51 cost=147
+|  |  tuple-ids=13 row-size=30B cardinality=51 cost=1923
 |  |  in pipelines: 33(GETNEXT), 31(OPEN)
 |  |
 |  32:EXCHANGE [HASH(ctr2.ctr_state)]
@@ -656,12 +656,12 @@ max-parallelism=20 segment-costs=[155192524, 803] cpu-comparison-result=210 [max
 |  |
 |  F13:PLAN FRAGMENT [HASH(ctr2.ctr_state)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=10.13MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[159, 5] cpu-comparison-result=90 [max(10 (self) vs 90 (sum children))]
+|  max-parallelism=10 segment-costs=[1935, 5] cpu-comparison-result=90 [max(10 (self) vs 90 (sum children))]
 |  33:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ctr_total_return)
 |  |  group by: ctr2.ctr_state
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=13 row-size=30B cardinality=51 cost=147
+|  |  tuple-ids=13 row-size=30B cardinality=51 cost=1923
 |  |  in pipelines: 33(GETNEXT), 31(OPEN)
 |  |
 |  32:EXCHANGE [HASH(ctr2.ctr_state)]

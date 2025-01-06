@@ -188,7 +188,7 @@ Max Per-Host Resource Reservation: Memory=791.45MB Threads=23
 Per-Host Resource Estimates: Memory=984MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[0, 0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  max-parallelism=1 segment-costs=[33, 0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: avg(ss_quantity), avg(ss_ext_sales_price), avg(ss_ext_wholesale_cost), sum(ss_ext_wholesale_cost)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -196,7 +196,7 @@ PLAN-ROOT SINK
 18:AGGREGATE [FINALIZE]
 |  output: avg:merge(ss_quantity), avg:merge(ss_ext_sales_price), avg:merge(ss_ext_wholesale_cost), sum:merge(ss_ext_wholesale_cost)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=7 row-size=40B cardinality=1 cost=0
+|  tuple-ids=7 row-size=40B cardinality=1 cost=33
 |  in pipelines: 18(GETNEXT), 11(OPEN)
 |
 17:EXCHANGE [UNPARTITIONED]
@@ -420,7 +420,7 @@ Max Per-Host Resource Reservation: Memory=791.45MB Threads=23
 Per-Host Resource Estimates: Memory=984MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[0, 0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  max-parallelism=1 segment-costs=[33, 0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: avg(ss_quantity), avg(ss_ext_sales_price), avg(ss_ext_wholesale_cost), sum(ss_ext_wholesale_cost)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -428,7 +428,7 @@ PLAN-ROOT SINK
 18:AGGREGATE [FINALIZE]
 |  output: avg:merge(ss_quantity), avg:merge(ss_ext_sales_price), avg:merge(ss_ext_wholesale_cost), sum:merge(ss_ext_wholesale_cost)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=7 row-size=40B cardinality=1 cost=0
+|  tuple-ids=7 row-size=40B cardinality=1 cost=33
 |  in pipelines: 18(GETNEXT), 11(OPEN)
 |
 17:EXCHANGE [UNPARTITIONED]

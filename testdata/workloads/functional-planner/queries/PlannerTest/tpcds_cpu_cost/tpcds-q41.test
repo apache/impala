@@ -56,7 +56,7 @@ Max Per-Host Resource Reservation: Memory=5.31MB Threads=1
 Per-Host Resource Estimates: Memory=42MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=42.00MB mem-reservation=5.31MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[171817, 333592, 307206, 100]
+|  max-parallelism=1 segment-costs=[171856, 338134, 307206, 100]
 PLAN-ROOT SINK
 |  output exprs: (i_product_name)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=100
@@ -70,7 +70,7 @@ PLAN-ROOT SINK
 04:AGGREGATE [FINALIZE]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=4 row-size=35B cardinality=36.00K cost=99847
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=104389
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 03:HASH JOIN [LEFT OUTER JOIN]
@@ -86,7 +86,7 @@ PLAN-ROOT SINK
 |  |  group by: i_manufact
 |  |  having: zeroifnull(count(*)) > CAST(0 AS BIGINT)
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=18 cost=477
+|  |  tuple-ids=2 row-size=31B cardinality=18 cost=516
 |  |  in pipelines: 02(GETNEXT), 01(OPEN)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
@@ -131,7 +131,7 @@ PLAN-ROOT SINK
 |
 F03:PLAN FRAGMENT [HASH((i_product_name))] hosts=4 instances=4
 Per-Instance Resources: mem-estimate=10.45MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=4 segment-costs=[112992, 307206, 122] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
+max-parallelism=4 segment-costs=[114160, 307206, 122] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 05:TOP-N [LIMIT=100]
 |  order by: (i_product_name) ASC
 |  mem-estimate=3.40KB mem-reservation=0B thread-reservation=0
@@ -141,7 +141,7 @@ max-parallelism=4 segment-costs=[112992, 307206, 122] cpu-comparison-result=4 [m
 10:AGGREGATE [FINALIZE]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=35B cardinality=36.00K cost=103221
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=104389
 |  in pipelines: 10(GETNEXT), 00(OPEN)
 |
 09:EXCHANGE [HASH((i_product_name))]
@@ -151,11 +151,11 @@ max-parallelism=4 segment-costs=[112992, 307206, 122] cpu-comparison-result=4 [m
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 Per-Instance Resources: mem-estimate=26.61MB mem-reservation=2.50MB thread-reservation=1
-max-parallelism=4 segment-costs=[336948, 99346] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
+max-parallelism=4 segment-costs=[338116, 99346] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 04:AGGREGATE [STREAMING]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=35B cardinality=36.00K cost=103221
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=104389
 |  in pipelines: 00(GETNEXT)
 |
 03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -182,13 +182,13 @@ max-parallelism=4 segment-costs=[336948, 99346] cpu-comparison-result=4 [max(4 (
 |  |
 |  F02:PLAN FRAGMENT [HASH(i_manufact)] hosts=4 instances=4
 |  Per-Instance Resources: mem-estimate=10.14MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=4 segment-costs=[555, 1] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
+|  max-parallelism=4 segment-costs=[561, 1] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 |  07:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: i_manufact
 |  |  having: zeroifnull(count(*)) > CAST(0 AS BIGINT)
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=18 cost=510
+|  |  tuple-ids=2 row-size=31B cardinality=18 cost=516
 |  |  in pipelines: 07(GETNEXT), 01(OPEN)
 |  |
 |  06:EXCHANGE [HASH(i_manufact)]
@@ -198,12 +198,12 @@ max-parallelism=4 segment-costs=[336948, 99346] cpu-comparison-result=4 [max(4 (
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 |  Per-Instance Resources: mem-estimate=26.55MB mem-reservation=2.50MB thread-reservation=1
-|  max-parallelism=4 segment-costs=[171850, 450]
+|  max-parallelism=4 segment-costs=[171856, 450]
 |  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: i_manufact
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=178 cost=510
+|  |  tuple-ids=2 row-size=31B cardinality=178 cost=516
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
@@ -248,7 +248,7 @@ PLAN-ROOT SINK
 |
 F03:PLAN FRAGMENT [HASH((i_product_name))] hosts=4 instances=4
 Per-Instance Resources: mem-estimate=10.45MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=4 segment-costs=[112992, 307206, 122] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
+max-parallelism=4 segment-costs=[114160, 307206, 122] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 05:TOP-N [LIMIT=100]
 |  order by: (i_product_name) ASC
 |  mem-estimate=3.40KB mem-reservation=0B thread-reservation=0
@@ -258,7 +258,7 @@ max-parallelism=4 segment-costs=[112992, 307206, 122] cpu-comparison-result=4 [m
 10:AGGREGATE [FINALIZE]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=35B cardinality=36.00K cost=103221
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=104389
 |  in pipelines: 10(GETNEXT), 00(OPEN)
 |
 09:EXCHANGE [HASH((i_product_name))]
@@ -268,11 +268,11 @@ max-parallelism=4 segment-costs=[112992, 307206, 122] cpu-comparison-result=4 [m
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 Per-Instance Resources: mem-estimate=26.61MB mem-reservation=2.50MB thread-reservation=1
-max-parallelism=4 segment-costs=[336948, 99346] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
+max-parallelism=4 segment-costs=[338116, 99346] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 04:AGGREGATE [STREAMING]
 |  group by: (i_product_name)
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=35B cardinality=36.00K cost=103221
+|  tuple-ids=4 row-size=35B cardinality=36.00K cost=104389
 |  in pipelines: 00(GETNEXT)
 |
 03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -299,13 +299,13 @@ max-parallelism=4 segment-costs=[336948, 99346] cpu-comparison-result=4 [max(4 (
 |  |
 |  F02:PLAN FRAGMENT [HASH(i_manufact)] hosts=4 instances=4
 |  Per-Instance Resources: mem-estimate=10.14MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=4 segment-costs=[555, 1] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
+|  max-parallelism=4 segment-costs=[561, 1] cpu-comparison-result=4 [max(4 (self) vs 4 (sum children))]
 |  07:AGGREGATE [FINALIZE]
 |  |  output: count:merge(*)
 |  |  group by: i_manufact
 |  |  having: zeroifnull(count(*)) > CAST(0 AS BIGINT)
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=18 cost=510
+|  |  tuple-ids=2 row-size=31B cardinality=18 cost=516
 |  |  in pipelines: 07(GETNEXT), 01(OPEN)
 |  |
 |  06:EXCHANGE [HASH(i_manufact)]
@@ -315,12 +315,12 @@ max-parallelism=4 segment-costs=[336948, 99346] cpu-comparison-result=4 [max(4 (
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 |  Per-Instance Resources: mem-estimate=26.55MB mem-reservation=2.50MB thread-reservation=1
-|  max-parallelism=4 segment-costs=[171850, 450]
+|  max-parallelism=4 segment-costs=[171856, 450]
 |  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: i_manufact
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2 row-size=31B cardinality=178 cost=510
+|  |  tuple-ids=2 row-size=31B cardinality=178 cost=516
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]

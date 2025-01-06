@@ -23,7 +23,7 @@ Max Per-Host Resource Reservation: Memory=16.75MB Threads=1
 Per-Host Resource Estimates: Memory=54MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=53.88MB mem-reservation=16.75MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  max-parallelism=1 segment-costs=[3286436228, 7914, 900]
+|  max-parallelism=1 segment-costs=[3286411638, 7914, 900]
 PLAN-ROOT SINK
 |  output exprs: s_store_name, s_store_id, sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=900
@@ -38,7 +38,7 @@ PLAN-ROOT SINK
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: s_store_name, s_store_id
 |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=3 row-size=156B cardinality=1.35K cost=1593626782
+|  tuple-ids=3 row-size=156B cardinality=1.35K cost=1593602192
 |  in pipelines: 05(GETNEXT), 01(OPEN)
 |
 04:HASH JOIN [INNER JOIN]
@@ -113,7 +113,7 @@ PLAN-ROOT SINK
 |
 F03:PLAN FRAGMENT [HASH(s_store_name,s_store_id)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=28.76MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[9653, 7914, 439] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+max-parallelism=10 segment-costs=[297875, 7914, 439] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 06:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC, s_store_id ASC, sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
 |  mem-estimate=15.23KB mem-reservation=0B thread-reservation=0
@@ -124,7 +124,7 @@ max-parallelism=10 segment-costs=[9653, 7914, 439] cpu-comparison-result=120 [ma
 |  output: sum:merge(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: s_store_name, s_store_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3 row-size=156B cardinality=1.35K cost=8535
+|  tuple-ids=3 row-size=156B cardinality=1.35K cost=296757
 |  in pipelines: 10(GETNEXT), 01(OPEN)
 |
 09:EXCHANGE [HASH(s_store_name,s_store_id)]
@@ -135,12 +135,12 @@ max-parallelism=10 segment-costs=[9653, 7914, 439] cpu-comparison-result=120 [ma
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=32.25MB mem-reservation=11.00MB thread-reservation=1
-max-parallelism=330 segment-costs=[3290070641, 14252] cpu-comparison-result=120 [max(120 (self) vs 22 (sum children))]
+max-parallelism=330 segment-costs=[3287119871, 14252] cpu-comparison-result=120 [max(120 (self) vs 22 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: s_store_name, s_store_id
 |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=3 row-size=156B cardinality=1.35K cost=1597280466
+|  tuple-ids=3 row-size=156B cardinality=1.35K cost=1594329696
 |  in pipelines: 01(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
@@ -249,7 +249,7 @@ PLAN-ROOT SINK
 |
 F03:PLAN FRAGMENT [HASH(s_store_name,s_store_id)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=28.76MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[9653, 7914, 439] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+max-parallelism=10 segment-costs=[297875, 7914, 439] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 06:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC, s_store_id ASC, sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END) ASC, sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END) ASC
 |  mem-estimate=15.23KB mem-reservation=0B thread-reservation=0
@@ -260,7 +260,7 @@ max-parallelism=10 segment-costs=[9653, 7914, 439] cpu-comparison-result=120 [ma
 |  output: sum:merge(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum:merge(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: s_store_name, s_store_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=3 row-size=156B cardinality=1.35K cost=8535
+|  tuple-ids=3 row-size=156B cardinality=1.35K cost=296757
 |  in pipelines: 10(GETNEXT), 01(OPEN)
 |
 09:EXCHANGE [HASH(s_store_name,s_store_id)]
@@ -271,12 +271,12 @@ max-parallelism=10 segment-costs=[9653, 7914, 439] cpu-comparison-result=120 [ma
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=2.00MB mem-reservation=2.00MB thread-reservation=0 runtime-filters-memory=2.00MB
 Per-Instance Resources: mem-estimate=32.25MB mem-reservation=11.00MB thread-reservation=1
-max-parallelism=330 segment-costs=[3290070641, 14252] cpu-comparison-result=120 [max(120 (self) vs 22 (sum children))]
+max-parallelism=330 segment-costs=[3287119871, 14252] cpu-comparison-result=120 [max(120 (self) vs 22 (sum children))]
 05:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN (d_day_name = 'Sunday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Monday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Tuesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Wednesday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Thursday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Friday') THEN ss_sales_price ELSE NULL END), sum(CASE WHEN (d_day_name = 'Saturday') THEN ss_sales_price ELSE NULL END)
 |  group by: s_store_name, s_store_id
 |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=3 row-size=156B cardinality=1.35K cost=1597280466
+|  tuple-ids=3 row-size=156B cardinality=1.35K cost=1594329696
 |  in pipelines: 01(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]

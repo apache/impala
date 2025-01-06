@@ -294,7 +294,7 @@ PLAN-ROOT SINK
 |  |
 |  F16:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  17:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -305,7 +305,7 @@ PLAN-ROOT SINK
 |  |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  group by: ss_list_price
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=31 row-size=20B cardinality=20.25K cost=59901
+|  |  tuple-ids=31 row-size=20B cardinality=20.25K cost=933670
 |  |  in pipelines: 48(GETNEXT), 15(OPEN)
 |  |
 |  47:EXCHANGE [HASH(ss_list_price)]
@@ -371,7 +371,7 @@ PLAN-ROOT SINK
 |  |
 |  F13:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  14:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -382,7 +382,7 @@ PLAN-ROOT SINK
 |  |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  group by: ss_list_price
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=25 row-size=20B cardinality=20.25K cost=59901
+|  |  tuple-ids=25 row-size=20B cardinality=20.25K cost=933670
 |  |  in pipelines: 43(GETNEXT), 12(OPEN)
 |  |
 |  42:EXCHANGE [HASH(ss_list_price)]
@@ -448,7 +448,7 @@ PLAN-ROOT SINK
 |  |
 |  F10:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  11:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -459,7 +459,7 @@ PLAN-ROOT SINK
 |  |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  group by: ss_list_price
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=19 row-size=20B cardinality=20.25K cost=59901
+|  |  tuple-ids=19 row-size=20B cardinality=20.25K cost=933670
 |  |  in pipelines: 38(GETNEXT), 09(OPEN)
 |  |
 |  37:EXCHANGE [HASH(ss_list_price)]
@@ -525,7 +525,7 @@ PLAN-ROOT SINK
 |  |
 |  F07:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  08:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -536,7 +536,7 @@ PLAN-ROOT SINK
 |  |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  group by: ss_list_price
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=13 row-size=20B cardinality=20.25K cost=59901
+|  |  tuple-ids=13 row-size=20B cardinality=20.25K cost=933670
 |  |  in pipelines: 33(GETNEXT), 06(OPEN)
 |  |
 |  32:EXCHANGE [HASH(ss_list_price)]
@@ -602,7 +602,7 @@ PLAN-ROOT SINK
 |  |
 |  F04:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  05:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -613,7 +613,7 @@ PLAN-ROOT SINK
 |  |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  group by: ss_list_price
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=7 row-size=20B cardinality=20.25K cost=59901
+|  |  tuple-ids=7 row-size=20B cardinality=20.25K cost=933670
 |  |  in pipelines: 28(GETNEXT), 03(OPEN)
 |  |
 |  27:EXCHANGE [HASH(ss_list_price)]
@@ -658,7 +658,7 @@ PLAN-ROOT SINK
 |
 F01:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 02:AGGREGATE
 |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -669,7 +669,7 @@ max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max
 |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  group by: ss_list_price
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1 row-size=20B cardinality=20.25K cost=59901
+|  tuple-ids=1 row-size=20B cardinality=20.25K cost=933670
 |  in pipelines: 24(GETNEXT), 00(OPEN)
 |
 23:EXCHANGE [HASH(ss_list_price)]
@@ -745,7 +745,7 @@ PLAN-ROOT SINK
 |  |
 |  F16:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  17:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -756,7 +756,7 @@ PLAN-ROOT SINK
 |  |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  group by: ss_list_price
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=31 row-size=20B cardinality=20.25K cost=59901
+|  |  tuple-ids=31 row-size=20B cardinality=20.25K cost=933670
 |  |  in pipelines: 48(GETNEXT), 15(OPEN)
 |  |
 |  47:EXCHANGE [HASH(ss_list_price)]
@@ -822,7 +822,7 @@ PLAN-ROOT SINK
 |  |
 |  F13:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  14:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -833,7 +833,7 @@ PLAN-ROOT SINK
 |  |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  group by: ss_list_price
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=25 row-size=20B cardinality=20.25K cost=59901
+|  |  tuple-ids=25 row-size=20B cardinality=20.25K cost=933670
 |  |  in pipelines: 43(GETNEXT), 12(OPEN)
 |  |
 |  42:EXCHANGE [HASH(ss_list_price)]
@@ -899,7 +899,7 @@ PLAN-ROOT SINK
 |  |
 |  F10:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  11:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -910,7 +910,7 @@ PLAN-ROOT SINK
 |  |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  group by: ss_list_price
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=19 row-size=20B cardinality=20.25K cost=59901
+|  |  tuple-ids=19 row-size=20B cardinality=20.25K cost=933670
 |  |  in pipelines: 38(GETNEXT), 09(OPEN)
 |  |
 |  37:EXCHANGE [HASH(ss_list_price)]
@@ -976,7 +976,7 @@ PLAN-ROOT SINK
 |  |
 |  F07:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  08:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -987,7 +987,7 @@ PLAN-ROOT SINK
 |  |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  group by: ss_list_price
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=13 row-size=20B cardinality=20.25K cost=59901
+|  |  tuple-ids=13 row-size=20B cardinality=20.25K cost=933670
 |  |  in pipelines: 33(GETNEXT), 06(OPEN)
 |  |
 |  32:EXCHANGE [HASH(ss_list_price)]
@@ -1053,7 +1053,7 @@ PLAN-ROOT SINK
 |  |
 |  F04:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+|  max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  05:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1064,7 +1064,7 @@ PLAN-ROOT SINK
 |  |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  |  group by: ss_list_price
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=7 row-size=20B cardinality=20.25K cost=59901
+|  |  tuple-ids=7 row-size=20B cardinality=20.25K cost=933670
 |  |  in pipelines: 28(GETNEXT), 03(OPEN)
 |  |
 |  27:EXCHANGE [HASH(ss_list_price)]
@@ -1109,7 +1109,7 @@ PLAN-ROOT SINK
 |
 F01:PLAN FRAGMENT [HASH(ss_list_price)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=12.85MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+max-parallelism=10 segment-costs=[937782, 4252, 2] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 02:AGGREGATE
 |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -1120,7 +1120,7 @@ max-parallelism=10 segment-costs=[64013, 4252, 2] cpu-comparison-result=120 [max
 |  output: avg:merge(ss_list_price), count:merge(ss_list_price)
 |  group by: ss_list_price
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1 row-size=20B cardinality=20.25K cost=59901
+|  tuple-ids=1 row-size=20B cardinality=20.25K cost=933670
 |  in pipelines: 24(GETNEXT), 00(OPEN)
 |
 23:EXCHANGE [HASH(ss_list_price)]

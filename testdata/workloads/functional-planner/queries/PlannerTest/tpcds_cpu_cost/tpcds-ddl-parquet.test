@@ -212,7 +212,7 @@ Max Per-Host Resource Reservation: Memory=10.06MB Threads=2
 Per-Host Resource Estimates: Memory=43MB
 F01:PLAN FRAGMENT [HASH(ss_sold_date_sk)] hosts=10 instances=10
 |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reservation=1
-|  max-parallelism=10 segment-costs=[5373, 1694, 3956795] cpu-comparison-result=10 [max(10 (self) vs 10 (sum children))]
+|  max-parallelism=10 segment-costs=[5592, 1694, 3956795] cpu-comparison-result=10 [max(10 (self) vs 10 (sum children))]
 WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_1_row_per_part, OVERWRITE=false, PARTITION-KEYS=(ss_sold_date_sk)]
 |  partitions=1824
 |  output exprs: count(*), ss_sold_date_sk
@@ -228,7 +228,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_1_row_per_part, OVERWR
 |  output: count:merge(*)
 |  group by: ss_sold_date_sk
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1 row-size=12B cardinality=1.82K cost=5070
+|  tuple-ids=1 row-size=12B cardinality=1.82K cost=5289
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:EXCHANGE [HASH(ss_sold_date_sk)]
@@ -238,12 +238,12 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_1_row_per_part, OVERWR
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=26.62MB mem-reservation=2.12MB thread-reservation=1
-max-parallelism=10 segment-costs=[5541, 2349]
+max-parallelism=10 segment-costs=[5604, 2349]
 01:AGGREGATE [STREAMING]
 |  output: sum_init_zero(tpcds_partitioned_parquet_snap.store_sales.stats: num_rows)
 |  group by: ss_sold_date_sk
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1 row-size=12B cardinality=1.82K cost=5226
+|  tuple-ids=1 row-size=12B cardinality=1.82K cost=5289
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
@@ -264,8 +264,8 @@ select count(*), ss_store_sk, ss_sold_date_sk
 from store_sales group by ss_store_sk, ss_sold_date_sk
 limit 5
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=466.75MB Threads=14
-Per-Host Resource Estimates: Memory=630MB
+Max Per-Host Resource Reservation: Memory=470.62MB Threads=16
+Per-Host Resource Estimates: Memory=677MB
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=6.02MB mem-reservation=6.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[5, 3954244] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
@@ -286,15 +286,15 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_5_part_1_row_per_part,
 |  tuple-ids=1 row-size=16B cardinality=5 cost=0
 |  in pipelines: 03(GETNEXT)
 |
-F01:PLAN FRAGMENT [HASH(ss_store_sk,ss_sold_date_sk)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=14.16MB mem-reservation=4.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[7250411, 7] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+F01:PLAN FRAGMENT [HASH(ss_store_sk,ss_sold_date_sk)] hosts=10 instances=30 (adjusted from 120)
+Per-Instance Resources: mem-estimate=14.16MB mem-reservation=2.88MB thread-reservation=1
+max-parallelism=30 segment-costs=[202012003, 7] cpu-comparison-result=120 [max(30 (self) vs 120 (sum children))]
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: ss_store_sk, ss_sold_date_sk
 |  limit: 5
-|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=5 cost=7030421
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=1 row-size=16B cardinality=5 cost=201792013
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:EXCHANGE [HASH(ss_store_sk,ss_sold_date_sk)]
@@ -303,7 +303,7 @@ max-parallelism=10 segment-costs=[7250411, 7] cpu-comparison-result=120 [max(10 
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=50.78MB mem-reservation=38.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=52.34MB mem-reservation=38.00MB thread-reservation=1
 max-parallelism=1360 segment-costs=[13514707828, 1840920]
 01:AGGREGATE [STREAMING]
 |  output: count(*)

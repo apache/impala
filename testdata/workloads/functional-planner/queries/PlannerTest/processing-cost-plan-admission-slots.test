@@ -79,12 +79,12 @@ max-parallelism=3 segment-costs=[556049, 104] cpu-comparison-result=16 [max(3 (s
 |  |
 |  F09:PLAN FRAGMENT [HASH(ctr2.ctr_store_sk)] hosts=3 instances=3 (adjusted from 384)
 |  Per-Instance Resources: mem-estimate=10.09MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=3 segment-costs=[2, 0] cpu-comparison-result=4 [max(3 (self) vs 4 (sum children))]
+|  max-parallelism=3 segment-costs=[690, 0] cpu-comparison-result=4 [max(3 (self) vs 4 (sum children))]
 |  25:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ctr_total_return)
 |  |  group by: ctr2.ctr_store_sk
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=11 row-size=20B cardinality=6 cost=1
+|  |  tuple-ids=11 row-size=20B cardinality=6 cost=689
 |  |  in pipelines: 25(GETNEXT), 23(OPEN)
 |  |
 |  24:EXCHANGE [HASH(ctr2.ctr_store_sk)]
@@ -94,12 +94,12 @@ max-parallelism=3 segment-costs=[556049, 104] cpu-comparison-result=16 [max(3 (s
 |  |
 |  F08:PLAN FRAGMENT [HASH(sr_customer_sk,sr_store_sk)] hosts=3 instances=3 (adjusted from 384)
 |  Per-Instance Resources: mem-estimate=20.49MB mem-reservation=3.94MB thread-reservation=1
-|  max-parallelism=3 segment-costs=[327730, 20658, 10] cpu-comparison-result=4 [max(3 (self) vs 4 (sum children))]
+|  max-parallelism=3 segment-costs=[327730, 21660, 10] cpu-comparison-result=4 [max(3 (self) vs 4 (sum children))]
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(sum(SR_RETURN_AMT))
 |  |  group by: sr_store_sk
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=10 row-size=20B cardinality=6 cost=20658
+|  |  tuple-ids=10 row-size=20B cardinality=6 cost=21660
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  23:AGGREGATE [FINALIZE]
@@ -408,12 +408,12 @@ max-parallelism=3 segment-costs=[556049, 104] cpu-comparison-result=16 [max(3 (s
 |  |
 |  F09:PLAN FRAGMENT [HASH(ctr2.ctr_store_sk)] hosts=3 instances=3 (adjusted from 384)
 |  Per-Instance Resources: mem-estimate=10.09MB mem-reservation=1.94MB thread-reservation=1
-|  max-parallelism=3 segment-costs=[2, 0] cpu-comparison-result=4 [max(3 (self) vs 4 (sum children))]
+|  max-parallelism=3 segment-costs=[690, 0] cpu-comparison-result=4 [max(3 (self) vs 4 (sum children))]
 |  25:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(ctr_total_return)
 |  |  group by: ctr2.ctr_store_sk
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=11 row-size=20B cardinality=6 cost=1
+|  |  tuple-ids=11 row-size=20B cardinality=6 cost=689
 |  |  in pipelines: 25(GETNEXT), 23(OPEN)
 |  |
 |  24:EXCHANGE [HASH(ctr2.ctr_store_sk)]
@@ -423,12 +423,12 @@ max-parallelism=3 segment-costs=[556049, 104] cpu-comparison-result=16 [max(3 (s
 |  |
 |  F08:PLAN FRAGMENT [HASH(sr_customer_sk,sr_store_sk)] hosts=3 instances=3 (adjusted from 384)
 |  Per-Instance Resources: mem-estimate=20.49MB mem-reservation=3.94MB thread-reservation=1
-|  max-parallelism=3 segment-costs=[327730, 20658, 10] cpu-comparison-result=4 [max(3 (self) vs 4 (sum children))]
+|  max-parallelism=3 segment-costs=[327730, 21660, 10] cpu-comparison-result=4 [max(3 (self) vs 4 (sum children))]
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(sum(SR_RETURN_AMT))
 |  |  group by: sr_store_sk
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=10 row-size=20B cardinality=6 cost=20658
+|  |  tuple-ids=10 row-size=20B cardinality=6 cost=21660
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  23:AGGREGATE [FINALIZE]

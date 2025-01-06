@@ -512,7 +512,7 @@ PLAN-ROOT SINK
 |
 F25:PLAN FRAGMENT [HASH(CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(channel) WHEN 27 THEN murmur_hash(channel) WHEN 28 THEN murmur_hash(NULL) END,CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(id) WHEN 27 THEN murmur_hash(NULL) WHEN 28 THEN murmur_hash(NULL) END)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[265114, 221854, 313895, 220] cpu-comparison-result=441 [max(10 (self) vs 441 (sum children))]
+max-parallelism=10 segment-costs=[265834, 221854, 313895, 220] cpu-comparison-result=441 [max(10 (self) vs 441 (sum children))]
 39:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(26,27,28) WHEN 26 THEN channel WHEN 27 THEN channel WHEN 28 THEN NULL END ASC, CASE valid_tid(26,27,28) WHEN 26 THEN id WHEN 27 THEN NULL WHEN 28 THEN NULL END ASC
 |  mem-estimate=7.03KB mem-reservation=0B thread-reservation=0
@@ -537,7 +537,7 @@ max-parallelism=10 segment-costs=[265114, 221854, 313895, 220] cpu-comparison-re
 |    output: sum:merge(sales), sum:merge(`returns`), sum:merge(profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
-|  tuple-ids=26N,27N,28N row-size=216B cardinality=36.72K cost=221853
+|  tuple-ids=26N,27N,28N row-size=216B cardinality=36.72K cost=222573
 |  in pipelines: 65(GETNEXT), 47(OPEN), 55(OPEN), 63(OPEN)
 |
 64:EXCHANGE [HASH(CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(channel) WHEN 27 THEN murmur_hash(channel) WHEN 28 THEN murmur_hash(NULL) END,CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(id) WHEN 27 THEN murmur_hash(NULL) WHEN 28 THEN murmur_hash(NULL) END)]
@@ -547,7 +547,7 @@ max-parallelism=10 segment-costs=[265114, 221854, 313895, 220] cpu-comparison-re
 |
 F24:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=49.95MB mem-reservation=7.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[2169, 125388, 29, 344492, 567467] cpu-comparison-result=441 [max(10 (self) vs 441 (sum children))]
+max-parallelism=10 segment-costs=[37267, 1628052, 1813, 344492, 567467] cpu-comparison-result=441 [max(10 (self) vs 441 (sum children))]
 37:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(sales), sum(returns), sum(profit)
@@ -571,7 +571,7 @@ max-parallelism=10 segment-costs=[2169, 125388, 29, 344492, 567467] cpu-comparis
 |  |  output: sum:merge(ws_ext_sales_price), sum:merge(coalesce(wr_return_amt, 0)), sum:merge(ws_net_profit - coalesce(wr_net_loss, 0))
 |  |  group by: web_site_id
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=22 row-size=76B cardinality=33 cost=14
+|  |  tuple-ids=22 row-size=76B cardinality=33 cost=1798
 |  |  in pipelines: 63(GETNEXT), 25(OPEN)
 |  |
 |  62:EXCHANGE [HASH(web_site_id)]
@@ -800,7 +800,7 @@ max-parallelism=10 segment-costs=[2169, 125388, 29, 344492, 567467] cpu-comparis
 |  |  output: sum:merge(cs_ext_sales_price), sum:merge(coalesce(cr_return_amount, 0)), sum:merge(cs_net_profit - coalesce(cr_net_loss, 0))
 |  |  group by: cp_catalog_page_id
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=76B cardinality=36.00K cost=108803
+|  |  tuple-ids=14 row-size=76B cardinality=36.00K cost=1611467
 |  |  in pipelines: 55(GETNEXT), 13(OPEN)
 |  |
 |  54:EXCHANGE [HASH(cp_catalog_page_id)]
@@ -810,12 +810,12 @@ max-parallelism=10 segment-costs=[2169, 125388, 29, 344492, 567467] cpu-comparis
 |  |
 |  F10:PLAN FRAGMENT [HASH(cs_item_sk,cs_order_number)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=24.18MB mem-reservation=5.00MB thread-reservation=1
-|  max-parallelism=90 segment-costs=[891170974, 194745] cpu-comparison-result=157 [max(40 (self) vs 157 (sum children))]
+|  max-parallelism=90 segment-costs=[891171287, 194745] cpu-comparison-result=157 [max(40 (self) vs 157 (sum children))]
 |  24:AGGREGATE [STREAMING]
 |  |  output: sum(cs_ext_sales_price), sum(coalesce(cr_return_amount, CAST(0 AS DECIMAL(7,2)))), sum(cs_net_profit - coalesce(cr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  |  group by: cp_catalog_page_id
 |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=76B cardinality=36.00K cost=12273052
+|  |  tuple-ids=14 row-size=76B cardinality=36.00K cost=12273365
 |  |  in pipelines: 13(GETNEXT)
 |  |
 |  23:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1029,7 +1029,7 @@ max-parallelism=10 segment-costs=[2169, 125388, 29, 344492, 567467] cpu-comparis
 |  output: sum:merge(ss_ext_sales_price), sum:merge(coalesce(sr_return_amt, 0)), sum:merge(ss_net_profit - coalesce(sr_net_loss, 0))
 |  group by: s_store_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=76B cardinality=678 cost=1857
+|  tuple-ids=6 row-size=76B cardinality=678 cost=36955
 |  in pipelines: 47(GETNEXT), 01(OPEN)
 |
 46:EXCHANGE [HASH(s_store_id)]
@@ -1272,7 +1272,7 @@ PLAN-ROOT SINK
 |
 F25:PLAN FRAGMENT [HASH(CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(channel) WHEN 27 THEN murmur_hash(channel) WHEN 28 THEN murmur_hash(NULL) END,CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(id) WHEN 27 THEN murmur_hash(NULL) WHEN 28 THEN murmur_hash(NULL) END)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reservation=1
-max-parallelism=10 segment-costs=[265114, 221854, 313895, 220] cpu-comparison-result=441 [max(10 (self) vs 441 (sum children))]
+max-parallelism=10 segment-costs=[265834, 221854, 313895, 220] cpu-comparison-result=441 [max(10 (self) vs 441 (sum children))]
 39:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(26,27,28) WHEN 26 THEN channel WHEN 27 THEN channel WHEN 28 THEN NULL END ASC, CASE valid_tid(26,27,28) WHEN 26 THEN id WHEN 27 THEN NULL WHEN 28 THEN NULL END ASC
 |  mem-estimate=7.03KB mem-reservation=0B thread-reservation=0
@@ -1297,7 +1297,7 @@ max-parallelism=10 segment-costs=[265114, 221854, 313895, 220] cpu-comparison-re
 |    output: sum:merge(sales), sum:merge(`returns`), sum:merge(profit)
 |    group by: NULL, NULL
 |  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
-|  tuple-ids=26N,27N,28N row-size=216B cardinality=36.72K cost=221853
+|  tuple-ids=26N,27N,28N row-size=216B cardinality=36.72K cost=222573
 |  in pipelines: 65(GETNEXT), 47(OPEN), 55(OPEN), 63(OPEN)
 |
 64:EXCHANGE [HASH(CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(channel) WHEN 27 THEN murmur_hash(channel) WHEN 28 THEN murmur_hash(NULL) END,CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(id) WHEN 27 THEN murmur_hash(NULL) WHEN 28 THEN murmur_hash(NULL) END)]
@@ -1307,7 +1307,7 @@ max-parallelism=10 segment-costs=[265114, 221854, 313895, 220] cpu-comparison-re
 |
 F24:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=49.95MB mem-reservation=7.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[2169, 125388, 29, 344492, 567467] cpu-comparison-result=441 [max(10 (self) vs 441 (sum children))]
+max-parallelism=10 segment-costs=[37267, 1628052, 1813, 344492, 567467] cpu-comparison-result=441 [max(10 (self) vs 441 (sum children))]
 37:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(sales), sum(returns), sum(profit)
@@ -1331,7 +1331,7 @@ max-parallelism=10 segment-costs=[2169, 125388, 29, 344492, 567467] cpu-comparis
 |  |  output: sum:merge(ws_ext_sales_price), sum:merge(coalesce(wr_return_amt, 0)), sum:merge(ws_net_profit - coalesce(wr_net_loss, 0))
 |  |  group by: web_site_id
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=22 row-size=76B cardinality=33 cost=14
+|  |  tuple-ids=22 row-size=76B cardinality=33 cost=1798
 |  |  in pipelines: 63(GETNEXT), 25(OPEN)
 |  |
 |  62:EXCHANGE [HASH(web_site_id)]
@@ -1560,7 +1560,7 @@ max-parallelism=10 segment-costs=[2169, 125388, 29, 344492, 567467] cpu-comparis
 |  |  output: sum:merge(cs_ext_sales_price), sum:merge(coalesce(cr_return_amount, 0)), sum:merge(cs_net_profit - coalesce(cr_net_loss, 0))
 |  |  group by: cp_catalog_page_id
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=76B cardinality=36.00K cost=108803
+|  |  tuple-ids=14 row-size=76B cardinality=36.00K cost=1611467
 |  |  in pipelines: 55(GETNEXT), 13(OPEN)
 |  |
 |  54:EXCHANGE [HASH(cp_catalog_page_id)]
@@ -1570,12 +1570,12 @@ max-parallelism=10 segment-costs=[2169, 125388, 29, 344492, 567467] cpu-comparis
 |  |
 |  F10:PLAN FRAGMENT [HASH(cs_item_sk,cs_order_number)] hosts=10 instances=10 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=24.18MB mem-reservation=5.00MB thread-reservation=1
-|  max-parallelism=90 segment-costs=[891170974, 194745] cpu-comparison-result=157 [max(40 (self) vs 157 (sum children))]
+|  max-parallelism=90 segment-costs=[891171287, 194745] cpu-comparison-result=157 [max(40 (self) vs 157 (sum children))]
 |  24:AGGREGATE [STREAMING]
 |  |  output: sum(cs_ext_sales_price), sum(coalesce(cr_return_amount, CAST(0 AS DECIMAL(7,2)))), sum(cs_net_profit - coalesce(cr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  |  group by: cp_catalog_page_id
 |  |  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=76B cardinality=36.00K cost=12273052
+|  |  tuple-ids=14 row-size=76B cardinality=36.00K cost=12273365
 |  |  in pipelines: 13(GETNEXT)
 |  |
 |  23:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1789,7 +1789,7 @@ max-parallelism=10 segment-costs=[2169, 125388, 29, 344492, 567467] cpu-comparis
 |  output: sum:merge(ss_ext_sales_price), sum:merge(coalesce(sr_return_amt, 0)), sum:merge(ss_net_profit - coalesce(sr_net_loss, 0))
 |  group by: s_store_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=76B cardinality=678 cost=1857
+|  tuple-ids=6 row-size=76B cardinality=678 cost=36955
 |  in pipelines: 47(GETNEXT), 01(OPEN)
 |
 46:EXCHANGE [HASH(s_store_id)]

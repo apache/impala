@@ -370,11 +370,11 @@ max-parallelism=10 segment-costs=[75699697, 42670965, 25050821] cpu-comparison-r
 |  |
 |  F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=96.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[0, 0] cpu-comparison-result=285 [max(1 (self) vs 285 (sum children))]
+|  max-parallelism=1 segment-costs=[8, 0] cpu-comparison-result=285 [max(1 (self) vs 285 (sum children))]
 |  49:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(netpaid)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=19 row-size=16B cardinality=1 cost=0
+|  |  tuple-ids=19 row-size=16B cardinality=1 cost=8
 |  |  in pipelines: 49(GETNEXT), 25(OPEN)
 |  |
 |  48:EXCHANGE [UNPARTITIONED]
@@ -931,11 +931,11 @@ max-parallelism=10 segment-costs=[75699697, 42670965, 25050821] cpu-comparison-r
 |  |
 |  F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=96.00KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[0, 0] cpu-comparison-result=285 [max(1 (self) vs 285 (sum children))]
+|  max-parallelism=1 segment-costs=[8, 0] cpu-comparison-result=285 [max(1 (self) vs 285 (sum children))]
 |  49:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(netpaid)
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=19 row-size=16B cardinality=1 cost=0
+|  |  tuple-ids=19 row-size=16B cardinality=1 cost=8
 |  |  in pipelines: 49(GETNEXT), 25(OPEN)
 |  |
 |  48:EXCHANGE [UNPARTITIONED]

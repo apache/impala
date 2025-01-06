@@ -162,7 +162,7 @@ PLAN-ROOT SINK
 |
 F05:PLAN FRAGMENT [HASH(substr(w_warehouse_name, 1, 20),sm_type,web_name)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=20.98MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[9294, 8155, 266] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+max-parallelism=10 segment-costs=[282111, 8155, 266] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 10:TOP-N [LIMIT=100]
 |  order by: substr(w_warehouse_name, 1, 20) ASC, sm_type ASC, web_name ASC
 |  mem-estimate=8.75KB mem-reservation=0B thread-reservation=0
@@ -173,7 +173,7 @@ max-parallelism=10 segment-costs=[9294, 8155, 266] cpu-comparison-result=120 [ma
 |  output: sum:merge(CASE WHEN (ws_ship_date_sk - ws_sold_date_sk <= 30) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (ws_ship_date_sk - ws_sold_date_sk > 30) AND (ws_ship_date_sk - ws_sold_date_sk <= 60) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (ws_ship_date_sk - ws_sold_date_sk > 60) AND (ws_ship_date_sk - ws_sold_date_sk <= 90) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (ws_ship_date_sk - ws_sold_date_sk > 90) AND (ws_ship_date_sk - ws_sold_date_sk <= 120) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (ws_ship_date_sk - ws_sold_date_sk > 120) THEN 1 ELSE 0 END)
 |  group by: substr(w_warehouse_name, 1, 20), sm_type, web_name
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=90B cardinality=1.39K cost=8569
+|  tuple-ids=5 row-size=90B cardinality=1.39K cost=281386
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(substr(w_warehouse_name, 1, 20),sm_type,web_name)]
@@ -365,7 +365,7 @@ PLAN-ROOT SINK
 |
 F05:PLAN FRAGMENT [HASH(substr(w_warehouse_name, 1, 20),sm_type,web_name)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=20.98MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[9294, 8155, 266] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
+max-parallelism=10 segment-costs=[282111, 8155, 266] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 10:TOP-N [LIMIT=100]
 |  order by: substr(w_warehouse_name, 1, 20) ASC, sm_type ASC, web_name ASC
 |  mem-estimate=8.75KB mem-reservation=0B thread-reservation=0
@@ -376,7 +376,7 @@ max-parallelism=10 segment-costs=[9294, 8155, 266] cpu-comparison-result=120 [ma
 |  output: sum:merge(CASE WHEN (ws_ship_date_sk - ws_sold_date_sk <= 30) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (ws_ship_date_sk - ws_sold_date_sk > 30) AND (ws_ship_date_sk - ws_sold_date_sk <= 60) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (ws_ship_date_sk - ws_sold_date_sk > 60) AND (ws_ship_date_sk - ws_sold_date_sk <= 90) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (ws_ship_date_sk - ws_sold_date_sk > 90) AND (ws_ship_date_sk - ws_sold_date_sk <= 120) THEN 1 ELSE 0 END), sum:merge(CASE WHEN (ws_ship_date_sk - ws_sold_date_sk > 120) THEN 1 ELSE 0 END)
 |  group by: substr(w_warehouse_name, 1, 20), sm_type, web_name
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=5 row-size=90B cardinality=1.39K cost=8569
+|  tuple-ids=5 row-size=90B cardinality=1.39K cost=281386
 |  in pipelines: 16(GETNEXT), 00(OPEN)
 |
 15:EXCHANGE [HASH(substr(w_warehouse_name, 1, 20),sm_type,web_name)]

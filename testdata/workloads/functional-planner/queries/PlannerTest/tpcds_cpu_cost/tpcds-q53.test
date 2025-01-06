@@ -157,7 +157,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(i_manufact_id)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=20.00MB mem-reservation=11.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[23442, 5554, 9508, 125] cpu-comparison-result=40 [max(10 (self) vs 40 (sum children))]
+max-parallelism=10 segment-costs=[277557, 5554, 9508, 125] cpu-comparison-result=40 [max(10 (self) vs 40 (sum children))]
 11:TOP-N [LIMIT=100]
 |  order by: avg_quarterly_sales ASC, sum_sales ASC, i_manufact_id ASC
 |  mem-estimate=3.52KB mem-reservation=0B thread-reservation=0
@@ -187,7 +187,7 @@ max-parallelism=10 segment-costs=[23442, 5554, 9508, 125] cpu-comparison-result=
 |  output: sum:merge(ss_sales_price)
 |  group by: i_manufact_id, d_qoy
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=24B cardinality=3.83K cost=22595
+|  tuple-ids=4 row-size=24B cardinality=3.83K cost=276710
 |  in pipelines: 16(GETNEXT), 01(OPEN)
 |
 15:EXCHANGE [HASH(i_manufact_id)]
@@ -198,12 +198,12 @@ max-parallelism=10 segment-costs=[23442, 5554, 9508, 125] cpu-comparison-result=
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=40 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 Per-Instance Resources: mem-estimate=27.09MB mem-reservation=10.00MB thread-reservation=1
-max-parallelism=40 segment-costs=[397002050, 7888] cpu-comparison-result=40 [max(40 (self) vs 36 (sum children))]
+max-parallelism=40 segment-costs=[396757334, 7888] cpu-comparison-result=40 [max(40 (self) vs 36 (sum children))]
 07:AGGREGATE [STREAMING]
 |  output: sum(ss_sales_price)
 |  group by: i_manufact_id, d_qoy
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=24B cardinality=3.83K cost=1433145
+|  tuple-ids=4 row-size=24B cardinality=3.83K cost=1188429
 |  in pipelines: 01(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -345,7 +345,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(i_manufact_id)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=20.00MB mem-reservation=11.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[23442, 5554, 9508, 125] cpu-comparison-result=40 [max(10 (self) vs 40 (sum children))]
+max-parallelism=10 segment-costs=[277557, 5554, 9508, 125] cpu-comparison-result=40 [max(10 (self) vs 40 (sum children))]
 11:TOP-N [LIMIT=100]
 |  order by: avg_quarterly_sales ASC, sum_sales ASC, i_manufact_id ASC
 |  mem-estimate=3.52KB mem-reservation=0B thread-reservation=0
@@ -375,7 +375,7 @@ max-parallelism=10 segment-costs=[23442, 5554, 9508, 125] cpu-comparison-result=
 |  output: sum:merge(ss_sales_price)
 |  group by: i_manufact_id, d_qoy
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=24B cardinality=3.83K cost=22595
+|  tuple-ids=4 row-size=24B cardinality=3.83K cost=276710
 |  in pipelines: 16(GETNEXT), 01(OPEN)
 |
 15:EXCHANGE [HASH(i_manufact_id)]
@@ -386,12 +386,12 @@ max-parallelism=10 segment-costs=[23442, 5554, 9508, 125] cpu-comparison-result=
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=40 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 Per-Instance Resources: mem-estimate=27.09MB mem-reservation=10.00MB thread-reservation=1
-max-parallelism=40 segment-costs=[397002050, 7888] cpu-comparison-result=40 [max(40 (self) vs 36 (sum children))]
+max-parallelism=40 segment-costs=[396757334, 7888] cpu-comparison-result=40 [max(40 (self) vs 36 (sum children))]
 07:AGGREGATE [STREAMING]
 |  output: sum(ss_sales_price)
 |  group by: i_manufact_id, d_qoy
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=24B cardinality=3.83K cost=1433145
+|  tuple-ids=4 row-size=24B cardinality=3.83K cost=1188429
 |  in pipelines: 01(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]

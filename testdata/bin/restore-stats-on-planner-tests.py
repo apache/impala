@@ -84,6 +84,10 @@ FIXED_STATS = {
     ("web_returns", "71.76K", "5.66MB"),
     ("web_sales", "719.38K", "45.09MB"),
     ("web_site", "30", "11.91KB")
+  ],
+  "tpcds_partitioned_parquet_snap": [
+    ("date_dim", "73.05K", "2.15MB"),
+    ("income_band", "20", "1.22KB")
   ]
 }
 FIXED_STATS["tpcds_partitioned_parquet_snap"] = FIXED_STATS["tpcds_parquet"]

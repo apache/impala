@@ -143,7 +143,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(w_warehouse_name,i_item_id)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=46.23MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[24999660, 4080496, 220] cpu-comparison-result=36 [max(10 (self) vs 36 (sum children))]
+max-parallelism=10 segment-costs=[53353710, 4080496, 220] cpu-comparison-result=36 [max(10 (self) vs 36 (sum children))]
 08:TOP-N [LIMIT=100]
 |  order by: w_warehouse_name ASC, i_item_id ASC
 |  mem-estimate=7.04KB mem-reservation=0B thread-reservation=0
@@ -155,7 +155,7 @@ max-parallelism=10 segment-costs=[24999660, 4080496, 220] cpu-comparison-result=
 |  group by: w_warehouse_name, i_item_id
 |  having: (CASE WHEN sum(CASE WHEN d_date < DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN CAST(sum(CASE WHEN d_date >= DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) AS DOUBLE) / CAST(sum(CASE WHEN d_date < DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) AS DOUBLE) ELSE NULL END) <= CAST(1.5 AS DOUBLE), (CASE WHEN sum(CASE WHEN d_date < DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN CAST(sum(CASE WHEN d_date >= DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) AS DOUBLE) / CAST(sum(CASE WHEN d_date < DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) AS DOUBLE) ELSE NULL END) >= CAST(0.66666700000000000958522150540375150740146636962890625 AS DOUBLE)
 |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=72B cardinality=389.70K cost=23275168
+|  tuple-ids=4 row-size=72B cardinality=389.70K cost=51629218
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
 12:EXCHANGE [HASH(w_warehouse_name,i_item_id)]
@@ -166,12 +166,12 @@ max-parallelism=10 segment-costs=[24999660, 4080496, 220] cpu-comparison-result=
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=30 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 Per-Instance Resources: mem-estimate=67.35MB mem-reservation=34.25MB thread-reservation=1
-max-parallelism=30 segment-costs=[245904713, 20089249] cpu-comparison-result=36 [max(30 (self) vs 36 (sum children))]
+max-parallelism=30 segment-costs=[243130875, 20089249] cpu-comparison-result=36 [max(30 (self) vs 36 (sum children))]
 07:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN d_date < DATE '2000-05-22' THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN d_date >= DATE '2000-05-22' THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
 |  group by: w_warehouse_name, i_item_id
 |  mem-estimate=48.38MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=72B cardinality=3.90M cost=144202030
+|  tuple-ids=4 row-size=72B cardinality=3.90M cost=141428192
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -315,7 +315,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(w_warehouse_name,i_item_id)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=46.23MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[24999660, 4080496, 220] cpu-comparison-result=36 [max(10 (self) vs 36 (sum children))]
+max-parallelism=10 segment-costs=[53353710, 4080496, 220] cpu-comparison-result=36 [max(10 (self) vs 36 (sum children))]
 08:TOP-N [LIMIT=100]
 |  order by: w_warehouse_name ASC, i_item_id ASC
 |  mem-estimate=7.04KB mem-reservation=0B thread-reservation=0
@@ -327,7 +327,7 @@ max-parallelism=10 segment-costs=[24999660, 4080496, 220] cpu-comparison-result=
 |  group by: w_warehouse_name, i_item_id
 |  having: (CASE WHEN sum(CASE WHEN d_date < DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN CAST(sum(CASE WHEN d_date >= DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) AS DOUBLE) / CAST(sum(CASE WHEN d_date < DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) AS DOUBLE) ELSE NULL END) <= CAST(1.5 AS DOUBLE), (CASE WHEN sum(CASE WHEN d_date < DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN CAST(sum(CASE WHEN d_date >= DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) AS DOUBLE) / CAST(sum(CASE WHEN d_date < DATE '2000-05-22' THEN inv_quantity_on_hand ELSE 0 END) AS DOUBLE) ELSE NULL END) >= CAST(0.66666700000000000958522150540375150740146636962890625 AS DOUBLE)
 |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=72B cardinality=389.70K cost=23275168
+|  tuple-ids=4 row-size=72B cardinality=389.70K cost=51629218
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
 12:EXCHANGE [HASH(w_warehouse_name,i_item_id)]
@@ -338,12 +338,12 @@ max-parallelism=10 segment-costs=[24999660, 4080496, 220] cpu-comparison-result=
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=30 (adjusted from 120)
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
 Per-Instance Resources: mem-estimate=67.35MB mem-reservation=34.25MB thread-reservation=1
-max-parallelism=30 segment-costs=[245904713, 20089249] cpu-comparison-result=36 [max(30 (self) vs 36 (sum children))]
+max-parallelism=30 segment-costs=[243130875, 20089249] cpu-comparison-result=36 [max(30 (self) vs 36 (sum children))]
 07:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN d_date < DATE '2000-05-22' THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN d_date >= DATE '2000-05-22' THEN inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
 |  group by: w_warehouse_name, i_item_id
 |  mem-estimate=48.38MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=72B cardinality=3.90M cost=144202030
+|  tuple-ids=4 row-size=72B cardinality=3.90M cost=141428192
 |  in pipelines: 00(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]

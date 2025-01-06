@@ -131,7 +131,7 @@ PLAN-ROOT SINK
 |
 F04:PLAN FRAGMENT [HASH(ca_zip)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=12.92MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[31928, 76337, 117] cpu-comparison-result=80 [max(10 (self) vs 80 (sum children))]
+max-parallelism=10 segment-costs=[386192, 76337, 117] cpu-comparison-result=80 [max(10 (self) vs 80 (sum children))]
 08:TOP-N [LIMIT=100]
 |  order by: ca_zip ASC
 |  mem-estimate=3.22KB mem-reservation=0B thread-reservation=0
@@ -142,7 +142,7 @@ max-parallelism=10 segment-costs=[31928, 76337, 117] cpu-comparison-result=80 [m
 |  output: sum:merge(cs_sales_price)
 |  group by: ca_zip
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=33B cardinality=10.17K cost=29255
+|  tuple-ids=4 row-size=33B cardinality=10.17K cost=383519
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
 12:EXCHANGE [HASH(ca_zip)]
@@ -302,7 +302,7 @@ PLAN-ROOT SINK
 |
 F05:PLAN FRAGMENT [HASH(ca_zip)] hosts=10 instances=10 (adjusted from 120)
 Per-Instance Resources: mem-estimate=11.84MB mem-reservation=1.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[31928, 76337, 117] cpu-comparison-result=170 [max(10 (self) vs 170 (sum children))]
+max-parallelism=10 segment-costs=[386192, 76337, 117] cpu-comparison-result=170 [max(10 (self) vs 170 (sum children))]
 08:TOP-N [LIMIT=100]
 |  order by: ca_zip ASC
 |  mem-estimate=3.22KB mem-reservation=0B thread-reservation=0
@@ -313,7 +313,7 @@ max-parallelism=10 segment-costs=[31928, 76337, 117] cpu-comparison-result=170 [
 |  output: sum:merge(cs_sales_price)
 |  group by: ca_zip
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4 row-size=33B cardinality=10.17K cost=29255
+|  tuple-ids=4 row-size=33B cardinality=10.17K cost=383519
 |  in pipelines: 14(GETNEXT), 00(OPEN)
 |
 13:EXCHANGE [HASH(ca_zip)]

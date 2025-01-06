@@ -993,7 +993,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
   @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
   def test_query_cpu_count_divisor_default(self, unique_database):
-    coordinator_test_args = ""
+    coordinator_test_args = "-gen_experimental_profile=true"
     self._setup_three_exec_group_cluster(coordinator_test_args)
     self.client.clear_configuration()
 
@@ -1260,7 +1260,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
   @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
   def test_query_cpu_count_on_insert(self, unique_database):
-    coordinator_test_args = ""
+    coordinator_test_args = "-gen_experimental_profile=true"
     self._setup_three_exec_group_cluster(coordinator_test_args)
     self.client.clear_configuration()
 
@@ -1414,7 +1414,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
   def test_query_cpu_count_divisor_two(self):
     # Expect to run the query on the small group (driven by MemoryAsk),
     # But the CpuAsk is around half of EffectiveParallelism.
-    coordinator_test_args = "-query_cpu_count_divisor=2 "
+    coordinator_test_args = "-gen_experimental_profile=true -query_cpu_count_divisor=2 "
     self._setup_three_exec_group_cluster(coordinator_test_args)
     self._set_query_options({
       'COMPUTE_PROCESSING_COST': 'true',
@@ -1455,8 +1455,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   def test_query_cpu_count_divisor_fraction(self):
     # Expect to run the query on the large group
-    coordinator_test_args = ("-min_processing_per_thread=550000 "
-        "-query_cpu_count_divisor=0.03 ")
+    coordinator_test_args = (
+      "-gen_experimental_profile=true -min_processing_per_thread=550000 "
+      "-query_cpu_count_divisor=0.03 ")
     self._setup_three_exec_group_cluster(coordinator_test_args)
     self._set_query_options({
       'COMPUTE_PROCESSING_COST': 'true',
@@ -1495,8 +1496,9 @@ class TestExecutorGroups(CustomClusterTestSuite):
   def test_no_skip_resource_checking(self):
     """This test check that executor group limit is enforced if
     skip_resource_checking_on_last_executor_group_set=false."""
-    coordinator_test_args = ("-query_cpu_count_divisor=0.01 "
-        "-skip_resource_checking_on_last_executor_group_set=false ")
+    coordinator_test_args = (
+      "-gen_experimental_profile=true -query_cpu_count_divisor=0.01 "
+      "-skip_resource_checking_on_last_executor_group_set=false ")
     self._setup_three_exec_group_cluster(coordinator_test_args)
     self._set_query_options({
       'COMPUTE_PROCESSING_COST': 'true',
@@ -1508,7 +1510,8 @@ class TestExecutorGroups(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   def test_min_processing_per_thread_small(self):
     """Test processing cost with min_processing_per_thread smaller than default"""
-    coordinator_test_args = "-min_processing_per_thread=500000"
+    coordinator_test_args = (
+      "-gen_experimental_profile=true -min_processing_per_thread=500000")
     self._setup_three_exec_group_cluster(coordinator_test_args)
 
     # Test that GROUPING_TEST_QUERY will get assigned to the large group.
@@ -1525,15 +1528,15 @@ class TestExecutorGroups(CustomClusterTestSuite):
         "WHERE ss_item_sk < 1000000 GROUP BY ss_item_sk LIMIT 10")
     self._run_query_and_verify_profile(high_scan_cost_query,
         ["Executor Group: root.small-group", "ExecutorGroupsConsidered: 2",
-          "Verdict: Match", "CpuAsk: 4",
-          "AvgAdmissionSlotsPerExecutor: 2"])
+          "Verdict: Match", "CpuAsk: 2",
+          "AvgAdmissionSlotsPerExecutor: 1"])
 
     # Test that high_scan_cost_query will get assigned to the tiny group
     # if MAX_FRAGMENT_INSTANCES_PER_NODE is limited to 1.
     self._set_query_options({'MAX_FRAGMENT_INSTANCES_PER_NODE': '1'})
     self._run_query_and_verify_profile(high_scan_cost_query,
         ["Executor Group: root.tiny-group", "ExecutorGroupsConsidered: 1",
-          "Verdict: Match", "CpuAsk: 2",
+          "Verdict: Match", "CpuAsk: 1",
           "AvgAdmissionSlotsPerExecutor: 1"])
 
     # Check resource pools on the Web queries site and admission site

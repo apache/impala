@@ -35,7 +35,7 @@ Max Per-Host Resource Reservation: Memory=73.03MB Threads=1
 Per-Host Resource Estimates: Memory=206MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=206.13MB mem-reservation=73.03MB thread-reservation=1 runtime-filters-memory=4.00MB
-|  max-parallelism=1 segment-costs=[4068221571, 153674, 0, 0]
+|  max-parallelism=1 segment-costs=[4068223067, 153674, 0, 0]
 PLAN-ROOT SINK
 |  output exprs: count(cs_order_number), sum(cs_ext_ship_cost), sum(cs_net_profit)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -56,7 +56,7 @@ PLAN-ROOT SINK
 |  output: sum(cs_ext_ship_cost), sum(cs_net_profit)
 |  group by: cs_order_number
 |  mem-estimate=36.29MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8 row-size=40B cardinality=731.78K cost=2171682
+|  tuple-ids=8 row-size=40B cardinality=731.78K cost=2173178
 |  in pipelines: 11(GETNEXT), 05(OPEN)
 |
 10:HASH JOIN [RIGHT ANTI JOIN]
@@ -199,7 +199,7 @@ PLAN-ROOT SINK
 |
 F06:PLAN FRAGMENT [HASH(cs1.cs_order_number)] hosts=10 instances=20 (adjusted from 120)
 Per-Instance Resources: mem-estimate=20.59MB mem-reservation=2.88MB thread-reservation=1
-max-parallelism=20 segment-costs=[177013385, 153674, 3] cpu-comparison-result=140 [max(70 (self) vs 140 (sum children))]
+max-parallelism=20 segment-costs=[177013447, 153674, 3] cpu-comparison-result=140 [max(70 (self) vs 140 (sum children))]
 12:AGGREGATE
 |  output: count(cs_order_number), sum:merge(cs_ext_ship_cost), sum:merge(cs_net_profit)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -210,7 +210,7 @@ max-parallelism=20 segment-costs=[177013385, 153674, 3] cpu-comparison-result=14
 |  output: sum(cs_ext_ship_cost), sum(cs_net_profit)
 |  group by: cs_order_number
 |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=8 row-size=40B cardinality=731.78K cost=2173116
+|  tuple-ids=8 row-size=40B cardinality=731.78K cost=2173178
 |  in pipelines: 11(GETNEXT), 05(OPEN)
 |
 10:HASH JOIN [RIGHT ANTI JOIN, PARTITIONED]
@@ -448,7 +448,7 @@ PLAN-ROOT SINK
 |
 F06:PLAN FRAGMENT [HASH(cs1.cs_order_number)] hosts=10 instances=20 (adjusted from 120)
 Per-Instance Resources: mem-estimate=20.59MB mem-reservation=2.88MB thread-reservation=1
-max-parallelism=20 segment-costs=[177013385, 153674, 3] cpu-comparison-result=140 [max(70 (self) vs 140 (sum children))]
+max-parallelism=20 segment-costs=[177013447, 153674, 3] cpu-comparison-result=140 [max(70 (self) vs 140 (sum children))]
 12:AGGREGATE
 |  output: count(cs_order_number), sum:merge(cs_ext_ship_cost), sum:merge(cs_net_profit)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -459,7 +459,7 @@ max-parallelism=20 segment-costs=[177013385, 153674, 3] cpu-comparison-result=14
 |  output: sum(cs_ext_ship_cost), sum(cs_net_profit)
 |  group by: cs_order_number
 |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=8 row-size=40B cardinality=731.78K cost=2173116
+|  tuple-ids=8 row-size=40B cardinality=731.78K cost=2173178
 |  in pipelines: 11(GETNEXT), 05(OPEN)
 |
 10:HASH JOIN [RIGHT ANTI JOIN, PARTITIONED]

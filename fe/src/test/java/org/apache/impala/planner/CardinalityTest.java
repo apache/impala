@@ -21,6 +21,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +33,7 @@ import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.MathUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -1333,5 +1335,69 @@ public class CardinalityTest extends PlannerTestBase {
     // Case 3: both argument is unknown.
     assertEquals(unknown + " vs " + unknown, unknown,
         PlanNode.smallestValidCardinality(unknown, unknown));
+  }
+
+  @Test
+  public void testEstimatePreaggCardinality() {
+    List<Long> positiveLong = Arrays.asList(1L, 2L, 5L, 10L, 100L, 1000L, Long.MAX_VALUE);
+    List<Long> validCard = new ArrayList<>(positiveLong);
+    validCard.add(-1L);
+    validCard.add(0L);
+
+    for (Long totalInstances : positiveLong) {
+      for (Long globalNdv : positiveLong) {
+        for (Long inputCard : validCard) {
+          String pattern = "totalInstances=%d, globalNdv=%d, inputCard=%d,"
+          + " isNonGroupingAggregation=%b, canCompteleEarly=%b, limit=%d, ouputCard=%d";
+
+          // Test regular preaggregation
+          long outputCard = AggregationNode.estimatePreaggCardinality(
+              totalInstances, globalNdv, inputCard, false, false, -1);
+          String message = String.format(pattern, totalInstances, globalNdv, inputCard,
+              false, false, -1, outputCard);
+          assertTrue(message + ", expect>=0", outputCard >= 0);
+          if (inputCard == 0) {
+            assertTrue(message + ", expect=0", outputCard == 0);
+          } else if (inputCard == -1 || totalInstances == 1) {
+            long leastInputVsNdv =
+                PlanNode.smallestValidCardinality(inputCard, globalNdv);
+            assertTrue(
+                message + ", expect=" + leastInputVsNdv, outputCard == leastInputVsNdv);
+          } else {
+            assertTrue(message + ", expect<=" + inputCard, outputCard <= inputCard);
+          }
+
+          // Test non-grouping preaggregation.
+          outputCard = AggregationNode.estimatePreaggCardinality(
+              totalInstances, globalNdv, inputCard, true, false, -1);
+          message = String.format(
+              pattern, totalInstances, globalNdv, inputCard, true, false, -1, outputCard);
+          assertTrue(message + ", expect>=0", outputCard >= 0);
+          long allDuplicate =
+              MathUtil.saturatingMultiplyCardinalities(globalNdv, totalInstances);
+          long leastInputVsAllDuplicate =
+              PlanNode.smallestValidCardinality(inputCard, allDuplicate);
+          if (allDuplicate < inputCard) {
+            assertTrue(message + ", expect=" + leastInputVsAllDuplicate,
+                outputCard == leastInputVsAllDuplicate);
+          }
+
+          // Test preaggregation with limit.
+          for (Long limit : validCard) {
+            if (limit < 0) continue;
+            outputCard = AggregationNode.estimatePreaggCardinality(
+                totalInstances, globalNdv, inputCard, false, true, limit);
+            message = String.format(pattern, totalInstances, globalNdv, inputCard, false,
+                true, limit, outputCard);
+            assertTrue(message + ", expect>=0", outputCard >= 0);
+            long allAtLimit =
+                MathUtil.saturatingMultiplyCardinalities(totalInstances, limit);
+            long leastOfAll =
+                PlanNode.smallestValidCardinality(allAtLimit, leastInputVsAllDuplicate);
+            assertTrue(message + ", expect=" + leastOfAll, outputCard == leastOfAll);
+          }
+        }
+      }
+    }
   }
 }
