@@ -24,6 +24,7 @@ import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
+import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.rules.CoreRules;
@@ -52,15 +53,19 @@ public class CalciteOptimizer implements CompilerStep {
   protected static final Logger LOG =
       LoggerFactory.getLogger(CalciteOptimizer.class.getName());
 
-  private final CalciteValidator validator_;
+  private final CalciteCatalogReader reader_;
+
+  public CalciteOptimizer(CalciteAnalysisResult analysisResult) {
+    this.reader_ = analysisResult.getCatalogReader();
+  }
 
   public CalciteOptimizer(CalciteValidator validator) {
-    this.validator_ = validator;
+    this.reader_ = validator.getCatalogReader();
   }
 
   public ImpalaPlanRel optimize(RelNode logPlan) throws ImpalaException {
     RelBuilder relBuilder = RelFactories.LOGICAL_BUILDER.create(logPlan.getCluster(),
-        validator_.getCatalogReader());
+        reader_);
 
     // Run some essential rules needed to create working RelNodes before doing
     // optimization

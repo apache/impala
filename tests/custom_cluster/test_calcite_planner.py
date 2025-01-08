@@ -20,6 +20,7 @@ import logging
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.test_dimensions import (add_mandatory_exec_option)
 
 LOG = logging.getLogger(__name__)
 
@@ -30,7 +31,12 @@ class TestCalcitePlanner(CustomClusterTestSuite):
   def setup_class(cls):
     super(TestCalcitePlanner, cls).setup_class()
 
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestCalcitePlanner, cls).add_test_dimensions()
+    add_mandatory_exec_option(cls, 'use_calcite_planner', 'true')
+
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(start_args="--use_calcite_planner=true")
+  @CustomClusterTestSuite.with_args(start_args="--env_vars=USE_CALCITE_PLANNER=true")
   def test_calcite_frontend(self, vector, unique_database):
     self.run_test_case('QueryTest/calcite', vector, use_db=unique_database)

@@ -17,6 +17,7 @@
 
 package org.apache.impala.calcite.service;
 
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCluster;
@@ -43,6 +44,9 @@ import org.apache.impala.calcite.operators.ImpalaConvertletTable;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.RelBuilder;
 
+import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.prepare.CalciteCatalogReader;
+
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -59,25 +63,41 @@ public class CalciteRelNodeConverter implements CompilerStep {
   private static final RelOptTable.ViewExpander NOOP_EXPANDER =
       (type, query, schema, path) -> null;
 
-  private final CalciteValidator validator_;
-
   private final RelOptCluster cluster_;
 
   private final RelOptPlanner planner_;
 
-  public CalciteRelNodeConverter(CalciteValidator validator) {
-    this.validator_ = validator;
+  private final RelDataTypeFactory typeFactory_;
+
+  private final SqlValidator sqlValidator_;
+
+  private final CalciteCatalogReader reader_;
+
+  public CalciteRelNodeConverter(CalciteAnalysisResult analysisResult) {
+    this.typeFactory_ = analysisResult.getTypeFactory();
+    this.reader_ = analysisResult.getCatalogReader();
+    this.sqlValidator_ = analysisResult.getSqlValidator();
     this.planner_ = new VolcanoPlanner();
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
     cluster_ =
-        RelOptCluster.create(planner_, new RexBuilder(validator_.getTypeFactory()));
+        RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
+  }
+
+  public CalciteRelNodeConverter(CalciteValidator validator) {
+    this.typeFactory_ = validator.getTypeFactory();
+    this.reader_ = validator.getCatalogReader();
+    this.sqlValidator_ = validator.getSqlValidator();
+    this.planner_ = new VolcanoPlanner();
+    planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
+    cluster_ =
+        RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
   }
 
   public RelNode convert(SqlNode validatedNode) {
     SqlToRelConverter relConverter = new SqlToRelConverter(
         NOOP_EXPANDER,
-        validator_.getSqlValidator(),
-        validator_.getCatalogReader(),
+        sqlValidator_,
+        reader_,
         cluster_,
         ImpalaConvertletTable.INSTANCE,
         SqlToRelConverter.config().withCreateValuesRel(false));
@@ -98,7 +118,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
     logDebug(subQueryRemovedPlan);
 
     RelBuilder relBuilder = RelFactories.LOGICAL_BUILDER.create(cluster_,
-        validator_.getCatalogReader());
+        reader_);
     RelNode decorrelatedPlan =
         RelDecorrelator.decorrelateQuery(subQueryRemovedPlan, relBuilder);
 
@@ -108,10 +128,6 @@ public class CalciteRelNodeConverter implements CompilerStep {
 
   public RelOptCluster getCluster() {
     return cluster_;
-  }
-
-  public CalciteValidator getValidator() {
-    return validator_;
   }
 
   @Override

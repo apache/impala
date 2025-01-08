@@ -774,6 +774,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   191: optional double mem_estimate_scale_for_spilling_operator = 0.0
+
+  // See comment in ImpalaService.thrift
+  192: optional bool use_calcite_planner = false;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

@@ -107,7 +107,9 @@ public class CalciteJniFrontend extends JniFrontend {
 
     CalciteMetadataHandler mdHandler = null;
 
-    if (!optionSupportedInCalcite(queryCtx)) {
+    try {
+      CalciteCompilerFactory.checkOptionSupportedInCalcite(queryCtx.getTQueryCtx());
+    } catch (UnsupportedFeatureException e) {
       return runThroughOriginalPlanner(thriftQueryContext, queryCtx);
     }
 
@@ -198,20 +200,6 @@ public class CalciteJniFrontend extends JniFrontend {
     if (LOG.isDebugEnabled()) {
       compilerStep.logDebug(stepResult);
     }
-  }
-
-  private boolean optionSupportedInCalcite(QueryContext queryCtx) {
-    // IMPALA-13530
-    if (!queryCtx.getTQueryCtx().getClient_request().getQuery_options().isDecimal_v2()) {
-      return false;
-    }
-
-    // IMPALA-13529
-    if (queryCtx.getTQueryCtx().getClient_request().getQuery_options()
-        .isAppx_count_distinct()) {
-      return false;
-    }
-    return true;
   }
 
   private static void loadCalciteImpalaFunctions() {

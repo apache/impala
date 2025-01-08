@@ -1343,6 +1343,9 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
       }
       case TImpalaQueryOptions::SYNC_HMS_EVENTS_STRICT_MODE: {
         query_options->__set_sync_hms_events_strict_mode(IsTrue(value));
+      }
+      case TImpalaQueryOptions::USE_CALCITE_PLANNER : {
+        query_options->__set_use_calcite_planner(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::SKIP_UNNEEDED_UPDATES_COL_LIMIT: {

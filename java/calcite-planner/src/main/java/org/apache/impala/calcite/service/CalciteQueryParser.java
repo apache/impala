@@ -36,16 +36,20 @@ public class CalciteQueryParser implements CompilerStep {
   protected static final Logger LOG =
       LoggerFactory.getLogger(CalciteQueryParser.class.getName());
 
-  private final CalciteJniFrontend.QueryContext queryCtx_;
+  private final String sqlStmt_;
 
   public CalciteQueryParser(CalciteJniFrontend.QueryContext queryCtx) {
-    this.queryCtx_ = queryCtx;
+    this.sqlStmt_ = queryCtx.getStmt();
+  }
+
+  public CalciteQueryParser(String stmt) {
+    this.sqlStmt_ = stmt;
   }
 
   public SqlNode parse() throws ParseException {
     try {
       // Create an SQL parser
-      SqlParser parser = SqlParser.create(queryCtx_.getStmt(),
+      SqlParser parser = SqlParser.create(sqlStmt_,
           SqlParser.config().withParserFactory(ImpalaSqlParserImpl.FACTORY)
               .withConformance(ImpalaConformance.INSTANCE)
               .withQuoting(Quoting.BACK_TICK_BACKSLASH)

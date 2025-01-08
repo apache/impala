@@ -1022,6 +1022,9 @@ enum TImpalaQueryOptions {
   // to either 1.0 (enabled) or 0.0 (disabled) and only set value in between for
   // experimental purpose.
   MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR = 190
+
+  // If True, use the Calcite planner for compilation
+  USE_CALCITE_PLANNER = 191
 }
 
 // The summary of a DML statement.

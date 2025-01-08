@@ -47,6 +47,8 @@ import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
+import org.apache.impala.thrift.TQueryCtx;
+
 import com.google.common.collect.Sets;
 
 import java.util.ArrayList;
@@ -92,7 +94,8 @@ public class CalciteMetadataHandler implements CompilerStep {
     // load the relevant tables in the query from catalogd
     this.stmtTableCache_ = stmtMetadataLoader.loadTables(tableVisitor.tableNames_);
 
-    this.reader_ = createCalciteCatalogReader(queryCtx, stmtTableCache_);
+    this.reader_ = createCalciteCatalogReader(stmtTableCache_,
+        queryCtx.getTQueryCtx(), queryCtx.getCurrentDb());
 
     // populate calcite schema.  This step needs to be done after the loader because the
     // schema needs to contain the columns in the table for validation, which cannot
@@ -108,24 +111,24 @@ public class CalciteMetadataHandler implements CompilerStep {
    * Since the individual Table objects have reference to the Schema, this also serves
    * as a way to give the tables Context information about the general query.
    */
-  private CalciteCatalogReader createCalciteCatalogReader(
-      CalciteJniFrontend.QueryContext queryCtx,
-      StmtMetadataLoader.StmtTableCache stmtTableCache) {
+  public static CalciteCatalogReader createCalciteCatalogReader(
+      StmtMetadataLoader.StmtTableCache stmtTableCache, TQueryCtx queryCtx,
+      String database) {
     RelDataTypeFactory typeFactory = new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
     Properties props = new Properties();
     props.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "false");
     CalciteConnectionConfig config = new CalciteConnectionConfigImpl(props);
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
     return new ImpalaCalciteCatalogReader(rootSchema,
-        Collections.singletonList(queryCtx.getCurrentDb()),
-        typeFactory, config, queryCtx.getTQueryCtx(), stmtTableCache);
+        Collections.singletonList(database),
+        typeFactory, config, queryCtx, stmtTableCache);
   }
 
   /**
    * Populate the CalciteSchema with tables being used by this query. Returns a
    * list of tables in the query that are not found in the database.
    */
-  private static List<String> populateCalciteSchema(CalciteCatalogReader reader,
+  public static List<String> populateCalciteSchema(CalciteCatalogReader reader,
       FeCatalog catalog, Set<TableName> tableNames) throws ImpalaException {
     List<String> notFoundTables = new ArrayList<>();
     CalciteSchema rootSchema = reader.getRootSchema();
@@ -178,7 +181,7 @@ public class CalciteMetadataHandler implements CompilerStep {
    * TableVisitor walks through the AST and places all the tables into
    * tableNames
    */
-  private static class TableVisitor extends SqlBasicVisitor<Void> {
+  public static class TableVisitor extends SqlBasicVisitor<Void> {
     private final String currentDb_;
     public final Set<TableName> tableNames_ = new HashSet<>();
 
