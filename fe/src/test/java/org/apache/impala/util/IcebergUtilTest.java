@@ -72,6 +72,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
+import java.util.TreeMap;
 
 /**
  * Unit tests for Iceberg Utilities.
@@ -457,5 +458,64 @@ public class IcebergUtilTest {
       this.catalog = catalog;
       this.clazz = clazz;
     }
+  }
+
+  @Test
+  public void testComputeStatsProperty() {
+    String empty = "";
+    assertEquals(empty, computeStatsPropertyRoundTrip(empty));
+
+    String singleCols = "1:1234,2:1235,4:2345,5:2346";
+    assertEquals(singleCols, computeStatsPropertyRoundTrip(singleCols));
+
+    String simpleRanges = "1-4:1234,6-10:2345";
+    assertEquals(simpleRanges, computeStatsPropertyRoundTrip(simpleRanges));
+
+    String rangesToMerge = "1-4:1234,5-8:1234,10:2345";
+    String mergedRanges = "1-8:1234,10:2345";
+    assertEquals(mergedRanges, computeStatsPropertyRoundTrip(rangesToMerge));
+
+    // Fill a disjunct range
+    String disjunctRanges = "1-4:1234,6-8:1234,10:2345";
+    TreeMap<Long, Long> disjunctRangesMap =
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(disjunctRanges);
+    disjunctRangesMap.put(5L, 1234L);
+    String completedRange = "1-8:1234,10:2345";
+    assertEquals(completedRange,
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.mapToString(disjunctRangesMap));
+
+    // Split a range
+    String rangeToSplit = "1-8:1234,10:2345";
+    TreeMap<Long, Long> rangeToSplitMap =
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(rangeToSplit);
+    rangeToSplitMap.put(4L, 2345L);
+    String splitRanges = "1-3:1234,4:2345,5-8:1234,10:2345";
+    assertEquals(splitRanges,
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.mapToString(rangeToSplitMap));
+
+    // Invalid properties yield empty maps
+    TreeMap<Long, Long> emptyMap = new TreeMap<>();
+    String invalid1 = "1:";
+    assertEquals(emptyMap,
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(invalid1));
+
+    // Spaces are not allowed
+    String invalid2 = "1:1234, 2:2345";
+    assertEquals(emptyMap,
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(invalid2));
+
+    String invalid3 = ":1234";
+    assertEquals(emptyMap,
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(invalid3));
+
+    String invalid4 = "1-3-5:1234";
+    assertEquals(emptyMap,
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(invalid4));
+  }
+
+  private String computeStatsPropertyRoundTrip(String property) {
+    TreeMap<Long, Long> map =
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(property);
+    return IcebergUtil.ComputeStatsSnapshotPropertyConverter.mapToString(map);
   }
 }

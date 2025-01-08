@@ -62,7 +62,8 @@ class CatalogOpExecutor {
       const apache::hive::service::cli::thrift::TTableSchema& tbl_stats_schema,
       const apache::hive::service::cli::thrift::TRowSet& tbl_stats_data,
       const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,
-      const apache::hive::service::cli::thrift::TRowSet& col_stats_data);
+      const apache::hive::service::cli::thrift::TRowSet& col_stats_data,
+      const std::optional<long>& snapshot_id);
 
   /// Makes an RPC to the CatalogServer to prioritize the loading of the catalog objects
   /// specified in the TPrioritizeLoadRequest. Returns OK if the RPC was successful,

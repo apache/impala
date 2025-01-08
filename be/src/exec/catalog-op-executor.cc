@@ -160,7 +160,8 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
 Status CatalogOpExecutor::ExecComputeStats(const TCatalogServiceRequestHeader& header,
     const TCatalogOpRequest& compute_stats_request,
     const TTableSchema& tbl_stats_schema, const TRowSet& tbl_stats_data,
-    const TTableSchema& col_stats_schema, const TRowSet& col_stats_data) {
+    const TTableSchema& col_stats_schema, const TRowSet& col_stats_data,
+    const std::optional<long>& snapshot_id) {
   // Create a new DDL request to alter the table's statistics.
   TCatalogOpRequest catalog_op_req;
   catalog_op_req.__isset.ddl_params = true;
@@ -185,6 +186,7 @@ Status CatalogOpExecutor::ExecComputeStats(const TCatalogServiceRequestHeader& h
   update_stats_params.__set_expect_all_partitions(
       compute_stats_params.expect_all_partitions);
   update_stats_params.__set_is_incremental(compute_stats_params.is_incremental);
+  if (snapshot_id.has_value()) update_stats_params.__set_snapshot_id(snapshot_id.value());
 
   // Fill the alteration request based on the child-query results.
   SetTableStats(tbl_stats_schema, tbl_stats_data,

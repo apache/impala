@@ -21,6 +21,7 @@ import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -30,8 +31,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
-import com.google.common.collect.Lists;
+
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
@@ -45,6 +47,7 @@ import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.CatalogLookupStatus;
+import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
@@ -120,6 +123,11 @@ public class IcebergTable extends Table implements FeIcebergTable {
 
   public static final String ICEBERG_DISABLE_READING_PUFFIN_STATS =
       "impala.iceberg_read_puffin_stats";
+
+  // Table property that can be used to store for each column the snapshot id for which
+  // stats are stored in HMS (i.e. not Puffin stats).
+  public static final String COMPUTE_STATS_SNAPSHOT_IDS =
+      "impala.computeStatsSnapshotIds";
 
   // Internal Iceberg table property that specifies the absolute path of the current
   // table metadata. This property is only valid for tables in 'hive.catalog'.
@@ -827,4 +835,47 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public IcebergContentFileStore getContentFileStore() {
     return fileStore_;
   }
+
+  /**
+   * The IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS property stores the snapshot id for which
+   * stats have been computed, for each column. It is a comma-separated list of values of
+   * the form "fieldIdRangeStart[-fieldIdRangeEndIncl]:snapshotId". The fieldId part may
+   * be a single value or a contiguous, inclusive range.
+   *
+   * Storing the snapshot ids on a per-column basis is needed because COMPUTE STATS can be
+   * set to calculate stats for only a subset of the columns, and then a different subset
+   * in a subsequent run. The recency of the stats will then be different for each column.
+   *
+   * Storing the Iceberg field ids instead of column names makes the format easier to
+   * handle as we do not need to take care of escaping special characters.
+   */
+  public void updateComputeStatsIcebergSnapshotsProperty(
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      TAlterTableUpdateStatsParams params) {
+    String snapshotIds = msTbl.getParameters().get(
+        IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS);
+
+    TreeMap<Long, Long> computeStatsMap =
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(snapshotIds);
+    updateComputeStatsIcebergSnapshotMap(computeStatsMap, params);
+    String property =
+        IcebergUtil.ComputeStatsSnapshotPropertyConverter.mapToString(computeStatsMap);
+    msTbl.putToParameters(IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS, property);
+  }
+
+  private void updateComputeStatsIcebergSnapshotMap(Map<Long, Long> map,
+      TAlterTableUpdateStatsParams params) {
+    // This will be -1 if there is no snapshot yet.
+    Preconditions.checkState(params.isSetSnapshot_id());
+    final long currentSnapshotId = params.snapshot_id;
+
+    // Insert/update columns for which we have computed stats.
+    if (params.isSetColumn_stats()) {
+      for (String colName : params.column_stats.keySet()) {
+        long fieldId = getIcebergApiTable().schema().findField(colName).fieldId();
+        map.put(fieldId, currentSnapshotId);
+      }
+    }
+  }
+
 }

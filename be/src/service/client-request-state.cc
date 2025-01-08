@@ -17,6 +17,8 @@
 
 #include "service/client-request-state.h"
 
+#include <optional>
+
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -53,6 +55,7 @@
 #include "util/lineage-util.h"
 #include "util/pretty-printer.h"
 #include "util/redactor.h"
+#include "util/runtime-profile.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
 #include "util/uid-util.h"
@@ -1866,6 +1869,20 @@ void ClientRequestState::MarkActive() {
   ++ref_count_;
 }
 
+std::optional<long> getIcebergSnapshotId(const TExecRequest& exec_req) {
+  DCHECK(exec_req.__isset.catalog_op_request);
+  DCHECK(exec_req.catalog_op_request.__isset.ddl_params);
+  DCHECK(exec_req.catalog_op_request.ddl_params.__isset.compute_stats_params);
+
+  const TComputeStatsParams& compute_stats_params =
+    exec_req.catalog_op_request.ddl_params.compute_stats_params;
+  if (compute_stats_params.__isset.iceberg_snapshot_id) {
+    return std::optional<long>(compute_stats_params.iceberg_snapshot_id);
+  } else {
+    return {};
+  }
+}
+
 Status ClientRequestState::UpdateTableAndColumnStats(
     const vector<ChildQuery*>& child_queries) {
   DCHECK_GE(child_queries.size(), 1);
@@ -1883,13 +1900,15 @@ Status ClientRequestState::UpdateTableAndColumnStats(
   }
 
   const TExecRequest& exec_req = exec_request();
+  std::optional<long> snapshot_id = getIcebergSnapshotId(exec_req);
   Status status = catalog_op_executor_->ExecComputeStats(
       GetCatalogServiceRequestHeader(),
       exec_req.catalog_op_request,
       child_queries[0]->result_schema(),
       child_queries[0]->result_data(),
       col_stats_schema,
-      col_stats_data);
+      col_stats_data,
+      snapshot_id);
   AddCatalogTimeline();
   {
     lock_guard<mutex> l(lock_);

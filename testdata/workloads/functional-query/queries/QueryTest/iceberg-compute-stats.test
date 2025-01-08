@@ -389,3 +389,60 @@ COMPUTE INCREMENTAL STATS ice_alltypes_part PARTITION (i=1);
 ---- CATCH
 COMPUTE INCREMENTAL ... PARTITION not supported for Iceberg table
 ====
+
+---- QUERY
+# Tests for 'impala.computeStatsSnapshotIds'.
+create table test_ice (
+  i INT,
+  b BIGINT,
+  s STRING
+) stored as iceberg;
+compute stats test_ice;
+describe formatted test_ice;
+---- RESULTS: VERIFY_IS_SUBSET
+# For a table that contains no snapshot, the snapshot ids are -1.
+row_regex:'','impala.computeStatsSnapshotIds','1-3:-1\s*'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Create a new snapshot, compute stats, and verify that the snapshot id is the same for
+# all columns.
+insert into test_ice values (1, 1, "one"), (1, 2, "two");
+compute stats test_ice;
+describe formatted test_ice;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','impala.computeStatsSnapshotIds','1-3:(\d+)\s*'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Compute stats for only the first and third columns, verify that they have the same
+# snapshot id.
+insert into test_ice values (10, 10, "ten");
+compute stats test_ice(i, s);
+describe formatted test_ice;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','impala.computeStatsSnapshotIds','1:(\d+),2:(\d+),3:\1\s*'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Compute stats for only the second and third columns, verify that they have the same
+# snapshot id.
+insert into test_ice values (100, 100, "hundred");
+compute stats test_ice(b, s);
+describe formatted test_ice;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'','impala.computeStatsSnapshotIds','1:(\d+),2-3:(\d+)\s*'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+drop stats test_ice;
+describe formatted test_ice;
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:'','impala.computeStatsSnapshotIds','.*'
+---- TYPES
+STRING,STRING,STRING
+====

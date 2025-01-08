@@ -1073,6 +1073,10 @@ public class ComputeStatsStmt extends StatementBase {
     if (table_ instanceof FeFsTable) {
       params.setTotal_file_bytes(((FeFsTable)table_).getTotalHdfsBytes());
     }
+
+    if (table_ instanceof FeIcebergTable) {
+      params.setIceberg_snapshot_id(((FeIcebergTable) table_).snapshotId());
+    }
     return params;
   }
 }

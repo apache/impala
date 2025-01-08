@@ -1994,6 +1994,9 @@ public class CatalogOpExecutor {
       // Set impala.lastComputeStatsTime just before alter_table to ensure that it is as
       // accurate as possible.
       Table.updateTimestampProperty(msTbl, HdfsTable.TBL_PROP_LAST_COMPUTE_STATS_TIME);
+      if (IcebergTable.isIcebergTable(msTbl)) {
+        ((IcebergTable) table).updateComputeStatsIcebergSnapshotsProperty(msTbl, params);
+      }
     }
 
     if (IcebergTable.isIcebergTable(msTbl) && isIcebergHmsIntegrationEnabled(msTbl)) {
@@ -2026,6 +2029,7 @@ public class CatalogOpExecutor {
     String CATALOG_SERVICE_ID = MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey();
     String CATALOG_VERSION    = MetastoreEventPropertyKey.CATALOG_VERSION.getKey();
     String COMPUTE_STATS_TIME = HdfsTable.TBL_PROP_LAST_COMPUTE_STATS_TIME;
+    String COMPUTE_STATS_SNAPSHOT_IDS = IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS;
 
     Preconditions.checkState(msTbl.getParameters().containsKey(CATALOG_SERVICE_ID));
     Preconditions.checkState(msTbl.getParameters().containsKey(CATALOG_VERSION));
@@ -2035,6 +2039,10 @@ public class CatalogOpExecutor {
     props.put(CATALOG_VERSION,    msTbl.getParameters().get(CATALOG_VERSION));
     if (msTbl.getParameters().containsKey(COMPUTE_STATS_TIME)) {
       props.put(COMPUTE_STATS_TIME, msTbl.getParameters().get(COMPUTE_STATS_TIME));
+    }
+    if (msTbl.getParameters().containsKey(COMPUTE_STATS_SNAPSHOT_IDS)) {
+      props.put(COMPUTE_STATS_SNAPSHOT_IDS,
+          msTbl.getParameters().get(COMPUTE_STATS_SNAPSHOT_IDS));
     }
 
     org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(iceTbl);
@@ -2726,6 +2734,7 @@ public class CatalogOpExecutor {
       catalog_.getLock().writeLock().unlock();
       modification.addCatalogServiceIdentifiersToTable();
       modification.registerInflightEvent();
+
       if (params.getPartition_set() == null) {
         // TODO: Report the number of updated partitions/columns to the user?
         // TODO: bulk alter the partitions.
@@ -2833,8 +2842,11 @@ public class CatalogOpExecutor {
         msTbl.getParameters().remove(StatsSetupConst.TOTAL_SIZE) != null;
     boolean droppedLastCompute =
         msTbl.getParameters().remove(HdfsTable.TBL_PROP_LAST_COMPUTE_STATS_TIME) != null;
+    boolean droppedIcebergComputeStatsSnapshotIds =
+        msTbl.getParameters().remove(IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS) != null;
 
-    if (droppedRowCount || droppedTotalSize || droppedLastCompute) {
+    if (droppedRowCount || droppedTotalSize || droppedLastCompute
+        || droppedIcebergComputeStatsSnapshotIds) {
       applyAlterTable(msTbl, false, null, catalogTimeline);
       ++numTargetedPartitions;
     }
@@ -2889,8 +2901,9 @@ public class CatalogOpExecutor {
     boolean isIntegratedIcebergTbl =
         IcebergTable.isIcebergTable(msTbl) && isIcebergHmsIntegrationEnabled(msTbl);
     Preconditions.checkState(isIntegratedIcebergTbl);
-    IcebergCatalogOpExecutor.unsetTblProperties(
-        iceTxn, Collections.singletonList(HdfsTable.TBL_PROP_LAST_COMPUTE_STATS_TIME));
+    IcebergCatalogOpExecutor.unsetTblProperties(iceTxn,
+       Arrays.asList(HdfsTable.TBL_PROP_LAST_COMPUTE_STATS_TIME,
+           IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS));
   }
 
   /**

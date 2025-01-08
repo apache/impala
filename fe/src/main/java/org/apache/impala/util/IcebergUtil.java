@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogProperties;
@@ -115,6 +116,8 @@ import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("UnstableApiUsage")
 public class IcebergUtil {
@@ -125,6 +128,8 @@ public class IcebergUtil {
   @SuppressWarnings("unused")
   private static final int ICEBERG_EPOCH_HOUR = 0;
   public static final String HIVE_CATALOG = "hive.catalog";
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergUtil.class);
 
   /**
    * Returns the corresponding catalog implementation for 'feTable'.
@@ -1356,5 +1361,106 @@ public class IcebergUtil {
       case TRUNCATE: return "iceberg_truncate_transform";
     }
     return "";
+  }
+
+  public static class ComputeStatsSnapshotPropertyConverter {
+    public static TreeMap<Long, Long> stringToMap(String snapshotIds) {
+      TreeMap<Long, Long> res = new TreeMap<Long, Long>();
+      if (snapshotIds == null) return res;
+
+      String[] columns = snapshotIds.split(",");
+
+      for (String column : columns) {
+        String[] colIdAndSnapshotId = column.split(":");
+        if (colIdAndSnapshotId.length != 2) {
+          return logAndReturnEmptyMap(snapshotIds);
+        }
+
+        try {
+          String colStr = colIdAndSnapshotId[0];
+          Long snapshotId = Long.parseLong(colIdAndSnapshotId[1]);
+
+          String[] colRange = colStr.split("-");
+          if (colRange.length == 1) {
+            res.put(Long.parseLong(colRange[0]), snapshotId);
+          } else if (colRange.length == 2) {
+            long rangeStart = Long.parseLong(colRange[0]);
+            long rangeEnd = Long.parseLong(colRange[1]);
+            for (long colId = rangeStart; colId <= rangeEnd; ++colId) {
+              res.put(colId, snapshotId);
+            }
+          } else {
+            return logAndReturnEmptyMap(snapshotIds);
+          }
+        } catch (NumberFormatException e) {
+          return logAndReturnEmptyMap(snapshotIds);
+        }
+      }
+
+      return res;
+    }
+
+    public static String mapToString(TreeMap<Long, Long> colAndSnapshotIds) {
+      ConversionState state = new ConversionState();
+
+      for (Map.Entry<Long, Long> entry : colAndSnapshotIds.entrySet()) {
+        long col = entry.getKey();
+        long snapshotId = entry.getValue();
+
+        if (state.canContinueRange(col, snapshotId)) {
+          state.extendRange();
+        } else {
+          state.flushRange();
+          state.initNewRange(col, snapshotId);
+        }
+      }
+      state.flushRange();
+
+      return state.getResult();
+    }
+
+    private static TreeMap<Long, Long> logAndReturnEmptyMap(String snapshotIdsStr) {
+      LOG.warn(String.format(
+          "Invalid value for table property '%s': \"%s\". Ignoring it.",
+          IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS, snapshotIdsStr));
+      return new TreeMap<>();
+    }
+
+    private static class ConversionState {
+      // Intentionally not using -1 as that is the snapshot ID of empty tables.
+      private static final long INVALID = -10;
+      private long colRangeStart_ = INVALID;
+      private long lastCol_ = INVALID;
+      private long lastSnapshotId_ = INVALID;
+      private final StringBuilder sb_ = new StringBuilder();
+
+      private boolean canContinueRange(long col, long snapshotId) {
+        return lastCol_ != INVALID && lastSnapshotId_ != INVALID
+            && lastSnapshotId_ == snapshotId && (lastCol_ + 1 == col);
+      }
+
+      private void extendRange() {
+        ++lastCol_;
+      }
+
+      private void flushRange() {
+        if (colRangeStart_ != INVALID) {
+          sb_.append(colRangeStart_);
+          if (lastCol_ != colRangeStart_) sb_.append("-").append(lastCol_);
+          sb_.append(":").append(lastSnapshotId_);
+        }
+      }
+
+      private void initNewRange(long col, long snapshotId) {
+        if (colRangeStart_ != INVALID) sb_.append(",");
+        colRangeStart_ = col;
+        lastCol_ = col;
+        lastSnapshotId_ = snapshotId;
+      }
+
+      private String getResult() {
+        return sb_.toString();
+      }
+    }
   }
 }

@@ -383,6 +383,9 @@ struct TAlterTableUpdateStatsParams {
 
   // If true, this is the result of an incremental stats computation
   6: optional bool is_incremental
+
+  // The snapshotId if this is an Iceberg table
+  7: optional i64 snapshot_id
 }
 
 // Parameters for ALTER TABLE SET [PARTITION partitionSet] CACHED|UNCACHED
@@ -697,6 +700,9 @@ struct TComputeStatsParams {
   // Sum of file sizes in the table. Only set for tables of type HDFS_TABLE and if
   // is_incremental is false.
   9: optional i64 total_file_bytes
+
+  // If this is an Iceberg table, stores the snapshot id for which stats are computed.
+  10: optional i64 iceberg_snapshot_id;
 }
 
 // Parameters for CREATE/DROP ROLE
