@@ -109,6 +109,64 @@ public class TupleCacheTest extends PlannerTestBase {
         String.format(basicJoinTmpl, "probe.id = build.id and build.id < 100"));
   }
 
+  @Test
+  public void testAggregateCacheKeys() {
+    // Scan and aggregate above scan are cached, aggregate above exchange is not.
+    String basicAgg = "select count(*), count(tinyint_col), min(tinyint_col), " +
+        "max(tinyint_col), sum(tinyint_col), avg(tinyint_col) " +
+        "from functional.alltypesagg";
+    verifyNIdenticalCacheKeys(basicAgg, basicAgg, 2);
+    // Scan and aggregate above scan are cached, aggregate above exchange is not.
+    String groupingAgg = "select tinyint_col, bigint_col, count(*), min(tinyint_col), " +
+        "max(tinyint_col), sum(tinyint_col), avg(tinyint_col) " +
+        "from functional.alltypesagg group by 2, 1";
+    verifyNIdenticalCacheKeys(groupingAgg, groupingAgg, 2);
+    // Scan and aggregate above scan are cached, later aggregates are not.
+    String distinctAgg = "select avg(l_quantity), ndv(l_discount), " +
+        "count(distinct l_partkey) from tpch_parquet.lineitem";
+    verifyNIdenticalCacheKeys(distinctAgg, distinctAgg, 2);
+    // Scan and aggregate above scan are cached, later aggregates are not.
+    String groupDistinctAgg = "select group_concat(distinct string_col) " +
+        "from functional.alltypesagg";
+    verifyNIdenticalCacheKeys(groupDistinctAgg, groupDistinctAgg, 2);
+    // Scan and the only aggregate are cached.
+    String havingAgg = "select 1 from functional.alltypestiny having count(*) > 0";
+    verifyNIdenticalCacheKeys(havingAgg, havingAgg, 2);
+    // Scan and aggregate above scan are cached. All later aggregates are above the
+    // exchange and thus not cached.
+    String twoPhaseAgg = "select bigint_col bc, count(smallint_col) c1, " +
+        "count(distinct int_col) c2 from functional.alltypessmall " +
+        "group by bigint_col order by bc";
+    verifyNIdenticalCacheKeys(twoPhaseAgg, twoPhaseAgg, 2);
+    // Build scan and aggregate above scan are cached. Probe scan caching is invalid
+    // because runtime filter contains agg with exchange. Other aggregates are above
+    // an exchange or hash join and thus not cached.
+    String rightJoinAgg = "with v1 as (select c_nationkey, c_custkey, count(*) " +
+        "from tpch.customer group by c_nationkey, c_custkey), " +
+        "v2 as (select c_nationkey, c_custkey, count(*) from v1, tpch.orders " +
+        "where c_custkey = o_custkey group by c_nationkey, c_custkey) " +
+        "select c_nationkey, count(*) from v2 group by c_nationkey";
+    verifyNIdenticalCacheKeys(rightJoinAgg, rightJoinAgg, 2);
+    // Both scans are cached, but aggregates above hash join and exchange are not.
+    String innerJoinAgg = "select count(*) from functional.alltypes t1 inner join " +
+        "functional.alltypestiny t2 on t1.smallint_col = t2.smallint_col group by " +
+        "t1.tinyint_col, t2.smallint_col having count(t2.int_col) = count(t1.bigint_col)";
+    verifyNIdenticalCacheKeys(innerJoinAgg, innerJoinAgg, 2);
+    // Both scans are cached, but aggregate is not because it's above a union. Limit only
+    // applies to aggregate above exchange, which is obviously not cached.
+    String unionAgg = "select count(*) from (select * from functional.alltypes " +
+        "union all select * from functional.alltypessmall) t limit 10";
+    verifyNIdenticalCacheKeys(unionAgg, unionAgg, 2);
+    // Only scan is cached, as aggregates are above an exchange and TOP-N.
+    String groupConcatGroupAgg = "select day, group_concat(distinct string_col) " +
+        "from (select * from functional.alltypesagg where id % 100 = day order by id " +
+        "limit 99999) a group by day";
+    verifyNIdenticalCacheKeys(groupConcatGroupAgg, groupConcatGroupAgg, 1);
+    // Only scan is cached, appx_median disables caching on aggregate.
+    String appxMedianAgg = "select appx_median(tinyint_col) from functional.alltypesagg";
+    verifyNIdenticalCacheKeys(appxMedianAgg, appxMedianAgg, 1);
+  }
+
   /**
    * Test cases that rely on masking out unnecessary data to have cache hits.
    */
@@ -342,9 +400,13 @@ public class TupleCacheTest extends PlannerTestBase {
   }
 
   protected void verifyIdenticalCacheKeys(String query1, String query2) {
+    verifyNIdenticalCacheKeys(query1, query2, 1);
+  }
+
+  protected void verifyNIdenticalCacheKeys(String query1, String query2, int n) {
     List<PlanNode> cacheEligibleNodes1 = getCacheEligibleNodes(query1);
     List<PlanNode> cacheEligibleNodes2 = getCacheEligibleNodes(query2);
-    assertTrue(cacheEligibleNodes1.size() > 0);
+    assertTrue(cacheEligibleNodes1.size() >= n);
     List<String> cacheKeys1 = getCacheKeys(cacheEligibleNodes1);
     List<String> cacheKeys2 = getCacheKeys(cacheEligibleNodes2);
     List<String> cacheHashTraces1 = getCacheHashTraces(cacheEligibleNodes1);

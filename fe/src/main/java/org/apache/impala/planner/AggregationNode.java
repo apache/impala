@@ -41,9 +41,11 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.ValidTupleIdExpr;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TAggregationNode;
 import org.apache.impala.thrift.TAggregator;
+import org.apache.impala.thrift.TBackendResourceProfile;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TPlanNode;
@@ -645,7 +647,7 @@ public class AggregationNode extends PlanNode {
   private AggregationNode getPrevAggNode(AggregationNode aggNode) {
     Preconditions.checkArgument(aggNode.getAggPhase() != AggPhase.FIRST);
     PlanNode child = aggNode.getChild(0);
-    if (child instanceof ExchangeNode) {
+    while (child instanceof ExchangeNode || child instanceof TupleCacheNode) {
       child = child.getChild(0);
     }
     Preconditions.checkState(child instanceof AggregationNode);
@@ -782,24 +784,41 @@ public class AggregationNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
+    Preconditions.checkState(false, "Unexpected use of old toThrift() signature.");
+  }
+
+  @Override
+  protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
     msg.agg_node = new TAggregationNode();
     msg.node_type = TPlanNodeType.AGGREGATION_NODE;
     boolean replicateInput = aggPhase_ == AggPhase.FIRST && aggInfos_.size() > 1;
     msg.agg_node.setReplicate_input(replicateInput);
-    msg.agg_node.setEstimated_input_cardinality(getChild(0).getCardinality());
+    // Normalize input cardinality estimate for caching in case stats change.
+    // Cache key of scan ensures we detect changes to actual input data.
+    msg.agg_node.setEstimated_input_cardinality(serialCtx.isTupleCache() ?
+        1 : getChild(0).getCardinality());
     msg.agg_node.setFast_limit_check(canCompleteEarly());
     for (int i = 0; i < aggInfos_.size(); ++i) {
       AggregateInfo aggInfo = aggInfos_.get(i);
       List<TExpr> aggregateFunctions = new ArrayList<>();
       for (FunctionCallExpr e : aggInfo.getMaterializedAggregateExprs()) {
-        aggregateFunctions.add(e.treeToThrift());
+        aggregateFunctions.add(e.treeToThrift(serialCtx));
       }
+      // At the point when TupleCachePlanner runs, the resource profile has not been
+      // calculated yet. They should not be in the cache key anyway, so mask them out.
+      TBackendResourceProfile resourceProfile = serialCtx.isTupleCache()
+          ? ResourceProfile.noReservation(0).toThrift()
+          : resourceProfiles_.get(i).toThrift();
+      // Ensure both tuple IDs are registered. Only one is added to tupleIds_.
+      serialCtx.registerTuple(aggInfo.getIntermediateTupleId());
+      serialCtx.registerTuple(aggInfo.getOutputTupleId());
       TAggregator taggregator = new TAggregator(aggregateFunctions,
-          aggInfo.getIntermediateTupleId().asInt(), aggInfo.getOutputTupleId().asInt(),
-          needsFinalize_, useStreamingPreagg_, resourceProfiles_.get(i).toThrift());
+          serialCtx.translateTupleId(aggInfo.getIntermediateTupleId()).asInt(),
+          serialCtx.translateTupleId(aggInfo.getOutputTupleId()).asInt(),
+          needsFinalize_, useStreamingPreagg_, resourceProfile);
       List<Expr> groupingExprs = aggInfo.getGroupingExprs();
       if (!groupingExprs.isEmpty()) {
-        taggregator.setGrouping_exprs(Expr.treesToThrift(groupingExprs));
+        taggregator.setGrouping_exprs(Expr.treesToThrift(groupingExprs, serialCtx));
       }
       msg.agg_node.addToAggregators(taggregator);
     }
@@ -1107,4 +1126,7 @@ public class AggregationNode extends PlanNode {
     return isSingleClassAgg() && hasLimit() && hasGrouping()
         && !multiAggInfo_.hasAggregateExprs() && getConjuncts().isEmpty();
   }
+
+  @Override
+  public boolean isTupleCachingImplemented() { return true; }
 }

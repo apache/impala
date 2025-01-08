@@ -412,6 +412,8 @@ public class FunctionCallExpr extends Expr {
             // Session / system information
             "coordinator", "current_database", "current_session", "current_user",
             "effective_user", "logged_in_user", "pid", "user", "version",
+            // Sampling aggregate functions
+            "appx_median",
             // AI Functions
             "ai_generate_text", "ai_generate_text_default");
     return functionNameInBuiltinSet(fnName_, knownNondeterministicFns);

@@ -58,6 +58,10 @@ def getCounterValues(profile, key):
   return [int(v) for v in counter_str_list]
 
 
+def assertCounterOrder(profile, key, vals):
+  values = getCounterValues(profile, key)
+  assert values == vals, values
+
 def assertCounter(profile, key, val, num_matches):
   if not isinstance(num_matches, list):
     num_matches = [num_matches]
@@ -354,6 +358,48 @@ class TestTupleCacheSingle(TestTupleCacheBase):
     assertCounters(exempt1.runtime_profile, num_hits=0, num_halted=0, num_skipped=0)
     assertCounters(exempt2.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
     assertCounters(exempt3.runtime_profile, num_hits=1, num_halted=0, num_skipped=0)
+
+  def test_aggregate(self, vector, unique_database):
+    """Simple aggregation can be cached"""
+    self.client.set_configuration(vector.get_value('exec_option'))
+    fq_table = "{0}.agg".format(unique_database)
+    self.create_table(fq_table)
+
+    result1 = self.execute_query("SELECT sum(age) FROM {0}".format(fq_table))
+    result2 = self.execute_query("SELECT sum(age) FROM {0}".format(fq_table))
+
+    assert result1.success
+    assert result2.success
+    assert result1.data == result2.data
+    assertCounters(result1.runtime_profile, 0, 0, 0, num_matches=2)
+    # Aggregate should hit, and scan node below it will miss.
+    assertCounterOrder(result2.runtime_profile, NUM_HITS, [1, 0])
+    assertCounter(result2.runtime_profile, NUM_HALTED, 0, num_matches=2)
+    assertCounter(result2.runtime_profile, NUM_SKIPPED, 0, num_matches=2)
+    # Verify that the bytes written by the first profile are the same as the bytes
+    # read by the second profile.
+    bytes_written = getCounterValues(result1.runtime_profile, "TupleCacheBytesWritten")
+    bytes_read = getCounterValues(result2.runtime_profile, "TupleCacheBytesRead")
+    assert len(bytes_written) == 2
+    assert len(bytes_read) == 1
+    assert bytes_written[0] == bytes_read[0]
+
+  def test_aggregate_reuse(self, vector):
+    """Cached aggregation can be re-used"""
+    self.client.set_configuration(vector.get_value('exec_option'))
+
+    result = self.execute_query("SELECT sum(int_col) FROM functional.alltypes")
+    assert result.success
+    assertCounters(result.runtime_profile, 0, 0, 0, num_matches=2)
+
+    result_scan = self.execute_query("SELECT avg(int_col) FROM functional.alltypes")
+    assert result_scan.success
+    assertCounterOrder(result_scan.runtime_profile, NUM_HITS, [0, 1])
+
+    result_agg = self.execute_query(
+        "SELECT avg(a) FROM (SELECT sum(int_col) as a FROM functional.alltypes) b")
+    assert result_agg.success
+    assertCounterOrder(result_agg.runtime_profile, NUM_HITS, [1, 0])
 
 
 @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
