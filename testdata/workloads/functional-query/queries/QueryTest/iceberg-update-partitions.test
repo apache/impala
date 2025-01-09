@@ -481,3 +481,25 @@ update ice_alltypes_part_v2 set p_date = add_months(p_date, i);
 ---- TYPES
 INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
 ====
+---- QUERY
+# Regression test for IMPALA-13655.
+# Updating a table with many partitions (with low mem_limit).
+# Then we also check the number of files to verify that
+# the inputs of the writers are actually sorted(/clustered).
+# The table contains 401 files before the update (1 per partition),
+# then the update writes a delete and a data file to each partition.
+CREATE TABLE ice_tpch_many_parts
+PARTITIONED BY SPEC(truncate(500, l_partkey))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2')
+AS SELECT * FROM tpch_parquet.lineitem
+WHERE l_linenumber=1;
+
+SET MEM_LIMIT=470m;
+UPDATE ice_tpch_many_parts SET l_orderkey=l_orderkey+1;
+SELECT count(*) FROM $DATABASE.ice_tpch_many_parts.`files`;
+---- RESULTS
+1203
+---- TYPES
+BIGINT
+====

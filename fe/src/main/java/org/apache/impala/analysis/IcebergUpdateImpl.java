@@ -177,7 +177,7 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
 
     TableSink insertSink = TableSink.create(modifyStmt_.table_, TableSink.Op.INSERT,
         insertPartitionKeyExprs_, insertResultExprs_, Collections.emptyList(), false,
-        false, new Pair<>(sortColumns_, sortingOrder_), -1, null,
+        true, new Pair<>(sortColumns_, sortingOrder_), -1, null,
         modifyStmt_.maxTableSinks_);
     TableSink deleteSink = new IcebergBufferedDeleteSink(
         icePosDelTable_, deletePartitionKeyExprs_, deleteResultExprs_, deleteTableId_);
