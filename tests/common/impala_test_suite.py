@@ -1053,12 +1053,12 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @execute_wrapper
   def execute_scalar(self, query, query_options=None):
-    """Executes a scalar query return the single row result.
-    Only validate that query return just one row.
+    """Executes a scalar query return the single row result. Only validate that
+    query return at most one row. Return None if query return an empty result.
     Remember to pass vector.get_value('exec_option') as 'query_options' argument
-    if the test has one."""
-    result = self.__execute_query(self.client, query, query_options)
-    assert len(result.data) <= 1, 'Multiple values returned from scalar'
+    if the test has one. If query_options is not set, the query will be run with
+    long_polling_time_ms=100 to speed up response."""
+    result = self.__execute_scalar(self.client, query, query_options)
     return result.data[0] if len(result.data) == 1 else None
 
   @classmethod
@@ -1068,11 +1068,12 @@ class ImpalaTestSuite(BaseTestSuite):
     """Executes a scalar query return the single row result.
     Validate that query execution is indeed successful and return just one row.
     Remember to pass vector.get_value('exec_option') as 'query_options' argument
-    if the test has one."""
-    result = cls.__execute_query(impalad_client, query, query_options, user)
+    if the test has one. If query_options is not set, the query will be run with
+    long_polling_time_ms=100 to speed up response."""
+    result = cls.__execute_scalar(impalad_client, query, query_options, user)
     assert result.success
-    assert len(result.data) <= 1, 'Multiple values returned from scalar'
-    return result.data[0] if len(result.data) == 1 else None
+    assert len(result.data) == 1
+    return result.data[0]
 
   def exec_and_compare_hive_and_impala_hs2(self, stmt, compare=lambda x, y: x == y):
     """Compare Hive and Impala results when executing the same statment over HS2"""
@@ -1130,6 +1131,19 @@ class ImpalaTestSuite(BaseTestSuite):
     """Executes the given query against the specified Impalad"""
     if query_options is not None: impalad_client.set_configuration(query_options)
     return impalad_client.execute(query, user=user)
+
+  @classmethod
+  def __execute_scalar(cls, impalad_client, query, query_options=None, user=None):
+    """Executes the given scalar query against the specified Impalad.
+    If query_options is not set, the query will be run with long_polling_time_ms=100
+    to speed up response."""
+    if query_options is None:
+      impalad_client.set_configuration_option('long_polling_time_ms', 100)
+    else:
+      impalad_client.set_configuration(query_options)
+    result = impalad_client.execute(query, user=user)
+    assert len(result.data) <= 1, 'Multiple values returned from scalar'
+    return result
 
   def clone_table(self, src_tbl, dst_tbl, recover_partitions, vector):
     src_loc = self._get_table_location(src_tbl, vector)
@@ -1551,7 +1565,9 @@ class ImpalaTestSuite(BaseTestSuite):
     """
     actual_log_path = self.__build_log_path(daemon, level)
 
-    def exists_func(_):
+    def exists_func(is_last_try):
+      if is_last_try:
+        LOG.info("Checking existence of {} for the last time.".format(actual_log_path))
       return os.path.exists(actual_log_path)
 
     assert retry(exists_func, max_attempts, sleep_time_s, 1, True), "file '{}' did not " \
