@@ -19,16 +19,16 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-
-import sys
-
-from tests.common.base_test_suite import BaseTestSuite
-
 from datetime import datetime, timedelta
 from http.client import HTTPMessage
+import sys
 
-from shell.cookie_util import (cookie_matches_path, get_cookie_expiry,
-                               get_all_matching_cookies)
+from impala_shell.cookie_util import (
+    cookie_matches_path,
+    get_all_matching_cookies,
+    get_cookie_expiry,
+)
+from tests.common.base_test_suite import BaseTestSuite
 
 
 class TestCookieUtil(BaseTestSuite):

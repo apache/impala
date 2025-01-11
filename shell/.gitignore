@@ -1,5 +1,6 @@
 /build/
 /gen-py/
+/impala_thrift_gen/
 /ext-py/
 
 # Ignore the build version python file

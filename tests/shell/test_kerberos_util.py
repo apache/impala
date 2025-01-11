@@ -20,7 +20,7 @@
 
 from __future__ import absolute_import, division, print_function
 
-from shell.kerberos_util import get_kerb_host_from_kerberos_host_fqdn
+from impala_shell.kerberos_util import get_kerb_host_from_kerberos_host_fqdn
 from tests.common.base_test_suite import BaseTestSuite
 
 

@@ -19,40 +19,54 @@
 # under the License.
 #
 # Impala's shell
-from __future__ import print_function, unicode_literals
-from compatibility import _xrange as xrange
-
+from __future__ import absolute_import, print_function, unicode_literals
 import cmd
 import errno
 import getpass
 import logging
 import os
-import prettytable
 import random
 import re
 import shlex
 import signal
 import socket
-import sqlparse
 import subprocess
+from subprocess import call
 import sys
 import textwrap
 import time
 import traceback
 
-from impala_client import ImpalaHS2Client, StrictHS2Client, \
-    ImpalaBeeswaxClient, QueryOptionLevels, log_exception_with_timestamp, log_timestamp
-from impala_shell_config_defaults import impala_shell_defaults
-from option_parser import get_option_parser, get_config_from_file
-from shell_output import (DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter,
-                          OverwritingStdErrOutputStream, VerticalOutputFormatter,
-                          match_string_type)
-from subprocess import call
-from shell_exceptions import (RPCException, DisconnectedException, QueryStateException,
-    QueryCancelledByShellException, MissingThriftMethodException)
+import prettytable
+import sqlparse
 
-from value_converter import HS2ValueConverter
-
+from impala_shell.compatibility import _xrange as xrange
+from impala_shell.impala_client import (
+    ImpalaBeeswaxClient,
+    ImpalaHS2Client,
+    log_exception_with_timestamp,
+    log_timestamp,
+    QueryOptionLevels,
+    StrictHS2Client,
+)
+from impala_shell.impala_shell_config_defaults import impala_shell_defaults
+from impala_shell.option_parser import get_config_from_file, get_option_parser
+from impala_shell.shell_exceptions import (
+    DisconnectedException,
+    MissingThriftMethodException,
+    QueryCancelledByShellException,
+    QueryStateException,
+    RPCException,
+)
+from impala_shell.shell_output import (
+    DelimitedOutputFormatter,
+    match_string_type,
+    OutputStream,
+    OverwritingStdErrOutputStream,
+    PrettyOutputFormatter,
+    VerticalOutputFormatter,
+)
+from impala_shell.value_converter import HS2ValueConverter
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
 VERSION_STRING = "impala shell build version not available"
@@ -60,8 +74,10 @@ READLINE_UNAVAILABLE_ERROR = "The readline module was either not found or disabl
                              "Command history will not be collected."
 
 # Tarball / packaging build makes impala_build_version available
+# TODO: There's no reason for this to fail when everything is built around pip installs,
+# so this could be simplified.
 try:
-  from impala_build_version import get_git_hash, get_build_date, get_version
+  from impala_shell.impala_build_version import get_build_date, get_git_hash, get_version
   VERSION_STRING = VERSION_FORMAT % {'version': get_version(),
                                      'git_hash': get_git_hash()[:7],
                                      'build_date': get_build_date()}
@@ -1511,7 +1527,7 @@ class ImpalaShell(cmd.Cmd, object):
       # Python2 will implicitly convert unicode to str when printing to stderr. It's done
       # using the default 'ascii' encoding, which will fail for UTF-8 error messages.
       # Here we use 'utf-8' to explicitly convert 'msg' to str if it's in unicode type.
-      if sys.version_info.major == 2 and isinstance(msg, unicode):
+      if sys.version_info.major == 2 and isinstance(msg, unicode):  # noqa: F821
         msg = msg.encode('utf-8')
       log_exception_with_timestamp(msg)
     except DisconnectedException as e:
@@ -2268,7 +2284,7 @@ def impala_shell_main():
         print(("-k requires a valid kerberos ticket but no valid kerberos "
                "ticket found."), file=sys.stderr)
         raise FatalShellException()
-    except OSError as e:
+    except OSError:
       print('klist not found on the system, install kerberos clients', file=sys.stderr)
       raise FatalShellException()
   elif options.use_ldap:
@@ -2311,7 +2327,7 @@ def impala_shell_main():
 
   if options.verbose:
     try:
-      import thrift.protocol.fastbinary
+      import thrift.protocol.fastbinary  # noqa: F401
     except Exception as e:
       print("WARNING: Failed to load Thrift's fastbinary module. Thrift's "
             "BinaryProtocol will not be accelerated, which can reduce performance. "

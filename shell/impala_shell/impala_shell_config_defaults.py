@@ -20,7 +20,6 @@
 
 # default options used by the Impala shell stored in a dict
 from __future__ import print_function, unicode_literals
-
 import getpass
 import os
 import socket

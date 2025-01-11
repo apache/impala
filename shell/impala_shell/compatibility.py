@@ -17,7 +17,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from __future__ import print_function, unicode_literals
+from __future__ import absolute_import, print_function, unicode_literals
 
 """
 A module where we can aggregate python2 -> 3 code contortions.
@@ -25,7 +25,6 @@ A module where we can aggregate python2 -> 3 code contortions.
 
 import os
 import sys
-
 
 if sys.version_info.major == 2:
   # default is typically ASCII, but unicode_literals dictates UTF-8

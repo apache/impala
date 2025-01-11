@@ -25,27 +25,16 @@ SHELL_HOME=${IMPALA_SHELL_HOME:-${IMPALA_HOME}/shell}
 
 # ${IMPALA_HOME}/bin has bootstrap_toolchain.py, required by bootstrap_virtualenv.py
 PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/bin
-
-# Default version of thrift for the impala-shell is thrift >= 0.11.0.
-PYTHONPATH=${PYTHONPATH}:${SHELL_HOME}/gen-py
-
-THRIFT_PY_ROOT="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT_PY_VERSION}"
+PYTHONPATH=${PYTHONPATH}:${SHELL_HOME}
 
 export LD_LIBRARY_PATH=":$(PYTHONPATH=${PYTHONPATH} \
   python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
   --print-ld-library-path)"
 
 IMPALA_PY_DIR="$(dirname "$0")/../infra/python"
-IMPALA_PY_ENV_DIR="${IMPALA_PY_DIR}/env-gcc${IMPALA_GCC_VERSION}"
+IMPALA_PY3_ENV_DIR="${IMPALA_PY_DIR}/env-gcc${IMPALA_GCC_VERSION}-py3"
 # Allow overriding the python executable
-IMPALA_PYTHON_EXECUTABLE="${IMPALA_PYTHON_EXECUTABLE:-${IMPALA_PY_ENV_DIR}/bin/python}"
-
-for PYTHON_LIB_DIR in ${THRIFT_PY_ROOT}/python/lib{64,}; do
-  [[ -d ${PYTHON_LIB_DIR} ]] || continue
-  for PKG_DIR in ${PYTHON_LIB_DIR}/python*/site-packages; do
-    PYTHONPATH=${PYTHONPATH}:${PKG_DIR}/
-  done
-done
+IMPALA_PYTHON_EXECUTABLE="${IMPALA_PYTHON_EXECUTABLE:-${IMPALA_PY3_ENV_DIR}/bin/python3}"
 
 # Note that this uses the external system python executable
 PYTHONPATH=${PYTHONPATH} python "${IMPALA_PY_DIR}/bootstrap_virtualenv.py"
@@ -61,4 +50,4 @@ fi
 
 # This uses the python executable in the impala python env
 PYTHONIOENCODING='utf-8' PYTHONPATH=${PYTHONPATH} \
-  exec "${IMPALA_PYTHON_EXECUTABLE}" ${EXTRA_ARGS:-} ${SHELL_HOME}/impala_shell.py "$@"
+  exec "${IMPALA_PYTHON_EXECUTABLE}" ${EXTRA_ARGS:-} -m "impala_shell.impala_shell" "$@"

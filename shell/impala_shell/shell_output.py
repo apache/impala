@@ -17,8 +17,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from __future__ import print_function, unicode_literals
-
+from __future__ import absolute_import, print_function, unicode_literals
 import csv
 import re
 import sys
@@ -38,11 +37,11 @@ def match_string_type(str_to_convert, reference_str):
     assert isinstance(str_to_convert, str)
     return str_to_convert
 
-  if type(str_to_convert) == type(reference_str):
+  if isinstance(str_to_convert, type(reference_str)):
     return str_to_convert
 
   if isinstance(reference_str, str):
-    assert isinstance(str_to_convert, unicode)
+    assert isinstance(str_to_convert, unicode)  # noqa: F821
     return str_to_convert.encode('UTF-8')
   else:
     assert isinstance(reference_str, str)
@@ -103,8 +102,8 @@ class DelimitedOutputFormatter(object):
                         lineterminator='\n', quoting=csv.QUOTE_MINIMAL)
     for row in rows:
       if sys.version_info.major == 2:
-        row = [val.encode('utf-8', 'replace') if isinstance(val, unicode) else val
-            for val in row]
+        row = [val.encode('utf-8', 'replace') if isinstance(val, unicode)  # noqa: F821
+            else val for val in row]
       writer.writerow(row)
     # The CSV writer produces an extra newline. Strip that extra newline (and
     # only that extra newline). csv wraps newlines for data values in quotes,
@@ -132,10 +131,10 @@ class VerticalOutputFormatter(DelimitedOutputFormatter):
                         lineterminator='\n', quoting=csv.QUOTE_MINIMAL)
     for r, row in enumerate(rows):
       if sys.version_info.major == 2:
-        row = [val.encode('utf-8', 'replace') if isinstance(val, unicode) else val
-            for val in row]
-      writer.writerow(["************************************** " +
-        str(r + 1) + ".row **************************************"])
+        row = [val.encode('utf-8', 'replace') if isinstance(val, unicode)  # noqa: F821
+            else val for val in row]
+      writer.writerow(["************************************** "
+        + str(r + 1) + ".row **************************************"])
       for c, val in enumerate(row):
         row[c] = self.column_names[c].rjust(self.column_name_max_len) + ": " + val
       writer.writerow(row)

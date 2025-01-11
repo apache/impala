@@ -17,21 +17,21 @@
 
 from __future__ import absolute_import, division, print_function
 import os
-import pytest
 import ssl
 import sys
 import time
+
+import pytest
 
 # This import is the actual ImpalaShell class from impala_shell.py.
 # We rename it to ImpalaShellClass here because we later import another
 # class called ImpalaShell from tests/shell/util.py, and we don't want
 # to mask it.
-from shell.impala_shell import ImpalaShell as ImpalaShellClass
-
-from tests.common.environ import IS_REDHAT_DERIVATIVE
+from impala_shell.impala_shell import ImpalaShell as ImpalaShellClass
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.test_vector import ImpalaTestVector
+from tests.common.environ import IS_REDHAT_DERIVATIVE
 from tests.common.test_dimensions import create_client_protocol_dimension
+from tests.common.test_vector import ImpalaTestVector
 from tests.shell.util import ImpalaShell
 
 REQUIRED_MIN_OPENSSL_VERSION = 0x10001000

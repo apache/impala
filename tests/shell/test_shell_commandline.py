@@ -19,34 +19,43 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
+from contextlib import closing
 import errno
 import getpass
 import os
-import pytest
 import re
 import signal
 import socket
-import tempfile
-
-from shell.impala_shell import ImpalaShell as ImpalaShellClass
-
 from subprocess import call, Popen
+import tempfile
+from time import sleep, time
+
+from builtins import range
+import pytest
+
+from impala_shell.impala_shell import ImpalaShell as ImpalaShellClass
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_service import ImpaladService
-from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
+from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT, ImpalaTestSuite
 from tests.common.skip import SkipIf
 from tests.common.test_dimensions import (
-  create_client_protocol_dimension, create_client_protocol_strict_dimension,
-  create_uncompressed_text_dimension, create_single_exec_option_dimension)
+    create_client_protocol_dimension,
+    create_client_protocol_strict_dimension,
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension,
+)
 from tests.common.test_result_verifier import error_msg_startswith
-from time import sleep, time
-from tests.shell.util import (get_impalad_host_port, assert_var_substitution,
-  run_impala_shell_cmd, ImpalaShell, build_shell_env, wait_for_query_state,
-  create_impala_shell_executable_dimension, get_impala_shell_executable,
-  stderr_get_first_error_msg)
-from contextlib import closing
-
+from tests.shell.util import (
+    assert_var_substitution,
+    build_shell_env,
+    create_impala_shell_executable_dimension,
+    get_impala_shell_executable,
+    get_impalad_host_port,
+    ImpalaShell,
+    run_impala_shell_cmd,
+    stderr_get_first_error_msg,
+    wait_for_query_state,
+)
 
 DEFAULT_QUERY = 'select 1'
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')

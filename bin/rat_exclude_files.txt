@@ -17,15 +17,15 @@ bin/junitxml_prune_notrun.py
 tests/*/__init__.py
 testdata/common/__init__.py
 fe/src/test/resources/regionservers
-shell/__init__.py
+shell/impala_shell/__init__.py
 ssh_keys/id_rsa_impala
 testdata/__init__.py
 tests/__init__.py
 bin/diagnostics/__init__.py
 lib/python/impala_py_lib/__init__.py
 lib/python/impala_py_lib/jenkins/__init__.py
-shell/packaging/MANIFEST.in
-shell/packaging/requirements.txt
+shell/MANIFEST.in
+shell/requirements.txt
 testdata/cluster/node_templates/cdh7/etc/init.d/kms
 testdata/authentication/*
 bin/banned_py3k_warnings.txt
@@ -113,7 +113,7 @@ docker/README.md
 be/src/thirdparty/pcg-cpp-0.98/README.md
 lib/python/README.md
 lib/python/impala_py_lib/gdb/README.md
-shell/packaging/README.md
+shell/README.md
 bin/kerberos/README-kerberos.md
 
 # http://www.apache.org/legal/src-headers.html: "Test data for which the addition of a

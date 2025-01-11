@@ -27,8 +27,7 @@
 # [impala.query_options]
 # EXPLAIN_LEVEL=2
 # MT_DOP=2
-from __future__ import print_function, unicode_literals
-
+from __future__ import absolute_import, print_function, unicode_literals
 import sys
 
 try:
@@ -36,8 +35,9 @@ try:
 except ImportError:
   from ConfigParser import ConfigParser  # python2
 
-from impala_shell_config_defaults import impala_shell_defaults
 from optparse import OptionParser, SUPPRESS_HELP
+
+from impala_shell.impala_shell_config_defaults import impala_shell_defaults
 
 
 class ConfigFileFormatError(Exception):
@@ -383,12 +383,12 @@ def get_option_parser(defaults):
       if short_opt in defaults:
         if option.dest not in defaults:
           defaults[option.dest] = defaults[short_opt]
-        elif type(defaults[option.dest]) == list:
+        elif isinstance(defaults[option.dest], list):
           defaults[option.dest].extend(defaults[short_opt])
       elif long_opt in defaults:
         if option.dest not in defaults:
           defaults[option.dest] = defaults[long_opt]
-        elif type(defaults[option.dest]) == list:
+        elif isinstance(defaults[option.dest], list):
           defaults[option.dest].extend(defaults[long_opt])
 
     # since the quiet flag is the same as the verbose flag

@@ -17,48 +17,67 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from __future__ import print_function, unicode_literals
-from compatibility import _xrange as xrange
-
-from bitarray import bitarray
+from __future__ import absolute_import, print_function, unicode_literals
 import base64
+from datetime import datetime
 import operator
 import re
-import sasl
 import socket
 import ssl
 import sys
 import time
 import traceback
-from datetime import datetime
 import uuid
 
-from impala_thrift_gen.beeswax import BeeswaxService
-from impala_thrift_gen.beeswax.BeeswaxService import QueryState
-from impala_thrift_gen.ImpalaService import ImpalaService, ImpalaHiveServer2Service
-from impala_thrift_gen.ImpalaService.ImpalaHiveServer2Service import (
-    TGetRuntimeProfileReq, TGetExecSummaryReq, TPingImpalaHS2ServiceReq,
-    TCloseImpalaOperationReq)
-from impala_thrift_gen.ErrorCodes.ttypes import TErrorCode
-from impala_thrift_gen.Status.ttypes import TStatus
-from impala_thrift_gen.TCLIService.TCLIService import (TExecuteStatementReq,
-    TOpenSessionReq, TCloseSessionReq, TProtocolVersion, TStatusCode,
-    TGetOperationStatusReq, TOperationState, TFetchResultsReq, TFetchOrientation,
-    TGetLogReq, TGetResultSetMetadataReq, TTypeId, TCancelOperationReq,
-    TCloseOperationReq)
-from ImpalaHttpClient import ImpalaHttpClient
-from exec_summary import build_exec_summary_table
-from kerberos_util import get_kerb_host_from_kerberos_host_fqdn
+from bitarray import bitarray
+import sasl
 from thrift.protocol import TBinaryProtocol
-from thrift_sasl import TSaslClientTransport
+from thrift.Thrift import TApplicationException, TException
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
-from thrift.Thrift import TApplicationException, TException
-from shell_exceptions import (RPCException, QueryStateException, DisconnectedException,
-    QueryCancelledByShellException, MissingThriftMethodException, HttpError)
+from thrift_sasl import TSaslClientTransport
 
-from value_converter import HS2ValueConverter
-from thrift_printer import ThriftPrettyPrinter
+from impala_shell.compatibility import _xrange as xrange
+from impala_shell.exec_summary import build_exec_summary_table
+from impala_shell.ImpalaHttpClient import ImpalaHttpClient
+from impala_shell.kerberos_util import get_kerb_host_from_kerberos_host_fqdn
+from impala_shell.shell_exceptions import (
+    DisconnectedException,
+    HttpError,
+    MissingThriftMethodException,
+    QueryCancelledByShellException,
+    QueryStateException,
+    RPCException,
+)
+from impala_shell.thrift_printer import ThriftPrettyPrinter
+from impala_shell.value_converter import HS2ValueConverter
+from impala_thrift_gen.beeswax import BeeswaxService
+from impala_thrift_gen.beeswax.BeeswaxService import QueryState
+from impala_thrift_gen.ErrorCodes.ttypes import TErrorCode
+from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service, ImpalaService
+from impala_thrift_gen.ImpalaService.ImpalaHiveServer2Service import (
+    TCloseImpalaOperationReq,
+    TGetExecSummaryReq,
+    TGetRuntimeProfileReq,
+    TPingImpalaHS2ServiceReq,
+)
+from impala_thrift_gen.Status.ttypes import TStatus
+from impala_thrift_gen.TCLIService.TCLIService import (
+    TCancelOperationReq,
+    TCloseOperationReq,
+    TCloseSessionReq,
+    TExecuteStatementReq,
+    TFetchOrientation,
+    TFetchResultsReq,
+    TGetLogReq,
+    TGetOperationStatusReq,
+    TGetResultSetMetadataReq,
+    TOpenSessionReq,
+    TOperationState,
+    TProtocolVersion,
+    TStatusCode,
+    TTypeId,
+)
 
 # Getters to extract HS2's representation of values to the display version.
 # An entry must be added to this map for each supported type. HS2's TColumn has many
@@ -96,7 +115,7 @@ def utf8_decode_if_needed(val):
 
 # Helper to decode unicode to utf8 encoded str in Python 2. NOOP in Python 3.
 def utf8_encode_if_needed(val):
-  if sys.version_info.major < 3 and isinstance(val, unicode):
+  if sys.version_info.major < 3 and isinstance(val, unicode):  # noqa: F821
     val = val.encode('utf-8', errors='replace')
   return val
 
@@ -478,7 +497,7 @@ class ImpalaClient(object):
     if self.use_ssl:
       # TSSLSocket needs the ssl module, which may not be standard on all Operating
       # Systems. Only attempt to import TSSLSocket if the user wants an SSL connection.
-      from TSSLSocketWithWildcardSAN import TSSLSocketWithWildcardSAN
+      from impala_shell.TSSLSocketWithWildcardSAN import TSSLSocketWithWildcardSAN
 
     # The kerberos_host_fqdn option exposes the SASL client's hostname attribute to
     # the user. impala-shell checks to ensure this host matches the host in the kerberos
@@ -1468,6 +1487,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
       # shell being installed as a standalone python package from public PyPI,
       # rather than being included as part of a typical Impala deployment.
       #
+      # TODO: Revisit the following:
       # Essentially, it's a hack that is required due to issues stemming from
       # IMPALA-6808. Because of the way the Impala python environment has been
       # somewhat haphazardly constructed, we end up polluting the top level Impala
@@ -1508,7 +1528,7 @@ def log_exception_with_timestamp(e, type="Exception", msg="", stderr_flag=True):
   # method log_exception_with_timestamp prints timestamp with exception trace
   # and accepts custom message before timestamp. stderr_flag controls print statement
   # to be logged in stderr, by default it is true.
-  if(stderr_flag):
+  if (stderr_flag):
       print("%s [%s] %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), type,
       msg), e, file=sys.stderr)
   else:

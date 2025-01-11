@@ -1,3 +1,5 @@
 include *.txt *.md *.py
 recursive-include impala_shell *.py
 recursive-exclude impala_shell *.pyc
+recursive-include impala_thrift_gen *.py
+recursive-exclude impala_thrift_gen *.pyc

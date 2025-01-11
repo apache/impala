@@ -16,28 +16,31 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-from __future__ import print_function, unicode_literals
-
+from __future__ import absolute_import, print_function, unicode_literals
+import base64
+from collections import namedtuple
+import datetime
 from io import BytesIO
 import os
 import os.path
 import ssl
 import sys
 import warnings
-import base64
-import datetime
-from collections import namedtuple
-
-from six.moves import urllib, http_client
-
-from thrift.transport.TTransport import TTransportBase
-from shell_exceptions import HttpError, AuthenticationException
-from cookie_util import get_all_matching_cookies, get_all_cookies, get_cookie_expiry
 
 import six
+from six.moves import http_client, urllib
+from thrift.transport.TTransport import TTransportBase
+
+from impala_shell.cookie_util import (
+    get_all_cookies,
+    get_all_matching_cookies,
+    get_cookie_expiry,
+)
+from impala_shell.shell_exceptions import AuthenticationException, HttpError
 
 # Declare namedtuple for Cookie with named fields - cookie and expiry_time
 Cookie = namedtuple('Cookie', ['cookie', 'expiry_time'])
+
 
 # This was taken from THttpClient.py in Thrift to allow making changes Impala needs.
 # The current changes that have been applied:

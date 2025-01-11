@@ -105,5 +105,5 @@ add_custom_target(shell_python3_install DEPENDS python3_venv shell_pypi_test_pac
 )
 
 add_custom_target(shell_tarball DEPENDS gen-deps shell_pypi_test_package "${IMPALA_PYTHON_BUILD_VENVS}"
-  COMMAND "${CMAKE_SOURCE_DIR}/shell/make_shell_tarball.sh" "${SHELL_TEST_PKG}" ${PYTHON_EXES}
+  COMMAND "${CMAKE_SOURCE_DIR}/shell/packaging/make_shell_tarball.sh" "${SHELL_TEST_PKG}" ${PYTHON_EXES}
 )

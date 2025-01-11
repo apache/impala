@@ -15,9 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from impala_thrift_gen.TCLIService.TCLIService import TTypeId
-
+from __future__ import absolute_import
 import sys
+
+from impala_thrift_gen.TCLIService.TCLIService import TTypeId
 
 
 class ValueConverter(object):

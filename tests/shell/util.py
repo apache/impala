@@ -19,31 +19,33 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from contextlib import closing
 import logging
 import os
+import re
+import shlex
 import socket
-from contextlib import closing
+from subprocess import PIPE, Popen
+import sys
+import time
 
 import pexpect
 import pytest
-import re
-import shlex
-import sys
-import time
-from subprocess import Popen, PIPE
 
 # This import is the actual ImpalaShell class from impala_shell.py.
 # We rename it to ImpalaShellClass here because we later import another
 # class called ImpalaShell from tests/shell/util.py, and we don't want
 # to mask it.
-from shell.impala_shell import ImpalaShell as ImpalaShellClass
-
-from tests.common.environ import (IMPALA_LOCAL_BUILD_VERSION,
-                                  ImpalaTestClusterProperties)
+from impala_shell.impala_shell import ImpalaShell as ImpalaShellClass
+from tests.common.environ import IMPALA_LOCAL_BUILD_VERSION, ImpalaTestClusterProperties
 from tests.common.impala_service import ImpaladService
-from tests.common.impala_test_suite import (IMPALAD_BEESWAX_HOST_PORT,
-    IMPALAD_HS2_HOST_PORT, IMPALAD_HS2_HTTP_HOST_PORT,
-    STRICT_HS2_HOST_PORT, STRICT_HS2_HTTP_HOST_PORT)
+from tests.common.impala_test_suite import (
+    IMPALAD_BEESWAX_HOST_PORT,
+    IMPALAD_HS2_HOST_PORT,
+    IMPALAD_HS2_HTTP_HOST_PORT,
+    STRICT_HS2_HOST_PORT,
+    STRICT_HS2_HTTP_HOST_PORT,
+)
 from tests.common.test_vector import ImpalaTestDimension
 
 LOG = logging.getLogger('tests/shell/util.py')

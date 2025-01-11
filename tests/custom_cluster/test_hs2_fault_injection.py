@@ -16,16 +16,17 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from time import sleep
+
 from builtins import round
 import pytest
 import requests
 
-from shell.ImpalaHttpClient import ImpalaHttpClient
-from shell.impala_client import ImpalaHS2Client
-from shell.shell_exceptions import HttpError
-from tests.common.impala_test_suite import IMPALAD_HS2_HTTP_HOST_PORT
+from impala_shell.impala_client import ImpalaHS2Client
+from impala_shell.ImpalaHttpClient import ImpalaHttpClient
+from impala_shell.shell_exceptions import HttpError
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from time import sleep
+from tests.common.impala_test_suite import IMPALAD_HS2_HTTP_HOST_PORT
 
 """IMPALA-12216 implemented timestamp to be printed in case of any error/warning
   during query execution, below is an example :
@@ -147,33 +148,33 @@ class TestHS2FaultInjection(CustomClusterTestSuite):
 
   def __expect_msg_retry(self, impala_rpc_name):
     """Returns expected log message for rpcs which can be retried"""
-    return ("[Exception] type=<class 'shell.shell_exceptions.HttpError'> in {0}. "
+    return ("[Exception] type=<class 'impala_shell.shell_exceptions.HttpError'> in {0}. "
       "Num remaining tries: 3 HTTP code 502: Injected Fault".format(impala_rpc_name))
 
   def __expect_msg_retry_with_extra(self, impala_rpc_name):
     """Returns expected log message for rpcs which can be retried and where the http
     message has a message body"""
-    return ("[Exception] type=<class 'shell.shell_exceptions.HttpError'> in {0}. "
+    return ("[Exception] type=<class 'impala_shell.shell_exceptions.HttpError'> in {0}. "
       "Num remaining tries: 3 HTTP code 503: Injected Fault [EXTRA]"
       .format(impala_rpc_name))
 
   def __expect_msg_retry_with_retry_after(self, impala_rpc_name):
     """Returns expected log message for rpcs which can be retried and the http
     message has a body and a Retry-After header that can be correctly decoded"""
-    return ("[Exception] type=<class 'shell.shell_exceptions.HttpError'> in {0}. "
+    return ("[Exception] type=<class 'impala_shell.shell_exceptions.HttpError'> in {0}. "
       "Num remaining tries: 3, retry after 1 secs "
       "HTTP code 503: Injected Fault [EXTRA]".format(impala_rpc_name))
 
   def __expect_msg_retry_with_retry_after_no_extra(self, impala_rpc_name):
     """Returns expected log message for rpcs which can be retried and the http
     message has a Retry-After header that can be correctly decoded"""
-    return ("[Exception] type=<class 'shell.shell_exceptions.HttpError'> in {0}. "
+    return ("[Exception] type=<class 'impala_shell.shell_exceptions.HttpError'> in {0}. "
       "Num remaining tries: 3, retry after 1 secs "
       "HTTP code 503: Injected Fault".format(impala_rpc_name))
 
   def __expect_msg_no_retry(self, impala_rpc_name):
     """Returns expected log message for rpcs which can not be retried"""
-    return ("[Exception] type=<class 'shell.shell_exceptions.HttpError'> in {0}.  "
+    return ("[Exception] type=<class 'impala_shell.shell_exceptions.HttpError'> in {0}.  "
       "HTTP code 502: Injected Fault".format(impala_rpc_name))
 
   @pytest.mark.execute_serially

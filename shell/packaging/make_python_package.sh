@@ -24,11 +24,10 @@
 #
 #   ${DIST_DIR}/impala_shell-<version>.tar.gz
 #
-# Until the thrift-generated python files in ${IMPALA_HOME}/shell/gen-py
+# Until the thrift-generated python files in ${IMPALA_HOME}/shell/impala_thrift_gen
 # have been created by the build process, this script will not work.
 # It also relies upon the impala_build_version.py file created by the
-# ${IMPALA_HOME}/shell/gen_impala_build_version.sh script, which needs
-# to run before this script will work.
+# ${IMPALA_HOME}/shell/gen_impala_build_version.sh script.
 #
 # After those files exist, however, this script can be run again at will.
 
@@ -39,36 +38,18 @@ SHELL_HOME="${IMPALA_HOME}"/shell
 STAGING_DIR="${WORKING_DIR}"/staging
 DIST_DIR="${DIST_DIR:-$SHELL_HOME/dist}"
 PACKAGE_DIR="${STAGING_DIR}"/impala_shell_package
-MODULE_LIB_DIR="${PACKAGE_DIR}"/impala_shell
 NO_CLEAN_DIST="${NO_CLEAN_DIST:-}"
 
-THRIFT_GEN_PY_DIR=${SHELL_HOME}/gen-py
-
 assemble_package_files() {
-  mkdir -p "${MODULE_LIB_DIR}"
+  mkdir -p "${PACKAGE_DIR}"
 
-  cp -r "${THRIFT_GEN_PY_DIR}"/* "${MODULE_LIB_DIR}"
+  cp -r "${SHELL_HOME}/impala_thrift_gen" "${PACKAGE_DIR}"
+  cp -r "${SHELL_HOME}/impala_shell" "${PACKAGE_DIR}"
 
-  cp "${WORKING_DIR}/__init__.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/compatibility.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/impala_shell.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/impala_client.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/option_parser.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/shell_output.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/impala_shell_config_defaults.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/TSSLSocketWithWildcardSAN.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/ImpalaHttpClient.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/shell_exceptions.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/cookie_util.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/kerberos_util.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/value_converter.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/thrift_printer.py" "${MODULE_LIB_DIR}"
-  cp "${SHELL_HOME}/exec_summary.py" "${MODULE_LIB_DIR}"
-
-  cp "${SHELL_HOME}/packaging/README.md" "${PACKAGE_DIR}"
-  cp "${SHELL_HOME}/packaging/MANIFEST.in" "${PACKAGE_DIR}"
-  cp "${SHELL_HOME}/packaging/requirements.txt" "${PACKAGE_DIR}"
-  cp "${SHELL_HOME}/packaging/setup.py" "${PACKAGE_DIR}"
+  cp "${SHELL_HOME}/README.md" "${PACKAGE_DIR}"
+  cp "${SHELL_HOME}/MANIFEST.in" "${PACKAGE_DIR}"
+  cp "${SHELL_HOME}/requirements.txt" "${PACKAGE_DIR}"
+  cp "${SHELL_HOME}/setup.py" "${PACKAGE_DIR}"
 
   cp "${IMPALA_HOME}/LICENSE.txt" "${PACKAGE_DIR}"
 }

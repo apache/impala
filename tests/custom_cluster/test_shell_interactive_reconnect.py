@@ -16,19 +16,18 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-import pytest
-import tempfile
 import socket
-import pexpect
-import os
 
+import pexpect
+import pytest
+
+# Follow tests/shell/test_shell_interactive.py naming.
+from impala_shell.impala_shell import ImpalaShell as ImpalaShellClass
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
-from tests.common.test_vector import ImpalaTestVector
 from tests.common.test_dimensions import create_client_protocol_dimension
-from tests.shell.util import ImpalaShell, get_shell_cmd, get_impalad_port, spawn_shell
-# Follow tests/shell/test_shell_interactive.py naming.
-from shell.impala_shell import ImpalaShell as ImpalaShellClass
+from tests.common.test_vector import ImpalaTestVector
+from tests.shell.util import get_impalad_port, get_shell_cmd, ImpalaShell, spawn_shell
 from tests.verifiers.metric_verifier import MetricVerifier
 
 NUM_QUERIES = 'impala-server.num-queries'

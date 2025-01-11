@@ -23,34 +23,46 @@ import http.client
 import http.server
 import logging
 import os
-import pexpect
-import pytest
 import re
 import signal
 import socket
 import socketserver
 import sys
+from tempfile import NamedTemporaryFile
 import threading
 from time import sleep
+
+import pexpect
+import pytest
 
 # This import is the actual ImpalaShell class from impala_shell.py.
 # We rename it to ImpalaShellClass here because we later import another
 # class called ImpalaShell from tests/shell/util.py, and we don't want
 # to mask it.
-from shell.impala_shell import ImpalaShell as ImpalaShellClass
-
-from tempfile import NamedTemporaryFile
+from impala_shell.impala_shell import ImpalaShell as ImpalaShellClass
+from impala_shell.impala_shell import TIPS
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import (
-  create_client_protocol_dimension, create_client_protocol_strict_dimension,
-  create_uncompressed_text_dimension, create_single_exec_option_dimension)
+    create_client_protocol_dimension,
+    create_client_protocol_strict_dimension,
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension,
+)
 from tests.common.test_result_verifier import error_msg_startswith
-from tests.shell.util import (assert_var_substitution, ImpalaShell, get_impalad_port,
-  get_shell_cmd, get_open_sessions_metric, spawn_shell, get_unused_port,
-  create_impala_shell_executable_dimension, get_impala_shell_executable,
-  stderr_get_first_error_msg)
+from tests.shell.util import (
+    assert_var_substitution,
+    create_impala_shell_executable_dimension,
+    get_impala_shell_executable,
+    get_impalad_port,
+    get_open_sessions_metric,
+    get_shell_cmd,
+    get_unused_port,
+    ImpalaShell,
+    spawn_shell,
+    stderr_get_first_error_msg,
+)
 
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
@@ -707,14 +719,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_tip(self, vector):
     """Smoke test for the TIP command"""
-    # Temporarily add impala_shell module to path to get at TIPS list for verification
-    sys.path.append("%s/shell/" % os.environ['IMPALA_HOME'])
-    try:
-      import impala_shell
-    finally:
-      sys.path = sys.path[:-1]
     result = run_impala_shell_interactive(vector, "tip;")
-    for t in impala_shell.TIPS:
+    for t in TIPS:
       if t in result.stderr: return
     assert False, "No tip found in output %s" % result.stderr
 

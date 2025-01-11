@@ -258,7 +258,7 @@ class ImpalaBeeswaxClient(object):
     return output
 
   def __build_summary_table(self, summary, output):
-    from shell.exec_summary import build_exec_summary_table
+    from impala_shell.exec_summary import build_exec_summary_table
     result = list()
     build_exec_summary_table(summary, 0, 0, False, result, is_prettyprint=False,
                              separate_prefix_column=True)

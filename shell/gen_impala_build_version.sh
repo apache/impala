@@ -41,10 +41,10 @@ BUILD_DATE=$(grep "BUILD_TIME: " ${IMPALA_VERSION_INFO_FILE} | cut -f 2- -d ' ')
 cat ${IMPALA_VERSION_INFO_FILE}
 
 SHELL_HOME=${IMPALA_HOME}/shell
-THRIFT_GEN_PY_DIR="${SHELL_HOME}/gen-py"
+IMPALA_SHELL_DIR="${SHELL_HOME}/impala_shell"
 
-rm -f ${THRIFT_GEN_PY_DIR}/impala_build_version.py
-cat > ${THRIFT_GEN_PY_DIR}/impala_build_version.py <<EOF
+rm -f ${IMPALA_SHELL_DIR}/impala_build_version.py
+cat > ${IMPALA_SHELL_DIR}/impala_build_version.py <<EOF
 # -*- coding: utf-8 -*-
 #
 # Licensed to the Apache Software Foundation (ASF) under one

@@ -25,6 +25,6 @@
 export PYTHONPATH=${IMPALA_HOME}:${IMPALA_HOME}/bin
 
 # Generated Thrift files are used by tests and other scripts.
-PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell/gen-py
+PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell
 
 PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/infra/python/env-gcc${IMPALA_GCC_VERSION}/lib

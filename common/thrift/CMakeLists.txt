@@ -66,6 +66,9 @@ function(THRIFT_GEN VAR)
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
         COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
+        # Ugly hack: Thrift incorrectly generates an unnecessary __init__.py at the top
+        # level. Remove it until we can patch Thrift to avoid generating this.
+        COMMAND rm -f ${PYTHON_OUTPUT_DIR}/__init__.py
         DEPENDS ${ABS_THRIFT_FILE}
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
@@ -83,6 +86,9 @@ function(THRIFT_GEN VAR)
             ${BE_OUTPUT_DIR}/gen-cpp/ImpalaService.h
         COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_JAVA_COMPILER} ${JAVA_FE_ARGS} ${THRIFT_FILE}
         COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
+        # Ugly hack: Thrift incorrectly generates an unnecessary __init__.py at the top
+        # level. Remove it until we can patch Thrift to avoid generating this.
+        COMMAND rm -f ${PYTHON_OUTPUT_DIR}/__init__.py
         DEPENDS ${ABS_THRIFT_FILE}
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
@@ -93,6 +99,9 @@ function(THRIFT_GEN VAR)
         COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_CPP_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
         COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_JAVA_COMPILER} ${JAVA_FE_ARGS} ${THRIFT_FILE}
         COMMAND ${THRIFT_QUIET_WRAPPER} ${THRIFT_PY_COMPILER} ${PYTHON_ARGS} ${THRIFT_FILE}
+        # Ugly hack: Thrift incorrectly generates an unnecessary __init__.py at the top
+        # level. Remove it until we can patch Thrift to avoid generating this.
+        COMMAND rm -f ${PYTHON_OUTPUT_DIR}/__init__.py
         DEPENDS ${ABS_THRIFT_FILE}
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
@@ -164,7 +173,7 @@ file(MAKE_DIRECTORY ${THIRDPARTY_THRIFT_DIR})
 # Args passed to thrift for Java gen
 set(JAVA_FE_ARGS ${THRIFT_JAVA_INCLUDE_DIR_OPTION} --gen java -o ${FE_OUTPUT_DIR})
 set(JAVA_EXT_DS_ARGS ${THRIFT_JAVA_INCLUDE_DIR_OPTION} --gen java -o ${EXT_DS_OUTPUT_DIR})
-set(PYTHON_ARGS ${THRIFT_PY_INCLUDE_DIR_OPTION} -r --gen py:no_utf8strings -o
+set(PYTHON_ARGS ${THRIFT_PY_INCLUDE_DIR_OPTION} -r --gen py:no_utf8strings -out
     ${PYTHON_OUTPUT_DIR})
 
 set (EXT_DATA_SRC_FILES

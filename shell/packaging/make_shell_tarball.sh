@@ -71,7 +71,7 @@ for PYTHON_EXE in $*; do
 done
 
 # Copy the impala-shell driver script into the tarball root
-cp ${SHELL_HOME}/impala-shell ${TARBALL_ROOT}
+cp ${SHELL_HOME}/packaging/impala-shell ${TARBALL_ROOT}
 
 pushd ${BUILD_DIR} > /dev/null
 echo "Making tarball in ${BUILD_DIR}"

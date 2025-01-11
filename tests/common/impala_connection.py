@@ -28,10 +28,10 @@ import re
 import time
 
 from future.utils import with_metaclass
-
 import impala.dbapi as impyla
 import impala.error as impyla_error
 import impala.hiveserver2 as hs2
+
 from impala_thrift_gen.beeswax.BeeswaxService import QueryState
 from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import (
@@ -112,7 +112,7 @@ def format_sql_for_logging(sql_stmt):
 
 
 def build_summary_table_from_thrift(thrift_exec_summary):
-  from shell.exec_summary import build_exec_summary_table
+  from impala_shell.exec_summary import build_exec_summary_table
   result = list()
   build_exec_summary_table(thrift_exec_summary, 0, 0, False, result,
                            is_prettyprint=False, separate_prefix_column=True)

@@ -19,11 +19,15 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from shell.impala_client import ImpalaBeeswaxClient, ImpalaHS2Client
+
+from impala_shell.impala_client import ImpalaBeeswaxClient, ImpalaHS2Client
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
-  create_client_protocol_dimension, create_client_protocol_no_strict_dimension,
-  create_uncompressed_text_dimension, create_single_exec_option_dimension)
+    create_client_protocol_dimension,
+    create_client_protocol_no_strict_dimension,
+    create_single_exec_option_dimension,
+    create_uncompressed_text_dimension,
+)
 from tests.shell.util import get_impalad_host_port
 
 
