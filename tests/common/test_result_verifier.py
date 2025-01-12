@@ -376,7 +376,7 @@ def apply_error_match_filter(error_list, replace_filenames=True):
   return [replace_fn(row) for row in error_list]
 
 
-def verify_raw_results(test_section, exec_result, file_format, result_section,
+def verify_raw_results(test_section, exec_result, vector, result_section,
                        type_section='TYPES', update_section=False,
                        replace_filenames=True):
   """
@@ -397,6 +397,8 @@ def verify_raw_results(test_section, exec_result, file_format, result_section,
   TODO: separate out the handling of sections like ERRORS from checking of query results
   to allow regular RESULTS/ERRORS sections in tests with DML_RESULTS (IMPALA-4471).
   """
+  file_format = vector.get_value('table_format').file_format
+  protocol = vector.get_value('protocol')
   expected_results = None
   if result_section in test_section:
     expected_results = remove_comments(test_section[result_section])
@@ -424,6 +426,15 @@ def verify_raw_results(test_section, exec_result, file_format, result_section,
         test_section['ERRORS'] = join_section_lines(actual_errors)
       else:
         raise
+
+  if type_section == 'TYPES' and protocol.startswith('hs2'):
+    # hs2 or hs2-http
+    if 'HS2_TYPES' in test_section:
+      assert 'TYPES' in test_section, \
+        "Base TYPES section must always be included alongside HS2_TYPES"
+      # In some cases HS2 types are expected differ from Beeswax types (e.g. see
+      # IMPALA-914), so use the HS2-specific section if present.
+      type_section = 'HS2_TYPES'
 
   if type_section in test_section:
     # Distinguish between an empty list and a list with an empty string.

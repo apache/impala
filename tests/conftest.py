@@ -32,14 +32,17 @@ import sys
 
 import tests.common
 from impala_py_lib.helpers import find_all_files, is_core_dump
+import tests.common.base_test_suite
 from tests.common.environ import build_flavor_timeout
 from tests.common.test_result_verifier import QueryTestResult
 from tests.common.patterns import is_valid_impala_identifier
+from tests.common.test_vector import BEESWAX, HS2, HS2_HTTP
 from tests.comparison.db_connection import ImpalaConnection
 from tests.util.filesystem_utils import FILESYSTEM, ISILON_WEBHDFS_PORT, WAREHOUSE
 
 LOG = logging.getLogger('test_configuration')
 LOG_FORMAT = "-- %(asctime)s %(levelname)-8s %(threadName)s: %(message)s"
+VALID_TEST_PROTOCOLS = [BEESWAX, HS2, HS2_HTTP]
 
 DEFAULT_CONN_TIMEOUT = 45
 DEFAULT_EXPLORATION_STRATEGY = 'core'
@@ -54,7 +57,7 @@ DEFAULT_KUDU_MASTER_HOSTS = os.getenv('KUDU_MASTER_HOSTS', '127.0.0.1')
 DEFAULT_KUDU_MASTER_PORT = os.getenv('KUDU_MASTER_PORT', '7051')
 DEFAULT_METASTORE_SERVER = 'localhost:9083'
 DEFAULT_NAMENODE_ADDR = None
-DEFAULT_TEST_PROTOCOL = os.getenv('DEFAULT_TEST_PROTOCOL', 'beeswax')
+DEFAULT_TEST_PROTOCOL = os.getenv('DEFAULT_TEST_PROTOCOL', BEESWAX)
 if FILESYSTEM == 'isilon':
   DEFAULT_NAMENODE_ADDR = "{node}:{port}".format(node=os.getenv("ISILON_NAMENODE"),
                                                  port=ISILON_WEBHDFS_PORT)
@@ -188,7 +191,7 @@ def pytest_addoption(parser):
                    "calcite_report_mode. Defaults to ${IMPALA_LOGS_DIR}/calcite_report.")
 
   parser.addoption("--default_test_protocol", default=DEFAULT_TEST_PROTOCOL,
-                   choices=("beeswax", "hs2", "hs2-http"),
+                   choices=VALID_TEST_PROTOCOLS,
                    help="Impala protocol to run test if test does not specify any.")
 
 
@@ -239,6 +242,9 @@ def pytest_generate_tests(metafunc):
   If a test has the 'vector' fixture specified, this code is invoked and it will build
   a set of test vectors to parameterize the test with.
   """
+  # All Impala tests classes must inherit BaseTestSuite.
+  assert issubclass(metafunc.cls, tests.common.base_test_suite.BaseTestSuite)
+  assert metafunc.cls.default_test_protocol() in VALID_TEST_PROTOCOLS
   if 'vector' in metafunc.fixturenames:
     metafunc.cls.add_test_dimensions()
     vectors = metafunc.cls.ImpalaTestMatrix.generate_test_vectors(
@@ -698,8 +704,9 @@ def pytest_collection_modifyitems(items, config, session):
   # We must modify the items list in place for it to take effect.
   items[:] = items_selected
 
-  logging.info("pytest shard selection enabled %s. Of %d items, selected %d items by hash.",
-      config.option.shard_tests, num_items, len(items))
+  logging.info(
+    "pytest shard selection enabled %s. Of %d items, selected %d items by hash.",
+    config.option.shard_tests, num_items, len(items))
 
 
 @pytest.hookimpl(trylast=True)

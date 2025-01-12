@@ -20,9 +20,6 @@ from __future__ import absolute_import, division, print_function
 import pytest
 import re
 
-from time import sleep
-from time import time
-from tests.common.errors import Timeout
 from tests.hs2.hs2_test_suite import (HS2TestSuite, needs_session,
     create_op_handle_without_secret)
 from TCLIService import TCLIService, constants
@@ -36,15 +33,14 @@ class TestFetch(HS2TestSuite):
     assert hs2_type.typeDesc.types[0].primitiveEntry.type == expected_type
 
   def __verify_char_max_len(self, t, max_len):
-    l = t.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers\
-      [constants.CHARACTER_MAXIMUM_LENGTH]
-    assert l.i32Value == max_len
+    qualifiers = t.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers
+    i32val = qualifiers[constants.CHARACTER_MAXIMUM_LENGTH].i32Value
+    assert i32val == max_len
 
   def __verify_decimal_precision_scale(self, hs2_type, precision, scale):
-    p = hs2_type.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers\
-      [constants.PRECISION]
-    s = hs2_type.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers\
-      [constants.SCALE]
+    qualifiers = hs2_type.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers
+    p = qualifiers[constants.PRECISION]
+    s = qualifiers[constants.SCALE]
     assert p.i32Value == precision
     assert s.i32Value == scale
 
@@ -199,8 +195,9 @@ class TestFetch(HS2TestSuite):
           self.column_results_to_string(fetch_results_resp.results.columns)
       assert num_rows == 25
       # Match whether stats are computed or not
-      assert re.match(
-        r"2009, 1, -?\d+, -?\d+, \d*\.?\d+KB, NOT CACHED, NOT CACHED, TEXT", result) is not None
+      pattern = r"2009, 1, -?\d+, -?\d+, \d*\.?\d+KB, NOT CACHED, NOT CACHED, TEXT"
+      assert re.match(pattern, result) is not None, \
+        'Looking for "{}" but none found:\n{}'.format(pattern, result)
 
   @needs_session()
   def test_show_column_stats(self):

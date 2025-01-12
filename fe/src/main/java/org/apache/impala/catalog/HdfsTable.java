@@ -2789,7 +2789,7 @@ public class HdfsTable extends Table implements FeFsTable {
     long totalBytes = 0L;
     long totalNumFiles = 0L;
     for (FeFsPartition p: orderedPartitions) {
-      int numFiles = p.getNumFileDescriptors();
+      long numFiles = p.getNumFileDescriptors();
       long size = p.getSize();
       totalNumFiles += numFiles;
       totalBytes += size;

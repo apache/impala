@@ -45,7 +45,6 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.PrintUtils;
-import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TNetworkAddress;

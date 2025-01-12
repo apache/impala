@@ -593,7 +593,8 @@ class ImpylaHS2ResultSet(object):
     self.column_types = column_types
     self.query = query
     self.log = log
-    self.profile = profile
+    # ImpalaBeeswaxResult store profile at runtime_profile field
+    self.runtime_profile = profile
     self.query_id = query_id
     self.__result_tuples = result_tuples
     # self.data is the data in the ImpalaBeeswaxResult format: a list of rows with each
@@ -601,6 +602,10 @@ class ImpylaHS2ResultSet(object):
     self.data = None
     if result_tuples is not None:
       self.data = [self.__convert_result_row(tuple) for tuple in result_tuples]
+
+  def tuples(self):
+    """Return the raw HS2 result set, which is a list of tuples."""
+    return self.__result_tuples
 
   def __convert_result_row(self, result_tuple):
     """Take primitive values from a result tuple and construct the tab-separated string

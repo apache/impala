@@ -23,6 +23,8 @@ ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, TS, DECIMAL4, DECIMAL8, DECIMAL16,
 1,1,1,'one',true,1,1,1,1987-05-19 00:00:00,0.000000001,1.00,1,1970-01-01,'one'
 ---- TYPES
 INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 # VALUES, single row, all target cols, NULL
@@ -37,6 +39,8 @@ ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, TS, DECIMAL4, DECIMAL8, DECIMAL16,
 2,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
 INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 # VALUES, single row, all target cols, boundary values. The timestamp value is the max
@@ -58,6 +62,8 @@ ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, TS, DECIMAL4, DECIMAL8, DECIMAL16,
 3,NaN,9223372036854775807,'',true,-128,32767,-Infinity,9999-12-31 23:59:59.999999000,0.999999999,9999999999999999.99,99999999999999999999999999999999999999,9999-12-31,''
 ---- TYPES
 INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 # VALUES, single row, subset of target cols
@@ -74,6 +80,8 @@ ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, TS, DECIMAL4, DECIMAL8, DECIMAL16,
 4,NULL,NULL,'NULL',true,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
 INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 # VALUES, multiple rows, all target cols
@@ -96,6 +104,8 @@ ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, TS, DECIMAL4, DECIMAL8, DECIMAL16,
 7,NULL,10,'NULL',false,127,-7,2,1400-01-01 00:00:00,0.000000000,0.00,0,1970-01-01,'NULL'
 ---- TYPES
 INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 # VALUES, multiple rows, subset of cols
@@ -119,6 +129,8 @@ ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, TS, DECIMAL4, DECIMAL8, DECIMAL16,
 9,-9,-99,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
 INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 # SELECT, single row, all target cols
@@ -144,6 +156,8 @@ ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, TS, DECIMAL4, DECIMAL8, DECIMAL16,
 10,0,0,'0',true,0,0,0,2009-01-02 00:10:00.450000000,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
 INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 # SELECT, single row, subset of cols
@@ -169,6 +183,8 @@ ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, TS, DECIMAL4, DECIMAL8, DECIMAL16,
 11,NULL,10,'NULL',false,NULL,NULL,10.1,2009-01-02 00:11:00.450000000,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
 INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 delete tdata
@@ -190,6 +206,8 @@ ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, TS, DECIMAL4, DECIMAL8, DECIMAL16,
 1,1.100000023841858,10,'1',false,1,1,10.1,2009-01-01 00:01:00,NULL,NULL,NULL,NULL,'1'
 ---- TYPES
 INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 # SELECT, multiple rows, subset of cols
@@ -209,13 +227,13 @@ ID, VALF, VALI, VALV, VALB, VALT, VALS, VALD, TS, DECIMAL4, DECIMAL8, DECIMAL16,
 5,NULL,NULL,'NULL',NULL,5,5,50.5,2009-01-01 00:05:00.100000000,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
 INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,TIMESTAMP,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 # Make sure we can insert empty strings into string columns and that we can scan them
 # back.
 insert into tdata values (320, 2.0, 932, cast('' as string), false, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, cast('' as varchar(10)))
----- RESULTS
-: 1
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
@@ -226,12 +244,12 @@ select id, valv, valb, valvc from tdata where id = 320;
 320,'',false,''
 ---- TYPES
 INT,STRING,BOOLEAN,STRING
+---- HS2_TYPES
+INT,STRING,BOOLEAN,VARCHAR
 ====
 ---- QUERY
 insert into tdata values
 (666, cast(1.2 as float), 43, cast('z' as string), true, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL)
----- RESULTS
-: 1
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
@@ -240,8 +258,6 @@ NumRowErrors: 0
 # insert row with primary key that already exists
 insert into tdata values
 (666, cast(1.2 as float), 43, cast('z' as VARCHAR(20)), true, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL)
----- RESULTS
-: 0
 ---- RUNTIME_PROFILE
 NumModifiedRows: 0
 NumRowErrors: 1
@@ -260,8 +276,6 @@ NumRowErrors: 0
 ---- QUERY
 insert into kudu_test_tbl
 select * from functional_kudu.alltypes where id < 100;
----- RESULTS
-: 0
 ---- RUNTIME_PROFILE
 NumModifiedRows: 0
 NumRowErrors: 100
@@ -270,8 +284,6 @@ NumRowErrors: 100
 # large insert - 100 rows were already inserted above and result in errors
 insert into kudu_test_tbl
 select * from functional_kudu.alltypes;
----- RESULTS
-: 7200
 ---- RUNTIME_PROFILE
 NumModifiedRows: 7200
 NumRowErrors: 100
@@ -303,8 +315,6 @@ create table allkeytypes (i1 tinyint, i2 smallint, i3 int, i4 bigint, name strin
 insert into allkeytypes select cast(id as tinyint), smallint_col, int_col,
   cast (bigint_col/10 as bigint), string_col, timestamp_col, cast(string_col as varchar(10)), float_col, double_col
   from functional.alltypes where id > 1 and id < 10
----- RESULTS
-: 2
 ---- RUNTIME_PROFILE
 NumModifiedRows: 2
 NumRowErrors: 6
@@ -313,8 +323,6 @@ NumRowErrors: 6
 # IMPALA-5871 - test that a cast is correctly added when inserting a string into a Kudu
 # timestamp partition column with distributed exec.
 insert into allkeytypes values (1,1,1,1,'1','2009-01-01 00:01:00',cast('1' as varchar(10)),null,null)
----- RESULTS
-: 1
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
@@ -327,8 +335,6 @@ create table timestampkey (t timestamp primary key)
 ---- QUERY
 # Regression test for IMPALA-8909 (used to hit a DCHECK in debug builds).
 insert into timestampkey select concat(string_col, " ") from functional.alltypessmall;
----- RESULTS
-: 0
 ---- RUNTIME_PROFILE
 NumModifiedRows: 0
 NumRowErrors: 100
@@ -357,6 +363,8 @@ A, B, C, D, E, F, G, H, I, J
 4,10,100,1000,NULL,4,'test',true,1111.11,'foo'
 ---- TYPES
 INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,STRING
+---- HS2_TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,VARCHAR
 ====
 ---- QUERY
 insert into tbl_with_defaults values (5, 5, 5, 5, 5, 5, 'row', false, 55555.55, cast('row' as varchar(10)))
@@ -373,6 +381,8 @@ A, B, C, D, E, F, G, H, I, J
 5,5,5,5,5,5,'row',false,55555.55,'row'
 ---- TYPES
 INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,STRING
+---- HS2_TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,VARCHAR
 ====
 ---- QUERY
 alter table tbl_with_defaults add columns (k int null, l int not null default 10000)
@@ -389,6 +399,8 @@ select * from tbl_with_defaults
 5,5,5,5,5,5,'row',false,55555.55,'row',NULL,10000
 ---- TYPES
 INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,STRING,INT,INT
+---- HS2_TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,VARCHAR,INT,INT
 ====
 ---- QUERY
 insert into tbl_with_defaults values (6,6,6,6,6,6,'another row',false,66666.66,cast('another' as varchar(10)),6,6)
@@ -406,6 +418,8 @@ A, B, C, D, E, F, G, H, I, J, K, L
 6,6,6,6,6,6,'another row',false,66666.66,'another',6,6
 ---- TYPES
 INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,STRING,INT,INT
+---- HS2_TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,VARCHAR,INT,INT
 ====
 ---- QUERY
 # IMPALA-5217: Try to insert NULL to a 'NOT NULL' col with a target col list that leaves
@@ -434,6 +448,8 @@ A, B, C, D, E, F, G, H, I, J, K, L
 6,6,6,6,6,6,'another row',false,66666.66,'another',6,6
 ---- TYPES
 INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,STRING,INT,INT
+---- HS2_TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,VARCHAR,INT,INT
 ====
 ---- QUERY
 # Test VARCHAR truncation
@@ -454,6 +470,8 @@ A, B, C, D, E, F, G, H, I, J, K, L
 7,7,7,7,7,7,'another row',false,77777.77,'sevenseven',7,7
 ---- TYPES
 INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,STRING,INT,INT
+---- HS2_TYPES
+INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,VARCHAR,INT,INT
 ====
 ---- QUERY
 create table multiple_partition_cols (x bigint, y bigint, z string, primary key(x, y))
@@ -479,8 +497,6 @@ BIGINT,BIGINT,STRING
 # SELECT with constant NULL
 insert into multiple_partition_cols select bigint_col, null, string_col
   from functional.alltypes where id = 1
----- RESULTS
-: 0
 ---- RUNTIME_PROFILE
 NumModifiedRows: 0
 NumRowErrors: 1
@@ -528,8 +544,6 @@ stored as kudu;
 # so that there's enough parallelism to reproduce the bug.
 insert into orders_key_only
 select o_orderkey from tpch_kudu.orders;
----- RESULTS
-: 1500000
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1500000
 NumRowErrors: 0

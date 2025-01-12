@@ -25,7 +25,9 @@ import pytest
 from itertools import product
 
 from tests.common.test_vector import (
-    ImpalaTestDimension, ImpalaTestVector, assert_exec_option_key)
+  EXEC_OPTION, PROTOCOL, TABLE_FORMAT,
+  BEESWAX, HS2, HS2_HTTP,
+  ImpalaTestDimension, ImpalaTestVector, assert_exec_option_key)
 from tests.util.filesystem_utils import (
     IS_HDFS)
 
@@ -121,7 +123,7 @@ class TableFormatInfo(object):
 
 def create_table_format_dimension(workload, table_format_string):
   dataset = get_dataset_from_workload(workload)
-  return ImpalaTestDimension('table_format',
+  return ImpalaTestDimension(TABLE_FORMAT,
       TableFormatInfo.create_from_string(dataset, table_format_string))
 
 
@@ -150,15 +152,15 @@ def create_kudu_dimension(workload):
 
 
 def default_client_protocol_dimension():
-  return ImpalaTestDimension('protocol', pytest.config.option.default_test_protocol)
+  return ImpalaTestDimension(PROTOCOL, pytest.config.option.default_test_protocol)
 
 
 def beeswax_client_protocol_dimension():
-  return ImpalaTestDimension('protocol', 'beeswax')
+  return ImpalaTestDimension(PROTOCOL, BEESWAX)
 
 
 def hs2_client_protocol_dimension():
-  return ImpalaTestDimension('protocol', 'hs2')
+  return ImpalaTestDimension(PROTOCOL, HS2)
 
 
 def create_client_protocol_dimension():
@@ -167,12 +169,12 @@ def create_client_protocol_dimension():
   # transport.
   import ssl
   if not hasattr(ssl, "create_default_context"):
-    return ImpalaTestDimension('protocol', 'beeswax', 'hs2')
-  return ImpalaTestDimension('protocol', 'beeswax', 'hs2', 'hs2-http')
+    return ImpalaTestDimension(PROTOCOL, BEESWAX, HS2)
+  return ImpalaTestDimension(PROTOCOL, BEESWAX, HS2, HS2_HTTP)
 
 
 def create_client_protocol_http_transport():
-  return ImpalaTestDimension('protocol', 'hs2-http')
+  return ImpalaTestDimension(PROTOCOL, HS2_HTTP)
 
 
 def create_client_protocol_strict_dimension():
@@ -191,22 +193,22 @@ def create_client_protocol_no_strict_dimension():
 def hs2_parquet_constraint(v):
   """Constraint function, used to only run HS2 against Parquet format, because file format
   and the client protocol are orthogonal."""
-  return (v.get_value('protocol') == 'beeswax' or
-          v.get_value('table_format').file_format == 'parquet' and
-          v.get_value('table_format').compression_codec == 'none')
+  return (v.get_protocol() == BEESWAX
+          or (v.get_table_format().file_format == 'parquet'
+              and v.get_table_format().compression_codec == 'none'))
 
 
 def hs2_text_constraint(v):
   """Constraint function, used to only run HS2 against uncompressed text, because file
   format and the client protocol are orthogonal."""
-  return (v.get_value('protocol') == 'beeswax' or
-          v.get_value('table_format').file_format == 'text' and
-          v.get_value('table_format').compression_codec == 'none')
+  return (v.get_protocol() == BEESWAX
+          or (v.get_table_format().file_format == 'text'
+              and v.get_table_format().compression_codec == 'none'))
 
 
 def orc_schema_resolution_constraint(v):
   """ Constraint to use multiple orc_schema_resolution only in case of orc files"""
-  file_format = v.get_value('table_format').file_format
+  file_format = v.get_table_format().file_format
   orc_schema_resolution = v.get_value('orc_schema_resolution')
   return file_format == 'orc' or orc_schema_resolution == 0
 
@@ -277,7 +279,7 @@ def create_exec_option_dimension_from_dict(exec_option_dimensions):
   exec_option_dimension_values = [dict(zip(keys, prod)) for prod in combinations]
 
   # Build a test vector out of it
-  return ImpalaTestDimension('exec_option', *exec_option_dimension_values)
+  return ImpalaTestDimension(EXEC_OPTION, *exec_option_dimension_values)
 
 
 def add_exec_option_dimension(test_suite, key, values):
@@ -354,7 +356,7 @@ def load_table_info_dimension(workload_name, exploration_strategy, file_formats=
         continue
       vector_values.append(TableFormatInfo(**vals))
 
-  return ImpalaTestDimension('table_format', *vector_values)
+  return ImpalaTestDimension(TABLE_FORMAT, *vector_values)
 
 
 def is_supported_insert_format(table_format):

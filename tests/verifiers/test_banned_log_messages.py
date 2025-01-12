@@ -21,8 +21,10 @@ from __future__ import absolute_import, division, print_function
 import os
 import subprocess
 
+from tests.common.base_test_suite import BaseTestSuite
 
-class TestBannedLogMessages:
+
+class TestBannedLogMessages(BaseTestSuite):
   """Verify that specific log messages are banned from Impala logs.
 
   This test suite should be run after all the tests have been run.
