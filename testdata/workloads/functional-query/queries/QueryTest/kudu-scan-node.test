@@ -161,6 +161,8 @@ order by key;
 4,'y'
 ---- TYPES
 INT, STRING
+---- HS2_TYPES
+INT, VARCHAR
 ====
 ---- QUERY
 # Regression test for IMPALA-6187. Make sure count(*) queries with partition columns only

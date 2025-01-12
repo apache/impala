@@ -158,7 +158,7 @@ public interface FeKuduTable extends FeTable {
             BackendConfig.INSTANCE.getKuduClientTimeoutMs());
         TResultRowBuilder tResultRowBuilder = new TResultRowBuilder();
         tResultRowBuilder.add(table.getNumRows());
-        tResultRowBuilder.add(tablets.size());
+        tResultRowBuilder.add((long) tablets.size());
         tResultRowBuilder.addBytes(kuduTable.getTableStatistics().getOnDiskSize());
         tResultRowBuilder.add("KUDU");
         tResultRowBuilder.add(table.getKuduMasterHosts());

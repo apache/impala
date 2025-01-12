@@ -54,7 +54,6 @@ from tests.common.test_dimensions import (
     ALL_NODES_ONLY,
     TableFormatInfo,
     create_exec_option_dimension,
-    default_client_protocol_dimension,
     get_dataset_from_workload,
     load_table_info_dimension)
 from tests.common.test_result_verifier import (
@@ -63,7 +62,10 @@ from tests.common.test_result_verifier import (
     verify_lineage,
     verify_raw_results,
     verify_runtime_profile)
-from tests.common.test_vector import ImpalaTestDimension, EXEC_OPTION_KEY
+from tests.common.test_vector import (
+  EXEC_OPTION, PROTOCOL, TABLE_FORMAT,
+  BEESWAX, HS2, HS2_HTTP,
+  ImpalaTestDimension)
 from tests.performance.query import Query
 from tests.performance.query_exec_functions import execute_using_jdbc
 from tests.performance.query_executor import JdbcQueryExecConfig
@@ -199,9 +201,32 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         cls.create_table_info_dimension(cls.exploration_strategy()))
     cls.ImpalaTestMatrix.add_dimension(cls.__create_exec_option_dimension())
-    # Execute tests through Beeswax by default. Individual tests that have been converted
-    # to work with the HS2 client can add HS2 in addition to or instead of beeswax.
-    cls.ImpalaTestMatrix.add_dimension(default_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+      ImpalaTestDimension(PROTOCOL, cls.default_test_protocol()))
+
+  @classmethod
+  def default_test_protocol(cls):
+    """This method is used to allow test subclasses to override
+    pytest.config.option.default_test_protocol as the default 'protocol' dimension.
+    If subclass override this method, return value must either be 'beeswax', 'hs2',
+    or 'hs2-http'.
+    The protocol kind of self.client is always match with return value of this method.
+    On the other hand, subclasses can still exercise other 'protocol' dimension
+    of test vector, by overriding add_test_dimensions(). Do note the correctness of
+    'vector' fixture relies on always querying through helper method that accept
+    'vector' argument, such as:
+    - run_test_case()
+    - execute_query_using_client()
+    - execute_query_async_using_client()
+    - execute_query_using_vector()
+    - create_impala_client_from_vector()
+    Most method in ImpalaTestSuite that has optional 'protocol' argument will default
+    to the return value of this method.
+    Default to return pytest.config.option.default_test_protocol."""
+    # default_test_protocol is usually 'beeswax', unless user specify otherwise.
+    # Individual tests that have been converted to work with the HS2 client can add HS2
+    # in addition to or instead of beeswax.
+    return pytest.config.option.default_test_protocol
 
   @staticmethod
   def create_hive_client(port):
@@ -332,13 +357,13 @@ class ImpalaTestSuite(BaseTestSuite):
     pass
 
   @classmethod
-  def create_impala_client(cls, host_port=None,
-                           protocol=pytest.config.option.default_test_protocol,
-                           is_hive=False):
+  def create_impala_client(cls, host_port=None, protocol=None, is_hive=False):
     """
     Create a new ImpalaConnection client.
     Make sure to always call this method using a with-as statement or manually close
     the returned connection before discarding it."""
+    if protocol is None:
+      protocol = cls.default_test_protocol()
     if host_port is None:
       host_port = cls.__get_default_host_port(protocol)
     client = create_connection(host_port=host_port,
@@ -354,18 +379,18 @@ class ImpalaTestSuite(BaseTestSuite):
     Return a client of specified 'protocol' and with cofiguration 'exec_option' set.
     Make sure to always call this method using a with-as statement or manually close
     the returned connection before discarding it."""
-    client = cls.create_impala_client(
-      protocol=vector.get_value('protocol'))
+    client = cls.create_impala_client(protocol=vector.get_protocol())
     client.set_configuration(vector.get_exec_option_dict())
     return client
 
   @classmethod
   def get_impalad_cluster_size(cls):
-    return len(cls.__get_cluster_host_ports(pytest.config.option.default_test_protocol))
+    return len(cls.__get_cluster_host_ports(cls.default_test_protocol()))
 
   @classmethod
-  def create_client_for_nth_impalad(cls, nth=0,
-                                    protocol=pytest.config.option.default_test_protocol):
+  def create_client_for_nth_impalad(cls, nth=0, protocol=None):
+    if protocol is None:
+      protocol = cls.default_test_protocol()
     host_ports = cls.__get_cluster_host_ports(protocol)
     if nth < len(IMPALAD_HOST_PORT_LIST):
       host_port = host_ports[nth]
@@ -383,21 +408,21 @@ class ImpalaTestSuite(BaseTestSuite):
     """Creates Impala clients for all supported protocols."""
     # The default connection (self.client) is Beeswax so that existing tests, which assume
     # Beeswax do not need modification (yet).
-    cls.beeswax_client = cls.create_impala_client(protocol='beeswax')
+    cls.beeswax_client = cls.create_impala_client(protocol=BEESWAX)
     cls.hs2_client = None
     try:
-      cls.hs2_client = cls.create_impala_client(protocol='hs2')
+      cls.hs2_client = cls.create_impala_client(protocol=HS2)
     except Exception as e:
       # HS2 connection can fail for benign reasons, e.g. running with unsupported auth.
       LOG.info("HS2 connection setup failed, continuing...: {0}".format(e))
     cls.hs2_http_client = None
     try:
-      cls.hs2_http_client = cls.create_impala_client(protocol='hs2-http')
+      cls.hs2_http_client = cls.create_impala_client(protocol=HS2_HTTP)
     except Exception as e:
       # HS2 HTTP connection can fail for benign reasons, e.g. running with unsupported
       # auth.
       LOG.info("HS2 HTTP connection setup failed, continuing...: {0}".format(e))
-    cls.client = cls.default_impala_client(pytest.config.option.default_test_protocol)
+    cls.client = cls.default_impala_client(cls.default_test_protocol())
 
   @classmethod
   def __reset_impala_clients(cls):
@@ -428,32 +453,33 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @classmethod
   def default_impala_client(cls, protocol):
-    if protocol == 'beeswax':
+    if protocol == BEESWAX:
       return cls.beeswax_client
-    if protocol == 'hs2':
+    if protocol == HS2:
       return cls.hs2_client
-    if protocol == 'hs2-http':
+    if protocol == HS2_HTTP:
       return cls.hs2_http_client
     raise Exception("unknown protocol: {0}".format(protocol))
 
   @classmethod
   def __get_default_host_port(cls, protocol):
-    if protocol == 'beeswax':
+    if protocol == BEESWAX:
       return IMPALAD
-    elif protocol == 'hs2-http':
+    elif protocol == HS2_HTTP:
       return IMPALAD_HS2_HTTP_HOST_PORT
-    else:
-      assert protocol == 'hs2'
+    elif protocol == HS2:
       return IMPALAD_HS2_HOST_PORT
+    else:
+      raise NotImplementedError("Not yet implemented: protocol=" + protocol)
 
   @classmethod
   def __get_cluster_host_ports(cls, protocol):
     """Return a list of host/port combinations for all impalads in the cluster."""
-    if protocol == 'beeswax':
+    if protocol == BEESWAX:
       return IMPALAD_HOST_PORT_LIST
-    elif protocol == 'hs2':
+    elif protocol == HS2:
       return IMPALAD_HS2_HOST_PORT_LIST
-    elif protocol == 'hs2-http':
+    elif protocol == HS2_HTTP:
       return IMPALAD_HS2_HTTP_HOST_PORT_LIST
     else:
       raise NotImplementedError("Not yet implemented: protocol=" + protocol)
@@ -682,15 +708,7 @@ class ImpalaTestSuite(BaseTestSuite):
           test_section[section_name] = test_section[section_name].replace(
               '$DATABASE', use_db)
     result_section, type_section = 'RESULTS', 'TYPES'
-    if vector.get_value('protocol').startswith('hs2'):
-      # hs2 or hs2-http
-      if 'HS2_TYPES' in test_section:
-        assert 'TYPES' in test_section,\
-            "Base TYPES section must always be included alongside HS2_TYPES"
-        # In some cases HS2 types are expected differ from Beeswax types (e.g. see
-        # IMPALA-914), so use the HS2-specific section if present.
-        type_section = 'HS2_TYPES'
-    verify_raw_results(test_section, result, vector.get_value('table_format').file_format,
+    verify_raw_results(test_section, result, vector,
                        result_section, type_section, pytest.config.option.update_results,
                        replace_filenames_with_placeholder)
 
@@ -714,9 +732,9 @@ class ImpalaTestSuite(BaseTestSuite):
     names, see 'reserved_keywords' below.
     """
     self.validate_exec_option_dimension(vector)
-    table_format_info = vector.get_value('table_format')
-    exec_options = vector.get_value(EXEC_OPTION_KEY)
-    protocol = vector.get_value('protocol')
+    table_format_info = vector.get_table_format()
+    exec_options = vector.get_exec_option_dict()
+    protocol = vector.get_protocol()
 
     target_impalad_clients = list()
     if multiple_impalad:
@@ -754,7 +772,7 @@ class ImpalaTestSuite(BaseTestSuite):
           if set_pattern_match:
             option_name = set_pattern_match.groups()[0].lower()
             query_options_changed.append(option_name)
-            assert option_name not in vector.get_value(EXEC_OPTION_KEY), (
+            assert option_name not in vector.get_value(EXEC_OPTION), (
                 "{} cannot be set in  the '.test' file since it is in the test vector. "
                 "Consider deepcopy()-ing the vector and removing this option in the "
                 "python test.".format(option_name))
@@ -769,7 +787,7 @@ class ImpalaTestSuite(BaseTestSuite):
       Helper to execute a query block in Hive. No special handling of query
       options is done, since we use a separate session for each block.
       """
-      h = ImpalaTestSuite.create_impala_client(HIVE_HS2_HOST_PORT, protocol='hs2',
+      h = ImpalaTestSuite.create_impala_client(HIVE_HS2_HOST_PORT, protocol=HS2,
               is_hive=True)
       try:
         result = None
@@ -913,9 +931,9 @@ class ImpalaTestSuite(BaseTestSuite):
           dml_results_query = "select * from %s limit 1000" % \
               test_section['DML_RESULTS_TABLE']
           dml_result = exec_fn(dml_results_query)
-          verify_raw_results(test_section, dml_result,
-              vector.get_value('table_format').file_format, result_section='DML_RESULTS',
-              update_section=pytest.config.option.update_results)
+          verify_raw_results(test_section, dml_result, vector,
+                             result_section='DML_RESULTS',
+                             update_section=pytest.config.option.update_results)
       except Exception as e:
         # When the calcite report mode is off, fail fast when hitting an error.
         if not pytest.config.option.calcite_report_mode:
@@ -1012,11 +1030,11 @@ class ImpalaTestSuite(BaseTestSuite):
     @wraps(function)
     def wrapper(*args, **kwargs):
       table_format = None
-      if kwargs.get('table_format'):
-        table_format = kwargs.get('table_format')
-        del kwargs['table_format']
+      if kwargs.get(TABLE_FORMAT):
+        table_format = kwargs.get(TABLE_FORMAT)
+        del kwargs[TABLE_FORMAT]
       if kwargs.get('vector'):
-        table_format = kwargs.get('vector').get_value('table_format')
+        table_format = kwargs.get('vector').get_table_format()
         del kwargs['vector']
         # self is the implicit first argument
       if table_format is not None:
@@ -1078,15 +1096,15 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def execute_query_using_client(self, client, query, vector):
     self.validate_exec_option_dimension(vector)
-    self.change_database(client, vector.get_value('table_format'))
-    query_options = vector.get_value(EXEC_OPTION_KEY)
+    self.change_database(client, vector.get_table_format())
+    query_options = vector.get_value(EXEC_OPTION)
     if query_options is not None: client.set_configuration(query_options)
     return client.execute(query)
 
   def execute_query_async_using_client(self, client, query, vector):
     self.validate_exec_option_dimension(vector)
-    self.change_database(client, vector.get_value('table_format'))
-    query_options = vector.get_value(EXEC_OPTION_KEY)
+    self.change_database(client, vector.get_table_format())
+    query_options = vector.get_value(EXEC_OPTION)
     if query_options is not None: client.set_configuration(query_options)
     return client.execute_async(query)
 
@@ -1098,7 +1116,7 @@ class ImpalaTestSuite(BaseTestSuite):
     'vector' must have 'protocol' and 'exec_option' dimension.
     Default ImpalaTestSuite client will be used depending on value of 'protocol'
     dimension."""
-    client = self.default_impala_client(vector.get_value('protocol'))
+    client = self.default_impala_client(vector.get_protocol())
     result = self.execute_query_using_client(client, query, vector)
     # Restore client configuration before returning.
     modified_configs = vector.get_exec_option_dict().keys()
@@ -1304,7 +1322,7 @@ class ImpalaTestSuite(BaseTestSuite):
       for tf in pytest.config.option.table_formats.split(','):
         dataset = get_dataset_from_workload(cls.get_workload())
         table_formats.append(TableFormatInfo.create_from_string(dataset, tf))
-      tf_dimensions = ImpalaTestDimension('table_format', *table_formats)
+      tf_dimensions = ImpalaTestDimension(TABLE_FORMAT, *table_formats)
     else:
       tf_dimensions = load_table_info_dimension(cls.get_workload(), exploration_strategy)
     # If 'skip_hbase' is specified or the filesystem is isilon, s3, GCS(gs), COS(cosn) or
@@ -1578,8 +1596,8 @@ class ImpalaTestSuite(BaseTestSuite):
     option_dim_names = []
     exec_option = dict()
     for vector_value in vector.vector_values:
-      if vector_value.name == EXEC_OPTION_KEY:
-        exec_option = vector.get_value(EXEC_OPTION_KEY)
+      if vector_value.name == EXEC_OPTION:
+        exec_option = vector.get_value(EXEC_OPTION)
       elif vector_value.name.lower() in EXEC_OPTION_NAMES:
         option_dim_names.append(vector_value.name.lower())
 
@@ -1592,10 +1610,10 @@ class ImpalaTestSuite(BaseTestSuite):
         pytest.fail("Exec option {} declared as independent dimension but not inserted "
             "into {} dimension. Consider using helper function "
             "add_exec_option_dimension or add_mandatory_exec_option "
-            "to declare it.".format(name, EXEC_OPTION_KEY))
+            "to declare it.".format(name, EXEC_OPTION))
       elif vector.get_value(name) != exec_option[name]:
         pytest.fail("{}[{}]={} does not match against dimension {}={}.".format(
-          EXEC_OPTION_KEY, name, exec_option[name], name, vector.get_value(name)))
+          EXEC_OPTION, name, exec_option[name], name, vector.get_value(name)))
 
   def __build_log_path(self, daemon, level):
     """Builds a path to a log file for a particular daemon. Does not assert that file

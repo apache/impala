@@ -26,7 +26,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.skip import SkipIfKudu, SkipIfBuildType, SkipIf
-from tests.common.test_dimensions import add_mandatory_exec_option
+from tests.common.test_dimensions import BEESWAX, add_mandatory_exec_option
 from tests.common.test_result_verifier import error_msg_expected
 from tests.util.event_processor_utils import EventProcessorUtils
 
@@ -39,6 +39,13 @@ class CustomKuduTest(CustomClusterTestSuite, KuduTestSuite):
   @classmethod
   def get_workload(cls):
     return 'functional-query'
+
+  @classmethod
+  def default_test_protocol(cls):
+    # run_test_case() can produce different result types between beeswax vs hs2 protocol
+    # in some tests. This fix the test to use beeswax protocol until we can migrate
+    # to hs2.
+    return BEESWAX
 
   @classmethod
   def add_custom_cluster_constraints(cls):

@@ -40,7 +40,7 @@ from random import choice, sample
 from string import ascii_lowercase, digits
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_kudu_dimension
+from tests.common.test_dimensions import HS2, create_kudu_dimension
 
 DEFAULT_KUDU_MASTER_WEBUI_PORT = os.getenv('KUDU_MASTER_WEBUI_PORT', '8051')
 
@@ -66,6 +66,7 @@ def get_kudu_master_flag(flag):
       return split[1]
   assert False, "Failed to find Kudu master flag: %s" % flag
 
+
 class KuduTestSuite(ImpalaTestSuite):
 
   # Lazily set.
@@ -74,7 +75,7 @@ class KuduTestSuite(ImpalaTestSuite):
   @classmethod
   def get_conn_timeout(cls):
     # For IMPALA-5079,IMPALA-4454
-    return 60 * 5 # 5 minutes
+    return 60 * 5  # 5 minutes
 
   @classmethod
   def setup_class(cls):
@@ -89,6 +90,12 @@ class KuduTestSuite(ImpalaTestSuite):
     super(KuduTestSuite, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
         create_kudu_dimension(cls.get_workload()))
+
+  @classmethod
+  def default_test_protocol(cls):
+    # run_test_case() can produce different result types between beeswax vs hs2 protocol
+    # in some tests. This fix the test to use hs2 protocol.
+    return HS2
 
   @classmethod
   def auto_create_db(cls):
@@ -167,19 +174,20 @@ class KuduTestSuite(ImpalaTestSuite):
         kudu.delete_table(name)
 
   @contextmanager
-  def drop_impala_table_after_context(self, cursor, table_name):
-    """For use in a "with" block: The named table will be dropped using the provided
-       cursor when the block exits.
+  def drop_impala_table_after_context(self, impala_client, table_name):
+    """DEPRECATED: use unique_database fixture instead.
+       For use in a "with" block: The named table will be dropped using the provided
+       impala_client when the block exits.
 
        cursor.execute("CREATE TABLE foo ...")
-       with drop_impala_table_after_context(cursor, "foo"):
+       with drop_impala_table_after_context(impala_client, "foo"):
          ...
        # Now table foo no longer exists.
     """
     try:
       yield
     finally:
-      cursor.execute("DROP TABLE %s" % table_name)
+      impala_client.execute("DROP TABLE IF EXISTS %s" % table_name)
 
   def kudu_col_type_to_impala_col_type(self, col_type):
     mapping = {BOOL: "BOOLEAN",

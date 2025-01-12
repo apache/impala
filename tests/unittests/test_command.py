@@ -19,15 +19,16 @@
 
 from __future__ import absolute_import, division, print_function
 import os
-import pytest
 import sys
 
+from tests.common.base_test_suite import BaseTestSuite
 # Update the sys.path to include the modules from bin/diagnostics.
 sys.path.insert(0,
     os.path.abspath(os.path.join(os.path.dirname(__file__), '../../bin/diagnostics')))
 from collect_diagnostics import Command
 
-class TestCommand(object):
+
+class TestCommand(BaseTestSuite):
   """ Unit tests for the Command class"""
 
   def test_simple_commands(self):
@@ -46,5 +47,3 @@ class TestCommand(object):
     c = Command(["sleep", "1000"], 1)
     assert c.run() != 0, "Command expected to timeout but succeeded."
     assert c.child_killed_by_timeout, "Command didn't timeout as expected."
-
-

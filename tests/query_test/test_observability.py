@@ -752,7 +752,7 @@ class TestObservability(ImpalaTestSuite):
     self.hs2_client.set_configuration(query_opts)
     result = self.hs2_client.execute("select sleep(2000)",
                                      profile_format=TRuntimeProfileFormat.THRIFT)
-    thrift_profile = result.profile
+    thrift_profile = result.runtime_profile
 
     expected_keys = ["HostCpuUserPercentage", "HostNetworkRx", "HostDiskReadThroughput"]
     for key in expected_keys:
@@ -769,7 +769,7 @@ class TestObservability(ImpalaTestSuite):
     that consume Impala debug webpages."""
     query = "select sleep(5)"
     result = self.hs2_client.execute(query, profile_format=TRuntimeProfileFormat.THRIFT)
-    tree = result.profile
+    tree = result.runtime_profile
 
     # tree.nodes[1] corresponds to ClientRequestState::summary_profile_
     # See be/src/service/client-request-state.[h|cc].

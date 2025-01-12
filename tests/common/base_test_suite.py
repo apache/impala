@@ -19,7 +19,7 @@
 from __future__ import absolute_import, division, print_function
 import logging
 
-from tests.common.test_vector import ImpalaTestMatrix
+from tests.common.test_vector import BEESWAX, ImpalaTestMatrix
 
 LOG = logging.getLogger('base_test_suite')
 
@@ -36,3 +36,8 @@ class BaseTestSuite(object):
     add more dimensions or different dimensions they can override this function.
     """
     cls.ImpalaTestMatrix = ImpalaTestMatrix()
+
+  @classmethod
+  def default_test_protocol(cls):
+    """See documentation in ImpalaTestSuite.default_test_protocol()."""
+    return BEESWAX

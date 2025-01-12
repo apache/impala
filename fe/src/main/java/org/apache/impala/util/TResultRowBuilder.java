@@ -27,6 +27,13 @@ import org.apache.impala.thrift.TResultRow;
 public class TResultRowBuilder {
   private final TResultRow row_ = new TResultRow();
 
+  public TResultRowBuilder add(int val) {
+    TColumnValue colVal = new TColumnValue();
+    colVal.setInt_val(val);
+    row_.addToColVals(colVal);
+    return this;
+  }
+
   public TResultRowBuilder add(long val) {
     TColumnValue colVal = new TColumnValue();
     colVal.setLong_val(val);

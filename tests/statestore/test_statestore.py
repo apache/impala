@@ -20,7 +20,6 @@ from builtins import range
 from collections import defaultdict
 import json
 import logging
-from random import randint
 import socket
 import threading
 import traceback
@@ -45,6 +44,7 @@ from StatestoreService.StatestoreSubscriber import TTopicRegistration
 from ErrorCodes.ttypes import TErrorCode
 from Status.ttypes import TStatus
 
+from tests.common.base_test_suite import BaseTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.common.skip import SkipIfDockerizedCluster
 
@@ -66,10 +66,12 @@ LOG = logging.getLogger('test_statestore')
 #    Test that only the subscribed-to topics are sent
 #    Test that topic deletions take effect correctly.
 
+
 def get_statestore_subscribers(host='localhost', port=25010):
   response = urlopen("http://{0}:{1}/subscribers?json".format(host, port))
   page = response.read()
   return json.loads(page)
+
 
 STATUS_OK = TStatus(TErrorCode.OK)
 DEFAULT_UPDATE_STATE_RESPONSE = TUpdateStateResponse(status=STATUS_OK, topic_updates=[],
@@ -80,6 +82,7 @@ WAIT_FOR_FAILURE_TIMEOUT = build_flavor_timeout(40, code_coverage_build_timeout=
 WAIT_FOR_HEARTBEAT_TIMEOUT = build_flavor_timeout(
     40, code_coverage_build_timeout=60)
 WAIT_FOR_UPDATE_TIMEOUT = build_flavor_timeout(40, code_coverage_build_timeout=60)
+
 
 class WildcardServerSocket(TSocket.TSocketBase, TTransport.TServerTransportBase):
   """Specialised server socket that binds to a random port at construction"""
@@ -125,7 +128,7 @@ class KillableThreadedServer(TServer):
       try:
         cnxn.open()
         return
-      except Exception as e:
+      except Exception:
         if i == num_tries - 1: raise
       time.sleep(0.1)
 
@@ -135,7 +138,7 @@ class KillableThreadedServer(TServer):
       try:
         cnxn.open()
         time.sleep(0.1)
-      except Exception as e:
+      except Exception:
         return
     raise Exception("Server did not stop")
 
@@ -158,13 +161,14 @@ class KillableThreadedServer(TServer):
     try:
       while not self.is_shutdown:
         self.processor.process(iprot, oprot)
-    except TTransport.TTransportException as tx:
+    except TTransport.TTransportException:
       pass
     except Exception as x:
       print(x)
 
     itrans.close()
     otrans.close()
+
 
 class StatestoreSubscriber(object):
   """A bare-bones subscriber skeleton. Tests should create a new StatestoreSubscriber(),
@@ -186,7 +190,7 @@ class StatestoreSubscriber(object):
   def __init__(self, heartbeat_cb=None, update_cb=None):
     self.heartbeat_event, self.heartbeat_count = threading.Condition(), 0
     # Track the number of updates received per topic.
-    self.update_counts = defaultdict(lambda : 0)
+    self.update_counts = defaultdict(lambda: 0)
     # Variables to notify for updates on each topic.
     self.update_event = threading.Condition()
     self.heartbeat_cb, self.update_cb = heartbeat_cb, update_cb
@@ -325,8 +329,8 @@ class StatestoreSubscriber(object):
         self.check_thread_exceptions()
         last_count = self.update_counts[topic_name]
         self.update_event.wait(WAIT_FOR_UPDATE_TIMEOUT)
-        if (time.time() > start_time + WAIT_FOR_UPDATE_TIMEOUT and
-              last_count == self.update_counts[topic_name]):
+        if (time.time() > start_time + WAIT_FOR_UPDATE_TIMEOUT
+            and last_count == self.update_counts[topic_name]):
           raise Exception(
               "Update not received for {0} within {1} (update count: {2})".format(
                 topic_name, WAIT_FOR_UPDATE_TIMEOUT, last_count))
@@ -334,7 +338,6 @@ class StatestoreSubscriber(object):
       return self
     finally:
       self.update_event.release()
-
 
   def wait_for_failure(self, timeout=WAIT_FOR_FAILURE_TIMEOUT):
     """Waits until this subscriber no longer appears in the statestore's subscriber
@@ -350,7 +353,7 @@ class StatestoreSubscriber(object):
 
 
 @SkipIfDockerizedCluster.statestore_not_exposed
-class TestStatestore():
+class TestStatestore(BaseTestSuite):
   def make_topic_update(self, topic_name, key_template="foo", value_template="bar",
                         num_updates=1, clear_topic_entries=False):
     topic_entries = [
@@ -468,14 +471,14 @@ class TestStatestore():
         # The update doesn't contain our topic.
         pass
       elif update_count == 1:
-        assert args.topic_deltas[topic_name].is_delta == False
+        assert args.topic_deltas[topic_name].is_delta is False
         delta = self.make_topic_update(topic_name)
         return TUpdateStateResponse(status=STATUS_OK, topic_updates=[delta],
                                     skipped=False)
       elif update_count == 2:
-        assert args.topic_deltas[topic_name].is_delta == False
+        assert args.topic_deltas[topic_name].is_delta is False
       elif update_count == 3:
-        assert args.topic_deltas[topic_name].is_delta == True
+        assert args.topic_deltas[topic_name].is_delta is True
         assert len(args.topic_deltas[topic_name].topic_entries) == 0
         assert args.topic_deltas[topic_name].to_version == 1
 
@@ -503,7 +506,7 @@ class TestStatestore():
                                     skipped=False)
       # All subsequent updates: set skipped=True and expected the full topic to be resent
       # every time
-      assert args.topic_deltas[topic_name].is_delta == False
+      assert args.topic_deltas[topic_name].is_delta is False
       assert len(args.topic_deltas[topic_name].topic_entries) == 1
       return TUpdateStateResponse(status=STATUS_OK, skipped=True)
 
@@ -602,12 +605,12 @@ class TestStatestore():
     def add_entries(sub, args):
       # None of, one or both of the topics may be in the update.
       updates = []
-      if (persistent_topic_name in args.topic_deltas and
-          sub.update_counts[persistent_topic_name] == 1):
+      if (persistent_topic_name in args.topic_deltas
+          and sub.update_counts[persistent_topic_name] == 1):
         updates.append(self.make_topic_update(persistent_topic_name))
 
-      if (transient_topic_name in args.topic_deltas and
-          sub.update_counts[transient_topic_name] == 1):
+      if (transient_topic_name in args.topic_deltas
+          and sub.update_counts[transient_topic_name] == 1):
         updates.append(self.make_topic_update(transient_topic_name))
 
       if len(updates) > 0:
@@ -617,14 +620,14 @@ class TestStatestore():
 
     def check_entries(sub, args):
       # None of, one or both of the topics may be in the update.
-      if (persistent_topic_name in args.topic_deltas and
-          sub.update_counts[persistent_topic_name] == 1):
+      if (persistent_topic_name in args.topic_deltas
+          and sub.update_counts[persistent_topic_name] == 1):
         assert len(args.topic_deltas[persistent_topic_name].topic_entries) == 1
         # Statestore should not send deletions when the update is not a delta, see
         # IMPALA-1891
-        assert args.topic_deltas[persistent_topic_name].topic_entries[0].deleted == False
-      if (transient_topic_name in args.topic_deltas and
-          sub.update_counts[persistent_topic_name] == 1):
+        assert args.topic_deltas[persistent_topic_name].topic_entries[0].deleted is False
+      if (transient_topic_name in args.topic_deltas
+          and sub.update_counts[persistent_topic_name] == 1):
         assert len(args.topic_deltas[transient_topic_name].topic_entries) == 0
       return DEFAULT_UPDATE_STATE_RESPONSE
 
@@ -737,6 +740,7 @@ class TestStatestore():
     update_lock = threading.Lock()
     last_to_versions = {}
     TOTAL_SUBSCRIBERS = 2
+
     def callback(sub, args, is_producer, sub_name):
       """Callback for subscriber to verify min_subscriber_topic_version behaviour.
       If 'is_producer' is true, this acts as the producer, otherwise it acts as the
@@ -794,8 +798,12 @@ class TestStatestore():
 
     # Two concurrent subscribers, which pushes out updates and checks the minimum
     # version, the other which just consumes the updates.
-    def producer_callback(sub, args): return callback(sub, args, True, "producer")
-    def consumer_callback(sub, args): return callback(sub, args, False, "consumer")
+    def producer_callback(sub, args):
+      return callback(sub, args, True, "producer")
+
+    def consumer_callback(sub, args):
+      return callback(sub, args, False, "consumer")
+
     with StatestoreSubscriber(update_cb=consumer_callback) as consumer_sub:
       with StatestoreSubscriber(update_cb=producer_callback) as producer_sub:
         consumer_reg = TTopicRegistration(topic_name=topic_name, is_transient=True)
