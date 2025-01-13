@@ -220,8 +220,8 @@ Status EncryptionKey::EncryptInternal(
   // mode is well-optimized(instruction level parallelism) with hardware acceleration
   // on x86 and PowerPC
   const EVP_CIPHER* evpCipher = GetCipher();
-  int success = encrypt ? EVP_EncryptInit_ex(ctx.ctx, evpCipher, NULL, key_, iv_) :
-                          EVP_DecryptInit_ex(ctx.ctx, evpCipher, NULL, key_, iv_);
+  int success = encrypt ? EVP_EncryptInit_ex(ctx.ctx, evpCipher, NULL, NULL, NULL) :
+                          EVP_DecryptInit_ex(ctx.ctx, evpCipher, NULL, NULL, NULL);
   if (success != 1) {
     return OpenSSLErr(encrypt ? "EVP_EncryptInit_ex" : "EVP_DecryptInit_ex", err_context);
   }
@@ -230,6 +230,12 @@ Status EncryptionKey::EncryptInternal(
         != 1) {
       return OpenSSLErr("EVP_CIPHER_CTX_ctrl", err_context);
     }
+  }
+  // setting iv after changing iv len, see https://github.com/openssl/openssl/pull/22590
+  success = encrypt ? EVP_EncryptInit_ex(ctx.ctx, NULL, NULL, key_, iv_) :
+                      EVP_DecryptInit_ex(ctx.ctx, NULL, NULL, key_, iv_);
+  if (success != 1) {
+    return OpenSSLErr(encrypt ? "EVP_EncryptInit_ex" : "EVP_DecryptInit_ex", err_context);
   }
 
   // The OpenSSL encryption APIs use ints for buffer lengths for some reason. To support
