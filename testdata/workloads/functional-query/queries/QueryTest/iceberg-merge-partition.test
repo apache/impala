@@ -339,3 +339,26 @@ when matched and target.id between 2 and 3 then update set string_col = "differe
 ---- TYPES
 INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
 ====
+---- QUERY
+# Regression test for IMPALA-13656.
+# Merging a from a source table with many partitions (with low mem_limit).
+# Then we also check the number of files to verify that
+# the inputs of the writers are actually sorted(/clustered).
+CREATE TABLE ice_tpch_many_parts
+PARTITIONED BY SPEC(truncate(500, l_partkey))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2')
+AS SELECT l_orderkey, l_partkey, l_linenumber, l_shipdate, l_comment
+FROM tpch_parquet.lineitem limit 1;
+
+SET MEM_LIMIT=400m;
+MERGE INTO ice_tpch_many_parts USING
+(SELECT l_orderkey, l_partkey, l_linenumber, l_shipdate, l_comment FROM tpch_parquet.lineitem WHERE l_linenumber=1) l
+ON ice_tpch_many_parts.l_orderkey=l.l_orderkey
+WHEN NOT MATCHED THEN INSERT values(l.l_orderkey, l.l_partkey, l.l_linenumber, l.l_shipdate, l.l_comment);
+SELECT count(*) FROM $DATABASE.ice_tpch_many_parts.`files`;
+---- RESULTS
+402
+---- TYPES
+BIGINT
+====

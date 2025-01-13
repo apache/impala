@@ -279,7 +279,7 @@ public class IcebergMergeImpl implements MergeImpl {
   public TableSink createInsertSink() {
     return TableSink.create(icebergTable_, TableSink.Op.INSERT,
         targetPartitionExpressions_, targetExpressions_, Collections.emptyList(), false,
-        false, targetSorting_.sortingColumnsAndOrder(), -1, null,
+        true, targetSorting_.sortingColumnsAndOrder(), -1, null,
         mergeStmt_.maxTableSinks_);
   }
 
