@@ -362,6 +362,18 @@ public class HdfsTable extends Table implements FeFsTable {
     // Total size (in bytes) of all files in a table/partition.
     public long totalFileBytes = 0;
 
+    public FileMetadataStats() {}
+
+    /**
+     * This constructor allows third party extensions to instantiate a FileMetadataStats
+     * with a List of FileDescriptor's.
+     */
+    public FileMetadataStats(List<FileDescriptor> fds) {
+      for (HdfsPartition.FileDescriptor fd : fds) {
+        accumulate(fd);
+      }
+    }
+
     // Initializes the values of the storage stats.
     public void init() {
       numFiles = 0;

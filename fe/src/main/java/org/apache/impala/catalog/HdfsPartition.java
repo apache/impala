@@ -767,11 +767,16 @@ public class HdfsPartition extends CatalogObjectImpl
   private final long lastRefreshEventId_;
 
   // File statistics corresponding to the encoded file descriptors.
-  private FileMetadataStats fileMetadataStats_ = null;
+  private final FileMetadataStats fileMetadataStats_;
 
   /**
-   * Constructor.  Needed for third party extensions that want to use their own builder
-   * to construct the object.
+   * Constructor. Needed for third party extensions that want to use their own builder
+   * to construct the object. A third party extension has to update the field of
+   * 'fileMetadataStats_' if it would like to use this field to get the size of the
+   * partition.
+   *
+   * Note that 'partitionIdCounter_' is not accessible to the subclasses in that its
+   * private.
    */
   protected HdfsPartition(HdfsTable table, long prevId, String partName,
       List<LiteralExpr> partitionKeyValues, HdfsStorageDescriptor fileFormatDescriptor,
@@ -789,9 +794,18 @@ public class HdfsPartition extends CatalogObjectImpl
         isMarkedCached, accessLevel, hmsParameters, cachedMsPartitionDescriptor,
         partitionStats, hasIncrementalStats, numRows, writeId,
         inFlightEvents, /*createEventId=*/-1L, /*lastCompactionId*/-1L,
-        /*lastRefreshEventId*/-1L, /*fileMetadataStats*/null);
+        /*lastRefreshEventId*/-1L, new HdfsTable.FileMetadataStats());
   }
 
+  /**
+   * Constructor. Needed for third party extensions that want to use their own builder
+   * to construct the object. A third party extension has to update the field of
+   * 'fileMetadataStats_' if it would like to use this field to get the size of the
+   * partition.
+   *
+   * Note that 'partitionIdCounter_' is not accessible to the subclasses in that its
+   * private.
+   */
   protected HdfsPartition(HdfsTable table, long id, long prevId, String partName,
       List<LiteralExpr> partitionKeyValues, HdfsStorageDescriptor fileFormatDescriptor,
       @Nonnull ImmutableList<byte[]> encodedFileDescriptors,
@@ -808,7 +822,35 @@ public class HdfsPartition extends CatalogObjectImpl
         isMarkedCached, accessLevel, hmsParameters, cachedMsPartitionDescriptor,
         partitionStats, hasIncrementalStats, numRows, writeId,
         inFlightEvents, /*createEventId=*/-1L, /*lastCompactionId*/-1L,
-        /*lastRefreshEventId*/-1L, /*fileMetadataStats*/null);
+        /*lastRefreshEventId*/-1L, new HdfsTable.FileMetadataStats());
+  }
+
+  /**
+   * Constructor. Needed for third party extensions that want to use their own builder
+   * to construct the object. It allows third party extensions to provide their own
+   * FileMetadataStats when instantiating an HdfsPartition.
+   *
+   * Note that 'partitionIdCounter_' is not accessible to the subclasses in that its
+   * private.
+   */
+  protected HdfsPartition(HdfsTable table, long id, long prevId, String partName,
+    List<LiteralExpr> partitionKeyValues, HdfsStorageDescriptor fileFormatDescriptor,
+    @Nonnull ImmutableList<byte[]> encodedFileDescriptors,
+    ImmutableList<byte[]> encodedInsertFileDescriptors,
+    ImmutableList<byte[]> encodedDeleteFileDescriptors,
+    HdfsPartitionLocationCompressor.Location location,
+    boolean isMarkedCached, TAccessLevel accessLevel, Map<String, String> hmsParameters,
+    CachedHmsPartitionDescriptor cachedMsPartitionDescriptor,
+    byte[] partitionStats, boolean hasIncrementalStats, long numRows, long writeId,
+    InFlightEvents inFlightEvents, long createEventId, long lastCompactionId,
+    HdfsTable.FileMetadataStats fileMetadataStats) {
+    this(table, partitionIdCounter_.getAndIncrement(), prevId, partName,
+        partitionKeyValues, fileFormatDescriptor, encodedFileDescriptors,
+        encodedInsertFileDescriptors, encodedDeleteFileDescriptors, location,
+        isMarkedCached, accessLevel, hmsParameters, cachedMsPartitionDescriptor,
+        partitionStats, hasIncrementalStats, numRows, writeId,
+        inFlightEvents, /*createEventId=*/-1L, /*lastCompactionId*/-1L,
+        /*lastRefreshEventId*/-1L, fileMetadataStats);
   }
 
   protected HdfsPartition(HdfsTable table, long id, long prevId, String partName,
@@ -822,6 +864,7 @@ public class HdfsPartition extends CatalogObjectImpl
       byte[] partitionStats, boolean hasIncrementalStats, long numRows, long writeId,
       InFlightEvents inFlightEvents, long createEventId, long lastCompactionId,
       long lastRefreshEventId, FileMetadataStats fileMetadataStats) {
+    Preconditions.checkArgument(fileMetadataStats != null);
     table_ = table;
     id_ = id;
     prevId_ = prevId;
@@ -1069,7 +1112,7 @@ public class HdfsPartition extends CatalogObjectImpl
   }
 
   public FileMetadataStats getFileMetadataStats() {
-    return Preconditions.checkNotNull(fileMetadataStats_);
+    return fileMetadataStats_;
   }
 
   @Override
@@ -1177,7 +1220,7 @@ public class HdfsPartition extends CatalogObjectImpl
 
   @Override
   public long getSize() {
-    if (fileMetadataStats_ != null) {
+    if (fileMetadataStats_.numFiles > 0) {
       return fileMetadataStats_.totalFileBytes;
     }
     long result = 0;
