@@ -57,8 +57,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
 
   def setup_method(self, method):
     super(TestUdfPersistence, self).setup_method(method)
-    impalad = self.cluster.impalads[0]
-    self.client = impalad.service.create_beeswax_client()
+    self.create_impala_clients()
     self.__cleanup()
     self.__load_drop_functions(
         self.CREATE_UDFS_TEMPLATE, self.DATABASE,
@@ -82,6 +81,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
 
   def teardown_method(self, method):
     self.__cleanup()
+    self.close_impala_clients()
     self.clear_tmp_dirs()
 
   def __cleanup(self):
@@ -99,10 +99,10 @@ class TestUdfPersistence(CustomClusterTestSuite):
       assert result is not None
 
   def __restart_cluster(self):
+    self.close_impala_clients()
     self._stop_impala_cluster()
     self._start_impala_cluster(list())
-    impalad = self.cluster.impalads[0]
-    self.client = impalad.service.create_beeswax_client()
+    self.create_impala_clients()
 
   def verify_function_count(self, query, count):
     result = self.client.execute(query)

@@ -72,6 +72,7 @@ class TestWorkloadManagementInitBase(CustomClusterTestSuite):
       catalog_opts += "--workload_mgmt_schema_version={} ".format(schema_version)
 
     try:
+      self.close_impala_clients()
       num_coords = cluster_size
       if cluster_size > 1:
         num_coords = cluster_size - 1
@@ -80,11 +81,10 @@ class TestWorkloadManagementInitBase(CustomClusterTestSuite):
           cluster_size=cluster_size, expected_num_impalads=cluster_size,
           num_coordinators=num_coords, wait_for_backends=wait_for_backends,
           log_symlinks=log_symlinks)
+      self.create_impala_clients()
     except CalledProcessError as e:
       if not expect_startup_err:
         raise e
-
-    self.client = self.create_impala_client(protocol=vector.get_value("protocol"))
 
     if wait_for_init_complete:
       self.wait_for_wm_init_complete()

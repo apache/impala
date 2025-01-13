@@ -54,6 +54,7 @@ from tests.common.test_dimensions import (
     ALL_NODES_ONLY,
     TableFormatInfo,
     create_exec_option_dimension,
+    default_client_protocol_dimension,
     get_dataset_from_workload,
     load_table_info_dimension)
 from tests.common.test_result_verifier import (
@@ -200,7 +201,7 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.ImpalaTestMatrix.add_dimension(cls.__create_exec_option_dimension())
     # Execute tests through Beeswax by default. Individual tests that have been converted
     # to work with the HS2 client can add HS2 in addition to or instead of beeswax.
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol', 'beeswax'))
+    cls.ImpalaTestMatrix.add_dimension(default_client_protocol_dimension())
 
   @staticmethod
   def create_hive_client(port):
@@ -224,6 +225,7 @@ class ImpalaTestSuite(BaseTestSuite):
   def setup_class(cls):
     """Setup section that runs before each test suite"""
     cls.client = None
+    cls.beeswax_client = None
     cls.hive_client = None
     cls.hs2_client = None
     cls.hs2_http_client = None
@@ -318,8 +320,9 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.close_impala_clients()
 
   @classmethod
-  def create_impala_client(cls, host_port=None, protocol='beeswax',
-      is_hive=False):
+  def create_impala_client(cls, host_port=None,
+                           protocol=pytest.config.option.default_test_protocol,
+                           is_hive=False):
     if host_port is None:
       host_port = cls.__get_default_host_port(protocol)
     client = create_connection(host_port=host_port,
@@ -330,10 +333,11 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @classmethod
   def get_impalad_cluster_size(cls):
-    return len(cls.__get_cluster_host_ports('beeswax'))
+    return len(cls.__get_cluster_host_ports(pytest.config.option.default_test_protocol))
 
   @classmethod
-  def create_client_for_nth_impalad(cls, nth=0, protocol='beeswax'):
+  def create_client_for_nth_impalad(cls, nth=0,
+                                    protocol=pytest.config.option.default_test_protocol):
     host_ports = cls.__get_cluster_host_ports(protocol)
     if nth < len(IMPALAD_HOST_PORT_LIST):
       host_port = host_ports[nth]
@@ -351,7 +355,7 @@ class ImpalaTestSuite(BaseTestSuite):
     """Creates Impala clients for all supported protocols."""
     # The default connection (self.client) is Beeswax so that existing tests, which assume
     # Beeswax do not need modification (yet).
-    cls.client = cls.create_impala_client(protocol='beeswax')
+    cls.beeswax_client = cls.create_impala_client(protocol='beeswax')
     cls.hs2_client = None
     try:
       cls.hs2_client = cls.create_impala_client(protocol='hs2')
@@ -365,19 +369,35 @@ class ImpalaTestSuite(BaseTestSuite):
       # HS2 HTTP connection can fail for benign reasons, e.g. running with unsupported
       # auth.
       LOG.info("HS2 HTTP connection setup failed, continuing...: {0}".format(e))
+    cls.client = cls.default_impala_client(pytest.config.option.default_test_protocol)
 
   @classmethod
   def close_impala_clients(cls):
     """Closes Impala clients created by create_impala_clients()."""
-    if cls.client:
-      cls.client.close()
-      cls.client = None
+    if cls.beeswax_client:
+      cls.beeswax_client.close()
+      cls.beeswax_client = None
     if cls.hs2_client:
       cls.hs2_client.close()
       cls.hs2_client = None
     if cls.hs2_http_client:
       cls.hs2_http_client.close()
       cls.hs2_http_client = None
+    # cls.client should be equal to one of above, unless test method implicitly override.
+    # Closing twice should be OK.
+    if cls.client:
+      cls.client.close()
+      cls.client = None
+
+  @classmethod
+  def default_impala_client(cls, protocol):
+    if protocol == 'beeswax':
+      return cls.beeswax_client
+    if protocol == 'hs2':
+      return cls.hs2_client
+    if protocol == 'hs2-http':
+      return cls.hs2_http_client
+    raise Exception("unknown protocol: {0}".format(protocol))
 
   @classmethod
   def __get_default_host_port(cls, protocol):
@@ -667,13 +687,7 @@ class ImpalaTestSuite(BaseTestSuite):
           [ImpalaTestSuite.create_impala_client(host_port, protocol=protocol)
            for host_port in self.__get_cluster_host_ports(protocol)]
     else:
-      if protocol == 'beeswax':
-        target_impalad_clients = [self.client]
-      elif protocol == 'hs2-http':
-        target_impalad_clients = [self.hs2_http_client]
-      else:
-        assert protocol == 'hs2'
-        target_impalad_clients = [self.hs2_client]
+      target_impalad_clients = [self.default_impala_client(protocol)]
 
     # Change the database to reflect the file_format, compression codec etc, or the
     # user specified database for all targeted impalad.

@@ -54,6 +54,7 @@ DEFAULT_KUDU_MASTER_HOSTS = os.getenv('KUDU_MASTER_HOSTS', '127.0.0.1')
 DEFAULT_KUDU_MASTER_PORT = os.getenv('KUDU_MASTER_PORT', '7051')
 DEFAULT_METASTORE_SERVER = 'localhost:9083'
 DEFAULT_NAMENODE_ADDR = None
+DEFAULT_TEST_PROTOCOL = os.getenv('DEFAULT_TEST_PROTOCOL', 'beeswax')
 if FILESYSTEM == 'isilon':
   DEFAULT_NAMENODE_ADDR = "{node}:{port}".format(node=os.getenv("ISILON_NAMENODE"),
                                                  port=ISILON_WEBHDFS_PORT)
@@ -61,6 +62,7 @@ if FILESYSTEM == 'isilon':
 # Timeout each individual test case after 2 hours, or 4 hours for slow builds
 PYTEST_TIMEOUT_S = \
     build_flavor_timeout(2 * 60 * 60, slow_build_timeout=4 * 60 * 60)
+
 
 def pytest_configure(config):
   """ Hook startup of pytest. Sets up log format and per-test timeout. """
@@ -184,6 +186,10 @@ def pytest_addoption(parser):
   parser.addoption("--calcite_report_output_dir", default=None,
                    help="Location to store the output JSON files for "
                    "calcite_report_mode. Defaults to ${IMPALA_LOGS_DIR}/calcite_report.")
+
+  parser.addoption("--default_test_protocol", default=DEFAULT_TEST_PROTOCOL,
+                   choices=("beeswax", "hs2", "hs2-http"),
+                   help="Impala protocol to run test if test does not specify any.")
 
 
 def pytest_assertrepr_compare(op, left, right):

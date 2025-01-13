@@ -60,13 +60,12 @@ class TestParquetMaxPageHeader(CustomClusterTestSuite):
 
   def setup_method(self, method):
     super(TestParquetMaxPageHeader, self).setup_method(method)
-    impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
-    self.client = client
+    self.create_impala_clients()
     self.__create_test_tbls()
 
   def teardown_method(self, method):
     self.__drop_test_tbls()
+    self.close_impala_clients()
 
   def __drop_test_tbls(self):
     self.client.execute("DROP TABLE IF EXISTS %s PURGE" % self.TEXT_TABLE_NAME)

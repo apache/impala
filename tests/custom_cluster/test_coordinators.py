@@ -266,14 +266,11 @@ class TestCoordinators(CustomClusterTestSuite):
     assert len(self.cluster.impalads) == 3
 
     coordinator = self.cluster.impalads[0]
-    worker1 = self.cluster.impalads[1]
-    worker2 = self.cluster.impalads[2]
 
     client = None
     try:
       client = coordinator.service.create_beeswax_client()
       assert client is not None
-      self.client = client
 
       client.execute("SET EXPLAIN_LEVEL=2")
       client.execute("SET TEST_REPLAN=0")
@@ -290,6 +287,7 @@ class TestCoordinators(CustomClusterTestSuite):
       assert 'F02:PLAN FRAGMENT [RANDOM] hosts=2 instances=2' in result
     finally:
       assert client is not None
+      client.close()
       self._stop_impala_cluster()
 
   @pytest.mark.execute_serially

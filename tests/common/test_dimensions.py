@@ -21,6 +21,7 @@ from __future__ import absolute_import, division, print_function
 from builtins import range
 import copy
 import os
+import pytest
 from itertools import product
 
 from tests.common.test_vector import (
@@ -146,6 +147,18 @@ def create_avro_snappy_dimension(workload):
 
 def create_kudu_dimension(workload):
   return create_table_format_dimension(workload, 'kudu/none')
+
+
+def default_client_protocol_dimension():
+  return ImpalaTestDimension('protocol', pytest.config.option.default_test_protocol)
+
+
+def beeswax_client_protocol_dimension():
+  return ImpalaTestDimension('protocol', 'beeswax')
+
+
+def hs2_client_protocol_dimension():
+  return ImpalaTestDimension('protocol', 'hs2')
 
 
 def create_client_protocol_dimension():

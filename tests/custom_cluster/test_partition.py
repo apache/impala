@@ -166,8 +166,9 @@ class TestPartitionDeletion(CustomClusterTestSuite):
         self.assert_catalogd_log_contains("INFO", deletion_log_regex.format(tbl, i))
 
     # Restart impalad and check the partitions on it
+    self.close_impala_clients()
     self.cluster.impalads[0].restart()
-    self.client = self.create_impala_client()
+    self.create_impala_clients()
     new_res = self.client.execute("show partitions {}".format(tbl))
     assert new_res.data == res.data
     self.assert_impalad_log_contains("WARNING", "stale partition", expected_count=0)
@@ -190,8 +191,9 @@ class TestPartitionDeletion(CustomClusterTestSuite):
       assert len(res.data) == 3
 
     # Restart impalad and check the partitions on it
+    self.close_impala_clients()
     self.cluster.impalads[0].restart()
-    self.client = self.create_impala_client()
+    self.create_impala_clients()
     new_res = self.client.execute("show partitions {}".format(tbl))
     assert new_res.data == res.data
     self.assert_impalad_log_contains("WARNING", "stale partition", expected_count=0)
@@ -209,8 +211,9 @@ class TestPartitionDeletion(CustomClusterTestSuite):
     self.client.execute("create table {}(i int) partitioned by (p int)".format(tbl))
     self.client.execute("describe " + tbl)
     # Restart impalad and check the partitions on it
+    self.close_impala_clients()
     self.cluster.impalads[0].restart()
-    self.client = self.create_impala_client()
+    self.create_impala_clients()
     res = self.client.execute("show partitions {}".format(tbl))
     assert len(res.data) == 1
     self.assert_impalad_log_contains("WARNING", "stale partition", expected_count=0)
