@@ -170,19 +170,9 @@ ClusterMembershipMgr::SnapshotPtr ClusterMembershipMgr::GetSnapshot() const {
   return state;
 }
 
-static bool is_active_coordinator(const BackendDescriptorPB& be) {
+static inline bool is_active_coordinator(const BackendDescriptorPB& be) {
   return be.has_is_coordinator() && be.is_coordinator() &&
       !(be.has_is_quiescing() && be.is_quiescing());
-}
-
-ExecutorGroup ClusterMembershipMgr::Snapshot::GetCoordinators() const {
-  ExecutorGroup coordinators("all-coordinators");
-  for (const auto& it : current_backends) {
-    if (is_active_coordinator(it.second)) {
-      coordinators.AddExecutor(it.second);
-    }
-  }
-  return coordinators;
 }
 
 vector<TNetworkAddress> ClusterMembershipMgr::Snapshot::GetCoordinatorAddresses() const {
@@ -195,6 +185,19 @@ vector<TNetworkAddress> ClusterMembershipMgr::Snapshot::GetCoordinatorAddresses(
     }
   }
   return coordinators;
+}
+
+static inline void _removeCoordIfExists(
+    const std::shared_ptr<ClusterMembershipMgr::Snapshot>& state,
+    const BackendDescriptorPB& be) {
+
+  // The BackendDescriptorPB may be incomplete. Use the backend id to retrieve the actual
+  // backend descriptor so the backend can be removed.
+  const BackendDescriptorPB* actual_be =
+      state->all_coordinators.LookUpBackendDesc(be.backend_id());
+  if (actual_be != nullptr) {
+    state->all_coordinators.RemoveExecutor(*actual_be);
+  }
 }
 
 void ClusterMembershipMgr::UpdateMembership(
@@ -298,6 +301,11 @@ void ClusterMembershipMgr::UpdateMembership(
           }
         }
         new_backend_map->erase(item.key);
+
+        // If a coordinator is not shutdown gracefully, then it will be deleted here.
+        if (be_desc.is_coordinator()) {
+          _removeCoordIfExists(new_state, be_desc);
+        }
       }
       continue;
     }
@@ -346,32 +354,45 @@ void ClusterMembershipMgr::UpdateMembership(
       if (existing.is_quiescing()) DCHECK(be_desc.is_quiescing());
 
       // If the node starts quiescing
-      if (be_desc.is_quiescing() && !existing.is_quiescing() && existing.is_executor()) {
-        // If the backend starts quiescing and it is present in the blacklist, remove it
-        // from the blacklist. If the backend is present in the blacklist, there is no
-        // need to remove it from the executor group because it has already been removed
-        bool blacklisted = new_blacklist->FindAndRemove(be_desc)
-            == ExecutorBlacklist::State::BLACKLISTED;
-        if (blacklisted) {
-          VLOG(1) << "Removing backend " << item.key << " from blacklist (quiescing)";
-          DCHECK(!IsBackendInExecutorGroups(be_desc, *new_executor_groups));
-        } else {
-          // Executor needs to be removed from its groups
-          for (const auto& group : be_desc.executor_groups()) {
-            VLOG(1) << "Removing backend " << item.key << " from group "
-                    << group.DebugString() << " (quiescing)";
-            RemoveExecutorAndGroup(be_desc, group, new_executor_groups);
+      if (be_desc.is_quiescing() && !existing.is_quiescing()) {
+        if (existing.is_executor()) {
+          // If the backend starts quiescing and it is present in the blacklist, remove it
+          // from the blacklist. If the backend is present in the blacklist, there is no
+          // need to remove it from the executor group because it has already been removed
+          bool blacklisted = new_blacklist->FindAndRemove(be_desc)
+              == ExecutorBlacklist::State::BLACKLISTED;
+          if (blacklisted) {
+            VLOG(1) << "Removing backend " << item.key << " from blacklist (quiescing)";
+            DCHECK(!IsBackendInExecutorGroups(be_desc, *new_executor_groups));
+          } else {
+            // Executor needs to be removed from its groups
+            for (const auto& group : be_desc.executor_groups()) {
+              VLOG(1) << "Removing backend " << item.key << " from group "
+                      << group.DebugString() << " (quiescing)";
+              RemoveExecutorAndGroup(be_desc, group, new_executor_groups);
+            }
           }
+        }
+
+        if (existing.is_coordinator()) {
+          _removeCoordIfExists(new_state, be_desc);
         }
       }
       existing = be_desc;
     } else {
       // Create
       new_backend_map->insert(make_pair(item.key, be_desc));
-      if (!be_desc.is_quiescing() && be_desc.is_executor()) {
-        for (const auto& group : be_desc.executor_groups()) {
-          VLOG(1) << "Adding backend " << item.key << " to group " << group.DebugString();
-          FindOrInsertExecutorGroup(group, new_executor_groups)->AddExecutor(be_desc);
+      if (!be_desc.is_quiescing()) {
+        if (be_desc.is_executor()) {
+          for (const auto& group : be_desc.executor_groups()) {
+            VLOG(1) << "Adding backend " << item.key << " to group " <<
+                group.DebugString();
+            FindOrInsertExecutorGroup(group, new_executor_groups)->AddExecutor(be_desc);
+          }
+        }
+
+        if (is_active_coordinator(be_desc)) {
+          new_state->all_coordinators.AddExecutor(be_desc);
         }
       }
       // Since this backend is new, it cannot already be on the blacklist or probation.
@@ -415,6 +436,13 @@ void ClusterMembershipMgr::UpdateMembership(
         }
       }
     }
+
+    // Add ourself to the list of all coordinators.
+    if (is_active_coordinator(*local_be_desc.get())) {
+      _removeCoordIfExists(new_state, *local_be_desc);
+      new_state->all_coordinators.AddExecutor(*local_be_desc);
+    }
+
     AddLocalBackendToStatestore(*local_be_desc, subscriber_topic_updates);
     DCHECK(CheckConsistency(*new_backend_map, *new_executor_groups, *new_blacklist));
   }

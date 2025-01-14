@@ -196,6 +196,19 @@ const BackendDescriptorPB* ExecutorGroup::LookUpBackendDesc(
   return nullptr;
 }
 
+const BackendDescriptorPB* ExecutorGroup::LookUpBackendDesc(
+    const UniqueIdPB& be_id) const {
+  for (const auto& executor_list : executor_map_) {
+    for (const auto& backend : executor_list.second){
+      if (backend.backend_id().hi() == be_id.hi()
+          && backend.backend_id().lo() == be_id.lo()) {
+        return &backend;
+      }
+    }
+  }
+  return nullptr;
+}
+
 int ExecutorGroup::NumExecutors() const {
   int count = 0;
   for (const auto& executor_list : executor_map_) count += executor_list.second.size();

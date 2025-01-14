@@ -143,9 +143,17 @@ INITIAL_QUEUE_REASON_REGEX = \
 # The path to resources directory which contains the admission control config files.
 RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test", "resources")
 
+# SQL statement that selects all records for the active queries table.
+ACTIVE_SQL = "select * from sys.impala_query_live"
+
 
 def impalad_admission_ctrl_config_args(fs_allocation_file, llama_site_file,
                                         additional_args="", make_copy=False):
+  """Generates impalad startup flags configuring the fair scheduler and llama site path
+     options and setting logging for admission control to VLOG_ROW.
+
+     The specified fair scheduler and llama site files are copied first, and the copies
+     are used as the value for the relevant startup flags."""
   fs_allocation_path = os.path.join(RESOURCES_DIR, fs_allocation_file)
   llama_site_path = os.path.join(RESOURCES_DIR, llama_site_file)
   if make_copy:
@@ -1773,6 +1781,232 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       assert mem_admitted['coordinator'] == 0
       for executor_mem_admitted in mem_admitted['executor']:
         assert executor_mem_admitted == 0
+
+  def __assert_systables_query(self, profile, expected_coords=None,
+      expected_frag_counts=None):
+    """Asserts the per-host fragment instances are correct in the provided profile."""
+
+    if expected_coords is None:
+      expected_coords = self.cluster.get_all_coordinators()
+
+    populate_frag_count = False
+    if expected_frag_counts is None:
+      populate_frag_count = True
+      expected_frag_counts = []
+
+    expected = []
+    for i, val in enumerate(expected_coords):
+      if populate_frag_count:
+        if i == 0:
+          expected_frag_counts.append(2)
+        else:
+          expected_frag_counts.append(1)
+
+      expected.append("{0}:{1}({2})".format(val.service.hostname, val.service.krpc_port,
+          expected_frag_counts[i]))
+
+    # Assert the correct request pool was used.
+    req_pool = re.search(r'\n\s+Request Pool:\s+(.*?)\n', profile)
+    assert req_pool, "Did not find request pool in query profile"
+    assert req_pool.group(1) == "root.onlycoords"
+
+    # Assert the fragment instances only ran on the coordinators.
+    perhost_frags = re.search(r'\n\s+Per Host Number of Fragment Instances:\s+(.*?)\n',
+        profile)
+    assert perhost_frags
+    sorted_hosts = " ".join(sorted(perhost_frags.group(1).split(" ")))
+    assert sorted_hosts
+    assert sorted_hosts == " ".join(expected)
+
+    # Assert the frontend selected the first executor group.
+    expected_verdict = "Assign to first group because only coordinators request pool " \
+        "specified"
+    fe_verdict = re.search(r'\n\s+Executor group 1:\n\s+Verdict: (.*?)\n', profile)
+    assert fe_verdict, "No frontend executor group verdict found."
+    assert fe_verdict.group(1) == expected_verdict, "Incorrect verdict found"
+
+  def __run_assert_systables_query(self, vector, expected_coords=None,
+        expected_frag_counts=None, query=ACTIVE_SQL):
+    """Runs a query using an only coordinators request pool and asserts the per-host
+        fragment instances are correct. This function can only be called from tests that
+        configured the cluster to use 'fair-scheduler-onlycoords.xml' and
+        'llama-site-onlycoords.xml'."""
+
+    vector.set_exec_option('request_pool', 'onlycoords')
+    result = self.execute_query_using_vector(query, vector)
+    assert result.success
+
+    self.__assert_systables_query(result.runtime_profile, expected_coords,
+      expected_frag_counts)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=3, cluster_size=5,
+      workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
+        fs_allocation_file="fair-scheduler-onlycoords.xml",
+        llama_site_file="llama-site-onlycoords.xml"),
+        statestored_args=_STATESTORED_ARGS)
+  def test_coord_only_pool_happy_path(self, vector):
+    """Asserts queries set to use an only coordinators request pool run all the fragment
+       instances on all coordinators and no executors even if the query includes
+       non-system tables."""
+    self.wait_for_wm_init_complete()
+
+    # Execute a query that only selects from a system table using a request pool that is
+    # only coordinators.
+    self.__run_assert_systables_query(vector)
+
+    # Execute a query that joins a non-system table with a system table using a request
+    # pool that is only coordinators. All fragment instances will run on the coordinators
+    # without running any on the executors.
+    self.__run_assert_systables_query(
+        vector=vector,
+        expected_frag_counts=[4, 2, 2,],
+        query="select a.test_name, b.db_user from functional.jointbl a inner join "
+              "sys.impala_query_live b on a.test_name = b.db_name"),
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=3, cluster_size=3,
+      workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
+        fs_allocation_file="fair-scheduler-onlycoords.xml",
+        llama_site_file="llama-site-onlycoords.xml"),
+        statestored_args=_STATESTORED_ARGS)
+  def test_coord_only_pool_no_executors(self, vector):
+    """Asserts queries that only select from the active queries table run even if no
+       executors are running."""
+    self.wait_for_wm_init_complete()
+    self.__run_assert_systables_query(vector)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=3, cluster_size=5,
+      workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
+        fs_allocation_file="fair-scheduler-onlycoords.xml",
+        llama_site_file="llama-site-onlycoords.xml"),
+        statestored_args=_STATESTORED_ARGS)
+  def test_coord_only_pool_one_quiescing_coord(self, vector):
+    """Asserts quiescing coordinators do not run fragment instances for queries that only
+       select from the active queries table."""
+    self.wait_for_wm_init_complete()
+
+    # Quiesce the second coordinator.
+    all_coords = self.cluster.get_all_coordinators()
+    coord_to_quiesce = all_coords[1]
+    self.execute_query_expect_success(self.client, ": shutdown('{}:{}')".format(
+        coord_to_quiesce.service.hostname, coord_to_quiesce.service.krpc_port))
+
+    # Ensure only two coordinators process a system tables query.
+    self.__run_assert_systables_query(
+        vector=vector,
+        expected_coords=[all_coords[0], all_coords[2]])
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=3, cluster_size=5,
+      workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
+        fs_allocation_file="fair-scheduler-onlycoords.xml",
+        llama_site_file="llama-site-onlycoords.xml"),
+        statestored_args=_STATESTORED_ARGS)
+  def test_coord_only_pool_one_coord_terminate(self, vector):
+    """Asserts a force terminated coordinator is eventually removed from the list of
+       active coordinators."""
+    self.wait_for_wm_init_complete()
+
+    # Abruptly end the third coordinator.
+    all_coords = self.cluster.get_all_coordinators()
+    coord_to_term = all_coords[2]
+    coord_to_term.kill()
+
+    vector.set_exec_option('request_pool', 'onlycoords')
+    client = self.default_impala_client(vector.get_value('protocol'))
+
+    done_waiting = False
+    iterations = 0
+    while not done_waiting and iterations < 20:
+      try:
+        result = self.execute_query_using_client(client, ACTIVE_SQL, vector)
+        assert result.success
+        done_waiting = True
+      except Exception as e:
+        # Since the coordinator was not gracefully shut down, it never had a change to
+        # send a quiescing message. Thus, the statestore will take some time to detect
+        # that coordinator is gone. During that time, queries again system tables will
+        # fail as the now terminated coordinator will still be sent rpcs.
+        if re.search(r"Exec\(\) rpc failed: Network error: "
+            r"Client connection negotiation failed: client connection to .*?:{}: "
+            r"connect: Connection refused".format(coord_to_term.service.krpc_port),
+            str(e)):
+          # Expected error, coordinator down not yet detected.
+          iterations += 1
+          sleep(3)
+        else:
+          raise e
+
+    assert done_waiting
+    self.__assert_systables_query(result.runtime_profile, [all_coords[0], all_coords[1]])
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=3, cluster_size=5,
+      workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
+        fs_allocation_file="fair-scheduler-onlycoords.xml",
+        llama_site_file="llama-site-onlycoords.xml"),
+        statestored_args=_STATESTORED_ARGS)
+  def test_coord_only_pool_add_coord(self, vector):
+    self.wait_for_wm_init_complete()
+
+    # Add a coordinator to the cluster.
+    cluster_size = len(self.cluster.impalads)
+    self._start_impala_cluster(
+        options=[
+            "--impalad_args=s{}".format(impalad_admission_ctrl_config_args(
+                fs_allocation_file="fair-scheduler-onlycoords.xml",
+                llama_site_file="llama-site-onlycoords.xml"))],
+        add_impalads=True,
+        cluster_size=6,
+        num_coordinators=1,
+        use_exclusive_coordinators=True,
+        wait_for_backends=False,
+        workload_mgmt=True)
+
+    self.assert_log_contains("impalad_node" + str(cluster_size), "INFO",
+        "join Impala Service pool")
+
+    # Assert the new coordinator ran a fragment instance.
+    self.__run_assert_systables_query(vector)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1, cluster_size=1,
+      workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
+        fs_allocation_file="fair-scheduler-onlycoords.xml",
+        llama_site_file="llama-site-onlycoords.xml",
+        additional_args="--expected_executor_group_sets=root.group-set-small:1,"
+                        "root.group-set-large:2 "
+                        "--num_expected_executors=2 --executor_groups=coordinator"),
+        statestored_args=_STATESTORED_ARGS)
+  def test_coord_only_pool_exec_groups(self, vector):
+    """Asserts queries using only coordinators request pools can run successfully when
+       executor groups are configured."""
+    self.wait_for_wm_init_complete()
+
+    # Assert queries can be run when no executors are started.
+    self.__run_assert_systables_query(vector)
+
+    # Add a single executor for the small executor group set.
+    self._start_impala_cluster(
+        options=[
+            "--impalad_args=--executor_groups=root.group-set-small-group-000:1"],
+        add_executors=True,
+        cluster_size=1,
+        wait_for_backends=False)
+    self.cluster.statestored.service.wait_for_live_subscribers(3, timeout=30)
+    self.__run_assert_systables_query(vector)
+
+    # Add two executors for the large executor group set.
+    self._start_impala_cluster(
+        options=[
+            "--impalad_args=--executor_groups=root.group-set-small-group-000:2"],
+        add_executors=True,
+        cluster_size=2,
+        wait_for_backends=False)
+    self.cluster.statestored.service.wait_for_live_subscribers(5, timeout=30)
+    self.__run_assert_systables_query(vector)
 
 
 class TestAdmissionControllerWithACService(TestAdmissionController):

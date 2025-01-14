@@ -56,6 +56,9 @@ public class AllocationConfiguration {
   private final Map<String, Map<String, Integer>> userQueryLimits;
   private final Map<String, Map<String, Integer>> groupQueryLimits;
 
+  // Specifies if each queue contains all nodes or only coordinators.
+  private final Map<String, Boolean> onlyCoordinators;
+
   // Policy for mapping apps to queues
   @VisibleForTesting
   QueuePlacementPolicy placementPolicy;
@@ -80,6 +83,7 @@ public class AllocationConfiguration {
       Map<String, Map<QueueACL, AccessControlList>> queueAcls,
       Map<String, Map<String, Integer>> userQueryLimits,
       Map<String, Map<String, Integer>> groupQueryLimits,
+      Map<String, Boolean> onlyCoordinators,
       QueuePlacementPolicy placementPolicy,
       Map<FSQueueType, Set<String>> configuredQueues,
       Set<String> nonPreemptableQueues) {
@@ -89,6 +93,7 @@ public class AllocationConfiguration {
     this.queueAcls = queueAcls;
     this.userQueryLimits = userQueryLimits;
     this.groupQueryLimits = groupQueryLimits;
+    this.onlyCoordinators = onlyCoordinators;
     this.placementPolicy = placementPolicy;
     this.configuredQueues = configuredQueues;
   }
@@ -100,6 +105,7 @@ public class AllocationConfiguration {
     queueAcls = new HashMap<>();
     userQueryLimits = new HashMap<>();
     groupQueryLimits = new HashMap<>();
+    onlyCoordinators = new HashMap<>();
     configuredQueues = new HashMap<>();
     for (FSQueueType queueType : FSQueueType.values()) {
       configuredQueues.put(queueType, new HashSet<String>());
@@ -201,5 +207,9 @@ public class AllocationConfiguration {
   public Map<String, Integer> getGroupQueryLimits(String queueName) {
     Map<String, Integer> limits = groupQueryLimits.get(queueName);
     return limits != null ? limits : Collections.emptyMap();
+  }
+
+  public boolean isOnlyCoordinators(String queueName) {
+    return onlyCoordinators.getOrDefault(queueName, Boolean.FALSE).booleanValue();
   }
 }

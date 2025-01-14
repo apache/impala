@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<allocations>
+    <queue name="group-set-small">
+      <weight>1.0</weight>
+      <schedulingPolicy>fair</schedulingPolicy>
+      <!-- Set a huge amount of memory to enable memory based admission control -->
+      <maxResources>50000000 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="group-set-large">
+      <weight>1.0</weight>
+      <schedulingPolicy>fair</schedulingPolicy>
+      <!-- Set a huge amount of memory to enable memory based admission control -->
+      <maxResources>50000000 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="onlycoords">
+        <maxResources>3000 mb, 0 vcores</maxResources>
+        <aclSubmitApps>* </aclSubmitApps>
+        <onlyCoordinators>true</onlyCoordinators>
+    </queue>
+    <queuePlacementPolicy>
+        <rule name="specified" create="false"/>
+        <rule name="reject" />
+    </queuePlacementPolicy>
+</allocations>

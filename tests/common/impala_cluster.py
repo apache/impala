@@ -180,6 +180,14 @@ class ImpalaCluster(object):
     LOG.info("Cluster: " + str(self.impalads))
     return choice([impalad for impalad in self.impalads if impalad != other_impalad])
 
+  def get_all_coordinators(self):
+    """Returns a list of all impalads where is_coordinator returns True. If no
+       coordinators are found, returns an empty list. The returned list is sorted by krpc
+       port ascending."""
+
+    return sorted([imp for imp in self.impalads if imp.is_coordinator()],
+    key=lambda x: x.service.krpc_port)
+
   def num_responsive_coordinators(self):
     """Find the number of impalad coordinators that can evaluate a test query."""
     n = 0

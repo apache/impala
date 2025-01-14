@@ -230,6 +230,8 @@ import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.RequestPoolService;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.impala.util.TSessionStateUtil;
+import static org.apache.impala.yarn.server.resourcemanager.scheduler.fair.
+    AllocationFileLoaderService.ROOT_POOL_NAME;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.KuduTransaction;
@@ -2196,8 +2198,28 @@ public class Frontend {
     Preconditions.checkState(
         !clientSetRequestPool || !queryOptions.getRequest_pool().isEmpty());
 
-    List<TExecutorGroupSet> originalExecutorGroupSets =
-        ExecutorMembershipSnapshot.getAllExecutorGroupSets();
+    boolean coordOnlyRequestPool = false;
+
+    if (clientSetRequestPool && RequestPoolService.getInstance() != null) {
+      final String pool_name = StringUtils.prependIfMissing(
+          queryOptions.getRequest_pool(), ROOT_POOL_NAME + ".");
+
+      coordOnlyRequestPool =
+          RequestPoolService.getInstance().getPoolConfig(pool_name).only_coordinators;
+    }
+
+    List<TExecutorGroupSet> originalExecutorGroupSets;
+    if (coordOnlyRequestPool) {
+      // The query is set to use an only coordinators request pool which means that no
+      // executors will be involved in query execution. Thus, the planner must ignore
+      // all executor groups and select the default group instead. The backend will ensure
+      // the query is scheduled on the coordinators.
+      originalExecutorGroupSets = new ArrayList<>(1);
+      TExecutorGroupSet all_coords = new TExecutorGroupSet();
+      originalExecutorGroupSets.add(all_coords);
+    } else {
+      originalExecutorGroupSets = ExecutorMembershipSnapshot.getAllExecutorGroupSets();
+    }
 
     LOG.info("The original executor group sets from executor membership snapshot: "
         + originalExecutorGroupSets);
@@ -2313,6 +2335,9 @@ public class Frontend {
         notScalable = true;
       } else if (!Frontend.canStmtBeAutoScaled(req)) {
         reason = "query is not auto-scalable";
+        notScalable = true;
+      } else if (coordOnlyRequestPool) {
+        reason = "only coordinators request pool specified";
         notScalable = true;
       }
 

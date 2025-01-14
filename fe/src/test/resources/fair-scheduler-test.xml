@@ -23,9 +23,11 @@
     <queue name="queueC">
       <aclSubmitApps>* </aclSubmitApps>
       <maxResources>1024 mb, 0 vcores</maxResources>
+      <onlyCoordinators>true</onlyCoordinators>
     </queue>
     <queue name="queueD">
       <aclSubmitApps>userA,userB </aclSubmitApps>
+      <onlyCoordinators>false</onlyCoordinators>
       <userQueryLimit>
         <user>*</user>
         <totalCount>3</totalCount>

@@ -84,6 +84,7 @@ DISABLE_LOG_BUFFERING = 'disable_log_buffering'
 # If True, resolves the actual files for all the log symlinks and outputs the resolved
 # paths to stderr.
 LOG_SYMLINKS = 'log_symlinks'
+WORKLOAD_MGMT = 'workload_mgmt'
 
 # Args that accept additional formatting to supply temporary dir path.
 ACCEPT_FORMATTING = set([IMPALAD_ARGS, CATALOGD_ARGS, IMPALA_LOG_DIR])
@@ -154,7 +155,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
       impalad_timeout_s=None, expect_cores=None, reset_ranger=False,
       impalad_graceful_shutdown=False, tmp_dir_placeholders=[],
-      expect_startup_fail=False, disable_log_buffering=False, log_symlinks=False):
+      expect_startup_fail=False, disable_log_buffering=False, log_symlinks=False,
+      workload_mgmt=False):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     args = dict()
@@ -198,6 +200,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       args[DISABLE_LOG_BUFFERING] = True
     if log_symlinks:
       args[LOG_SYMLINKS] = True
+    if workload_mgmt:
+      args[WORKLOAD_MGMT] = True
 
     def merge_args(args_first, args_last):
       result = args_first.copy()
@@ -328,6 +332,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if IMPALAD_TIMEOUT_S in args:
       kwargs[IMPALAD_TIMEOUT_S] = args[IMPALAD_TIMEOUT_S]
 
+    if args.get(WORKLOAD_MGMT, False):
+      if IMPALAD_ARGS or CATALOGD_ARGS in args:
+        kwargs[WORKLOAD_MGMT] = True
+
     if args.get(EXPECT_CORES, False):
       # Make a note of any core files that already exist
       possible_cores = find_all_files('*core*')
@@ -399,25 +407,33 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if not self.SHARED_CLUSTER_ARGS:
       self.cluster_teardown(method.__name__, method.__dict__)
 
-  def wait_for_wm_init_complete(self, timeout_s=120):
+  def wait_for_wm_init_complete(self, timeout_s=60):
     """
     Waits for the catalog to report the workload management initialization process has
-    completed and for the catalog updates to be received by the coordinators.
+    completed and for the catalog updates to be received by the coordinators. The input
+    timeout_s is used as the timeout for three separate function calls. Thus, the
+    theoretical max amount of time this function could wait is (timeout_s * 3).
     """
-    self.assert_catalogd_log_contains("INFO", r'Completed workload management '
-        r'initialization', timeout_s=timeout_s)
+    catalog_log = self.assert_log_contains_multiline("catalogd", "INFO", r'Completed '
+        r'workload management initialization.*?A catalog update with \d+ entries is '
+        r'assembled\. Catalog version: (\d+)', timeout_s)
 
-    catalog_log = self.assert_catalogd_log_contains("INFO", r'A catalog update with \d+ '
-        r'entries is assembled. Catalog version: (\d+)', timeout_s=10, expected_count=-1)
+    # Assert each coordinator has received a catalog update that was assembled after
+    # workload management completed.
+    for idx, _ in enumerate(self.cluster.get_all_coordinators()):
+      node_name = "impalad"
+      if idx > 0:
+        node_name += "_node" + str(idx)
 
-    def assert_func():
-      coord_log = self.assert_impalad_log_contains("INFO", r'Catalog topic update '
-          r'applied with version: (\d+)', timeout_s=5, expected_count=-1)
-      return int(coord_log.group(1)) >= int(catalog_log.group(1))
+      def assert_func():
+        coord_log = self.assert_log_contains(node_name, "INFO", r'Catalog topic update '
+            r'applied with version: (\d+)', timeout_s=timeout_s, expected_count=-1)
+        return int(coord_log.group(1)) >= int(catalog_log.group(1))
 
-    assert retry(func=assert_func, max_attempts=10, sleep_time_s=3, backoff=1), \
-        "Expected a catalog topic update with version '{}' or later, but no such " \
-        "update was found.".format(catalog_log.group(1))
+      max_attempts = timeout_s / 3
+      assert retry(func=assert_func, max_attempts=max_attempts, sleep_time_s=3,
+          backoff=1), "Expected a catalog topic update with version '{}' or later, but " \
+          "no such update was found.".format(catalog_log.group(1))
 
   @classmethod
   def _stop_impala_cluster(cls):
@@ -514,7 +530,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                             impalad_timeout_s=60,
                             ignore_pid_on_log_rotation=False,
                             wait_for_backends=True,
-                            log_symlinks=False):
+                            log_symlinks=False,
+                            workload_mgmt=False):
     cls.impala_log_dir = impala_log_dir
     # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
     # certain custom startup arguments work and we want to keep them independent of dev
@@ -543,6 +560,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if pytest.config.option.use_local_catalog:
       cmd.append("--impalad_args=--use_local_catalog=1")
       cmd.append("--catalogd_args=--catalog_topic_mode=minimal")
+
+    if workload_mgmt:
+      cmd.append("--impalad_args=--enable_workload_mgmt=true")
+      cmd.append("--catalogd_args=--enable_workload_mgmt=true")
 
     default_query_option_kvs = []
     # Put any defaults first, then any arguments after that so they can override defaults.
