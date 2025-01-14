@@ -86,10 +86,8 @@ class ClusterMembershipMgr {
   // Clients can obtain an immutable copy. Class instances can be created through the
   // implicitly-defined default and copy constructors.
   struct Snapshot {
-    Snapshot() = default;
+    Snapshot() : all_coordinators("all-coordinators") {};
     Snapshot(const Snapshot&) = default;
-    /// Returns an executor group of all non-quiescing coordinators in the cluster.
-    ExecutorGroup GetCoordinators() const;
     /// Returns the addresses of all non-quiescing coordinators in the cluster.
     std::vector<TNetworkAddress> GetCoordinatorAddresses() const;
     /// The current backend descriptor of the local backend.
@@ -111,6 +109,10 @@ class ClusterMembershipMgr {
     /// The version of this Snapshot. It is incremented every time the cluster membership
     /// changes.
     int64_t version = 0;
+
+    // Executor group of all non-quiescing coordinators in the cluster. Set during the
+    // SetState() function.
+    ExecutorGroup all_coordinators;
   };
 
   /// An immutable shared membership snapshot.

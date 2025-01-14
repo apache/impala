@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration>
+  <property>
+    <name>impala.admission-control.max-query-cpu-core-per-node-limit.root.group-set-small</name>
+    <value>12</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.group-set-small</name>
+    <value>53687091200</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-mt-dop.root.group-set-small</name>
+    <value>16</value>
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.group-set-small</name>
+    <value>2147483648</value>
+  </property>
+  <property>
+    <name>impala.admission-control.pool-queue-timeout-ms.root.group-set-small</name>
+    <value>600000</value>
+  </property>
+
+  <property>
+    <name>impala.admission-control.max-query-cpu-core-per-node-limit.root.group-set-large</name>
+    <value>12</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.group-set-large</name>
+    <value>53687091200</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-mt-dop.root.group-set-large</name>
+    <value>16</value>
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.group-set-large</name>
+    <value>2147483648</value>
+  </property>
+  <property>
+    <name>impala.admission-control.pool-queue-timeout-ms.root.group-set-large</name>
+    <value>600000</value>
+  </property>
+
+  <property>
+    <name>llama.am.throttling.maximum.placed.reservations.onlycoords</name>
+    <value>1</value>
+  </property>
+  <property>
+    <name>llama.am.throttling.maximum.queued.reservations.onlycoords</name>
+    <value>5</value>
+  </property>
+  <property>
+    <name>impala.admission-control.pool-queue-timeout-ms.onlycoords</name>
+    <value>30000</value>
+  </property>
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.onlycoords</name>
+    <value>1610612736</value><!--1.5GB-->
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.onlycoords</name>
+    <value>52428800</value><!--50MB-->
+  </property>
+</configuration>

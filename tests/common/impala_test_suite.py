@@ -1529,6 +1529,37 @@ class ImpalaTestSuite(BaseTestSuite):
     return self.assert_log_contains(
         daemon, level, line_regex, expected_count, timeout_s, dry_run)
 
+  def assert_log_contains_multiline(self, daemon, level, line_regex, timeout_s=6):
+    """
+    Asserts the the daemon log with specified level (e.g. ERROR, WARNING, INFO) contains
+    at least one match of the provided regular expression. The difference with this
+    function is the regular expression is compiled with the DOTALL flag which causes the
+    dot operator to also match newlines. Thus, the provided line_regex can match over
+    multiple lines.
+
+    Returns the result of the regular expression search() function or fails an assertion
+    if the regular expression is not matched in the given timeframe.
+    """
+    if (self._warn_assert_log):
+      LOG.warning(
+          "{} calls assert_log_contains() with timeout_s={}. Make sure that glog "
+          "buffering has been disabled (--logbuflevel=-1), or "
+          "CustomClusterTestSuite.with_args is set with disable_log_buffering=True, "
+          "or timeout_s is sufficient.".format(self.__class__.__name__, timeout_s))
+
+    pattern = re.compile(line_regex, re.DOTALL)
+
+    for i in range(0, timeout_s):
+      log_file_path = self.__build_log_path(daemon, level)
+      with open(log_file_path) as log:
+        ret = pattern.search(log.read())
+        if ret is not None:
+          return ret
+      time.sleep(1)
+
+    assert False, "did not find any logfile " \
+        "contents matching the regex '{}'".format(line_regex)
+
   def assert_log_contains(self, daemon, level, line_regex, expected_count=1, timeout_s=6,
       dry_run=False):
     """

@@ -378,6 +378,7 @@ public class RequestPoolService {
       result.setMax_requests(MAX_PLACED_RESERVATIONS_DEFAULT);
       result.setMax_queued(MAX_QUEUED_RESERVATIONS_DEFAULT);
       result.setDefault_query_options("");
+      result.setOnly_coordinators(false);
     } else {
       // Capture the current conf_ in case it changes while we're using it.
       Configuration currentConf = conf_;
@@ -403,6 +404,7 @@ public class RequestPoolService {
           getPoolConfigValue(currentConf, pool, MAX_QUERY_CPU_CORE_PER_NODE_LIMIT, 0L));
       result.setMax_query_cpu_core_coordinator_limit(getPoolConfigValue(
           currentConf, pool, MAX_QUERY_CPU_CORE_COORDINATOR_LIMIT, 0L));
+      result.setOnly_coordinators(allocationConf_.get().isOnlyCoordinators(pool));
     }
     if (LOG.isTraceEnabled()) {
       LOG.debug("getPoolConfig(pool={}): max_mem_resources={}, max_requests={},"

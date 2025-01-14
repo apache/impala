@@ -96,6 +96,12 @@ class ExecutorGroup {
   /// change while it holds the pointer.
   const BackendDescriptorPB* LookUpBackendDesc(const NetworkAddressPB& host) const;
 
+  /// Looks up the backend descriptor for the executor with an id matching the provided
+  /// executor id. Returns nullptr if no executor is found. The returned descriptor should
+  /// not be retained beyond the lifetime of this ExecutorGroup and the caller must make
+  /// sure that the group does not change while it holds the pointer.
+  const BackendDescriptorPB* LookUpBackendDesc(const UniqueIdPB& be_id) const;
+
   /// Returns the hash ring associated with this executor group. It's owned by the group
   /// and the caller must not hold a reference beyond the groups lifetime.
   const HashRing* GetHashRing() const { return &executor_ip_hash_ring_; }

@@ -81,5 +81,18 @@ BackendDescriptorPB MakeBackendDescriptor(int idx, int port_offset,
   return MakeBackendDescriptor(idx, group_desc, port_offset, admit_mem_limit);
 }
 
+void AssertLookupById(const BackendDescriptorPB& exec1, const BackendDescriptorPB& exec2,
+    const ExecutorGroup& group) {
+  const BackendDescriptorPB* actual_exec1 = group.LookUpBackendDesc(exec1.backend_id());
+  ASSERT_NE(nullptr, actual_exec1);
+  ASSERT_EQ(exec1.address().hostname(), actual_exec1->address().hostname());
+  ASSERT_EQ(exec1.address().port(), actual_exec1->address().port());
+
+  const BackendDescriptorPB* actual_exec2 = group.LookUpBackendDesc(exec2.backend_id());
+  ASSERT_NE(nullptr, actual_exec2);
+  ASSERT_EQ(exec2.address().hostname(), actual_exec2->address().hostname());
+  ASSERT_EQ(exec2.address().port(), actual_exec2->address().port());
+}
+
 }  // end namespace test
 }  // end namespace impala

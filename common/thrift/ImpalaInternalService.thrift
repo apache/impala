@@ -232,6 +232,12 @@ struct TPoolConfig {
   // If a rule for the user is not present in user_query_limits, then these rules
   // are evaluated, if the user is a member of a group.
   13: required map<string, i32> group_query_limits
+
+  // Specifies the state of the onlyCoordinators configuration element for a request pool.
+  // When request pools are configured, they can be specified as being only coordinators
+  // which means that pool only considers resources from the coordinator nodes and queries
+  // for that pool schedule fragment instances on coordinator nodes only.
+  14: optional bool only_coordinators
 }
 
 struct TParseDateStringResult {
