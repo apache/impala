@@ -55,5 +55,10 @@ BackendDescriptorPB MakeBackendDescriptor(
 BackendDescriptorPB MakeBackendDescriptor(int idx, int port_offset = 0,
     int64_t admit_mem_limit = 4L * MEGABYTE);
 
+/// Assert the LookupBackendDesc() function returns correct results when passed a
+/// backend id.
+void AssertLookupById(const BackendDescriptorPB& exec1, const BackendDescriptorPB& exec2,
+    const ExecutorGroup& group);
+
 }  // end namespace test
 }  // end namespace impala

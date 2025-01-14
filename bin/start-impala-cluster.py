@@ -1147,7 +1147,7 @@ if __name__ == "__main__":
                                  use_exclusive_coordinators, existing_cluster_size)
       expected_cluster_size += existing_cluster_size
     elif options.add_impalads:
-      cluster_ops.start_impalads(options.cluster_size, options.num_coordinators,
+      cluster_ops.start_impalads(options.num_coordinators, options.num_coordinators,
                                  options.use_exclusive_coordinators,
                                  existing_cluster_size)
       expected_cluster_size += existing_cluster_size
@@ -1171,7 +1171,9 @@ if __name__ == "__main__":
     if options.add_impalads:
       # TODO: This is a hack to make the waiting logic work. We'd better add a dedicated
       # option for adding a new cluster using the existing catalogd and statestore.
+      # https://issues.apache.org/jira/browse/IMPALA-13755
       expected_num_ready_impalads = options.cluster_size
+      expected_cluster_size = options.cluster_size
     impala_cluster.wait_until_ready(expected_cluster_size, expected_num_ready_impalads)
   except Exception as e:
     LOG.exception("Error starting cluster")

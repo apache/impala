@@ -59,10 +59,10 @@ import com.google.common.annotations.VisibleForTesting;
 @Public
 @Unstable
 public class AllocationFileLoaderService extends AbstractService {
-  
+
   public static final Log LOG = LogFactory.getLog(
       AllocationFileLoaderService.class.getName());
-  
+
   /** Time to wait between checks of the allocation file */
   public static final long ALLOC_RELOAD_INTERVAL_MS = 10 * 1000;
 
@@ -74,26 +74,28 @@ public class AllocationFileLoaderService extends AbstractService {
 
   public static final long THREAD_JOIN_TIMEOUT_MS = 1000;
 
+  public static final String ROOT_POOL_NAME = "root";
+
   private final Clock clock;
 
   private long lastSuccessfulReload; // Last time we successfully reloaded queues
   private boolean lastReloadAttemptFailed = false;
-  
-  // Path to XML file containing allocations. 
+
+  // Path to XML file containing allocations.
   private File allocFile;
-  
+
   private Listener reloadListener;
-  
+
   @VisibleForTesting
   long reloadIntervalMs = ALLOC_RELOAD_INTERVAL_MS;
-  
+
   private Thread reloadThread;
   private volatile boolean running = true;
-  
+
   public AllocationFileLoaderService() {
     this(new SystemClock());
   }
-  
+
   public AllocationFileLoaderService(Clock clock) {
     super(AllocationFileLoaderService.class.getName());
     this.clock = clock;
@@ -288,6 +290,7 @@ public class AllocationFileLoaderService extends AbstractService {
     Map<String, Map<QueueACL, AccessControlList>> queueAcls = new HashMap<>();
     Map<String, Map<String, Integer>> userQueryLimits = new HashMap<>();
     Map<String, Map<String, Integer>> groupQueryLimits = new HashMap<>();
+    Map<String, Boolean> onlyCoordinators = new HashMap<>();
     Set<String> nonPreemptableQueues = new HashSet<>();
     int userMaxAppsDefault = Integer.MAX_VALUE;
     int queueMaxAppsDefault = Integer.MAX_VALUE;
@@ -404,8 +407,8 @@ public class AllocationFileLoaderService extends AbstractService {
     // Load queue elements.  A root queue can either be included or omitted.  If
     // it's included, all other queues must be inside it.
     for (Element element : queueElements) {
-      String parent = "root";
-      if (element.getAttribute("name").equalsIgnoreCase("root")) {
+      String parent = ROOT_POOL_NAME;
+      if (element.getAttribute("name").equalsIgnoreCase(ROOT_POOL_NAME)) {
         if (queueElements.size() > 1) {
           throw new AllocationConfigurationException("If configuring root queue,"
               + " no other queues can be placed alongside it.");
@@ -416,7 +419,8 @@ public class AllocationFileLoaderService extends AbstractService {
           maxChildQueueResources, queueMaxApps, userMaxApps, queueMaxAMShares,
           queueWeights, queuePolicies, minSharePreemptionTimeouts,
           fairSharePreemptionTimeouts, fairSharePreemptionThresholds, queueAcls,
-          userQueryLimits, groupQueryLimits, configuredQueues, nonPreemptableQueues);
+          userQueryLimits, groupQueryLimits, configuredQueues, onlyCoordinators,
+          nonPreemptableQueues);
     }
 
     // Load placement policy and pass it configured queues
@@ -430,18 +434,18 @@ public class AllocationFileLoaderService extends AbstractService {
     }
 
     // Set the min/fair share preemption timeout for the root queue
-    if (!minSharePreemptionTimeouts.containsKey("root")){
-      minSharePreemptionTimeouts.put("root",
+    if (!minSharePreemptionTimeouts.containsKey(ROOT_POOL_NAME)){
+      minSharePreemptionTimeouts.put(ROOT_POOL_NAME,
           defaultMinSharePreemptionTimeout);
     }
-    if (!fairSharePreemptionTimeouts.containsKey("root")) {
-      fairSharePreemptionTimeouts.put("root",
+    if (!fairSharePreemptionTimeouts.containsKey(ROOT_POOL_NAME)) {
+      fairSharePreemptionTimeouts.put(ROOT_POOL_NAME,
           defaultFairSharePreemptionTimeout);
     }
 
     // Set the fair share preemption threshold for the root queue
-    if (!fairSharePreemptionThresholds.containsKey("root")) {
-      fairSharePreemptionThresholds.put("root",
+    if (!fairSharePreemptionThresholds.containsKey(ROOT_POOL_NAME)) {
+      fairSharePreemptionThresholds.put(ROOT_POOL_NAME,
           defaultFairSharePreemptionThreshold);
     }
 
@@ -451,7 +455,7 @@ public class AllocationFileLoaderService extends AbstractService {
         queueMaxResourcesDefault, queueMaxAMShareDefault, queuePolicies,
         defaultSchedPolicy, minSharePreemptionTimeouts, fairSharePreemptionTimeouts,
         fairSharePreemptionThresholds, queueAcls, userQueryLimits, groupQueryLimits,
-        newPlacementPolicy, configuredQueues, nonPreemptableQueues);
+        onlyCoordinators, newPlacementPolicy, configuredQueues, nonPreemptableQueues);
     lastSuccessfulReload = clock.getTime();
     lastReloadAttemptFailed = false;
 
@@ -481,6 +485,7 @@ public class AllocationFileLoaderService extends AbstractService {
       Map<String, Map<String, Integer>> userQueryLimits,
       Map<String, Map<String, Integer>> groupQueryLimits,
       Map<FSQueueType, Set<String>> configuredQueues,
+      Map<String, Boolean> onlyCoordinators,
       Set<String> nonPreemptableQueues)
       throws AllocationConfigurationException {
     String queueName = CharMatcher.whitespace().trimFrom(element.getAttribute("name"));
@@ -576,9 +581,13 @@ public class AllocationFileLoaderService extends AbstractService {
             maxChildQueueResources, queueMaxApps, userMaxApps, queueMaxAMShares,
             queueWeights, queuePolicies, minSharePreemptionTimeouts,
             fairSharePreemptionTimeouts, fairSharePreemptionThresholds, queueAcls,
-            userQueryLimits, groupQueryLimits, configuredQueues, nonPreemptableQueues);
+            userQueryLimits, groupQueryLimits, configuredQueues, onlyCoordinators,
+            nonPreemptableQueues);
         configuredQueues.get(FSQueueType.PARENT).add(queueName);
         isLeaf = false;
+      } else if ("onlyCoordinators".equals(field.getTagName())) {
+        String text = ((Text)field.getFirstChild()).getData().trim();
+        onlyCoordinators.put(queueName, Boolean.parseBoolean(text));
       }
     }
     if (isLeaf) {
@@ -611,14 +620,13 @@ public class AllocationFileLoaderService extends AbstractService {
         allocationConfiguration.getConfiguredQueues();
     Set<String> parentQueues = configuredQueues.get(FSQueueType.PARENT);
     Set<String> leafQueues = configuredQueues.get(FSQueueType.LEAF);
-    String root = "root";
-    if (parentQueues.size() == 1 && parentQueues.contains(root)) {
+    if (parentQueues.size() == 1 && parentQueues.contains(ROOT_POOL_NAME)) {
       Map<String, Integer> rootUserQueryLimits =
-          allocationConfiguration.getUserQueryLimits(root);
+          allocationConfiguration.getUserQueryLimits(ROOT_POOL_NAME);
       Map<String, Integer> rootGroupQueryLimits =
-          allocationConfiguration.getGroupQueryLimits(root);
+          allocationConfiguration.getGroupQueryLimits(ROOT_POOL_NAME);
       for (String leafQueue : leafQueues) {
-        if (leafQueue.startsWith(root)) {
+        if (leafQueue.startsWith(ROOT_POOL_NAME)) {
           Map<String, Integer> groupQueryLimits =
               allocationConfiguration.getGroupQueryLimits(leafQueue);
           Map<String, Integer> userQueryLimits =

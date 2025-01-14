@@ -2504,7 +2504,7 @@ Status ClientRequestState::TryKillQueryRemotely(
   // coordinator in the cluster, it will be the status to return.
   Status status = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
   ExecutorGroup all_coordinators =
-      ExecEnv::GetInstance()->cluster_membership_mgr()->GetSnapshot()->GetCoordinators();
+      ExecEnv::GetInstance()->cluster_membership_mgr()->GetSnapshot()->all_coordinators;
   // Skipping the current impalad.
   unique_ptr<ExecutorGroup> other_coordinators{ExecutorGroup::GetFilteredExecutorGroup(
       &all_coordinators, {ExecEnv::GetInstance()->krpc_address()})};

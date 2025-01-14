@@ -714,11 +714,11 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
         }
         if (!authenticated) {
           if (use_jwt_) {
-            LOG(INFO) << "Invalid JWT token provided: " << bearer_token;
+            LOG(INFO) << "Invalid JWT token provided";
             total_jwt_token_auth_failure_->Increment(1);
           }
           if (use_oauth_) {
-            LOG(INFO) << "Invalid OAuth token provided: " << bearer_token;
+            LOG(INFO) << "Invalid OAuth token provided";
             total_oauth_token_auth_failure_->Increment(1);
           }
         }

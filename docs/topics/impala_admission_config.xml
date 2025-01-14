@@ -144,10 +144,10 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
         <p>
           Here are sample <filepath>fair-scheduler.xml</filepath> and
           <filepath>llama-site.xml</filepath> files that define resource pools
-          <codeph>root.default</codeph>, <codeph>root.development</codeph>, and
-          <codeph>root.production</codeph>. These files define resource pools for Impala
-          admission control and are separate from the similar
-          <codeph>fair-scheduler.xml</codeph>that defines resource pools for YARN.
+          <codeph>root.default</codeph>, <codeph>root.development</codeph>,
+          <codeph>root.production</codeph>, and <codeph>root.coords</codeph>.
+          These files define resource pools for Impala admission control and are separate
+          from the similar <codeph>fair-scheduler.xml</codeph>that defines resource pools for YARN.
         </p>
 
         <p>
@@ -173,6 +173,36 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
           to those pools.
         </p>
 
+        <p>
+          The <codeph>&lt;onlyCoordinators&gt;</codeph> element is a boolean that defaults
+          to <codeph>false</codeph>. If this value is set to <codeph>true</codeph>, the
+          named request pool will contain only the coordinators and none of the executors.
+          The main purpose of this setting is to enable running queries against the
+          <codeph>sys.impala_query_live</codeph> table from workload management. Since the
+          data for this table is stored in the memory of the coordinators, the executors
+          do not need to be involved if the query only selects from this table.
+        </p>
+
+        <p>
+          To use an <codeph>&lt;onlyCoordinators&gt;</codeph> request pool, set the
+          <codeph>REQUEST_POOL</codeph> query option to the name of the
+          <codeph>&lt;onlyCoordinators&gt;</codeph> request pool. <b>Caution</b> even though
+          these request pools do not contain executors, they can still run any query.
+          Thus, while the <codeph>REQUEST_POOL</codeph> query option is set to an only
+          coordinators request pool, queries have the potential to run the coordinators
+          out of resources.
+        </p>
+
+        <p>
+          Caution: care must be taken when naming the <codeph>&lt;onlyCoordinators&gt;</codeph>
+          request pool. If the name has the same prefix as a named executor group set, then
+          queries may be automatically routed to the request pool.  For example, if the
+          coordinator is configured with
+          <codeph>--expected_executor_group_sets=prefix1:10</codeph>, then an only coordinators
+          request pool named <codeph>prefix1-onlycoords<codeph> will potentially have
+          queries routed to it.
+        </p>
+
 <codeblock>&lt;allocations>
 
     &lt;queue name="root">
@@ -188,6 +218,11 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
         &lt;queue name="production">
             &lt;maxResources>1000000 mb, 0 vcores&lt;/maxResources>
             &lt;aclSubmitApps> ops,admin&lt;/aclSubmitApps>
+        &lt;/queue>
+        &lt;queue name="coords">
+            &lt;maxResources>1000000 mb, 0 vcores&lt;/maxResources>
+            &lt;aclSubmitApps>ops,admin&lt;/aclSubmitApps>
+            &lt;onlyCoordinators>true&lt;/onlyCoordinators>
         &lt;/queue>
     &lt;/queue>
     &lt;queuePlacementPolicy>

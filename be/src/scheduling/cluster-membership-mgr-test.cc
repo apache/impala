@@ -15,8 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <memory>
 #include <deque>
+#include <memory>
+#include <sstream>
+#include <vector>
 
 #include "common/logging.h"
 #include "common/names.h"
@@ -272,9 +274,38 @@ class ClusterMembershipMgrTest : public testing::Test {
   }
 };
 
+/// Asserts a provided list of expected hostnames are in the all_coordinators
+/// ExecutorGroup of the provided ClusterMembershipMgr.
+void _assertCoords(
+    ClusterMembershipMgr& cmm, const std::vector<const char*> expected_hostnames) {
+  ExecutorGroup::Executors actual_coords =
+    cmm.GetSnapshot()->all_coordinators.GetAllExecutorDescriptors();
+
+  std::ostringstream actual_hostnames;
+  for (const auto& actual : actual_coords) {
+    actual_hostnames << " " << actual.address().hostname();
+  }
+
+  ASSERT_EQ(expected_hostnames.size(), actual_coords.size())
+      << "Actual hostnames:" << actual_hostnames.str();
+
+  for (auto expected : expected_hostnames) {
+    bool found = false;
+    for (const auto& actual : actual_coords) {
+      if (actual.address().hostname() == expected) {
+        found = true;
+        break;
+      }
+    }
+
+    EXPECT_TRUE(found) << "did not find expected coordinator '" << expected
+                       << "' in actual coordinators:" << actual_hostnames.str();
+  }
+}
+
 /// This test takes two instances of the ClusterMembershipMgr through a common lifecycle.
 /// It also serves as an example for how to craft statestore messages and pass them to
-/// UpdaUpdateMembership().
+/// UpdateMembership().
 TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   auto b1 = make_shared<BackendDescriptorPB>(MakeBackendDescriptor(1));
   auto b2 = make_shared<BackendDescriptorPB>(MakeBackendDescriptor(2));
@@ -306,6 +337,8 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
 
   // First manager now has one BE
   ASSERT_EQ(1, cmm1.GetSnapshot()->current_backends.size());
+  _assertCoords(cmm1, {"host_1"});
+  _assertCoords(cmm2, {});
 
   // Hook up second callback and iterate with the result of the first manager
   cmm2.SetLocalBeDescFn([b2]() { return b2; });
@@ -314,6 +347,8 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   cmm2.UpdateMembership(topic_delta_map, &returned_topic_deltas);
   ASSERT_EQ(1, returned_topic_deltas.size());
   ASSERT_EQ(2, cmm2.GetSnapshot()->current_backends.size());
+  _assertCoords(cmm1, {"host_1"});
+  _assertCoords(cmm2, {"host_1", "host_2"});
 
   // Send the returned update to the first manager, this time no deltas will be returned
   *ss_topic_delta = returned_topic_deltas[0];
@@ -321,6 +356,8 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   cmm1.UpdateMembership(topic_delta_map, &returned_topic_deltas);
   ASSERT_EQ(0, returned_topic_deltas.size());
   ASSERT_EQ(2, cmm1.GetSnapshot()->current_backends.size());
+  _assertCoords(cmm1, {"host_1", "host_2"});
+  _assertCoords(cmm2, {"host_1", "host_2"});
 
   // Both managers now have the same state. Shutdown one of them and step through
   // propagating the update.
@@ -334,6 +371,8 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   // It will also remove itself from the executor group (but not the current backends).
   ASSERT_EQ(1, GetDefaultGroupSize(cmm1));
   ASSERT_EQ(2, cmm1.GetSnapshot()->current_backends.size());
+  _assertCoords(cmm1, {"host_1", "host_2"});
+  _assertCoords(cmm2, {"host_1", "host_2"});
 
   // Propagate the quiescing to the 2nd mgr
   *ss_topic_delta = returned_topic_deltas[0];
@@ -343,6 +382,8 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   ASSERT_EQ(0, returned_topic_deltas.size());
   ASSERT_EQ(2, cmm2.GetSnapshot()->current_backends.size());
   ASSERT_EQ(1, GetDefaultGroupSize(cmm2));
+  _assertCoords(cmm1, {"host_1", "host_2"});
+  _assertCoords(cmm2, {"host_2"});
 
   // Delete the 1st backend from the 2nd one
   ASSERT_EQ(1, ss_topic_delta->topic_entries.size());
@@ -351,6 +392,8 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   ASSERT_EQ(0, returned_topic_deltas.size());
   ASSERT_EQ(1, cmm2.GetSnapshot()->current_backends.size());
   ASSERT_EQ(1, GetDefaultGroupSize(cmm2));
+  _assertCoords(cmm1, {"host_1", "host_2"});
+  _assertCoords(cmm2, {"host_2"});
 }
 
 TEST_F(ClusterMembershipMgrTest, IsBlacklisted) {
@@ -447,6 +490,11 @@ TEST_F(ClusterMembershipMgrTest, ExecutorBlacklist) {
   DeleteBackend(backends_[2].get());
   EXPECT_EQ(NUM_BACKENDS - 1, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 2, GetDefaultGroupSize(*backends_[0]->cmm));
+
+  // Assert blacklisting executors does not impact the all_coordinators ExecutorGroup.
+  // host_1 was quiesced and host_2 was deleted, both actions do impact all_coordinators.
+  _assertCoords(*backends_[0]->cmm, {"host_0"});
+  _assertCoords(*backends_[1]->cmm, {"host_0", "host_1"});
 }
 
 // This test runs a group of 20 backends through their full lifecycle, validating that

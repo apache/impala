@@ -2250,8 +2250,14 @@ Status AdmissionController::ComputeGroupScheduleStates(
   }
   const BackendDescriptorPB& coord_desc = it->second;
 
-  vector<const ExecutorGroup*> executor_groups =
-      GetExecutorGroupsForQuery(membership_snapshot->executor_groups, request);
+  vector<const ExecutorGroup*> executor_groups;
+
+  if (UNLIKELY(queue_node->pool_cfg.only_coordinators)) {
+    executor_groups = {&membership_snapshot->all_coordinators};
+  } else {
+    executor_groups =
+        GetExecutorGroupsForQuery(membership_snapshot->executor_groups, request);
+  }
 
   if (executor_groups.empty()) {
     queue_node->not_admitted_reason = REASON_NO_EXECUTOR_GROUPS;
@@ -2261,7 +2267,7 @@ Status AdmissionController::ComputeGroupScheduleStates(
 
   // Collect all coordinators if needed for the request.
   ExecutorGroup coords = request.request.include_all_coordinators ?
-      membership_snapshot->GetCoordinators() : ExecutorGroup("all-coordinators");
+      membership_snapshot->all_coordinators : ExecutorGroup("all-coordinators");
 
   // We loop over the executor groups in a deterministic order. If
   // --balance_queries_across_executor_groups set to true, executor groups with more
