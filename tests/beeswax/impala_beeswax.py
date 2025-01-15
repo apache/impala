@@ -44,6 +44,10 @@ from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
 LOG = logging.getLogger('impala_beeswax')
+# time to sleep in seconds before polling again. This uses a fixed
+# 50 millisecond sleep that doesn't vary by elapsed time. This is only used for
+# testing, and there is no reason to sleep longer for test environments.
+DEFAULT_SLEEP_INTERVAL = 0.05
 
 
 # Custom exception wrapper.
@@ -291,16 +295,9 @@ class ImpalaBeeswaxClient(object):
   def close_query(self, handle):
     self.__do_rpc(lambda: self.imp_service.close(handle))
 
-  def _get_sleep_interval(self, start_time):
-    """Returns the time to sleep in seconds before polling again. This uses a fixed
-       50 millisecond sleep that doesn't vary by elapsed time. This is only used for
-       testing, and there is no reason to sleep longer for test environments."""
-    return 0.05
-
   def wait_for_finished(self, query_handle):
     """Given a query handle, polls the coordinator waiting for the query to transition to
        'FINISHED' state"""
-    loop_start = time.time()
     while True:
       start_rpc_time = time.time()
       query_state = self.get_state(query_handle)
@@ -315,9 +312,8 @@ class ImpalaBeeswaxClient(object):
           raise ImpalaBeeswaxException(error_log, None)
         finally:
           self.close_query(query_handle)
-      sleep_time = self._get_sleep_interval(loop_start)
-      if rpc_time < sleep_time:
-        time.sleep(sleep_time - rpc_time)
+      if rpc_time < DEFAULT_SLEEP_INTERVAL:
+        time.sleep(DEFAULT_SLEEP_INTERVAL - rpc_time)
 
   def wait_for_finished_timeout(self, query_handle, timeout=10):
     """Given a query handle and a timeout, polls the coordinator waiting for the query to
@@ -337,19 +333,24 @@ class ImpalaBeeswaxClient(object):
           raise ImpalaBeeswaxException(error_log, None)
         finally:
           self.close_query(query_handle)
-      sleep_time = self._get_sleep_interval(start_time)
-      if rpc_time < sleep_time:
-        time.sleep(sleep_time - rpc_time)
+      if rpc_time < DEFAULT_SLEEP_INTERVAL:
+        time.sleep(DEFAULT_SLEEP_INTERVAL - rpc_time)
     return False
 
-  def wait_for_admission_control(self, query_handle):
+  def wait_for_admission_control(self, query_handle, timeout_s=60):
     """Given a query handle, polls the coordinator waiting for it to complete
-      admission control processing of the query"""
-    while True:
+      admission control processing of the query.
+      Return True if query pass admission control after given timeout_s."""
+    start_time = time.time()
+    while (time.time() - start_time < timeout_s):
+      start_rpc_time = time.time()
       query_state = self.get_state(query_handle)
+      rpc_time = time.time() - start_rpc_time
       if query_state > self.query_states["COMPILED"]:
-        break
-      time.sleep(0.05)
+        return True
+      if rpc_time < DEFAULT_SLEEP_INTERVAL:
+        time.sleep(DEFAULT_SLEEP_INTERVAL - rpc_time)
+    return False
 
   def get_admission_result(self, query_handle):
     """Given a query handle, returns the admission result from the query profile"""

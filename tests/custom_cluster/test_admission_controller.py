@@ -25,6 +25,7 @@ import os
 import pytest
 import re
 import shutil
+import signal
 import sys
 import threading
 from copy import copy
@@ -43,6 +44,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.resource_pool_config import ResourcePoolConfig
 from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
+    create_exec_option_dimension,
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
 from tests.common.test_vector import ImpalaTestDimension
@@ -62,6 +64,7 @@ LOG = logging.getLogger('admission_test')
 # the query active and consuming resources by fetching one row at a time. The
 # where clause is for debugging purposes; each thread will insert its id so
 # that running queries can be correlated with the thread that submitted them.
+# This query returns 329970 rows.
 QUERY = " union all ".join(["select * from functional.alltypesagg where id != {0}"] * 30)
 
 SLOW_QUERY = "select count(*) from functional.alltypes where int_col = sleep(20000)"
@@ -123,6 +126,10 @@ QUERY_END_BEHAVIORS = ['EOS', 'CLIENT_CANCEL', 'QUERY_TIMEOUT', 'CLIENT_CLOSE']
 QUERY_END_TIMEOUT_S = 3
 FETCH_INTERVAL = 0.5
 assert FETCH_INTERVAL < QUERY_END_TIMEOUT_S
+
+# How long to wait for admission control status. This assumes a worst case of 40 queries
+# admitted serially, with a 3s inactivity timeout.
+ADMIT_TIMEOUT_S = 120
 
 # Value used for --admission_control_stale_topic_threshold_ms in tests.
 STALE_TOPIC_THRESHOLD_MS = 500
@@ -730,7 +737,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1, cluster_size=2,
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
           pool_max_mem=2 * 1024 * 1024 * 1024, proc_mem_limit=3 * 1024 * 1024 * 1024))
-  def test_mem_limit_coordinators(self, vector, unique_database):
+  def test_mem_limit_coordinators(self, vector):
     """Verify that the query option mem_limit_coordinators is only enforced on the
     coordinators."""
     ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
@@ -1946,7 +1953,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions
   (parameterized) and the ability to submit to one impalad or many in a round-robin
   fashion. Each query is submitted on a separate thread. After admission, the query
-  thread will block with the query open and wait for the main thread to notify it to
+  thread will fetch rows slowly and wait for the main thread to notify it to
   end its query. The query thread can end its query by fetching to the end, cancelling
   itself, closing itself, or waiting for the query timeout to take effect. Depending
   on the test parameters a varying number of queries will be admitted, queued, and
@@ -1976,28 +1983,41 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
   @classmethod
   def add_test_dimensions(cls):
     super(TestAdmissionControllerStress, cls).add_test_dimensions()
+    # This test really need to run using beeswax client since hs2 client has not
+    # implemented some methods needed to query admission control status.
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol', 'beeswax'))
+    # Slow down test query by setting low batch_size.
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+      cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[10]))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('round_robin_submission', *ROUND_ROBIN_SUBMISSION))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('submission_delay_ms', *SUBMISSION_DELAY_MS))
 
-    # Additional constraints for code coverage jobs and core.
-    num_queries = 50
+    # The number of queries to submit. The test does not support fewer queries than
+    # MAX_NUM_CONCURRENT_QUERIES + MAX_NUM_QUEUED_QUERIES to keep some validation logic
+    # simple.
+    num_queries = 40
     if ImpalaTestClusterProperties.get_instance().has_code_coverage():
       # Code coverage builds can't handle the increased concurrency.
       num_queries = 15
     elif cls.exploration_strategy() == 'core':
       num_queries = 30
+    assert num_queries >= MAX_NUM_CONCURRENT_QUERIES + MAX_NUM_QUEUED_QUERIES
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('num_queries', num_queries))
+
+  @classmethod
+  def add_custom_cluster_constraints(cls):
+    # Override default constraint from CustomClusterTestSuite
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'text'
+        and v.get_value('table_format').compression_codec == 'none')
+    if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(
           lambda v: v.get_value('submission_delay_ms') == 0)
       cls.ImpalaTestMatrix.add_constraint(
           lambda v: v.get_value('round_robin_submission'))
-
-    # The number of queries to submit. The test does not support fewer queries than
-    # MAX_NUM_CONCURRENT_QUERIES + MAX_NUM_QUEUED_QUERIES to keep some validation logic
-    # simple.
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('num_queries', num_queries))
 
   def setup(self):
     # All threads are stored in this list and it's used just to make sure we clean up
@@ -2009,29 +2029,31 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     # the list). The individual operations on the list are atomic and thread-safe thanks
     # to the GIL.
     self.executing_threads = list()
+    # Exit event to break any sleep/wait.
+    self.exit = threading.Event()
+
+    def quit(signum, _frame):
+      signame = signal.Signals(signum).name
+      LOG.fatal('Signal handler called with signal {} ({}): {}'.format(
+        signum, signame, _frame))
+      self.exit.set()
+
+    signal.signal(signal.SIGTERM, quit)
+    signal.signal(signal.SIGINT, quit)
+    signal.signal(signal.SIGHUP, quit)
 
   def teardown(self):
     # Set shutdown for all threads (cancel if needed)
-    for thread in self.all_threads:
-      try:
-        thread.lock.acquire()
-        thread.shutdown = True
-        if thread.query_handle is not None:
-          LOG.debug("Attempt to clean up thread executing query %s (state %s)",
-              thread.query_num, thread.query_state)
-          client = thread.impalad.service.create_beeswax_client()
-          try:
-            client.cancel(thread.query_handle)
-          finally:
-            client.close()
-      finally:
-        thread.lock.release()
+    self.exit.set()
 
     # Wait for all threads to exit
     for thread in self.all_threads:
       thread.join(5)
-      LOG.debug("Join thread for query num %s %s", thread.query_num,
+      LOG.info("Join thread for query num %s %s", thread.query_num,
           "TIMED OUT" if thread.isAlive() else "")
+
+  def should_run(self):
+    return not self.exit.is_set()
 
   def get_ac_processes(self):
     """Returns a list of all Processes which may be used to perform admission control. If
@@ -2089,7 +2111,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     log_metrics("wait_for_metric_changes, initial=", initial)
     current = initial
     start_time = time()
-    while True:
+    while self.should_run():
       current = self.get_admission_metrics()
       log_metrics("wait_for_metric_changes, current=", current)
       deltas = compute_metric_deltas(current, initial)
@@ -2117,7 +2139,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
           REQUEST_QUEUE_UPDATE_INTERVAL)['count']
       curr[impalad] = init[impalad]
 
-    while True:
+    while self.should_run():
       LOG.debug("wait_for_statestore_updates: curr=%s, init=%s, d=%s",
           list(curr.values()), list(init.values()),
           [curr[i] - init[i] for i in self.impalads])
@@ -2142,7 +2164,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     # All individual list operations are thread-safe, so we don't need to use a
     # lock to synchronize before checking the list length (on which another thread
     # may call append() concurrently).
-    while len(self.executing_threads) < num_threads:
+    while self.should_run() and len(self.executing_threads) < num_threads:
       assert (time() - start_time < STRESS_TIMEOUT), ("Timed out waiting %s seconds for "
           "%s admitted client rpcs to return. Only %s executing " % (
             STRESS_TIMEOUT, num_threads, len(self.executing_threads)))
@@ -2162,14 +2184,14 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     for i in range(num_queries):
       # pop() is thread-safe, it's OK if another thread is appending concurrently.
       thread = self.executing_threads.pop(0)
-      LOG.info("Cancelling query {}".format(thread.query_num_and_id()))
+      LOG.info("Ending query {}".format(thread.query_num))
       assert thread.query_state == 'ADMITTED'
       current_executing_queries.append(thread)
       thread.query_state = 'REQUEST_QUERY_END'
 
     # Wait for the queries to end
     start_time = time()
-    while True:
+    while self.should_run():
       all_done = True
       for thread in self.all_threads:
         if thread.query_state == 'REQUEST_QUERY_END':
@@ -2182,7 +2204,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
   class SubmitQueryThread(threading.Thread):
     def __init__(self, impalad, additional_query_options, vector, query_num,
-        query_end_behavior, executing_threads):
+        query_end_behavior, executing_threads, exit_signal):
       """
       executing_threads must be provided so that this thread can add itself when the
       query is admitted and begins execution.
@@ -2195,69 +2217,74 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       self.query_end_behavior = query_end_behavior
       self.impalad = impalad
       self.error = None
+      self.num_rows_fetched = 0
       # query_state is defined and used only by the test code, not a property exposed by
       # the server
       self.query_state = 'NOT_SUBMITTED'
-
-      # lock protects query_handle and shutdown, used by the main thread in teardown()
-      self.lock = threading.RLock()
-      self.query_handle = None
-      self.shutdown = False  # Set by the main thread when tearing down
+      # Set by the main thread when tearing down
+      self.exit_signal = exit_signal
       self.setDaemon(True)
 
+    def thread_should_run(self):
+      return not self.exit_signal.is_set()
+
     def run(self):
+      # Scope of client and query_handle must be local within this run() method.
       client = None
+      query_handle = None
       try:
         try:
-          # Take the lock while query_handle is being created to avoid an unlikely race
-          # condition with teardown() (i.e. if an error occurs on the main thread), and
-          # check if the test is already shut down.
-          self.lock.acquire()
-          if self.shutdown:
-            self.print_termination_log()
+          if not self.thread_should_run():
             return
 
-          exec_options = self.vector.get_value('exec_option')
+          exec_options = dict()
+          exec_options.update(self.vector.get_exec_option_dict())
           exec_options.update(self.additional_query_options)
           # Turning off result spooling allows us to better control query execution by
           # controlling the number of rows fetched. This allows us to maintain resource
           # usage among backends.
           exec_options['spool_query_results'] = 0
+          exec_options['long_polling_time_ms'] = 100
+          if self.query_end_behavior == 'QUERY_TIMEOUT':
+            exec_options['query_timeout_s'] = QUERY_END_TIMEOUT_S
           query = QUERY.format(self.query_num)
           self.query_state = 'SUBMITTING'
           client = self.impalad.service.create_beeswax_client()
           ImpalaTestSuite.change_database(client, self.vector.get_value('table_format'))
           client.set_configuration(exec_options)
 
-          if self.query_end_behavior == 'QUERY_TIMEOUT':
-            client.execute("SET QUERY_TIMEOUT_S={0}".format(QUERY_END_TIMEOUT_S))
-
           LOG.info("Submitting query %s with ending behavior %s",
                    self.query_num, self.query_end_behavior)
-          self.query_handle = client.execute_async(query)
-          client.wait_for_admission_control(self.query_handle)
-          admission_result = client.get_admission_result(self.query_handle)
+          query_handle = client.execute_async(query)
+          admitted = client.wait_for_admission_control(
+            query_handle, timeout_s=ADMIT_TIMEOUT_S)
+          if not admitted:
+            msg = "Query {} failed to pass admission control within {} seconds".format(
+                self.query_num, ADMIT_TIMEOUT_S)
+            self.log_handle(client, query_handle, msg)
+            self.query_state = 'ADMIT_TIMEOUT'
+            return
+          admission_result = client.get_admission_result(query_handle)
           assert len(admission_result) > 0
           if "Rejected" in admission_result:
-            LOG.info("Rejected query %s", self.query_num_and_id())
+            msg = "Rejected query {}".format(self.query_num)
+            self.log_handle(client, query_handle, msg)
             self.query_state = 'REJECTED'
-            self.print_termination_log()
-            self.query_handle = None
             return
           elif "Timed out" in admission_result:
-            LOG.info("Query %s timed out", self.query_num_and_id())
+            msg = "Query {} timed out".format(self.query_num)
+            self.log_handle(client, query_handle, msg)
             self.query_state = 'TIMED OUT'
-            self.print_termination_log()
-            self.query_handle = None
             return
-          LOG.info("Admission result for query %s : %s",
-                   self.query_num_and_id(), admission_result)
+          msg = "Admission result for query {} : {}".format(
+            self.query_num, admission_result)
+          self.log_handle(client, query_handle, msg)
         except ImpalaBeeswaxException as e:
           LOG.exception(e)
           raise e
-        finally:
-          self.lock.release()
-        LOG.info("Admitted query %s", self.query_num_and_id())
+
+        msg = "Admitted query {}".format(self.query_num)
+        self.log_handle(client, query_handle, msg)
         self.query_state = 'ADMITTED'
         # The thread becomes visible to the main thread when it is added to the
         # shared list of executing_threads. append() is atomic and thread-safe.
@@ -2265,69 +2292,70 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
         # Synchronize with the main thread. At this point, the thread is executing a
         # query. It needs to wait until the main thread requests it to end its query.
-        while not self.shutdown and self.query_state != 'COMPLETED':
+        while self.thread_should_run() and self.query_state != 'COMPLETED':
           # The query needs to stay active until the main thread requests it to end.
           # Otherwise, the query may get cancelled early. Fetch 1 row every
           # FETCH_INTERVAL to keep the query active.
-          fetch_result = client.fetch(query, self.query_handle, 1)
+          fetch_result = client.fetch(query, query_handle, 1)
           assert len(fetch_result.data) == 1, str(fetch_result)
+          self.num_rows_fetched += len(fetch_result.data)
           if self.query_state == 'REQUEST_QUERY_END':
-            self._end_query(client, query)
+            self._end_query(client, query, query_handle)
             # The query has released admission control resources
             self.query_state = 'COMPLETED'
-            self.print_termination_log()
-            self.query_handle = None
           sleep(FETCH_INTERVAL)
       except Exception as e:
         LOG.exception(e)
         # Unknown errors will be raised later
         self.error = e
         self.query_state = 'ERROR'
-        self.print_termination_log()
       finally:
+        self.print_termination_log()
         if client is not None:
-          try:
-            self.lock.acquire()
-            client.close()
-            # Closing the client closes the query as well
-            self.query_handle = None
-          finally:
-            self.lock.release()
+          # Closing the client closes the query as well
+          client.close()
 
     def print_termination_log(self):
-      LOG.info("Thread for query {} terminating in state {}".format(
-        self.query_num, self.query_state))
+      msg = ("Thread for query {} terminating in state {}. "
+             "rows_fetched={} end_behavior={}").format(
+          self.query_num, self.query_state, self.num_rows_fetched,
+          self.query_end_behavior)
+      LOG.info(msg)
 
-    def query_num_and_id(self):
-      return "{} (id={})".format(self.query_num, self.query_handle.get_handle().id)
-
-    def _end_query(self, client, query):
+    def _end_query(self, client, query, query_handle):
       """Bring the query to the appropriate end state defined by self.query_end_behaviour.
       Returns once the query has reached that state."""
-      LOG.info("Ending query {} by {}".format(
-        self.query_num_and_id(), self.query_end_behavior))
+      msg = "Ending query {} by {}".format(self.query_num, self.query_end_behavior)
+      self.log_handle(client, query_handle, msg)
       if self.query_end_behavior == 'QUERY_TIMEOUT':
         # Sleep and wait for the query to be cancelled. The cancellation will
         # set the state to EXCEPTION.
         start_time = time()
-        while (client.get_state(self.query_handle) != client.QUERY_STATES['EXCEPTION']):
+        while self.thread_should_run() and (
+          client.get_state(query_handle) != client.QUERY_STATES['EXCEPTION']):
           assert (time() - start_time < STRESS_TIMEOUT),\
             "Timed out waiting %s seconds for query cancel" % (STRESS_TIMEOUT,)
           sleep(1)
         # try fetch and confirm from exception message that query was timed out.
         try:
-          client.fetch(query, self.query_handle)
+          client.fetch(query, query_handle)
           assert False
         except Exception as e:
           assert 'expired due to client inactivity' in str(e)
       elif self.query_end_behavior == 'EOS':
         # Fetch all rows so we hit eos.
-        client.fetch(query, self.query_handle)
+        client.fetch(query, query_handle)
       elif self.query_end_behavior == 'CLIENT_CANCEL':
-        client.cancel(self.query_handle)
+        client.cancel(query_handle)
       else:
         assert self.query_end_behavior == 'CLIENT_CLOSE'
-        client.close_query(self.query_handle)
+        client.close_query(query_handle)
+
+    def log_handle(self, client, query_handle, msg):
+      """Log ourself here rather than using client.log_handle() to display
+      log timestamp."""
+      handle_id = client.handle_id(query_handle)
+      LOG.info("{}: {}".format(handle_id, msg))
 
   def _check_queries_page_resource_pools(self):
     """Checks that all queries in the '/queries' webpage json have the correct resource
@@ -2360,7 +2388,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     start_time = time()
     LOG.info("Waiting for %s <= queued queries <= %s" % (min_queued, max_queued))
     actual_queued = self._get_queries_page_num_queued()
-    while actual_queued < min_queued or actual_queued > max_queued:
+    while self.should_run() and (
+      actual_queued < min_queued or actual_queued > max_queued):
       assert (time() - start_time < STRESS_TIMEOUT), ("Timed out waiting %s seconds for "
           "%s <= queued queries <= %s, %s currently queued.",
             STRESS_TIMEOUT, min_queued, max_queued, actual_queued)
@@ -2382,17 +2411,21 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
     num_queries = vector.get_value('num_queries')
     assert num_queries >= MAX_NUM_CONCURRENT_QUERIES + MAX_NUM_QUEUED_QUERIES
-    initial_metrics = self.get_admission_metrics()
+    initial_metrics = self.get_consistent_admission_metrics(0)
     log_metrics("Initial metrics: ", initial_metrics)
 
+    # This is the query submission loop.
     for query_num in range(num_queries):
+      if not self.should_run():
+        break
+      if submission_delay_ms > 0:
+        sleep(submission_delay_ms / 1000.0)
       impalad = self.impalads[query_num % len(self.impalads)]
       query_end_behavior = QUERY_END_BEHAVIORS[query_num % len(QUERY_END_BEHAVIORS)]
       thread = self.SubmitQueryThread(impalad, additional_query_options, vector,
-          query_num, query_end_behavior, self.executing_threads)
+          query_num, query_end_behavior, self.executing_threads, self.exit)
       thread.start()
       self.all_threads.append(thread)
-      sleep(submission_delay_ms / 1000.0)
 
     # Wait for the admission control to make the initial admission decision for all
     # the queries. They should either be admitted immediately, queued, or rejected.
@@ -2534,6 +2567,10 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     """Run a workload with a variety of outcomes in a pool that has user quotas
     configured. Note the user quotas will not prevent any queries from running, but this
     allows verification that metrics about users are consistent after queries end"""
+    if (not vector.get_value('round_robin_submission')
+        or not vector.get_value('submission_delay_ms') == 0):
+      # Save time by running only 1 out of 6 vector combination.
+      pytest.skip('Only run with round_robin_submission=True and submission_delay_ms=0.')
     self.pool_name = 'root.queueF'
     self.run_admission_test(vector, {'request_pool': self.pool_name},
                             check_user_aggregates=True)
