@@ -214,7 +214,13 @@ Status ClientRequestState::SetResultCache(QueryResultSet* cache,
 }
 
 void ClientRequestState::SetRemoteSubmitTime(int64_t remote_submit_time) {
-  query_events_->Start(remote_submit_time);
+  int64_t ack_submit_time = min(MonotonicStopWatch::Now(), remote_submit_time);
+  if (ack_submit_time < remote_submit_time) {
+    VLOG_QUERY << "Ignoring remote_submit_time (" << remote_submit_time
+               << " ns) that is more than coordinator time (" << ack_submit_time
+               << " ns) for query id=" << PrintId(query_id());
+  }
+  query_events_->Start(ack_submit_time);
 }
 
 void ClientRequestState::SetFrontendProfile(const TExecRequest& exec_request) {

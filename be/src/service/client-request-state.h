@@ -99,7 +99,9 @@ class ClientRequestState {
   void SetFrontendProfile(const TExecRequest& exec_request);
 
   /// Sets the coordinator time that the plan request was submitted at so that
-  /// the backend timeline starts where the frontend timeline ends
+  /// the backend timeline starts where the frontend timeline ends.
+  /// remote_submit_time will be ignored and replaced with internal
+  /// MonotonicStopWatch::Now() if the later is greater than the former.
   void SetRemoteSubmitTime(int64_t remote_submit_time);
 
   /// Based on query type, this either initiates execution of this ClientRequestState's
