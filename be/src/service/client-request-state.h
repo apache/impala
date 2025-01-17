@@ -82,6 +82,11 @@ class ClientRequestState {
 
   ~ClientRequestState();
 
+  /// Enums representing query exection state internal to impala.
+  /// Mapping to client protocol-specific states are provided by methods such as
+  /// BeeswaxQueryState() for Beeswax and TOperationState() for HS2.
+  /// If updating this enum, please also update mappings at
+  /// tests/common/impala_connection.py
   enum class ExecState { INITIALIZED, PENDING, RUNNING, FINISHED, ERROR };
 
   enum class RetryState { RETRYING, RETRIED, NOT_RETRIED };

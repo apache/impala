@@ -25,6 +25,7 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift_sasl import TSaslClientTransport
 
+
 def create_transport(host, port, service, transport_type="buffered", user=None,
                      password=None, use_ssl=False, ssl_cert=None):
   """
@@ -78,4 +79,11 @@ def op_handle_to_query_id(t_op_handle):
   if t_op_handle is None or t_op_handle.operationId is None:
     return None
   # This should use the same logic as in ImpalaServer::THandleIdentifierToTUniqueId().
-  return "%x:%x" % struct.unpack("QQ", t_op_handle.operationId.guid)
+  return "%016x:%016x" % struct.unpack("QQ", t_op_handle.operationId.guid)
+
+
+def session_handle_to_session_id(t_session_op_handle):
+  if t_session_op_handle is None or t_session_op_handle.sessionId is None:
+    return None
+  # This should use the same logic as in ImpalaServer::THandleIdentifierToTUniqueId().
+  return "%016x:%016x" % struct.unpack("QQ", t_session_op_handle.sessionId.guid)

@@ -491,6 +491,26 @@ class ImpaladService(BaseImpalaService):
     # Only check if the port is open, do not create Thrift transport.
     return self.is_port_open(self.hs2_http_port)
 
+  def create_client(self, protocol):
+    """Creates a new client connection for given protocol to this impalad"""
+    port = self.beeswax_port
+    if protocol == 'hs2':
+      port = self.hs2_port
+    elif protocol == 'hs2-http':
+      port = self.hs2_http_port
+    client = create_connection('%s:%d' % (self.hostname, port), protocol=protocol)
+    client.connect()
+    return client
+
+  def create_client_from_vector(self, vector):
+    """A shorthand for create_client with test vector as input.
+    Vector must have 'protocol' and 'exec_option' dimension.
+    Return a client of specified 'protocol' and with cofiguration 'exec_option' set."""
+    client = self.create_client(protocol=vector.get_value('protocol'))
+    client.set_configuration(vector.get_exec_option_dict())
+    return client
+
+
 # Allows for interacting with the StateStore service to perform operations such as
 # accessing the debug webpage.
 class StateStoredService(BaseImpalaService):

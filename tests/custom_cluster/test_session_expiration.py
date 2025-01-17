@@ -179,9 +179,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
     self.close_impala_clients()
     # Create 2 sessions.
     client1 = impalad.service.create_hs2_client()
-    client1.execute_async("select sleep(5000)")
     client2 = impalad.service.create_hs2_client()
-    client2.execute_async("select sleep(5000)")
     try:
       # Trying to open a third session should fail.
       impalad.service.create_hs2_client()

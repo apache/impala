@@ -345,13 +345,11 @@ class ImpalaTestSuite(BaseTestSuite):
       cls.hive_transport.close()
     cls.close_impala_clients()
 
-  @classmethod
-  def setup_method(cls, test_method):
+  def setup_method(self, test_method):
     """Setup for all test method."""
-    cls.__reset_impala_clients()
+    self._reset_impala_clients()
 
-  @classmethod
-  def teardown_method(cls, test_method):
+  def teardown_method(self, test_method):
     """Teardown for all test method.
     Currently, it is only here as a placeholder for future use and complement
     setup_method() declaration."""
@@ -426,7 +424,7 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.client = cls.default_impala_client(cls.default_test_protocol())
 
   @classmethod
-  def __reset_impala_clients(cls):
+  def _reset_impala_clients(cls):
     if cls.beeswax_client:
       cls.beeswax_client.clear_configuration()
     if cls.hs2_client:
@@ -1437,6 +1435,7 @@ class ImpalaTestSuite(BaseTestSuite):
     """Waits for the given 'query_handle' to reach the 'expected_state' using 'client', or
     with the default connection if 'client' is None. If it does not reach the given state
     within 'timeout' seconds, the method throws an AssertionError.
+    DEPRECATED: Use client.wait_for_impala_state() instead.
     """
     self.wait_for_any_state(handle, [expected_state], timeout, client)
 
@@ -1445,6 +1444,7 @@ class ImpalaTestSuite(BaseTestSuite):
     or with the default connection if 'client' is None. If it does not reach one of the
     given states within 'timeout' seconds, the method throws an AssertionError. Returns
     the final state.
+    DEPRECATED: Use client.wait_for_any_impala_state() instead.
     """
     if client is None: client = self.client
     start_time = time.time()

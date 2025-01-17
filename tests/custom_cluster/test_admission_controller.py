@@ -27,12 +27,9 @@ import re
 import signal
 import sys
 import threading
-from copy import copy
+from copy import deepcopy
 from time import sleep, time
 
-from beeswaxd.BeeswaxService import QueryState
-
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.cluster_config import (
     impalad_admission_ctrl_flags,
     impalad_admission_ctrl_config_args,
@@ -43,9 +40,14 @@ from tests.common.custom_cluster_test_suite import (
     START_ARGS,
     CustomClusterTestSuite)
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
+from tests.common.impala_connection import (
+    RUNNING, FINISHED, ERROR,
+    IMPALA_CONNECTION_EXCEPTION)
 from tests.common.resource_pool_config import ResourcePoolConfig
 from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
+    HS2, BEESWAX,
+    add_mandatory_exec_option,
     create_exec_option_dimension,
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -163,10 +165,21 @@ def metric_key(pool_name, metric_name):
   return "admission-controller.%s.%s" % (metric_name, pool_name)
 
 
+def wait_single_statestore_heartbeat():
+  """Wait for state sync across impalads."""
+  sleep(STATESTORE_RPC_FREQUENCY_MS / 1000.0)
+
+
 class TestAdmissionControllerBase(CustomClusterTestSuite):
+
   @classmethod
   def get_workload(self):
     return 'functional-query'
+
+  @classmethod
+  def default_test_protocol(cls):
+    # Do not change this. Multiple test method has been hardcoded under this assumption.
+    return HS2
 
   @classmethod
   def add_test_dimensions(cls):
@@ -176,14 +189,32 @@ class TestAdmissionControllerBase(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
       create_uncompressed_text_dimension(cls.get_workload()))
 
+  def enable_admission_service(self, method):
+    """Inject argument to enable admission control service.
+    Must be called at setup_method() and before calling setup_method() of superclass."""
+    start_args = "--enable_admission_service"
+    if START_ARGS in method.__dict__:
+      start_args = method.__dict__[START_ARGS] + " " + start_args
+    method.__dict__[START_ARGS] = start_args
+    if IMPALAD_ARGS in method.__dict__:
+      method.__dict__[ADMISSIOND_ARGS] = method.__dict__[IMPALAD_ARGS]
 
-class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
+
+class TestAdmissionControllerRawHS2(TestAdmissionControllerBase, HS2TestSuite):
+
+  @classmethod
+  def default_test_protocol(cls):
+    # HS2TestSuite override self.hs2_client with a raw Impala hs2 thrift client.
+    # This will set self.client = self.beeswax_client.
+    # Do not change this. Multiple test method has been hardcoded under this assumption.
+    return BEESWAX
+
   def __check_pool_rejected(self, client, pool, expected_error_re):
     try:
       client.set_configuration({'request_pool': pool})
       client.execute("select 1")
       assert False, "Query should return error"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert re.search(expected_error_re, str(e))
 
   def __check_query_options(self, profile, expected_query_options):
@@ -231,34 +262,6 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
     HS2TestSuite.check_response(get_profile_resp)
     self.__check_query_options(get_profile_resp.profile, expected_options)
-
-  def _execute_and_collect_profiles(self, queries, timeout_s, config_options={},
-      allow_query_failure=False):
-    """Submit the query statements in 'queries' in parallel to the first impalad in
-    the cluster. After submission, the results are fetched from the queries in
-    sequence and their profiles are collected. Wait for up to timeout_s for
-    each query to finish. If 'allow_query_failure' is True, succeeds if the query
-    completes successfully or ends up in the EXCEPTION state. Otherwise expects the
-    queries to complete successfully.
-    Returns the profile strings."""
-    client = self.cluster.impalads[0].service.create_beeswax_client()
-    expected_states = [client.QUERY_STATES['FINISHED']]
-    if allow_query_failure:
-      expected_states.append(client.QUERY_STATES['EXCEPTION'])
-    try:
-      handles = []
-      profiles = []
-      client.set_configuration(config_options)
-      for query in queries:
-        handles.append(client.execute_async(query))
-      for query, handle in zip(queries, handles):
-        state = self.wait_for_any_state(handle, expected_states, timeout_s)
-        if state == client.QUERY_STATES['FINISHED']:
-          self.client.fetch(query, handle)
-        profiles.append(self.client.get_runtime_profile(handle))
-      return profiles
-    finally:
-      client.close()
 
   def get_ac_process(self):
     """Returns the Process that is running the admission control service."""
@@ -314,7 +317,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       # Wait for query to clear admission control and get accounted for
       client.wait_for_admission_control(handle)
       self.__check_pool_rejected(client, 'root.queueA', "exceeded timeout")
-      assert client.get_state(handle) == client.QUERY_STATES['FINISHED']
+      assert client.is_finished(handle)
       # queueA has default query options mem_limit=128m,query_timeout_s=5
       self.__check_query_options(client.get_runtime_profile(handle),
           [queueA_mem_limit, 'QUERY_TIMEOUT_S=5', 'REQUEST_POOL=root.queueA'])
@@ -386,7 +389,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     open_session_req = TCLIService.TOpenSessionReq()
     open_session_req.username = ""
     open_session_resp = self.hs2_client.OpenSession(open_session_req)
-    TestAdmissionController.check_response(open_session_resp)
+    TestAdmissionControllerRawHS2.check_response(open_session_resp)
 
     try:
       execute_statement_req = TCLIService.TExecuteStatementReq()
@@ -401,7 +404,110 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     finally:
       close_req = TCLIService.TCloseSessionReq()
       close_req.sessionHandle = open_session_resp.sessionHandle
-      TestAdmissionController.check_response(self.hs2_client.CloseSession(close_req))
+      TestAdmissionControllerRawHS2.check_response(
+        self.hs2_client.CloseSession(close_req))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=10,
+          pool_max_mem=1024 * 1024 * 1024))
+  @needs_session()
+  def test_queuing_status_through_query_log_and_exec_summary(self):
+    """Test to verify that the HS2 client's GetLog() call and the ExecSummary expose
+    the query's queuing status, that is, whether the query was queued and what was the
+    latest queuing reason."""
+    # Start a long-running query.
+    long_query_resp = self.execute_statement("select sleep(10000)")
+    # Ensure that the query has started executing.
+    self.wait_for_admission_control(long_query_resp.operationHandle)
+    # Submit another query.
+    queued_query_resp = self.execute_statement("select sleep(1)")
+    # Wait until the query is queued.
+    self.wait_for_operation_state(queued_query_resp.operationHandle,
+            TCLIService.TOperationState.PENDING_STATE)
+    # Check whether the query log message correctly exposes the queuing status.
+    log = self.wait_for_log_message(
+        queued_query_resp.operationHandle, "Admission result :")
+    assert "Admission result : Queued" in log, log
+    assert "Latest admission queue reason : number of running queries 1 is at or over "
+    "limit 1" in log, log
+    # Now check the same for ExecSummary.
+    summary_req = ImpalaHiveServer2Service.TGetExecSummaryReq()
+    summary_req.operationHandle = queued_query_resp.operationHandle
+    summary_req.sessionHandle = self.session_handle
+    exec_summary_resp = self.hs2_client.GetExecSummary(summary_req)
+    assert exec_summary_resp.summary.is_queued
+    assert "number of running queries 1 is at or over limit 1" in \
+           exec_summary_resp.summary.queued_reason, \
+      exec_summary_resp.summary.queued_reason
+    # Close the running query.
+    self.close(long_query_resp.operationHandle)
+    # Close the queued query.
+    self.close(queued_query_resp.operationHandle)
+
+
+class TestAdmissionControllerRawHS2WithACService(TestAdmissionControllerRawHS2):
+  """Runs all of the tests from TestAdmissionControllerRawHS2 but with the second
+  impalad in the minicluster configured to perform all admission control."""
+
+  def get_ac_process(self):
+    return self.cluster.admissiond
+
+  def get_ac_log_name(self):
+    return "admissiond"
+
+  def setup_method(self, method):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    self.enable_admission_service(method)
+    super(TestAdmissionControllerRawHS2, self).setup_method(method)
+
+
+class TestAdmissionController(TestAdmissionControllerBase):
+
+  def get_ac_process(self):
+    """Returns the Process that is running the admission control service."""
+    return self.cluster.impalads[0]
+
+  def get_ac_log_name(self):
+    """Returns the prefix of the log files for the admission control process."""
+    return "impalad"
+
+  def setup_method(self, method):
+    """All tests in this class is non-destructive. Therefore, we can afford
+    resetting clients at every setup_method."""
+    super(TestAdmissionController, self).setup_method(method)
+    self._reset_impala_clients()
+
+  def _execute_and_collect_profiles(self, queries, timeout_s, config_options={},
+      allow_query_failure=False):
+    """Submit the query statements in 'queries' in parallel to the first impalad in
+    the cluster. After submission, the results are fetched from the queries in
+    sequence and their profiles are collected. Wait for up to timeout_s for
+    each query to finish. If 'allow_query_failure' is True, succeeds if the query
+    completes successfully or ends up in the EXCEPTION state. Otherwise expects the
+    queries to complete successfully.
+    Returns the profile strings."""
+    client = self.cluster.impalads[0].service.create_hs2_client()
+    expected_states = [FINISHED]
+    if allow_query_failure:
+      expected_states.append(ERROR)
+    try:
+      handles = []
+      profiles = []
+      client.set_configuration(config_options)
+      for query in queries:
+        handles.append(client.execute_async(query))
+      for query, handle in zip(queries, handles):
+        state = client.wait_for_any_impala_state(handle, expected_states, timeout_s)
+        if state == FINISHED:
+          self.client.fetch(query, handle)
+        profiles.append(client.get_runtime_profile(handle))
+      return profiles
+    finally:
+      for handle in handles:
+        client.close_query(handle)
+      client.close()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -610,7 +716,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       handle = self.client.execute_async(query.format(1))
       self.client.wait_for_finished_timeout(handle, 1000)
       expected_mem_limits = self.__get_mem_limits_admission_debug_page()
-      actual_mem_limits = self.__get_mem_limits_memz_debug_page(handle.get_handle().id)
+      actual_mem_limits = self.__get_mem_limits_memz_debug_page(
+        self.client.handle_id(handle))
       mem_admitted =\
           get_mem_admitted_backends_debug_page(self.cluster, self.get_ac_process())
       debug_string = " expected_mem_limits:" + str(
@@ -670,7 +777,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def test_dedicated_coordinator_planner_estimates(self, vector, unique_database):
     """Planner tests to add coverage for coordinator estimates when using dedicated
     coordinators. Also includes coverage for verifying cluster memory admitted."""
-    vector_copy = copy(vector)
+    vector_copy = deepcopy(vector)
     exec_options = vector_copy.get_value('exec_option')
     # Remove num_nodes from the options to allow test case runner to set it in one of
     # the test cases.
@@ -756,17 +863,17 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     query = "select * from functional.alltypesagg, (select 1) B limit 1"
     # Successfully run a query with mem limit equal to the lowest process memory among
     # impalads
-    exec_options = copy(vector.get_value('exec_option'))
+    exec_options = deepcopy(vector.get_value('exec_option'))
     exec_options['mem_limit'] = "2G"
     self.execute_query_expect_success(self.client, query, exec_options)
     # Test that a query scheduled to run on a single node and submitted to the impalad
     # with higher proc mem limit succeeds.
-    exec_options = copy(vector.get_value('exec_option'))
+    exec_options = deepcopy(vector.get_value('exec_option'))
     exec_options['mem_limit'] = "3G"
     exec_options['num_nodes'] = "1"
     self.execute_query_expect_success(self.client, query, exec_options)
     # Exercise rejection checks in admission controller.
-    exec_options = copy(vector.get_value('exec_option'))
+    exec_options = deepcopy(vector.get_value('exec_option'))
     exec_options['mem_limit'] = "3G"
     ex = self.execute_query_expect_failure(self.client, query, exec_options)
     assert ("Rejected query from pool default-pool: request memory needed "
@@ -777,17 +884,18 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       # Wait for previous queries to finish to avoid flakiness.
       for impalad in self.cluster.impalads:
         impalad.service.wait_for_metric_value("impala-server.num-fragments-in-flight", 0)
-      impalad_with_2g_mem = self.cluster.impalads[2].service.create_beeswax_client()
+      impalad_with_2g_mem = self.cluster.impalads[2].service.create_client_from_vector(
+        vector)
       impalad_with_2g_mem.set_configuration_option('mem_limit', '1G')
       impalad_with_2g_mem.execute_async("select sleep(1000)")
       # Wait for statestore update to update the mem admitted in each node.
-      sleep(STATESTORE_RPC_FREQUENCY_MS / 1000)
-      exec_options = copy(vector.get_value('exec_option'))
+      wait_single_statestore_heartbeat()
+      exec_options = deepcopy(vector.get_value('exec_option'))
       exec_options['mem_limit'] = "2G"
       # Since Queuing is synchronous, and we can't close the previous query till this
       # returns, we wait for this to timeout instead.
       self.execute_query(query, exec_options)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert re.search(r"Queued reason: Not enough memory available on host \S+.Needed "
           r"2.00 GB but only 1.00 GB out of 2.00 GB was available.", str(e)), str(e)
     finally:
@@ -800,11 +908,11 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         max_queued=1, pool_max_mem=PROC_MEM_TEST_LIMIT),
     statestored_args=_STATESTORED_ARGS,
     disable_log_buffering=True)
-  def test_cancellation(self):
+  def test_cancellation(self, vector):
     """ Test to confirm that all Async cancellation windows are hit and are able to
     successfully cancel the query"""
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_client_from_vector(vector)
     try:
       client.set_configuration_option("debug_action", "AC_BEFORE_ADMISSION:SLEEP@2000")
       client.set_configuration_option("mem_limit", self.PROC_MEM_TEST_LIMIT + 1)
@@ -848,15 +956,16 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       client.set_configuration_option('enable_trivial_query_for_admission', 'false')
       queued_query_handle = client.execute_async("select 5")
       sleep(1)
-      assert client.get_state(queued_query_handle) == QueryState.COMPILED
-      assert "Admission result: Queued" in client.get_runtime_profile(queued_query_handle)
+      assert client.is_pending(queued_query_handle)
+      assert "Admission result: Queued" in client.get_runtime_profile(
+        queued_query_handle)
       # Only cancel the queued query, because close will wait till it unregisters, this
       # gives us a chance to close the running query and allow the dequeue thread to
       # dequeue the queue query
       client.cancel(queued_query_handle)
       client.close_query(handle)
-      client.close_query(queued_query_handle)
-      queued_profile = client.get_runtime_profile(queued_query_handle)
+      queued_profile = client.close_query(queued_query_handle,
+                                          fetch_profile_after_close=True)
       assert "Admission result: Cancelled (queued)" in queued_profile, queued_profile
       self.assert_log_contains(
           self.get_ac_log_name(), 'INFO', "Dequeued cancelled query=")
@@ -866,11 +975,12 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       handle = client.execute_async("select sleep(10000)")
       queued_query_handle = client.execute_async("select 6")
       sleep(1)
-      assert client.get_state(queued_query_handle) == QueryState.COMPILED
-      assert "Admission result: Queued" in client.get_runtime_profile(queued_query_handle)
-      client.close_query(queued_query_handle)
+      assert client.is_pending(queued_query_handle)
+      assert "Admission result: Queued" in client.get_runtime_profile(
+        queued_query_handle)
+      queued_profile = client.close_query(queued_query_handle,
+                                          fetch_profile_after_close=True)
       client.close_query(handle)
-      queued_profile = client.get_runtime_profile(queued_query_handle)
       assert "Admission result: Cancelled (queued)" in queued_profile
       for i in self.cluster.impalads:
         i.service.wait_for_metric_value(
@@ -1000,7 +1110,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Run a bunch of queries with mem_limit set so that only one can be admitted
     # immediately. The rest should be queued and dequeued (timeout) due to host memory
     # pressure.
-    STMT = "select sleep(100)"
+    STMT = "select sleep(1000)"
     TIMEOUT_S = 20
     NUM_QUERIES = 5
     # IMPALA-9856: Disable query result spooling so that we can run queries with low
@@ -1034,7 +1144,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Run a bunch of queries with mem_limit set so that only one can be admitted
     # immediately. The rest should be queued and dequeued (timeout) due to pool memory
     # pressure.
-    STMT = "select sleep(100)"
+    STMT = "select sleep(1000)"
     TIMEOUT_S = 20
     NUM_QUERIES = 5
     # IMPALA-9856: Disable query result spooling so that we can run queries with low
@@ -1143,7 +1253,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.close_query(handle_running)
     self.__assert_num_queries_accounted(0)
     # Case 3: When a query gets rejected
-    exec_options = copy(vector.get_value('exec_option'))
+    exec_options = deepcopy(vector.get_value('exec_option'))
     exec_options['mem_limit'] = "1b"
     self.execute_query_expect_failure(self.client, query, exec_options)
     self.__assert_num_queries_accounted(0)
@@ -1211,6 +1321,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
                                                      pool=pool)
     query2 = self.execute_async_and_wait_for_running(impalad2, SLOW_QUERY, USER_ROOT,
                                                      pool=pool)
+    wait_single_statestore_heartbeat()
     keys = [
       "admission-controller.agg-current-users.root.queueB",
       "admission-controller.local-current-users.root.queueB",
@@ -1294,16 +1405,16 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       query_handles.append(query_handle)
 
     # Let state sync across impalads.
-    sleep(STATESTORE_RPC_FREQUENCY_MS / 1000.0)
+    wait_single_statestore_heartbeat()
 
     # Another query should be rejected
     impalad = self.cluster.impalads[limit % 2]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     client.set_configuration({'request_pool': pool})
     try:
       client.execute(SLOW_QUERY, user=user)
       assert False, "query should fail"
-    except Exception as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       # Construct the expected error message.
       expected = ("Rejected query from pool {pool}: current per-{type} load {limit} for "
                   "user '{user}'{group_description} is at or above the {err_type} limit "
@@ -1328,14 +1439,12 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
   def execute_async_and_wait_for_running(self, impalad, query, user, pool):
     # Execute a query asynchronously, and wait for it to be running.
-    # Use beeswax client as it allows specifying the user that runs the query.
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     client.set_configuration({'request_pool': pool})
     handle = client.execute_async(query, user=user)
     timeout_s = 10
     # Make sure the query has been admitted and is running.
-    self.wait_for_state(
-      handle, client.QUERY_STATES['RUNNING'], timeout_s, client=client)
+    client.wait_for_impala_state(handle, RUNNING, timeout_s)
     return self.ClientAndHandle(client, handle)
 
   @pytest.mark.execute_serially
@@ -1375,8 +1484,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.client.close_query(sleep_query_handle)
 
     # Observe that the queued query fails.
-    self.wait_for_state(queued_query_handle, QueryState.EXCEPTION, 20),
-    self.close_query(queued_query_handle)
+    self.client.wait_for_impala_state(queued_query_handle, ERROR, 20),
+    self.client.close_query(queued_query_handle)
 
     # Change the config back to a valid value
     config.set_config_value(pool_name, config_str, 0)
@@ -1396,8 +1505,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.client.close_query(sleep_query_handle)
 
     # Observe that the queued query fails.
-    self.wait_for_state(queued_query_handle, QueryState.EXCEPTION, 20),
-    self.close_query(queued_query_handle)
+    self.client.wait_for_impala_state(queued_query_handle, ERROR, 20),
+    self.client.close_query(queued_query_handle)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -1405,7 +1514,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       pool_max_mem=1024 * 1024 * 1024),
     statestored_args=_STATESTORED_ARGS)
   def test_trivial_query(self):
-    self.client.execute("set enable_trivial_query_for_admission=false")
+    self.client.set_configuration_option("enable_trivial_query_for_admission", "false")
 
     # Test the second request does need to queue when trivial query is disabled.
     sleep_query_handle = self.client.execute_async("select sleep(10000)")
@@ -1417,7 +1526,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.client.close_query(sleep_query_handle)
     self.client.close_query(trivial_query_handle)
 
-    self.client.execute("set enable_trivial_query_for_admission=true")
+    self.client.set_configuration_option("enable_trivial_query_for_admission", "true")
     # Test when trivial query is enabled, all trivial queries should be
     # admitted immediately.
     sleep_query_handle = self.client.execute_async("select sleep(10000)")
@@ -1439,7 +1548,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Test whether it will fail for a normal query.
     failed_query_handle = self.client.execute_async(
             "select * from functional_parquet.alltypes limit 100")
-    self.wait_for_state(failed_query_handle, QueryState.EXCEPTION, 20)
+    self.client.wait_for_impala_state(failed_query_handle, ERROR, 20)
     self.client.close_query(failed_query_handle)
     # Test it should pass all the trivial queries.
     self._test_trivial_queries_suc()
@@ -1463,7 +1572,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     def _test_multi_trivial_query_runs(self):
       timeout = 10
       admit_obj = self.admit_obj
-      client = admit_obj.cluster.impalads[0].service.create_beeswax_client()
+      client = admit_obj.cluster.impalads[0].service.create_hs2_client()
       for i in range(100):
         handle = client.execute_async(self.sql)
         if not self.expect_err:
@@ -1579,44 +1688,6 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       sleep(0.1)
     assert False, "Timed out waiting for change to profile\nSearch " \
                   "String: {0}\nProfile:\n{1}".format(search_string, str(profile))
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=10,
-          pool_max_mem=1024 * 1024 * 1024))
-  @needs_session()
-  def test_queuing_status_through_query_log_and_exec_summary(self):
-    """Test to verify that the HS2 client's GetLog() call and the ExecSummary expose
-    the query's queuing status, that is, whether the query was queued and what was the
-    latest queuing reason."""
-    # Start a long-running query.
-    long_query_resp = self.execute_statement("select sleep(10000)")
-    # Ensure that the query has started executing.
-    self.wait_for_admission_control(long_query_resp.operationHandle)
-    # Submit another query.
-    queued_query_resp = self.execute_statement("select sleep(1)")
-    # Wait until the query is queued.
-    self.wait_for_operation_state(queued_query_resp.operationHandle,
-            TCLIService.TOperationState.PENDING_STATE)
-    # Check whether the query log message correctly exposes the queuing status.
-    log = self.wait_for_log_message(
-        queued_query_resp.operationHandle, "Admission result :")
-    assert "Admission result : Queued" in log, log
-    assert "Latest admission queue reason : number of running queries 1 is at or over "
-    "limit 1" in log, log
-    # Now check the same for ExecSummary.
-    summary_req = ImpalaHiveServer2Service.TGetExecSummaryReq()
-    summary_req.operationHandle = queued_query_resp.operationHandle
-    summary_req.sessionHandle = self.session_handle
-    exec_summary_resp = self.hs2_client.GetExecSummary(summary_req)
-    assert exec_summary_resp.summary.is_queued
-    assert "number of running queries 1 is at or over limit 1" in \
-           exec_summary_resp.summary.queued_reason,\
-      exec_summary_resp.summary.queued_reason
-    # Close the running query.
-    self.close(long_query_resp.operationHandle)
-    # Close the queued query.
-    self.close(queued_query_resp.operationHandle)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -1743,12 +1814,12 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       # state because of the 'WAIT' debug action), wait for the 'lineitem' scan to
       # complete, and then validate that one of the executor backends shutdowns and
       # releases its admitted memory.
-      self.wait_for_state(handle, self.client.QUERY_STATES['RUNNING'], timeout)
+      self.client.wait_for_impala_state(handle, RUNNING, timeout)
       # Once the 'lineitem' scan completes, NumCompletedBackends should be 1.
       self.assert_eventually(60, 1, lambda: "NumCompletedBackends: 1 (1)"
           in self.client.get_runtime_profile(handle))
       get_num_completed_backends(self.cluster.impalads[0].service,
-        handle.get_handle().id) == 1
+        self.client.handle_id(handle)) == 1
       mem_admitted =\
           get_mem_admitted_backends_debug_page(self.cluster, self.get_ac_process())
       num_executor_zero_admitted = 0
@@ -2012,13 +2083,7 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
   def setup_method(self, method):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
-
-    start_args = "--enable_admission_service"
-    if START_ARGS in method.__dict__:
-      start_args = method.__dict__[START_ARGS] + " " + start_args
-    method.__dict__[START_ARGS] = start_args
-    if IMPALAD_ARGS in method.__dict__:
-      method.__dict__[ADMISSIOND_ARGS] = method.__dict__[IMPALAD_ARGS]
+    self.enable_admission_service(method)
     super(TestAdmissionControllerWithACService, self).setup_method(method)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
@@ -2038,8 +2103,7 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     timeout_s = 10
     # Make sure the query is through admission control before killing the admissiond. It
     # should be unaffected and finish successfully.
-    self.wait_for_state(
-        before_kill_handle, self.client.QUERY_STATES['RUNNING'], timeout_s)
+    self.client.wait_for_impala_state(before_kill_handle, RUNNING, timeout_s)
     self.cluster.admissiond.kill()
     result = self.client.fetch(query, before_kill_handle)
     assert result.data == ["730"]
@@ -2059,7 +2123,7 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     try:
       result = self.client.fetch(query, no_restart_handle)
       assert False, "Query should have failed"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Failed to admit query after waiting " in str(e)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
@@ -2077,20 +2141,18 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     handle1 = self.execute_query_async(query)
     timeout_s = 10
     # Make sure the first query has been admitted.
-    self.wait_for_state(
-        handle1, self.client.QUERY_STATES['RUNNING'], timeout_s)
+    self.client.wait_for_impala_state(handle1, RUNNING, timeout_s)
 
     # Run another query. This query should be queued because only 1 query is allowed in
     # the default pool.
-    handle2 = self.execute_query_async(query)
+    handle2 = self.client.execute_async(query)
     self._wait_for_change_to_profile(handle2, "Admission result: Queued")
 
     # Cancel the first query. It's resources should be released and the second query
     # should be admitted.
     self.client.cancel(handle1)
     self.client.close_query(handle1)
-    self.wait_for_state(
-        handle2, self.client.QUERY_STATES['RUNNING'], timeout_s)
+    self.client.wait_for_impala_state(handle2, RUNNING, timeout_s)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially
@@ -2108,20 +2170,18 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     handle1 = self.execute_query_async(query)
     timeout_s = 10
     # Make sure the first query has been admitted.
-    self.wait_for_state(
-        handle1, self.client.QUERY_STATES['RUNNING'], timeout_s)
+    self.client.wait_for_impala_state(handle1, RUNNING, timeout_s)
 
     # Run another query. This query should be queued because the executor group only has 1
     # slot.
-    handle2 = self.execute_query_async(query)
+    handle2 = self.client.execute_async(query)
     self._wait_for_change_to_profile(handle2, "Admission result: Queued")
 
     # Cancel the first query. It's resources should be released and the second query
     # should be admitted.
     self.client.cancel(handle1)
     self.client.close_query(handle1)
-    self.wait_for_state(
-        handle2, self.client.QUERY_STATES['RUNNING'], timeout_s)
+    self.client.wait_for_impala_state(handle2, RUNNING, timeout_s)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially
@@ -2133,25 +2193,23 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     # Query designed to run for a few minutes.
     query = "select count(*) from functional.alltypes where int_col = sleep(10000)"
     impalad1 = self.cluster.impalads[0]
-    client1 = impalad1.service.create_beeswax_client()
+    client1 = impalad1.service.create_hs2_client()
     handle1 = client1.execute_async(query)
     timeout_s = 10
     # Make sure the first query has been admitted.
-    self.wait_for_state(
-        handle1, self.client.QUERY_STATES['RUNNING'], timeout_s, client=client1)
+    client1.wait_for_impala_state(handle1, RUNNING, timeout_s)
 
     # Run another query with a different coordinator. This query should be queued because
     # only 1 query is allowed in the default pool.
     impalad2 = self.cluster.impalads[1]
-    client2 = impalad2.service.create_beeswax_client()
+    client2 = impalad2.service.create_hs2_client()
     handle2 = client2.execute_async(query)
     self._wait_for_change_to_profile(handle2, "Admission result: Queued", client=client2)
 
     # Kill the coordinator for the first query. The resources for the query should get
     # cleaned up and the second query should be admitted.
     impalad1.kill()
-    self.wait_for_state(
-        handle2, self.client.QUERY_STATES['RUNNING'], timeout_s, client=client2)
+    client2.wait_for_impala_state(handle2, RUNNING, timeout_s)
 
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
@@ -2185,15 +2243,22 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       submitting to a single impalad, we know exactly what the values should be,
       otherwise we just check that they are within reasonable bounds.
   """
+
+  BATCH_SIZE = 100
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestAdmissionControllerStress, cls).add_test_dimensions()
-    # This test really need to run using beeswax client since hs2 client has not
-    # implemented some methods needed to query admission control status.
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol', 'beeswax'))
     # Slow down test query by setting low batch_size.
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-      cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[10]))
+      cluster_sizes=[0], disable_codegen_options=[False],
+      batch_sizes=[cls.BATCH_SIZE]))
+    # Turning off result spooling allows us to better control query execution by
+    # controlling the number of rows fetched. This allows us to maintain resource
+    # usage among backends.
+    add_mandatory_exec_option(cls, 'spool_query_results', 0)
+    # Set 100ms long poling time to get faster initial response.
+    add_mandatory_exec_option(cls, 'long_polling_time_ms', 100)
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('round_robin_submission', *ROUND_ROBIN_SUBMISSION))
     cls.ImpalaTestMatrix.add_dimension(
@@ -2356,7 +2421,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
             REQUEST_QUEUE_UPDATE_INTERVAL)['count']
       assert (time() - start_time < STRESS_TIMEOUT),\
           "Timed out waiting %s seconds for heartbeats" % (STRESS_TIMEOUT,)
-      sleep(STATESTORE_RPC_FREQUENCY_MS / float(1000))
+      wait_single_statestore_heartbeat()
     LOG.info("Waited %s for %s heartbeats", round(time() - start_time, 1), heartbeats)
 
   def wait_for_admitted_threads(self, num_threads):
@@ -2410,7 +2475,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       sleep(1)
 
   class SubmitQueryThread(threading.Thread):
-    def __init__(self, impalad, additional_query_options, vector, query_num,
+    def __init__(self, impalad, vector, query_num,
         query_end_behavior, executing_threads, exit_signal):
       """
       executing_threads must be provided so that this thread can add itself when the
@@ -2418,8 +2483,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       """
       super(self.__class__, self).__init__()
       self.executing_threads = executing_threads
-      self.vector = vector
-      self.additional_query_options = additional_query_options
+      # Make vector local to this thread, because run() will modify it later.
+      self.vector = deepcopy(vector)
       self.query_num = query_num
       self.query_end_behavior = query_end_behavior
       self.impalad = impalad
@@ -2431,6 +2496,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       # Set by the main thread when tearing down
       self.exit_signal = exit_signal
       self.setDaemon(True)
+      # Determine how many rows to fetch per interval.
+      self.rows_per_fetch = TestAdmissionControllerStress.BATCH_SIZE
 
     def thread_should_run(self):
       return not self.exit_signal.is_set()
@@ -2444,20 +2511,12 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
           if not self.thread_should_run():
             return
 
-          exec_options = dict()
-          exec_options.update(self.vector.get_exec_option_dict())
-          exec_options.update(self.additional_query_options)
-          # Turning off result spooling allows us to better control query execution by
-          # controlling the number of rows fetched. This allows us to maintain resource
-          # usage among backends.
-          exec_options['spool_query_results'] = 0
-          exec_options['long_polling_time_ms'] = 100
           if self.query_end_behavior == 'QUERY_TIMEOUT':
-            exec_options['query_timeout_s'] = QUERY_END_TIMEOUT_S
+            self.vector.set_exec_option('query_timeout_s', QUERY_END_TIMEOUT_S)
           query = QUERY.format(self.query_num)
           self.query_state = 'SUBMITTING'
-          client = self.impalad.service.create_beeswax_client()
-          client.set_configuration(exec_options)
+          assert self.vector.get_protocol() == HS2, "Must use hs2 protocol"
+          client = self.impalad.service.create_client_from_vector(self.vector)
 
           LOG.info("Submitting query %s with ending behavior %s",
                    self.query_num, self.query_end_behavior)
@@ -2485,7 +2544,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
           msg = "Admission result for query {} : {}".format(
             self.query_num, admission_result)
           self.log_handle(client, query_handle, msg)
-        except ImpalaBeeswaxException as e:
+        except IMPALA_CONNECTION_EXCEPTION as e:
           LOG.exception(e)
           raise e
 
@@ -2500,10 +2559,10 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         # query. It needs to wait until the main thread requests it to end its query.
         while self.thread_should_run() and self.query_state != 'COMPLETED':
           # The query needs to stay active until the main thread requests it to end.
-          # Otherwise, the query may get cancelled early. Fetch 1 row every
-          # FETCH_INTERVAL to keep the query active.
-          fetch_result = client.fetch(query, query_handle, 1)
-          assert len(fetch_result.data) == 1, str(fetch_result)
+          # Otherwise, the query may get cancelled early. Fetch self.rows_per_fetch row
+          # every FETCH_INTERVAL to keep the query active.
+          fetch_result = client.fetch(query, query_handle, self.rows_per_fetch)
+          assert len(fetch_result.data) == self.rows_per_fetch, str(fetch_result)
           self.num_rows_fetched += len(fetch_result.data)
           if self.query_state == 'REQUEST_QUERY_END':
             self._end_query(client, query, query_handle)
@@ -2537,20 +2596,19 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         # Sleep and wait for the query to be cancelled. The cancellation will
         # set the state to EXCEPTION.
         start_time = time()
-        while self.thread_should_run() and (
-          client.get_state(query_handle) != client.QUERY_STATES['EXCEPTION']):
+        while self.thread_should_run() and not client.is_error(query_handle):
           assert (time() - start_time < STRESS_TIMEOUT),\
             "Timed out waiting %s seconds for query cancel" % (STRESS_TIMEOUT,)
           sleep(1)
-        # try fetch and confirm from exception message that query was timed out.
         try:
-          client.fetch(query, query_handle)
+          # try fetch and confirm from exception message that query was timed out.
+          client.fetch(query, query_handle, discard_results=True)
           assert False
-        except Exception as e:
+        except (Exception, ImpalaHiveServer2Service) as e:
           assert 'expired due to client inactivity' in str(e)
       elif self.query_end_behavior == 'EOS':
         # Fetch all rows so we hit eos.
-        client.fetch(query, query_handle)
+        client.fetch(query, query_handle, discard_results=True)
       elif self.query_end_behavior == 'CLIENT_CANCEL':
         client.cancel(query_handle)
       else:
@@ -2604,8 +2662,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     LOG.info("Found %s queued queries after %s seconds", actual_queued,
         round(time() - start_time, 1))
 
-  def run_admission_test(self, vector, additional_query_options,
-                         check_user_aggregates=False):
+  def run_admission_test(self, vector, check_user_aggregates=False):
     LOG.info("Starting test case with parameters: %s", vector)
     self.impalads = self.cluster.impalads
     self.ac_processes = self.get_ac_processes()
@@ -2628,8 +2685,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         sleep(submission_delay_ms / 1000.0)
       impalad = self.impalads[query_num % len(self.impalads)]
       query_end_behavior = QUERY_END_BEHAVIORS[query_num % len(QUERY_END_BEHAVIORS)]
-      thread = self.SubmitQueryThread(impalad, additional_query_options, vector,
-          query_num, query_end_behavior, self.executing_threads, self.exit)
+      thread = self.SubmitQueryThread(impalad, vector, query_num, query_end_behavior,
+                                      self.executing_threads, self.exit)
       thread.start()
       self.all_threads.append(thread)
 
@@ -2747,11 +2804,12 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
     self.pool_name = 'default-pool'
+    vector.set_exec_option('request_pool', self.pool_name)
+    vector.set_exec_option('mem_limit', sys.maxsize)
     # The pool has no mem resources set, so submitting queries with huge mem_limits
     # should be fine. This exercises the code that does the per-pool memory
     # accounting (see MemTracker::GetPoolMemReserved()) without actually being throttled.
-    self.run_admission_test(vector, {'request_pool': self.pool_name,
-      'mem_limit': sys.maxsize})
+    self.run_admission_test(vector)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -2761,7 +2819,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     statestored_args=_STATESTORED_ARGS)
   def test_admission_controller_with_configs(self, vector):
     self.pool_name = 'root.queueB'
-    self.run_admission_test(vector, {'request_pool': self.pool_name})
+    vector.set_exec_option('request_pool', self.pool_name)
+    self.run_admission_test(vector)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -2778,8 +2837,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       # Save time by running only 1 out of 6 vector combination.
       pytest.skip('Only run with round_robin_submission=True and submission_delay_ms=0.')
     self.pool_name = 'root.queueF'
-    self.run_admission_test(vector, {'request_pool': self.pool_name},
-                            check_user_aggregates=True)
+    vector.set_exec_option('request_pool', self.pool_name)
+    self.run_admission_test(vector, check_user_aggregates=True)
 
   def get_proc_limit(self):
     """Gets the process mem limit as reported by the impalad's mem-tracker metric.
@@ -2816,8 +2875,9 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     # the mem limit.
     num_impalads = len(self.cluster.impalads)
     query_mem_limit = (proc_limit // MAX_NUM_CONCURRENT_QUERIES // num_impalads) - 1
-    self.run_admission_test(vector,
-        {'request_pool': self.pool_name, 'mem_limit': query_mem_limit})
+    vector.set_exec_option('request_pool', self.pool_name)
+    vector.set_exec_option('mem_limit', query_mem_limit)
+    self.run_admission_test(vector)
 
 
 class TestAdmissionControllerStressWithACService(TestAdmissionControllerStress):
@@ -2833,11 +2893,5 @@ class TestAdmissionControllerStressWithACService(TestAdmissionControllerStress):
   def setup_method(self, method):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
-
-    start_args = "--enable_admission_service"
-    if START_ARGS in method.__dict__:
-      start_args = method.__dict__[START_ARGS] + " " + start_args
-    method.__dict__[START_ARGS] = start_args
-    if IMPALAD_ARGS in method.__dict__:
-      method.__dict__[ADMISSIOND_ARGS] = method.__dict__[IMPALAD_ARGS]
+    self.enable_admission_service(method)
     super(TestAdmissionControllerStressWithACService, self).setup_method(method)

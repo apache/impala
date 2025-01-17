@@ -224,11 +224,11 @@ class ImpalaBeeswaxClient(object):
       if not fetch_profile_after_close:
         result.runtime_profile = self.get_runtime_profile(handle)
 
-      self.close_query(handle)
+      profile_after_close = self.close_query(handle, fetch_profile_after_close)
 
       if fetch_profile_after_close:
-        # Fetch the profile again after the query has closed and the profile is complete.
-        result.runtime_profile = self.get_runtime_profile(handle)
+        # Attach profile that is obtained after query closed.
+        result.runtime_profile = profile_after_close
 
     return result
 
@@ -292,8 +292,11 @@ class ImpalaBeeswaxClient(object):
   def cancel_query(self, query_id):
     return self.__do_rpc(lambda: self.imp_service.Cancel(query_id))
 
-  def close_query(self, handle):
+  def close_query(self, handle, fetch_profile_after_close=False):
     self.__do_rpc(lambda: self.imp_service.close(handle))
+    if fetch_profile_after_close:
+      return self.get_runtime_profile(handle)
+    return None
 
   def wait_for_finished(self, query_handle):
     """Given a query handle, polls the coordinator waiting for the query to transition to
@@ -371,7 +374,8 @@ class ImpalaBeeswaxClient(object):
   def get_log(self, query_handle):
     return self.__do_rpc(lambda: self.imp_service.get_log(query_handle))
 
-  def fetch_results(self, query_string, query_handle, max_rows=-1):
+  def fetch_results(self, query_string, query_handle, max_rows=-1,
+                    discard_results=False):
     """Fetches query results given a handle and query type (insert, use, other)"""
     query_type = self.__get_query_type(query_string)
     if query_type == 'use':
@@ -382,6 +386,8 @@ class ImpalaBeeswaxClient(object):
 
     # Result fetching for insert is different from other queries.
     exec_result = None
+    if discard_results:
+      return exec_result
     if query_type == 'insert':
       exec_result = self.__fetch_insert_results(query_handle)
     else:

@@ -21,15 +21,24 @@
 
 from __future__ import absolute_import, division, print_function
 import abc
-import codecs
 from future.utils import with_metaclass
 import logging
 import re
+import time
 
+from beeswaxd.BeeswaxService import QueryState
 import impala.dbapi as impyla
+import impala.error as impyla_error
 import tests.common
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
+from tests.beeswax.impala_beeswax import (
+  DEFAULT_SLEEP_INTERVAL,
+  ImpalaBeeswaxClient,
+  ImpalaBeeswaxException)
+from tests.common.test_vector import BEESWAX, HS2, HS2_HTTP
+from tests.util.thrift_util import (
+  op_handle_to_query_id,
+  session_handle_to_session_id)
 
 
 LOG = logging.getLogger(__name__)
@@ -45,6 +54,36 @@ PROGRESS_LOG_RE = re.compile(
     r'^Query [a-z0-9:]+ [0-9]+% Complete \([0-9]+ out of [0-9]+\)$')
 
 MAX_SQL_LOGGING_LENGTH = 128 * 1024
+
+# Tuple of root exception types from different client protocol.
+IMPALA_CONNECTION_EXCEPTION = (ImpalaBeeswaxException, impyla_error.Error)
+
+# String representation of ClientRequestState::ExecState
+INITIALIZED = 'INITIALIZED'
+PENDING = 'PENDING'
+RUNNING = 'RUNNING'
+FINISHED = 'FINISHED'
+ERROR = 'ERROR'
+# ExecState that is final.
+EXEC_STATES_FINAL = set([FINISHED, ERROR])
+# Possible ExecState after query passed admission controller.
+EXEC_STATES_ADMITTED = set([RUNNING, FINISHED, ERROR])
+# Mapping of a ExecState to a set of possible future ExecState.
+LEGAL_FUTURE_STATES = {
+  INITIALIZED: set([PENDING, RUNNING, FINISHED, ERROR]),
+  PENDING: set([RUNNING, FINISHED, ERROR]),
+  RUNNING: set([FINISHED, ERROR]),
+  FINISHED: set([ERROR]),
+  ERROR: set()
+}
+
+
+def has_legal_future_state(impala_state, future_states):
+  """Return True if 'impala_state' can transition to one of state listed in
+  'future_states'."""
+  assert impala_state in LEGAL_FUTURE_STATES
+  expected_impala_states = set(future_states)
+  return len(LEGAL_FUTURE_STATES[impala_state] & expected_impala_states) > 0
 
 
 # test_exprs.py's TestExprLimits executes extremely large SQLs (multiple MBs). It is the
@@ -149,19 +188,64 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
     pass
 
   @abc.abstractmethod
-  def close_query(self, handle):
+  def close_query(self, handle, fetch_profile_after_close=False):
     """Closes the query."""
     pass
 
   @abc.abstractmethod
   def get_state(self, operation_handle):
-    """Returns the state of a query"""
+    """Returns the state of a query.
+    May raise en error, depending on connection type."""
     pass
 
   @abc.abstractmethod
-  def state_is_finished(self, operation_handle):
-    """Returns whether the state of a query is finished"""
+  def get_impala_exec_state(self, operation_handle):
+    """Returns a string translation from client specific state of operation_handle
+    to Impala's ClientRequestState::ExecState."""
     pass
+
+  def __is_at_exec_state(self, operation_handle, impala_state):
+    self.log_handle(
+      operation_handle, 'checking ' + impala_state + ' state for operation')
+    return self.get_impala_exec_state(operation_handle) == impala_state
+
+  def state_is_finished(self, operation_handle):
+    """Returns whether the Impala exec state of a operation_handle is FINISHED.
+    DEPRECATED: use is_finished() instead."""
+    return self.is_finished(operation_handle)
+
+  def is_initialized(self, operation_handle):
+    """Returns whether the Impala exec state of a operation_handle is INITIALIZED"""
+    return self.__is_at_exec_state(operation_handle, INITIALIZED)
+
+  def is_pending(self, operation_handle):
+    """Returns whether the Impala exec state of a operation_handle is PENDING"""
+    return self.__is_at_exec_state(operation_handle, PENDING)
+
+  def is_running(self, operation_handle):
+    """Returns whether the Impala exec state of a operation_handle is RUNNING"""
+    return self.__is_at_exec_state(operation_handle, RUNNING)
+
+  def is_finished(self, operation_handle):
+    """Returns whether the Impala exec state of a operation_handle is FINISHED"""
+    return self.__is_at_exec_state(operation_handle, FINISHED)
+
+  def is_error(self, operation_handle):
+    """Returns whether the Impala exec state of a operation_handle is ERROR.
+    Internally, it will call get_state(), and any exception thrown by get_state() will
+    cause this method to return True."""
+    return self.__is_at_exec_state(operation_handle, ERROR)
+
+  def is_executing(self, operation_handle):
+    """Returns whether the state of a operation_handle is executing or will be
+    executing. Return False if operation_handle has ended, either successful or
+    with error."""
+    return self.get_impala_exec_state(operation_handle) not in EXEC_STATES_FINAL
+
+  def is_admitted(self, operation_handle):
+    """Returns whether the state of a operation_handle has passed Impala
+    admission control. Return True if handle state is error."""
+    return self.get_impala_exec_state(operation_handle) in EXEC_STATES_ADMITTED
 
   @abc.abstractmethod
   def get_log(self, operation_handle):
@@ -185,10 +269,19 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
     pass
 
   @abc.abstractmethod
-  def fetch(self, sql_stmt, operation_handle, max_rows=-1):
+  def fetch(self, sql_stmt, operation_handle, max_rows=-1, discard_results=False):
     """Fetches query results up to max_rows given a handle and sql statement.
     If max_rows < 0, all rows are fetched. If max_rows > 0 but the number of
-    rows returned is less than max_rows, all the rows have been fetched."""
+    rows returned is less than max_rows, all the rows have been fetched.
+    Return None if discard_results is True.
+    TODO: 'sql_stmt' can be obtained from 'operation_handle'."""
+    pass
+
+  @abc.abstractmethod
+  def get_runtime_profile(self, operation_handle,
+                          profile_format=TRuntimeProfileFormat.STRING):
+    """Get runtime profile of given 'operation_handle'.
+    Handle must stay open."""
     pass
 
   @abc.abstractmethod
@@ -198,14 +291,85 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
     Otherwise, return str(operation_handle)."""
     pass
 
-  @abc.abstractmethod
   def log_handle(self, operation_handle, message):
     """Log 'message' at INFO level, along with id of 'operation_handle'."""
+    handle_id = self.handle_id(operation_handle)
+    LOG.info("-- {0}: {1}".format(handle_id, message))
+
+  def log_client(self, message):
+    """Log 'message' at INFO level."""
+    LOG.info("-- {0}".format(message))
+
+  def wait_for_impala_state(self, operation_handle, expected_impala_state, timeout):
+    """Waits for the given 'operation_handle' to reach the 'expected_impala_state'.
+    'expected_impala_state' must be a string of either 'INITIALIZED', 'PENDING',
+    'RUNNING', 'FINISHED', or 'ERROR'. If it does not reach the given state within
+    'timeout' seconds, the method throws an AssertionError.
+    """
+    self.wait_for_any_impala_state(operation_handle, [expected_impala_state], timeout)
+
+  def wait_for_any_impala_state(self, operation_handle, expected_impala_states,
+                                timeout_s):
+    """Waits for the given 'operation_handle' to reach one of 'expected_impala_states'.
+    Each string in 'expected_impala_states' must either be 'INITIALIZED', 'PENDING',
+    'RUNNING', 'FINISHED', or 'ERROR'. If it does not reach one of the given states
+    within 'timeout' seconds, the method throws an AssertionError.
+    Returns the final state.
+    """
+    start_time = time.time()
+    timeout_msg = None
+    while True:
+      impala_state = self.get_impala_exec_state(operation_handle)
+      interval = time.time() - start_time
+      if impala_state in expected_impala_states:
+        # Reached one of expected_impala_states.
+        break
+      elif not has_legal_future_state(impala_state, expected_impala_states):
+        timeout_msg = ("query '{0}' can not transition from last known state '{1}' to "
+                       "any of the expected states {2}. Stop waiting after {3} "
+                       "seconds.").format(
+          self.handle_id(operation_handle), impala_state, expected_impala_states,
+          interval)
+        break
+      elif interval >= timeout_s:
+        timeout_msg = ("query '{0}' did not reach one of the expected states {1}, last "
+                       "known state {2}").format(
+          self.handle_id(operation_handle), expected_impala_states, impala_state)
+        break
+      time.sleep(DEFAULT_SLEEP_INTERVAL)
+
+    if timeout_msg is not None:
+      raise tests.common.errors.Timeout(timeout_msg)
+    return impala_state
+
+  @abc.abstractmethod
+  def wait_for_admission_control(self, operation_handle, timeout_s=60):
+    """Given an 'operation_handle', polls the coordinator waiting for it to complete
+    admission control processing of the query.
+    Return True if query pass admission control after given 'timeout_s'."""
+    pass
+
+  @abc.abstractmethod
+  def get_admission_result(self, operation_handle):
+    """Given an 'operation_handle', returns the admission result from the query
+    profile"""
     pass
 
 
 # Represents a connection to Impala using the Beeswax API.
 class BeeswaxConnection(ImpalaConnection):
+
+  # This is based on ClientRequestState::BeeswaxQueryState().
+  __QUERY_STATE_TO_EXEC_STATE = {
+    QueryState.CREATED: INITIALIZED,
+    QueryState.COMPILED: PENDING,
+    QueryState.RUNNING: RUNNING,
+    QueryState.FINISHED: FINISHED,
+    QueryState.EXCEPTION: ERROR,
+    # These are not official ExecState, but added to complete mapping.
+    QueryState.INITIALIZED: 'UNIMPLEMENTED_INITIALIZED',
+  }
+
   def __init__(self, host_port, use_kerberos=False, user=None, password=None,
                use_ssl=False):
     self.__beeswax_client = ImpalaBeeswaxClient(host_port, use_kerberos, user=user,
@@ -217,7 +381,7 @@ class BeeswaxConnection(ImpalaConnection):
     self.QUERY_STATES = self.__beeswax_client.query_states
 
   def get_test_protocol(self):
-    return 'beeswax'
+    return BEESWAX
 
   def get_host_port(self):
     return self.__host_port
@@ -250,30 +414,35 @@ class BeeswaxConnection(ImpalaConnection):
       self.set_configuration_option("client_identifier", tests.common.current_node)
 
   def connect(self):
-    LOG.info("-- connecting to: %s" % self.__host_port)
-    self.__beeswax_client.connect()
+    try:
+      self.__beeswax_client.connect()
+      self.log_client("connected to %s with beeswax" % self.__host_port)
+    except Exception as e:
+      self.log_client("failed connecting to %s with beeswax" % self.__host_port)
+      raise e
 
   # TODO: rename to close_connection
   def close(self):
-    LOG.info("-- closing connection to: %s" % self.__host_port)
+    self.log_client("closing beeswax connection to: %s" % self.__host_port)
     self.__beeswax_client.close_connection()
 
-  def close_query(self, operation_handle):
+  def close_query(self, operation_handle, fetch_profile_after_close=False):
     self.log_handle(operation_handle, 'closing query for operation')
-    self.__beeswax_client.close_query(operation_handle.get_handle())
+    return self.__beeswax_client.close_query(operation_handle.get_handle(),
+                                             fetch_profile_after_close)
 
   def close_dml(self, operation_handle):
     self.log_handle(operation_handle, 'closing DML query')
     self.__beeswax_client.close_dml(operation_handle.get_handle())
 
   def execute(self, sql_stmt, user=None, fetch_profile_after_close=False):
-    LOG.info("-- executing against %s\n" % (self.__host_port))
+    self.log_client("executing against %s\n" % (self.__host_port))
     log_sql_stmt(sql_stmt)
     return self.__beeswax_client.execute(sql_stmt, user=user,
         fetch_profile_after_close=fetch_profile_after_close)
 
   def execute_async(self, sql_stmt, user=None):
-    LOG.info("-- executing async: %s\n" % (self.__host_port))
+    self.log_client("executing async: %s\n" % (self.__host_port))
     log_sql_stmt(sql_stmt)
     beeswax_handle = self.__beeswax_client.execute_query_async(sql_stmt, user=user)
     return OperationHandle(beeswax_handle, sql_stmt)
@@ -286,15 +455,17 @@ class BeeswaxConnection(ImpalaConnection):
     self.log_handle(operation_handle, 'getting state')
     return self.__beeswax_client.get_state(operation_handle.get_handle())
 
-  def state_is_finished(self, operation_handle):
-    self.log_handle(operation_handle, 'checking finished state for operation')
-    return self.get_state(operation_handle) == self.QUERY_STATES["FINISHED"]
+  def get_impala_exec_state(self, operation_handle):
+    return self.__QUERY_STATE_TO_EXEC_STATE[self.get_state(operation_handle)]
 
   def get_exec_summary(self, operation_handle):
     self.log_handle(operation_handle, 'getting exec summary operation')
     return self.__beeswax_client.get_exec_summary(operation_handle.get_handle())
 
-  def get_runtime_profile(self, operation_handle):
+  def get_runtime_profile(self, operation_handle,
+                          profile_format=TRuntimeProfileFormat.STRING):
+    assert profile_format == TRuntimeProfileFormat.STRING, (
+      "Beeswax client only support getting runtime profile in STRING format.")
     self.log_handle(operation_handle, 'getting runtime profile operation')
     return self.__beeswax_client.get_runtime_profile(operation_handle.get_handle())
 
@@ -316,11 +487,11 @@ class BeeswaxConnection(ImpalaConnection):
     self.log_handle(operation_handle, 'getting log for operation')
     return self.__beeswax_client.get_log(operation_handle.get_handle().log_context)
 
-  def fetch(self, sql_stmt, operation_handle, max_rows=-1):
+  def fetch(self, sql_stmt, operation_handle, max_rows=-1, discard_results=False):
     self.log_handle(operation_handle, 'fetching {} rows'.format(
       'all' if max_rows < 0 else max_rows))
     return self.__beeswax_client.fetch_results(
-        sql_stmt, operation_handle.get_handle(), max_rows)
+        sql_stmt, operation_handle.get_handle(), max_rows, discard_results)
 
   def handle_id(self, operation_handle):
     query_id = operation_handle.get_handle().id
@@ -340,9 +511,23 @@ class ImpylaHS2Connection(ImpalaConnection):
   plus Impala-specific extensions, e.g. for fetching runtime profiles.
   TODO: implement support for kerberos, SSL, etc.
   """
+
+  # ClientRequestState::TOperationState()
+  __OPERATION_STATE_TO_EXEC_STATE = {
+    'INITIALIZED_STATE': INITIALIZED,
+    'PENDING_STATE': PENDING,
+    'RUNNING_STATE': RUNNING,
+    'FINISHED_STATE': FINISHED,
+    'ERROR_STATE': ERROR,
+    # These are not official ExecState, but added to complete mapping.
+    'CANCELED_STATE': 'UNIMPLEMENTED_CANCELLED',
+    'CLOSED_STATE': 'UNIMPLEMENTED_CLOSED',
+    'UKNOWN_STATE': 'UNIMPLEMENTED_UNKNOWN'
+  }
+
   def __init__(self, host_port, use_kerberos=False, is_hive=False,
                use_http_transport=False, http_path="", use_ssl=False,
-               collect_profile_and_log=True):
+               collect_profile_and_log=True, user=None):
     self.__host_port = host_port
     self.__use_http_transport = use_http_transport
     self.__http_path = http_path
@@ -353,28 +538,37 @@ class ImpylaHS2Connection(ImpalaConnection):
     # cursor for different operations (as opposed to creating a new cursor per operation)
     # so that the session is preserved. This means that we can only execute one operation
     # at a time per connection, which is a limitation also imposed by the Beeswax API.
+    # However, for ease of async query testing, opening multiple cursors through single
+    # ImpylaHS2Connection is allowed if executing query through execute_async() or
+    # execute() with user parameter that is different than self.__user. Do note though
+    # that they will not share the same session with self.__cursor.
     self.__impyla_conn = None
     self.__cursor = None
     # Default query option obtained from initial connect.
     # Query option names are in lower case for consistency.
     self.__default_query_options = {}
+    # List of all cursors that created through execute_async.
+    self.__async_cursors = list()
     # Query options to send along with each query.
     self.__query_options = {}
     self._is_hive = is_hive
     # Some Hive HS2 protocol, such as custom Calcite planner, may be able to collect
     # profile and log from Impala.
     self._collect_profile_and_log = collect_profile_and_log
+    self.__user = user
 
   def get_test_protocol(self):
     if self.__http_path:
-      return 'hs2-http'
+      return HS2_HTTP
     else:
-      return 'hs2'
+      return HS2
 
   def get_host_port(self):
     return self.__host_port
 
   def set_configuration_option(self, name, value):
+    # Only set the option if it's not already set to the same value.
+    # value must be parsed to string.
     name = name.lower()
     value = str(value)
     if self.__query_options.get(name) != value:
@@ -389,35 +583,53 @@ class ImpylaHS2Connection(ImpalaConnection):
     if hasattr(tests.common, "current_node") and not self._is_hive:
       self.set_configuration_option("client_identifier", tests.common.current_node)
 
+  def __open_single_cursor(self, user=None):
+    return self.__impyla_conn.cursor(user=user, convert_types=False,
+                                     close_finished_queries=False)
+
+  def __close_single_cursor(self, cursor):
+    try:
+      # Explicitly close the cursor so that it will close the session.
+      cursor.close()
+    except Exception:
+      # The session may no longer be valid if the impalad was restarted during the test.
+      pass
+
   def connect(self):
-    LOG.info("-- connecting to {0} with impyla".format(self.__host_port))
     host, port = self.__host_port.split(":")
     conn_kwargs = {}
     if self._is_hive:
       conn_kwargs['auth_mechanism'] = 'PLAIN'
-    self.__impyla_conn = impyla.connect(host=host, port=int(port),
-                                        use_http_transport=self.__use_http_transport,
-                                        http_path=self.__http_path,
-                                        use_ssl=self.__use_ssl, **conn_kwargs)
-    # Get the default query options for the session before any modifications are made.
-    self.__cursor = \
-        self.__impyla_conn.cursor(convert_types=False, close_finished_queries=False)
-    self.__default_query_options = {}
-    if not self._is_hive:
-      self.__cursor.execute("set all")
-      for name, val, kind in self.__cursor:
-        collect_default_query_options(self.__default_query_options, name, val, kind)
-      self.__cursor.close_operation()
+    try:
+      self.__impyla_conn = impyla.connect(
+        host=host, port=int(port), use_http_transport=self.__use_http_transport,
+        http_path=self.__http_path, use_ssl=self.__use_ssl, **conn_kwargs)
+      self.__cursor = self.__open_single_cursor(user=self.__user)
+      # Get the default query options for the session before any modifications are made.
+      self.__default_query_options = {}
+      if not self._is_hive:
+        self.__cursor.execute("set all")
+        for name, val, kind in self.__cursor:
+          collect_default_query_options(self.__default_query_options, name, val, kind)
+        self.__cursor.close_operation()
       LOG.debug("Default query options: {0}".format(self.__default_query_options))
+      self.log_client("connected to {0} with impyla {1} session {2}".format(
+        self.__host_port, self.get_test_protocol(), self.__get_session_id(self.__cursor)
+      ))
+    except Exception as e:
+      self.log_client("failed connecting to {0} with impyla {1}".format(
+        self.__host_port, self.get_test_protocol()
+      ))
+      raise e
 
   def close(self):
-    LOG.info("-- closing connection to: {0}".format(self.__host_port))
-    try:
-      # Explicitly close the cursor so that it will close the session.
-      self.__cursor.close()
-    except Exception:
-      # The session may no longer be valid if the impalad was restarted during the test.
-      pass
+    self.log_client("closing 1 sync and {0} async {1} connections to: {2}".format(
+      len(self.__async_cursors), self.get_test_protocol(), self.__host_port))
+    self.__close_single_cursor(self.__cursor)
+    for async_cursor in self.__async_cursors:
+      self.__close_single_cursor(async_cursor)
+    # Remove all async cursors.
+    self.__async_cursors = list()
     try:
       self.__impyla_conn.close()
     except AttributeError as e:
@@ -430,59 +642,90 @@ class ImpylaHS2Connection(ImpalaConnection):
     """Trigger the GetTables() HS2 request on the given database (None means all dbs).
     Returns a list of (catalogName, dbName, tableName, tableType, tableComment).
     """
-    LOG.info("-- getting tables for database: {0}".format(database))
+    self.log_client("getting tables for database: {0}".format(database))
     self.__cursor.get_tables(database_name=database)
     return self.__cursor.fetchall()
 
-  def close_query(self, operation_handle):
+  def close_query(self, operation_handle, fetch_profile_after_close=False):
     self.log_handle(operation_handle, 'closing query for operation')
+    # close_operation() will wipe out _last_operation.
+    # Assign it to op_handle so that we can pull the profile after close_operation().
+    op_handle = operation_handle.get_handle()._last_operation
     operation_handle.get_handle().close_operation()
+    if fetch_profile_after_close:
+      assert self._collect_profile_and_log, (
+        "This connection is not configured to collect profile.")
+      return op_handle.get_profile(TRuntimeProfileFormat.STRING)
+    return None
+
+  def __log_execute(self, cursor, user):
+    self.log_client(
+      "executing against {0} at {1}. session: {2} main_cursor: {3} user: {4}\n".format(
+        (self._is_hive and 'Hive' or 'Impala'), self.__host_port,
+        self.__get_session_id(cursor), (cursor == self.__cursor), user)
+    )
 
   def execute(self, sql_stmt, user=None, profile_format=TRuntimeProfileFormat.STRING,
       fetch_profile_after_close=False):
-    LOG.info("-- executing against {0} at {1}\n".format(
-      self._is_hive and 'Hive' or 'Impala', self.__host_port))
     log_sql_stmt(sql_stmt)
-    self.__cursor.execute(sql_stmt, configuration=self.__query_options)
-    handle = OperationHandle(self.__cursor, sql_stmt)
+    cursor = self.__cursor
+    result = None
+    try:
+      if user != self.__user:
+        # Must create a new cursor to supply 'user'.
+        cursor = self.__open_single_cursor(user=user)
+      self.__log_execute(cursor, user)
+      cursor.execute(sql_stmt, configuration=self.__query_options)
+      handle = OperationHandle(cursor, sql_stmt)
+      self.log_handle(handle, "started query in session {0}".format(
+        self.__get_session_id(cursor)))
+      result = self.__fetch_results_and_profile(
+        handle, profile_format=profile_format,
+        fetch_profile_after_close=fetch_profile_after_close)
+    finally:
+      cursor.close_operation()
+      if cursor != self.__cursor:
+        self.__close_single_cursor(cursor)
+    return result
 
+  def __fetch_results_and_profile(
+      self, operation_handle, profile_format=TRuntimeProfileFormat.STRING,
+      fetch_profile_after_close=False):
     r = None
     try:
-      r = self.__fetch_results(handle, profile_format=profile_format)
+      r = self.__fetch_results(operation_handle, profile_format=profile_format)
     finally:
       if r is None:
         # Try to close the query handle but ignore any exceptions not to replace the
         # original exception raised by '__fetch_results'.
         try:
-          self.close_query(handle)
+          self.close_query(operation_handle)
         except Exception:
           pass
       elif fetch_profile_after_close:
-        op_handle = handle.get_handle()._last_operation
-        self.close_query(handle)
-
         # Match ImpalaBeeswaxResult by placing the full profile including end time and
         # duration into the return object.
-        r.runtime_profile = op_handle.get_profile(profile_format)
+        r.runtime_profile = self.close_query(operation_handle, fetch_profile_after_close)
         return r
       else:
-        self.close_query(handle)
+        self.close_query(operation_handle)
         return r
 
   def execute_async(self, sql_stmt, user=None):
-    LOG.info("-- executing against {0} at {1}\n".format(
-        self._is_hive and 'Hive' or 'Impala', self.__host_port))
-    log_sql_stmt(sql_stmt)
-    if user is not None:
-      raise NotImplementedError("Not yet implemented for HS2 - authentication")
+    async_cursor = None
     try:
-      self.__cursor.execute_async(sql_stmt, configuration=self.__query_options)
-      handle = OperationHandle(self.__cursor, sql_stmt)
-      LOG.info("Started query {0}".format(self.get_query_id(handle)))
+      async_cursor = self.__open_single_cursor(user=user)
+      handle = OperationHandle(async_cursor, sql_stmt)
+      self.__log_execute(async_cursor, user)
+      log_sql_stmt(sql_stmt)
+      async_cursor.execute_async(sql_stmt, configuration=self.__query_options)
+      self.__async_cursors.append(async_cursor)
       return handle
-    except Exception:
-      self.__cursor.close_operation()
-      raise
+    except Exception as e:
+      if async_cursor:
+        async_cursor.close_operation()
+        self.__close_single_cursor(async_cursor)
+      raise e
 
   def cancel(self, operation_handle):
     self.log_handle(operation_handle, 'canceling operation')
@@ -492,34 +735,38 @@ class ImpylaHS2Connection(ImpalaConnection):
   def get_query_id(self, operation_handle):
     """Return the string representation of the query id.
     Return empty string if handle is already canceled or closed."""
+    id = None
     last_op = operation_handle.get_handle()._last_operation
-    if last_op is None:
-      return ""
-    guid_bytes = last_op.handle.operationId.guid
-    # hex_codec works on bytes, so this needs to a decode() to get back to a string
-    hi_str = codecs.encode(guid_bytes[7::-1], 'hex_codec').decode()
-    lo_str = codecs.encode(guid_bytes[16:7:-1], 'hex_codec').decode()
-    return "{0}:{1}".format(hi_str, lo_str)
+    if last_op is not None:
+      id = op_handle_to_query_id(last_op.handle)
+    return "" if id is None else id
+
+  def __get_session_id(self, cursor):
+    """Return the string representation of the session id.
+    Return empty string if handle is already canceled or closed."""
+    id = None
+    if cursor.session is not None:
+      id = session_handle_to_session_id(cursor.session.handle)
+    return "" if id is None else id
 
   def handle_id(self, operation_handle):
     query_id = self.get_query_id(operation_handle)
     return query_id if query_id else str(operation_handle)
 
-  def log_handle(self, operation_handle, message):
-    handle_id = self.handle_id(operation_handle)
-    LOG.info("-- {0}: {1}".format(handle_id, message))
-
   def get_state(self, operation_handle):
     self.log_handle(operation_handle, 'getting state')
     cursor = operation_handle.get_handle()
-    return cursor.status()
-
-  def state_is_finished(self, operation_handle):
-    self.log_handle(operation_handle, 'checking finished state for operation')
-    cursor = operation_handle.get_handle()
     # cursor.status contains a string representation of one of
     # TCLIService.TOperationState.
-    return cursor.status() == "FINISHED_STATE"
+    return cursor.status()
+
+  def get_impala_exec_state(self, operation_handle):
+    try:
+      return self.__OPERATION_STATE_TO_EXEC_STATE[self.get_state(operation_handle)]
+    except impyla_error.Error:
+      return ERROR
+    except Exception as e:
+      raise e
 
   def get_exec_summary(self, operation_handle):
     self.log_handle(operation_handle, 'getting exec summary operation')
@@ -527,22 +774,53 @@ class ImpylaHS2Connection(ImpalaConnection):
     # summary returned is thrift, not string.
     return cursor.get_summary()
 
-  def get_runtime_profile(self, operation_handle, profile_format):
+  def get_runtime_profile(self, operation_handle,
+                          profile_format=TRuntimeProfileFormat.STRING):
     self.log_handle(operation_handle, 'getting runtime profile operation')
     cursor = operation_handle.get_handle()
     return cursor.get_profile(profile_format=profile_format)
 
   def wait_for_finished_timeout(self, operation_handle, timeout):
     self.log_handle(operation_handle, 'waiting for query to reach FINISHED state')
-    raise NotImplementedError("Not yet implemented for HS2 - states differ from beeswax")
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+      start_rpc_time = time.time()
+      impala_state = self.get_impala_exec_state(operation_handle)
+      rpc_time = time.time() - start_rpc_time
+      # if the rpc succeeded, the output is the query state
+      if impala_state == FINISHED:
+        return True
+      elif impala_state == ERROR:
+        try:
+          error_log = self.__do_rpc(
+            lambda: self.imp_service.get_log(operation_handle.log_context))
+          raise impyla_error.OperationalError(error_log, None)
+        finally:
+          self.close_query(operation_handle)
+      if rpc_time < DEFAULT_SLEEP_INTERVAL:
+        time.sleep(DEFAULT_SLEEP_INTERVAL - rpc_time)
+    return False
 
-  def wait_for_admission_control(self, operation_handle):
+  def wait_for_admission_control(self, operation_handle, timeout_s=60):
     self.log_handle(operation_handle, 'waiting for completion of the admission control')
-    raise NotImplementedError("Not yet implemented for HS2 - states differ from beeswax")
+    start_time = time.time()
+    while time.time() - start_time < timeout_s:
+      start_rpc_time = time.time()
+      if self.is_admitted(operation_handle):
+        return True
+      rpc_time = time.time() - start_rpc_time
+      if rpc_time < DEFAULT_SLEEP_INTERVAL:
+        time.sleep(DEFAULT_SLEEP_INTERVAL - rpc_time)
+    return False
 
   def get_admission_result(self, operation_handle):
     self.log_handle(operation_handle, 'getting the admission result')
-    raise NotImplementedError("Not yet implemented for HS2 - states differ from beeswax")
+    if self.is_admitted(operation_handle):
+      query_profile = self.get_runtime_profile(operation_handle)
+      admit_result = re.search(r"Admission result: (.*)", query_profile)
+      if admit_result:
+        return admit_result.group(1)
+    return ""
 
   def get_log(self, operation_handle):
     self.log_handle(operation_handle, 'getting log for operation')
@@ -552,12 +830,13 @@ class ImpylaHS2Connection(ImpalaConnection):
              if not PROGRESS_LOG_RE.match(line)]
     return '\n'.join(lines)
 
-  def fetch(self, sql_stmt, operation_handle, max_rows=-1):
+  def fetch(self, sql_stmt, operation_handle, max_rows=-1, discard_results=False):
     self.log_handle(operation_handle, 'fetching {} rows'.format(
       'all' if max_rows < 0 else max_rows))
-    return self.__fetch_results(operation_handle, max_rows)
+    return self.__fetch_results(operation_handle, max_rows, discard_results)
 
   def __fetch_results(self, handle, max_rows=-1,
+                      discard_results=False,
                       profile_format=TRuntimeProfileFormat.STRING):
     """Implementation of result fetching from handle."""
     cursor = handle.get_handle()
@@ -581,10 +860,15 @@ class ImpylaHS2Connection(ImpalaConnection):
     else:
       log = None
       profile = None
-    return ImpylaHS2ResultSet(success=True, result_tuples=result_tuples,
-                              column_labels=column_labels, column_types=column_types,
-                              query=handle.sql_stmt(), log=log, profile=profile,
-                              query_id=self.get_query_id(handle))
+    result = None
+
+    if discard_results:
+      return result
+    result = ImpylaHS2ResultSet(success=True, result_tuples=result_tuples,
+                                column_labels=column_labels, column_types=column_types,
+                                query=handle.sql_stmt(), log=log, profile=profile,
+                                query_id=self.get_query_id(handle))
+    return result
 
 
 class ImpylaHS2ResultSet(object):
@@ -628,17 +912,17 @@ class ImpylaHS2ResultSet(object):
       return str(val)
 
 
-def create_connection(host_port, use_kerberos=False, protocol='beeswax',
+def create_connection(host_port, use_kerberos=False, protocol=BEESWAX,
     is_hive=False, use_ssl=False, collect_profile_and_log=True):
-  if protocol == 'beeswax':
+  if protocol == BEESWAX:
     c = BeeswaxConnection(host_port=host_port, use_kerberos=use_kerberos,
                           use_ssl=use_ssl)
-  elif protocol == 'hs2':
+  elif protocol == HS2:
     c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos,
         is_hive=is_hive, use_ssl=use_ssl,
         collect_profile_and_log=collect_profile_and_log)
   else:
-    assert protocol == 'hs2-http'
+    assert protocol == HS2_HTTP
     c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos,
         is_hive=is_hive, use_http_transport=True, http_path='cliservice',
         use_ssl=use_ssl, collect_profile_and_log=collect_profile_and_log)
