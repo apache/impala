@@ -31,15 +31,18 @@ from tests.util.iceberg_metadata_util import rewrite_metadata
 
 
 def create_iceberg_table_from_directory(impala_client, unique_database, table_name,
-                                        file_format):
-  """Utility function to create an iceberg table from a directory. The directory must
-  exist in $IMPALA_HOME/testdata/data/iceberg_test with the name 'table_name'"""
+      file_format, table_location="${IMPALA_HOME}/testdata/data/iceberg_test",
+      warehouse_prefix=os.getenv("FILESYSTEM_PREFIX")):
+  """Utility function to create an iceberg table from a directory."""
+
+  if not warehouse_prefix and unique_database:
+    warehouse_prefix = os.getenv("DEFAULT_FS", WAREHOUSE_PREFIX)
 
   # Only orc and parquet tested/supported
   assert file_format == "orc" or file_format == "parquet"
 
-  local_dir = os.path.join(
-    os.environ['IMPALA_HOME'], 'testdata', 'data', 'iceberg_test', table_name)
+  table_location = os.path.expandvars(table_location)
+  local_dir = os.path.join(table_location, table_name)
   assert os.path.isdir(local_dir)
 
   # Rewrite iceberg metadata to use the warehouse prefix and use unique_database
@@ -50,7 +53,7 @@ def create_iceberg_table_from_directory(impala_client, unique_database, table_na
   check_call(['mkdir', '-p', tmp_dir])
   check_call(['cp', '-r', local_dir, tmp_dir])
   local_dir = os.path.join(tmp_dir, table_name)
-  rewrite_metadata(WAREHOUSE_PREFIX, unique_database, os.path.join(local_dir, 'metadata'))
+  rewrite_metadata(warehouse_prefix, unique_database, os.path.join(local_dir, 'metadata'))
 
   # Put the directory in the database's directory (not the table directory)
   hdfs_parent_dir = os.path.join(get_fs_path("/test-warehouse"), unique_database)

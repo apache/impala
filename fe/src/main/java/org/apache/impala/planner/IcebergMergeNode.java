@@ -43,18 +43,18 @@ import org.apache.impala.thrift.TQueryOptions;
 public class IcebergMergeNode extends PlanNode {
   private final List<MergeCase> cases_;
   private final Expr rowPresent_;
-  private List<Expr> positionMetaExprs_;
+  private List<Expr> deleteMetaExprs_;
   private List<Expr> partitionMetaExprs_;
   private final TupleDescriptor mergeActionTuple_;
   private final TupleId targetTupleId_;
 
   public IcebergMergeNode(PlanNodeId id, PlanNode child, List<MergeCase> cases,
-      Expr rowPresent, List<Expr> positionMetaExprs, List<Expr> partitionMetaExprs,
+      Expr rowPresent, List<Expr> deleteMetaExprs, List<Expr> partitionMetaExprs,
       TupleDescriptor mergeActionTuple, TupleId targetTupleId) {
     super(id, "MERGE");
     this.cases_ = cases;
     this.rowPresent_ = rowPresent;
-    this.positionMetaExprs_ = positionMetaExprs;
+    this.deleteMetaExprs_ = deleteMetaExprs;
     this.partitionMetaExprs_ = partitionMetaExprs;
     this.mergeActionTuple_ = mergeActionTuple;
     this.targetTupleId_ = targetTupleId;
@@ -76,7 +76,7 @@ public class IcebergMergeNode extends PlanNode {
       mergeCases.add(tMergeCase);
     }
     TIcebergMergeNode mergeNode = new TIcebergMergeNode(mergeCases,
-        rowPresent_.treeToThrift(), Expr.treesToThrift(positionMetaExprs_),
+        rowPresent_.treeToThrift(), Expr.treesToThrift(deleteMetaExprs_),
         Expr.treesToThrift(partitionMetaExprs_), mergeActionTuple_.getId().asInt(),
         targetTupleId_.asInt());
     msg.setMerge_node(mergeNode);
@@ -92,8 +92,8 @@ public class IcebergMergeNode extends PlanNode {
     }
     partitionMetaExprs_ =
         Expr.substituteList(partitionMetaExprs_, getOutputSmap(), analyzer, true);
-    positionMetaExprs_ =
-        Expr.substituteList(positionMetaExprs_, getOutputSmap(), analyzer, true);
+    deleteMetaExprs_ =
+        Expr.substituteList(deleteMetaExprs_, getOutputSmap(), analyzer, true);
     rowPresent_.substitute(getOutputSmap(), analyzer, true);
   }
 

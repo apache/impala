@@ -758,7 +758,7 @@ struct TIcebergMergeCase {
 struct TIcebergMergeNode {
   1: required list<TIcebergMergeCase> cases
   2: required Exprs.TExpr row_present
-  3: required list<Exprs.TExpr> position_meta_exprs
+  3: required list<Exprs.TExpr> delete_meta_exprs
   4: required list<Exprs.TExpr> partition_meta_exprs
   5: required Types.TTupleId merge_action_tuple_id
   6: required Types.TTupleId target_tuple_id

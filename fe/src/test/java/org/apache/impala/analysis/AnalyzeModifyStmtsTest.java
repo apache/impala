@@ -384,6 +384,10 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
         + "id in (select max(id) from functional_parquet.iceberg_non_partitioned)) s "
         + "on t.id = s.id "
         + "when matched and s.id > 2 then delete");
+    // Target table contains equality delete files
+    AnalyzesOk("merge into functional_parquet.iceberg_v2_delete_equality t "
+        + "using functional_parquet.iceberg_v2_delete_equality s "
+        + "on t.id = s.id when not matched then insert *");
 
     // Inline view as target
     AnalysisError("merge into "
@@ -527,11 +531,5 @@ public class AnalyzeModifyStmtsTest extends AnalyzerTest {
         "Target table 'functional_parquet.iceberg_partition_evolution' is incompatible"
             + " with source expressions.\nExpression 's.`month`' (type: INT) is not "
             + "compatible with column 'date_string_col' (type: STRING)");
-    // Target table contains equality delete files
-    AnalysisError("merge into functional_parquet.iceberg_v2_delete_equality t "
-            + "using functional_parquet.iceberg_v2_delete_equality s "
-            + "on t.id = s.id when not matched then insert *",
-        "MERGE statement is not supported for Iceberg tables "
-            + "containing equality deletes.");
   }
 }

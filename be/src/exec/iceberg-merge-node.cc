@@ -50,8 +50,8 @@ Status IcebergMergePlanNode::Init(const TPlanNode& tnode, FragmentState* state) 
   RETURN_IF_ERROR(ScalarExpr::Create(
       tnode.merge_node.row_present, *row_descriptor_, state, pool, &row_present_));
 
-  RETURN_IF_ERROR(ScalarExpr::Create(tnode.merge_node.position_meta_exprs,
-      *row_descriptor_, state, pool, &position_meta_exprs_));
+  RETURN_IF_ERROR(ScalarExpr::Create(tnode.merge_node.delete_meta_exprs,
+      *row_descriptor_, state, pool, &delete_meta_exprs_));
 
   RETURN_IF_ERROR(ScalarExpr::Create(tnode.merge_node.partition_meta_exprs,
       *row_descriptor_, state, pool, &partition_meta_exprs_));
@@ -99,7 +99,7 @@ IcebergMergeNode::IcebergMergeNode(
     child_row_idx_(0),
     child_eos_(false),
     row_present_(pnode.row_present_),
-    position_meta_exprs_(pnode.position_meta_exprs_),
+    delete_meta_exprs_(pnode.delete_meta_exprs_),
     partition_meta_exprs_(pnode.partition_meta_exprs_) {
   DCHECK(pnode.merge_action_tuple_id_ != -1);
   DCHECK(pnode.target_tuple_id_ != -1);
@@ -132,8 +132,8 @@ Status IcebergMergeNode::Prepare(RuntimeState* state) {
       expr_perm_pool_.get(), expr_results_pool_.get(), &row_present_evaluator_));
 
   RETURN_IF_ERROR(
-      ScalarExprEvaluator::Create(position_meta_exprs_, state, state->obj_pool(),
-          expr_perm_pool_.get(), expr_results_pool_.get(), &position_meta_evaluators_));
+      ScalarExprEvaluator::Create(delete_meta_exprs_, state, state->obj_pool(),
+          expr_perm_pool_.get(), expr_results_pool_.get(), &delete_meta_evaluators_));
 
   RETURN_IF_ERROR(
       ScalarExprEvaluator::Create(partition_meta_exprs_, state, state->obj_pool(),
@@ -155,7 +155,7 @@ Status IcebergMergeNode::Open(RuntimeState* state) {
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
 
   RETURN_IF_ERROR(row_present_evaluator_->Open(state));
-  RETURN_IF_ERROR(ScalarExprEvaluator::Open(position_meta_evaluators_, state));
+  RETURN_IF_ERROR(ScalarExprEvaluator::Open(delete_meta_evaluators_, state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(partition_meta_evaluators_, state));
 
   for (auto* merge_case : all_cases_) {
@@ -293,18 +293,18 @@ void IcebergMergeNode::Close(RuntimeState* state) {
     merge_case->Close(state);
   }
   row_present_evaluator_->Close(state);
-  ScalarExprEvaluator::Close(position_meta_evaluators_, state);
+  ScalarExprEvaluator::Close(delete_meta_evaluators_, state);
   ScalarExprEvaluator::Close(partition_meta_evaluators_, state);
 
   row_present_->Close();
-  ScalarExpr::Close(position_meta_exprs_);
+  ScalarExpr::Close(delete_meta_exprs_);
   ScalarExpr::Close(partition_meta_exprs_);
 
   ExecNode::Close(state);
 }
 
-const std::vector<ScalarExprEvaluator*>& IcebergMergeNode::PositionMetaEvals() {
-  return position_meta_evaluators_;
+const std::vector<ScalarExprEvaluator*>& IcebergMergeNode::DeleteMetaEvals() {
+  return delete_meta_evaluators_;
 }
 
 const std::vector<ScalarExprEvaluator*>& IcebergMergeNode::PartitionMetaEvals() {
@@ -328,7 +328,7 @@ Status IcebergMergeCase::Prepare(RuntimeState* state, IcebergMergeNode& parent) 
   combined_evaluators_.insert(
       combined_evaluators_.end(), output_evaluators_.begin(), output_evaluators_.end());
   combined_evaluators_.insert(combined_evaluators_.end(),
-      parent.PositionMetaEvals().begin(), parent.PositionMetaEvals().end());
+      parent.DeleteMetaEvals().begin(), parent.DeleteMetaEvals().end());
   combined_evaluators_.insert(combined_evaluators_.end(),
       parent.PartitionMetaEvals().begin(), parent.PartitionMetaEvals().end());
   return Status::OK();

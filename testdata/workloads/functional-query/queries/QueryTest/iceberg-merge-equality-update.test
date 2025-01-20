@@ -1,0 +1,16 @@
+====
+---- QUERY
+# Merge into partitioned target table with equality delete files from the source table
+# using when matched update clause
+merge into iceberg_v2_delete_equality_partitioned target using iceberg_v2_delete_equality_partitioned source
+on target.i = source.i and target.i > 10 when matched then update set i = cast(source.i + 100 as int)
+---- TYPES
+INT,STRING,DATE
+---- DML_RESULTS: iceberg_v2_delete_equality_partitioned
+1,'str1',2023-12-24
+1,'str1',2023-12-25
+2,'str2',2023-12-24
+4,'str4',2023-12-24
+322,'str2',2023-12-25
+333433,'str3',2023-12-24
+====

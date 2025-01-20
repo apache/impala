@@ -80,7 +80,7 @@ public class IcebergMergeImpl implements MergeImpl {
   private TupleId targetTupleId_;
 
   private List<Expr> targetExpressions_;
-  private List<Expr> targetPositionMetaExpressions_;
+  private List<Expr> targetDeleteMetaExpressions_;
   private List<Expr> targetPartitionMetaExpressions_;
   private List<Expr> targetPartitionExpressions_;
   private MergeSorting targetSorting_;
@@ -94,7 +94,7 @@ public class IcebergMergeImpl implements MergeImpl {
     on_ = on;
     table_ = targetTableRef_.getTable();
     targetExpressions_ = Lists.newArrayList();
-    targetPositionMetaExpressions_ = Lists.newArrayList();
+    targetDeleteMetaExpressions_ = Lists.newArrayList();
     targetPartitionMetaExpressions_ = Lists.newArrayList();
     targetPartitionExpressions_ = Lists.newArrayList();
   }
@@ -126,12 +126,6 @@ public class IcebergMergeImpl implements MergeImpl {
       throw new AnalysisException(String.format(
           "Unsupported '%s': '%s' for Iceberg table: %s",
           TableProperties.MERGE_MODE, modifyWriteMode, icebergTable_.getFullName()));
-    }
-    if (!icebergTable_.getContentFileStore().getEqualityDeleteFiles().isEmpty()) {
-      throw new AnalysisException(
-          "MERGE statement is not supported for Iceberg tables "
-              + "containing equality deletes.");
-      //TODO: IMPALA-13674
     }
     for (Column column : icebergTable_.getColumns()) {
       Path slotPath =
@@ -205,8 +199,8 @@ public class IcebergMergeImpl implements MergeImpl {
     targetExpressions_ = Expr.substituteList(targetExpressions_, smap, analyzer, true);
     targetPartitionMetaExpressions_ =
         Expr.substituteList(targetPartitionMetaExpressions_, smap, analyzer, true);
-    targetPositionMetaExpressions_ =
-        Expr.substituteList(targetPositionMetaExpressions_, smap, analyzer, true);
+    targetDeleteMetaExpressions_ =
+        Expr.substituteList(targetDeleteMetaExpressions_, smap, analyzer, true);
     mergeActionExpression_ = mergeActionExpression_.substitute(smap, analyzer, true);
     targetPartitionExpressions_ =
         Expr.substituteList(targetPartitionExpressions_, smap, analyzer, true);
@@ -218,7 +212,7 @@ public class IcebergMergeImpl implements MergeImpl {
   @Override
   public List<Expr> getResultExprs() {
     List<Expr> result = Lists.newArrayList(targetExpressions_);
-    result.addAll(targetPositionMetaExpressions_);
+    result.addAll(targetDeleteMetaExpressions_);
     result.addAll(targetPartitionMetaExpressions_);
     result.add(mergeActionExpression_);
     return result;
@@ -243,10 +237,10 @@ public class IcebergMergeImpl implements MergeImpl {
     // the sink and the merge node differs.
     List<MergeCase> copyOfCases =
         mergeStmt_.getCases().stream().map(MergeCase::clone).collect(Collectors.toList());
-    List<Expr> positionMetaExprs = Expr.cloneList(targetPositionMetaExpressions_);
+    List<Expr> deleteMetaExprs = Expr.cloneList(targetDeleteMetaExpressions_);
     List<Expr> partitionMetaExprs = Expr.cloneList(targetPartitionMetaExpressions_);
     IcebergMergeNode mergeNode = new IcebergMergeNode(ctx.getNextNodeId(), child,
-        copyOfCases, rowPresentExpression_.clone(), positionMetaExprs, partitionMetaExprs,
+        copyOfCases, rowPresentExpression_.clone(), deleteMetaExprs, partitionMetaExprs,
         mergeActionTuple_, targetTupleId_);
     mergeNode.init(analyzer);
     return mergeNode;
@@ -279,7 +273,7 @@ public class IcebergMergeImpl implements MergeImpl {
       deletePartitionKeys = targetPartitionMetaExpressions_;
     }
     return new IcebergBufferedDeleteSink(icebergPositionalDeleteTable_,
-        deletePartitionKeys, targetPositionMetaExpressions_, deleteTableId_);
+        deletePartitionKeys, targetDeleteMetaExpressions_, deleteTableId_);
   }
 
   public TableSink createInsertSink() {
@@ -335,27 +329,34 @@ public class IcebergMergeImpl implements MergeImpl {
               VirtualColumn.ICEBERG_PARTITION_SERIALIZED.getName())));
     }
 
-    List<Expr> positionMetaExpressions;
+    List<Expr> deleteMetaExpressions = Lists.newArrayList();
 
-    if (mergeStmt_.hasOnlyInsertCases() && icebergTable_.getContentFileStore()
-        .getDataFilesWithDeletes().isEmpty()) {
-      positionMetaExpressions = Collections.emptyList();
-    } else {
-      // DELETE/UPDATE cases require position information to write delete files
-      positionMetaExpressions = ImmutableList.of(
-          new SlotRef(
+    boolean hasEqualityDeleteFiles = !icebergTable_.getContentFileStore()
+        .getEqualityDeleteFiles().isEmpty();
+    boolean hasPositionDeleteFiles = !icebergTable_.getContentFileStore()
+        .getPositionDeleteFiles().isEmpty();
+
+    if (!mergeStmt_.hasOnlyInsertCases() || hasPositionDeleteFiles) {
+      // DELETE/UPDATE cases require position information to write/read delete files
+      deleteMetaExpressions.add(new SlotRef(
               ImmutableList.of(targetTableRef_.getUniqueAlias(),
-                  VirtualColumn.INPUT_FILE_NAME.getName())),
-          new SlotRef(
-              ImmutableList.of(targetTableRef_.getUniqueAlias(),
-                  VirtualColumn.FILE_POSITION.getName())));
+                  VirtualColumn.INPUT_FILE_NAME.getName())));
+      deleteMetaExpressions.add(new SlotRef(
+          ImmutableList.of(targetTableRef_.getUniqueAlias(),
+              VirtualColumn.FILE_POSITION.getName())));
+    }
+
+    if (hasEqualityDeleteFiles) {
+      deleteMetaExpressions.add(new SlotRef(
+          ImmutableList.of(targetTableRef_.getUniqueAlias(),
+              VirtualColumn.ICEBERG_DATA_SEQUENCE_NUMBER.getName())));
     }
 
     selectListItems.add(new SelectListItem(rowPresentExpression, ROW_PRESENT));
     selectListItems.addAll(
         targetSlotRefs.stream().map(expr -> new SelectListItem(expr, null))
             .collect(Collectors.toList()));
-    selectListItems.addAll(positionMetaExpressions.stream()
+    selectListItems.addAll(deleteMetaExpressions.stream()
         .map(expr -> new SelectListItem(expr, null))
         .collect(Collectors.toList()));
     selectListItems.addAll(partitionMetaExpressions.stream()
@@ -366,7 +367,7 @@ public class IcebergMergeImpl implements MergeImpl {
 
     rowPresentExpression_ = rowPresentExpression;
     targetPartitionMetaExpressions_ = partitionMetaExpressions;
-    targetPositionMetaExpressions_ = positionMetaExpressions;
+    targetDeleteMetaExpressions_ = deleteMetaExpressions;
     targetExpressions_ = targetSlotRefs;
 
     FromClause fromClause =

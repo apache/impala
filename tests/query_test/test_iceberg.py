@@ -2064,6 +2064,20 @@ class TestIcebergV2Table(IcebergTestSuite):
   def test_merge_star(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-merge-star', vector, unique_database)
 
+  def test_merge_equality_update(self, vector, unique_database):
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_v2_delete_equality_partitioned", "parquet",
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice",
+        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
+    self.run_test_case('QueryTest/iceberg-merge-equality-update', vector, unique_database)
+
+  def test_merge_equality_insert(self, vector, unique_database):
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_v2_delete_equality_partitioned", "parquet",
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice",
+        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
+    self.run_test_case('QueryTest/iceberg-merge-equality-insert', vector, unique_database)
+
   def test_cleanup(self, unique_database):
       """Test that all uncommitted files written by Impala are removed from the file
       system when a DML commit to an Iceberg table fails, and that the effects of the

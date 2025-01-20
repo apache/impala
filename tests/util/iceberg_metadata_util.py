@@ -111,6 +111,16 @@ def generate_new_path(table_params, file_path):
       start_directory, file_path))
 
   result = file_path[start:]
+
+  # Remove unneccessary parts if the table location differs from
+  # the default location, for example:
+  # /test-warehouse/iceberg_test/hadoop_catalog/ice/table translates to
+  # /test-warehouse/table
+  if unique_database:
+    table_name_start = file_path.find(table_name)
+    if table_name_start != start + len(start_directory) + 1:
+      result = start_directory + result[table_name_start - 1:]
+
   if prefix:
     result = prefix + result
 
