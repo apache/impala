@@ -42,7 +42,8 @@ class AuthProvider {
   /// Creates a new Thrift transport factory in the out parameter that performs
   /// authorisation per this provider's protocol. The type of the transport returned is
   /// determined by 'underlying_transport_type' and there may be multiple levels of
-  /// wrapped transports, eg. a TBufferedTransport around a TSaslServerTransport.
+  /// wrapped transports, eg. a ThriftServer::BufferedTransport around a
+  /// TSaslServerTransport.
   virtual Status GetServerTransportFactory(
       ThriftServer::TransportType underlying_transport_type,
       const std::string& server_name, MetricGroup* metrics,

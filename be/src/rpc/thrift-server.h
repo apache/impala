@@ -59,6 +59,24 @@ class AuthProvider;
 /// TODO: shutdown is buggy (which only harms tests)
 class ThriftServer {
  public:
+
+   /// Override TBufferedTransport::close() to avoid calling flush() which is not safe
+   /// in TSSLSocket if it is in error state. See IMPALA-13680 / THRIFT-5846 for details.
+   class BufferedTransport :
+      public apache::thrift::transport::TBufferedTransport {
+
+    public:
+      BufferedTransport(std::shared_ptr<apache::thrift::transport::TTransport>& transport,
+          uint32_t sz, std::shared_ptr<apache::thrift::TConfiguration>&& config)
+      : apache::thrift::transport::TBufferedTransport(transport, sz, config) {}
+
+      // base implementation:
+      // https://github.com/apache/thrift/blob/d078721e44fea7713832ae5d0f5d9ca67317f19e/lib/cpp/src/thrift/transport/TBufferTransports.h#L367
+      virtual void close() override {
+        transport_->close();
+      }
+  };
+
   /// Transport factory that wraps transports in a buffered transport with a customisable
   /// buffer-size and optionally in another transport from a provided factory. A larger
   /// buffer is usually more efficient, as it allows the underlying transports to perform
@@ -81,7 +99,7 @@ class ThriftServer {
       VerifyMaxMessageSizeInheritance(trans.get(), wrapped.get());
       std::shared_ptr<apache::thrift::transport::TTransport> buffered_wrapped =
           std::shared_ptr<apache::thrift::transport::TTransport>(
-              new apache::thrift::transport::TBufferedTransport(
+              new BufferedTransport(
                   wrapped, buffer_size_, wrapped->getConfiguration()));
       VerifyMaxMessageSizeInheritance(wrapped.get(), buffered_wrapped.get());
       return buffered_wrapped;

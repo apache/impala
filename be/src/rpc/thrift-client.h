@@ -154,7 +154,7 @@ ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port
   }
 
   // transport_ is created by wrapping the socket_ in the TTransport provided by the
-  // auth_provider_ and then a TBufferedTransport (IMPALA-1928).
+  // auth_provider_ and then a ThriftServer::BufferedTransport (IMPALA-1928).
   transport_ = socket_;
   init_status_ = auth_provider_->WrapClientTransport(address_.hostname, transport_,
       service_name, &transport_);

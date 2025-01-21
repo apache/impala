@@ -116,7 +116,7 @@ std::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   // to be the same so that the authentication state is identical for communication in
   // both directions. In order to do this, we share the same TTransport object for both
   // input and output set in TAcceptQueueServer::SetupConnection.
-  std::shared_ptr<TBufferedTransport> ret_transport;
+  std::shared_ptr<impala::ThriftServer::BufferedTransport> ret_transport;
   std::shared_ptr<TTransport> wrapped(
       new TSaslServerTransport(serverDefinitionMap_, trans));
   // Verify the max message size is inherited properly
@@ -126,7 +126,7 @@ std::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   TSocket* socket = static_cast<TSocket*>(trans.get());
   socket->setRecvTimeout(FLAGS_sasl_connect_tcp_timeout_ms);
   socket->setSendTimeout(FLAGS_sasl_connect_tcp_timeout_ms);
-  ret_transport.reset(new TBufferedTransport(wrapped,
+  ret_transport.reset(new impala::ThriftServer::BufferedTransport(wrapped,
       impala::ThriftServer::BufferedTransportFactory::DEFAULT_BUFFER_SIZE_BYTES,
           wrapped->getConfiguration()));
   impala::VerifyMaxMessageSizeInheritance(wrapped.get(), ret_transport.get());
