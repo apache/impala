@@ -101,6 +101,10 @@ abstract class ModifyImpl {
       // Builds the select list and column position mapping for the target table.
       ArrayList<SelectListItem> selectList = new ArrayList<>();
       buildAndValidateSelectExprs(analyzer, selectList);
+      // Filter out rows that would be unnecessary to update.
+      if (modifyStmt_ instanceof UpdateStmt) {
+        ((UpdateStmt) modifyStmt_).rewriteWherePredicate(analyzer);
+      }
 
       // Analyze the generated select statement.
       sourceStmt_ = new SelectStmt(new SelectList(selectList), modifyStmt_.fromClause_,

@@ -189,9 +189,9 @@ public class ExprRewriterTest extends AnalyzerTest {
     // Update.
     RewritesOk("update t2 set name = 'test' from " +
         "functional.alltypes t1 join functional_kudu.dimtbl t2 on (t1.id = t2.id) " +
-        "where t2.id < 10", 10, 5);
+        "where t2.id < 10", 14, 5);
     RewritesOk("update functional_kudu.dimtbl set name = 'test', zip = 4711 " +
-        "where exists (" + stmt_ + ")", 28, 16);
+        "where exists (" + stmt_ + ")", 35, 17);
     // Delete.
     RewritesOk("delete a from " +
         "functional_kudu.testtbl a join functional.testtbl b on a.zip = b.zip", 4, 2);
@@ -359,7 +359,8 @@ public class ExprRewriterTest extends AnalyzerTest {
             + "FROM functional_kudu.alltypes WHERE id = (SELECT 1 + 1)",
         "UPDATE functional_kudu.alltypes SET string_col = 'test' "
             + "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) "
-            + "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 2)");
+            + "ON id = `$a$1`.`$c$1` "
+            + "WHERE id = (SELECT 2) AND string_col IS DISTINCT FROM 'test'");
 
     // Delete
     assertToSql(ctx,

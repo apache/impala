@@ -1708,8 +1708,8 @@ class TestIcebergV2Table(IcebergTestSuite):
     the parent ids match the previous snapshot ids. See IMPALA-12708."""
 
     self.validate_snapshots(db, "single_col", 3)
-    self.validate_snapshots(db, "ice_alltypes", 17)
-    self.validate_snapshots(db, "ice_id_partitioned", 4)
+    self.validate_snapshots(db, "ice_alltypes", 21)
+    self.validate_snapshots(db, "ice_id_partitioned", 7)
 
   def validate_snapshots(self, db, tbl, expected_snapshots):
     tbl_name = "{}.{}".format(db, tbl)
@@ -1730,16 +1730,16 @@ class TestIcebergV2Table(IcebergTestSuite):
 
     hive_results = get_hive_results("ice_alltypes", "bool_col")
     assert hive_results == \
-        "false,0,111,0.0,0.0,0,0.00,2023-11-07,2000-01-01 00:00:00.0,IMPALA,zerob\n" \
-        "true,3,222,1.0,1.0,23,123.12,2023-11-08,2001-01-01 01:01:01.0,ICEBERG,oneb\n"
+        "false,0,111,0.0,0.0,234,123.00,2023-11-07,2000-01-01 00:00:00.0,IMPALA,zerob\n" \
+        "true,3,222,1.0,1.0,NULL,NULL,2023-11-08,2001-01-01 01:01:01.0,ICEBERG,oneb\n"
 
     hive_results = get_hive_results("ice_id_partitioned", "i")
     assert hive_results == \
-        "1,0,Apache Impala\n"     \
+        "1,0,APACHE IMPALA\n"     \
         "2,0,iceberg\n"    \
         "3,0,hive\n"       \
-        "4,1,Apache Spark\n"      \
-        "5,2,Kudu\n"
+        "5,2,Kudu\n"      \
+        "10,1,Apache Spark\n"
 
     hive_results = get_hive_results("ice_bucket_transform", "i")
     assert hive_results == \

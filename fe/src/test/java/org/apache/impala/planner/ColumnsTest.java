@@ -274,7 +274,8 @@ public class ColumnsTest extends FrontendTestBase {
             "functional_parquet.iceberg_v2_delete_positional.file__position",
             "functional_parquet.iceberg_v2_delete_positional.id",
             "functional_parquet.iceberg_v2_delete_positional.input__file__name"),
-        ImmutableList.of("functional_parquet.iceberg_v2_delete_positional.id"),
+        ImmutableList.of("functional_parquet.iceberg_v2_delete_positional.data",
+            "functional_parquet.iceberg_v2_delete_positional.id"),
         ImmutableList.of(
             "functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01."
                 + "file_path",

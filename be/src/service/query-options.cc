@@ -1345,6 +1345,12 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_sync_hms_events_strict_mode(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::SKIP_UNNEEDED_UPDATES_COL_LIMIT: {
+        int32_t int32_t_val = 0;
+        RETURN_IF_ERROR(QueryOptionParser::Parse<int32_t>(option, value, &int32_t_val));
+        query_options->__set_skip_unneeded_updates_col_limit(int32_t_val);
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

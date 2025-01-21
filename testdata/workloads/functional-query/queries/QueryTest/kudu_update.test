@@ -22,6 +22,25 @@ NumModifiedRows: 5
 NumRowErrors: 0
 ====
 ---- QUERY
+# No rows should be modified, because they already have the desired values.
+update tdata set vali=43 where id = 40
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 0
+---- LABELS
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16, VALDATE, VALVC
+---- DML_RESULTS: tdata
+1,'martin',1.0,232232323,'a',true,1,2,3,0.000000001,2.22,3,1970-01-01,'martin'
+2,'david',1.0,99398493939,'b',false,4,5,6,0.000000004,5.55,6,1970-01-02,'david'
+3,'todd',1.0,993393939,'c',true,7,8,9,0.000000007,8.88,9,1970-01-03,'todd'
+40,'he',0.0,43,'e',false,50,60,70,0.000000050,66.60,70,1970-01-04,'he'
+120,'she',0.0,99,'f',true,-1,0,1,-0.000000001,0.00,1,1970-01-05,'she'
+---- TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
+====
+---- QUERY
 # single row, equality on key, bigint
 # TODO: Verify row count in RESULTS after fixing IMPALA-3713, and supporting RESULTS and
 # DML_RESULTS in the same test case.
@@ -254,10 +273,11 @@ INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,D
 INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
-# multiple rows, predicate on non-key
+# predicate on non-key
+# Two rows match, but only one needs to be updated, the other is already false
 update tdata set valb=false where name LIKE '%he'
 ---- RUNTIME_PROFILE
-NumModifiedRows: 2
+NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
 ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC4, VALDEC8, VALDEC16, VALDATE, VALVC

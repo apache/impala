@@ -64,7 +64,7 @@ public abstract class ModifyStmt extends DmlStatementBase {
   protected final List<Pair<SlotRef, Expr>> assignments_;
 
   // Optional WHERE clause of the statement
-  protected final Expr wherePredicate_;
+  protected Expr wherePredicate_;
 
   // Path identifying the target table.
   protected final List<String> targetTablePath_;
@@ -166,14 +166,13 @@ public abstract class ModifyStmt extends DmlStatementBase {
     table_ = dstTbl;
     if (modifyImpl_ == null) createModifyImpl();
     modifyImpl_.analyze(analyzer);
+    sqlString_ = toSql();
     // Create and analyze the source statement.
     modifyImpl_.createSourceStmt(analyzer);
     // Add target table to descriptor table.
     analyzer.getDescTbl().setTargetTable(table_);
 
     analyzer_.addWhereColumns(wherePredicate_);
-
-    sqlString_ = toSql();
   }
 
   /**

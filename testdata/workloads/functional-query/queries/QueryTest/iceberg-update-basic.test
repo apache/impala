@@ -163,9 +163,9 @@ NumModifiedRows: 1
 NumDeletedRows: 1
 ====
 ---- QUERY
-update ice_alltypes set bigint_col = 33, int_col = 3, string_col = 'three';
+update ice_alltypes set bigint_col = 33, int_col = 30, string_col = 'three';
 ---- DML_RESULTS: ice_alltypes
-true,3,33,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'three','oneb'
+true,30,33,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'three','oneb'
 ---- TYPES
 BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
 ---- RUNTIME_PROFILE
@@ -173,6 +173,18 @@ NumModifiedRows: 1
 NumDeletedRows: 1
 ====
 ---- QUERY
+# The row already has the desired values, no need to update. (IMPALA-12588)
+update ice_alltypes set bigint_col = 33, int_col = 30, string_col = 'three';
+---- DML_RESULTS: ice_alltypes
+true,30,33,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'three','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 0
+====
+---- QUERY
+# Only one field changes.
 update ice_alltypes set bigint_col = 33, int_col = 3, string_col = 'three';
 ---- DML_RESULTS: ice_alltypes
 true,3,33,1,1,1,1.00,2001-01-01,2001-01-01 01:01:01,'three','oneb'
@@ -210,10 +222,59 @@ NumDeletedRows: 2
 ====
 ---- QUERY
 # If the JOIN in UPDATE has multiple matches Impala should raise an error.
+# Changing bigint_col to actually have rows to update.
 insert into ref_table values (0, 1111, 'IIMMPPAALLAA', '2023-12-01');
-update ice_alltypes set bigint_col=bi, string_col=s, date_col=d from ice_alltypes, ref_table where int_col = i;
+update ice_alltypes set bigint_col=bi+1, string_col=s, date_col=d from ice_alltypes, ref_table where int_col = i;
 ---- CATCH
 Duplicated row in DELETE sink.
+====
+---- QUERY
+# Check that NULL values and expressions evaluating to NULL in assignments are handled correctly.
+update ice_alltypes set dec_10_0_col = NULL, dec_8_2_col = cast(123.123 + NULL as decimal(8, 2));
+---- DML_RESULTS: ice_alltypes
+false,0,111,0,0,NULL,NULL,2023-11-07,2000-01-01 00:00:00,'IMPALA','zerob'
+true,3,222,1,1,NULL,NULL,2023-11-08,2001-01-01 01:01:01,'ICEBERG','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumDeletedRows: 2
+====
+---- QUERY
+# Check that NULL assignments and WHERE condition filter rows correctly.
+update ice_alltypes set dec_10_0_col = cast(123.123 as decimal(10, 0)), dec_8_2_col = NULL where int_col < 2;
+---- DML_RESULTS: ice_alltypes
+false,0,111,0,0,123,NULL,2023-11-07,2000-01-01 00:00:00,'IMPALA','zerob'
+true,3,222,1,1,NULL,NULL,2023-11-08,2001-01-01 01:01:01,'ICEBERG','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# Swap two columns
+update ice_alltypes set dec_10_0_col = cast(dec_8_2_col as decimal(10, 0)), dec_8_2_col = cast(dec_10_0_col as decimal(8, 2));
+---- DML_RESULTS: ice_alltypes
+false,0,111,0,0,NULL,123.00,2023-11-07,2000-01-01 00:00:00,'IMPALA','zerob'
+true,3,222,1,1,NULL,NULL,2023-11-08,2001-01-01 01:01:01,'ICEBERG','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# Check col_a = col_b + col_c
+update ice_alltypes set dec_10_0_col = cast(bigint_col + dec_8_2_col as decimal(10, 0));
+---- DML_RESULTS: ice_alltypes
+false,0,111,0,0,234,123.00,2023-11-07,2000-01-01 00:00:00,'IMPALA','zerob'
+true,3,222,1,1,NULL,NULL,2023-11-08,2001-01-01 01:01:01,'ICEBERG','oneb'
+---- TYPES
+BOOLEAN,INT,BIGINT,FLOAT,DOUBLE,DECIMAL,DECIMAL,DATE,TIMESTAMP,STRING,BINARY
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
 ====
 ---- QUERY
 create table ice_id_partitioned (i int, p int, s string)
@@ -264,6 +325,74 @@ FROM ice_id_partitioned JOIN ref_view ON (i = ri);
 5,2,'Kudu'
 ---- TYPES
 INT,INT,STRING
+====
+---- QUERY
+# Update partitioned Iceberg table based on VIEW
+UPDATE ice_id_partitioned SET s = upper(rs)
+FROM ice_id_partitioned JOIN ref_view ON (i = ri)
+WHERE p < 1 AND rs = (select min(rs) from ref_view);
+---- DML_RESULTS: ice_id_partitioned
+1,0,'APACHE IMPALA'
+2,0,'iceberg'
+3,0,'hive'
+4,1,'Apache Spark'
+5,2,'Kudu'
+---- TYPES
+INT,INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# Test if changing SKIP_UNNEEDED_UPDATES_COL_LIMIT query option takes effect: the 4th row
+# is updated even though the table content remained the same.
+SET SKIP_UNNEEDED_UPDATES_COL_LIMIT = 1;
+UPDATE ice_id_partitioned SET i=ri, p=1
+FROM ice_id_partitioned JOIN ref_table_2 ON (i = ri);
+---- DML_RESULTS: ice_id_partitioned
+1,0,'APACHE IMPALA'
+2,0,'iceberg'
+3,0,'hive'
+4,1,'Apache Spark'
+5,2,'Kudu'
+---- TYPES
+INT,INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# Setting SKIP_UNNEEDED_UPDATES_COL_LIMIT back to default. No rows should be updated.
+SET SKIP_UNNEEDED_UPDATES_COL_LIMIT = 10;
+UPDATE ice_id_partitioned SET i=ri, p=1
+FROM ice_id_partitioned JOIN ref_table_2 ON (i = ri);
+---- DML_RESULTS: ice_id_partitioned
+1,0,'APACHE IMPALA'
+2,0,'iceberg'
+3,0,'hive'
+4,1,'Apache Spark'
+5,2,'Kudu'
+---- TYPES
+INT,INT,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsInserted): 0
+====
+---- QUERY
+# Update partitioned Iceberg table with inline view in FROM clause
+UPDATE ice_id_partitioned SET i=cast(a.max_val*(p+1) as int)
+FROM ice_id_partitioned JOIN ref_view ON (i = ri), (SELECT max(i) max_val FROM ice_id_partitioned) a
+WHERE p = 1;
+---- DML_RESULTS: ice_id_partitioned
+1,0,'APACHE IMPALA'
+2,0,'iceberg'
+3,0,'hive'
+10,1,'Apache Spark'
+5,2,'Kudu'
+---- TYPES
+INT,INT,STRING
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
 ====
 ---- QUERY
 # Negative test for UPDATE part 3:
@@ -412,6 +541,8 @@ STRING, STRING, STRING, STRING
 # query is closed, when releasing resources. This test is a valid regression test because
 # even if it passes, there will be a crash: some later queries are likely to fail and
 # there will be a minidump in the build artifacts, so the build will be marked FAILED.
+# Also testing that rows which already have the desired value should not be skipped
+# because there is a UDF in the SET list.
 create function if not exists identity(int) returns int location 'UDF_LOCATION' symbol='Identity';
 create table update_with_udf(int_col INT)
 stored by iceberg

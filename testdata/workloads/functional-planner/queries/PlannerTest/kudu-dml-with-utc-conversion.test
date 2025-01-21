@@ -92,6 +92,7 @@ Per-Host Resources: mem-estimate=20.75MB mem-reservation=0B thread-reservation=2
   |  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.timestamp_primary_key]
+     predicates: t IS DISTINCT FROM TIMESTAMP '1970-01-01 00:00:00'
      kudu predicates: tkey = TIMESTAMP '1970-01-01 00:00:00'
      mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=16B cardinality=1

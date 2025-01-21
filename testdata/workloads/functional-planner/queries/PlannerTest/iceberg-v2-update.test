@@ -6,7 +6,7 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes]
    HDFS partitions=1/1 files=1 size=625B
-   predicates: i = 3
+   predicates: i = 3, s IS DISTINCT FROM concat(s, s)
    Iceberg snapshot id: 728158873687794725
    row-size=36B cardinality=1
 ---- DISTRIBUTEDPLAN
@@ -16,7 +16,7 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes]
    HDFS partitions=1/1 files=1 size=625B
-   predicates: i = 3
+   predicates: i = 3, s IS DISTINCT FROM concat(s, s)
    Iceberg snapshot id: 728158873687794725
    row-size=36B cardinality=1
 ====
@@ -36,7 +36,7 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
-   predicates: id = 15
+   predicates: id = 15, `data` IS DISTINCT FROM concat(`data`, 'a')
    Iceberg snapshot id: 5725822353600261755
    row-size=40B cardinality=1
 ---- DISTRIBUTEDPLAN
@@ -56,7 +56,7 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
-   predicates: id = 15
+   predicates: id = 15, `data` IS DISTINCT FROM concat(`data`, 'a')
    Iceberg snapshot id: 5725822353600261755
    row-size=40B cardinality=1
 ====
@@ -67,7 +67,7 @@ MULTI DATA SINK
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=40B cardinality=2
+|  row-size=40B cardinality=1
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE-01 functional_parquet.iceberg_v2_delete_positional-position-delete]
 |     HDFS partitions=1/1 files=1 size=1.54KB
@@ -76,15 +76,16 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
+   predicates: id IS DISTINCT FROM CAST(id + 1 AS INT)
    Iceberg snapshot id: 5725822353600261755
-   row-size=40B cardinality=3
+   row-size=40B cardinality=1
 ---- DISTRIBUTEDPLAN
 MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_v2_delete_positional, OVERWRITE=false]
 |->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_delete_positional-POSITION-DELETE]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
-|  row-size=40B cardinality=2
+|  row-size=40B cardinality=1
 |
 |--03:EXCHANGE [DIRECTED]
 |  |
@@ -95,8 +96,9 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
+   predicates: id IS DISTINCT FROM CAST(id + 1 AS INT)
    Iceberg snapshot id: 5725822353600261755
-   row-size=40B cardinality=3
+   row-size=40B cardinality=1
 ====
 UPDATE iceberg_v2_delete_positional SET id = 42 WHERE FILE__POSITION = id
 ---- PLAN
@@ -114,7 +116,7 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
-   predicates: FILE__POSITION = id
+   predicates: FILE__POSITION = id, functional_parquet.iceberg_v2_delete_positional.file__position IS DISTINCT FROM 42, id IS DISTINCT FROM 42
    Iceberg snapshot id: 5725822353600261755
    row-size=40B cardinality=1
 ---- DISTRIBUTEDPLAN
@@ -134,7 +136,7 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_delete_positional]
    HDFS partitions=1/1 files=1 size=662B
-   predicates: FILE__POSITION = id
+   predicates: FILE__POSITION = id, functional_parquet.iceberg_v2_delete_positional.file__position IS DISTINCT FROM 42, id IS DISTINCT FROM 42
    Iceberg snapshot id: 5725822353600261755
    row-size=40B cardinality=1
 ====
@@ -146,10 +148,10 @@ MULTI DATA SINK
 |
 03:SORT
 |  order by: action ASC NULLS LAST
-|  row-size=76B cardinality=10
+|  row-size=76B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=76B cardinality=10
+|  row-size=80B cardinality=1
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
@@ -158,8 +160,9 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
+   predicates: id IS DISTINCT FROM length(action)
    Iceberg snapshot id: 8885697082976537578
-   row-size=76B cardinality=20
+   row-size=80B cardinality=2
 ---- DISTRIBUTEDPLAN
 MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
@@ -167,12 +170,12 @@ MULTI DATA SINK
 |
 05:SORT
 |  order by: action ASC NULLS LAST
-|  row-size=76B cardinality=10
+|  row-size=76B cardinality=1
 |
 04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.action)]
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
-|  row-size=76B cardinality=10
+|  row-size=80B cardinality=1
 |
 |--03:EXCHANGE [DIRECTED]
 |  |
@@ -183,8 +186,59 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=3 size=3.48KB
+   predicates: id IS DISTINCT FROM length(action)
    Iceberg snapshot id: 8885697082976537578
-   row-size=76B cardinality=20
+   row-size=80B cardinality=2
+====
+UPDATE iceberg_v2_partitioned_position_deletes set id = length(action) where user like "impala"
+---- PLAN
+MULTI DATA SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+03:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=76B cardinality=1
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
+|  row-size=80B cardinality=1
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   predicates: id IS DISTINCT FROM length(action), `user` LIKE 'impala'
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=2
+---- DISTRIBUTEDPLAN
+MULTI DATA SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE]
+|
+05:SORT
+|  order by: action ASC NULLS LAST
+|  row-size=76B cardinality=1
+|
+04:EXCHANGE [HASH(functional_parquet.iceberg_v2_partitioned_position_deletes.action)]
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
+|  row-size=80B cardinality=1
+|
+|--03:EXCHANGE [DIRECTED]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
+|     HDFS partitions=1/1 files=3 size=9.47KB
+|     Iceberg snapshot id: 8885697082976537578
+|     row-size=204B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
+   HDFS partitions=1/1 files=3 size=3.48KB
+   predicates: id IS DISTINCT FROM length(action), `user` LIKE 'impala'
+   Iceberg snapshot id: 8885697082976537578
+   row-size=80B cardinality=2
 ====
 UPDATE iceberg_v2_partitioned_position_deletes set id = length(action) where action = 'click'
 ---- PLAN
@@ -194,10 +248,10 @@ MULTI DATA SINK
 |
 03:SORT
 |  order by: action ASC NULLS LAST
-|  row-size=76B cardinality=3
+|  row-size=76B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=76B cardinality=3
+|  row-size=80B cardinality=1
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
 |     HDFS partitions=1/1 files=1 size=3.15KB
@@ -206,9 +260,10 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=1 size=1.15KB
+   predicates: id IS DISTINCT FROM 5
    Iceberg snapshot id: 8885697082976537578
    skipped Iceberg predicates: action = 'click'
-   row-size=76B cardinality=6
+   row-size=80B cardinality=1
 ---- DISTRIBUTEDPLAN
 MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
@@ -216,10 +271,10 @@ MULTI DATA SINK
 |
 04:SORT
 |  order by: action ASC NULLS LAST
-|  row-size=76B cardinality=3
+|  row-size=76B cardinality=1
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
-|  row-size=76B cardinality=3
+|  row-size=80B cardinality=1
 |
 |--03:EXCHANGE [DIRECTED]
 |  |
@@ -230,9 +285,10 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
    HDFS partitions=1/1 files=1 size=1.15KB
+   predicates: id IS DISTINCT FROM 5
    Iceberg snapshot id: 8885697082976537578
    skipped Iceberg predicates: action = 'click'
-   row-size=76B cardinality=6
+   row-size=80B cardinality=1
 ====
 UPDATE target set user = s from iceberg_v2_partitioned_position_deletes target, iceberg_v2_positional_update_all_rows source where target.id = source.i
 ---- PLAN
@@ -246,8 +302,9 @@ MULTI DATA SINK
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: target.id = source.i
+|  other predicates: `user` IS DISTINCT FROM s
 |  runtime filters: RF000 <- source.i
-|  row-size=104B cardinality=10
+|  row-size=116B cardinality=10
 |
 |--07:UNION
 |  |  pass-through-operands: all
@@ -272,7 +329,7 @@ MULTI DATA SINK
 |     row-size=36B cardinality=3
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
-|  row-size=68B cardinality=10
+|  row-size=80B cardinality=10
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
 |     HDFS partitions=1/1 files=3 size=9.47KB
@@ -283,7 +340,7 @@ MULTI DATA SINK
    HDFS partitions=1/1 files=3 size=3.48KB
    runtime filters: RF000 -> target.id
    Iceberg snapshot id: 8885697082976537578
-   row-size=68B cardinality=20
+   row-size=80B cardinality=20
 ---- DISTRIBUTEDPLAN
 MULTI DATA SINK
 |->WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERWRITE=false, PARTITION-KEYS=(action)]
@@ -297,8 +354,9 @@ MULTI DATA SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: target.id = source.i
+|  other predicates: `user` IS DISTINCT FROM s
 |  runtime filters: RF000 <- source.i
-|  row-size=104B cardinality=10
+|  row-size=116B cardinality=10
 |
 |--11:EXCHANGE [BROADCAST]
 |  |
@@ -327,7 +385,7 @@ MULTI DATA SINK
 |     row-size=36B cardinality=3
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
-|  row-size=68B cardinality=10
+|  row-size=80B cardinality=10
 |
 |--09:EXCHANGE [DIRECTED]
 |  |
@@ -340,7 +398,7 @@ MULTI DATA SINK
    HDFS partitions=1/1 files=3 size=3.48KB
    runtime filters: RF000 -> target.id
    Iceberg snapshot id: 8885697082976537578
-   row-size=68B cardinality=20
+   row-size=80B cardinality=20
 ====
 update iceberg_partition_transforms_zorder set ts = days_add(ts, 10), i = cast(i + 1000 as int)
 ---- PLAN
@@ -354,6 +412,7 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder]
    HDFS partitions=1/1 files=1 size=1.08KB
+   predicates: ts IS DISTINCT FROM days_add(ts, 10) OR i IS DISTINCT FROM CAST(i + 1000 AS INT)
    Iceberg snapshot id: 7350750578864730166
    row-size=72B cardinality=1
 ---- DISTRIBUTEDPLAN
@@ -367,6 +426,7 @@ MULTI DATA SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder]
    HDFS partitions=1/1 files=1 size=1.08KB
+   predicates: ts IS DISTINCT FROM days_add(ts, 10) OR i IS DISTINCT FROM CAST(i + 1000 AS INT)
    Iceberg snapshot id: 7350750578864730166
    row-size=72B cardinality=1
 ====
@@ -384,13 +444,14 @@ MULTI DATA SINK
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: source.id = ice_zorder.i
+|  other predicates: j IS DISTINCT FROM length(action)
 |  runtime filters: RF000 <- ice_zorder.i
-|  row-size=84B cardinality=20
+|  row-size=88B cardinality=20
 |
 |--00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder ice_zorder]
 |     HDFS partitions=1/1 files=1 size=1.08KB
 |     Iceberg snapshot id: 7350750578864730166
-|     row-size=68B cardinality=1
+|     row-size=72B cardinality=1
 |
 01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
    HDFS partitions=1/1 files=20 size=22.90KB
@@ -410,15 +471,16 @@ MULTI DATA SINK
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: source.id = ice_zorder.i
+|  other predicates: j IS DISTINCT FROM length(action)
 |  runtime filters: RF000 <- ice_zorder.i
-|  row-size=84B cardinality=20
+|  row-size=88B cardinality=20
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder ice_zorder]
 |     HDFS partitions=1/1 files=1 size=1.08KB
 |     Iceberg snapshot id: 7350750578864730166
-|     row-size=68B cardinality=1
+|     row-size=72B cardinality=1
 |
 01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
    HDFS partitions=1/1 files=20 size=22.90KB
@@ -440,13 +502,14 @@ MULTI DATA SINK
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: source.id = ice_zorder.i
+|  other predicates: j IS DISTINCT FROM length(action)
 |  runtime filters: RF000 <- ice_zorder.i
-|  row-size=84B cardinality=20
+|  row-size=88B cardinality=20
 |
 |--00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder ice_zorder]
 |     HDFS partitions=1/1 files=1 size=1.08KB
 |     Iceberg snapshot id: 7350750578864730166
-|     row-size=68B cardinality=1
+|     row-size=72B cardinality=1
 |
 01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
    HDFS partitions=1/1 files=20 size=22.90KB
@@ -466,19 +529,61 @@ MULTI DATA SINK
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: source.id = ice_zorder.i
+|  other predicates: j IS DISTINCT FROM length(action)
 |  runtime filters: RF000 <- ice_zorder.i
-|  row-size=84B cardinality=20
+|  row-size=88B cardinality=20
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder ice_zorder]
 |     HDFS partitions=1/1 files=1 size=1.08KB
 |     Iceberg snapshot id: 7350750578864730166
-|     row-size=68B cardinality=1
+|     row-size=72B cardinality=1
 |
 01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
    HDFS partitions=1/1 files=20 size=22.90KB
    runtime filters: RF000 -> source.id
    Iceberg snapshot id: 8270633197658268308
    row-size=16B cardinality=20
+====
+# If there are too many items in the SET list, do not create extra filtering predicates.
+update iceberg_lineitem_multiblock
+set l_orderkey=1, l_partkey=1, l_suppkey=1, l_linenumber=1, l_tax=NULL, l_comment='',
+l_shipmode='', l_shipdate=NULL, l_commitdate=NULL, l_returnflag=NULL, l_discount=NULL
+---- PLAN
+MULTI DATA SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_lineitem_multiblock, OVERWRITE=false]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_lineitem_multiblock-POSITION-DELETE]
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
+|  row-size=72B cardinality=17.89K
+|
+|--01:SCAN HDFS [functional_parquet.iceberg_lineitem_multiblock-POSITION-DELETE-01 functional_parquet.iceberg_lineitem_multiblock-position-delete]
+|     HDFS partitions=1/1 files=1 size=13.29KB
+|     Iceberg snapshot id: 4821756033809199889
+|     row-size=238B cardinality=2.11K
+|
+00:SCAN HDFS [functional_parquet.iceberg_lineitem_multiblock]
+   HDFS partitions=1/1 files=1 size=1.73MB
+   Iceberg snapshot id: 4821756033809199889
+   row-size=72B cardinality=20.00K
+---- DISTRIBUTEDPLAN
+MULTI DATA SINK
+|->WRITE TO HDFS [functional_parquet.iceberg_lineitem_multiblock, OVERWRITE=false]
+|->BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_lineitem_multiblock-POSITION-DELETE]
+|
+02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN, DIRECTED]
+|  row-size=72B cardinality=17.89K
+|
+|--03:EXCHANGE [DIRECTED]
+|  |
+|  01:SCAN HDFS [functional_parquet.iceberg_lineitem_multiblock-POSITION-DELETE-01 functional_parquet.iceberg_lineitem_multiblock-position-delete]
+|     HDFS partitions=1/1 files=1 size=13.29KB
+|     Iceberg snapshot id: 4821756033809199889
+|     row-size=238B cardinality=2.11K
+|
+00:SCAN HDFS [functional_parquet.iceberg_lineitem_multiblock]
+   HDFS partitions=1/1 files=1 size=1.73MB
+   Iceberg snapshot id: 4821756033809199889
+   row-size=72B cardinality=20.00K
 ====

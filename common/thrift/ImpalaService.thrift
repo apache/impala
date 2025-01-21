@@ -998,6 +998,13 @@ enum TImpalaQueryOptions {
   // SYNC_HMS_EVENTS_WAIT_TIME_S seconds. Defaults to false, which means coordinator will
   // start query planning regardless of the failure.
   SYNC_HMS_EVENTS_STRICT_MODE = 188
+
+  // Turns on an optimization in UPDATE operation that skips updating rows which already
+  // have the desired value. The filtering is on by default, skipping unnecessary updates
+  // if there are up to 10 items in the SET list. If more columns are updated than the
+  // given value, then no filtering is done.
+  // Set it non-positive to turn this feature off completely.
+  SKIP_UNNEEDED_UPDATES_COL_LIMIT = 189
 }
 
 // The summary of a DML statement.
