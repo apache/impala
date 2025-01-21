@@ -642,6 +642,7 @@ struct TIcebergContentFileStore {
   5: optional bool has_avro
   6: optional bool has_orc
   7: optional bool has_parquet
+  8: optional list<string> missing_files
 }
 
 // Represents a drop partition request for Iceberg tables

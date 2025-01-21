@@ -27,6 +27,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -172,15 +174,28 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       Path path = FileSystemUtil.createFullyQualifiedPath(
           new Path(contentFileInfo.getSecond().path().toString()));
       FileStatus stat = nameToFileStatus.get(path);
-      IcebergFileDescriptor fd = createFd(contentFileInfo.getFirst(),
-          contentFileInfo.getSecond(), stat, partPath, numUnknownDiskIds);
-      loadedFds_.add(fd);
-      fileMetadataStats_.accumulate(fd);
+      loadFdFromStorage(contentFileInfo, stat, partPath, numUnknownDiskIds);
     }
-    loadStats_.loadedFiles += filesSupportsStorageIds.size();
     loadStats_.unknownDiskIds += numUnknownDiskIds.getRef();
     if (LOG.isTraceEnabled()) {
       LOG.trace(loadStats_.debugString());
+    }
+  }
+
+  private void loadFdFromStorage(Pair<FileSystem, ContentFile<?>> contentFileInfo,
+      FileStatus stat, Path partPath, Reference<Long> numUnknownDiskIds)
+      throws CatalogException {
+    try {
+      IcebergFileDescriptor fd = createFd(contentFileInfo.getFirst(),
+          contentFileInfo.getSecond(), stat, partPath, numUnknownDiskIds);
+      loadedFds_.add(fd);
+      ++loadStats_.loadedFiles;
+      fileMetadataStats_.accumulate(fd);
+    } catch (IOException e) {
+      StringWriter w = new StringWriter();
+      e.printStackTrace(new PrintWriter(w));
+      LOG.warn(String.format("Failed to load Iceberg content file: '%s' Caused by: %s",
+          contentFileInfo.getSecond().path().toString(), w));
     }
   }
 
@@ -194,7 +209,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
    *  which means we can safely reuse the old FDs.
    */
   private Iterable<ContentFile<?>> loadContentFilesWithOldFds(Path partPath)
-      throws IOException {
+      throws TableLoadingException {
     if (forceRefreshLocations || oldFdsByPath_.isEmpty()) {
       return icebergFiles_.getAllContentFiles();
     }
@@ -214,7 +229,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
 
   private IcebergFileDescriptor createFd(FileSystem fs, ContentFile<?> contentFile,
       FileStatus stat, Path partPath, Reference<Long> numUnknownDiskIds)
-      throws IOException {
+      throws CatalogException, IOException {
     if (stat == null) {
       Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
           new Path(contentFile.path().toString()));
@@ -230,8 +245,8 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     String relPath = FileSystemUtil.relativizePathNoThrow(stat.getPath(), partPath);
     if (relPath == null) {
       if (requiresDataFilesInTableLocation_) {
-        throw new IOException(String.format("Failed to load Iceberg datafile %s, because "
-            + "it's outside of the table location", stat.getPath().toUri()));
+        throw new TableLoadingException(String.format("Failed to load Iceberg datafile " +
+            "%s, because it's outside of the table location", stat.getPath().toUri()));
       } else {
         absPath = stat.getPath().toString();
       }
@@ -303,14 +318,14 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   }
 
   IcebergFileDescriptor getOldFd(ContentFile<?> contentFile, Path partPath)
-      throws IOException {
+      throws TableLoadingException {
     Path contentFilePath = FileSystemUtil.createFullyQualifiedPath(
         new Path(contentFile.path().toString()));
     String lookupPath = FileSystemUtil.relativizePathNoThrow(contentFilePath, partPath);
     if (lookupPath == null) {
       if (requiresDataFilesInTableLocation_) {
-        throw new IOException(String.format("Failed to load Iceberg datafile %s, because "
-            + "it's outside of the table location", contentFilePath));
+        throw new TableLoadingException(String.format("Failed to load Iceberg datafile " +
+            "%s, because it's outside of the table location", contentFilePath));
       } else {
         lookupPath = contentFilePath.toString();
       }

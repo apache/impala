@@ -22,9 +22,12 @@ import com.google.common.collect.Lists;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -153,6 +156,7 @@ public class IcebergContentFileStore {
   private MapListContainer dataFilesWithDeletes_ = new MapListContainer();
   private MapListContainer positionDeleteFiles_ = new MapListContainer();
   private MapListContainer equalityDeleteFiles_ = new MapListContainer();
+  private Set<String> missingFiles_ = new HashSet<>();
 
   // Caches file descriptors loaded during time-travel queries.
   private final ConcurrentMap<String, EncodedFileDescriptor> oldFileDescMap_ =
@@ -173,31 +177,33 @@ public class IcebergContentFileStore {
     Preconditions.checkNotNull(icebergFiles);
 
     Map<String, IcebergFileDescriptor> fileDescMap = new HashMap<>();
-    for (FileDescriptor fileDesc : fileDescriptors) {
-      Preconditions.checkState(fileDesc instanceof IcebergFileDescriptor);
+    for (IcebergFileDescriptor fileDesc : fileDescriptors) {
       Path path = new Path(fileDesc.getAbsolutePath(iceApiTable.location()));
-      fileDescMap.put(path.toUri().getPath(), (IcebergFileDescriptor)fileDesc);
+      fileDescMap.put(path.toUri().getPath(), fileDesc);
     }
 
     for (DataFile dataFile : icebergFiles.dataFilesWithoutDeletes) {
-      Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(dataFile, fileDescMap);
-      dataFilesWithoutDeletes_.add(pathHashAndFd.first, pathHashAndFd.second);
+      storeFile(dataFile, fileDescMap, dataFilesWithoutDeletes_);
     }
     for (DataFile dataFile : icebergFiles.dataFilesWithDeletes) {
-      Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(dataFile, fileDescMap);
-      dataFilesWithDeletes_.add(pathHashAndFd.first, pathHashAndFd.second);
+      storeFile(dataFile, fileDescMap, dataFilesWithDeletes_);
     }
     for (DeleteFile deleteFile : icebergFiles.positionDeleteFiles) {
-      Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(deleteFile, fileDescMap);
-      positionDeleteFiles_.add(pathHashAndFd.first, pathHashAndFd.second);
+      storeFile(deleteFile, fileDescMap, positionDeleteFiles_);
     }
     for (DeleteFile deleteFile : icebergFiles.equalityDeleteFiles) {
-      Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(deleteFile, fileDescMap);
-      equalityDeleteFiles_.add(pathHashAndFd.first, pathHashAndFd.second);
+      storeFile(deleteFile, fileDescMap, equalityDeleteFiles_);
+    }
+  }
+
+  private void storeFile(ContentFile<?> contentFile,
+      Map<String, IcebergFileDescriptor> fileDescMap, MapListContainer container) {
+    Pair<String, EncodedFileDescriptor> pathHashAndFd =
+        getPathHashAndFd(contentFile, fileDescMap);
+    if (pathHashAndFd.second != null) {
+      container.add(pathHashAndFd.first, pathHashAndFd.second);
+    } else {
+      missingFiles_.add(contentFile.path().toString());
     }
   }
 
@@ -238,6 +244,14 @@ public class IcebergContentFileStore {
 
   public List<IcebergFileDescriptor> getEqualityDeleteFiles() {
     return equalityDeleteFiles_.getList();
+  }
+
+  public boolean hasMissingFile() {
+    return !missingFiles_.isEmpty();
+  }
+
+  public Set<String> getMissingFiles() {
+    return missingFiles_;
   }
 
   public long getNumFiles() {
@@ -291,6 +305,8 @@ public class IcebergContentFileStore {
     Path path = new Path(contentFile.path().toString());
     IcebergFileDescriptor fileDesc = fileDescMap.get(path.toUri().getPath());
 
+    if (fileDesc == null) return null;
+
     FbFileMetadata fileMetadata = fileDesc.getFbFileMetadata();
     Preconditions.checkState(fileMetadata != null);
     FbIcebergMetadata icebergMetadata = fileMetadata.icebergMetadata();
@@ -312,6 +328,7 @@ public class IcebergContentFileStore {
     ret.setHas_avro(hasAvro_);
     ret.setHas_orc(hasOrc_);
     ret.setHas_parquet(hasParquet_);
+    ret.setMissing_files(new ArrayList<>(missingFiles_));
     return ret;
   }
 
@@ -342,6 +359,8 @@ public class IcebergContentFileStore {
     ret.hasAvro_ = tFileStore.isSetHas_avro() ? tFileStore.isHas_avro() : false;
     ret.hasOrc_ = tFileStore.isSetHas_orc() ? tFileStore.isHas_orc() : false;
     ret.hasParquet_ = tFileStore.isSetHas_parquet() ? tFileStore.isHas_parquet() : false;
+    ret.missingFiles_ = tFileStore.isSetMissing_files() ?
+        new HashSet<>(tFileStore.getMissing_files()) : Collections.emptySet();
     return ret;
   }
 }

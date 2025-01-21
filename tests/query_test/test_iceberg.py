@@ -1606,6 +1606,58 @@ class TestIcebergV2Table(IcebergTestSuite):
           test_file_vars={'$OVERWRITE_SNAPSHOT_ID': str(overwrite_snapshot_id.data[0]),
                           '$OVERWRITE_SNAPSHOT_TS': str(overwrite_snapshot_ts.data[0])})
 
+  @SkipIf.not_hdfs
+  def test_missing_data_files(self, vector, unique_database):
+    def list_files(tbl):
+      query_result = self.execute_query("select file_path from {}.`files`".format(tbl))
+      return query_result.data
+
+    def first_snapshot(tbl):
+      query_result = self.execute_query(
+          "select snapshot_id from {}.`snapshots` order by committed_at".format(tbl))
+      return query_result.data[0]
+
+    def insert_values(tbl, values):
+      self.execute_query("insert into {} values {}".format(tbl, values))
+
+    missing_files_nopart = unique_database + ".missing_files_nopart"
+    missing_files_part = unique_database + ".missing_files_part"
+    self.execute_query("""CREATE TABLE {} (i int, p int)
+        STORED BY ICEBERG
+        TBLPROPERTIES('format-version'='2')""".format(missing_files_nopart))
+    insert_values(missing_files_nopart, "(1, 1)")
+    first_file = set(list_files(missing_files_nopart))
+    insert_values(missing_files_nopart, "(2, 2)")
+
+    all_files = set(list_files(missing_files_nopart))
+    assert len(all_files) == 2
+    second_file = next(iter(all_files - first_file))
+    check_output(["hdfs", "dfs", "-rm", second_file])
+
+    self.execute_query("""CREATE TABLE {} (i int, p int)
+        PARTITIONED BY SPEC (p)
+        STORED BY ICEBERG
+        TBLPROPERTIES('format-version'='2')""".format(missing_files_part))
+    insert_values(missing_files_part, "(1, 1)")
+    insert_values(missing_files_part, "(2, 2)")
+    files = list_files(missing_files_part)
+    part_2_f = None
+    for f in files:
+      if "p=2" in f:
+        part_2_f = f
+        break
+    assert part_2_f is not None
+    check_output(["hdfs", "dfs", "-rm", part_2_f])
+
+    self.execute_query("invalidate metadata {}".format(missing_files_nopart))
+    self.execute_query("invalidate metadata {}".format(missing_files_part))
+
+    self.run_test_case('QueryTest/iceberg-missing-data-files', vector,
+        unique_database,
+        test_file_vars={
+            '$NOPART_FIRST_SNAPSHOT': first_snapshot(missing_files_nopart),
+            '$PART_FIRST_SNAPSHOT': first_snapshot(missing_files_part)})
+
   def test_delete(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-delete', vector,
         unique_database)

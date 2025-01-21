@@ -177,6 +177,11 @@ public class IcebergScanPlanner {
 
   private void setFileDescriptorsBasedOnFileStore() throws ImpalaException {
     IcebergContentFileStore fileStore = getIceTable().getContentFileStore();
+    if (fileStore.hasMissingFile()) {
+      throw new ImpalaRuntimeException(String.format("Iceberg table '%s' cannot be" +
+          " fully loaded due to unavailable files: %s Check ImpalaD/CatalogD logs for" +
+          " details.", getIceTable().getFullName(), fileStore.getMissingFiles()));
+    }
     if (tblRef_.getSelectedDataFilesForOptimize() != null) {
       dataFilesWithoutDeletes_ = tblRef_.getSelectedDataFilesForOptimize();
     } else {
@@ -729,8 +734,11 @@ public class IcebergScanPlanner {
 
     if (tblRef_.getTimeTravelSpec() == null) {
       // We should always find the data files in the cache when not doing time travel.
-      throw new ImpalaRuntimeException("Cannot find file in cache: " + cf.path()
-          + " with snapshot id: " + getIceTable().snapshotId());
+      throw new ImpalaRuntimeException(String.format("Cannot find file: %s in" +
+          " Iceberg table %s (snapshot id: %d) It's possibly missing from storage." +
+          " Check ImpalaD/CatalogD logs for details. List of all missing files: %s",
+          cf.path(), getIceTable().getFullName(), getIceTable().snapshotId(),
+          fileStore.getMissingFiles()));
     }
     // We can still find the file descriptor among the old file descriptors.
     iceFileDesc = fileStore.getOldFileDescriptor(pathHash);
