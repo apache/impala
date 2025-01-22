@@ -72,6 +72,8 @@ command line parameter.</p>
     <th title="{{tips_last_event}}">Last Event</th>
     <th title="{{tips_rows_fetched}}"># rows fetched</th>
     <th title="{{tips_resource_pool}}">Resource Pool</th>
+    <th title="{{tips_coordinator_slots}}">Coordinator Slots</th>
+    <th title="{{tips_executor_slots}}">Executor Slots</th>
     <th title="{{tips_statement}}">Statement</th>
   </tr>
 {{! filter to get just executing queries from in_flight_queries}}
@@ -93,6 +95,8 @@ command line parameter.</p>
     <td><samp>{{last_event}}</samp></td>
     <td>{{rows_fetched}}</td>
     <td>{{resource_pool}}</td>
+    <td>{{coordinator_slots}}</td>
+    <td>{{executor_slots}}</td>
     <td><samp>{{stmt}}</samp></td>
   </tr>
 {{/executing}}
@@ -142,6 +146,8 @@ command line parameter.</p>
     <th title="{{tips_last_event}}">Last Event</th>
     <th title="{{tips_rows_fetched}}"># rows fetched</th>
     <th title="{{tips_resource_pool}}">Resource Pool</th>
+    <th title="{{tips_coordinator_slots}}">Coordinator Slots</th>
+    <th title="{{tips_executor_slots}}">Executor Slots</th>
     <th title="{{tips_statement}}">Statement</th>
   </tr>
 {{! filter to get just waiting queries from in_flight_queries}}
@@ -164,6 +170,8 @@ command line parameter.</p>
     <td><samp>{{last_event}}</samp></td>
     <td>{{rows_fetched}}</td>
     <td>{{resource_pool}}</td>
+    <td>{{coordinator_slots}}</td>
+    <td>{{executor_slots}}</td>
     <td><samp>{{stmt}}</samp></td>
   </tr>
 {{/waiting}}
@@ -208,6 +216,8 @@ command line parameter.</p>
     <th title="{{tips_state}}">State</th>
     <th title="{{tips_rows_fetched}}"># rows fetched</th>
     <th title="{{tips_resource_pool}}">Resource Pool</th>
+    <th title="{{tips_coordinator_slots}}">Coordinator Slots</th>
+    <th title="{{tips_executor_slots}}">Executor Slots</th>
     <th title="{{tips_statement}}">Statement</th>
   </tr>
 {{#completed_queries}}
@@ -226,6 +236,8 @@ command line parameter.</p>
     <td><samp>{{state}}</samp></td>
     <td>{{rows_fetched}}</td>
     <td>{{resource_pool}}</td>
+    <td>{{coordinator_slots}}</td>
+    <td>{{executor_slots}}</td>
     <td><samp>{{stmt}}</samp></td>
   </tr>
 {{/completed_queries}}
@@ -258,6 +270,8 @@ command line parameter.</p>
     <th title="{{tips_state}}">State</th>
     <th title="{{tips_rows_fetched}}"># rows fetched</th>
     <th title="{{tips_resource_pool}}">Resource Pool</th>
+    <th title="{{tips_coordinator_slots}}">Coordinator Slots</th>
+    <th title="{{tips_executor_slots}}">Executor Slots</th>
     <th title="{{tips_statement}}">Statement</th>
     <th>Delete</th>
   </tr>
@@ -407,6 +421,8 @@ command line parameter.</p>
         insertRowVal(row, query.state);
         insertRowVal(row, query.rows_fetched);
         insertRowVal(row, query.resource_pool);
+        insertRowVal(row, query.coordinator_slots);
+        insertRowVal(row, query.executor_slots);
         insertRowVal(row, query.statement);
         var deleteButton = document.createElement("input");
         deleteButton.type = "button";

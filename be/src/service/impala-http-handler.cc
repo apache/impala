@@ -505,6 +505,14 @@ void ImpalaHttpHandler::AddQueryRecordTips(Document* document) {
 
   document->AddMember("tips_statement", "The statement submitted for the query.",
       document->GetAllocator());
+
+  document->AddMember("tips_coordinator_slots",
+      "The number of admission control slots used on the coordinator.",
+      document->GetAllocator());
+
+  document->AddMember("tips_executor_slots",
+      "The number of admission control slots used on the executors.",
+      document->GetAllocator());
 }
 
 std::string ImpalaHttpHandler::ProgressToString(int64_t num_completed, int64_t total) {
@@ -645,6 +653,10 @@ void ImpalaHttpHandler::QueryStateToJson(const QueryStateRecord& record,
 
   Value resource_pool(record.resource_pool.c_str(), document->GetAllocator());
   value->AddMember("resource_pool", resource_pool, document->GetAllocator());
+
+  value->AddMember(
+      "coordinator_slots", record.coordinator_slots, document->GetAllocator());
+  value->AddMember("executor_slots", record.executor_slots, document->GetAllocator());
 }
 
 void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,

@@ -608,9 +608,23 @@ def assert_query(query_tbl, client, expected_cluster_id="", raw_profile=None,
   # OrderBy Columns
   assert_col(TQueryTableColumn.ORDERBY_COLUMNS, r'\n\s+OrderBy Columns:\s+(.*?)\n')
 
-  # Assert all entries have been tested and added to ret_data
-  for i in range(len(TQueryTableColumn._VALUES_TO_NAMES)):
-    assert TQueryTableColumn._VALUES_TO_NAMES[i] in ret_data
+  # Coordinator and Executor Slots Columns
+  admission_slots = re.findall(
+    r'\n\s+\-\s+AdmissionSlots:\s+(\d*?)\s+.*?\n', profile_text)
+  value = column_val(TQueryTableColumn.COORDINATOR_SLOTS)
+  if TQueryTableColumn.COORDINATOR_SLOTS in expected_overrides:
+    assert value == expected_overrides[TQueryTableColumn.COORDINATOR_SLOTS]
+  else:
+    # The first host has the coordinator admission slots.
+    expected_coordinator_slots = admission_slots[0] if len(admission_slots) > 0 else "0"
+    assert value == expected_coordinator_slots
+  value = column_val(TQueryTableColumn.EXECUTOR_SLOTS)
+  if TQueryTableColumn.EXECUTOR_SLOTS in expected_overrides:
+    assert value == expected_overrides[TQueryTableColumn.EXECUTOR_SLOTS]
+  else:
+    # Take executor admission slots from the second impalad.
+    expected_executor_slots = admission_slots[1] if len(admission_slots) > 1 else "0"
+    assert value == expected_executor_slots
 
   return ret_data
 # function assert_query

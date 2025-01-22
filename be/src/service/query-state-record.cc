@@ -83,6 +83,8 @@ void QueryStateRecord::Init(const ClientRequestState& query_handle) {
     cluster_mem_est = query_handle.schedule()->cluster_mem_est();
     bytes_read = utilization.bytes_read;
     bytes_sent = utilization.exchange_bytes_sent + utilization.scan_bytes_sent;
+    coordinator_slots = get_admission_slots(query_handle.schedule(), true);
+    executor_slots = get_admission_slots(query_handle.schedule(), false);
     has_coord = true;
   } else {
     num_completed_scan_ranges = 0;
@@ -93,6 +95,8 @@ void QueryStateRecord::Init(const ClientRequestState& query_handle) {
     cluster_mem_est = 0;
     bytes_read = 0;
     bytes_sent = 0;
+    coordinator_slots = 0;
+    executor_slots = 0;
     has_coord = false;
   }
   beeswax_query_state = query_handle.BeeswaxQueryState();
@@ -135,7 +139,20 @@ void QueryStateRecord::Init(const ClientRequestState& query_handle) {
   }
 }
 
-bool QueryStateRecord::StartTimeComparator::operator() (
+int64_t QueryStateRecord::get_admission_slots(
+    const QuerySchedulePB* query_schedule, bool is_coordinator) {
+  int64_t number_slots = 0;
+  for (const auto& entry : query_schedule->backend_exec_params()) {
+    if (entry.is_coord_backend() == is_coordinator) {
+      number_slots = entry.slots_to_use();
+      // Stop looking as soon as we find one suitable backend.
+      break;
+    }
+  }
+  return number_slots;
+}
+
+bool QueryStateRecord::StartTimeComparator::operator()(
     const QueryStateRecord& lhs, const QueryStateRecord& rhs) const {
   if (lhs.start_time_us == rhs.start_time_us) return lhs.id < rhs.id;
   return lhs.start_time_us < rhs.start_time_us;

@@ -49,7 +49,7 @@ class TestQueryLive(CustomClusterTestSuite):
     # Alter can add additional event fields. Filter them out.
     describe_ext_data = [
         line for line in describe_ext_result.data if 'impala.events.catalog' not in line]
-    assert len(describe_ext_data) == 86
+    assert len(describe_ext_data) == 88
     system_table_re = re.compile(r'__IMPALA_SYSTEM_TABLE\s+true')
     assert list(filter(system_table_re.search, describe_ext_data))
     external_re = re.compile(r'EXTERNAL\s+TRUE')
@@ -139,7 +139,7 @@ class TestQueryLive(CustomClusterTestSuite):
 
     # describe query
     describe_result = self.execute_query('describe sys.impala_query_live')
-    assert len(describe_result.data) == 54
+    assert len(describe_result.data) == 56
     self.assert_describe_extended()
 
     # show create table
@@ -224,13 +224,13 @@ class TestQueryLive(CustomClusterTestSuite):
 
     try:
       describe_column = self.execute_query('describe sys.impala_query_live')
-      assert len(describe_column.data) == 55
+      assert len(describe_column.data) == 57
       assert column_desc in describe_column.data
 
       select_column = self.execute_query(
           'select test_alter from sys.impala_query_live limit 1')
       assert select_column.data == ['NULL']
-      self.assert_impalad_log_contains('WARNING', r'Unknown column \(position 54\)'
+      self.assert_impalad_log_contains('WARNING', r'Unknown column \(position 56\)'
           + ' added to table IMPALA_QUERY_LIVE; check if a coordinator was upgraded')
     finally:
       # Ensure new column is dropped in case of test failure
@@ -240,7 +240,7 @@ class TestQueryLive(CustomClusterTestSuite):
     assert drop_column.data == ['Column has been dropped.']
 
     describe_column2 = self.execute_query('describe sys.impala_query_live')
-    assert len(describe_column2.data) == 54
+    assert len(describe_column2.data) == 56
     assert column_desc not in describe_column2.data
 
     select_column2 = self.execute_query('select * from sys.impala_query_live')

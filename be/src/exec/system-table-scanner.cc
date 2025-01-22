@@ -405,6 +405,16 @@ Status QueryScanner::MaterializeNextTuple(
           RETURN_IF_ERROR(WriteStringSlot(join(query.orderby_columns, ","), pool, slot));
         }
         break;
+      case TQueryTableColumn::COORDINATOR_SLOTS:
+        if (LIKELY(IncludeField(TQueryTableColumn::type::COORDINATOR_SLOTS))) {
+          WriteBigIntSlot(record.coordinator_slots, slot);
+        }
+        break;
+      case TQueryTableColumn::EXECUTOR_SLOTS:
+        if (LIKELY(IncludeField(TQueryTableColumn::type::EXECUTOR_SLOTS))) {
+          WriteBigIntSlot(record.executor_slots, slot);
+        }
+        break;
       default:
         LOG(WARNING) << "Unknown column (position " << slot_desc->col_pos() << ") added"
             " to table " << table_name_ << "; check if a coordinator was upgraded";

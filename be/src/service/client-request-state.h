@@ -38,7 +38,6 @@
 namespace impala {
 
 class AdmissionControlClient;
-class ClientRequestStateCleaner;
 class Coordinator;
 class Expr;
 class Frontend;

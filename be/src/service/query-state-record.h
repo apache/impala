@@ -24,6 +24,7 @@
 
 #include "gen-cpp/ExecStats_types.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/admission_control_service.pb.h"
 #include "util/network-util.h"
 
 namespace impala {
@@ -146,6 +147,11 @@ struct QueryStateRecord {
   /// True if this query was retried, false otherwise.
   bool was_retried = false;
 
+  /// Number of Admission Control Slots used on Coordinator.
+  int64_t coordinator_slots;
+  /// Number of Admission Control Slots used on Executor.
+  int64_t executor_slots;
+
   /// If this query was retried, the query id of the retried query.
   std::unique_ptr<const TUniqueId> retried_query_id;
 
@@ -164,6 +170,12 @@ struct QueryStateRecord {
     /// Comparator that sorts by start time.
     bool operator() (const QueryStateRecord& lhs, const QueryStateRecord& rhs) const;
   };
+
+  /// Get the number of admission slots used from the Query Schedule.
+  /// If 'is_coordinator' is true then only look at the coordinator backend, otherwise
+  /// use the value from the first executor backend.
+  static int64_t get_admission_slots(
+      const QuerySchedulePB* query_schedule, bool is_coordinator);
 
   private:
   // Common initialization for constructors.

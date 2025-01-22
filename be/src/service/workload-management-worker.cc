@@ -410,6 +410,16 @@ const std::array<FieldParser, NumQueryTableColumns> FIELD_PARSERS = {{
     // orderby columns
     {[](FieldParserContext& ctx) {
       ctx.sql << "'" << boost::algorithm::join(ctx.record->orderby_columns, ",") << "'";
+    }},
+
+    //  coordinator slots
+    {[](FieldParserContext& ctx) {
+      ctx.sql << ctx.record->base_state->coordinator_slots;
+    }},
+
+    // executor slots
+    {[](FieldParserContext& ctx) {
+      ctx.sql << ctx.record->base_state->executor_slots;
     }}}}; // FIELD_PARSERS constant array
 
 } // namespace workloadmgmt

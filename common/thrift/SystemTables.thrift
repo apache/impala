@@ -80,4 +80,8 @@ enum TQueryTableColumn {
     JOIN_COLUMNS
     AGGREGATE_COLUMNS
     ORDERBY_COLUMNS
+
+    # Change 2 - Added Columns for Workload Management Schema Version 1.2.0
+    COORDINATOR_SLOTS
+    EXECUTOR_SLOTS
 }

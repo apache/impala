@@ -89,6 +89,13 @@ FieldDefEntry _createV110String(TQueryTableColumn::type db_col) {
   return make_pair<>(db_col, FieldDefinition(TPrimitiveType::STRING, v));
 }
 
+FieldDefEntry _createV120BigInt(TQueryTableColumn::type db_col) {
+  Version v;
+  EXPECT_TRUE(ParseVersion("1.2.0", &v).ok());
+
+  return make_pair<>(db_col, FieldDefinition(TPrimitiveType::BIGINT, v));
+}
+
 // Predicate function that can be passed to gtest EXPECT/ASSERT calls to determine
 // correctness of a FIELD_DEFINITIONS map entry.
 bool _fieldDefsEqual(const FieldDefEntry& lhs,
@@ -156,6 +163,8 @@ TEST(WorkloadManagementFieldsTest, CheckFieldDefinitions) {
       _createV110String(TQueryTableColumn::JOIN_COLUMNS),
       _createV110String(TQueryTableColumn::AGGREGATE_COLUMNS),
       _createV110String(TQueryTableColumn::ORDERBY_COLUMNS),
+      _createV120BigInt(TQueryTableColumn::COORDINATOR_SLOTS),
+      _createV120BigInt(TQueryTableColumn::EXECUTOR_SLOTS),
   };
 
   ASSERT_EQ(FIELD_DEFINITIONS.size(), expected_field_defs.size());

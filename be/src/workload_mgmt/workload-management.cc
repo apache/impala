@@ -173,8 +173,12 @@ const std::map<TQueryTableColumn::type, FieldDefinition> FIELD_DEFINITIONS = {
     {TQueryTableColumn::AGGREGATE_COLUMNS,
         FieldDefinition(TPrimitiveType::STRING, VERSION_1_1_0)},
     {TQueryTableColumn::ORDERBY_COLUMNS,
-        FieldDefinition(
-            TPrimitiveType::STRING, VERSION_1_1_0)}}; // FIELD_DEFINITIONS constant list
+        FieldDefinition(TPrimitiveType::STRING, VERSION_1_1_0)},
+    {TQueryTableColumn::COORDINATOR_SLOTS,
+        FieldDefinition(TPrimitiveType::BIGINT, VERSION_1_2_0)},
+    {TQueryTableColumn::EXECUTOR_SLOTS,
+        FieldDefinition(TPrimitiveType::BIGINT, VERSION_1_2_0)}};
+// FIELD_DEFINITIONS constant list
 
 /// Variable to cache the Version object created by parsing the workload management schema
 /// version startup flag. Variable must only be modified during the workload management

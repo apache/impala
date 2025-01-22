@@ -58,10 +58,12 @@ const std::string WM_DB = "sys";
 const kudu::Version NO_TABLE_EXISTS = kudu::Version();
 const kudu::Version VERSION_1_0_0 = impala::ConstructVersion(1, 0, 0);
 const kudu::Version VERSION_1_1_0 = impala::ConstructVersion(1, 1, 0);
+const kudu::Version VERSION_1_2_0 = impala::ConstructVersion(1, 2, 0);
 
 /// Set of all possible valid schema versions.  Must be sorted in order from earliest to
 /// latest version.
-const std::set<kudu::Version> KNOWN_VERSIONS = {VERSION_1_0_0, VERSION_1_1_0};
+const std::set<kudu::Version> KNOWN_VERSIONS = {
+    VERSION_1_0_0, VERSION_1_1_0, VERSION_1_2_0};
 
 /// Constants declaring how durations measured in milliseconds will be stored in the
 /// table. Must match the constants with the same name declared in SystemTable.java.

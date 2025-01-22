@@ -53,7 +53,7 @@ struct FieldParserContext {
 using FieldParser = void (*)(FieldParserContext&);
 
 /// Number of query table columns. Used to initialize a std::array.
-constexpr size_t NumQueryTableColumns = TQueryTableColumn::ORDERBY_COLUMNS + 1;
+constexpr size_t NumQueryTableColumns = TQueryTableColumn::EXECUTOR_SLOTS + 1;
 
 /// Array containing parser functions for each query column. These parsers are used to
 /// generate the value for each query column from a completed query represented by a

@@ -54,7 +54,7 @@ TEST(WorkloadManagementTest, ParseSchemaVersionFlagEmpty) {
   Version v;
 
   ASSERT_OK(ParseSchemaVersionFlag(&v));
-  ASSERT_EQ("1.1.0", v.ToString());
+  ASSERT_EQ("1.2.0", v.ToString());
 }
 
 TEST(WorkloadManagementTest, ParseSchemaVersionFlagInvalid) {
@@ -100,7 +100,7 @@ TEST(WorkloadManagementTest, StartupChecksUnknownVersion) {
 
   EXPECT_EQ(TErrorCode::type::GENERAL, ret.code());
   EXPECT_EQ("Workload management schema version '99999.99999.99999' is not one of the "
-            "known versions: '1.0.0', '1.1.0'",
+            "known versions: '1.0.0', '1.1.0', '1.2.0'",
       ret.msg().msg());
 }
 
@@ -133,7 +133,7 @@ TEST(WorkloadManagementTest, QueryLiveTableNameWithDb) {
 TEST(WorkloadManagementTest, KnownVersions) {
   // Asserts the known versions are correct and are in the correct order in the
   // KNOWN_VERSIONS set.
-  ASSERT_EQ(2, KNOWN_VERSIONS.size());
+  ASSERT_EQ(3, KNOWN_VERSIONS.size());
 
   auto iter = KNOWN_VERSIONS.cbegin();
 
@@ -141,6 +141,9 @@ TEST(WorkloadManagementTest, KnownVersions) {
   iter++;
 
   EXPECT_EQ("1.1.0", iter->ToString());
+  iter++;
+
+  EXPECT_EQ("1.2.0", iter->ToString());
   iter++;
 
   EXPECT_EQ(KNOWN_VERSIONS.cend(), iter);
