@@ -257,6 +257,7 @@ if __name__ == "__main__":
   skip_serial = detect_and_remove_flag('--skip-serial')
   skip_stress = detect_and_remove_flag('--skip-stress')
   skip_parallel = detect_and_remove_flag('--skip-parallel')
+  skip_verifiers = detect_and_remove_flag('--skip-verifiers')
   test_executor = TestExecutor(exit_on_error=exit_on_error)
 
   # If the user is just asking for --help, just print the help test and then exit.
@@ -328,11 +329,12 @@ if __name__ == "__main__":
     if test_executor.total_executed == 0:
       sys.exit(1)
 
-    # Finally, validate impalad/statestored metrics.
-    args = build_test_args(base_name="verify-metrics{0}".format(shard_identifier),
-                           valid_dirs=['verifiers'])
-    args.append('verifiers/test_verify_metrics.py')
-    run(args)
+    if not skip_verifiers:
+      # Finally, validate impalad/statestored metrics.
+      args = build_test_args(base_name="verify-metrics{0}".format(shard_identifier),
+                             valid_dirs=['verifiers'])
+      args.append('verifiers/test_verify_metrics.py')
+      run(args)
 
   if test_executor.tests_failed:
     sys.exit(1)

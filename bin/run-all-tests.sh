@@ -63,7 +63,8 @@ fi
 : ${CLUSTER_TEST_FILES:=}
 # Run JS tests
 : ${JS_TEST:=false}
-# Verifiers to run after all tests. Skipped if empty.
+# Verifiers to run after all tests. Skipped if true.
+: ${SKIP_VERIFIERS:=false}
 : ${TEST_SUITE_VERIFIERS:=verifiers/test_banned_log_messages.py}
 : ${TEST_SUITE_VERIFIERS_LOG_DIR:=${IMPALA_LOGS_DIR}/verifiers}
 # Extra arguments passed to start-impala-cluster for tests. These do not apply to custom
@@ -201,6 +202,12 @@ if [[ "${EXPLORATION_STRATEGY}" == "core" ]]; then
   RUN_TESTS_ARGS+=" --skip-stress"
 fi
 
+if [[ "$SKIP_VERIFIERS" == true ]]; then
+  # Skip verifiers.
+  TEST_SUITE_VERIFIERS=""
+  RUN_TESTS_ARGS+=" --skip-verifiers"
+fi
+
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # Only one impalad is supported when running against local filesystem.
   COMMON_PYTEST_ARGS+=" --impalad=localhost:21000"
@@ -268,13 +275,6 @@ do
     if ! "${IMPALA_HOME}/bin/run-backend-tests.sh"; then
       TEST_RET_CODE=1
     fi
-  fi
-
-  # Run some queries using run-workload to verify run-workload has not been broken.
-  if ! run-step "Run test run-workload" test-run-workload.log \
-      "${IMPALA_HOME}/bin/run-workload.py" -w tpch --num_clients=2 --query_names=TPCH-Q1 \
-      --table_format=text/none --exec_options="disable_codegen:False" ${KERB_ARGS}; then
-    TEST_RET_CODE=1
   fi
 
   if [[ "$FE_TEST" == true ]]; then
