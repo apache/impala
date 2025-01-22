@@ -434,6 +434,13 @@ string curl(const string& curl_options, int32_t port = FLAGS_webserver_port) {
   return cmd;
 }
 
+string curl_status_code(const string& curl_options, int32_t port = FLAGS_webserver_port) {
+  string cmd = Substitute("curl -s -f -w \"%{http_code}\" $0 'http://127.0.0.1:$1'",
+      curl_options, port);
+  cout << cmd << endl;
+  return exec(cmd.c_str());
+}
+
 class CookieJar {
 public:
   CookieJar() : dir_(filesystem::unique_path()), path_(dir_ / "cookiejar") {
@@ -568,7 +575,7 @@ TEST(Webserver, TestPostWithSpnego) {
     string token = cookie.token();
     ASSERT_FALSE(token.empty());
     // Post with the cookie fails due to CSRF protection.
-    ASSERT_NE(system(curl("-d '' -b " + cookie.path().string()).c_str()), 0);
+    ASSERT_EQ(curl_status_code("-d '' -b " + cookie.path().string()), "403");
 
     // Include the cookie's random token as csrf_token and request should succeed.
     ASSERT_EQ(system(curl(Substitute(
@@ -619,8 +626,8 @@ TEST(Webserver, StartWithPasswordFileTest) {
     string token = cookie.token();
     ASSERT_FALSE(token.empty());
     // Post with the cookie fails due to CSRF protection.
-    ASSERT_NE(system(curl(Substitute("--digest -u test:test -b $0 -d ''",
-        cookie.path().string())).c_str()), 0);
+    ASSERT_EQ(curl_status_code(Substitute("--digest -u test:test -b $0 -d ''",
+        cookie.path().string()).c_str()), "403");
 
     // Include the cookie's random token as csrf_token and request should succeed.
     ASSERT_EQ(system(curl(Substitute("--digest -u test:test -b $0 -d 'csrf_token=$1'",
