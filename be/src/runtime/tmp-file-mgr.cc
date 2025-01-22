@@ -118,6 +118,11 @@ DEFINE_bool(remote_batch_read, false,
     "Set if the system uses batch reading for the remote temporary files. Batch reading"
     "allows reading a block asynchronously when the buffer pool is trying to pin one"
     "page of that block.");
+DEFINE_bool(remote_scratch_cleanup_on_startup, true,
+    "If enabled, the Impala daemon will clean up the host-level directory within the "
+    "specified remote scratch directory during startup to remove potential leftover "
+    "files. This assumes a single Impala daemon per host. "
+    "For multiple daemons on a host, set this to false to prevent unintended cleanup.");
 
 using boost::algorithm::is_any_of;
 using boost::algorithm::join;
@@ -441,22 +446,48 @@ void TmpFileMgr::NewFile(
   new_file->reset(new TmpFileLocal(file_group, device_id, new_file_path.string()));
 }
 
-void TmpFileMgr::RemoveRemoteDir(TmpFileGroup* file_group, DeviceId device_id) {
+static string ConstructRemoteDirPath(const string& base_dir, const string& hostname,
+    const string& backend_id = "", const string& query_id = "") {
+  stringstream dir;
+  dir << base_dir << "/" << hostname;
+  if (!backend_id.empty()) {
+    dir << "/" << backend_id;
+    DCHECK(!query_id.empty());
+    dir << "_" << query_id;
+  }
+  return dir.str();
+}
+
+void TmpFileMgr::RemoveRemoteDirForHost(const string& dir, hdfsFS hdfs_conn) {
+  if (!FLAGS_remote_scratch_cleanup_on_startup) return;
+  DCHECK(hdfs_conn != nullptr);
+  const string hostlevel_dir = ConstructRemoteDirPath(
+      dir, ExecEnv::GetInstance()->configured_backend_address().hostname);
+  if (hdfsExists(hdfs_conn, hostlevel_dir.c_str()) == 0) {
+    hdfsDelete(hdfs_conn, hostlevel_dir.c_str(), 1);
+    LOG(INFO) << "Called to remove the host-level remote directory " << hostlevel_dir;
+  }
+}
+
+void TmpFileMgr::RemoveRemoteDirForQuery(TmpFileGroup* file_group) {
   if (tmp_dirs_remote_ == nullptr) return;
-  string dir = tmp_dirs_remote_->path_;
-  stringstream files_dir;
-  files_dir << dir << "/" << PrintId(ExecEnv::GetInstance()->backend_id(), "_") << "_"
-            << PrintId(file_group->unique_id(), "_");
+  const string& dir = tmp_dirs_remote_->path_;
+  const string& hostname = ExecEnv::GetInstance()->configured_backend_address().hostname;
+  const string backend_id = PrintId(ExecEnv::GetInstance()->backend_id(), "_");
+  const string query_id = PrintId(file_group->unique_id(), "_");
+  const string querylevel_dir =
+      ConstructRemoteDirPath(dir, hostname, backend_id, query_id);
   hdfsFS hdfs_conn;
   Status status =
-      HdfsFsCache::instance()->GetConnection(files_dir.str(), &hdfs_conn, &hdfs_conns_);
+      HdfsFsCache::instance()->GetConnection(querylevel_dir, &hdfs_conn, &hdfs_conns_);
   if (status.ok()) {
     DCHECK(hdfs_conn != nullptr);
-    hdfsDelete(hdfs_conn, files_dir.str().c_str(), 1);
+    hdfsDelete(hdfs_conn, querylevel_dir.c_str(), 1);
+    LOG(INFO) << "Called to remove the query-level remote directory " << querylevel_dir;
   } else {
     LOG(WARNING) << "Failed to remove the remote directory because unable to create a "
                     "connection to "
-                 << files_dir.str();
+                 << querylevel_dir;
   }
 }
 
@@ -809,10 +840,12 @@ Status TmpDirS3::VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_
     bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) {
   // For the S3 path, it doesn't need to create the directory for the uploading
   // as long as the S3 address is correct.
+  DCHECK(tmp_mgr != nullptr);
   DCHECK(!path_.empty());
   hdfsFS hdfs_conn;
   RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
       path_, &hdfs_conn, &(tmp_mgr->hdfs_conns_), tmp_mgr->s3a_options()));
+  tmp_mgr->RemoveRemoteDirForHost(path_, hdfs_conn);
   return Status::OK();
 }
 
@@ -841,14 +874,17 @@ Status TmpDirHdfs::VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_di
     bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) {
   DCHECK(!path_.empty());
   hdfsFS hdfs_conn;
-  // If the HDFS path doesn't exist, it would fail while uploading, so we
-  // create the HDFS path if it doesn't exist.
   RETURN_IF_ERROR(
       HdfsFsCache::instance()->GetConnection(path_, &hdfs_conn, &(tmp_mgr->hdfs_conns_)));
   if (hdfsExists(hdfs_conn, path_.c_str()) != 0) {
+    // If the impala scratch path in hdfs doesn't exist, attempt to create the path to
+    // verify it's valid and writable for scratch usage.
+    // Failure may indicate a permission or configuration issue.
     if (hdfsCreateDirectory(hdfs_conn, path_.c_str()) != 0) {
       return Status(GetHdfsErrorMsg("HDFS create path failed: ", path_));
     }
+  } else {
+    tmp_mgr->RemoveRemoteDirForHost(path_, hdfs_conn);
   }
   return Status::OK();
 }
@@ -1323,7 +1359,7 @@ void TmpFileGroup::Close() {
   }
   CloseInternal<std::unique_ptr<TmpFile>>(tmp_files_);
   CloseInternal<std::shared_ptr<TmpFile>>(tmp_files_remote_);
-  tmp_file_mgr_->RemoveRemoteDir(this, 0);
+  tmp_file_mgr_->RemoveRemoteDirForQuery(this);
   tmp_file_mgr_->scratch_bytes_used_metric_->Increment(
       -1 * scratch_space_bytes_used_counter_->value());
 }
@@ -1405,8 +1441,9 @@ Status TmpFileGroup::AllocateRemoteSpace(int64_t num_bytes, TmpFile** tmp_file,
   DeviceId dev_id = tmp_file_mgr_->tmp_dirs_.size();
   string unique_name = lexical_cast<string>(random_generator()());
   stringstream file_name;
-  dir = dir + "/" + PrintId(ExecEnv::GetInstance()->backend_id(), "_") + "_"
-      + PrintId(unique_id(), "_");
+  dir = ConstructRemoteDirPath(dir,
+      ExecEnv::GetInstance()->configured_backend_address().hostname,
+      PrintId(ExecEnv::GetInstance()->backend_id(), "_"), PrintId(unique_id(), "_"));
 
   string new_file_path = GenerateNewPath(dir, unique_name);
   const string& local_buffer_dir = tmp_file_mgr_->local_buff_dir_->path();

@@ -347,8 +347,13 @@ class TmpFileMgr {
   void NewFile(TmpFileGroup* file_group, DeviceId device_id,
     std::unique_ptr<TmpFile>* new_file);
 
-  /// Remove the remote directory which stores tmp files of the tmp file group.
-  void RemoveRemoteDir(TmpFileGroup* file_group, DeviceId device_id);
+  /// Remove the remote directory which stores temporary files of the tmp file group.
+  void RemoveRemoteDirForQuery(TmpFileGroup* file_group);
+
+  /// Remove the remote directory which stores temporary files of the entire host.
+  /// Called during Impala daemon startup to clean up any leftover temporary files.
+  /// Assumes there is only one Impala daemon process running per host.
+  void RemoveRemoteDirForHost(const string& dir, hdfsFS hdfs_conn);
 
   bool initialized_ = false;
 

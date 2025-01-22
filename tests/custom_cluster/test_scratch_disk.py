@@ -22,6 +22,7 @@ from builtins import range
 import os
 import pytest
 import re
+import socket
 import stat
 import subprocess
 import time
@@ -529,3 +530,42 @@ class TestScratchDir(CustomClusterTestSuite):
     assert (metrics1 > 0)
     client.close_query(handle)
     client.close()
+
+  @pytest.mark.execute_serially
+  @SkipIf.not_scratch_fs
+  def test_scratch_dirs_remote_spill_leftover_files_removal(self, vector):
+    # Test remote scratch directory cleanup after Impala daemon restart.
+    normal_dirs = self.generate_dirs('scratch_dirs_remote_spill', 1)
+    normal_dirs.append(self.dfs_tmp_path())
+    self._start_impala_cluster([
+      '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
+      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true'],
+      cluster_size=1,
+      expected_num_impalads=1)
+    self.assert_impalad_log_contains("INFO", "Using scratch directory ",
+                                    expected_count=len(normal_dirs) - 1)
+    vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
+    impalad = self.cluster.impalads[0]
+    client = impalad.service.create_beeswax_client()
+    self.execute_query_async_using_client(client, self.spill_query_big_table, vector)
+    verifier = MetricVerifier(impalad.service)
+    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
+    # Dir0 is the remote directory.
+    impalad.service.wait_for_metric_value(
+        'tmp-file-mgr.scratch-space-bytes-used.dir-0', 1, allow_greater=True)
+    impalad.kill()
+    client.close()
+    hostname = socket.gethostname()
+    # Verify that there are leftover files in the remote scratch dirs after being killed.
+    full_dfs_tmp_path = "{}/impala-scratch".format(self.dfs_tmp_path())
+    files_result = subprocess.check_output(["hdfs", "dfs", "-ls", full_dfs_tmp_path])
+    assert "Found 1 items" in files_result
+    assert hostname in files_result
+    full_dfs_tmp_path_with_hostname = "{}/{}".format(full_dfs_tmp_path, hostname)
+    files_result = subprocess.check_output(["hdfs", "dfs", "-ls",
+        full_dfs_tmp_path_with_hostname])
+    assert "Found 1 items" in files_result
+    impalad.start()
+    # Verify that the leftover files being removed after the impala daemon restarted.
+    files_result = subprocess.check_output(["hdfs", "dfs", "-ls", full_dfs_tmp_path])
+    assert files_result == ""

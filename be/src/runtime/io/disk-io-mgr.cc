@@ -403,6 +403,7 @@ end:
   if (status.ok()) {
     disk_file_dst_->SetStatus(io::DiskFileStatus::PERSISTED);
     disk_file_dst_->SetActualFileSize(file_size);
+    VLOG(2) << "File upload succeeded. File name: " << remote_file_path;
   } else {
     LOG(WARNING) << "File upload failed, msg:" << status.msg().msg();
   }

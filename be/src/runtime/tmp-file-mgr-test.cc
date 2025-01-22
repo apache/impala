@@ -60,6 +60,7 @@ DECLARE_string(remote_tmp_file_size);
 DECLARE_int32(wait_for_spill_buffer_timeout_s);
 DECLARE_bool(remote_batch_read);
 DECLARE_string(remote_read_memory_buffer_size);
+DECLARE_bool(remote_scratch_cleanup_on_startup);
 
 namespace impala {
 
@@ -1163,6 +1164,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
   // Create a fake s3 connection in order to pass the connection verification.
   HdfsFsCache::HdfsFsMap fake_hdfs_conn_map;
   hdfsFS fake_conn = reinterpret_cast<hdfsFS>(1);
+  FLAGS_remote_scratch_cleanup_on_startup = false;
   fake_hdfs_conn_map.insert(make_pair("s3a://fake_host/", fake_conn));
   // Two types of paths, one with directory, one without.
   vector<string> s3_paths{"s3a://fake_host", "s3a://fake_host/dir"};
