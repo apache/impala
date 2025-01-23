@@ -24,6 +24,8 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ThriftSerializationCtx;
+import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExchangeNode;
@@ -362,6 +364,22 @@ public class ExchangeNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
+    Preconditions.checkState(false, "Unexpected use of old toThrift() signature.");
+  }
+
+  @Override
+  protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
+    if (isMergingExchange()) {
+      LOG.trace("{} ineligible for caching because it is a merging exchange", this);
+      serialCtx.setTupleCachingIneligible(IneligibilityReason.MERGING_EXCHANGE);
+    } else if (!isDirectedExchange() && !isBroadcastExchange()) {
+      LOG.trace("{} ineligible for caching because it is a partitioned exchange", this);
+      serialCtx.setTupleCachingIneligible(IneligibilityReason.PARTITIONED_EXCHANGE);
+    }
+    // Data that arrives via an exchange could come from any other node, so it could come
+    // from any scan range that feeds into this regardless of node. Incorporate all the
+    // current scan ranges into the cache key.
+    serialCtx.incorporateScans();
     if (processingCost_.isValid() && processingCost_ instanceof BroadcastProcessingCost) {
       Preconditions.checkState(
           getNumReceivers() == processingCost_.getNumInstancesExpected());
@@ -369,13 +387,14 @@ public class ExchangeNode extends PlanNode {
     msg.node_type = TPlanNodeType.EXCHANGE_NODE;
     msg.exchange_node = new TExchangeNode();
     for (TupleId tid: tupleIds_) {
-      msg.exchange_node.addToInput_row_tuples(tid.asInt());
+      msg.exchange_node.addToInput_row_tuples(serialCtx.translateTupleId(tid).asInt());
     }
 
     if (isMergingExchange()) {
       TSortInfo sortInfo = new TSortInfo(
-          Expr.treesToThrift(mergeInfo_.getSortExprs()), mergeInfo_.getIsAscOrder(),
-          mergeInfo_.getNullsFirst(), mergeInfo_.getSortingOrder());
+          Expr.treesToThrift(mergeInfo_.getSortExprs(), serialCtx),
+          mergeInfo_.getIsAscOrder(), mergeInfo_.getNullsFirst(),
+          mergeInfo_.getSortingOrder());
       msg.exchange_node.setSort_info(sortInfo);
       msg.exchange_node.setOffset(offset_);
     }
@@ -387,4 +406,10 @@ public class ExchangeNode extends PlanNode {
     if (!nodeStack.isEmpty()) nodeStack.add(this);
     getChild(0).reduceCardinalityByRuntimeFilter(nodeStack, reductionScale);
   }
+
+  @Override
+  public boolean isTupleCachingImplemented() { return true; }
+
+  @Override
+  public boolean omitTupleCache() { return true; }
 }

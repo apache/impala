@@ -76,14 +76,10 @@ public class JoinBuildSink extends DataSink implements SpillableOperator {
     TJoinBuildSink tBuildSink = new TJoinBuildSink();
     tBuildSink.setDest_node_id(joinNode_.getId().asInt());
     tBuildSink.setJoin_op(joinNode_.getJoinOp().toThrift());
-    if (joinNode_ instanceof HashJoinNode) {
+    if (joinNode_ instanceof HashJoinNode ||
+        joinNode_ instanceof IcebergDeleteNode) {
       tBuildSink.setEq_join_conjuncts(
-          ((HashJoinNode)joinNode_).getThriftEquiJoinConjuncts());
-      tBuildSink.setHash_seed(joinNode_.getFragment().getHashSeed());
-    }
-    if (joinNode_ instanceof IcebergDeleteNode) {
-      tBuildSink.setEq_join_conjuncts(
-          ((IcebergDeleteNode) joinNode_).getThriftEquiJoinConjuncts());
+          joinNode_.getThriftEquiJoinConjuncts(new ThriftSerializationCtx()));
       tBuildSink.setHash_seed(joinNode_.getFragment().getHashSeed());
     }
     for (RuntimeFilter filter : runtimeFilters_) {

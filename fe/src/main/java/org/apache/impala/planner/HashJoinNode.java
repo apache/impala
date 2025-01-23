@@ -30,7 +30,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
-import org.apache.impala.thrift.TEqJoinCondition;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.THashJoinNode;
 import org.apache.impala.thrift.TPlanNode;
@@ -146,32 +146,20 @@ public class HashJoinNode extends JoinNode implements SpillableOperator {
   }
 
   @Override
-  protected void toThrift(TPlanNode msg) {
+  protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
     msg.node_type = TPlanNodeType.HASH_JOIN_NODE;
-    msg.join_node = joinNodeToThrift();
+    msg.join_node = joinNodeToThrift(serialCtx);
     msg.join_node.hash_join_node = new THashJoinNode();
-    msg.join_node.hash_join_node.setEq_join_conjuncts(getThriftEquiJoinConjuncts());
+    msg.join_node.hash_join_node.setEq_join_conjuncts(
+        getThriftEquiJoinConjuncts(serialCtx));
     for (Expr e: otherJoinConjuncts_) {
-      msg.join_node.hash_join_node.addToOther_join_conjuncts(e.treeToThrift());
+      msg.join_node.hash_join_node.addToOther_join_conjuncts(e.treeToThrift(serialCtx));
     }
-    msg.join_node.hash_join_node.setHash_seed(getFragment().getHashSeed());
-  }
-
-  /**
-   * Helper to get the equi-join conjuncts in a thrift representation.
-   */
-  public List<TEqJoinCondition> getThriftEquiJoinConjuncts() {
-    List<TEqJoinCondition> equiJoinConjuncts = new ArrayList<>(eqJoinConjuncts_.size());
-    for (Expr entry : eqJoinConjuncts_) {
-      BinaryPredicate bp = (BinaryPredicate)entry;
-      TEqJoinCondition eqJoinCondition =
-          new TEqJoinCondition(bp.getChild(0).treeToThrift(),
-              bp.getChild(1).treeToThrift(),
-              bp.getOp() == BinaryPredicate.Operator.NOT_DISTINCT);
-
-      equiJoinConjuncts.add(eqJoinCondition);
+    // Omit hash seed for tuple caching to improve generalizability. Hash seed is only
+    // used by partitioned builds, which are currently excluded from tuple caching.
+    if (!serialCtx.isTupleCache()) {
+      msg.join_node.hash_join_node.setHash_seed(getFragment().getHashSeed());
     }
-    return equiJoinConjuncts;
   }
 
   @Override

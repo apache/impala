@@ -22,6 +22,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.TreeMap;
 
 import org.apache.impala.analysis.DescriptorTable;
@@ -100,6 +101,8 @@ public class TupleCacheInfo {
     // limits on a sorted input).
     LIMIT,
     NONDETERMINISTIC_FN,
+    MERGING_EXCHANGE,
+    PARTITIONED_EXCHANGE,
   }
   private EnumSet<IneligibilityReason> ineligibilityReasons_;
 
@@ -198,22 +201,33 @@ public class TupleCacheInfo {
   }
 
   /**
-   * Pull in a child's TupleCacheInfo into this TupleCacheInfo. If the child is
-   * ineligible, then this is marked ineligible and there is no need to calculate
-   * a hash. If the child is eligible, it incorporates the child's hash into this
-   * hash. Returns true if the child was merged, false if it was ineligible.
-   *
-   * Resolves scan ranges statically for cases where results depend on all scan ranges.
+   * Pull in a child's TupleCacheInfo into this TupleCacheInfo while also incorporating
+   * all of its scan ranges into the key. This returns true if the child is eligible
+   * and false otherwise.
    */
   public boolean mergeChildWithScans(TupleCacheInfo child) {
-    if (!mergeChildImpl(child)) {
-      return false;
+    if (!child.isEligible()) {
+      return mergeChild(child);
     }
+    // Use a temporary TupleCacheInfo to incorporate the scan ranges for this child.
+    TupleCacheInfo tmpInfo = new TupleCacheInfo(descriptorTable_);
+    boolean success = tmpInfo.mergeChild(child);
+    Preconditions.checkState(success);
+    tmpInfo.incorporateScans();
+    tmpInfo.finalizeHash();
+    return mergeChild(tmpInfo);
+  }
 
+  /**
+   * Incorporate all the scan range information from input scan nodes into the
+   * cache key. This clears the lists of input scan nodes, as the information is
+   * now built into the cache key.
+   */
+  public void incorporateScans() {
     // Add all scan range specs to the hash. Copy only the relevant fields, primarily:
     // filename, mtime, size, and offset. Others like partition_id may change after
     // reloading metadata.
-    for (HdfsScanNode scanNode: child.inputScanNodes_) {
+    for (HdfsScanNode scanNode: inputScanNodes_) {
       TScanRangeSpec orig = scanNode.getScanRangeSpecs();
       TScanRangeSpec spec = new TScanRangeSpec();
       if (orig.isSetConcrete_ranges()) {
@@ -243,7 +257,9 @@ public class TupleCacheInfo {
       }
       hashThrift(spec);
     }
-    return true;
+    // The scan ranges have been incorporated into the key and are no longer needed
+    // at runtime.
+    inputScanNodes_.clear();
   }
 
   /**
@@ -417,5 +433,34 @@ public class TupleCacheInfo {
     // The slot must have been registered before this reference happens
     Preconditions.checkState(slotTranslationMap_.containsKey(globalId));
     return slotTranslationMap_.get(globalId);
+  }
+
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+    builder.append("TupleCacheInfo:");
+    if (isEligible()) {
+      builder.append("cache key: ");
+      builder.append(getHashString());
+      builder.append("\n");
+      builder.append("cache key hash trace: ");
+      builder.append(getHashTrace());
+      builder.append("\n");
+    } else {
+      builder.append("ineligibility reasons: ");
+      builder.append(getIneligibilityReasonsString());
+      builder.append("\n");
+    }
+    return builder.toString();
+  }
+
+  /**
+   * Construct a comma separated list of the ineligibility reasons.
+   */
+  public String getIneligibilityReasonsString() {
+    StringJoiner joiner = new StringJoiner(",");
+    for (IneligibilityReason reason : ineligibilityReasons_) {
+      joiner.add(reason.toString());
+    }
+    return joiner.toString();
   }
 }

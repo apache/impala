@@ -142,6 +142,16 @@ class JoinBuilder : public DataSink {
   /// this builder calls CloseFromProbe(). BlockingJoinNode never calls Close() directly.
   void CloseFromProbe(RuntimeState* join_node_state);
 
+  /// This is called from BlockingJoinNode to signal that the node won't even reach the
+  /// probe phase. This can happen if the node is closed before calling Open(). This can
+  /// happen if the BlockingJoinNode is a child of a TupleCacheNode with a cache hit.
+  /// This only makes sense when using a separate join build. Each BlockingJoinNode needs
+  /// to call CloseBeforeProbe() if it won't call WaitForInitialBuild(). This adjusts the
+  /// number of outstanding probes so that the builder doesn't wait unnecessarily for
+  /// probes that will never show up. If there are no threads left, this notifies the
+  /// builder.
+  void CloseBeforeProbe(RuntimeState* join_node_state);
+
   int num_probe_threads() const { return num_probe_threads_; }
 
   static string ConstructBuilderName(const char* name, int join_node_id) {

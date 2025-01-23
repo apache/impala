@@ -38,10 +38,14 @@ import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.ThriftSerializationCtx;
+import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
+import org.apache.impala.thrift.TEqJoinCondition;
 import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TJoinDistributionMode;
 import org.apache.impala.thrift.TJoinNode;
+import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -983,17 +987,42 @@ public abstract class JoinNode extends PlanNode {
     }
   }
 
+  @Override
+  protected void toThrift(TPlanNode msg) {
+    Preconditions.checkState(false, "Unexpected use of old toThrift() signature.");
+  }
+
   /** Helper to construct TJoinNode. */
-  protected TJoinNode joinNodeToThrift() {
+  protected TJoinNode joinNodeToThrift(ThriftSerializationCtx serialCtx) {
+    if (distrMode_ ==  DistributionMode.PARTITIONED) {
+      LOG.trace("{} ineligible for caching because it is a partitioned exchange", this);
+      serialCtx.setTupleCachingIneligible(IneligibilityReason.PARTITIONED_EXCHANGE);
+    }
     TJoinNode result = new TJoinNode(joinOp_.toThrift());
     List<TupleId> buildTupleIds = getChild(1).getTupleIds();
     result.setBuild_tuples(new ArrayList<>(buildTupleIds.size()));
     result.setNullable_build_tuples(new ArrayList<>(buildTupleIds.size()));
     for (TupleId tid : buildTupleIds) {
-      result.addToBuild_tuples(tid.asInt());
+      result.addToBuild_tuples(serialCtx.translateTupleId(tid).asInt());
       result.addToNullable_build_tuples(getChild(1).getNullableTupleIds().contains(tid));
     }
     return result;
+  }
+
+  /**
+   * Helper to get the equi-join conjuncts in a thrift representation.
+   */
+  public List<TEqJoinCondition> getThriftEquiJoinConjuncts(
+      ThriftSerializationCtx serialCtx) {
+    List<TEqJoinCondition> equiJoinConjuncts = new ArrayList<>(eqJoinConjuncts_.size());
+    for (BinaryPredicate bp : eqJoinConjuncts_) {
+      TEqJoinCondition eqJoinCondition = new TEqJoinCondition(
+          bp.getChild(0).treeToThrift(serialCtx), bp.getChild(1).treeToThrift(serialCtx),
+          bp.getOp() == BinaryPredicate.Operator.NOT_DISTINCT);
+
+      equiJoinConjuncts.add(eqJoinCondition);
+    }
+    return equiJoinConjuncts;
   }
 
   @Override
@@ -1078,4 +1107,8 @@ public abstract class JoinNode extends PlanNode {
     double selectivity = RuntimeFilterGenerator.getJoinNodeSelectivity(this);
     return 0 <= selectivity && selectivity <= 1;
   }
+
+
+  @Override
+  public boolean isTupleCachingImplemented() { return true; }
 }

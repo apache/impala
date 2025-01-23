@@ -41,7 +41,10 @@ JoinBuilder::JoinBuilder(TDataSinkId sink_id, const JoinBuilderConfig& sink_conf
     join_op_(sink_config.join_op_),
     is_separate_build_(sink_id != -1),
     num_probe_threads_(
-        is_separate_build_ ? state->instance_ctx().num_join_build_outputs : 1) {}
+        is_separate_build_ ? state->instance_ctx().num_join_build_outputs : 1),
+    outstanding_probes_(num_probe_threads_) {
+  DCHECK_GE(outstanding_probes_, 1);
+}
 
 JoinBuilder::~JoinBuilder() {
   DCHECK_EQ(0, probe_refcount_);
@@ -55,13 +58,37 @@ void JoinBuilder::CloseFromProbe(RuntimeState* join_node_state) {
       --probe_refcount_;
       last_probe = probe_refcount_ == 0;
       VLOG(3) << "JoinBuilder (id=" << join_node_id_ << ")"
-              << "closed from finstance "
+              << "closed from probe from finstance "
               << PrintId(join_node_state->fragment_instance_id())
               << "probe_refcount_=" << probe_refcount_;
       DCHECK_GE(probe_refcount_, 0);
     }
     // Only need to notify when the probe count is zero.
     if (last_probe) build_wakeup_cv_.NotifyAll();
+  } else {
+    Close(join_node_state);
+  }
+}
+
+void JoinBuilder::CloseBeforeProbe(RuntimeState* join_node_state) {
+  if (is_separate_build_) {
+    bool no_threads_remaining;
+    {
+      unique_lock<mutex> l(separate_build_lock_);
+      --outstanding_probes_;
+      // If all the probes are done (probe_refcount_ == 0) and there are no
+      // futher probes expected (outstanding_probes_ == 0), then there are
+      // no threads left.
+      no_threads_remaining = (probe_refcount_ == 0 && outstanding_probes_ == 0);
+      VLOG(3) << "JoinBuilder (id=" << join_node_id_ << ")"
+              << "closed before probe from finstance "
+              << PrintId(join_node_state->fragment_instance_id())
+              << "outstanding_probes_=" << outstanding_probes_ << " "
+              << "probe_refcount_=" << probe_refcount_;
+      DCHECK_GE(outstanding_probes_, 0);
+    }
+    // Only notify when there are no threads remaining
+    if (no_threads_remaining) build_wakeup_cv_.NotifyAll();
   } else {
     Close(join_node_state);
   }
@@ -103,8 +130,6 @@ void JoinBuilder::HandoffToProbesAndWait(RuntimeState* build_side_state) {
   {
     unique_lock<mutex> l(separate_build_lock_);
     ready_to_probe_ = true;
-    outstanding_probes_ = num_probe_threads_;
-    DCHECK_GE(outstanding_probes_, 1);
     VLOG(3) << "JoinBuilder (id=" << join_node_id_ << ")"
             << " waiting for " << outstanding_probes_ << " probes.";
     probe_wakeup_cv_.NotifyAll();

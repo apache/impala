@@ -161,6 +161,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
 
   num_probe_rows_partitioned_ =
       ADD_COUNTER(runtime_profile(), "ProbeRowsPartitioned", TUnit::UNIT);
+  prepare_succeeded_ = true;
   return Status::OK();
 }
 
@@ -298,9 +299,25 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   if (build_batch_ != nullptr) build_batch_->Reset();
   if (probe_batch_ != nullptr) probe_batch_->Reset();
   CloseAndDeletePartitions(nullptr);
+  bool separate_build = UseSeparateBuild(state->query_options());
+  if (prepare_succeeded_ && builder_ == nullptr && separate_build) {
+    DCHECK(builder_ == nullptr);
+    DCHECK(!waited_for_build_);
+    // Find the separate join builder. This can return an error status if the Prepare()
+    // phase failed. In that case, there is no need to notify the builder and it can
+    // be skipped.
+    JoinBuilder* separate_builder;
+    Status status = LookupSeparateJoinBuilder(state, &separate_builder);
+    if (status.ok()) {
+      builder_ = dynamic_cast<PhjBuilder*>(separate_builder);
+      DCHECK(builder_ != nullptr);
+    }
+  }
   if (builder_ != nullptr) {
-    bool separate_build = UseSeparateBuild(state->query_options());
-    if (!separate_build || waited_for_build_) {
+    if (separate_build && !waited_for_build_) {
+      // There is a separate build and we never reached the probe phase
+      builder_->CloseBeforeProbe(state);
+    } else {
       if (separate_build
           && buffer_pool_client()->GetReservation() > resource_profile_.min_reservation) {
         // Transfer back surplus reservation, which we may have borrowed from 'builder_'.

@@ -81,6 +81,12 @@ public class TupleCachePlanner {
       return node;
     }
 
+    // If node omits tuple cache placement - such as Exchange and Union nodes, where it
+    // would not be beneficial - skip it.
+    if (node.omitTupleCache()) {
+      return node;
+    }
+
     // Should we cache above this node?
     // Simplest policy: always cache if eligible
     // TODO: Make this more complicated (e.g. cost calculations)

@@ -1406,6 +1406,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public boolean isTupleCachingImplemented() { return false; }
 
   /**
+   * Whether a tuple cache node should be omitted immediately above this node (e.g.
+   * because it is not a beneficial caching location). This has no impact on eligibility,
+   * so tuple cache nodes can be placed higher in the plan. PlanNodes should override
+   * this to return true if this is an unfavorable caching location.
+   */
+  public boolean omitTupleCache() { return false; }
+
+  /**
    * Return the least between 'cardinality1' and 'cardinality2'
    * that is not a negative number (unknown).
    * Can return -1 if both number is less than 0.

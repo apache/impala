@@ -26,6 +26,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TNestedLoopJoinNode;
 import org.apache.impala.thrift.TPlanNode;
@@ -164,12 +165,12 @@ public class NestedLoopJoinNode extends JoinNode {
   }
 
   @Override
-  protected void toThrift(TPlanNode msg) {
+  protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
     msg.node_type = TPlanNodeType.NESTED_LOOP_JOIN_NODE;
-    msg.join_node = joinNodeToThrift();
+    msg.join_node = joinNodeToThrift(serialCtx);
     msg.join_node.nested_loop_join_node = new TNestedLoopJoinNode();
     for (Expr e : otherJoinConjuncts_) {
-      msg.join_node.nested_loop_join_node.addToJoin_conjuncts(e.treeToThrift());
+      msg.join_node.nested_loop_join_node.addToJoin_conjuncts(e.treeToThrift(serialCtx));
     }
   }
 

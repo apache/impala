@@ -22,6 +22,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -75,43 +76,48 @@ public class TupleCacheTest extends PlannerTestBase {
 
   @Test
   public void testRuntimeFilterCacheKeys() {
-    String basicJoinTmpl = "select straight_join probe.id from functional.alltypes " +
-        "probe, functional.alltypestiny build where %s";
-    verifyIdenticalCacheKeys(
-        String.format(basicJoinTmpl, "probe.id = build.id"),
-        String.format(basicJoinTmpl, "probe.id = build.id"));
-    // Trivial rewrite produces same plan
-    verifyIdenticalCacheKeys(
-        String.format(basicJoinTmpl, "probe.id = build.id"),
-        String.format(basicJoinTmpl, "build.id = probe.id"));
-    // Larger join with same subquery. Cache keys match because cache is disabled when
-    // the build side is too complex.
-    verifyIdenticalCacheKeys(
-        String.format(basicJoinTmpl, "probe.id = build.id"),
-        "select straight_join p.id from functional.alltypes p, (" +
-        String.format(basicJoinTmpl, "probe.id = build.id") + ") b where p.id = b.id");
-    // Different filter slot
-    verifyOverlappingCacheKeys(
-        String.format(basicJoinTmpl, "probe.id = build.id"),
-        String.format(basicJoinTmpl, "probe.id + 1 = build.id"));
-    // Different target expression
-    verifyOverlappingCacheKeys(
-        String.format(basicJoinTmpl, "probe.id + 1 = build.id"),
-        String.format(basicJoinTmpl, "probe.id + 2 = build.id"));
-    // Larger join with similar subquery and simpler plan tree.
-    verifyOverlappingCacheKeys(
-        String.format(basicJoinTmpl, "probe.id = build.id"),
-        "select straight_join a.id from functional.alltypes a, functional.alltypes b, " +
-        "functional.alltypestiny c where a.id = b.id and b.id = c.id");
-    // Different build-side source table
-    verifyDifferentCacheKeys(
-        String.format(basicJoinTmpl, "probe.id = build.id"),
-        "select straight_join a.id from functional.alltypes a, functional.alltypes b " +
-        "where a.id = b.id");
-    // Different build-side predicates
-    verifyDifferentCacheKeys(
-        String.format(basicJoinTmpl, "probe.id = build.id"),
-        String.format(basicJoinTmpl, "probe.id = build.id and build.id < 100"));
+    for (boolean isDistributedPlan : Arrays.asList(false, true)) {
+      String basicJoinTmpl = "select straight_join probe.id from functional.alltypes " +
+          "probe, functional.alltypestiny build where %s";
+      verifyIdenticalCacheKeys(
+          String.format(basicJoinTmpl, "probe.id = build.id"),
+          String.format(basicJoinTmpl, "probe.id = build.id"), isDistributedPlan);
+      // Trivial rewrite produces same plan
+      verifyIdenticalCacheKeys(
+          String.format(basicJoinTmpl, "probe.id = build.id"),
+          String.format(basicJoinTmpl, "build.id = probe.id"), isDistributedPlan);
+      // Larger join with same subquery. Cache keys match for the subquery, but don't
+      // match for the outer query.
+      verifyOverlappingCacheKeys(
+          String.format(basicJoinTmpl, "probe.id = build.id"),
+          "select straight_join p.id from functional.alltypes p, (" +
+          String.format(basicJoinTmpl, "probe.id = build.id") + ") b where p.id = b.id",
+          isDistributedPlan);
+      // Different filter slot
+      verifyOverlappingCacheKeys(
+          String.format(basicJoinTmpl, "probe.id = build.id"),
+          String.format(basicJoinTmpl, "probe.id + 1 = build.id"), isDistributedPlan);
+      // Different target expression
+      verifyOverlappingCacheKeys(
+          String.format(basicJoinTmpl, "probe.id + 1 = build.id"),
+          String.format(basicJoinTmpl, "probe.id + 2 = build.id"), isDistributedPlan);
+      // Larger join with similar subquery and simpler plan tree.
+      verifyOverlappingCacheKeys(
+          String.format(basicJoinTmpl, "probe.id = build.id"),
+          "select straight_join a.id from functional.alltypes a, " +
+          "functional.alltypes b, functional.alltypestiny c where a.id = b.id " +
+          "and b.id = c.id", isDistributedPlan);
+      // Different build-side source table
+      verifyDifferentCacheKeys(
+          String.format(basicJoinTmpl, "probe.id = build.id"),
+          "select straight_join a.id from functional.alltypes a, functional.alltypes b " +
+          "where a.id = b.id", isDistributedPlan);
+      // Different build-side predicates
+      verifyDifferentCacheKeys(
+          String.format(basicJoinTmpl, "probe.id = build.id"),
+          String.format(basicJoinTmpl, "probe.id = build.id and build.id < 100"),
+          isDistributedPlan);
+    }
   }
 
   @Test
@@ -151,12 +157,18 @@ public class TupleCacheTest extends PlannerTestBase {
         "v2 as (select c_nationkey, c_custkey, count(*) from v1, tpch.orders " +
         "where c_custkey = o_custkey group by c_nationkey, c_custkey) " +
         "select c_nationkey, count(*) from v2 group by c_nationkey";
-    verifyNIdenticalCacheKeys(rightJoinAgg, rightJoinAgg, 2);
+    verifyNIdenticalCacheKeys(rightJoinAgg, rightJoinAgg, 2,
+        /* isDistributedPlan */ true);
+    // For single node plan, there are no exchanges and everything is eligible.
+    verifyAllEligible(rightJoinAgg, /* isDistributedPlan */ false);
     // Both scans are cached, but aggregates above hash join and exchange are not.
     String innerJoinAgg = "select count(*) from functional.alltypes t1 inner join " +
         "functional.alltypestiny t2 on t1.smallint_col = t2.smallint_col group by " +
         "t1.tinyint_col, t2.smallint_col having count(t2.int_col) = count(t1.bigint_col)";
-    verifyNIdenticalCacheKeys(innerJoinAgg, innerJoinAgg, 2);
+    verifyNIdenticalCacheKeys(innerJoinAgg, innerJoinAgg, 2,
+        /* isDistributedPlan */ true);
+    // For single node plan, there are no exchanges and everything is eligible.
+    verifyAllEligible(innerJoinAgg, /* isDistributedPlan */ false);
     // Both scans are cached, but aggregate is not because it's above a union. Limit only
     // applies to aggregate above exchange, which is obviously not cached.
     String unionAgg = "select count(*) from (select * from functional.alltypes " +
@@ -200,8 +212,9 @@ public class TupleCacheTest extends PlannerTestBase {
 
     // Verify that a limit makes a statement ineligible
     verifyCacheIneligible("select id from functional.alltypes limit 10");
-    // A limit higher in the plan doesn't impact cache eligibility for the scan nodes.
-    verifyIdenticalCacheKeys(
+    // A limit higher in the plan doesn't impact cache eligibility for the scan nodes,
+    // but it does make the join node ineligible.
+    verifyOverlappingCacheKeys(
         "select a.id from functional.alltypes a, functional.alltypes b",
         "select a.id from functional.alltypes a, functional.alltypes b limit 10");
 
@@ -329,6 +342,66 @@ public class TupleCacheTest extends PlannerTestBase {
   }
 
   @Test
+  public void testJoins() {
+    // A plan with a hash join is eligible
+    verifyAllEligible("select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id = build.id and " +
+        "probe.int_col <= build.int_col", /* isDistributedPlan*/ false);
+
+    // A plan with a nested loop join is eligible
+    verifyAllEligible("select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id < build.id",
+        /* isDistributedPlan*/ false);
+
+    // An iceberg plan with a delete join
+    verifyAllEligible(
+        "select * from functional_parquet.iceberg_v2_positional_delete_all_rows",
+        /* isDistributedPlan*/ false);
+
+    // Different predicates on the join node makes the cache keys different, but it
+    // doesn't impact the scan nodes.
+    verifyOverlappingCacheKeys(
+        "select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id = build.id and " +
+        "probe.int_col <= build.int_col",
+        "select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id = build.id and " +
+        "probe.int_col + 1 <= build.int_col");
+
+    // Different predicates on the nested loop join node makes the cache keys different
+    verifyOverlappingCacheKeys(
+        "select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id < build.id",
+        "select straight_join probe.id from functional.alltypes probe, " +
+        "functional.alltypes build where probe.id + 1 < build.id");
+
+    // Using broadcast/shuffle hints to compare the same query with a broadcast
+    // join vs a partitioned join. They share the build-side scan location.
+    String simple_join_with_hint_template =
+        "select straight_join probe.id from functional.alltypes probe join " +
+        "%s functional.alltypes build on (probe.id = build.id)";
+    verifyOverlappingCacheKeys(
+        String.format(simple_join_with_hint_template, "/* +broadcast */"),
+        String.format(simple_join_with_hint_template, "/* +shuffle */"),
+        /* isDistributedPlan */ true);
+
+    // With a broadcast join, we can cache past the join.
+    verifyJoinNodesEligible(
+        String.format(simple_join_with_hint_template, "/* +broadcast */"), 1,
+        /* isDistributedPlan */ true);
+
+    // With a partitioned join, verify that we don't cache past the join.
+    verifyJoinNodesEligible(
+        String.format(simple_join_with_hint_template, "/* +shuffle */"), 0,
+        /* isDistributedPlan */ true);
+
+    // Verify that we can cache past a directed exchange
+    verifyJoinNodesEligible(
+        "select * from functional_parquet.iceberg_v2_positional_delete_all_rows", 1,
+        /* isDistributedPlan */ true);
+  }
+
+  @Test
   public void testDeterministicScheduling() {
     // Verify that the HdfsScanNode that feeds into a TupleCacheNode uses deterministic
     // scan range scheduling. When there are more ways for locations to be cache
@@ -347,8 +420,9 @@ public class TupleCacheTest extends PlannerTestBase {
     }
   }
 
-  protected List<PlanNode> getCacheEligibleNodes(String query) {
-    List<PlanFragment> plan = getPlan(query);
+  protected List<PlanNode> getCacheEligibleNodes(String query,
+      boolean isDistributedPlan) {
+    List<PlanFragment> plan = getPlan(query, isDistributedPlan);
     PlanNode planRoot = plan.get(0).getPlanRoot();
     // Walk over the plan and produce a list of cache keys.
     List<PlanNode> preOrderPlanNodes = planRoot.getNodesPreOrder();
@@ -362,6 +436,11 @@ public class TupleCacheTest extends PlannerTestBase {
     }
 
     return cacheEligibleNodes;
+  }
+
+  // Simplified signature for single node plan
+  protected List<PlanNode> getCacheEligibleNodes(String query) {
+    return getCacheEligibleNodes(query, /* isDistributedPlan */ false);
   }
 
   private List<String> getCacheKeys(List<PlanNode> cacheEligibleNodes) {
@@ -380,46 +459,49 @@ public class TupleCacheTest extends PlannerTestBase {
     return cacheHashTraces;
   }
 
-  private void printCacheEligibleNode(PlanNode node, StringBuilder log) {
-    log.append(node.getDisplayLabel());
-    log.append("\n");
-    log.append("cache key: ");
-    log.append(node.getTupleCacheInfo().getHashString());
-    log.append("\n");
-    log.append("cache key hash trace: ");
-    log.append(node.getTupleCacheInfo().getHashTrace());
-    log.append("\n");
-  }
-
-  private void printQueryCacheEligibleNodes(String query,
-      List<PlanNode> cacheEligibleNodes, StringBuilder log) {
+  private void printQueryNodesCacheInfo(String query,
+      List<PlanNode> nodes, StringBuilder log) {
     log.append("Query: ");
     log.append(query);
     log.append("\n");
-    for (PlanNode node : cacheEligibleNodes) {
-      printCacheEligibleNode(node, log);
+    for (PlanNode node : nodes) {
+      log.append(node.getDisplayLabel());
+      log.append("\n");
+      log.append(node.getTupleCacheInfo().toString());
     }
   }
 
-  protected void verifyCacheIneligible(String query) {
-    List<PlanNode> cacheEligibleNodes = getCacheEligibleNodes(query);
+  protected void verifyCacheIneligible(String query, boolean isDistributedPlan) {
+    List<PlanNode> cacheEligibleNodes = getCacheEligibleNodes(query, isDistributedPlan);
 
     // No eligible locations
     if (cacheEligibleNodes.size() != 0) {
       StringBuilder errorLog = new StringBuilder();
       errorLog.append("Expected no cache eligible nodes. Instead found:\n");
-      printQueryCacheEligibleNodes(query, cacheEligibleNodes, errorLog);
+      printQueryNodesCacheInfo(query, cacheEligibleNodes, errorLog);
       fail(errorLog.toString());
     }
   }
 
-  protected void verifyIdenticalCacheKeys(String query1, String query2) {
-    verifyNIdenticalCacheKeys(query1, query2, 1);
+  // Simplified signature for single node plan
+  protected void verifyCacheIneligible(String query) {
+    verifyCacheIneligible(query, /* isDistributedPlan */ false);
   }
 
-  protected void verifyNIdenticalCacheKeys(String query1, String query2, int n) {
-    List<PlanNode> cacheEligibleNodes1 = getCacheEligibleNodes(query1);
-    List<PlanNode> cacheEligibleNodes2 = getCacheEligibleNodes(query2);
+  protected void verifyIdenticalCacheKeys(String query1, String query2,
+      boolean isDistributedPlan) {
+    verifyNIdenticalCacheKeys(query1, query2, 1, isDistributedPlan);
+  }
+
+  // Simplified signature for single node plan
+  protected void verifyIdenticalCacheKeys(String query1, String query2) {
+    verifyIdenticalCacheKeys(query1, query2, /* isDistributedPlan */ false);
+  }
+
+  protected void verifyNIdenticalCacheKeys(String query1, String query2, int n,
+     boolean isDistributedPlan) {
+    List<PlanNode> cacheEligibleNodes1 = getCacheEligibleNodes(query1, isDistributedPlan);
+    List<PlanNode> cacheEligibleNodes2 = getCacheEligibleNodes(query2, isDistributedPlan);
     assertTrue(cacheEligibleNodes1.size() >= n);
     List<String> cacheKeys1 = getCacheKeys(cacheEligibleNodes1);
     List<String> cacheKeys2 = getCacheKeys(cacheEligibleNodes2);
@@ -428,15 +510,21 @@ public class TupleCacheTest extends PlannerTestBase {
     if (!cacheKeys1.equals(cacheKeys2) || !cacheHashTraces1.equals(cacheHashTraces2)) {
       StringBuilder errorLog = new StringBuilder();
       errorLog.append("Expected identical cache keys. Instead found:\n");
-      printQueryCacheEligibleNodes(query1, cacheEligibleNodes1, errorLog);
-      printQueryCacheEligibleNodes(query2, cacheEligibleNodes2, errorLog);
+      printQueryNodesCacheInfo(query1, cacheEligibleNodes1, errorLog);
+      printQueryNodesCacheInfo(query2, cacheEligibleNodes2, errorLog);
       fail(errorLog.toString());
     }
   }
 
-  protected void verifyOverlappingCacheKeys(String query1, String query2) {
-    List<PlanNode> cacheEligibleNodes1 = getCacheEligibleNodes(query1);
-    List<PlanNode> cacheEligibleNodes2 = getCacheEligibleNodes(query2);
+  // Simplified signature for single node plan
+  protected void verifyNIdenticalCacheKeys(String query1, String query2, int n) {
+    verifyNIdenticalCacheKeys(query1, query2, n, /* isDistributedPlan */ false);
+  }
+
+  protected void verifyOverlappingCacheKeys(String query1, String query2,
+      boolean isDistributedPlan) {
+    List<PlanNode> cacheEligibleNodes1 = getCacheEligibleNodes(query1, isDistributedPlan);
+    List<PlanNode> cacheEligibleNodes2 = getCacheEligibleNodes(query2, isDistributedPlan);
 
     // None of this makes any sense unless they both have eligible nodes
     assertTrue(cacheEligibleNodes1.size() > 0);
@@ -459,23 +547,29 @@ public class TupleCacheTest extends PlannerTestBase {
     if (keyIntersection.size() == 0 || hashTraceIntersection.size() == 0) {
       StringBuilder errorLog = new StringBuilder();
       errorLog.append("Expected overlapping cache keys. Instead found:\n");
-      printQueryCacheEligibleNodes(query1, cacheEligibleNodes1, errorLog);
-      printQueryCacheEligibleNodes(query2, cacheEligibleNodes2, errorLog);
+      printQueryNodesCacheInfo(query1, cacheEligibleNodes1, errorLog);
+      printQueryNodesCacheInfo(query2, cacheEligibleNodes2, errorLog);
       fail(errorLog.toString());
     }
 
     if (cacheKeys1.equals(cacheKeys2) || cacheHashTraces1.equals(cacheHashTraces2)) {
       StringBuilder errorLog = new StringBuilder();
       errorLog.append("Expected some cache keys to differ. Instead found:\n");
-      printQueryCacheEligibleNodes(query1, cacheEligibleNodes1, errorLog);
-      printQueryCacheEligibleNodes(query2, cacheEligibleNodes2, errorLog);
+      printQueryNodesCacheInfo(query1, cacheEligibleNodes1, errorLog);
+      printQueryNodesCacheInfo(query2, cacheEligibleNodes2, errorLog);
       fail(errorLog.toString());
     }
   }
 
-  protected void verifyDifferentCacheKeys(String query1, String query2) {
-    List<PlanNode> cacheEligibleNodes1 = getCacheEligibleNodes(query1);
-    List<PlanNode> cacheEligibleNodes2 = getCacheEligibleNodes(query2);
+  // Simplified signature for single node plan
+  protected void verifyOverlappingCacheKeys(String query1, String query2) {
+    verifyOverlappingCacheKeys(query1, query2, /* isDistributedPlan */ false);
+  }
+
+  protected void verifyDifferentCacheKeys(String query1, String query2,
+      boolean isDistributedPlan) {
+    List<PlanNode> cacheEligibleNodes1 = getCacheEligibleNodes(query1, isDistributedPlan);
+    List<PlanNode> cacheEligibleNodes2 = getCacheEligibleNodes(query2, isDistributedPlan);
 
     // None of this makes any sense unless they both have eligible nodes
     assertTrue(cacheEligibleNodes1.size() > 0);
@@ -497,8 +591,63 @@ public class TupleCacheTest extends PlannerTestBase {
     if (keyIntersection.size() != 0 || hashTraceIntersection.size() != 0) {
       StringBuilder errorLog = new StringBuilder();
       errorLog.append("Expected different cache keys. Instead found:\n");
-      printQueryCacheEligibleNodes(query1, cacheEligibleNodes1, errorLog);
-      printQueryCacheEligibleNodes(query2, cacheEligibleNodes2, errorLog);
+      printQueryNodesCacheInfo(query1, cacheEligibleNodes1, errorLog);
+      printQueryNodesCacheInfo(query2, cacheEligibleNodes2, errorLog);
+      fail(errorLog.toString());
+    }
+  }
+
+  // Simplified signature for single node plan
+  protected void verifyDifferentCacheKeys(String query1, String query2) {
+    verifyDifferentCacheKeys(query1, query2, /* isDistributedPlan */ false);
+  }
+
+  protected void verifyAllEligible(String query, boolean isDistributedPlan) {
+    List<PlanFragment> plan = getPlan(query, isDistributedPlan);
+    PlanNode planRoot = plan.get(0).getPlanRoot();
+    // Walk over the plan and produce a list of cache keys.
+    List<PlanNode> preOrderPlanNodes = planRoot.getNodesPreOrder();
+    List<PlanNode> ineligibleNodes = new ArrayList<PlanNode>();
+    for (PlanNode node : preOrderPlanNodes) {
+      if (node instanceof TupleCacheNode) continue;
+      TupleCacheInfo info = node.getTupleCacheInfo();
+      if (!info.isEligible()) {
+        ineligibleNodes.add(node);
+      }
+    }
+    if (ineligibleNodes.size() != 0) {
+      StringBuilder errorLog = new StringBuilder();
+      errorLog.append("Expected all nodes eligible, instead found ineligible nodes:\n");
+      printQueryNodesCacheInfo(query, ineligibleNodes, errorLog);
+      fail(errorLog.toString());
+    }
+  }
+
+  protected void verifyJoinNodesEligible(String query, int expectedEligibleJoins,
+      boolean isDistributedPlan) {
+    List<PlanFragment> plan = getPlan(query, isDistributedPlan);
+    PlanNode planRoot = plan.get(0).getPlanRoot();
+    // Walk over the plan and produce a list of cache keys.
+    List<PlanNode> preOrderPlanNodes = planRoot.getNodesPreOrder();
+    List<PlanNode> ineligibleJoinNodes = new ArrayList<PlanNode>();
+    int eligibleJoins = 0;
+    for (PlanNode node : preOrderPlanNodes) {
+      if (node instanceof JoinNode) {
+        TupleCacheInfo info = node.getTupleCacheInfo();
+        if (!info.isEligible()) {
+          ineligibleJoinNodes.add(node);
+        } else {
+          eligibleJoins++;
+        }
+      }
+    }
+    if (eligibleJoins != expectedEligibleJoins) {
+      StringBuilder errorLog = new StringBuilder();
+      errorLog.append(
+          String.format("Expected %d join nodes eligible, instead found %d.\n",
+              eligibleJoins, expectedEligibleJoins));
+      errorLog.append("Ineligible join nodes:");
+      printQueryNodesCacheInfo(query, ineligibleJoinNodes, errorLog);
       fail(errorLog.toString());
     }
   }
@@ -512,7 +661,7 @@ public class TupleCacheTest extends PlannerTestBase {
    * @param query the query to run
    * @return the first (or only) fragment plan node
    */
-  private List<PlanFragment> getPlan(String query) {
+  private List<PlanFragment> getPlan(String query, boolean isDistributedPlan) {
     // Create a query context with rewrites disabled
     // TODO: Should probably turn them on, or run a test
     // both with and without rewrites.
@@ -523,7 +672,7 @@ public class TupleCacheTest extends PlannerTestBase {
     // Force the plan to run on a single node so it
     // resides in a single fragment.
     TQueryOptions queryOptions = queryCtx.client_request.getQuery_options();
-    queryOptions.setNum_nodes(1);
+    queryOptions.setNum_nodes(isDistributedPlan ? 0 : 1);
     // Turn on tuple caching
     queryOptions.setEnable_tuple_cache(true);
 
@@ -537,5 +686,12 @@ public class TupleCacheTest extends PlannerTestBase {
       fail(e.getMessage());
     }
     return planCtx.getPlan();
+  }
+
+  /**
+   * Simplified signature of getPlan() to get the single node plan
+   */
+  private List<PlanFragment> getPlan(String query) {
+    return getPlan(query, false);
   }
 }

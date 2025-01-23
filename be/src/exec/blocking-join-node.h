@@ -116,6 +116,10 @@ class BlockingJoinNode : public ExecNode {
   /// on the builder.
   bool waited_for_build_ = false;
 
+  /// True if Prepare() exited successfully. This is used to avoid deadlocks where
+  /// a thread calls WaitForPrepare() without having successfully finished Prepare().
+  bool prepare_succeeded_ = false;
+
   /// Store in node to avoid reallocating. Cleared after build completes.
   boost::scoped_ptr<RowBatch> build_batch_;
 
@@ -247,6 +251,12 @@ class BlockingJoinNode : public ExecNode {
   bool UseSeparateBuild(const TQueryOptions& query_options) const {
     return plan_node().UseSeparateBuild(query_options);
   }
+
+  /// Find the build sink for the separate builder fragment. This is only valid when
+  /// there is a separate builder fragment. Currently, this cannot be used during the
+  /// Prepare() phase, because it uses QueryState::WaitForPrepare(), which waits for
+  /// Prepare() to finish for all fragment instances.
+  Status LookupSeparateJoinBuilder(RuntimeState* state, JoinBuilder** separate_builder);
 
   const RowDescriptor& probe_row_desc() const {
     return plan_node().probe_row_desc();

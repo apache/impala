@@ -254,6 +254,10 @@ Status TupleCacheNode::GetNext(
     Status status = reader_->GetNext(state, buffer_pool_client(), output_row_batch, eos);
     if (status.ok()) {
       cached_rowbatch_returned_to_caller_ = true;
+      // Close the child now that there is no hope of recovery in case of failure. This
+      // allows it to tear down any state and notify any affected threads that the
+      // children won't ever reach Open().
+      child(0)->Close(state);
     } else {
       // If we have returned a cached row batch to the caller, then it is not safe
       // to try to get any rows from the child as they could be duplicates. Any

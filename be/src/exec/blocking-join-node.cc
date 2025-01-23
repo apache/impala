@@ -181,6 +181,31 @@ void BlockingJoinNode::ProcessBuildInputAsync(
   state->resource_pool()->ReleaseThreadToken(false);
 }
 
+Status BlockingJoinNode::LookupSeparateJoinBuilder(RuntimeState* state,
+    JoinBuilder** separate_builder) {
+  // This can only be called when there is a separate join build
+  DCHECK(UseSeparateBuild(state->query_options()));
+
+  // Find the input fragment's build sink. GetFInstanceState() waits for the Prepare()
+  // phase to complete for all the fragments on this executor, so it is unsuitable to
+  // call during Prepare() itself. Typically, this is used during the Open() phase.
+  const google::protobuf::RepeatedPtrField<JoinBuildInputPB>& build_inputs =
+      state->instance_ctx_pb().join_build_inputs();
+  auto it = std::find_if(build_inputs.begin(), build_inputs.end(),
+      [this](const JoinBuildInputPB& bi) { return bi.join_node_id() == id_; });
+  DCHECK(it != build_inputs.end());
+  FragmentInstanceState* build_finstance;
+  TUniqueId input_finstance_id;
+  UniqueIdPBToTUniqueId(it->input_finstance_id(), &input_finstance_id);
+  RETURN_IF_ERROR(
+      state->query_state()->GetFInstanceState(input_finstance_id, &build_finstance));
+  TDataSinkType::type build_sink_type = build_finstance->fragment().output_sink.type;
+  DCHECK(IsJoinBuildSink(build_sink_type));
+  *separate_builder = build_finstance->GetJoinBuildSink();
+  DCHECK(*separate_builder != nullptr);
+  return Status::OK();
+}
+
 Status BlockingJoinNode::OpenImpl(RuntimeState* state, JoinBuilder** separate_builder) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   eos_ = false;
@@ -191,20 +216,7 @@ Status BlockingJoinNode::OpenImpl(RuntimeState* state, JoinBuilder** separate_bu
   if (UseSeparateBuild(state->query_options())) {
     // Find the input fragment's build sink. We do this in the Open() phase so we don't
     // block this finstance's Prepare() phase on the build finstance's Prepare() phase.
-    const google::protobuf::RepeatedPtrField<JoinBuildInputPB>& build_inputs =
-        state->instance_ctx_pb().join_build_inputs();
-    auto it = std::find_if(build_inputs.begin(), build_inputs.end(),
-        [this](const JoinBuildInputPB& bi) { return bi.join_node_id() == id_; });
-    DCHECK(it != build_inputs.end());
-    FragmentInstanceState* build_finstance;
-    TUniqueId input_finstance_id;
-    UniqueIdPBToTUniqueId(it->input_finstance_id(), &input_finstance_id);
-    RETURN_IF_ERROR(
-        state->query_state()->GetFInstanceState(input_finstance_id, &build_finstance));
-    TDataSinkType::type build_sink_type = build_finstance->fragment().output_sink.type;
-    DCHECK(IsJoinBuildSink(build_sink_type));
-    *separate_builder = build_finstance->GetJoinBuildSink();
-    DCHECK(*separate_builder != nullptr);
+    RETURN_IF_ERROR(LookupSeparateJoinBuilder(state, separate_builder));
   } else {
     // The integrated join build requires some tricky time accounting because two
     // threads execute concurrently with the time from the left and right child

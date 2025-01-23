@@ -129,4 +129,15 @@ public class ThriftSerializationCtx {
       return globalId;
     }
   }
+
+  /**
+   * Incorporate all the scan range information from the children nodes into the
+   * compile-time cache key. This eliminates the need to include these scan ranges
+   * in the runtime key.
+   */
+  public void incorporateScans() {
+    if (isTupleCache()) {
+      tupleCacheInfo_.incorporateScans();
+    }
+  }
 }
