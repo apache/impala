@@ -43,9 +43,9 @@ class TestHdfsCaching(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsCaching, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('exec_option')['batch_size'] == 0)
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == "text")
 
   # The tpch nation table is cached as part of data loading. We'll issue a query
@@ -63,7 +63,7 @@ class TestHdfsCaching(ImpalaTestSuite):
       cached_bytes_before.append(impalad.service.get_metric_value(cached_read_metric))
 
     # Execute the query.
-    result = self.execute_query(query_string)
+    result = self.execute_query_using_vector(query_string, vector)
     assert(len(result.data) == 1)
     assert(result.data[0] == '25')
 
@@ -77,8 +77,8 @@ class TestHdfsCaching(ImpalaTestSuite):
     num_metrics_increased = 0
     assert(len(cached_bytes_before) == len(cached_bytes_after))
     for i in range(0, len(cached_bytes_before)):
-      assert(cached_bytes_before[i] == cached_bytes_after[i] or\
-             cached_bytes_before[i] + expected_bytes_delta == cached_bytes_after[i])
+      assert (cached_bytes_before[i] == cached_bytes_after[i]
+              or cached_bytes_before[i] + expected_bytes_delta == cached_bytes_after[i])
       if cached_bytes_after[i] > cached_bytes_before[i]:
         num_metrics_increased = num_metrics_increased + 1
 
@@ -105,7 +105,7 @@ class TestHdfsCaching(ImpalaTestSuite):
 
     # Run this query for some iterations since it is timing dependent.
     for x in range(1, num_iters):
-      result = self.execute_query(query_string)
+      result = self.execute_query_using_vector(query_string, vector)
       assert(len(result.data) == 2)
 
 
@@ -134,9 +134,9 @@ class TestHdfsCachingFallbackPath(ImpalaTestSuite):
     create_query_sql = "CREATE EXTERNAL TABLE %s.cached_nation like tpch.nation "\
         "LOCATION '%s'" % (unique_database, encrypted_table_dir)
     check_call(["hdfs", "dfs", "-mkdir", encrypted_table_dir], shell=False)
-    check_call(["hdfs", "crypto", "-createZone", "-keyName", "testKey1", "-path",\
+    check_call(["hdfs", "crypto", "-createZone", "-keyName", "testKey1", "-path",
         encrypted_table_dir], shell=False)
-    check_call(["hdfs", "dfs", "-cp", get_fs_path("/test-warehouse/tpch.nation/*.tbl"),\
+    check_call(["hdfs", "dfs", "-cp", get_fs_path("/test-warehouse/tpch.nation/*.tbl"),
         encrypted_table_dir], shell=False)
     # Reduce the scan range size to force the query to have multiple scan ranges.
     exec_options = vector.get_value('exec_option')
@@ -154,7 +154,7 @@ class TestHdfsCachingFallbackPath(ImpalaTestSuite):
           pytest.fail("Timed out caching path: " + encrypted_table_dir)
         time.sleep(2)
       self.execute_query_expect_success(self.client, "invalidate metadata "
-          "%s.cached_nation" % unique_database);
+          "%s.cached_nation" % unique_database)
       result = self.execute_query_expect_success(self.client, "select count(*) from "
           "%s.cached_nation" % unique_database, exec_options)
       assert(len(result.data) == 1)
@@ -162,8 +162,8 @@ class TestHdfsCachingFallbackPath(ImpalaTestSuite):
     except Exception as e:
       pytest.fail("Failure in test_hdfs_caching_fallback_path: " + str(e))
     finally:
-      check_call(["hdfs", "dfs", "-rm", "-r", "-f", "-skipTrash", encrypted_table_dir],\
-          shell=False)
+      check_call(["hdfs", "dfs", "-rm", "-r", "-f", "-skipTrash", encrypted_table_dir],
+                 shell=False)
 
 
 @SkipIfFS.hdfs_caching
@@ -177,16 +177,18 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     super(TestHdfsCachingDdl, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' and \
-        v.get_value('table_format').compression_codec == 'none')
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'text'
+        and v.get_value('table_format').compression_codec == 'none')
 
   def setup_method(self, method):
+    super(TestHdfsCachingDdl, self).setup_method(method)
     self.cleanup_db("cachedb")
     self.client.execute("create database cachedb")
 
   def teardown_method(self, method):
     self.cleanup_db("cachedb")
+    super(TestHdfsCachingDdl, self).teardown_method(method)
 
   @pytest.mark.execute_serially
   @SkipIfDockerizedCluster.accesses_host_filesystem
@@ -200,10 +202,10 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     # for the table with partitions on both HDFS and local file system.
     assert num_entries_pre == get_num_cache_requests() - 10
 
-    self.client.execute("drop table cachedb.cached_tbl_part")
-    self.client.execute("drop table cachedb.cached_tbl_nopart")
-    self.client.execute("drop table cachedb.cached_tbl_local")
-    self.client.execute("drop table cachedb.cached_tbl_ttl")
+    self.execute_query_using_vector("drop table cachedb.cached_tbl_part", vector)
+    self.execute_query_using_vector("drop table cachedb.cached_tbl_nopart", vector)
+    self.execute_query_using_vector("drop table cachedb.cached_tbl_local", vector)
+    self.execute_query_using_vector("drop table cachedb.cached_tbl_ttl", vector)
 
     # Dropping the tables should cleanup cache entries leaving us with the same
     # total number of entries.
@@ -213,18 +215,22 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
   def test_caching_ddl_drop_database(self, vector):
     """IMPALA-2518: DROP DATABASE CASCADE should properly drop all impacted cache
         directives"""
+    with self.create_impala_client_from_vector(vector) as client:
+      self.__run_caching_ddl_drop_database(client)
+
+  def __run_caching_ddl_drop_database(self, client):
     num_entries_pre = get_num_cache_requests()
     # Populates the `cachedb` database with some cached tables and partitions
-    self.client.execute("use cachedb")
-    self.client.execute("create table cached_tbl_nopart (i int) cached in 'testPool'")
-    self.client.execute("insert into cached_tbl_nopart select 1")
-    self.client.execute("create table cached_tbl_part (i int) partitioned by (j int) \
-                         cached in 'testPool'")
-    self.client.execute("insert into cached_tbl_part (i,j) select 1, 2")
+    client.execute("use cachedb")
+    client.execute("create table cached_tbl_nopart (i int) cached in 'testPool'")
+    client.execute("insert into cached_tbl_nopart select 1")
+    client.execute("create table cached_tbl_part (i int) partitioned by (j int) "
+                   "cached in 'testPool'")
+    client.execute("insert into cached_tbl_part (i,j) select 1, 2")
     # We expect the number of cached entities to grow
     assert num_entries_pre < get_num_cache_requests()
-    self.client.execute("use default")
-    self.client.execute("drop database cachedb cascade")
+    client.execute("use default")
+    client.execute("drop database cachedb cascade")
     # We want to see the number of cached entities return to the original count
     assert num_entries_pre == get_num_cache_requests()
 
@@ -236,18 +242,21 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     num_entries_pre = get_num_cache_requests()
     create_table = ("create table cachedb.cached_tbl_reload "
         "(id int) cached in 'testPool' with replication = 8")
-    self.client.execute(create_table)
+    self.execute_query_using_vector(create_table, vector)
 
     # Access the table once to load the metadata
-    self.client.execute("select count(*) from cachedb.cached_tbl_reload")
+    self.execute_query_using_vector(
+      "select count(*) from cachedb.cached_tbl_reload", vector)
 
     create_table = ("create table cachedb.cached_tbl_reload_part (i int) "
         "partitioned by (j int) cached in 'testPool' with replication = 8")
-    self.client.execute(create_table)
+    self.execute_query_using_vector(create_table, vector)
 
     # Add two partitions
-    self.client.execute("alter table cachedb.cached_tbl_reload_part add partition (j=1)")
-    self.client.execute("alter table cachedb.cached_tbl_reload_part add partition (j=2)")
+    self.execute_query_using_vector(
+      "alter table cachedb.cached_tbl_reload_part add partition (j=1)", vector)
+    self.execute_query_using_vector(
+      "alter table cachedb.cached_tbl_reload_part add partition (j=2)", vector)
 
     assert num_entries_pre + 4 == get_num_cache_requests(), \
       "Adding the tables should be reflected by the number of cache directives."
@@ -262,9 +271,11 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
         "/test-warehouse/cachedb.db/cached_tbl_reload_part/j=2", 3)
 
     # Create a bogus cached table abusing an existing cache directive ID, IMPALA-1750
-    dirid = get_cache_directive_for_path("/test-warehouse/cachedb.db/cached_tbl_reload_part/j=2")
-    self.client.execute(("create table cachedb.no_replication_factor (id int) " \
-                         "tblproperties(\"cache_directive_id\"=\"%s\")" % dirid))
+    dirid = get_cache_directive_for_path(
+      "/test-warehouse/cachedb.db/cached_tbl_reload_part/j=2")
+    self.execute_query_using_vector(
+      ("create table cachedb.no_replication_factor (id int) "
+       "tblproperties(\"cache_directive_id\"=\"{}\")").format(dirid), vector)
     self.run_test_case('QueryTest/hdfs-caching-validation', vector)
     # Temp fix for IMPALA-2510. Due to IMPALA-2518, when the test database is dropped,
     # the cache directives are not removed for table 'cached_tbl_reload_part'.
@@ -290,15 +301,18 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     # We want to see the number of cached entities return to the original count.
     assert num_entries_pre == get_num_cache_requests()
 
+
 def drop_cache_directives_for_path(path):
   """Drop the cache directive for a given path"""
   rc, stdout, stderr = exec_process("hdfs cacheadmin -removeDirectives -path %s" % path)
   assert rc == 0, \
       "Error removing cache directive for path %s (%s, %s)" % (path, stdout, stderr)
 
+
 def is_path_fully_cached(path):
   """Returns true if all the bytes of the path are cached, false otherwise"""
-  rc, stdout, stderr = exec_process("hdfs cacheadmin -listDirectives -stats -path %s" % path)
+  rc, stdout, stderr = exec_process(
+    "hdfs cacheadmin -listDirectives -stats -path %s" % path)
   assert rc == 0
   caching_stats = stdout.strip("\n").split("\n")[-1].split()
   # Compare BYTES_NEEDED and BYTES_CACHED, the output format is as follows
@@ -309,8 +323,9 @@ def is_path_fully_cached(path):
 def get_cache_directive_for_path(path):
   rc, stdout, stderr = exec_process("hdfs cacheadmin -listDirectives -path %s" % path)
   assert rc == 0
-  dirid = re.search('^\s+?(\d+)\s+?testPool\s+?.*?$', stdout, re.MULTILINE).group(1)
+  dirid = re.search(r'^\s+?(\d+)\s+?testPool\s+?.*?$', stdout, re.MULTILINE).group(1)
   return dirid
+
 
 def change_cache_directive_repl_for_path(path, repl):
   """Drop the cache directive for a given path"""
@@ -319,6 +334,7 @@ def change_cache_directive_repl_for_path(path, repl):
     "hdfs cacheadmin -modifyDirective -id %s -replication %s" % (dirid, repl))
   assert rc == 0, \
       "Error modifying cache directive for path %s (%s, %s)" % (path, stdout, stderr)
+
 
 def get_num_cache_requests():
   """Returns the number of outstanding cache requests. Due to race conditions in the

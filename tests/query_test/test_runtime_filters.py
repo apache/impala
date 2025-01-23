@@ -87,6 +87,9 @@ class TestRuntimeFilters(ImpalaTestSuite):
       add_mandatory_exec_option(cls, "async_codegen", 1)
 
   def test_basic_filters(self, vector):
+    # Remove 'num_nodes' option so we can set it at .test file.
+    # Revisit this if 'num_nodes' dimension size increase.
+    vector.unset_exec_option('num_nodes')
     num_filters_per_host = vector.get_exec_option('max_num_filters_aggregated_per_host')
     num_backend = 2  # exclude coordinator
     num_updates = (num_backend + 1 if num_filters_per_host == 0

@@ -1526,6 +1526,9 @@ class TestIcebergV2Table(IcebergTestSuite):
   @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.hardcoded_uris
   def test_read_position_deletes(self, vector):
+    # Remove 'batch_size' option so we can set it at .test file.
+    # Revisit this if 'batch_size' dimension size increase.
+    vector.unset_exec_option('batch_size')
     self.run_test_case('QueryTest/iceberg-v2-read-position-deletes', vector)
 
   @SkipIfDockerizedCluster.internal_hostname
@@ -1586,6 +1589,9 @@ class TestIcebergV2Table(IcebergTestSuite):
 
   @SkipIf.hardcoded_uris
   def test_metadata_tables(self, vector, unique_database):
+    # Remove 'batch_size' option so we can set it at .test file.
+    # Revisit this if 'batch_size' dimension size increase.
+    vector.unset_exec_option('batch_size')
     with self.create_impala_client() as impalad_client:
       overwrite_snapshot_id = impalad_client.execute("select snapshot_id from "
                              "functional_parquet.iceberg_query_metadata.snapshots "

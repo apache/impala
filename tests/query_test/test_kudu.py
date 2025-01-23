@@ -75,6 +75,9 @@ class TestKuduBasicDML(KuduTestSuite):
 
   @SkipIfKudu.no_hybrid_clock()
   def test_kudu_insert(self, vector, unique_database):
+    # Remove 'abort_on_error' option so we can set it at .test file.
+    # Revisit this if 'abort_on_error' dimension size increase.
+    vector.unset_exec_option('abort_on_error')
     self.run_test_case('QueryTest/kudu_insert', vector, use_db=unique_database)
 
   @SkipIfKudu.no_hybrid_clock()

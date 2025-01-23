@@ -120,9 +120,13 @@ class HS2TestSuite(ImpalaTestSuite):
                          'doubleVal', 'binaryVal']
 
   def setup(self):
+    # TODO: Rename this method to connect() and provide proper py.test setup_method().
+    # test_hs2.py is using this class as cursor.
     self.socket, self.hs2_client = self._open_hs2_connection()
 
   def teardown(self):
+    # TODO: Rename this method to close() and provide proper py.test teardown_method().
+    # test_hs2.py is using this class as cursor.
     if self.socket:
       self.socket.close()
 
@@ -177,6 +181,8 @@ class HS2TestSuite(ImpalaTestSuite):
                                 "profile or execution summary".format(user))
 
   def close(self, op_handle):
+    # TODO: Rename this method to close_query().
+    # test_hs2.py is using this class as cursor.
     close_op_req = TCLIService.TCloseOperationReq()
     close_op_req.operationHandle = op_handle
     close_op_resp = self.hs2_client.CloseOperation(close_op_req)

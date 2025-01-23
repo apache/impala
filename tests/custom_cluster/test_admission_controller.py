@@ -2000,7 +2000,8 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       cls.ImpalaTestMatrix.add_constraint(
           lambda v: v.get_value('round_robin_submission'))
 
-  def setup(self):
+  def setup_method(self, method):
+    super(TestAdmissionControllerStress, self).setup_method(method)
     # All threads are stored in this list and it's used just to make sure we clean up
     # properly in teardown.
     self.all_threads = list()
@@ -2023,7 +2024,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     signal.signal(signal.SIGINT, quit)
     signal.signal(signal.SIGHUP, quit)
 
-  def teardown(self):
+  def teardown_method(self, method):
     # Set shutdown for all threads (cancel if needed)
     self.exit.set()
 
@@ -2032,6 +2033,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       thread.join(5)
       LOG.info("Join thread for query num %s %s", thread.query_num,
           "TIMED OUT" if thread.isAlive() else "")
+    super(TestAdmissionControllerStress, self).teardown_method(method)
 
   def should_run(self):
     return not self.exit.is_set()
