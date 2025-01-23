@@ -320,15 +320,43 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.close_impala_clients()
 
   @classmethod
+  def setup_method(cls, test_method):
+    """Setup for all test method."""
+    cls.__reset_impala_clients()
+
+  @classmethod
+  def teardown_method(cls, test_method):
+    """Teardown for all test method.
+    Currently, it is only here as a placeholder for future use and complement
+    setup_method() declaration."""
+    pass
+
+  @classmethod
   def create_impala_client(cls, host_port=None,
                            protocol=pytest.config.option.default_test_protocol,
                            is_hive=False):
+    """
+    Create a new ImpalaConnection client.
+    Make sure to always call this method using a with-as statement or manually close
+    the returned connection before discarding it."""
     if host_port is None:
       host_port = cls.__get_default_host_port(protocol)
     client = create_connection(host_port=host_port,
         use_kerberos=pytest.config.option.use_kerberos, protocol=protocol,
         is_hive=is_hive)
     client.connect()
+    return client
+
+  @classmethod
+  def create_impala_client_from_vector(cls, vector):
+    """A shorthand for create_impala_client with test vector as input.
+    Vector must have 'protocol' and 'exec_option' dimension.
+    Return a client of specified 'protocol' and with cofiguration 'exec_option' set.
+    Make sure to always call this method using a with-as statement or manually close
+    the returned connection before discarding it."""
+    client = cls.create_impala_client(
+      protocol=vector.get_value('protocol'))
+    client.set_configuration(vector.get_exec_option_dict())
     return client
 
   @classmethod
@@ -370,6 +398,15 @@ class ImpalaTestSuite(BaseTestSuite):
       # auth.
       LOG.info("HS2 HTTP connection setup failed, continuing...: {0}".format(e))
     cls.client = cls.default_impala_client(pytest.config.option.default_test_protocol)
+
+  @classmethod
+  def __reset_impala_clients(cls):
+    if cls.beeswax_client:
+      cls.beeswax_client.clear_configuration()
+    if cls.hs2_client:
+      cls.hs2_client.clear_configuration()
+    if cls.hs2_http_client:
+      cls.hs2_http_client.clear_configuration()
 
   @classmethod
   def close_impala_clients(cls):
@@ -463,10 +500,10 @@ class ImpalaTestSuite(BaseTestSuite):
     if not self.default_query_options:
       query_options = impalad_client.get_default_configuration()
       for key, value in query_options.items():
-        self.default_query_options[key.upper()] = value
+        self.default_query_options[key.lower()] = value
     # Restore all the changed query options.
     for query_option in query_options_changed:
-      query_option = query_option.upper()
+      query_option = query_option.lower()
       if query_option not in self.default_query_options:
         continue
       default_val = self.default_query_options[query_option]
@@ -715,7 +752,7 @@ class ImpalaTestSuite(BaseTestSuite):
         for query in query.split(';'):
           set_pattern_match = SET_PATTERN.match(query)
           if set_pattern_match:
-            option_name = set_pattern_match.groups()[0]
+            option_name = set_pattern_match.groups()[0].lower()
             query_options_changed.append(option_name)
             assert option_name not in vector.get_value(EXEC_OPTION_KEY), (
                 "{} cannot be set in  the '.test' file since it is in the test vector. "
@@ -1055,6 +1092,21 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def close_query_using_client(self, client, query):
     return client.close_query(query)
+
+  def execute_query_using_vector(self, query, vector):
+    """Run 'query' with given test 'vector'.
+    'vector' must have 'protocol' and 'exec_option' dimension.
+    Default ImpalaTestSuite client will be used depending on value of 'protocol'
+    dimension."""
+    client = self.default_impala_client(vector.get_value('protocol'))
+    result = self.execute_query_using_client(client, query, vector)
+    # Restore client configuration before returning.
+    modified_configs = vector.get_exec_option_dict().keys()
+    for name, val in client.get_default_configuration().items():
+      lower_name = name.lower()
+      if lower_name in modified_configs:
+        client.set_configuration_option(lower_name, val)
+    return result
 
   @execute_wrapper
   def execute_query_async(self, query, query_options=None):

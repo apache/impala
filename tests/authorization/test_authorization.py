@@ -38,7 +38,9 @@ ADMIN = "admin"
 
 
 class TestAuthorization(CustomClusterTestSuite):
-  def setup(self):
+
+  def setup_method(self, method):
+    super(TestAuthorization, self).setup_method(method)
     host, port = (self.cluster.impalads[0].service.hostname,
                   self.cluster.impalads[0].service.hs2_port)
     self.socket = TSocket(host, port)
@@ -47,9 +49,10 @@ class TestAuthorization(CustomClusterTestSuite):
     self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
     self.hs2_client = ImpalaHiveServer2Service.Client(self.protocol)
 
-  def teardown(self):
+  def teardown_method(self, method):
     if self.socket:
       self.socket.close()
+    super(TestAuthorization, self).teardown_method(method)
 
   def __execute_hs2_stmt(self, statement, verify=True):
     """

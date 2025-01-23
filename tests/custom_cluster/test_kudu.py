@@ -73,6 +73,9 @@ class TestKuduOperations(CustomKuduTest):
   def test_local_tz_conversion_ops(self, vector, unique_database):
     """IMPALA-5539: Test Kudu timestamp reads/writes are correct with the
        use_local_tz_for_unix_timestamp_conversions flag."""
+    # Remove 'abort_on_error' option so we can set it at .test file.
+    # Revisit this if 'abort_on_error' dimension size increase.
+    vector.unset_exec_option('abort_on_error')
     # These tests provide enough coverage of queries with timestamps.
     self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database)
     self.run_test_case('QueryTest/kudu_insert', vector, use_db=unique_database)

@@ -23,12 +23,15 @@ import re
 from random import randint
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_dimensions import (
+  add_exec_option_dimension,
+  create_exec_option_dimension,
+  create_uncompressed_text_dimension)
 from tests.util.test_file_parser import QueryTestSectionReader
 
 LOG = logging.getLogger('test_exprs')
+EXPR_REWRITE_OPTIONS = [0, 1]
+
 
 class TestExprs(ImpalaTestSuite):
   @classmethod
@@ -40,17 +43,17 @@ class TestExprs(ImpalaTestSuite):
     super(TestExprs, cls).add_test_dimensions()
     # Test with and without expr rewrites to cover regular expr evaluations
     # as well as constant folding, in particular, timestamp literals.
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('enable_expr_rewrites', *[0,1]))
+    add_exec_option_dimension(cls, 'enable_expr_rewrites', EXPR_REWRITE_OPTIONS)
     if cls.exploration_strategy() == 'core':
       # Test with file format that supports codegen
       cls.ImpalaTestMatrix.add_constraint(lambda v:
-          v.get_value('table_format').file_format == 'parquet' and
-          v.get_value('table_format').compression_codec == 'none')
+          v.get_value('table_format').file_format == 'parquet'
+          and v.get_value('table_format').compression_codec == 'none')
 
   def test_exprs(self, vector):
-    vector.get_value('exec_option')['enable_expr_rewrites'] = \
-        vector.get_value('enable_expr_rewrites')
+    # Remove 'exec_single_node_rows_threshold' option so we can set it at .test file.
+    # Revisit this if 'exec_single_node_rows_threshold' dimension size increase.
+    vector.unset_exec_option('exec_single_node_rows_threshold')
     # TODO: Enable some of these tests for Avro if possible
     # Don't attempt to evaluate timestamp expressions with Avro tables (which don't
     # support a timestamp type)"
@@ -71,8 +74,6 @@ class TestExprs(ImpalaTestSuite):
 
   def test_special_strings(self, vector):
     """Test handling of expressions with "special" strings."""
-    vector.get_value('exec_option')['enable_expr_rewrites'] = \
-        vector.get_value('enable_expr_rewrites')
     self.run_test_case('QueryTest/special-strings', vector)
 
   def test_encryption_exprs(self, vector):
@@ -82,9 +83,6 @@ class TestExprs(ImpalaTestSuite):
     the mode used in them. For modes that may not be supported, we run a
     probing query first and only run the test file if it succeeds.
     """
-    vector.get_value('exec_option')['enable_expr_rewrites'] = \
-      vector.get_value('enable_expr_rewrites')
-
     # Run queries that are expected to fail, e.g. trying invalid operation modes etc.
     self.run_test_case('QueryTest/encryption_exprs_errors', vector)
 
@@ -92,17 +90,17 @@ class TestExprs(ImpalaTestSuite):
     self.run_test_case('QueryTest/encryption_exprs_aes_256_ecb', vector)
     self.run_test_case('QueryTest/encryption_exprs_aes_256_cfb', vector)
 
-    aes_256_gcm_ok = self._check_aes_mode_supported("aes_256_gcm")
+    aes_256_gcm_ok = self._check_aes_mode_supported("aes_256_gcm", vector)
     if aes_256_gcm_ok:
       self.run_test_case('QueryTest/encryption_exprs_aes_256_gcm', vector)
     self._log_whether_aes_tests_run("aes_256_gcm", aes_256_gcm_ok)
 
-    aes_128_gcm_ok = self._check_aes_mode_supported("aes_128_gcm")
+    aes_128_gcm_ok = self._check_aes_mode_supported("aes_128_gcm", vector)
     if aes_128_gcm_ok:
       self.run_test_case('QueryTest/encryption_exprs_aes_128_gcm', vector)
     self._log_whether_aes_tests_run("aes_128_gcm", aes_128_gcm_ok)
 
-    aes_256_ctr_ok = self._check_aes_mode_supported("aes_256_ctr")
+    aes_256_ctr_ok = self._check_aes_mode_supported("aes_256_ctr", vector)
     if aes_256_ctr_ok:
       self.run_test_case('QueryTest/encryption_exprs_aes_256_ctr', vector)
     self._log_whether_aes_tests_run("aes_256_ctr", aes_256_ctr_ok)
@@ -114,7 +112,7 @@ class TestExprs(ImpalaTestSuite):
             "supports" if running else "does not support")
     LOG.warning(msg)
 
-  def _check_aes_mode_supported(self, mode):
+  def _check_aes_mode_supported(self, mode, vector):
     """Checks whether the given AES mode is supported in the current
     environment (see "test_encryption_exprs()") by running a probing query."""
     assert "ECB" not in mode.upper()
@@ -129,7 +127,7 @@ class TestExprs(ImpalaTestSuite):
         expr=expr, key=key, mode=mode, iv=iv)
 
     try:
-      res = self.execute_query(query)
+      res = self.execute_query_using_vector(query, vector)
       assert res.success
       return True
     except Exception as e:
@@ -173,32 +171,32 @@ class TestExprLimits(ImpalaTestSuite):
       if (i + 1 != self.EXPR_CHILDREN_LIMIT - 1):
         in_query += ","
     in_query += ")"
-    self.__exec_query(in_query)
+    self.__exec_query(in_query, vector)
 
     # CASE expr
     case_query = "select case "
     for i in range(0, self.EXPR_CHILDREN_LIMIT // 2):
       case_query += " when true then 1"
     case_query += " end"
-    self.__exec_query(case_query)
+    self.__exec_query(case_query, vector)
 
   def test_expr_depth_limit(self, vector):
     # Compound predicates
     and_query = "select " + self.__gen_deep_infix_expr("true", " and false")
-    self.__exec_query(and_query)
+    self.__exec_query(and_query, vector)
     or_query = "select " + self.__gen_deep_infix_expr("true", " or false")
-    self.__exec_query(or_query)
+    self.__exec_query(or_query, vector)
 
     # Arithmetic expr
     arith_query = "select " + self.__gen_deep_infix_expr("1", " + 1")
-    self.__exec_query(arith_query)
+    self.__exec_query(arith_query, vector)
 
     func_query = "select " + self.__gen_deep_func_expr("lower(", "'abc'", ")")
-    self.__exec_query(func_query)
+    self.__exec_query(func_query, vector)
 
     # Casts.
     cast_query = "select " + self.__gen_deep_func_expr("cast(", "1", " as int)")
-    self.__exec_query(cast_query)
+    self.__exec_query(cast_query, vector)
 
   def test_under_statement_expression_limit(self):
     """Generate a huge case statement that barely fits within the statement expression
@@ -216,8 +214,9 @@ class TestExprLimits(ImpalaTestSuite):
     """Generate a huge case statement that exceeds the default 16MB limit and verify
        that it gets rejected."""
 
-    expected_err_tmpl = ("Statement length of {0} bytes exceeds the maximum "
-        "statement length \({1} bytes\)")
+    expected_err_tmpl = (
+      r"Statement length of {0} bytes exceeds the maximum "
+      r"statement length \({1} bytes\)")
     size_16mb = 16 * 1024 * 1024
 
     # Case 1: a valid SQL that would parse correctly
@@ -241,8 +240,9 @@ class TestExprLimits(ImpalaTestSuite):
     case = self.__gen_huge_case("int_col", 66, 2, "  ")
     query = "select {0} as huge_case from functional.alltypes".format(case)
     assert len(query) < 16 * 1024 * 1024
-    expected_err_re = ("Exceeded the statement expression limit \({0}\)\n"
-        "Statement has .* expressions.").format(250000)
+    expected_err_re = (
+      r"Exceeded the statement expression limit \({0}\)\n"
+      r"Statement has .* expressions.").format(250000)
     err = self.execute_query_expect_failure(self.client, query)
     assert re.search(expected_err_re, str(err))
 
@@ -282,12 +282,13 @@ class TestExprLimits(ImpalaTestSuite):
       expr += close_func
     return expr
 
-  def __exec_query(self, sql_str):
+  def __exec_query(self, sql_str, vector):
     try:
-      impala_ret = self.execute_query(sql_str)
+      impala_ret = self.execute_query_using_vector(sql_str, vector)
       assert impala_ret.success, "Failed to execute query %s" % (sql_str)
     except Exception as e:  # consider any exception a failure
       assert False, "Failed to execute query %s: %s" % (sql_str, e)
+
 
 class TestUtcTimestampFunctions(ImpalaTestSuite):
   """Tests for UTC timestamp functions, i.e. functions that do not depend on the behavior
@@ -300,21 +301,18 @@ class TestUtcTimestampFunctions(ImpalaTestSuite):
     super(TestUtcTimestampFunctions, cls).add_test_dimensions()
     # Test with and without expr rewrites to cover regular expr evaluations
     # as well as constant folding, in particular, timestamp literals.
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('enable_expr_rewrites', *[0,1]))
+    add_exec_option_dimension(cls, 'enable_expr_rewrites', EXPR_REWRITE_OPTIONS)
     if cls.exploration_strategy() == 'core':
       # Test with file format that supports codegen
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format == 'text' and\
-          v.get_value('table_format').compression_codec == 'none')
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('table_format').file_format == 'text'
+          and v.get_value('table_format').compression_codec == 'none')
 
   @classmethod
   def get_workload(cls):
     return 'functional-query'
 
   def test_utc_functions(self, vector):
-    vector.get_value('exec_option')['enable_expr_rewrites'] = \
-        vector.get_value('enable_expr_rewrites')
     self.run_test_case('QueryTest/utc-timestamp-functions', vector)
 
 
@@ -330,8 +328,7 @@ class TestConstantFoldingNoTypeLoss(ImpalaTestSuite):
     super(TestConstantFoldingNoTypeLoss, cls).add_test_dimensions()
     # Test with and without expr rewrites to verify that constant folding does not change
     # the behaviour.
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('enable_expr_rewrites', *[0,1]))
+    add_exec_option_dimension(cls, 'enable_expr_rewrites', EXPR_REWRITE_OPTIONS)
     # We don't actually use a table so one file format is enough.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet'])
@@ -350,13 +347,13 @@ class TestConstantFoldingNoTypeLoss(ImpalaTestSuite):
     for (typename, width) in types_and_widths:
       shift_val = width - 2  # Valid and positive for signed types.
       expected_value = 1 << shift_val
-      result = self.execute_query_expect_success(self.client,
-          query_template.format(typename=typename, shift_val=shift_val))
+      result = self.execute_query_using_vector(
+        query_template.format(typename=typename, shift_val=shift_val), vector)
       assert result.data == [str(expected_value)]
 
   def test_addition(self, vector):
     query = "select typeof(cast(1 as bigint) + cast(rand() as tinyint))"
-    result = self.execute_query_expect_success(self.client, query)
+    result = self.execute_query_using_vector(query, vector)
     assert result.data == ["BIGINT"]
 
 
@@ -367,22 +364,29 @@ class TestNonConstPatternILike(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestNonConstPatternILike, cls).add_test_dimensions()
+    # This test does not care about the file format of test table.
+    # Fix the table format to text.
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   @classmethod
   def get_workload(cls):
     return 'functional-query'
 
   def test_non_const_pattern_ilike(self, vector, unique_database):
-    tbl_name = '`{0}`.`ilike_test`'.format(unique_database)
+    with self.create_impala_client_from_vector(vector) as client:
+      tbl_name = '`{0}`.`ilike_test`'.format(unique_database)
+      self.__run_non_const_pattern_ilike(client, tbl_name)
 
-    self.execute_query_expect_success(self.client,
+  def __run_non_const_pattern_ilike(self, client, tbl_name):
+    self.execute_query_expect_success(client,
         "CREATE TABLE {0} (pattern_str string)".format(tbl_name))
-    self.execute_query_expect_success(self.client,
+    self.execute_query_expect_success(client,
         "INSERT INTO TABLE {0} VALUES('%b%'), ('.*b.*')".format(tbl_name))
 
-    ilike_result = self.execute_query_expect_success(self.client,
+    ilike_result = self.execute_query_expect_success(client,
         "SELECT count(*) FROM {0} WHERE 'ABC' ILIKE pattern_str".format(tbl_name))
     assert int(ilike_result.get_data()) == 1
-    iregexp_result = self.execute_query_expect_success(self.client,
+    iregexp_result = self.execute_query_expect_success(client,
         "SELECT count(*) FROM {0} WHERE 'ABC' IREGEXP pattern_str".format(tbl_name))
     assert int(iregexp_result.get_data()) == 1

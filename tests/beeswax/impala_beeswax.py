@@ -136,7 +136,7 @@ class ImpalaBeeswaxClient(object):
     return self.__query_options
 
   def set_query_option(self, name, value):
-    self.__query_options[name.upper()] = value
+    self.__query_options[name.lower()] = value
 
   def set_query_options(self, query_option_dict):
     if query_option_dict is None:
@@ -146,7 +146,7 @@ class ImpalaBeeswaxClient(object):
       self.set_query_option(name, value)
 
   def get_query_option(self, name):
-    return self.__query_options.get(name.upper())
+    return self.__query_options.get(name.lower())
 
   def clear_query_options(self):
     self.__query_options.clear()

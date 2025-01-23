@@ -67,6 +67,17 @@ def log_sql_stmt(sql_stmt):
     LOG.info("-- [...]")
 
 
+def collect_default_query_options(options, name, val, kind):
+  if kind == 'REMOVED':
+    return
+  name = name.lower()
+  val = str(val).strip('"')
+  if ',' in val:
+    # Value is a list. Wrap it with double quote.
+    val = '"{}"'.format(val)
+  options[name] = val
+
+
 # Common wrapper around the internal types of HS2/Beeswax operation/query handles.
 class OperationHandle(object):
   def __init__(self, handle, sql_stmt):
@@ -197,6 +208,9 @@ class BeeswaxConnection(ImpalaConnection):
     self.__beeswax_client = ImpalaBeeswaxClient(host_port, use_kerberos, user=user,
                                                 password=password, use_ssl=use_ssl)
     self.__host_port = host_port
+    # Default query option, obtained at first call to get_default_configuration().
+    # Query option names are in lower case for consistency.
+    self.__default_query_options = None
     self.QUERY_STATES = self.__beeswax_client.query_states
 
   def get_test_protocol(self):
@@ -207,15 +221,24 @@ class BeeswaxConnection(ImpalaConnection):
 
   def set_configuration_option(self, name, value):
     # Only set the option if it's not already set to the same value.
+    name = name.lower()
+    value = str(value)
     if self.__beeswax_client.get_query_option(name) != value:
-      LOG.info('SET %s=%s;' % (name, value))
+      LOG.info("set_option('{}', '{}')".format(name, value))
       self.__beeswax_client.set_query_option(name, value)
 
-  def get_default_configuration(self):
-    result = {}
+  def __collect_default_options(self):
+    options = {}
     for item in self.__beeswax_client.get_default_configuration():
-      result[item.key] = item.value
-    return result
+      collect_default_query_options(
+        options, item.key, item.value, str(item.level))
+    LOG.debug("Default query options: {0}".format(options))
+    return options
+
+  def get_default_configuration(self):
+    if self.__default_query_options is None:
+      self.__default_query_options = self.__collect_default_options()
+    return self.__default_query_options.copy()
 
   def clear_configuration(self):
     self.__beeswax_client.clear_query_options()
@@ -329,6 +352,9 @@ class ImpylaHS2Connection(ImpalaConnection):
     # at a time per connection, which is a limitation also imposed by the Beeswax API.
     self.__impyla_conn = None
     self.__cursor = None
+    # Default query option obtained from initial connect.
+    # Query option names are in lower case for consistency.
+    self.__default_query_options = {}
     # Query options to send along with each query.
     self.__query_options = {}
     self._is_hive = is_hive
@@ -346,7 +372,11 @@ class ImpylaHS2Connection(ImpalaConnection):
     return self.__host_port
 
   def set_configuration_option(self, name, value):
-    self.__query_options[name] = str(value)
+    name = name.lower()
+    value = str(value)
+    if self.__query_options.get(name) != value:
+      LOG.info("set_option('{}', '{}')".format(name, value))
+      self.__query_options[name] = value
 
   def get_default_configuration(self):
     return self.__default_query_options.copy()
@@ -371,8 +401,8 @@ class ImpylaHS2Connection(ImpalaConnection):
     self.__default_query_options = {}
     if not self._is_hive:
       self.__cursor.execute("set all")
-      for name, val, _ in self.__cursor:
-        self.__default_query_options[name] = val
+      for name, val, kind in self.__cursor:
+        collect_default_query_options(self.__default_query_options, name, val, kind)
       self.__cursor.close_operation()
       LOG.debug("Default query options: {0}".format(self.__default_query_options))
 

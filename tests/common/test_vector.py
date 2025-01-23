@@ -99,13 +99,15 @@ class ImpalaTestVector(object):
     return self.get_value(EXEC_OPTION_KEY)
 
   def get_exec_option(self, option_name):
-    return self.get_value(EXEC_OPTION_KEY)[option_name]
+    value = self.get_value(EXEC_OPTION_KEY).get(option_name.lower())
+    assert value is not None
+    return value
 
   def set_exec_option(self, option_name, option_value):
-    self.get_value(EXEC_OPTION_KEY)[option_name] = option_value
+    self.get_value(EXEC_OPTION_KEY)[option_name.lower()] = str(option_value)
 
   def unset_exec_option(self, option_name):
-    del self.get_value(EXEC_OPTION_KEY)[option_name]
+    del self.get_value(EXEC_OPTION_KEY)[option_name.lower()]
 
   def __str__(self):
       return ' | '.join(['%s' % vector_value for vector_value in self.vector_values])

@@ -18,7 +18,6 @@
 from __future__ import absolute_import, division, print_function
 import os
 import pytest
-from copy import deepcopy
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
@@ -51,6 +50,9 @@ class TestMtDopFlags(CustomClusterTestSuite):
   def test_mt_dop_runtime_filters_one_node(self, vector):
     """Runtime filter tests, which assume 3 fragment instances, can also be run on a single
     node cluster to test multiple filter sources/destinations per backend."""
+    # Remove 'num_nodes' option so we can set it at .test file.
+    # Revisit this if 'num_nodes' dimension size increase.
+    vector.unset_exec_option('num_nodes')
     # Runtime filter test with RUNTIME_PROFILE seconds modified to reflect
     # the different filter aggregation pattern with mt_dop.
     vector.get_value('exec_option')['mt_dop'] = 3
@@ -67,7 +69,7 @@ class TestMtDopFlags(CustomClusterTestSuite):
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
   @CustomClusterTestSuite.with_args(cluster_size=1)
-  def test_mt_dop_union_empty_table(self, unique_database):
+  def test_mt_dop_union_empty_table(self):
     """ Regression test for IMPALA-11803: When used in DEBUG build,
     impalad crashed while running union on an empty table with MT_DOP>1.
     This test verifies the fix on the same."""
@@ -75,6 +77,7 @@ class TestMtDopFlags(CustomClusterTestSuite):
     self.client.execute("select count(*) from (select f2 from"
                         " functional.emptytable union all select id from"
                         " functional.alltypestiny) t")
+
 
 class TestMaxMtDop(CustomClusterTestSuite):
   @classmethod

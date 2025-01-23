@@ -41,6 +41,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
   TEST_DB_NAME = "insert_empty_result_db"
 
   def setup_method(self, method):
+    super(TestInsertBehaviour, self).setup_method(method)
     # cleanup and create a fresh test database
     if method.__name__ == "test_insert_select_with_empty_resultset":
       self.cleanup_db(self.TEST_DB_NAME)
@@ -50,6 +51,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
   def teardown_method(self, method):
     if method.__name__ == "test_insert_select_with_empty_resultset":
       self.cleanup_db(self.TEST_DB_NAME)
+    super(TestInsertBehaviour, self).teardown_method(method)
 
   @SkipIfFS.eventually_consistent
   @pytest.mark.execute_serially
@@ -77,7 +79,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # We do this here because the above 'make_dir' call doesn't make a directory for S3.
     for dir_ in dir_locations:
       self.filesystem_client.create_file(
-          table_dir + dir_ + '/' + hidden_file_locations[0] , '', overwrite=True)
+        table_dir + dir_ + '/' + hidden_file_locations[0], '', overwrite=True)
 
     for file_ in hidden_file_locations:
       self.filesystem_client.create_file(table_dir + file_, '', overwrite=True)
@@ -406,8 +408,8 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_failure(self.client, insert_query)
 
     # Check that the mask correctly applies to the named user ACL
-    self.hdfs_client.setacl(table_path, "user::r-x,user:" + user +
-                            ":rwx,group::r-x,other::rwx,mask::r--")
+    self.hdfs_client.setacl(table_path, "user::r-x,user:" + user
+                            + ":rwx,group::r-x,other::rwx,mask::r--")
     self.execute_query_expect_success(self.client, refresh_query)
     # Should be unwritable because mask applies to named user and disables writing
     self.execute_query_expect_failure(self.client, insert_query)
@@ -624,7 +626,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # We expect exactly one partition per year and month, since subsequent row batches of
     # a partition will be written into the same file.
     expected_partitions = \
-        ["year=%s/month=%s" % (y, m) for y in [2009, 2010] for m in range(1,13)]
+        ["year=%s/month=%s" % (y, m) for y in [2009, 2010] for m in range(1, 13)]
 
     for partition in expected_partitions:
       partition_path = "{0}/{1}".format(table_path, partition)

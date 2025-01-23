@@ -125,15 +125,17 @@ class FaultInjectingImpalaHS2Client(ImpalaHS2Client):
 class TestHS2FaultInjection(CustomClusterTestSuite):
   """Class for testing the http fault injection in various rpcs used by the
   impala-shell client"""
-  def setup(self):
+  def setup_method(self, method):
+    super(TestHS2FaultInjection, self).setup_method(method)
     impalad = IMPALAD_HS2_HTTP_HOST_PORT.split(":")
     self.custom_hs2_http_client = FaultInjectingImpalaHS2Client(impalad, 1024,
         kerberos_host_fqdn=None, use_http_base_transport=True, http_path='cliservice')
     self.transport = self.custom_hs2_http_client.transport
 
-  def teardown(self):
+  def teardown_method(self, method):
     self.transport.disable_fault()
     self.custom_hs2_http_client.close_connection()
+    super(TestHS2FaultInjection, self).teardown_method(method)
 
   def connect(self):
     self.custom_hs2_http_client.connect()
