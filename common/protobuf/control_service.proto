@@ -329,6 +329,10 @@ message ShutdownStatusPB {
 
   // Number of queries still executing on backend.
   optional int64 backend_queries_executing = 5;
+
+  // Milliseconds remaining in query cancel before shutdown deadline. 0 if the deadline
+  // has expired.
+  optional int64 cancel_deadline_remaining_ms = 6;
 }
 
 message RemoteShutdownResultPB {

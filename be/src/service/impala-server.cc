@@ -40,6 +40,8 @@
 #include <rapidjson/stringbuffer.h>
 #include <sys/types.h>
 
+#include "runtime/query-exec-mgr.h"
+
 #include "catalog/catalog-server.h"
 #include "catalog/catalog-util.h"
 #include "common/compiler-util.h"
@@ -326,6 +328,13 @@ DEFINE_int64(shutdown_deadline_s, 60 * 60, "Default time limit in seconds for th
     "down process. If this duration elapses after the shut down process is started, "
     "the daemon shuts down regardless of any running queries.");
 
+DEFINE_int64(shutdown_query_cancel_period_s, 60,
+    "Time limit in seconds for canceling running queries before the shutdown deadline. "
+    "If this value is greater than 0, the Impala daemon will attempt to cancel running "
+    "queries starting from this period before reaching the deadline. However, if this "
+    "period exceeds 20% of the total shutdown deadline, it will be capped at 20% of the "
+    "total shutdown duration.");
+
 #ifndef NDEBUG
   DEFINE_int64(stress_metadata_loading_pause_injection_ms, 0, "Simulates metadata loading"
       "for a given query by injecting a sleep equivalent to this configuration in "
@@ -485,6 +494,8 @@ const char* ImpalaServer::QUERY_ERROR_FORMAT = "Query $0 failed:\n$1\n";
 
 // Interval between checks for query expiration.
 const int64_t EXPIRATION_CHECK_INTERVAL_MS = 1000L;
+// The max allowed ratio of the shutdown query cancel period to the shutdown deadline.
+constexpr double SHUTDOWN_CANCEL_MAX_RATIO = 0.2;
 
 // Template to return error messages for client requests that could not be found, belonged
 // to the wrong session, or had a mismatched secret. We need to use this particular string
@@ -501,8 +512,9 @@ static const char* INACTIVE_QUERY_DRIVER_TEMPLATE =
 ThreadSafeRandom ImpalaServer::rng_(GetRandomSeed32());
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
-    : exec_env_(exec_env),
-      services_started_(false) {
+  : exec_env_(exec_env),
+    services_started_(false),
+    shutdown_deadline_cancel_queries_(false) {
   // Initialize default config
   InitializeConfigVariables();
 
@@ -2082,6 +2094,7 @@ void ImpalaServer::CancelFromThreadPool(const CancellationWork& cancellation_wor
   Status error;
   switch (cancellation_work.cause()) {
     case CancellationWorkCause::TERMINATED_BY_SERVER:
+    case CancellationWorkCause::GRACEFUL_SHUTDOWN:
       error = cancellation_work.error();
       break;
     case CancellationWorkCause::BACKEND_FAILED: {
@@ -3418,6 +3431,12 @@ Status ImpalaServer::CheckNotShuttingDown() const {
       TErrorCode::SERVER_SHUTTING_DOWN, ShutdownStatusToString(GetShutdownStatus())));
 }
 
+static int64_t GetShutdownCancelThreshold() {
+  return std::min(
+      static_cast<int64_t>(FLAGS_shutdown_deadline_s * SHUTDOWN_CANCEL_MAX_RATIO * 1000L),
+      FLAGS_shutdown_query_cancel_period_s * 1000L);
+}
+
 ShutdownStatusPB ImpalaServer::GetShutdownStatus() const {
   ShutdownStatusPB result;
   int64_t shutdown_time = shutting_down_.Load();
@@ -3429,6 +3448,10 @@ ShutdownStatusPB ImpalaServer::GetShutdownStatus() const {
   result.set_grace_remaining_ms(
       max<int64_t>(0, FLAGS_shutdown_grace_period_s * 1000 - elapsed_ms));
   result.set_deadline_remaining_ms(max<int64_t>(0, shutdown_deadline - now));
+  if (FLAGS_shutdown_query_cancel_period_s > 0) {
+    result.set_cancel_deadline_remaining_ms(
+        max<int64_t>(0, shutdown_deadline - now - GetShutdownCancelThreshold()));
+  }
   result.set_finstances_executing(
       ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->GetValue());
   result.set_client_requests_registered(
@@ -3439,11 +3462,16 @@ ShutdownStatusPB ImpalaServer::GetShutdownStatus() const {
 }
 
 string ImpalaServer::ShutdownStatusToString(const ShutdownStatusPB& shutdown_status) {
-  return Substitute("shutdown grace period left: $0, deadline left: $1, "
-                    "queries registered on coordinator: $2, queries executing: $3, "
-                    "fragment instances: $4",
+  return Substitute("shutdown grace period left: $0, deadline left: $1, $2"
+                    "queries registered on coordinator: $3, queries executing: $4, "
+                    "fragment instances: $5",
       PrettyPrinter::Print(shutdown_status.grace_remaining_ms(), TUnit::TIME_MS),
       PrettyPrinter::Print(shutdown_status.deadline_remaining_ms(), TUnit::TIME_MS),
+      FLAGS_shutdown_query_cancel_period_s > 0 ?
+          Substitute("cancel deadline left: $0, ",
+              PrettyPrinter::Print(
+                  shutdown_status.cancel_deadline_remaining_ms(), TUnit::TIME_MS)) :
+          "",
       shutdown_status.client_requests_registered(),
       shutdown_status.backend_queries_executing(),
       shutdown_status.finstances_executing());
@@ -3491,8 +3519,18 @@ Status ImpalaServer::StartShutdown(
   }
   if (set_deadline) {
     shutdown_status->set_deadline_remaining_ms(relative_deadline_s * 1000L);
+    if (FLAGS_shutdown_query_cancel_period_s > 0) {
+      shutdown_status->set_cancel_deadline_remaining_ms(
+          relative_deadline_s * 1000L - GetShutdownCancelThreshold());
+    }
   }
   return Status::OK();
+}
+
+bool ImpalaServer::CancelQueriesForGracefulShutdown() {
+  LOG(INFO) << "Start to cancel all running queries for graceful shutdown.";
+  // Cancel all active queries this Impala daemon involves.
+  return ExecEnv::GetInstance()->query_exec_mgr()->CancelQueriesForGracefulShutdown();
 }
 
 [[noreturn]] void ImpalaServer::ShutdownThread() {
@@ -3506,6 +3544,10 @@ Status ImpalaServer::StartShutdown(
       break;
     } else if (shutdown_status.deadline_remaining_ms() <= 0) {
       break;
+    } else if (FLAGS_shutdown_query_cancel_period_s > 0
+        && !shutdown_deadline_cancel_queries_
+        && shutdown_status.cancel_deadline_remaining_ms() <= 0) {
+      shutdown_deadline_cancel_queries_ = CancelQueriesForGracefulShutdown();
     }
   }
 

@@ -862,6 +862,10 @@ class ImpalaServer : public ImpalaServiceIf,
   Status CloseSessionInternal(const TUniqueId& session_id, const SecretArg& secret,
       bool ignore_if_absent) WARN_UNUSED_RESULT;
 
+  /// Cancel all running queries associated with this Impala daemon.
+  /// Returns true if the cancellation of all running queries has already been triggered.
+  bool CancelQueriesForGracefulShutdown();
+
   /// The output of a runtime profile. The output of a profile can be in one of three
   /// formats: string, thrift, or json. The format is specified by TRuntimeProfileFormat.
   /// The struct is a union of all output profiles types. The struct is similar to a
@@ -1672,6 +1676,11 @@ class ImpalaServer : public ImpalaServiceIf,
   /// client requests and running finstances. Set before 'shutting_down_' and updated
   /// atomically if a new shutdown command with a shorter deadline comes in.
   AtomicInt64 shutdown_deadline_{0};
+
+  /// Flag that records if the cancel queries before shutdown deadline has been started.
+  /// The flag is set when the shutdown cancel queries period has been reached and all
+  /// running queries have been sent for cancellation.
+  std::atomic_bool shutdown_deadline_cancel_queries_;
 
   /// Stores the last version number for the admission heartbeat that was sent.
   /// Incremented every time a new admission heartbeat is sent.

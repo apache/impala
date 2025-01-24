@@ -31,7 +31,10 @@ enum class CancellationWorkCause {
   TERMINATED_BY_SERVER,
   // The query is being terminated because a backend failed. We can skip cancelling the
   // query if the fragment instances running on that backend all completed.
-  BACKEND_FAILED
+  BACKEND_FAILED,
+  // The Impala Server terminated the query during shutdown and the query has not been
+  // done yet when the graceful shutdown deadline is reached.
+  GRACEFUL_SHUTDOWN
 };
 
 /// Work item for ImpalaServer::cancellation_thread_pool_.
@@ -56,10 +59,18 @@ class CancellationWork {
         failed_backends, false);
   }
 
+  // Construct a GRACEFUL_SHUTDOWN CancellationWork instance.
+  static CancellationWork GracefulShutdown(
+      const TUniqueId& query_id, const Status& error, bool unregister) {
+    return CancellationWork(
+        query_id, CancellationWorkCause::GRACEFUL_SHUTDOWN, error, {}, unregister);
+  }
+
   const TUniqueId& query_id() const { return query_id_; }
   CancellationWorkCause cause() const { return cause_; }
   const Status& error() const {
-    DCHECK_ENUM_EQ(cause_, CancellationWorkCause::TERMINATED_BY_SERVER);
+    DCHECK(cause_ == CancellationWorkCause::TERMINATED_BY_SERVER
+        || cause_ == CancellationWorkCause::GRACEFUL_SHUTDOWN);
     return error_;
   }
   const std::vector<NetworkAddressPB>& failed_backends() const {

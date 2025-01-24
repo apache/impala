@@ -73,19 +73,28 @@ class QueryExecMgr : public CacheLineAligned {
   void CancelQueriesForFailedCoordinators(
       const std::unordered_set<BackendIdPB>& current_membership);
 
+  /// Before graceful shutdown, cancel all the queries within the daemon.
+  /// Returns false if the job hasn't been done yet due to the full cancellation queue.
+  /// Otherwise returns true.
+  bool CancelQueriesForGracefulShutdown();
+
   /// Work item for QueryExecMgr::cancellation_thread_pool_.
   /// This class needs to support move construction and assignment for use in ThreadPool.
   class QueryCancellationTask {
    public:
     // Empty constructor needed to make ThreadPool happy.
-    QueryCancellationTask() : qs_(nullptr) {}
-    QueryCancellationTask(QueryState* qs) : qs_(qs) {}
+    QueryCancellationTask() : qs_(nullptr), is_coord_active_(true) {}
+    QueryCancellationTask(QueryState* qs, bool is_coord_active)
+      : qs_(qs), is_coord_active_(is_coord_active) {}
 
     QueryState* GetQueryState() const { return qs_; }
+    bool IsCoordActive() const { return is_coord_active_; }
 
    private:
     // QueryState to be cancelled.
     QueryState* qs_;
+    // Is the coordinator active.
+    bool is_coord_active_;
   };
 
  private:
@@ -117,5 +126,20 @@ class QueryExecMgr : public CacheLineAligned {
   /// called from the cancellation thread pool. The cancellation_task contains the
   /// QueryState to be cancelled.
   void CancelFromThreadPool(const QueryCancellationTask& cancellation_task);
+
+  // Helper function to collect queries to cancel based on a filter.
+  // The 'to_cancel' vector (must not be nullptr) will store any queries
+  // to cancel.
+  void CollectQueriesToCancel(std::function<bool(QueryState*)> filter,
+      bool is_coord_active, std::vector<QueryCancellationTask>* to_cancel);
+
+  // Helper function to enqueue cancellation requests and handle cases where the
+  // queue is full accordingly.
+  // Returns true if all requests in 'to_cancel' were successfully processed.
+  bool ProcessCancelQueries(
+      const vector<QueryCancellationTask>& to_cancel, bool handle_full_queue);
+
+  /// Helper function to cancel queries.
+  void CancelQueries(const QueryCancellationTask& to_cancel);
 };
 }

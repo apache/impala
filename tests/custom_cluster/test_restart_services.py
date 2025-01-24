@@ -489,16 +489,38 @@ class TestRestart(CustomClusterTestSuite):
       client.close()
 
 
-def parse_shutdown_result(result):
-  """Parse the shutdown result string and return the strings (grace left,
-  deadline left, queries registered, queries executing)."""
+def _get_shutdown_pattern(with_cancel):
+  base_pattern = (r'shutdown grace period left: ([0-9ms]*), '
+                 r'deadline left: ([0-9ms]*)')
+  cancel_part = r', cancel deadline left: ([0-9ms]*)' if with_cancel else ''
+  end_pattern = (r', queries registered on coordinator: ([0-9]*), queries executing: '
+                r'([0-9]*), fragment instances: [0-9]*')
+  return base_pattern + cancel_part + end_pattern
+
+
+def parse_shutdown_result_with_cancel(result):
+  """Parse shutdown string with cancel deadline."""
   assert len(result.data) == 1
   summary = result.data[0]
-  match = re.match(r'shutdown grace period left: ([0-9ms]*), deadline left: ([0-9ms]*), '
-                   r'queries registered on coordinator: ([0-9]*), queries executing: '
-                   r'([0-9]*), fragment instances: [0-9]*', summary)
+  match = re.match(_get_shutdown_pattern(True), summary)
   assert match is not None, summary
   return match.groups()
+
+
+def parse_shutdown_result(result):
+  """Parse shutdown string without cancel deadline."""
+  assert len(result.data) == 1
+  summary = result.data[0]
+  match = re.match(_get_shutdown_pattern(False), summary)
+  assert match is not None, summary
+  return match.groups()
+
+
+def get_remain_shutdown_query_cancel(exec_shutdown_deadline_s,
+    exec_shutdown_query_cancel_s):
+  max_allowed_cancel_s = int(exec_shutdown_deadline_s * 0.2)
+  return exec_shutdown_deadline_s - min(exec_shutdown_query_cancel_s,
+      max_allowed_cancel_s)
 
 
 class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
@@ -641,22 +663,25 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
 
   EXEC_SHUTDOWN_GRACE_PERIOD_S = 5
   EXEC_SHUTDOWN_DEADLINE_S = 10
+  EXEC_SHUTDOWN_QUERY_CANCEL_S = 30
 
   @pytest.mark.execute_serially
   @SkipIfNotHdfsMinicluster.scheduling
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \
           --shutdown_deadline_s={deadline} \
+          --shutdown_query_cancel_period_s=0 \
           --hostname={hostname}".format(grace_period=EXEC_SHUTDOWN_GRACE_PERIOD_S,
             deadline=EXEC_SHUTDOWN_DEADLINE_S, hostname=socket.gethostname()))
   def test_shutdown_executor(self):
-    self.do_test_shutdown_executor(fetch_delay_s=0)
+    self.do_test_shutdown_executor(fetch_delay_s=0, has_query_cancel_period=False)
 
   @pytest.mark.execute_serially
   @SkipIfNotHdfsMinicluster.scheduling
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \
           --shutdown_deadline_s={deadline} \
+          --shutdown_query_cancel_period_s=0 \
           --stress_status_report_delay_ms={status_report_delay_ms} \
           --hostname={hostname}".format(grace_period=EXEC_SHUTDOWN_GRACE_PERIOD_S,
             deadline=EXEC_SHUTDOWN_DEADLINE_S, status_report_delay_ms=5000,
@@ -667,9 +692,22 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     print(self.exploration_strategy)
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip()
-    self.do_test_shutdown_executor(fetch_delay_s=5)
+    self.do_test_shutdown_executor(fetch_delay_s=5, has_query_cancel_period=False)
 
-  def do_test_shutdown_executor(self, fetch_delay_s):
+  @pytest.mark.execute_serially
+  @SkipIfNotHdfsMinicluster.scheduling
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--shutdown_grace_period_s={grace_period} \
+          --shutdown_deadline_s={deadline} \
+          --shutdown_query_cancel_period_s={query_cancel_period} \
+          --hostname={hostname}".format(grace_period=EXEC_SHUTDOWN_GRACE_PERIOD_S,
+            deadline=EXEC_SHUTDOWN_DEADLINE_S,
+            query_cancel_period=EXEC_SHUTDOWN_QUERY_CANCEL_S,
+            hostname=socket.gethostname()))
+  def test_shutdown_executor_with_query_cancel_period(self):
+    self.do_test_shutdown_executor(fetch_delay_s=0, has_query_cancel_period=True)
+
+  def do_test_shutdown_executor(self, fetch_delay_s, has_query_cancel_period):
     """Implementation of test that shuts down and then restarts an executor. This should
     not disrupt any queries that start after the shutdown or complete before the shutdown
     time limit. The test is parameterized by 'fetch_delay_s', the amount to delay before
@@ -697,9 +735,17 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
 
     # Shut down and wait for the shutdown state to propagate through statestore.
     result = self.execute_query_expect_success(self.client, SHUTDOWN_EXEC2)
-    assert parse_shutdown_result(result) == (
-        "{0}s000ms".format(self.EXEC_SHUTDOWN_GRACE_PERIOD_S),
-        "{0}s000ms".format(self.EXEC_SHUTDOWN_DEADLINE_S), "0", "1")
+    if has_query_cancel_period:
+      assert parse_shutdown_result_with_cancel(result) == (
+          "{0}s000ms".format(self.EXEC_SHUTDOWN_GRACE_PERIOD_S),
+          "{0}s000ms".format(self.EXEC_SHUTDOWN_DEADLINE_S),
+          "{0}s000ms".format(get_remain_shutdown_query_cancel(
+              self.EXEC_SHUTDOWN_DEADLINE_S, self.EXEC_SHUTDOWN_QUERY_CANCEL_S)),
+          "0", "1")
+    else:
+      assert parse_shutdown_result(result) == (
+          "{0}s000ms".format(self.EXEC_SHUTDOWN_GRACE_PERIOD_S),
+          "{0}s000ms".format(self.EXEC_SHUTDOWN_DEADLINE_S), "0", "1")
 
     # Check that the status is reflected on the debug page.
     web_json = self.cluster.impalads[1].service.get_debug_webpage_json("")
@@ -743,11 +789,20 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     # Test that a query will fail when the executor shuts down after the limit.
     deadline_expiry_handle = self.__exec_and_wait_until_running(SLOW_QUERY)
     result = self.execute_query_expect_success(self.client, SHUTDOWN_EXEC2)
-    assert parse_shutdown_result(result) == (
-        "{0}s000ms".format(self.EXEC_SHUTDOWN_GRACE_PERIOD_S),
-        "{0}s000ms".format(self.EXEC_SHUTDOWN_DEADLINE_S), "0", "1")
+    if has_query_cancel_period:
+      assert parse_shutdown_result_with_cancel(result) == (
+          "{0}s000ms".format(self.EXEC_SHUTDOWN_GRACE_PERIOD_S),
+          "{0}s000ms".format(self.EXEC_SHUTDOWN_DEADLINE_S),
+          "{0}s000ms".format(get_remain_shutdown_query_cancel(
+              self.EXEC_SHUTDOWN_DEADLINE_S, self.EXEC_SHUTDOWN_QUERY_CANCEL_S)),
+          "0", "1")
+    else:
+      assert parse_shutdown_result(result) == (
+          "{0}s000ms".format(self.EXEC_SHUTDOWN_GRACE_PERIOD_S),
+          "{0}s000ms".format(self.EXEC_SHUTDOWN_DEADLINE_S), "0", "1")
     self.cluster.impalads[1].wait_for_exit()
-    self.__check_deadline_expired(SLOW_QUERY, deadline_expiry_handle)
+    self.__check_deadline_expired(SLOW_QUERY, deadline_expiry_handle,
+        has_query_cancel_period)
 
     # Test that we can reduce the deadline after setting it to a high value.
     # Run a query that will fail as a result of the reduced deadline.
@@ -758,13 +813,19 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     LOW_DEADLINE = 5
     result = self.execute_query_expect_success(
         self.client, SHUTDOWN_EXEC3.format(HIGH_DEADLINE))
-    grace, deadline, _, _ = parse_shutdown_result(result)
+    if has_query_cancel_period:
+      grace, deadline, _, _, _ = parse_shutdown_result_with_cancel(result)
+    else:
+      grace, deadline, _, _ = parse_shutdown_result(result)
     assert grace == "{0}s000ms".format(self.EXEC_SHUTDOWN_GRACE_PERIOD_S)
     assert deadline == "{0}m{1}s".format(HIGH_DEADLINE // 60, HIGH_DEADLINE % 60)
 
     result = self.execute_query_expect_success(
         self.client, SHUTDOWN_EXEC3.format(VERY_HIGH_DEADLINE))
-    _, deadline, _, _ = parse_shutdown_result(result)
+    if has_query_cancel_period:
+      _, deadline, _, _, _ = parse_shutdown_result_with_cancel(result)
+    else:
+      _, deadline, _, _ = parse_shutdown_result(result)
     LOG.info("Deadline is {0}".format(deadline))
     min_string, sec_string = re.match("([0-9]*)m([0-9]*)s", deadline).groups()
     assert int(min_string) * 60 + int(sec_string) <= HIGH_DEADLINE, \
@@ -772,22 +833,31 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
 
     result = self.execute_query_expect_success(
         self.client, SHUTDOWN_EXEC3.format(LOW_DEADLINE))
-    _, deadline, _, queries_executing = parse_shutdown_result(result)
+    if has_query_cancel_period:
+      _, deadline, _, _, queries_executing = parse_shutdown_result_with_cancel(result)
+    else:
+      _, deadline, _, queries_executing = parse_shutdown_result(result)
     assert deadline == "{0}s000ms".format(LOW_DEADLINE)
     assert int(queries_executing) > 0, "Slow query should still be running."
     self.cluster.impalads[2].wait_for_exit()
-    self.__check_deadline_expired(SLOW_QUERY, deadline_expiry_handle)
+    self.__check_deadline_expired(SLOW_QUERY, deadline_expiry_handle,
+        has_query_cancel_period)
 
   COORD_SHUTDOWN_GRACE_PERIOD_S = 5
   COORD_SHUTDOWN_DEADLINE_S = 120
+  COORD_SHUTDOWN_FAST_DEADLINE_S = 20
+  COORD_SHUTDOWN_QUERY_CANCEL_PERIOD_S = 10
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \
           --shutdown_deadline_s={deadline} \
+          --shutdown_query_cancel_period_s={query_cancel_period} \
           --hostname={hostname}".format(
           grace_period=COORD_SHUTDOWN_GRACE_PERIOD_S,
-          deadline=COORD_SHUTDOWN_DEADLINE_S, hostname=socket.gethostname()),
+          deadline=COORD_SHUTDOWN_DEADLINE_S,
+          query_cancel_period=COORD_SHUTDOWN_QUERY_CANCEL_PERIOD_S,
+          hostname=socket.gethostname()),
       default_query_options=[("num_scanner_threads", "1")])
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6,
                  close_session=False)
@@ -806,7 +876,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
 
     # Shut down the coordinator. Operations that start after this point should fail.
     result = self.execute_query_expect_success(self.client, SHUTDOWN)
-    grace, deadline, registered, _ = parse_shutdown_result(result)
+    grace, deadline, _, registered, _ = parse_shutdown_result_with_cancel(result)
     assert grace == "{0}s000ms".format(self.COORD_SHUTDOWN_GRACE_PERIOD_S)
     assert deadline == "{0}m".format(self.COORD_SHUTDOWN_DEADLINE_S // 60), "4"
     assert registered == "3"
@@ -860,6 +930,80 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     self.client.close_query(before_shutdown_handle)
     self.cluster.impalads[0].wait_for_exit()
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--shutdown_grace_period_s={grace_period} \
+          --shutdown_deadline_s={deadline} \
+          --shutdown_query_cancel_period_s={query_cancel_period} \
+          --hostname={hostname}".format(
+          grace_period=COORD_SHUTDOWN_GRACE_PERIOD_S,
+          deadline=COORD_SHUTDOWN_FAST_DEADLINE_S,
+          query_cancel_period=COORD_SHUTDOWN_QUERY_CANCEL_PERIOD_S,
+          hostname=socket.gethostname()),
+      default_query_options=[("num_scanner_threads", "1")])
+  def test_shutdown_coordinator_cancel_query(self):
+    """Test that shuts down the coordinator with a short deadline, the slow query should
+    be cancelled before the deadline is reached."""
+    # Start a slow query running.
+    # Set NUM_SCANNER_THREADS=1 above to make the runtime more predictable.
+    SLOW_QUERY = """select * from tpch_parquet.lineitem where sleep(1) < l_orderkey"""
+    SHUTDOWN = ": shutdown()"
+
+    slow_query_handle = self.__exec_and_wait_until_running(SLOW_QUERY)
+
+    # Shut down the coordinator.
+    result = self.execute_query_expect_success(self.client, SHUTDOWN)
+    grace, deadline, cancel, registered, _ = parse_shutdown_result_with_cancel(result)
+    assert grace == "{0}s000ms".format(self.COORD_SHUTDOWN_GRACE_PERIOD_S)
+    assert deadline == "{0}s000ms".format(self.COORD_SHUTDOWN_FAST_DEADLINE_S)
+    assert cancel == "{0}s000ms".format(get_remain_shutdown_query_cancel(
+        self.COORD_SHUTDOWN_FAST_DEADLINE_S, self.COORD_SHUTDOWN_FAST_DEADLINE_S))
+    assert registered == "2"
+
+    # This query is too slow to complete before the deadline, because the
+    # query_cancel_period is set, this query should be cancelled before shutdown.
+    self.__check_deadline_expired(SLOW_QUERY, slow_query_handle, True)
+    self.cluster.impalads[0].wait_for_exit()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--shutdown_grace_period_s={grace_period} \
+          --shutdown_deadline_s={deadline} \
+          --shutdown_query_cancel_period_s={query_cancel_period} \
+          --hostname={hostname}".format(
+          grace_period=COORD_SHUTDOWN_GRACE_PERIOD_S,
+          deadline=COORD_SHUTDOWN_FAST_DEADLINE_S,
+          query_cancel_period=COORD_SHUTDOWN_QUERY_CANCEL_PERIOD_S,
+          hostname=socket.gethostname()),
+      default_query_options=[("num_scanner_threads", "1")])
+  def test_shutdown_coordinator_and_executor_cancel_query(self):
+    """Test that shuts down the executor and coordinator, the slow query should
+    be cancelled before the deadline is reached."""
+    # Start two slow queries running.
+    # Set NUM_SCANNER_THREADS=1 above to make the runtime more predictable.
+    SLOW_QUERY = """select * from tpch_parquet.lineitem where sleep(1) < l_orderkey"""
+    SHUTDOWN = ": shutdown()"
+    SHUTDOWN_EXEC2 = ": shutdown('localhost:27001')"
+
+    slow_query_handle = self.__exec_and_wait_until_running(SLOW_QUERY)
+
+    # Shut down the executor.
+    result = self.execute_query_expect_success(self.client, SHUTDOWN_EXEC2)
+    grace, deadline, cancel, registered, running =\
+        parse_shutdown_result_with_cancel(result)
+    assert grace == "{0}s000ms".format(self.COORD_SHUTDOWN_GRACE_PERIOD_S)
+    assert deadline == "{0}s000ms".format(self.COORD_SHUTDOWN_FAST_DEADLINE_S)
+    assert cancel == "{0}s000ms".format(get_remain_shutdown_query_cancel(
+        self.COORD_SHUTDOWN_FAST_DEADLINE_S, self.COORD_SHUTDOWN_FAST_DEADLINE_S))
+    assert registered == "0"
+    assert running > 0
+    self.cluster.impalads[1].wait_for_exit()
+    # The slow query should be cancelled.
+    self.__check_deadline_expired(SLOW_QUERY, slow_query_handle, True)
+    # Shut down the coordinator.
+    self.execute_query_expect_success(self.client, SHUTDOWN)
+    self.cluster.impalads[0].wait_for_exit()
+
   def __exec_and_wait_until_running(self, query, timeout=20):
     """Execute 'query' with self.client and wait until it is in the RUNNING state.
     'timeout' controls how long we will wait"""
@@ -884,14 +1028,18 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     assert backends_match is not None, profile
     return int(backends_match.group(1))
 
-  def __check_deadline_expired(self, query, handle):
+  def __check_deadline_expired(self, query, handle, has_query_cancel_period):
     """Check that the query with 'handle' fails because of a backend hitting the
-    deadline and shutting down."""
+    deadline and shutting down. If query_cancel_period is set, the query should
+    be cancelled by the server before shutdown."""
     try:
       self.client.fetch(query, handle)
       assert False, "Expected query to fail"
     except Exception as e:
-      assert 'Failed due to unreachable impalad(s)' in str(e)
+      if has_query_cancel_period:
+        assert 'Cancelled' in str(e)
+      else:
+        assert 'Failed due to unreachable impalad(s)' in str(e)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

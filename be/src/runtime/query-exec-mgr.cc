@@ -43,6 +43,8 @@
 
 #include "common/names.h"
 
+using std::unordered_set;
+using std::vector;
 using namespace impala;
 
 // TODO: this logging should go into a per query log.
@@ -228,47 +230,75 @@ void QueryExecMgr::AcquireQueryStateLocked(QueryState* qs) {
   DCHECK(refcnt > 0);
 }
 
-void QueryExecMgr::CancelQueriesForFailedCoordinators(
-    const std::unordered_set<BackendIdPB>& current_membership) {
-  // Build a list of queries that are scheduled by failed coordinators (as
-  // evidenced by their absence from the cluster membership list).
-  std::vector<QueryCancellationTask> to_cancel;
+void QueryExecMgr::CollectQueriesToCancel(std::function<bool(QueryState*)> filter,
+    bool is_coord_active, vector<QueryExecMgr::QueryCancellationTask>* to_cancel) {
+  DCHECK(to_cancel != nullptr);
   ExecEnv::GetInstance()->query_exec_mgr()->qs_map_.DoFuncForAllEntries(
       [&](QueryState* qs) {
-        if (qs != nullptr && !qs->IsCancelled()) {
-          if (current_membership.find(qs->GetCoordinatorBackendId())
-              == current_membership.end()) {
-            // decremented by ReleaseQueryState()
-            AcquireQueryStateLocked(qs);
-            to_cancel.push_back(QueryCancellationTask(qs));
-          }
+        if (qs != nullptr && !qs->IsCancelled() && filter(qs)) {
+          // decremented by ReleaseQueryState()
+          AcquireQueryStateLocked(qs);
+          to_cancel->push_back(QueryCancellationTask(qs, is_coord_active));
         }
       });
+}
 
-  // Since we are the only producer for the cancellation thread pool, we can find the
-  // remaining capacity of the pool and submit the new cancellation requests without
-  // blocking.
+void QueryExecMgr::CancelQueries(const QueryCancellationTask& to_cancel) {
+  QueryState* qs = to_cancel.GetQueryState();
+  DCHECK(qs != nullptr);
+  if (qs == nullptr) return;
+  VLOG(1) << "CancelFromThreadPool(): cancel query " << PrintId(qs->query_id());
+  qs->Cancel();
+  qs->is_coord_active_.Store(to_cancel.IsCoordActive());
+  ReleaseQueryState(qs);
+}
+
+bool QueryExecMgr::ProcessCancelQueries(
+    const vector<QueryCancellationTask>& to_cancel, bool handle_full_queue) {
   int query_num_to_cancel = to_cancel.size();
-  int remaining_queue_size = QUERY_EXEC_MGR_MAX_CANCELLATION_QUEUE_SIZE
+  const int remaining_queue_size = QUERY_EXEC_MGR_MAX_CANCELLATION_QUEUE_SIZE
       - cancellation_thread_pool_->GetQueueSize();
+  bool all_handled = true;
+
   if (query_num_to_cancel > remaining_queue_size) {
-    // Fill the queue up to maximum limit, and ignore the rest which will get cancelled
-    // eventually anyways when QueryState::ReportExecStatus() hits the timeout.
-    LOG_EVERY_N(WARNING, 60) << "QueryExecMgr cancellation queue is full";
-    query_num_to_cancel = remaining_queue_size;
-    for (int i = query_num_to_cancel; i < to_cancel.size(); ++i) {
-      ReleaseQueryState(to_cancel[i].GetQueryState());
+    if (handle_full_queue) {
+      LOG_EVERY_N(WARNING, 60) << "QueryExecMgr cancellation queue is full";
+      query_num_to_cancel = remaining_queue_size;
+      for (int i = query_num_to_cancel; i < to_cancel.size(); ++i) {
+        ReleaseQueryState(to_cancel[i].GetQueryState());
+      }
+    } else {
+      all_handled = false;
     }
   }
+
   for (int i = 0; i < query_num_to_cancel; ++i) {
     cancellation_thread_pool_->Offer(to_cancel[i]);
   }
+  return all_handled;
+}
+
+void QueryExecMgr::CancelQueriesForFailedCoordinators(
+    const unordered_set<BackendIdPB>& current_membership) {
+  vector<QueryCancellationTask> to_cancel;
+  CollectQueriesToCancel(
+      [&](QueryState* qs) {
+        return current_membership.find(qs->GetCoordinatorBackendId())
+            == current_membership.end();
+      },
+      false /* is_coord_active */, &to_cancel);
+  ProcessCancelQueries(to_cancel, true /* handle_full_queue */);
+}
+
+bool QueryExecMgr::CancelQueriesForGracefulShutdown() {
+  vector<QueryCancellationTask> to_cancel;
+  CollectQueriesToCancel(
+      [&](QueryState* qs) { return true; }, true /* is_coord_active */, &to_cancel);
+  // If the queue is full for cancellation, the caller, which is the shutdown thread
+  // should handle this by retrying later for the rest.
+  return ProcessCancelQueries(to_cancel, false /* handle_full_queue */);
 }
 
 void QueryExecMgr::CancelFromThreadPool(const QueryCancellationTask& cancellation_task) {
-  QueryState* qs = cancellation_task.GetQueryState();
-  VLOG(1) << "CancelFromThreadPool(): cancel query " << PrintId(qs->query_id());
-  qs->Cancel();
-  qs->is_coord_active_.Store(false);
-  ReleaseQueryState(qs);
+  CancelQueries(cancellation_task);
 }
