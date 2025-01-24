@@ -204,6 +204,9 @@ function notindocker {
   fi
 }
 
+# X permission on home directory is needed for some uses of postgresql (IMPALA-13693)
+chmod o+X ~
+
 # Note that yum has its own retries; see yum.conf(5).
 REAL_APT_GET=$(ubuntu which apt-get)
 function apt-get {

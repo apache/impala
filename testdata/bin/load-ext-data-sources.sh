@@ -110,14 +110,14 @@ sudo -u postgres psql -U hiveuser -d functional -f /tmp/jdbc_test_strategy.sql
 
 # Load data to jdbc table
 cat ${IMPALA_HOME}/testdata/target/AllTypes/* > /tmp/jdbc_alltypes.csv
-loadCmd="COPY alltypes FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
+loadCmd="\COPY alltypes FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
 sudo -u postgres psql -d functional -c "$loadCmd"
 
-loadCmd="COPY \"AllTypesWithQuote\" FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
+loadCmd="\COPY \"AllTypesWithQuote\" FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
 sudo -u postgres psql -d functional -c "$loadCmd"
 
 cat ${IMPALA_HOME}/testdata/data/decimal_tbl.txt > /tmp/jdbc_decimal_tbl.csv
-loadCmd="COPY decimal_tbl FROM '/tmp/jdbc_decimal_tbl.csv' DELIMITER ',' CSV"
+loadCmd="\COPY decimal_tbl FROM '/tmp/jdbc_decimal_tbl.csv' DELIMITER ',' CSV"
 sudo -u postgres psql -d functional -c "$loadCmd"
 
 # Create impala tables and load data
