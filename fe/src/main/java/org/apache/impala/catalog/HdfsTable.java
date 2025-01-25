@@ -58,10 +58,8 @@ import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
-import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
-import org.apache.impala.catalog.HdfsTable.FileMetadataStats;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -2646,7 +2644,7 @@ public class HdfsTable extends Table implements FeFsTable {
       FileStatus status = statuses.next();
       if (!status.isDirectory()) continue;
       Pair<String, LiteralExpr> keyValues =
-          getTypeCompatibleValue(status.getPath(), partitionKeys.get(depth));
+          getPartValueFromPath(status.getPath(), partitionKeys.get(depth));
       if (keyValues == null) continue;
 
       List<String> currentPartitionValues = Lists.newArrayList(partitionValues);
@@ -2692,7 +2690,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * original value, the second element is the LiteralExpr created from the original
    * value.
    */
-  private Pair<String, LiteralExpr> getTypeCompatibleValue(
+  private Pair<String, LiteralExpr> getPartValueFromPath(
       Path path, String partitionKey) {
     String partName[] = path.getName().split("=");
     if (partName.length != 2 || !partName[0].equals(partitionKey)) return null;
@@ -2701,22 +2699,22 @@ public class HdfsTable extends Table implements FeFsTable {
     Column column = getColumn(partName[0]);
     Preconditions.checkNotNull(column);
     Type type = column.getType();
-    return getPartitionExprFromValue(partName[1], type);
+    // URL decode the partition value since it may contain encoded URL.
+    String partValue = FileUtils.unescapePathName(partName[1]);
+    return getPartitionExprFromValue(partValue, type);
   }
 
   /**
    * Converts a given partition value to a {@link LiteralExpr} based on the type of the
    * partition column.
-   * @param partValue Value of the partition column
+   * @param value Value of the partition column
    * @param type Type of the partition column
    * @return Pair which contains the partition value and its equivalent
    * {@link LiteralExpr} according to the type provided.
    */
   private Pair<String, LiteralExpr> getPartitionExprFromValue(
-      String partValue, Type type) {
+      String value, Type type) {
     LiteralExpr expr;
-    // URL decode the partition value since it may contain encoded URL.
-    String value = FileUtils.unescapePathName(partValue);
     if (!value.equals(getNullPartitionKeyValue())) {
       try {
         expr = LiteralExpr.createFromUnescapedStr(value, type);

@@ -1382,6 +1382,41 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       # Make sure the table doesn't change after this test
       self.execute_query("alter table {} drop if exists partition(j=-1)".format(tbl))
 
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--invalidate_metadata_on_event_processing_failure=false")
+  def test_encoded_partition_values(self, unique_database):
+    # Create a table with URL encoded partition values
+    tbl = unique_database + ".tbl"
+    self.execute_query("create table {}(i int) partitioned by(s string)".format(tbl))
+    part_values = [
+      "00:00:00",
+      "00%3A00%3A00",
+      "00%253A00%253A00",
+    ]
+    for p in part_values:
+      self.execute_query("alter table {} add partition (s='{}')".format(tbl, p))
+
+    # Generate INSERT event on a URL encoded partition which could be incorrectly decoded
+    # to another partition, e.g. '00%3A00%3A00' -> '00:00:00'
+    self.run_stmt_in_hive(
+        "insert into table {} partition(s='00%3A00%3A00') values (0)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    res = self.execute_query("select * from " + tbl)
+    assert len(res.data) == 1
+    assert res.data[0] == '0\t00%3A00%3A00'
+
+    # Test on processing batch of such partition events
+    self.run_stmt_in_hive(
+        "set hive.exec.dynamic.partition.mode=nonstrict; "
+        "insert into table {} values (1, '00%3A00%3A00'), (2, '00%253A00%253A00')"
+        .format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    res = self.execute_query("select * from " + tbl)
+    assert len(res.data) == 3
+    assert '0\t00%3A00%3A00' in res.data
+    assert '1\t00%3A00%3A00' in res.data
+    assert '2\t00%253A00%253A00' in res.data
+
 
 @SkipIfFS.hive
 class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):
