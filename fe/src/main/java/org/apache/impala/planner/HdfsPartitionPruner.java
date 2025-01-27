@@ -129,8 +129,7 @@ public class HdfsPartitionPruner {
     Iterator<Expr> it = conjuncts.iterator();
     while (it.hasNext()) {
       Expr conjunct = it.next();
-      if (conjunct.isBoundBySlotIds(partitionSlots_) &&
-          !conjunct.contains(Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE)) {
+      if (isPartitionPrunedFilterConjunct(partitionSlots_, conjunct)) {
         // Check if the conjunct can be evaluated from the partition metadata.
         // Use a cloned conjunct to rewrite BetweenPredicates and allow
         // canEvalUsingPartitionMd() to fold constant expressions without modifying
@@ -187,6 +186,12 @@ public class HdfsPartitionPruner {
       results = pruneForSimpleLimit(hdfsTblRef, analyzer, results);
     }
     return new Pair<>(results, partitionConjuncts);
+  }
+
+  public static boolean isPartitionPrunedFilterConjunct(List<SlotId> partitionSlots,
+      Expr conjunct) {
+    return conjunct.isBoundBySlotIds(partitionSlots) &&
+        !conjunct.contains(Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE);
   }
 
   /**
