@@ -60,6 +60,7 @@ import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.OrderByElement;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.calcite.functions.AnalyzedAnalyticExpr;
 import org.apache.impala.calcite.functions.AnalyzedFunctionCallExpr;
 import org.apache.impala.calcite.functions.FunctionResolver;
@@ -83,6 +84,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,8 +144,17 @@ public class ImpalaAnalyticRel extends Project
     AnalyticPlanner analyticPlanner =
         new AnalyticPlanner(analyticInfo, context.ctx_.getRootAnalyzer(), context.ctx_);
 
+    // TODO: IMPALA-12961.  strip out null exprs which can exist when the tablescan does
+    // not output all of its columns.
+    List<Expr> nonNullExprs = inputNodeWithExprs.outputExprs_.stream()
+        .filter(e -> e != null).collect(Collectors.toList());
+    List<TupleIsNullPredicate> tupleIsNullPreds =
+        TupleIsNullPredicate.getUniqueBoundTupleIsNullPredicates(nonNullExprs,
+            inputNodeWithExprs.planNode_.getTupleIds());
+
     PlanNode planNode = analyticPlanner.createSingleNodePlan(
-        inputNodeWithExprs.planNode_, Collections.emptyList(), new ArrayList<>());
+        inputNodeWithExprs.planNode_, Collections.emptyList(), new ArrayList<>(),
+        tupleIsNullPreds);
 
     // Get a mapping of all expressions to its corresponding Impala Expr object. The
     // non-analytic expressions will have a RexInputRef type RexNode, while the

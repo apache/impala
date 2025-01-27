@@ -94,6 +94,8 @@ public class AnalyticPlanner {
    * hash partitioning during the parallelization of 'root'.
    * Any unassigned conjuncts from 'analyzer_' are applied after analytic functions are
    * evaluated.
+   * A list of TupleIsNullPredicates is passed in as required by SortInfo (see comment
+   * in createSortInfo where the expressions are materialized).
    * TODO: when generating sort orders for the sort groups, optimize the ordering
    * of the partition exprs (so that subsequent sort operations see the input sorted
    * on a prefix of their required sort exprs)
@@ -101,7 +103,8 @@ public class AnalyticPlanner {
    * (using the equivalence classes) rather than looking for expr equality
    */
   public PlanNode createSingleNodePlan(PlanNode root,
-      List<Expr> groupingExprs, List<Expr> inputPartitionExprs) throws ImpalaException {
+      List<Expr> groupingExprs, List<Expr> inputPartitionExprs,
+      List<TupleIsNullPredicate> tupleIsNullPreds) throws ImpalaException {
     // If the plan node is not an EmptySetNode, identify predicates that reference the
     // logical analytic tuple (this logical analytic tuple is replaced by different
     // physical ones during planning)
@@ -135,14 +138,17 @@ public class AnalyticPlanner {
           partitionGroups, groupingExprs, root.getNumInstances(), inputPartitionExprs);
     }
 
+    List<TupleIsNullPredicate> emptyPreds = new ArrayList<>();
     for (int i = 0; i < partitionGroups.size(); ++i) {
       PartitionGroup partitionGroup = partitionGroups.get(i);
       for (int j = 0; j < partitionGroup.sortGroups.size(); ++j) {
+        boolean firstSortGroup = (i == 0) && (j == 0);
         boolean lastSortGroup = (i == partitionGroups.size() - 1) &&
                 (j == partitionGroup.sortGroups.size() - 1);
         root = createSortGroupPlan(root, partitionGroup.sortGroups.get(j),
             j == 0 ? partitionGroup.partitionByExprs : null,
-            lastSortGroup ? perPartitionLimits : null);
+            lastSortGroup ? perPartitionLimits : null,
+            firstSortGroup ? tupleIsNullPreds : emptyPreds);
       }
     }
 
@@ -316,15 +322,19 @@ public class AnalyticPlanner {
    * on sortExprs.
    */
   private SortInfo createSortInfo(PlanNode input, List<Expr> sortExprs,
-      List<Boolean> isAsc, List<Boolean> nullsFirst) {
-    return createSortInfo(input, sortExprs, isAsc, nullsFirst, TSortingOrder.LEXICAL);
+      List<Boolean> isAsc, List<Boolean> nullsFirst,
+      List<TupleIsNullPredicate> tupleIsNullPreds) {
+    return createSortInfo(input, sortExprs, isAsc, nullsFirst, tupleIsNullPreds,
+        TSortingOrder.LEXICAL);
   }
 
   /**
    * Same as above, but with extra parameter, sorting order.
    */
   private SortInfo createSortInfo(PlanNode input, List<Expr> sortExprs,
-      List<Boolean> isAsc, List<Boolean> nullsFirst, TSortingOrder sortingOrder) {
+      List<Boolean> isAsc, List<Boolean> nullsFirst,
+      List<TupleIsNullPredicate> tupleIsNullPreds,
+      TSortingOrder sortingOrder) {
     List<Expr> inputSlotRefs = new ArrayList<>();
     for (TupleId tid: input.getTupleIds()) {
       TupleDescriptor tupleDesc = analyzer_.getTupleDesc(tid);
@@ -360,23 +370,13 @@ public class AnalyticPlanner {
         sortingOrder);
     sortInfo.createSortTupleInfo(inputSlotRefs, analyzer_);
 
-    // Lhs exprs to be substituted in ancestor plan nodes could have a rhs that contains
-    // TupleIsNullPredicates. TupleIsNullPredicates require specific tuple ids for
+    // TupleIsNullPredicates require specific tuple ids for
     // evaluation. Since this sort materializes a new tuple, it's impossible to evaluate
     // TupleIsNullPredicates referring to this sort's input after this sort,
     // To preserve the information whether an input tuple was null or not this sort node,
-    // we materialize those rhs TupleIsNullPredicates, which are then substituted
+    // we materialize those TupleIsNullPredicates, which are then substituted
     // by a SlotRef into the sort's tuple in ancestor nodes (IMPALA-1519).
-    if (inputSmap != null) {
-      List<TupleIsNullPredicate> tupleIsNullPreds = new ArrayList<>();
-      for (Expr rhsExpr: inputSmap.getRhs()) {
-        // Ignore substitutions that are irrelevant at this plan node and its ancestors.
-        if (!rhsExpr.isBoundByTupleIds(input.getTupleIds())) continue;
-        rhsExpr.collect(TupleIsNullPredicate.class, tupleIsNullPreds);
-      }
-      Expr.removeDuplicates(tupleIsNullPreds);
-      sortInfo.addMaterializedExprs(tupleIsNullPreds, analyzer_);
-    }
+    sortInfo.addMaterializedExprs(tupleIsNullPreds, analyzer_);
     sortInfo.getSortTupleDescriptor().materializeSlots();
     return sortInfo;
   }
@@ -391,7 +391,8 @@ public class AnalyticPlanner {
    * Any placed limits have 'pushed' set to true.
    */
   private PlanNode createSortGroupPlan(PlanNode root, SortGroup sortGroup,
-      List<Expr> partitionExprs, List<PartitionLimit> perPartitionLimits)
+      List<Expr> partitionExprs, List<PartitionLimit> perPartitionLimits,
+      List<TupleIsNullPredicate> tupleIsNullPreds)
               throws ImpalaException {
     List<Expr> partitionByExprs = sortGroup.partitionByExprs;
     List<OrderByElement> orderByElements = sortGroup.orderByElements;
@@ -426,7 +427,8 @@ public class AnalyticPlanner {
         }
       }
 
-      SortInfo sortInfo = createSortInfo(root, sortExprs, isAsc, nullsFirst);
+      SortInfo sortInfo = createSortInfo(root, sortExprs, isAsc, nullsFirst,
+          tupleIsNullPreds);
       // IMPALA-8533: Avoid generating sort with empty tuple descriptor
       if(sortInfo.getSortTupleDescriptor().getSlots().size() > 0) {
         // Select the lowest limit to push into the sort. Other limit conjuncts will

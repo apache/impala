@@ -213,6 +213,23 @@ public class TupleIsNullPredicate extends Predicate {
     return expr;
   }
 
+  /**
+   * Given a list of expressions and a list of TupleIds, extract all the
+   * TupleIsNullPredicate expressions that are bound to any of the tuple Ids
+   * passed in.
+   */
+  public static List<TupleIsNullPredicate> getUniqueBoundTupleIsNullPredicates(
+      List<Expr> exprs, List<TupleId> tids) {
+
+    List<TupleIsNullPredicate> tupleIsNullPreds = new ArrayList<>();
+    for (Expr expr : exprs) {
+      if (!expr.isBoundByTupleIds(tids)) continue;
+      expr.collect(TupleIsNullPredicate.class, tupleIsNullPreds);
+    }
+    Expr.removeDuplicates(tupleIsNullPreds);
+    return tupleIsNullPreds;
+  }
+
   @Override
   public Expr clone() { return new TupleIsNullPredicate(this); }
 

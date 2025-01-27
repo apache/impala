@@ -296,7 +296,8 @@ public class SingleNodePlanner {
 
         List<Expr> inputPartitionExprs = new ArrayList<>();
         root = analyticPlanner.createSingleNodePlan(
-            root, groupingExprs, inputPartitionExprs);
+            root, groupingExprs, inputPartitionExprs,
+            getTupleIsNullPreds(root));
         if (multiAggInfo != null && !inputPartitionExprs.isEmpty()
             && multiAggInfo.getMaterializedAggClasses().size() == 1) {
           // analytic computation will benefit from a partition on inputPartitionExprs
@@ -2358,5 +2359,13 @@ public class SingleNodePlanner {
           analyzer, unionStmt.getTupleId().asList(), result);
     }
     return result;
+  }
+
+  private List<TupleIsNullPredicate> getTupleIsNullPreds(PlanNode planNode) {
+    if (planNode.getOutputSmap() == null) {
+      return new ArrayList<>();
+    }
+    return TupleIsNullPredicate.getUniqueBoundTupleIsNullPredicates(
+        planNode.getOutputSmap().getRhs(), planNode.getTupleIds());
   }
 }
