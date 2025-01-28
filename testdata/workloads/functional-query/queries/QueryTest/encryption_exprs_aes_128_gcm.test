@@ -1,0 +1,84 @@
+====
+---- QUERY
+select base64encode(aes_encrypt('ABC', '1234567890123456','AES_128_GCM','1234567890123456'));
+---- RESULTS
+'x+am+BIqtrEK9FpC/zrvpOycjQ=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('x+am+BIqtrEK9FpC/zrvpOycjQ=='),'1234567890123456','AES_128_GCM','1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('', '1234567890123456','AES_128_GCM','1234567890123456'));
+---- RESULTS
+'moMhTz224yot8uRtksO+pw=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('moMhTz224yot8uRtksO+pw=='),'1234567890123456','AES_128_GCM','1234567890123456');
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+select count(*) from functional.alltypes where string_col = aes_decrypt(aes_encrypt(string_col, '1234567890123456',
+'AES_128_GCM', '1234567890123456'), '1234567890123456', 'AES_128_GCM', '1234567890123456');
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from functional_parquet.alltypes where CAST(timestamp_col AS STRING) =
+aes_decrypt(aes_encrypt(CAST(timestamp_col AS STRING), '1234567890123456', 'AES_128_GCM', '1234567890123456'),
+'1234567890123456', 'AES_128_GCM', '1234567890123456');
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+select base64encode(aes_encrypt('The quick brown fox jumps over the lazy dog', '1234567890123456','AES_128_GCM',
+'1234567890123456'));
+---- RESULTS
+'0syAnPYY0qT/RNtD7s0UkV/4P7HSl8xI1ZCz9AINV3r5W0xLkUs/gAlXWD+i6TIx+WiWiuipZJMXLmM='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('0syAnPYY0qT/RNtD7s0UkV/4P7HSl8xI1ZCz9AINV3r5W0xLkUs/gAlXWD+i6TIx+WiWiuipZJMXLmM='),
+'1234567890123456','AES_128_GCM','1234567890123456');
+---- RESULTS
+'The quick brown fox jumps over the lazy dog'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('Impala', '1234567890123456','AES_128_GCM','12345678901'));
+---- RESULTS
+'sBDdvFMLqNtJvuHUP8s7oWaH0NWXNQ=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('sBDdvFMLqNtJvuHUP8s7oWaH0NWXNQ=='),'1234567890123456','AES_128_GCM','12345678901');
+---- RESULTS
+'Impala'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(aes_encrypt('Impala', '1234567890123456','AES_128_GCM','12345678901'),
+'1234567890123456','AES_128_GCM','12345678901');
+---- RESULTS
+'Impala'
+---- TYPES
+STRING
+====

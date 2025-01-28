@@ -472,13 +472,11 @@ Status InitializeEncryptionKey(FunctionContext* ctx, const StringVal& expr,
 // GCM mode expects expression, key, AES mode and iv vector.
 // CTR and CFB modes expect expression, key, AES mode and iv vector.
 // ECB mode expects expression, key, AES mode.
-// If the mode passed by the user is supported by Impala (a valid member of
-// AES_CIPHER_MODE except for INVALID) but not supported by the OpenSSL
-// library used internally, then the default mode of the library is chosen.
 //
-// This is different from the case where the user enters a mode that Impala does not
-// support (e.g., a nonexistent or invalid mode). In such cases, the mode is
-// considered invalid, and an error is returned.
+// If 'mode' is NULL, a default mode will be chosen at runtime.
+//
+// If the mode passed by the user is not supported by Impala or by the OpenSSL
+// library used internally, an error is returned.
 //
 // Description of the modes supported:
 // AES-GCM (Advanced Encryption Standard Galois/Counter Mode) is a mode of operation

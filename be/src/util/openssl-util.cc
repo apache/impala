@@ -32,6 +32,7 @@
 #include <openssl/tls1.h>
 
 #include "common/atomic.h"
+#include "common/status.h"
 #include "gutil/port.h" // ATTRIBUTE_WEAK
 #include "gutil/strings/substitute.h"
 
@@ -376,14 +377,13 @@ const EVP_CIPHER* EncryptionKey::GetCipher() const {
 
 Status EncryptionKey::InitializeFields(const uint8_t* key, int key_len, const uint8_t* iv,
     int iv_len, AES_CIPHER_MODE m) {
-  mode_ = m;
+  RETURN_IF_ERROR(ValidateModeAndKeyLength(m, key_len));
   if (!IsModeSupported(m)) {
-    mode_ = GetSupportedDefaultMode();
-    LOG(WARNING) << Substitute("$0 is not supported, fall back to $1.",
-        ModeToString(m), ModeToString(mode_));
+    return Status(Substitute("AES mode $0 is not supported by OpenSSL version ($1) "
+        "that Impala was built against.", ModeToString(m), OPENSSL_VERSION_TEXT));
   }
-  Status status = ValidateModeAndKeyLength(m, key_len);
-  RETURN_IF_ERROR(status);
+
+  mode_ = m;
 
   key_length_ = key_len;
   iv_length_ = iv_len;

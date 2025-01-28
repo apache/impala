@@ -1,0 +1,140 @@
+====
+---- QUERY
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM','1234567890123456'));
+---- RESULTS
+'F/DLkSwEikFOlqzXVCysy1JX7Q=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_GCM','1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM','1234567890123456'),
+'12345678901234567890123456789012','AES_256_GCM','1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt(aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),
+'12345678901234567890123456789012','AES_256_GCM','1234567890123456'),'12345678901234567890123456789012','AES_256_GCM',
+'1234567890123456'));
+---- RESULTS
+'F/DLkSwEikFOlqzXVCysy1JX7Q=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM','1234567890123456'),
+'12345678901234567890123456789012',NULL,'1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+# Encryption/ decryption with expr as NULL.
+select base64encode(aes_encrypt(NULL, '12345678901234567890123456789012','AES_256_GCM','1234567890123456'));
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(NULL,'12345678901234567890123456789012','AES_256_GCM','1234567890123456');
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Key cannot be NULL, with the default mode GCM.
+select base64encode(aes_encrypt('ABC',NULL,'AES_256_GCM','1234567890123456'));
+---- RESULTS
+---- CATCH
+Key cannot be NULL.
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),NULL,'AES_256_GCM','1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Key cannot be NULL.
+====
+---- QUERY
+# iv cannot be NULL for GCM mode.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM',NULL));
+---- RESULTS
+---- CATCH
+IV vector required for AES_256_GCM mode
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_GCM',NULL);
+---- RESULTS
+---- CATCH
+UDF ERROR: IV vector required for AES_256_GCM mode
+====
+---- QUERY
+# Error with incorrect key length.
+select base64encode(aes_encrypt('ABC', '123456789012345678901234567890121','AES_256_GCM','1234567890123456'));
+---- RESULTS
+---- CATCH
+AES only supports 128 and 256 bit key lengths
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'123456789012345678901234567890121','AES_256_GCM',
+'1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: AES only supports 128 and 256 bit key lengths
+====
+---- QUERY
+# Error with incorrect iv length.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM','12345678901234567'));
+---- RESULTS
+---- CATCH
+IV vector size is greater than 16 bytes
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_GCM',
+'12345678901234567');
+---- RESULTS
+---- CATCH
+UDF ERROR: IV vector size is greater than 16 bytes
+====
+---- QUERY
+# Modes are case-insensitive.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','aes_256_gcm','1234567890123456'));
+---- RESULTS
+'F/DLkSwEikFOlqzXVCysy1JX7Q=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','aes_256_gcm',
+'1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+# Encryption/ decryption when mode is NULL, defaulting to GCM mode.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012',NULL,'1234567890123456'));
+---- RESULTS
+'F/DLkSwEikFOlqzXVCysy1JX7Q=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012',NULL,'1234567890123456');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====

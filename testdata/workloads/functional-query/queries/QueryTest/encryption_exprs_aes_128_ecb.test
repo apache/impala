@@ -1,0 +1,23 @@
+====
+---- QUERY
+# AES encryption/decryption examples:
+select aes_decrypt(base64decode('y6Ss+zCYObpCbgfWfyNWTw=='),'1234567890123456','AES_128_ECB','');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('BQGHoM3lqYcsurCRq3PlUw=='),'1234567890123456','AES_128_ECB','');
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('ofMshL41XkG6NQ+v6bawAQ=='),'1234567890123456','AES_128_ECB','');
+---- RESULTS
+'Hello World!'
+---- TYPES
+STRING
+====
