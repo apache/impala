@@ -62,7 +62,7 @@ FOOTER = """
 
 RESULT_CATEGORIES = ["Success", "Parse Failure", "Analysis Failure",
                      "Unsupported Feature", "Result Difference",
-                     "Profile Difference", "Other"]
+                     "Profile Difference", "Different Error Msg", "Other"]
 
 RESULT_CATEGORY_STYLE_MAP = {
   "Success": "success",
@@ -71,6 +71,7 @@ RESULT_CATEGORY_STYLE_MAP = {
   "Unsupported Feature": "expected_fail",
   "Result Difference": "fail",
   "Profile Difference": "fail",
+  "Different Error Msg": "expected_fail",
   "Other": "fail"
 }
 
@@ -101,6 +102,9 @@ def categorize_error_string(error_string):
     return "Success"
   elif "ParseException" in error_string:
     return "Parse Failure"
+  elif "Unexpected exception string" in error_string and \
+      "Not found in actual" in error_string:
+    return "Different Error Msg"
   elif "AnalysisException" in error_string:
     return "Analysis Failure"
   elif "UnsupportedFeatureException" in error_string:
