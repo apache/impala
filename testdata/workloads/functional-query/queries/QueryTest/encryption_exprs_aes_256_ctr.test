@@ -1,0 +1,66 @@
+====
+---- QUERY
+select base64encode(aes_encrypt('impalaaaaaaaaaaaaaaaaaaaa', '12345678901234567890123456789012','AES_256_CTR',
+'1234567890123456'));
+---- RESULTS
+'pkw4Y8WLkJnACfAL4R4BNb0HYMEjpcA63A=='
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode('pkw4Y8WLkJnACfAL4R4BNb0HYMEjpcA63A=='),'12345678901234567890123456789012',
+'AES_256_CTR','1234567890123456');
+---- RESULTS
+'impalaaaaaaaaaaaaaaaaaaaa'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt('', '12345678901234567890123456789012','AES_256_CTR','1234567890123456'));
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(base64decode(''),'12345678901234567890123456789012','AES_256_CTR','1234567890123456');
+---- RESULTS
+''
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt((aes_encrypt('impalaaaaaaaaaaaaaaaaaaaa', '12345678901234567890123456789012','AES_256_CTR',
+'1234567890123456')),'12345678901234567890123456789012','AES_256_CTR','1234567890123456');
+---- RESULTS
+'impalaaaaaaaaaaaaaaaaaaaa'
+---- TYPES
+STRING
+====
+---- QUERY
+select base64encode(aes_encrypt(NULL, '12345678901234567890123456789012','AES_256_CTR','1234567890123456'));
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+select aes_decrypt(NULL,'12345678901234567890123456789012','AES_256_CTR','1234567890123456');
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# iv cannot be NULL for CTR mode.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_CTR',NULL));
+---- RESULTS
+---- CATCH
+IV vector required for AES_256_CTR mode
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_CTR',NULL);
+---- RESULTS
+---- CATCH
+UDF ERROR: IV vector required for AES_256_CTR mode
+====

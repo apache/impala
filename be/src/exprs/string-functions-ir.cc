@@ -259,7 +259,7 @@ StringVal StringFunctions::Rpad(FunctionContext* context, const StringVal& str,
 
 IntVal StringFunctions::Length(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return IntVal::null();
-  if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE, 0)) {
+  if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
     return Utf8Length(context, str);
   }
   return IntVal(str.len);

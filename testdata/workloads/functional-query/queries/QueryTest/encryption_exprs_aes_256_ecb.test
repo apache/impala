@@ -1,0 +1,15 @@
+====
+---- QUERY
+select aes_decrypt(base64decode('E1zl+pDv/GY4JLk254KAIQ=='),'12345678901234567890123456789012','AES_256_ECB','');
+---- RESULTS
+'ABC'
+---- TYPES
+STRING
+====
+---- QUERY
+# ECB not supported for AES encryption.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_ECB','1234567890123456'));
+---- RESULTS
+---- CATCH
+ECB mode is not supported for encryption.
+====

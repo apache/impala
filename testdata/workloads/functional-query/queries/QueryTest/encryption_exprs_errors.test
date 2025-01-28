@@ -1,0 +1,55 @@
+====
+---- QUERY
+# Error resulting due to user entered incorrect mode.
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_CTB','1234567890123456'));
+---- RESULTS
+---- CATCH
+Invalid AES 'mode': AES_256_CTB
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_CTB',
+'1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Invalid AES 'mode': AES_256_CTB
+====
+---- QUERY
+# Prefixes of supported modes are not accepted
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','','1234567890123456'));
+---- RESULTS
+---- CATCH
+Invalid AES 'mode':
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','',
+'1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Invalid AES 'mode':
+====
+---- QUERY
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256','1234567890123456'));
+---- RESULTS
+---- CATCH
+Invalid AES 'mode': AES_256
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256',
+'1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Invalid AES 'mode': AES_256
+====
+---- QUERY
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GC','1234567890123456'));
+---- RESULTS
+---- CATCH
+Invalid AES 'mode': AES_256_GC
+====
+---- QUERY
+select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_GC',
+'1234567890123456');
+---- RESULTS
+---- CATCH
+UDF ERROR: Invalid AES 'mode': AES_256_GC
+====

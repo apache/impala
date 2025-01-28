@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import, division, print_function
 from builtins import range
+import logging
 import pytest
 import re
 from random import randint
@@ -26,6 +27,8 @@ from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.test_file_parser import QueryTestSectionReader
+
+LOG = logging.getLogger('test_exprs')
 
 class TestExprs(ImpalaTestSuite):
   @classmethod
@@ -73,10 +76,66 @@ class TestExprs(ImpalaTestSuite):
     self.run_test_case('QueryTest/special-strings', vector)
 
   def test_encryption_exprs(self, vector):
-    """Test handling encryption/ decryption functionality"""
+    """Test handling encryption/ decryption functionality.
+    Some AES operation modes are not supported by all versions of the OpenSSL
+    library, therefore the tests are divided into separate .test files based on
+    the mode used in them. For modes that may not be supported, we run a
+    probing query first and only run the test file if it succeeds.
+    """
     vector.get_value('exec_option')['enable_expr_rewrites'] = \
       vector.get_value('enable_expr_rewrites')
-    self.run_test_case('QueryTest/encryption_exprs', vector)
+
+    # Run queries that are expected to fail, e.g. trying invalid operation modes etc.
+    self.run_test_case('QueryTest/encryption_exprs_errors', vector)
+
+    self.run_test_case('QueryTest/encryption_exprs_aes_128_ecb', vector)
+    self.run_test_case('QueryTest/encryption_exprs_aes_256_ecb', vector)
+    self.run_test_case('QueryTest/encryption_exprs_aes_256_cfb', vector)
+
+    aes_256_gcm_ok = self._check_aes_mode_supported("aes_256_gcm")
+    if aes_256_gcm_ok:
+      self.run_test_case('QueryTest/encryption_exprs_aes_256_gcm', vector)
+    self._log_whether_aes_tests_run("aes_256_gcm", aes_256_gcm_ok)
+
+    aes_128_gcm_ok = self._check_aes_mode_supported("aes_128_gcm")
+    if aes_128_gcm_ok:
+      self.run_test_case('QueryTest/encryption_exprs_aes_128_gcm', vector)
+    self._log_whether_aes_tests_run("aes_128_gcm", aes_128_gcm_ok)
+
+    aes_256_ctr_ok = self._check_aes_mode_supported("aes_256_ctr")
+    if aes_256_ctr_ok:
+      self.run_test_case('QueryTest/encryption_exprs_aes_256_ctr', vector)
+    self._log_whether_aes_tests_run("aes_256_ctr", aes_256_ctr_ok)
+
+  def _log_whether_aes_tests_run(self, mode, running):
+    msg = "{} {} tests because the OpenSSL version {} this mode.".format(
+            "Running" if running else "Not running",
+            mode,
+            "supports" if running else "does not support")
+    LOG.warning(msg)
+
+  def _check_aes_mode_supported(self, mode):
+    """Checks whether the given AES mode is supported in the current
+    environment (see "test_encryption_exprs()") by running a probing query."""
+    assert "ECB" not in mode.upper()
+
+    expr = "expr"
+    key_len_bytes = 32 if "256" in mode else 16
+    key = "A" * key_len_bytes
+
+    # GCM doesn't support an empty IV.
+    iv = "a"
+    query = 'select aes_encrypt("{expr}", "{key}", "{mode}", "{iv}")'.format(
+        expr=expr, key=key, mode=mode, iv=iv)
+
+    try:
+      res = self.execute_query(query)
+      assert res.success
+      return True
+    except Exception as e:
+      assert "not supported by OpenSSL" in str(e)
+      return False
+
 
 # Tests very deep expression trees and expressions with many children. Impala defines
 # a 'safe' upper bound on the expr depth and the number of expr children in the
