@@ -67,6 +67,17 @@ public class FrontendProfile {
   @GuardedBy("this")
   private Map<String, TRuntimeProfileNode> childrenProfiles_ = new TreeMap<>();
 
+  /**
+   * Profile nodes to be added to the profile when it is decided that there is no
+   * replanning. With auto-scaling, it is possible that different executor groups are
+   * tried for the query, and a plan is generated for each. Profile information that is
+   * only needed for the last, final plan can be collected here. This list is cleared once
+   * a plan for an executor group is discarded. The profiles are added as regular children
+   * for the final plan.
+   */
+  @GuardedBy("this")
+  private List<TRuntimeProfileNode> stagedChildrenProfiles_ = new ArrayList<>();
+
   FrontendProfile() {
     profile_ = new TRuntimeProfileNode("Frontend",
         /*num_children=*/ 0,
@@ -189,6 +200,20 @@ public class FrontendProfile {
     Preconditions.checkNotNull(child.getName());
     Preconditions.checkArgument(!childrenProfiles_.containsKey(child.getName()));
     childrenProfiles_.put(child.getName(), child);
+  }
+
+  public synchronized void stageChildrenProfile(TRuntimeProfileNode child) {
+    stagedChildrenProfiles_.add(child);
+  }
+
+  public synchronized void clearStagedChildrenProfiles() {
+    stagedChildrenProfiles_.clear();
+  }
+
+  public synchronized void finalizeStagedChildrenProfiles() {
+    for (TRuntimeProfileNode profile : stagedChildrenProfiles_) {
+      addChildrenProfile(profile);
+    }
   }
 
   private TCounter getOrCreateCounter(String name, TUnit unit) {

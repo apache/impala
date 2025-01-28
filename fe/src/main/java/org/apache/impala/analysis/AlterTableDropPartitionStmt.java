@@ -166,7 +166,7 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
     }
 
     try (CloseableIterable<FileScanTask> fileScanTasks = IcebergUtil.planFiles(table,
-        icebergPartitionExprs, null)) {
+        icebergPartitionExprs, null, null)) {
       icebergFilePaths_ = new ArrayList<>();
       Set<String> icebergPartitionSummary = new HashSet<>();
       for (FileScanTask fileScanTask : fileScanTasks) {

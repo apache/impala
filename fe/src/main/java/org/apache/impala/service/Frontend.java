@@ -70,6 +70,8 @@ import org.apache.iceberg.HistoryEntry;
 import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.metrics.ScanMetrics;
+import org.apache.iceberg.metrics.ScanMetricsResult;
 import org.apache.impala.analysis.AlterDbStmt;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
@@ -2682,6 +2684,9 @@ public class Frontend {
       planCtx.compilationState_.restoreState();
       FrontendProfile.getCurrent().addToCounter(
           EXECUTOR_GROUPS_CONSIDERED, TUnit.UNIT, 1);
+      // Clear profile children that will not be used.
+      FrontendProfile.getCurrent().clearStagedChildrenProfiles();
+
       i++;
     }
 
@@ -2700,6 +2705,8 @@ public class Frontend {
     }
 
     LOG.info("Selected executor group: " + group_set + ", reason: " + reason);
+
+    FrontendProfile.getCurrent().finalizeStagedChildrenProfiles();
 
     // Transfer the profile access flag which is collected during 1st compilation.
     req.setUser_has_profile_access(planCtx.compilationState_.userHasProfileAccess());
@@ -2778,6 +2785,95 @@ public class Frontend {
     TRuntimeProfileNode profile = createTRuntimeProfileNode(PLANNER_PROFILE);
     addInfoString(profile, PLANNER_TYPE, planner);
     FrontendProfile.getCurrent().addChildrenProfile(profile);
+  }
+
+  /**
+   * Update the query profile with Iceberg Scan metrics. The metrics are placed into a
+   * section within the 'Frontend' section of the profile. 'nodeId' is the id of the node
+   * that is responsible for scanning the corresponding Iceberg table: this node may be a
+   * scan node, a join node or a union node depending on whether the table has delete
+   * files.
+   * If 'metrics' is NULL, the query profile will be updated with a message that planning
+   * was done without using Iceberg.
+   */
+  public static void addIcebergScanMetricsToProfile(String nodeId,
+      ScanMetricsResult metrics) {
+    TRuntimeProfileNode profile = createTRuntimeProfileNode(
+        "Iceberg Plan Metrics for Node " + nodeId);
+
+    if (metrics == null) {
+      addInfoString(profile, "Planning done without Iceberg",
+          "no Iceberg scan metrics available.");
+    } else {
+      fillProfileNodeWithIcebergScanMetrics(profile, metrics);
+    }
+
+    FrontendProfile.getCurrent().stageChildrenProfile(profile);
+  }
+
+  private static void fillProfileNodeWithIcebergScanMetrics(TRuntimeProfileNode profile,
+      ScanMetricsResult metrics) {
+    long durationMs = metrics.totalPlanningDuration().totalDuration().toMillis();
+    String totalDuration = PrintUtils.printTimeMs(durationMs);
+    if (totalDuration.isEmpty()) {
+      // PrintUtils.printTimeMs() returns an empty string for '0'.
+      totalDuration = "0";
+    }
+    addInfoString(profile, ScanMetrics.TOTAL_PLANNING_DURATION, totalDuration);
+
+    String resultDataFiles = Long.toString(metrics.resultDataFiles().value());
+    addInfoString(profile, ScanMetrics.RESULT_DATA_FILES, resultDataFiles);
+
+    String resultDeleteFiles = Long.toString(metrics.resultDeleteFiles().value());
+    addInfoString(profile, ScanMetrics.RESULT_DELETE_FILES, resultDeleteFiles);
+
+    String totalDataManifests = Long.toString(metrics.totalDataManifests().value());
+    addInfoString(profile, ScanMetrics.TOTAL_DATA_MANIFESTS, totalDataManifests);
+
+    String totalDeleteManifests = Long.toString(metrics.totalDeleteManifests().value());
+    addInfoString(profile, ScanMetrics.TOTAL_DELETE_MANIFESTS, totalDeleteManifests);
+
+    String scannedDataManifests = Long.toString(metrics.scannedDataManifests().value());
+    addInfoString(profile, ScanMetrics.SCANNED_DATA_MANIFESTS, scannedDataManifests);
+
+    String skippedDataManifests = Long.toString(metrics.skippedDataManifests().value());
+    addInfoString(profile, ScanMetrics.SKIPPED_DATA_MANIFESTS, skippedDataManifests);
+
+    long totalFileSizeInBytes = metrics.totalFileSizeInBytes().value();
+    String totalFileSizePretty = PrintUtils.printBytes(totalFileSizeInBytes);
+    String totalFileSize = String.format("%s (%s)",
+        totalFileSizePretty, totalFileSizeInBytes);
+    addInfoString(profile, ScanMetrics.TOTAL_FILE_SIZE_IN_BYTES, totalFileSize);
+
+    long totalDeleteFileSizeInBytes = metrics.totalDeleteFileSizeInBytes().value();
+    String totalDeleteFileSizePretty = PrintUtils.printBytes(totalDeleteFileSizeInBytes);
+    String totalDeleteFileSize = String.format("%s (%s)",
+        totalDeleteFileSizePretty, totalDeleteFileSizeInBytes);
+    addInfoString(profile, ScanMetrics.TOTAL_DELETE_FILE_SIZE_IN_BYTES,
+        totalDeleteFileSize);
+
+    String skippedDataFiles = Long.toString(metrics.skippedDataFiles().value());
+    addInfoString(profile, ScanMetrics.SKIPPED_DATA_FILES, skippedDataFiles);
+
+    String skippedDeleteFiles = Long.toString(metrics.skippedDeleteFiles().value());
+    addInfoString(profile, ScanMetrics.SKIPPED_DELETE_FILES, skippedDeleteFiles);
+
+    String scannedDeleteManifests = Long.toString(
+        metrics.scannedDeleteManifests().value());
+    addInfoString(profile, ScanMetrics.SCANNED_DELETE_MANIFESTS, scannedDeleteManifests);
+
+    String skippedDeleteManifests = Long.toString(
+        metrics.skippedDeleteManifests().value());
+    addInfoString(profile, ScanMetrics.SKIPPED_DELETE_MANIFESTS, skippedDeleteManifests);
+
+    String indexedDeleteFiles = Long.toString(metrics.indexedDeleteFiles().value());
+    addInfoString(profile, ScanMetrics.INDEXED_DELETE_FILES, indexedDeleteFiles);
+
+    String equalityDeleteFiles = Long.toString(metrics.equalityDeleteFiles().value());
+    addInfoString(profile, ScanMetrics.EQUALITY_DELETE_FILES, equalityDeleteFiles);
+
+    String positionalDeleteFiles = Long.toString(metrics.positionalDeleteFiles().value());
+    addInfoString(profile, ScanMetrics.POSITIONAL_DELETE_FILES, positionalDeleteFiles);
   }
 
   private TExecRequest doCreateExecRequest(CompilerFactory compilerFactory,

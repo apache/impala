@@ -19,11 +19,16 @@ package org.apache.impala.planner;
 
 import static org.junit.Assert.assertEquals;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.apache.iceberg.metrics.ScanMetricsResult;
 
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.ColumnStats;
@@ -1641,5 +1646,24 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("iceberg-merge-insert-only", options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
             PlannerTestOption.INCLUDE_EXPLAIN_HEADER));
+  }
+
+  /**
+   * This test ensures that if the number of metrics in Iceberg's ScanMetricsResult
+   * changes we're aware of it.
+   */
+  @Test
+  public void testIcebergScanMetricsResultCardinality() {
+    final int expectedMethodNumber = 16;
+
+    Method[] methods = ScanMetricsResult.class.getDeclaredMethods();
+
+    long publicMethods = java.util.Arrays.stream(methods)
+      .filter(method -> {
+        int modifiers = method.getModifiers();
+        return Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers);
+    }).count();
+
+    Assert.assertEquals(expectedMethodNumber, publicMethods);
   }
 }

@@ -43,6 +43,10 @@ import org.apache.iceberg.expressions.ExpressionUtil;
 import org.apache.iceberg.expressions.ExpressionVisitors;
 import org.apache.iceberg.expressions.True;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.metrics.MetricsReport;
+import org.apache.iceberg.metrics.MetricsReporter;
+import org.apache.iceberg.metrics.ScanMetricsResult;
+import org.apache.iceberg.metrics.ScanReport;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BinaryPredicate.Operator;
@@ -78,6 +82,7 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.planner.JoinNode.DistributionMode;
+import org.apache.impala.service.Frontend;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TQueryOptions;
@@ -93,6 +98,26 @@ import org.slf4j.LoggerFactory;
  * class deals with such complexities.
  */
 public class IcebergScanPlanner {
+  // TODO: This class is available in the Iceberg library from release 1.4.0. We could
+  // drop this and use the one from Iceberg once we've done a version bump.
+  private static class InMemoryMetricsReporter implements MetricsReporter {
+    private MetricsReport metricsReport_;
+
+    @Override
+    public void report(MetricsReport report) {
+      Preconditions.checkArgument(
+          report == null || report instanceof ScanReport,
+          "Metrics report is not a scan report");
+      this.metricsReport_ = report;
+    }
+
+    public ScanMetricsResult scanMetricsResult() {
+      if (metricsReport_ == null) return null;
+
+      return ((ScanReport) metricsReport_).scanMetrics();
+    }
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(IcebergScanPlanner.class);
 
   private Analyzer analyzer_;
@@ -137,6 +162,8 @@ public class IcebergScanPlanner {
 
   private final long snapshotId_;
 
+  private final InMemoryMetricsReporter metricsReporter_ = new InMemoryMetricsReporter();
+
   public IcebergScanPlanner(Analyzer analyzer, PlannerContext ctx,
       TableRef iceTblRef, List<Expr> conjuncts, MultiAggregateInfo aggInfo)
       throws ImpalaException {
@@ -152,6 +179,20 @@ public class IcebergScanPlanner {
   }
 
   public PlanNode createIcebergScanPlan() throws ImpalaException {
+    PlanNode res = createPlanNodeHelper();
+    Preconditions.checkNotNull(res);
+
+    ScanMetricsResult metricsResult = metricsReporter_.scanMetricsResult();
+    Preconditions.checkState(
+        !needIcebergForPlanning() || snapshotId_ == -1 || metricsResult != null);
+
+    // Update the query profile with the scan metrics.
+    Frontend.addIcebergScanMetricsToProfile(res.getId().toString(), metricsResult);
+
+    return res;
+  }
+
+  private PlanNode createPlanNodeHelper() throws ImpalaException {
     if (!needIcebergForPlanning()) {
       analyzer_.materializeSlots(conjuncts_);
       setFileDescriptorsBasedOnFileStore();
@@ -560,9 +601,14 @@ public class IcebergScanPlanner {
 
     TimeTravelSpec timeTravelSpec = tblRef_.getTimeTravelSpec();
 
+    // 'metricsReporter_' is filled when the try-with-resources releases the FileScanTask
+    // iterable, i.e. not when the call to IcebergUtil.planFiles() returns.
     try (CloseableIterable<FileScanTask> fileScanTasks =
-        IcebergUtil.planFiles(getIceTable(),
-            new ArrayList<>(impalaIcebergPredicateMapping_.keySet()), timeTravelSpec)) {
+        IcebergUtil.planFiles(
+            getIceTable(),
+            new ArrayList<>(impalaIcebergPredicateMapping_.keySet()),
+            timeTravelSpec,
+            metricsReporter_)) {
       long dataFilesCacheMisses = 0;
       for (FileScanTask fileScanTask : fileScanTasks) {
         Expression residualExpr = fileScanTask.residual();
@@ -598,6 +644,7 @@ public class IcebergScanPlanner {
           "Failed to load data files for Iceberg table: %s", getIceTable().getFullName()),
           e);
     }
+
     updateDeleteStatistics();
   }
 

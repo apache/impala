@@ -64,6 +64,9 @@ import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.expressions.Term;
 import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.metrics.LoggingMetricsReporter;
+import org.apache.iceberg.metrics.MetricsReporter;
+import org.apache.iceberg.metrics.MetricsReporters;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 import org.apache.iceberg.transforms.Transforms;
@@ -631,14 +634,20 @@ public class IcebergUtil {
    * Returns a list of Iceberg FileScanTask objects. These objects contain a data file
    * to be scanned and the associated delete files need to be applied.
    */
-  public static CloseableIterable<FileScanTask> planFiles(FeIcebergTable table,
-      List<Expression> predicates, TimeTravelSpec timeTravelSpec)
-        throws TableLoadingException {
+  public static CloseableIterable<FileScanTask> planFiles(
+      FeIcebergTable table,
+      List<Expression> predicates,
+      TimeTravelSpec timeTravelSpec,
+      MetricsReporter metricsReporter) throws TableLoadingException {
     if (table.snapshotId() == -1) return CloseableIterable.empty();
 
     TableScan scan = createScanAsOf(table, timeTravelSpec);
     for (Expression predicate : predicates) {
       scan = scan.filter(predicate);
+    }
+
+    if (metricsReporter != null) {
+      scan = scan.metricsReporter(metricsReporter);
     }
 
     return scan.planFiles();
@@ -651,7 +660,7 @@ public class IcebergUtil {
       FeIcebergTable table, List<Expression> predicates, TimeTravelSpec timeTravelSpec)
         throws TableLoadingException {
     try (CloseableIterable<FileScanTask> fileScanTasks = planFiles(
-        table, predicates, timeTravelSpec)) {
+        table, predicates, timeTravelSpec, null)) {
       return new GroupedContentFiles(fileScanTasks);
     } catch (IOException e) {
       throw new TableLoadingException("Error during reading Iceberg manifest files.", e);
