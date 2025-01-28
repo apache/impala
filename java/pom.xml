@@ -24,7 +24,6 @@ under the License.
   <version>4.4.0.3.3.6.0-1</version>
   <packaging>pom</packaging>
   <name>Apache Impala Parent POM</name>
-
   <!--
   When adding new properties to control library versions, also add them to
   bin/impala-config.sh as environment variables so other branches can easily override
@@ -97,7 +96,29 @@ under the License.
     getting other artifacts from the mirror.
     -->
     <!-- Local/S3 repositories -->
+	  <repository>
+            <id>acceldata repo</id>
+            <name>acceldata repo</name>
+            <url>https://repo1.acceldata.dev/repository/odp-central/</url>
+            <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+  </repository>
     <repository>
+            <id>acceldata staging repo</id>
+            <name>acceldata staging repo</name>
+            <url>https://repo1.acceldata.dev/repository/odp-staging-central/</url>
+            <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+  </repository>
+	  <repository>
       <id>impala.toolchain.kudu.repo</id>
       <url>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY}</url>
       <name>Impala Toolchain Kudu Repository</name>

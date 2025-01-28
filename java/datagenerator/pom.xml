@@ -31,7 +31,30 @@ under the License.
   <packaging>jar</packaging>
 
   <name>Test Data Generator</name>
-
+  <repositories>
+    <repository>
+            <id>acceldata repo</id>
+            <name>acceldata repo</name>
+            <url>https://repo1.acceldata.dev/repository/odp-central/</url>
+            <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+        </repository>
+<repository>
+            <id>acceldata staging repo</id>
+            <name>acceldata staging repo</name>
+            <url>https://repo1.acceldata.dev/repository/odp-staging-central/</url>
+            <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+  </repository>
+  </repositories>
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
