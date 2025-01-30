@@ -438,7 +438,14 @@ string curl_status_code(const string& curl_options, int32_t port = FLAGS_webserv
   string cmd = Substitute("curl -s -f -w \"%{http_code}\" $0 'http://127.0.0.1:$1'",
       curl_options, port);
   cout << cmd << endl;
-  return exec(cmd.c_str());
+  string result = exec(cmd.c_str());
+  if (result.size() > 3) {
+    // In some cases the stdout of curl can contain extra characters before the status
+    // code (see IMPALA-13702 for details). As http status codes are expected to be 3
+    // digits it is always ok to return the last 3 characters.
+    result = result.substr(result.size() - 3, 3);
+  }
+  return result;
 }
 
 class CookieJar {
