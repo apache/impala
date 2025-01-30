@@ -90,4 +90,22 @@ public interface ImpalaPlanRel {
     }
     throw new RuntimeException("Unknown RelNode: " +  relNode);
   }
+
+  /**
+   * Returns true for the nodes that should pass through the "parent aggregate"
+   * to its child. Some queries have optimizations which require the table scan
+   * to be aware of an aggregate done immediately after the table scan (e.g.
+   * partitiion key scanning, count star optimization). Only the RelNodes
+   * mentioned below can be in between the Aggregate RelNode and the Table Scan
+   * RelNode.
+   */
+  public static boolean canPassThroughParentAggregate(ImpalaPlanRel planRel) {
+    switch (getRelNodeType((RelNode) planRel)) {
+      case FILTER:
+      case PROJECT:
+        return true;
+      default:
+        return false;
+    }
+  }
 }

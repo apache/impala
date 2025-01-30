@@ -2037,7 +2037,6 @@ public class HdfsScanNode extends ScanNode {
       msg.hdfs_scan_node.setDeterministic_scanrange_assignment(
           deterministicScanRangeAssignment_);
     }
-    Preconditions.checkState((optimizedAggSmap_ == null) == (countStarSlot_ == null));
     if (countStarSlot_ != null) {
       msg.hdfs_scan_node.setCount_star_slot_offset(countStarSlot_.getByteOffset());
     }

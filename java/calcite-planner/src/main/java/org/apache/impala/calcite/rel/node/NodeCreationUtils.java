@@ -87,7 +87,7 @@ public class NodeCreationUtils {
 
     unionNode.init(analyzer);
 
-    return new NodeWithExprs(unionNode, outputExprs, childrenPlanNodes);
+    return new NodeWithExprs(unionNode, outputExprs);
   }
 
   public static List<Expr> createOutputExprs(List<SlotDescriptor> slotDescs) {

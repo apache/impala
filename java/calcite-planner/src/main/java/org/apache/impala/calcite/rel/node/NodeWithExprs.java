@@ -31,27 +31,20 @@ import java.util.List;
 public class NodeWithExprs {
   public final PlanNode planNode_;
   public final List<Expr> outputExprs_;
+  public final Expr countStarOptimization_;
 
   public NodeWithExprs(PlanNode planNode, List<Expr> outputExprs) {
-    this.planNode_ = planNode;
-    this.outputExprs_ = outputExprs;
-  }
-
-  public NodeWithExprs(PlanNode planNode, List<Expr> outputExprs,
-      List<NodeWithExprs> childrenNodeWithExprs) {
-    this.planNode_ = planNode;
-    this.outputExprs_ = outputExprs;
-  }
-
-  public NodeWithExprs(PlanNode planNode, List<Expr> outputExprs,
-      NodeWithExprs childNodeWithExprs) {
-    this.planNode_ = planNode;
-    this.outputExprs_ = outputExprs;
+    this(planNode, outputExprs, null);
   }
 
   public NodeWithExprs(PlanNode planNode, NodeWithExprs childNodeWithExprs) {
+    this(planNode, childNodeWithExprs.outputExprs_, null);
+  }
 
+  public NodeWithExprs(PlanNode planNode, List<Expr> outputExprs,
+      Expr countStarOptimization) {
     this.planNode_ = planNode;
-    this.outputExprs_ = childNodeWithExprs.outputExprs_;
+    this.outputExprs_ = outputExprs;
+    this.countStarOptimization_ = countStarOptimization;
   }
 }

@@ -87,7 +87,7 @@ abstract public class ScanNode extends PlanNode {
   // then be applied to the MultiAggregateInfo in this query block. We do not apply the
   // smap in this class directly to avoid side effects and make it easier to reason about.
   protected MultiAggregateInfo aggInfo_ = null;
-  protected static final String STATS_NUM_ROWS = "stats: num_rows";
+  public static final String STATS_NUM_ROWS = "stats: num_rows";
 
   // Should be applied to the AggregateInfo from the same query block. We cannot use the
   // PlanNode.outputSmap_ for this purpose because we don't want the smap entries to be
@@ -168,11 +168,7 @@ abstract public class ScanNode extends PlanNode {
     countFn.analyzeNoThrow(analyzer);
 
     // Create the sum function.
-    SlotDescriptor sd = analyzer.addSlotDescriptor(getTupleDesc());
-    sd.setType(Type.BIGINT);
-    sd.setIsMaterialized(true);
-    sd.setIsNullable(false);
-    sd.setLabel(STATS_NUM_ROWS);
+    SlotDescriptor sd = createCountStarOptimizationDesc(getTupleDesc(), analyzer);
     List<Expr> args = new ArrayList<>();
     args.add(new SlotRef(sd));
     FunctionCallExpr sumFn = new FunctionCallExpr("sum_init_zero", args);
@@ -180,6 +176,19 @@ abstract public class ScanNode extends PlanNode {
 
     optimizedAggSmap_ = new ExprSubstitutionMap();
     optimizedAggSmap_.put(countFn, sumFn);
+    return sd;
+  }
+
+  /**
+   * Creates special SlotDescriptor for the count star optimization.
+   */
+  public static SlotDescriptor createCountStarOptimizationDesc(TupleDescriptor tupleDesc,
+      Analyzer analyzer) {
+    SlotDescriptor sd = analyzer.addSlotDescriptor(tupleDesc);
+    sd.setType(Type.BIGINT);
+    sd.setIsMaterialized(true);
+    sd.setIsNullable(false);
+    sd.setLabel(ScanNode.STATS_NUM_ROWS);
     return sd;
   }
 

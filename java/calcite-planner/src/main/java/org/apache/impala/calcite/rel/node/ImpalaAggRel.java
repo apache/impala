@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
@@ -29,6 +30,7 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlSingleValueAggFunction;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.impala.calcite.functions.AnalyzedFunctionCallExpr;
@@ -45,6 +47,7 @@ import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.calcite.util.SimplifiedAnalyzer;
+import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -103,7 +106,8 @@ public class ImpalaAggRel extends Aggregate
 
     List<Expr> groupingExprs = getGroupingExprs(inputWithExprs.outputExprs_);
     List<FunctionCallExpr> aggExprs = getAggregateExprs(context.ctx_,
-        inputWithExprs.outputExprs_, simplifiedAnalyzer);
+        inputWithExprs.outputExprs_, simplifiedAnalyzer,
+        inputWithExprs.countStarOptimization_);
     List<List<Expr>> groupingSets =
         getGroupingSets(simplifiedAnalyzer, inputWithExprs.outputExprs_);
 
@@ -143,7 +147,7 @@ public class ImpalaAggRel extends Aggregate
     aggNode.init(simplifiedAnalyzer);
     simplifiedAnalyzer.clearUnassignedConjuncts();
 
-    return new NodeWithExprs(aggNode, outputExprs, inputWithExprs);
+    return new NodeWithExprs(aggNode, outputExprs);
   }
 
   private NodeWithExprs getChildPlanNode(ParentPlanRelContext context
@@ -153,6 +157,8 @@ public class ImpalaAggRel extends Aggregate
         new ParentPlanRelContext.Builder(context, this);
     // filter condition handled by agg node, so no need to pass it to the child.
     builder.setFilterCondition(null);
+    builder.setParentAggregate(this);
+    builder.setInputRefs(ImmutableBitSet.of(RelOptUtil.getAllFields(this)));
     return relInput.getPlanNode(builder.build());
   }
 
@@ -263,17 +269,64 @@ public class ImpalaAggRel extends Aggregate
     return transposePhaseAgg;
   }
 
+  /**
+   * Returns true if the agg call is for distinct columns. This is used
+   * by the partition key scan optimization which can limit the number of
+   * rows scanned in the table scan if only distinct rows are needed by
+   * this agg.
+   */
+  public boolean hasDistinctOnly() throws ImpalaException {
+    for (AggregateCall aggCall : getAggCallList()) {
+      Function fn = getFunction(aggCall);
+      if (fn == null) {
+        return false;
+      }
+      Preconditions.checkState(fn instanceof AggregateFunction);
+      AggregateFunction aggFn = (AggregateFunction) fn;
+      if (!aggFn.ignoresDistinct() && !aggCall.isDistinct()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public boolean hasCountStarOnly() {
+    if (getAggCallList().size() == 0) {
+      return false;
+    }
+    for (AggregateCall aggCall : getAggCallList()) {
+      if (!aggCall.getAggregation().getKind().equals(SqlKind.COUNT)) {
+        return false;
+      }
+      if (aggCall.getArgList().size() > 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private List<FunctionCallExpr> getAggregateExprs(PlannerContext ctx,
-      List<Expr> inputExprs, Analyzer analyzer) throws ImpalaException ,
+      List<Expr> inputExprs, Analyzer analyzer,
+      Expr countStarOptimization) throws ImpalaException,
       AnalysisException {
     List<FunctionCallExpr> exprs = Lists.newArrayList();
     ImpalaPlanRel input = (ImpalaPlanRel) getInput(0);
     for (AggregateCall aggCall : getAggCallList()) {
+      if (hasCountStarOnly()) {
+        if (countStarOptimization != null) {
+          List<Expr> args = new ArrayList<>();
+          args.add(countStarOptimization);
+          FunctionCallExpr sumFn = new FunctionCallExpr("sum_init_zero", args);
+          sumFn.analyzeNoThrow(analyzer);
+          exprs.add(sumFn);
+          continue;
+        }
+      }
       List<Expr> operands = aggCall.getArgList().stream()
           .map(t -> inputExprs.get(t))
           .collect(Collectors.toList());
 
-      Function fn = getFunction(ctx, aggCall);
+      Function fn = getFunction(aggCall);
       Preconditions.checkState(fn != null, "Could not find the Impala function for " +
           aggCall.getAggregation().getName());
 
@@ -289,7 +342,7 @@ public class ImpalaAggRel extends Aggregate
     return exprs;
   }
 
-  private Function getFunction(PlannerContext ctx, AggregateCall aggCall)
+  private Function getFunction(AggregateCall aggCall)
       throws ImpalaException {
     RelDataType retType = aggCall.getType();
     SqlAggFunction aggFunction = aggCall.getAggregation();
@@ -326,7 +379,7 @@ public class ImpalaAggRel extends Aggregate
 
     cardinalityCheckNode.init(ctx.getRootAnalyzer());
 
-    return new NodeWithExprs(cardinalityCheckNode, outputExprs, inputNodeWithExprs);
+    return new NodeWithExprs(cardinalityCheckNode, outputExprs);
   }
 
   public Aggregate copy(RelTraitSet relTraitSet, RelNode relNode,

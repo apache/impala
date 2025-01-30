@@ -43,6 +43,8 @@ public class ParentPlanRelContext {
 
   public final RelDataType parentRowType_;
 
+  public ImpalaAggRel parentAggregate_;
+
   /**
    * Constructor meant for root node.
    */
@@ -52,6 +54,7 @@ public class ParentPlanRelContext {
     this.inputRefs_ = null;
     this.parentType_ = null;
     this.parentRowType_ = null;
+    this.parentAggregate_ = null;
   }
 
   private ParentPlanRelContext(Builder builder) {
@@ -60,6 +63,7 @@ public class ParentPlanRelContext {
     this.inputRefs_ = builder.inputRefs_;
     this.parentType_ = builder.parentType_;
     this.parentRowType_ = builder.parentRowType_;
+    this.parentAggregate_ = builder.parentAggregate_;
   }
 
   public static class Builder {
@@ -68,6 +72,7 @@ public class ParentPlanRelContext {
     private ImmutableBitSet inputRefs_;
     private ImpalaPlanRel.RelNodeType parentType_;
     private RelDataType  parentRowType_;
+    private ImpalaAggRel parentAggregate_;
 
     /**
      * Should only be called from root level.
@@ -81,6 +86,9 @@ public class ParentPlanRelContext {
       this.context_ = planRelContext.ctx_;
       this.filterCondition_ = planRelContext.filterCondition_;
       this.parentType_ = planRel.relNodeType();
+      this.parentAggregate_ = ImpalaPlanRel.canPassThroughParentAggregate(planRel)
+          ? planRelContext.parentAggregate_
+          : null;
     }
 
     public void setFilterCondition(RexNode filterCondition) {
@@ -97,6 +105,10 @@ public class ParentPlanRelContext {
 
     public void setParentType(ImpalaPlanRel.RelNodeType parentType) {
       this.parentType_ = parentType;
+    }
+
+    public void setParentAggregate(ImpalaAggRel parentAggregate) {
+      this.parentAggregate_ = parentAggregate;
     }
 
     public ParentPlanRelContext build() {

@@ -143,7 +143,7 @@ public class ImpalaSortRel extends Sort
         inputNodeWithExprs.planNode_, sortInfo, limit_, offset_, limit_ != -1,
         context.ctx_.getRootAnalyzer());
 
-    NodeWithExprs retNode = new NodeWithExprs(sortNode, outputExprs, inputNodeWithExprs);
+    NodeWithExprs retNode = new NodeWithExprs(sortNode, outputExprs);
 
     // If there is a filter condition, a SelectNode will get added on top
     // of the retNode.

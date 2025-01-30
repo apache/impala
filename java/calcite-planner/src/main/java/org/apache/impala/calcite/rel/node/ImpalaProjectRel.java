@@ -91,7 +91,8 @@ public class ImpalaProjectRel extends Project
 
     // There is no Impala Plan Node mapped to Project, so we just return the child
     // PlanNode. However, the outputExprs change with the Project.
-    return new NodeWithExprs(inputWithExprs.planNode_, outputExprs, inputWithExprs);
+    return new NodeWithExprs(inputWithExprs.planNode_, outputExprs,
+        inputWithExprs.countStarOptimization_);
   }
 
   /**

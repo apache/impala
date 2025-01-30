@@ -51,6 +51,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.calcite.rel.util.ImpalaBaseTableRef;
@@ -62,11 +63,15 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.UnsupportedFeatureException;
+import org.apache.impala.util.AcidUtils;
 
 import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 
 public class CalciteTable extends RelOptAbstractTable
@@ -74,6 +79,7 @@ public class CalciteTable extends RelOptAbstractTable
 
   private final HdfsTable table_;
 
+  private final Map<Integer, Integer> impalaPositionMap_;
 
   private final List<String> qualifiedTableName_;
 
@@ -82,6 +88,7 @@ public class CalciteTable extends RelOptAbstractTable
     super(reader, table.getName(), buildColumnsForRelDataType(table));
     this.table_ = (HdfsTable) table;
     this.qualifiedTableName_ = table.getTableName().toPath();
+    this.impalaPositionMap_ = buildPositionMap();
 
     checkIfTableIsSupported(table);
   }
@@ -91,6 +98,7 @@ public class CalciteTable extends RelOptAbstractTable
     RelDataTypeFactory typeFactory = new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
 
     RelDataTypeFactory.Builder builder = new RelDataTypeFactory.Builder(typeFactory);
+
     // skip clustering columns, save them for the end
     for (Column column : table.getColumnsInHiveOrder()) {
       if (column.getType().isComplexType()) {
@@ -126,28 +134,6 @@ public class CalciteTable extends RelOptAbstractTable
     BaseTableRef baseTblRef = new ImpalaBaseTableRef(tblRef, resolvedPath, analyzer);
     baseTblRef.analyze(analyzer);
     return baseTblRef;
-  }
-
-  // Create tuple and slot descriptors for this base table
-  public TupleDescriptor createTupleAndSlotDesc(BaseTableRef baseTblRef,
-      List<String> fieldNames, Analyzer analyzer) throws ImpalaException {
-    // create the slot descriptors corresponding to this tuple descriptor
-    // by supplying the field names from Calcite's output schema for this node
-    for (int i = 0; i < fieldNames.size(); i++) {
-      String fieldName = fieldNames.get(i);
-      SlotRef slotref =
-          new SlotRef(Path.createRawPath(baseTblRef.getUniqueAlias(), fieldName));
-      slotref.analyze(analyzer);
-      SlotDescriptor slotDesc = slotref.getDesc();
-      if (slotDesc.getType().isCollectionType()) {
-        throw new AnalysisException(String.format(fieldName + " "
-            + "is a complex type (array/map/struct) column. "
-            + "This is not currently supported."));
-      }
-      slotDesc.setIsMaterialized(true);
-    }
-    TupleDescriptor tupleDesc = baseTblRef.getDesc();
-    return tupleDesc;
   }
 
   /**
@@ -230,5 +216,68 @@ public class CalciteTable extends RelOptAbstractTable
   @Override
   public SqlMonotonicity getMonotonicity(String columnName) {
     return SqlMonotonicity.NOT_MONOTONIC;
+  }
+
+  @Override
+  public double getRowCount() {
+    return (double) table_.getNumRows();
+  }
+
+  /**
+   * Returns a position map from Impala column numbers to Calcite
+   * column numbers. Calcite places the columns in "Hive Order"
+   * so that a 'select *' will return the column list in the
+   * right order, but this map is needed because sometimes we
+   * only have the "Column.getPosition()" column number which
+   * is the Impala column number.
+   */
+  private Map<Integer, Integer> buildPositionMap() {
+
+    Map<Integer, Integer> impalaPositionMap = new HashMap<>();
+    // skip clustering columns, save them for the end
+    int i = 0;
+    for (Column column : table_.getColumnsInHiveOrder()) {
+      impalaPositionMap.put(column.getPosition(), i);
+      i++;
+    }
+
+    return impalaPositionMap;
+  }
+
+  public int getCalcitePosition(int impalaPosition) {
+    return impalaPositionMap_.get(impalaPosition);
+  }
+
+  public int getNumberColumnsIncludingAcid() {
+    return impalaPositionMap_.keySet().size();
+  }
+
+  /**
+   * Returns true if the conditions on the table meet the requirements
+   * needed to apply the count star optimization.
+   */
+  public boolean canApplyCountStarOptimization(List<String> fieldNames) {
+    Set<HdfsFileFormat> fileFormats = table_.getFileFormats();
+    if (fileFormats.size() != 1) {
+      return false;
+    }
+    if (!fileFormats.contains(HdfsFileFormat.ORC) &&
+        !fileFormats.contains(HdfsFileFormat.PARQUET) &&
+        !fileFormats.contains(HdfsFileFormat.HUDI_PARQUET)) {
+      return false;
+    }
+    if (AcidUtils.isFullAcidTable(table_.getMetaStoreTable().getParameters())) {
+      return false;
+    }
+    return isOnlyClusteredCols(fieldNames);
+  }
+
+  public boolean isOnlyClusteredCols(List<String> fieldNames) {
+    for (int i = 0; i < fieldNames.size(); i++) {
+      if (!table_.isClusteringColumn(table_.getColumn(fieldNames.get(i)))) {
+        return false;
+      }
+    }
+    return true;
   }
 }

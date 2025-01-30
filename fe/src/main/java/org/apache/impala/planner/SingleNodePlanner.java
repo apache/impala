@@ -1675,7 +1675,8 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     } else if (addAcidSlotsIfNeeded(analyzer, hdfsTblRef, partitions)) {
       // We are scanning a full ACID table that has delete delta files. Let's create
       // a LEFT ANTI JOIN between the insert deltas and delete deltas.
-      return createAcidJoinNode(analyzer, hdfsTblRef, conjuncts, partitions, pair.second);
+      return createAcidJoinNode(analyzer, hdfsTblRef, conjuncts, partitions, pair.second,
+          ctx_);
     } else {
       HdfsScanNode scanNode =
           new HdfsScanNode(ctx_.getNextNodeId(), tupleDesc, conjuncts, partitions,
@@ -1760,9 +1761,9 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
    * adds a LEFT ANTI HASH JOIN with BROADCAST distribution mode. I.e. delete events will
    * be broadcasted to the nodes that scan the insert files.
    */
-  private PlanNode createAcidJoinNode(Analyzer analyzer, TableRef hdfsTblRef,
+  public static PlanNode createAcidJoinNode(Analyzer analyzer, TableRef hdfsTblRef,
       List<Expr> conjuncts, List<? extends FeFsPartition> partitions,
-      List<Expr> partConjuncts)
+      List<Expr> partConjuncts, PlannerContext ctx)
       throws ImpalaException {
     FeTable feTable = hdfsTblRef.getTable();
     Preconditions.checkState(AcidUtils.isFullAcidTable(
@@ -1781,11 +1782,11 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     TableRef deleteDeltaRef = TableRef.newTableRef(analyzer, hdfsTblRef.getPath(),
         hdfsTblRef.getUniqueAlias() + "-delete-delta");
     addAcidSlots(analyzer, deleteDeltaRef);
-    HdfsScanNode deltaScanNode = new HdfsScanNode(ctx_.getNextNodeId(),
+    HdfsScanNode deltaScanNode = new HdfsScanNode(ctx.getNextNodeId(),
         hdfsTblRef.getDesc(), conjuncts, insertDeltaPartitions, hdfsTblRef,
         /*aggInfo=*/null, partConjuncts, /*isPartitionKeyScan=*/false);
     deltaScanNode.init(analyzer);
-    HdfsScanNode deleteDeltaScanNode = new HdfsScanNode(ctx_.getNextNodeId(),
+    HdfsScanNode deleteDeltaScanNode = new HdfsScanNode(ctx.getNextNodeId(),
         deleteDeltaRef.getDesc(), Collections.emptyList(), deleteDeltaPartitions,
         deleteDeltaRef, /*aggInfo=*/null, partConjuncts, /*isPartitionKeyScan=*/false);
     deleteDeltaScanNode.init(analyzer);
@@ -1799,7 +1800,7 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     JoinNode acidJoin = new HashJoinNode(deltaScanNode, deleteDeltaScanNode,
         /*straight_join=*/true, DistributionMode.BROADCAST, JoinOperator.LEFT_ANTI_JOIN,
         acidJoinConjuncts, /*otherJoinConjuncts=*/Collections.emptyList());
-    acidJoin.setId(ctx_.getNextNodeId());
+    acidJoin.setId(ctx.getNextNodeId());
     acidJoin.init(analyzer);
     acidJoin.setIsDeleteRowsJoin();
     return acidJoin;
