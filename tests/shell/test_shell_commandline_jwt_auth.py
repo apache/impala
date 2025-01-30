@@ -78,23 +78,23 @@ class TestImpalaShellJwtAuth(ImpalaTestSuite):
   def test_multiple_auth_ldap_jwt(self, vector):
     """Asserts that ldap and jwt auth cannot both be enabled."""
     result = run_impala_shell_cmd(vector, ['-l', '-j'], expect_success=False)
-    assert "Please specify at most one authentication mechanism (-k, -l, or -j)" \
+    assert "Please specify at most one authentication mechanism (-k, -l, -j, or -a)" \
            in result.stderr
 
   def test_multiple_auth_ldap_kerberos(self, vector):
     """Asserts that ldap and kerberos auth cannot both be enabled."""
     result = run_impala_shell_cmd(vector, ['-l', '-k'], expect_success=False)
-    assert "Please specify at most one authentication mechanism (-k, -l, or -j)" \
+    assert "Please specify at most one authentication mechanism (-k, -l, -j, or -a)" \
            in result.stderr
 
   def test_multiple_auth_jwt_kerberos(self, vector):
     """Asserts that jwt and kerberos auth cannot both be enabled."""
     result = run_impala_shell_cmd(vector, ['-j', '-k'], expect_success=False)
-    assert "Please specify at most one authentication mechanism (-k, -l, or -j)" \
+    assert "Please specify at most one authentication mechanism (-k, -l, -j, or -a)" \
            in result.stderr
 
   def test_multiple_auth_ldap_jwt_kerberos(self, vector):
     """Asserts ldap, jwt, and kerberos auth cannot all be enabled."""
     result = run_impala_shell_cmd(vector, ['-l', '-j', '-k'], expect_success=False)
-    assert "Please specify at most one authentication mechanism (-k, -l, or -j)" \
+    assert "Please specify at most one authentication mechanism (-k, -l, -j, or -a)" \
            in result.stderr

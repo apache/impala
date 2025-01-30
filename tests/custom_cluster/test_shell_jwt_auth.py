@@ -47,6 +47,11 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
                   "-jwt_token_auth=true -jwt_allow_without_tls=true "
                   .format(JWKS_JSON_PATH))
 
+  IMPALAD_OAUTH_ARGS = ("-v 2 -oauth_jwks_file_path={0} -oauth_token_auth=true "
+                        "-oauth_jwt_custom_claim_username=sub "
+                        "-oauth_allow_without_tls=true "
+                  .format(JWKS_JSON_PATH))
+
   # Name of the Impala metric containing the total count of hs2-http connections opened.
   HS2_HTTP_CONNS = "impala.thrift-server.hiveserver2-http-frontend.total-connections"
 

@@ -235,7 +235,7 @@ def get_option_parser(defaults):
   parser.add_option("-a", "--oauth", dest="use_oauth",
                     action="store_true",
                     help="Use OAuth to authenticate with Impala. Impala must be"
-                    "configured to allow Oauth authentication. \t\t")
+                    "configured to allow OAuth authentication. \t\t")
   parser.add_option("-u", "--user", dest="user",
                     help="User to authenticate with.")
   parser.add_option("--ssl", dest="ssl",
@@ -275,10 +275,23 @@ def get_option_parser(defaults):
                     "unencrypted, and may be vulnerable to attack.")
   parser.add_option("--ldap_password_cmd", dest="ldap_password_cmd",
                     help="Shell command to run to retrieve the LDAP password")
+  parser.add_option("--oauth_client_id", dest="oauth_client_id",
+                    help="User to authenticate with OAuth auth server")
+  parser.add_option("--oauth_client_secret_cmd", dest="oauth_client_secret_cmd",
+                    help="Shell command to run to retrieve OAuth client secret")
   parser.add_option("--jwt_cmd", dest="jwt_cmd",
                     help="Shell command to run to retrieve the JWT")
   parser.add_option("--oauth_cmd", dest="oauth_cmd",
                     help="Shell command to run to retrieve the Oauth Token")
+  parser.add_option("--oauth_server", dest="oauth_server",
+                    help="OAuth Server url to get access and refresh tokens. Impala must"
+                    "be configured to allow OAuth authentication")
+  parser.add_option("--oauth_endpoint", dest="oauth_endpoint",
+                    help="OAuth Server endpoint to get access and refresh tokens. Impala"
+                    "must be configured to allow OAuth authentication")
+  # This option is used to create mock oauth auth server response for testing.
+  parser.add_option("--oauth_mock_response_cmd", dest="oauth_mock_response_cmd",
+                    help=SUPPRESS_HELP)
   parser.add_option("--var", dest="keyval", action="append",
                     help="Defines a variable to be used within the Impala session."
                          " Can be used multiple times to set different variables."
@@ -358,10 +371,11 @@ def get_option_parser(defaults):
                     "values when using the HS2 protocol. The default behaviour makes the "
                     "values handled by Python's str() built-in method. Use '16G' to "
                     "match the Beeswax protocol's floating-point output format.")
+  # When using the hs2-http protocol, set this value in the X-Forwarded-For header.
+  # This is primarily for testing purposes.
   parser.add_option("--hs2_x_forward", type="str",
                     dest="hs2_x_forward", default=None,
-                    help="When using the hs2-http protocol, set this value in the "
-                    "X-Forwarded-For header. This is primarily for testing purposes.")
+                    help=SUPPRESS_HELP)
   parser.add_option("--beeswax_compat_num_rows", dest="beeswax_compat_num_rows",
                     action="store_true",
                     help="If specified, always print num rows report at the end of query "

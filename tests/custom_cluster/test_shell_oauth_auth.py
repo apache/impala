@@ -41,10 +41,18 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
   OAUTH_SIGNED_PATH = os.path.join(JWKS_JWTS_DIR, 'jwt_signed')
   OAUTH_EXPIRED_PATH = os.path.join(JWKS_JWTS_DIR, 'jwt_expired')
   OAUTH_INVALID_JWK = os.path.join(JWKS_JWTS_DIR, 'jwt_signed_untrusted')
+  OAUTH_CLIENT_SECRET = os.path.join(JWKS_JWTS_DIR, 'oauth_client_secret')
+  OAUTH_VALID_PAYLOAD = os.path.join(JWKS_JWTS_DIR, 'okta_oauth_payload_valid')
+  OAUTH_INVALID_PAYLOAD = os.path.join(JWKS_JWTS_DIR, 'okta_oauth_payload_invalid')
 
   IMPALAD_ARGS = ("-v 2 -oauth_jwks_file_path={0} -oauth_jwt_custom_claim_username=sub "
     "-oauth_token_auth=true -oauth_allow_without_tls=true "
     .format(JWKS_JSON_PATH))
+
+  IMPALAD_OAUTH_ARGS = ("-v 2 -oauth_jwks_file_path={0} -oauth_token_auth=true "
+                        "-oauth_jwt_custom_claim_username=sub "
+                        "-oauth_allow_without_tls=true "
+                        .format(JWKS_JSON_PATH))
 
   # Name of the Impala metric containing the total count of hs2-http connections opened.
   HS2_HTTP_CONNS = "impala.thrift-server.hiveserver2-http-frontend.total-connections"
@@ -194,8 +202,88 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
     assert "HTTP code 401: Unauthorized" in result.stderr
     assert "Not connected to Impala, could not execute queries." in result.stderr
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_OAUTH_ARGS,
+    impala_log_dir="{oauth_auth_success}",
+    tmp_dir_placeholders=["oauth_auth_success"],
+    disable_log_buffering=True,
+    cluster_size=1)
+  def test_oauth_auth_with_clientid_and_secret_success(self, vector):
+    """Asserts the Impala shell can authenticate to Impala using OAuth authentication.
+    Also executes a query to ensure the authentication was successful."""
+    # Run a query and wait for it to complete.
+    args = ['--protocol', vector.get_value('protocol'), '-a',
+            '--oauth_client_id', 'oauth-test-user', '--oauth_client_secret_cmd',
+            'cat {0}'.format(TestImpalaShellOAuthAuth.OAUTH_CLIENT_SECRET),
+            '--oauth_server', 'localhost:8000',
+            '--oauth_endpoint', '/oauth/token',
+            '--oauth_mock_response_cmd',
+            'cat {0}'.format(TestImpalaShellOAuthAuth.OAUTH_VALID_PAYLOAD),
+            '-q', 'select version()', '--auth_creds_ok_in_clear']
+    result = run_impala_shell_cmd(vector, args)
+
+    # Shut down cluster to ensure logs flush to disk.
+    self._stop_impala_cluster()
+
+    # Ensure OAuth auth was enabled by checking the coordinator startup flags logged
+    # in the coordinator's INFO logfile
+    self.assert_impalad_log_contains("INFO",
+        '--oauth_jwks_file_path={0}'.format(self.JWKS_JSON_PATH), expected_count=1)
+    # Ensure OAuth auth was successful by checking impala coordinator logs
+    self.assert_impalad_log_contains("INFO",
+        'effective username: test-user', expected_count=1)
+    self.assert_impalad_log_contains("INFO",
+        r'connected_user \(string\) = "test-user"', expected_count=1)
+
+    # Ensure the query ran successfully.
+    assert "version()" in result.stdout
+    assert "impalad version" in result.stdout
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_OAUTH_ARGS,
+    impala_log_dir="{oauth_auth_failure}",
+    tmp_dir_placeholders=["oauth_auth_failure"],
+    disable_log_buffering=True,
+    cluster_size=1)
+  def test_oauth_auth_with_clientid_and_secret_failure(self, vector):
+    """Asserts the Impala shell fails to authenticate with Impala if it can't
+    retrieve the OAuth access token from the OAuth Server."""
+    # Run a query and wait for it to complete.
+    args = ['--protocol', vector.get_value('protocol'), '-a',
+            '--oauth_client_id', 'oauth-test-user', '--oauth_client_secret_cmd',
+            'cat {0}'.format(TestImpalaShellOAuthAuth.OAUTH_CLIENT_SECRET),
+            '--oauth_server', 'localhost:8000',
+            '--oauth_endpoint', '/oauth/token',
+            '--oauth_mock_response_cmd',
+            'cat {0}'.format(TestImpalaShellOAuthAuth.OAUTH_INVALID_PAYLOAD),
+            '-q', 'select version()', '--auth_creds_ok_in_clear']
+    result = run_impala_shell_cmd(vector, args, expect_success=False)
+
+    # Since Impala failed to authenticate, both success and fail count
+    # will be zero.
+    self.__assert_success_fail_metric(success_count=0, fail_count=0)
+
+    # Shut down cluster to ensure logs flush to disk.
+    self._stop_impala_cluster()
+
+    # Ensure OAuth auth was enabled by checking the coordinator startup flags logged
+    # in the coordinator's INFO logfile
+    self.assert_impalad_log_contains("INFO",
+        '--oauth_jwks_file_path={0}'.format(self.JWKS_JSON_PATH), expected_count=1)
+    # Ensure OAuth auth was not received in the logs
+    self.assert_impalad_log_contains("INFO",
+        'effective username: test-user', expected_count=0)
+    self.assert_impalad_log_contains("INFO",
+        r'connected_user \(string\) = "test-user"', expected_count=0)
+
+    # Ensure the query did not run successfully.
+    assert "version()" not in result.stdout
+    assert "impalad version" not in result.stdout
+
   def __assert_success_fail_metric(self, success_count=0, fail_count=0):
-    """Impala emits metrics that count the number of successful and failed OAUth
+    """Impala emits metrics that count the number of successful and failed OAuth
     authentications. This function asserts the OAuth auth success/fail counters from the
     coordinator match the expected values."""
     actual = self.cluster.get_first_impalad().service.get_metric_values([

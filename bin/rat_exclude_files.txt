@@ -192,6 +192,9 @@ testdata/jwt/*.json
 testdata/jwt/jwt_expired
 testdata/jwt/jwt_signed
 testdata/jwt/jwt_signed_untrusted
+testdata/jwt/oauth_client_secret
+testdata/jwt/okta_oauth_payload_valid
+testdata/jwt/okta_oauth_payload_invalid
 testdata/tzdb/2017c.zip
 testdata/tzdb/2017c-corrupt.zip
 testdata/tzdb_tiny/*

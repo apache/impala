@@ -36,6 +36,8 @@ import sys
 import textwrap
 import time
 import traceback
+import json
+from six.moves import http_client
 
 import prettytable
 import sqlparse
@@ -229,6 +231,13 @@ class ImpalaShell(cmd.Cmd, object):
     self.jwt = options.jwt
     self.use_oauth = options.use_oauth
     self.oauth = options.oauth
+    self.oauth_server = options.oauth_server
+    self.oauth_client_id = options.oauth_client_id
+    self.oauth_client_secret_cmd = options.oauth_client_secret_cmd
+    self.oauth_client_secret = options.oauth_client_secret
+    self.oauth_endpoint = options.oauth_endpoint
+    self.oauth_mock_response_cmd = options.oauth_mock_response_cmd
+    self.oauth_mock_response = options.oauth_mock_response
     # When running tests in strict mode, the server uses the ldap
     # protocol but can allow any password.
     if options.use_ldap_test_password:
@@ -1008,7 +1017,9 @@ class ImpalaShell(cmd.Cmd, object):
       self.jwt = getpass.getpass("Enter JWT: ")
 
     if self.use_oauth and self.oauth is None:
-      self.oauth = getpass.getpass("Enter OAUTH: ")
+      self.oauth_get_access_token()
+      if self.oauth is None and self.oauth_mock_response is None:
+        self.oauth = getpass.getpass("Enter OAUTH: ")
 
     if not args: args = socket.getfqdn()
     tokens = args.split(" ")
@@ -1874,6 +1885,60 @@ class ImpalaShell(cmd.Cmd, object):
         if not self.ignore_query_failure: return False
     return True
 
+  def oauth_get_access_token(self):
+    """Fetches OAuth access token from the OAuth Auth Server
+    using client_id and client_secret. If however, the
+    oauth_mock_response is set, then it returns the contents
+    of the file passed as parameter for oauth_mock_response_cmd.
+    """
+    json_body = dict()
+    if self.use_oauth and self.oauth is None:
+      if self.oauth_server is None:
+        print("Error: OAuth Server is empty")
+        sys.exit(1)
+      if self.oauth_endpoint is None:
+        print("Error: OAuth endpoint is empty")
+        sys.exit(1)
+      if self.oauth_client_id is None:
+        print("Error: OAuth Client id is empty")
+        sys.exit(1)
+
+      # If client secret is not provided through a command, then request it from user
+      if self.oauth_client_secret is None:
+        self.oauth_client_secret = getpass.getpass("Enter OAuth Client Secret: ")
+
+      # Fetch the access tokens first using client id and client secret
+      if self.oauth_mock_response is None:
+        try:
+          # Retreive the oauth access token from the OAuth Server
+          conn = http_client.HTTPSConnection(self.oauth_server, timeout=10)
+          payload = "{\"client_id\":\"" + self.oauth_client_id + \
+            "\",\"client_secret\":\"" + self.oauth_client_secret + \
+            "\",\"audience\":\"https://" + self.oauth_server + \
+            "/api/v2/\",\"grant_type\":\"client_credentials\"}"
+          headers = {'content-type': "application/json", "charset": "utf-8"}
+          conn.request("POST", self.oauth_endpoint, payload.encode('utf-8'), headers)
+          res = conn.getresponse()
+          if (res.status != 200):
+            print("HTTP error: ", res.status, res.read().decode("utf-8"))
+            sys.exit(1)
+          data = res.read()
+          json_body = json.loads(data.decode("utf-8"))
+        except Exception as e:
+          print("Error getting OAuth access tokens", e)
+          sys.exit(1)
+        finally:
+          if conn:
+            conn.close()
+      else:
+        # Fetch mock response
+        json_body = json.loads(self.oauth_mock_response)
+
+      if "access_token" in json_body.keys():
+        self.oauth = json_body["access_token"]
+      else:
+        print("Error: OAuth access token not found in json payload")
+        sys.exit(1)
 
 TIPS = [
   "Press TAB twice to see a list of available commands.",
@@ -2203,7 +2268,7 @@ def impala_shell_main():
     auth_method_count += 1
 
   if auth_method_count > 1:
-    print("Please specify at most one authentication mechanism (-k, -l, or -j)",
+    print("Please specify at most one authentication mechanism (-k, -l, -j, or -a)",
           file=sys.stderr)
     raise FatalShellException()
 
@@ -2254,6 +2319,11 @@ def impala_shell_main():
   if not options.use_oauth and options.oauth_cmd:
     print("Option --oauth_cmd requires using OAUTH authentication mechanism (-a)",
           file=sys.stderr)
+    raise FatalShellException()
+
+  if not options.use_oauth and options.oauth_client_secret_cmd:
+    print("Option --oauth_client_secret_cmd requires using OAUTH authentication "
+          "mechanism (-a)", file=sys.stderr)
     raise FatalShellException()
 
   if options.hs2_fp_format:
@@ -2313,8 +2383,17 @@ def impala_shell_main():
     options.jwt = read_password_cmd(options.jwt_cmd, "JWT", True)
 
   options.oauth = None
-  if options.use_oauth and options.oauth_cmd:
-    options.oauth = read_password_cmd(options.oauth_cmd, "OAUTH", True)
+  options.oauth_client_secret = None
+  options.oauth_mock_response = None
+  if options.use_oauth:
+    if options.oauth_cmd:
+      options.oauth = read_password_cmd(options.oauth_cmd, "OAUTH", True)
+    elif options.oauth_client_secret_cmd:
+      options.oauth_client_secret = read_password_cmd(options.oauth_client_secret_cmd,
+          "OAuth client secret", True)
+    if options.oauth_mock_response_cmd:
+      options.oauth_mock_response = read_password_cmd(options.oauth_mock_response_cmd,
+          "OAuth mock response", True)
 
   if options.ssl:
     if options.ca_cert is None:
