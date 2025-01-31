@@ -127,6 +127,10 @@ if [[ $ENABLE_RANGER_AUTH -eq 1 ]]; then
   # The following jar is needed by RangerRESTUtils.java.
   export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:\
       ${RANGER_HOME}/ews/webapp/WEB-INF/lib/gethostname4j-*.jar"
+  # RANGER-4845: Starts from Ranger-2.5, ranger uses guava included in hadoop.
+  # This jar file doesn't exist for Ranger 2.4 and previous versions.
+  export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:\
+      ${RANGER_HOME}/ews/webapp/WEB-INF/lib/hadoop-shaded-guava-*.jar"
 fi
 
 # For Hive 3, we use Tez for execution. We have to add it to the classpath.
