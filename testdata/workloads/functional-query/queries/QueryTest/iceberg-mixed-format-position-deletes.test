@@ -14,7 +14,11 @@ ALTER TABLE ice_mixed_formats SET TBLPROPERTIES ('write.format.default'='avro');
 DELETE FROM ice_mixed_formats WHERE i = 3;
 ====
 ---- QUERY
+# Second REFRESH should not do a full reload.
 refresh ice_mixed_formats;
+refresh ice_mixed_formats;
+---- RUNTIME_PROFILE
+row_regex:.*Iceberg table reload skipped as no change detected
 ====
 ---- QUERY
 SHOW FILES IN ice_mixed_formats;

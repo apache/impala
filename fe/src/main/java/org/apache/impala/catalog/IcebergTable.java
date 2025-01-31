@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -37,6 +38,7 @@ import java.util.TreeMap;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.mr.InputFormatConfig;
@@ -243,6 +245,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
 
   // Cached Iceberg API table object.
   private org.apache.iceberg.Table icebergApiTable_;
+  private String currentMetadataLocation_ = null;
 
   // The snapshot id cached in the CatalogD, necessary to syncronize the caches.
   private long catalogSnapshotId_ = -1;
@@ -456,58 +459,95 @@ public class IcebergTable extends Table implements FeIcebergTable {
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     verifyTable(msTbl);
     try {
-      // Copy the table to check later if anything has changed.
-      msTable_ = msTbl.deepCopy();
-      // Other engines might create Iceberg tables without setting the HiveIceberg*
-      // storage descriptors. Impala relies on the storage descriptors being set to
-      // certain classes, so we set it here for the in-memory metastore table.
-      FeIcebergTable.setIcebergStorageDescriptor(msTable_);
-      setTableStats(msTable_);
-      // Load metadata from Iceberg
-      final Timer.Context ctxStorageLdTime =
-          getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA).time();
-      try {
-        icebergApiTable_ = IcebergUtil.loadTable(this);
-        catalogTimeline.markEvent("Loaded Iceberg API table");
-        catalogSnapshotId_ = FeIcebergTable.super.snapshotId();
-        loadSchemaFromIceberg();
-        catalogTimeline.markEvent("Loaded schema from Iceberg");
-        // Loading hdfs table after loaded schema from Iceberg,
-        // in case we create external Iceberg table skipping column info in sql.
-        icebergFileFormat_ = IcebergUtil.getIcebergFileFormat(msTbl);
-        icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTbl);
-        icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTbl);
-        icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTbl);
-        icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTbl);
-        GroupedContentFiles icebergFiles = IcebergUtil.getIcebergFiles(this,
-            new ArrayList<>(), /*timeTravelSpec=*/null);
-        catalogTimeline.markEvent("Loaded Iceberg files");
-        hdfsTable_.setSkipIcebergFileMetadataLoading(true);
-        hdfsTable_.load(reuseMetadata, msClient, msTable_, reason, catalogTimeline);
-        IcebergFileMetadataLoader loader = new IcebergFileMetadataLoader(
-            icebergApiTable_,
-            fileStore_ == null ? Collections.emptyList() : fileStore_.getAllFiles(),
-            getHostIndex(), Preconditions.checkNotNull(icebergFiles),
-            Utils.requiresDataFilesInTableLocation(this));
-        loader.load();
-        fileStore_ = new IcebergContentFileStore(
-            icebergApiTable_, loader.getLoadedIcebergFds(), icebergFiles);
-        partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
-        setIcebergTableStats();
-        loadAllColumnStats(msClient, catalogTimeline);
-        applyPuffinNdvStats(catalogTimeline);
-        setAvroSchema(msClient, msTbl, fileStore_, catalogTimeline);
-        updateMetrics(loader.getFileMetadataStats());
-      } catch (Exception e) {
+      loadTableMetadata(msClient, msTbl, catalogTimeline);
+      loadFileMetadata(reuseMetadata, msClient, reason, catalogTimeline);
+      setIcebergTableStats();
+      refreshLastUsedTime();
+    } catch (Exception e) {
         throw new IcebergTableLoadingException("Error loading metadata for Iceberg table "
             + icebergTableLocation_, e);
-      } finally {
-        storageMetadataLoadTime_ = ctxStorageLdTime.stop();
-      }
-      refreshLastUsedTime();
     } finally {
       context.stop();
     }
+  }
+
+  private void loadTableMetadata(IMetaStoreClient msClient,
+      org.apache.hadoop.hive.metastore.api.Table msTbl, EventSequence catalogTimeline)
+      throws TableLoadingException, ImpalaRuntimeException {
+    // Copy the table to check later if anything has changed.
+    msTable_ = msTbl.deepCopy();
+    // Other engines might create Iceberg tables without setting the HiveIceberg*
+    // storage descriptors. Impala relies on the storage descriptors being set to
+    // certain classes, so we set it here for the in-memory metastore table.
+    FeIcebergTable.setIcebergStorageDescriptor(msTable_);
+    setTableStats(msTable_);
+    icebergApiTable_ = IcebergUtil.loadTable(this);
+    catalogTimeline.markEvent("Loaded Iceberg API table");
+    catalogSnapshotId_ = FeIcebergTable.super.snapshotId();
+    loadSchemaFromIceberg();
+    catalogTimeline.markEvent("Loaded schema from Iceberg");
+    icebergFileFormat_ = IcebergUtil.getIcebergFileFormat(msTbl);
+    icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTbl);
+    icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTbl);
+    icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTbl);
+    icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTbl);
+    loadAllColumnStats(msClient, catalogTimeline);
+    applyPuffinNdvStats(catalogTimeline);
+  }
+
+  /**
+   * Reloads file metadata, unless reuseMetadata is true and metadata.json file hasn't
+   * changed.
+   */
+  private void loadFileMetadata(boolean reuseMetadata, IMetaStoreClient msClient,
+      String reason, EventSequence catalogTimeline) throws IcebergTableLoadingException {
+    if (reuseMetadata && canSkipReload()) {
+      catalogTimeline.markEvent(
+          "Iceberg table reload skipped as no change detected");
+      return;
+    }
+    final Timer.Context ctxStorageLdTime =
+        getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA).time();
+    try {
+      currentMetadataLocation_ =
+          ((BaseTable)icebergApiTable_).operations().current().metadataFileLocation();
+      GroupedContentFiles icebergFiles = IcebergUtil.getIcebergFiles(this,
+          new ArrayList<>(), /*timeTravelSpec=*/null);
+      catalogTimeline.markEvent("Loaded Iceberg files");
+      // We use IcebergFileMetadataLoader directly to load file metadata, so we don't
+      // want 'hdfsTable_' to do any file loading.
+      hdfsTable_.setSkipIcebergFileMetadataLoading(true);
+      // Iceberg schema loading must always precede hdfs table loading, because in case we
+      // create an external Iceberg table, we have no column information in the SQL
+      // statement.
+      hdfsTable_.load(reuseMetadata, msClient, msTable_, reason, catalogTimeline);
+      IcebergFileMetadataLoader loader = new IcebergFileMetadataLoader(
+          icebergApiTable_,
+          fileStore_ == null ? Collections.emptyList() : fileStore_.getAllFiles(),
+          getHostIndex(), Preconditions.checkNotNull(icebergFiles),
+          Utils.requiresDataFilesInTableLocation(this));
+      loader.load();
+      fileStore_ = new IcebergContentFileStore(
+          icebergApiTable_, loader.getLoadedIcebergFds(), icebergFiles);
+      partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
+
+      setAvroSchema(msClient, msTable_, fileStore_, catalogTimeline);
+      updateMetrics(loader.getFileMetadataStats());
+    } catch (Exception e) {
+      throw new IcebergTableLoadingException("Error loading metadata for Iceberg table "
+          + icebergTableLocation_, e);
+    } finally {
+      storageMetadataLoadTime_ = ctxStorageLdTime.stop();
+    }
+  }
+
+  private boolean canSkipReload() {
+    if (icebergApiTable_ == null) return false;
+    Preconditions.checkState(icebergApiTable_ instanceof BaseTable);
+    BaseTable newTable = (BaseTable) icebergApiTable_;
+    return Objects.equals(
+        currentMetadataLocation_,
+        newTable.operations().current().metadataFileLocation());
   }
 
   private void updateMetrics(FileMetadataStats stats) {
