@@ -231,9 +231,8 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     String uri = resources.get(RangerImpalaResourceBuilder.URL);
     if (uri != null && uri.startsWith("/")) {
       uri = "hdfs://localhost:20500" + uri;
+      resources.put(RangerImpalaResourceBuilder.URL, uri);
     }
-    resources.put(RangerImpalaResourceBuilder.URL, uri);
-
     return resources;
   }
 
