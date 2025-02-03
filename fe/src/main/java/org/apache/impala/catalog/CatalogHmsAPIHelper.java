@@ -65,7 +65,6 @@ import org.apache.hadoop.hive.metastore.api.PartitionsByExprResult;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.impala.analysis.TableName;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.metastore.CatalogMetastoreServiceHandler;
 import org.apache.impala.catalog.metastore.HmsApiNameEnum;
 import org.apache.impala.common.Pair;

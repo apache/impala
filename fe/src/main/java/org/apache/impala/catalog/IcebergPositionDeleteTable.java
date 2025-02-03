@@ -20,7 +20,6 @@ package org.apache.impala.catalog;
 import java.util.Collections;
 import java.util.Set;
 
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.thrift.TColumnStats;
 
 /**

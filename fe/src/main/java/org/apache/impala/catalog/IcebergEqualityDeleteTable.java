@@ -21,7 +21,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.util.IcebergSchemaConverter;
 

@@ -75,6 +75,7 @@ import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IncompleteTable;
@@ -3051,7 +3052,7 @@ public class MetastoreEventsProcessorTest {
           .getParameters().get("testAlterPartition"));
       long numLoadFMDBefore =
           tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
-      List<HdfsPartition.FileDescriptor> FDbefore = tbl.getPartitionsForNames(
+      List<FileDescriptor> FDbefore = tbl.getPartitionsForNames(
           Collections.singletonList("p1=1")).get(0).getFileDescriptors();
       eventsProcessor_.processEvents();
       // After event processing, parameters should be updated
@@ -3060,14 +3061,14 @@ public class MetastoreEventsProcessorTest {
       // However, file metadata should not be reloaded after an alter partition event
       long numLoadFMDAfter =
           tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
-      List<HdfsPartition.FileDescriptor> FDafter = tbl.getPartitionsForNames(
+      List<FileDescriptor> FDafter = tbl.getPartitionsForNames(
           Collections.singletonList("p1=1")).get(0).getFileDescriptors();
       assertEquals("File metadata should not be reloaded",
           numLoadFMDBefore, numLoadFMDAfter);
       // getFileDescriptors() always returns a new instance, so we need to compare the
       // underlying array
-      assertEquals(Lists.transform(FDbefore, HdfsPartition.FileDescriptor.TO_BYTES),
-          Lists.transform(FDafter, HdfsPartition.FileDescriptor.TO_BYTES));
+      assertEquals(Lists.transform(FDbefore, FileDescriptor.TO_BYTES),
+          Lists.transform(FDafter, FileDescriptor.TO_BYTES));
     } finally {
       // Restore original config
       BackendConfig.create(origCfg);

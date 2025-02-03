@@ -629,8 +629,8 @@ public class PartialCatalogInfoWriteIdTest {
 
   private List<String> getPathsFromFileDescriptors(List<THdfsFileDesc> fileDescriptors) {
     return fileDescriptors.stream()
-        .map(HdfsPartition.FileDescriptor::fromThrift)
-        .map(HdfsPartition.FileDescriptor::getPath)
+        .map(FileDescriptor::fromThrift)
+        .map(FileDescriptor::getPath)
         .collect(Collectors.toList());
   }
 

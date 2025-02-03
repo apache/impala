@@ -25,7 +25,6 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.apache.iceberg.Table;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;

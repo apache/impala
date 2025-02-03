@@ -59,8 +59,6 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
-import org.apache.impala.catalog.HdfsPartition.FileBlock;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
@@ -709,7 +707,7 @@ public interface FeIcebergTable extends FeFsTable {
     /**
      * Get FileDescriptor by data file location
      */
-    public static HdfsPartition.FileDescriptor getFileDescriptor(
+    public static FileDescriptor getFileDescriptor(
         ContentFile<?> contentFile, FeIcebergTable table) throws IOException {
       Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
           new Path(contentFile.path().toString()));
@@ -724,7 +722,7 @@ public interface FeIcebergTable extends FeFsTable {
       return getFileDescriptor(fsForPath, fileStatus, table);
     }
 
-    private static HdfsPartition.FileDescriptor getFileDescriptor(FileSystem fs,
+    private static FileDescriptor getFileDescriptor(FileSystem fs,
         FileStatus fileStatus, FeIcebergTable table) throws IOException {
       Reference<Long> numUnknownDiskIds = new Reference<>(0L);
 
@@ -741,7 +739,7 @@ public interface FeIcebergTable extends FeFsTable {
       }
 
       if (!FileSystemUtil.supportsStorageIds(fs)) {
-        return HdfsPartition.FileDescriptor.createWithNoBlocks(
+        return FileDescriptor.createWithNoBlocks(
             fileStatus, relPath, absPath);
       }
 
@@ -752,7 +750,7 @@ public interface FeIcebergTable extends FeFsTable {
         locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
       }
 
-      return HdfsPartition.FileDescriptor.create(fileStatus, relPath, locations,
+      return FileDescriptor.create(fileStatus, relPath, locations,
           table.getHostIndex(), fileStatus.isEncrypted(), fileStatus.isErasureCoded(),
           numUnknownDiskIds, absPath);
     }

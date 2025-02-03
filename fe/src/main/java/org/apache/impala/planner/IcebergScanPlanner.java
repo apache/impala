@@ -60,7 +60,7 @@ import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeIcebergTable;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.IcebergEqualityDeleteTable;

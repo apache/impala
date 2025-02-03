@@ -37,7 +37,6 @@ import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.local.CatalogdMetaProvider;
 import org.apache.impala.catalog.local.LocalCatalog;
 import org.apache.impala.catalog.local.LocalFsTable;

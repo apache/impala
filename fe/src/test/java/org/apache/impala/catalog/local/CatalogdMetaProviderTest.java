@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.local.CatalogdMetaProvider.SizeOfWeigher;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
@@ -661,7 +662,7 @@ public class CatalogdMetaProviderTest {
       List<String> paths = partMap.values().stream()
           .map(PartitionMetadata::getFileDescriptors)
           .flatMap(Collection::stream)
-          .map(HdfsPartition.FileDescriptor::getPath)
+          .map(FileDescriptor::getPath)
           .collect(Collectors.toList());
       assertEquals("Actual paths: " + paths, 1, paths.size());
     }

@@ -33,7 +33,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.util.PatternMatcher;
 

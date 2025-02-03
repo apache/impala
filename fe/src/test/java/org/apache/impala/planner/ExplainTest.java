@@ -29,6 +29,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.common.FileSystemUtil;
@@ -154,8 +155,8 @@ public class ExplainTest extends FrontendTestBase {
       String path, FileSystemUtil.FsType fsType) {
     HdfsPartition mockHdfsPartition = mock(HdfsPartition.class);
 
-    List<HdfsPartition.FileDescriptor> mockFilesDescs = new ArrayList<>();
-    HdfsPartition.FileDescriptor mockFileDesc = mock(HdfsPartition.FileDescriptor.class);
+    List<FileDescriptor> mockFilesDescs = new ArrayList<>();
+    FileDescriptor mockFileDesc = mock(FileDescriptor.class);
     when(mockFileDesc.getFileLength()).thenReturn(1L);
     when(mockFileDesc.getRelativePath()).thenReturn("");
     when(mockFileDesc.getPath()).thenReturn("");

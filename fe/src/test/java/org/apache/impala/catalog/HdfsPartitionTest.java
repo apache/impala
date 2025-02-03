@@ -31,7 +31,6 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.StringLiteral;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;

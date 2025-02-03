@@ -26,7 +26,6 @@ import com.google.flatbuffers.FlatBufferBuilder;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.fb.FbFileDesc;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.junit.After;

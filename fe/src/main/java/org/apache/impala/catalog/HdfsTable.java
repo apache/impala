@@ -58,8 +58,6 @@ import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
-import org.apache.impala.catalog.HdfsPartition.FileBlock;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -367,7 +365,7 @@ public class HdfsTable extends Table implements FeFsTable {
      * with a List of FileDescriptor's.
      */
     public FileMetadataStats(List<FileDescriptor> fds) {
-      for (HdfsPartition.FileDescriptor fd : fds) {
+      for (FileDescriptor fd : fds) {
         accumulate(fd);
       }
     }
