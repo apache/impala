@@ -23,9 +23,8 @@ import org.apache.iceberg.DataFile;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeIcebergTable;
-import org.apache.impala.catalog.FileDescriptor;
-import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.IcebergContentFileStore;
+import org.apache.impala.catalog.IcebergFileDescriptor;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ByteUnits;
@@ -220,7 +219,7 @@ public class OptimizeStmt extends DmlStatementBase {
         mode_ = filterResult.getOptimizationMode();
 
         if (mode_ == TIcebergOptimizationMode.PARTIAL) {
-          List<FileDescriptor> selectedDataFilesWithoutDeletes =
+          List<IcebergFileDescriptor> selectedDataFilesWithoutDeletes =
               dataFilesWithoutDeletesToFileDescriptors(
                   filterResult.getSelectedFilesWithoutDeletes(), iceTable);
           tableRef_.setSelectedDataFilesForOptimize(selectedDataFilesWithoutDeletes);
@@ -232,7 +231,7 @@ public class OptimizeStmt extends DmlStatementBase {
     }
   }
 
-  private List<FileDescriptor> dataFilesWithoutDeletesToFileDescriptors(
+  private List<IcebergFileDescriptor> dataFilesWithoutDeletesToFileDescriptors(
       List<DataFile> contentFiles, FeIcebergTable iceTable)
       throws IOException, ImpalaRuntimeException {
     GroupedContentFiles selectedContentFiles = new GroupedContentFiles();
@@ -244,8 +243,8 @@ public class OptimizeStmt extends DmlStatementBase {
     return selectedFiles.getDataFilesWithoutDeletes();
   }
 
-  private void collectAbsolutePaths(List<FileDescriptor> selectedFiles) {
-    for (FileDescriptor fileDesc : selectedFiles) {
+  private void collectAbsolutePaths(List<IcebergFileDescriptor> selectedFiles) {
+    for (IcebergFileDescriptor fileDesc : selectedFiles) {
       org.apache.hadoop.fs.Path path = new org.apache.hadoop.fs.Path(
           fileDesc.getAbsolutePath(((FeIcebergTable) table_).getHdfsBaseDir()));
       selectedIcebergFilePaths_.add(path.toUri().toString());

@@ -43,11 +43,14 @@ public abstract class IcebergDeleteTable extends VirtualTable implements FeIcebe
     protected final static int INVALID_MAP_VALUE_ID = -1;
 
     protected FeIcebergTable baseTable_;
-    protected Set<FileDescriptor> deleteFiles_;
+    protected Set<IcebergFileDescriptor> deleteFiles_;
     protected long deleteRecordsCount_;
 
-    public IcebergDeleteTable(FeIcebergTable baseTable, String name,
-        Set<FileDescriptor> deleteFiles, long deleteRecordsCount) {
+    public IcebergDeleteTable(
+        FeIcebergTable baseTable,
+        String name,
+        Set<IcebergFileDescriptor> deleteFiles,
+        long deleteRecordsCount) {
       super(baseTable.getMetaStoreTable(), baseTable.getDb(), name,
           baseTable.getOwnerUser());
       baseTable_ = baseTable;
@@ -65,7 +68,7 @@ public abstract class IcebergDeleteTable extends VirtualTable implements FeIcebe
     @Override
     public TTableStats getTTableStats() {
       long totalBytes = 0;
-      for (FileDescriptor df : deleteFiles_) {
+      for (IcebergFileDescriptor df : deleteFiles_) {
           totalBytes += df.getFileLength();
       }
       TTableStats ret = new TTableStats(getNumRows());

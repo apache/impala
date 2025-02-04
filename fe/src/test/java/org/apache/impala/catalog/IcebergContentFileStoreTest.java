@@ -48,15 +48,6 @@ public class IcebergContentFileStoreTest {
   @After
   public void cleanUp() { catalog_.close(); }
 
-  @Test
-  public void testDecodeWithoutIcebergMetadata() {
-    expectedException.expect(NullPointerException.class);
-
-    FileDescriptor fileDesc = new FileDescriptor(createFbFileDesc(),null);
-
-    IcebergContentFileStore.decode(IcebergContentFileStore.encode(fileDesc));
-  }
-
   private FbFileDesc createFbFileDesc() {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
     fbb.finish(
@@ -74,7 +65,7 @@ public class IcebergContentFileStoreTest {
         "iceberg_v2_partitioned_position_deletes_orc");
     assertTrue(iceTbl.getContentFileStore().getNumFiles() > 0);
 
-    for (FileDescriptor fileDesc : iceTbl.getContentFileStore().getAllFiles()) {
+    for (IcebergFileDescriptor fileDesc : iceTbl.getContentFileStore().getAllFiles()) {
       FileDescriptor serdeFileDesc =
           IcebergContentFileStore.decode(IcebergContentFileStore.encode(fileDesc));
       assertTrue(fileDesc != serdeFileDesc);

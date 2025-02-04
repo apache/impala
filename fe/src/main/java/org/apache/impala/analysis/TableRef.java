@@ -33,8 +33,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.FileDescriptor;
-import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.IcebergFileDescriptor;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -166,7 +165,7 @@ public class TableRef extends StmtNode {
 
   // Iceberg data files without deletes selected for OPTIMIZE from this table ref.
   // Used only in PARTIAL optimization mode, otherwise it is null.
-  private List<FileDescriptor> selectedDataFilesWithoutDeletesForOptimize_;
+  private List<IcebergFileDescriptor> selectedDataFilesWithoutDeletesForOptimize_;
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
@@ -851,11 +850,11 @@ public class TableRef extends StmtNode {
     return res;
   }
 
-  public void setSelectedDataFilesForOptimize(List<FileDescriptor> fileDescs) {
+  public void setSelectedDataFilesForOptimize(List<IcebergFileDescriptor> fileDescs) {
     selectedDataFilesWithoutDeletesForOptimize_ = fileDescs;
   }
 
-  public List<FileDescriptor> getSelectedDataFilesForOptimize() {
+  public List<IcebergFileDescriptor> getSelectedDataFilesForOptimize() {
     return selectedDataFilesWithoutDeletesForOptimize_;
   }
 

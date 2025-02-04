@@ -66,41 +66,17 @@ public class IcebergContentFileStore {
     }
   }
 
-  protected static FileDescriptor decode(EncodedFileDescriptor encodedFd) {
+  protected static IcebergFileDescriptor decode(EncodedFileDescriptor encodedFd) {
+    Preconditions.checkNotNull(encodedFd.fileDesc_);
     Preconditions.checkNotNull(encodedFd.fileMetadata_);
 
-    return new FileDescriptor(
+    return new IcebergFileDescriptor(
         FbFileDesc.getRootAsFbFileDesc(ByteBuffer.wrap(encodedFd.fileDesc_)),
-        FbFileMetadata.getRootAsFbFileMetadata(
-            ByteBuffer.wrap(encodedFd.fileMetadata_))) {
-      // Whenever getting the FileDescriptor for the same path hash it will be a
-      // different FileDescriptor object. As a result the default equals() and
-      // hashCode() functions can't be used to judge equality between these
-      // FileDescriptors.
-      @Override
-      public boolean equals(Object obj) {
-        if (obj == null) return false;
-        if (!(obj instanceof FileDescriptor)) return false;
-        FileDescriptor otherFD = (FileDescriptor) obj;
-        if ((this.getFbFileMetadata() == null && otherFD.getFbFileMetadata() != null) ||
-            (this.getFbFileMetadata() != null && otherFD.getFbFileMetadata() == null)) {
-          return false;
-        }
-        return this.getFbFileDescriptor().getByteBuffer().array() ==
-            otherFD.getFbFileDescriptor().getByteBuffer().array() &&
-            this.getFbFileMetadata().getByteBuffer().array() ==
-                otherFD.getFbFileMetadata().getByteBuffer().array();
-      }
-
-      @Override
-      public int hashCode() {
-        return getAbsolutePath().hashCode();
-      }
-    };
+        FbFileMetadata.getRootAsFbFileMetadata(ByteBuffer.wrap(encodedFd.fileMetadata_)));
   }
 
   // Function to convert from a FileDescriptor to an EncodedFileDescriptor.
-  protected static EncodedFileDescriptor encode(FileDescriptor fd) {
+  protected static EncodedFileDescriptor encode(IcebergFileDescriptor fd) {
     return new EncodedFileDescriptor(
         encodeFB(fd.getFbFileDescriptor()),
         encodeFB(fd.getFbFileMetadata()));
@@ -132,7 +108,7 @@ public class IcebergContentFileStore {
       return false;
     }
 
-    public FileDescriptor get(String pathHash) {
+    public IcebergFileDescriptor get(String pathHash) {
       if (!fileDescMap_.containsKey(pathHash)) return null;
       return decode(fileDescMap_.get(pathHash));
     }
@@ -141,7 +117,7 @@ public class IcebergContentFileStore {
       return fileDescList_.size();
     }
 
-    List<FileDescriptor> getList() {
+    List<IcebergFileDescriptor> getList() {
       return Lists.transform(fileDescList_, fd -> IcebergContentFileStore.decode(fd));
     }
 
@@ -160,7 +136,7 @@ public class IcebergContentFileStore {
         List<TNetworkAddress> networkAddresses, ListMap<TNetworkAddress> hostIndex) {
       MapListContainer ret = new MapListContainer();
       for (Map.Entry<String, THdfsFileDesc> entry : thriftMap.entrySet()) {
-        FileDescriptor fd = FileDescriptor.fromThrift(entry.getValue());
+        IcebergFileDescriptor fd = IcebergFileDescriptor.fromThrift(entry.getValue());
         Preconditions.checkNotNull(fd);
         if (networkAddresses != null) {
           Preconditions.checkNotNull(hostIndex);
@@ -190,76 +166,77 @@ public class IcebergContentFileStore {
   public IcebergContentFileStore() {}
 
   public IcebergContentFileStore(
-      Table iceApiTable, List<FileDescriptor> fileDescriptors,
+      Table iceApiTable, List<IcebergFileDescriptor> fileDescriptors,
       GroupedContentFiles icebergFiles) {
     Preconditions.checkNotNull(iceApiTable);
     Preconditions.checkNotNull(fileDescriptors);
     Preconditions.checkNotNull(icebergFiles);
 
-    Map<String, FileDescriptor> hdfsFileDescMap = new HashMap<>();
+    Map<String, IcebergFileDescriptor> fileDescMap = new HashMap<>();
     for (FileDescriptor fileDesc : fileDescriptors) {
+      Preconditions.checkState(fileDesc instanceof IcebergFileDescriptor);
       Path path = new Path(fileDesc.getAbsolutePath(iceApiTable.location()));
-      hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
+      fileDescMap.put(path.toUri().getPath(), (IcebergFileDescriptor)fileDesc);
     }
 
     for (DataFile dataFile : icebergFiles.dataFilesWithoutDeletes) {
       Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(dataFile, hdfsFileDescMap);
+          getPathHashAndFd(dataFile, fileDescMap);
       dataFilesWithoutDeletes_.add(pathHashAndFd.first, pathHashAndFd.second);
     }
     for (DataFile dataFile : icebergFiles.dataFilesWithDeletes) {
       Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(dataFile, hdfsFileDescMap);
+          getPathHashAndFd(dataFile, fileDescMap);
       dataFilesWithDeletes_.add(pathHashAndFd.first, pathHashAndFd.second);
     }
     for (DeleteFile deleteFile : icebergFiles.positionDeleteFiles) {
       Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(deleteFile, hdfsFileDescMap);
+          getPathHashAndFd(deleteFile, fileDescMap);
       positionDeleteFiles_.add(pathHashAndFd.first, pathHashAndFd.second);
     }
     for (DeleteFile deleteFile : icebergFiles.equalityDeleteFiles) {
       Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(deleteFile, hdfsFileDescMap);
+          getPathHashAndFd(deleteFile, fileDescMap);
       equalityDeleteFiles_.add(pathHashAndFd.first, pathHashAndFd.second);
     }
   }
 
   // This is only invoked during time travel, when we are querying a snapshot that has
   // data files which have been removed since.
-  public void addOldFileDescriptor(String pathHash, FileDescriptor desc) {
+  public void addOldFileDescriptor(String pathHash, IcebergFileDescriptor desc) {
     oldFileDescMap_.put(pathHash, encode(desc));
   }
 
-  public FileDescriptor getDataFileDescriptor(String pathHash) {
-    FileDescriptor desc = dataFilesWithoutDeletes_.get(pathHash);
+  public IcebergFileDescriptor getDataFileDescriptor(String pathHash) {
+    IcebergFileDescriptor desc = dataFilesWithoutDeletes_.get(pathHash);
     if (desc != null) return desc;
     return dataFilesWithDeletes_.get(pathHash);
   }
 
-  public FileDescriptor getDeleteFileDescriptor(String pathHash) {
-    FileDescriptor ret = positionDeleteFiles_.get(pathHash);
+  public IcebergFileDescriptor getDeleteFileDescriptor(String pathHash) {
+    IcebergFileDescriptor ret = positionDeleteFiles_.get(pathHash);
     if (ret != null) return ret;
     return equalityDeleteFiles_.get(pathHash);
   }
 
-  public FileDescriptor getOldFileDescriptor(String pathHash) {
+  public IcebergFileDescriptor getOldFileDescriptor(String pathHash) {
     if (!oldFileDescMap_.containsKey(pathHash)) return null;
     return decode(oldFileDescMap_.get(pathHash));
   }
 
-  public List<FileDescriptor> getDataFilesWithoutDeletes() {
+  public List<IcebergFileDescriptor> getDataFilesWithoutDeletes() {
     return dataFilesWithoutDeletes_.getList();
   }
 
-  public List<FileDescriptor> getDataFilesWithDeletes() {
+  public List<IcebergFileDescriptor> getDataFilesWithDeletes() {
     return dataFilesWithDeletes_.getList();
   }
 
-  public List<FileDescriptor> getPositionDeleteFiles() {
+  public List<IcebergFileDescriptor> getPositionDeleteFiles() {
     return positionDeleteFiles_.getList();
   }
 
-  public List<FileDescriptor> getEqualityDeleteFiles() {
+  public List<IcebergFileDescriptor> getEqualityDeleteFiles() {
     return equalityDeleteFiles_.getList();
   }
 
@@ -270,7 +247,7 @@ public class IcebergContentFileStore {
            equalityDeleteFiles_.getNumFiles();
   }
 
-  public Iterable<FileDescriptor> getAllFiles() {
+  public Iterable<IcebergFileDescriptor> getAllFiles() {
     return Iterables.concat(
         dataFilesWithoutDeletes_.getList(),
         dataFilesWithDeletes_.getList(),
@@ -278,7 +255,7 @@ public class IcebergContentFileStore {
         equalityDeleteFiles_.getList());
   }
 
-  public Iterable<FileDescriptor> getAllDataFiles() {
+  public Iterable<IcebergFileDescriptor> getAllDataFiles() {
     return Iterables.concat(
         dataFilesWithoutDeletes_.getList(),
         dataFilesWithDeletes_.getList());
@@ -302,17 +279,17 @@ public class IcebergContentFileStore {
   }
 
   private Pair<String, EncodedFileDescriptor> getPathHashAndFd(
-      ContentFile<?> contentFile, Map<String, FileDescriptor> hdfsFileDescMap) {
+      ContentFile<?> contentFile, Map<String, IcebergFileDescriptor> fileDescMap) {
     return new Pair<>(
         IcebergUtil.getFilePathHash(contentFile),
-        getIcebergFd(hdfsFileDescMap, contentFile));
+        getIcebergFd(fileDescMap, contentFile));
   }
 
   private EncodedFileDescriptor getIcebergFd(
-      Map<String, FileDescriptor> hdfsFileDescMap,
+      Map<String, IcebergFileDescriptor> fileDescMap,
       ContentFile<?> contentFile) {
     Path path = new Path(contentFile.path().toString());
-    FileDescriptor fileDesc = hdfsFileDescMap.get(path.toUri().getPath());
+    IcebergFileDescriptor fileDesc = fileDescMap.get(path.toUri().getPath());
 
     FbFileMetadata fileMetadata = fileDesc.getFbFileMetadata();
     Preconditions.checkState(fileMetadata != null);

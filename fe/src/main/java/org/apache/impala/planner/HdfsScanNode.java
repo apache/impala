@@ -60,6 +60,7 @@ import org.apache.impala.catalog.FileBlock;
 import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.IcebergFileDescriptor;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
@@ -1535,8 +1536,9 @@ public class HdfsScanNode extends ScanNode {
         hdfsFileSplit.setIs_encrypted(fileDesc.getIsEncrypted());
         hdfsFileSplit.setIs_erasure_coded(fileDesc.getIsEc());
         scanRange.setHdfs_file_split(hdfsFileSplit);
-        if (fileDesc.getFbFileMetadata() != null) {
-          scanRange.setFile_metadata(fileDesc.getFbFileMetadata().getByteBuffer());
+        if (fileDesc instanceof IcebergFileDescriptor) {
+          scanRange.setFile_metadata(
+              ((IcebergFileDescriptor)fileDesc).getFbFileMetadata().getByteBuffer());
         }
         TScanRangeLocationList scanRangeLocations = new TScanRangeLocationList();
         scanRangeLocations.scan_range = scanRange;

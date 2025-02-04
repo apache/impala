@@ -37,9 +37,12 @@ public class IcebergPositionDeleteTable extends IcebergDeleteTable  {
         new TColumnStats());
   }
 
-  public IcebergPositionDeleteTable(FeIcebergTable baseTable, String name,
-      Set<FileDescriptor> deleteFiles,
-      long deleteRecordsCount, TColumnStats filePathsStats) {
+  public IcebergPositionDeleteTable(
+      FeIcebergTable baseTable,
+      String name,
+      Set<IcebergFileDescriptor> deleteFiles,
+      long deleteRecordsCount,
+      TColumnStats filePathsStats) {
     super(baseTable, name, deleteFiles, deleteRecordsCount);
     Column filePath = new IcebergColumn(FILE_PATH_COLUMN, Type.STRING, /*comment=*/"",
         colsByPos_.size(), IcebergTable.V2_FILE_PATH_FIELD_ID, INVALID_MAP_KEY_ID,

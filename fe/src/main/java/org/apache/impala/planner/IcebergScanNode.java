@@ -35,6 +35,7 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.IcebergFileDescriptor;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.ThriftSerializationCtx;
@@ -56,7 +57,7 @@ public class IcebergScanNode extends HdfsScanNode {
   // List of files needed to be scanned by this scan node. The list is sorted in case of
   // partitioned tables, so partition range scans are scheduled more evenly.
   // See IMPALA-12765 for details.
-  private List<FileDescriptor> fileDescs_;
+  private List<IcebergFileDescriptor> fileDescs_;
 
   // Indicates that the files in 'fileDescs_' are sorted.
   private boolean filesAreSorted_ = false;
@@ -81,14 +82,14 @@ public class IcebergScanNode extends HdfsScanNode {
   private final PlanNodeId deleteFileScanNodeId;
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
-      MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs,
+      MultiAggregateInfo aggInfo, List<IcebergFileDescriptor> fileDescs,
       List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, long snapshotId) {
     this(id, tblRef, conjuncts, aggInfo, fileDescs, nonIdentityConjuncts,
         skippedConjuncts, null, snapshotId);
   }
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
-      MultiAggregateInfo aggInfo, List<FileDescriptor> fileDescs,
+      MultiAggregateInfo aggInfo, List<IcebergFileDescriptor> fileDescs,
       List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, PlanNodeId deleteId,
       long snapshotId) {
     super(id, tblRef.getDesc(), conjuncts,
@@ -127,11 +128,13 @@ public class IcebergScanNode extends HdfsScanNode {
     if (sampledFiles_ != null) {
       for (List<FileDescriptor> sampledFileDescs : sampledFiles_.values()) {
         for (FileDescriptor fd : sampledFileDescs) {
-          cardinality_ += fd.getFbFileMetadata().icebergMetadata().recordCount();
+          Preconditions.checkState(fd instanceof IcebergFileDescriptor);
+          IcebergFileDescriptor iceFd = (IcebergFileDescriptor) fd;
+          cardinality_ += iceFd.getFbFileMetadata().icebergMetadata().recordCount();
         }
       }
     } else {
-      for (FileDescriptor fd : fileDescs_) {
+      for (IcebergFileDescriptor fd : fileDescs_) {
         cardinality_ += fd.getFbFileMetadata().icebergMetadata().recordCount();
       }
     }
@@ -179,14 +182,14 @@ public class IcebergScanNode extends HdfsScanNode {
     if (limit != -1) {
       long cnt = 0;
       List<FileDescriptor> ret = new ArrayList<>();
-      for (FileDescriptor fd : fileDescs_) {
+      for (IcebergFileDescriptor fd : fileDescs_) {
         if (cnt == limit) break;
         ret.add(fd);
         ++cnt;
       }
       return ret;
     } else {
-      return fileDescs_;
+      return new ArrayList<>(fileDescs_);
     }
   }
 
@@ -267,7 +270,7 @@ public class IcebergScanNode extends HdfsScanNode {
     boolean hasParquet = false;
     boolean hasOrc = false;
     boolean hasAvro = false;
-    for (FileDescriptor fileDesc : fileDescs_) {
+    for (IcebergFileDescriptor fileDesc : fileDescs_) {
       byte fileFormat = fileDesc.getFbFileMetadata().icebergMetadata().fileFormat();
       if (fileFormat == FbIcebergDataFileFormat.PARQUET) {
         hasParquet = true;

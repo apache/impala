@@ -64,6 +64,7 @@ import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.IcebergEqualityDeleteTable;
+import org.apache.impala.catalog.IcebergFileDescriptor;
 import org.apache.impala.catalog.IcebergPositionDeleteTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
@@ -114,14 +115,14 @@ public class IcebergScanPlanner {
   private List<Expr> nonIdentityConjuncts_ = new ArrayList<>();
 
   // Containers for different groupings of file descriptors.
-  private List<FileDescriptor> dataFilesWithoutDeletes_ = new ArrayList<>();
-  private List<FileDescriptor> dataFilesWithDeletes_ = new ArrayList<>();
-  private Set<FileDescriptor> positionDeleteFiles_ = new HashSet<>();
+  private List<IcebergFileDescriptor> dataFilesWithoutDeletes_ = new ArrayList<>();
+  private List<IcebergFileDescriptor> dataFilesWithDeletes_ = new ArrayList<>();
+  private Set<IcebergFileDescriptor> positionDeleteFiles_ = new HashSet<>();
 
   // Holds all the equalityFieldIds from the equality delete file descriptors involved in
   // this query.
   private Set<Integer> allEqualityFieldIds_ = new HashSet<>();
-  private Map<List<Integer>, Set<FileDescriptor>> equalityIdsToDeleteFiles_ =
+  private Map<List<Integer>, Set<IcebergFileDescriptor>> equalityIdsToDeleteFiles_ =
       new HashMap<>();
 
 
@@ -468,7 +469,7 @@ public class IcebergScanPlanner {
         getOrderedEqualityFieldIds(equalityDeletesRecordCount_);
     JoinNode joinNode = null;
     for (List<Integer> equalityIds : orderedEqualityFieldIds) {
-      Set<FileDescriptor> equalityDeleteFiles =
+      Set<IcebergFileDescriptor> equalityDeleteFiles =
           equalityIdsToDeleteFiles_.get(equalityIds);
       Preconditions.checkState(equalityDeleteFiles != null &&
           !equalityDeleteFiles.isEmpty());
@@ -563,14 +564,15 @@ public class IcebergScanPlanner {
         if (residualExpr != null && !(residualExpr instanceof True)) {
           residualExpressions_.add(residualExpr);
         }
-        Pair<FileDescriptor, Boolean> fileDesc = getFileDescriptor(fileScanTask.file());
+        Pair<IcebergFileDescriptor, Boolean> fileDesc =
+            getFileDescriptor(fileScanTask.file());
         if (!fileDesc.second) ++dataFilesCacheMisses;
         if (fileScanTask.deletes().isEmpty()) {
           dataFilesWithoutDeletes_.add(fileDesc.first);
         } else {
           dataFilesWithDeletes_.add(fileDesc.first);
           for (DeleteFile delFile : fileScanTask.deletes()) {
-            Pair<FileDescriptor, Boolean> delFileDesc = getFileDescriptor(delFile);
+            Pair<IcebergFileDescriptor, Boolean> delFileDesc = getFileDescriptor(delFile);
             if (!delFileDesc.second) ++dataFilesCacheMisses;
             if (delFile.content() == FileContent.EQUALITY_DELETES) {
               addEqualityDeletesAndIds(delFileDesc.first);
@@ -594,7 +596,7 @@ public class IcebergScanPlanner {
     updateDeleteStatistics();
   }
 
-  private void addEqualityDeletesAndIds(FileDescriptor fd) {
+  private void addEqualityDeletesAndIds(IcebergFileDescriptor fd) {
     FbIcebergMetadata fileMetadata = fd.getFbFileMetadata().icebergMetadata();
     Preconditions.checkState(fileMetadata.equalityFieldIdsLength() > 0,
         "Equality delete file doesn't have equality field IDs: " + fd.toString());
@@ -609,10 +611,10 @@ public class IcebergScanPlanner {
     equalityIdsToDeleteFiles_.get(eqFieldIdList).add(fd);
   }
 
-  private void initEqualityIds(List<FileDescriptor> equalityDeleteFiles) {
+  private void initEqualityIds(List<IcebergFileDescriptor> equalityDeleteFiles) {
     Preconditions.checkState(allEqualityFieldIds_.isEmpty());
     Preconditions.checkState(equalityIdsToDeleteFiles_.isEmpty());
-    for (FileDescriptor fd : equalityDeleteFiles) addEqualityDeletesAndIds(fd);
+    for (IcebergFileDescriptor fd : equalityDeleteFiles) addEqualityDeletesAndIds(fd);
   }
 
   private void filterConjuncts() {
@@ -653,19 +655,19 @@ public class IcebergScanPlanner {
   }
 
   private void updateDeleteStatistics() {
-    for (FileDescriptor fd : dataFilesWithDeletes_) {
+    for (IcebergFileDescriptor fd : dataFilesWithDeletes_) {
       updateDataFilesWithDeletesStatistics(fd);
     }
-    for (FileDescriptor fd : positionDeleteFiles_) {
+    for (IcebergFileDescriptor fd : positionDeleteFiles_) {
       updatePositionDeleteFilesStatistics(fd);
     }
-    for (Map.Entry<List<Integer>, Set<FileDescriptor>> entry :
+    for (Map.Entry<List<Integer>, Set<IcebergFileDescriptor>> entry :
         equalityIdsToDeleteFiles_.entrySet()) {
       updateEqualityDeleteFilesStatistics(entry.getKey(), entry.getValue());
     }
   }
 
-  private void updateDataFilesWithDeletesStatistics(FileDescriptor fd) {
+  private void updateDataFilesWithDeletesStatistics(IcebergFileDescriptor fd) {
     String path = fd.getAbsolutePath(getIceTable().getLocation());
     long pathSize = path.length();
     dataFilesWithDeletesSumPaths_ += pathSize;
@@ -674,14 +676,15 @@ public class IcebergScanPlanner {
     }
   }
 
-  private void updatePositionDeleteFilesStatistics(FileDescriptor fd) {
+  private void updatePositionDeleteFilesStatistics(IcebergFileDescriptor fd) {
     positionDeletesRecordCount_ += getRecordCount(fd);
   }
 
-  private void updateEqualityDeleteFilesStatistics(List<Integer> equalityIds,
-      Set<FileDescriptor> fileDescriptors) {
+  private void updateEqualityDeleteFilesStatistics(
+      List<Integer> equalityIds,
+      Set<IcebergFileDescriptor> fileDescriptors) {
     long numRecords = 0;
-    for (FileDescriptor fd : fileDescriptors) {
+    for (IcebergFileDescriptor fd : fileDescriptors) {
       numRecords += getRecordCount(fd);
       equalityDeleteSequenceNumbers_.add(
           fd.getFbFileMetadata().icebergMetadata().dataSequenceNumber());
@@ -689,7 +692,7 @@ public class IcebergScanPlanner {
     equalityDeletesRecordCount_.put(equalityIds, numRecords);
   }
 
-  private long getRecordCount(FileDescriptor fd) {
+  private long getRecordCount(IcebergFileDescriptor fd) {
     long recordCount = fd.getFbFileMetadata().icebergMetadata().recordCount();
     // 'record_count' is a required field for Iceberg data files, but let's still
     // prepare for the case when a compute engine doesn't fill it.
@@ -708,46 +711,57 @@ public class IcebergScanPlanner {
     return colStats;
   }
 
-  private Pair<FileDescriptor, Boolean> getFileDescriptor(ContentFile cf)
+  /*
+   * Returns an IcebergFileDescriptor and an indicator whether it was found in the cache.
+   * True for cache hit and false for cache miss.
+   */
+  private Pair<IcebergFileDescriptor, Boolean> getFileDescriptor(ContentFile<?> cf)
       throws ImpalaRuntimeException {
-    boolean cachehit = true;
     String pathHash = IcebergUtil.getFilePathHash(cf);
     IcebergContentFileStore fileStore = getIceTable().getContentFileStore();
-    FileDescriptor fileDesc = cf.content() == FileContent.DATA ?
+
+    IcebergFileDescriptor iceFileDesc = cf.content() == FileContent.DATA ?
         fileStore.getDataFileDescriptor(pathHash) :
         fileStore.getDeleteFileDescriptor(pathHash);
+    if (iceFileDesc != null) {
+      return new Pair<>(iceFileDesc, true);
+    }
 
-    if (fileDesc == null) {
-      if (tblRef_.getTimeTravelSpec() == null) {
-        // We should always find the data files in the cache when not doing time travel.
-        throw new ImpalaRuntimeException("Cannot find file in cache: " + cf.path()
-            + " with snapshot id: " + getIceTable().snapshotId());
-      }
-      // We can still find the file descriptor among the old file descriptors.
-      fileDesc = fileStore.getOldFileDescriptor(pathHash);
-      if (fileDesc != null) {
-        return new Pair<>(fileDesc, true);
-      }
-      cachehit = false;
-      try {
-        fileDesc = FeIcebergTable.Utils.getFileDescriptor(cf,
-            getIceTable().getIcebergApiTable(),
-            FeIcebergTable.Utils.requiresDataFilesInTableLocation(getIceTable()),
-            getIceTable().getHostIndex());
-      } catch (IOException ex) {
-        throw new ImpalaRuntimeException(
-            "Cannot load file descriptor for " + cf.path(), ex);
-      }
-      if (fileDesc == null) {
+    if (tblRef_.getTimeTravelSpec() == null) {
+      // We should always find the data files in the cache when not doing time travel.
+      throw new ImpalaRuntimeException("Cannot find file in cache: " + cf.path()
+          + " with snapshot id: " + getIceTable().snapshotId());
+    }
+    // We can still find the file descriptor among the old file descriptors.
+    iceFileDesc = fileStore.getOldFileDescriptor(pathHash);
+    if (iceFileDesc != null) {
+      return new Pair<>(iceFileDesc, true);
+    }
+
+    FileDescriptor hdfsFileDesc = null;
+    try {
+      hdfsFileDesc = FeIcebergTable.Utils.getHdfsFileDescriptor(cf,
+          getIceTable().getIcebergApiTable(),
+          FeIcebergTable.Utils.requiresDataFilesInTableLocation(getIceTable()),
+          getIceTable().getHostIndex());
+      if (hdfsFileDesc == null) {
         throw new ImpalaRuntimeException(
             "Cannot load file descriptor for: " + cf.path());
       }
-      // Add file descriptor to the cache.
-      fileDesc = fileDesc.cloneWithFileMetadata(
-          IcebergUtil.createIcebergMetadata(getIceTable().getIcebergApiTable(), cf));
-      fileStore.addOldFileDescriptor(pathHash, fileDesc);
+    } catch (IOException ex) {
+      throw new ImpalaRuntimeException(
+          "Cannot load file descriptor for " + cf.path(), ex);
     }
-    return new Pair<>(fileDesc, cachehit);
+
+    Preconditions.checkNotNull(hdfsFileDesc);
+
+    // Add file descriptor to the cache.
+    iceFileDesc = IcebergFileDescriptor.cloneWithFileMetadata(
+        hdfsFileDesc,
+        IcebergUtil.createIcebergMetadata(getIceTable().getIcebergApiTable(), cf));
+    fileStore.addOldFileDescriptor(pathHash, iceFileDesc);
+
+    return new Pair<>(iceFileDesc, false);
   }
 
   /**

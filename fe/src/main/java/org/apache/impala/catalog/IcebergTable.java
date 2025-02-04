@@ -455,7 +455,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
             Utils.requiresDataFilesInTableLocation(this));
         loader.load();
         fileStore_ = new IcebergContentFileStore(
-            icebergApiTable_, loader.getLoadedFds(), icebergFiles);
+            icebergApiTable_, loader.getLoadedIcebergFds(), icebergFiles);
         partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
         setIcebergTableStats();
         loadAllColumnStats(msClient, catalogTimeline);

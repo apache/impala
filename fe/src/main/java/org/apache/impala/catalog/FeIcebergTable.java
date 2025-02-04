@@ -707,7 +707,7 @@ public interface FeIcebergTable extends FeFsTable {
     /**
      * Get FileDescriptor by data file location
      */
-    public static FileDescriptor getFileDescriptor(
+    public static FileDescriptor getHdfsFileDescriptor(
         ContentFile<?> contentFile, Table iceApiTable,
         boolean requiresDataFilesInTableLocation,
         ListMap<TNetworkAddress> hostIndex) throws IOException {
@@ -721,11 +721,12 @@ public interface FeIcebergTable extends FeFsTable {
         // For OSS service (e.g. S3A, COS, OSS, etc), we create FileStatus ourselves.
         fileStatus = createFileStatus(contentFile, fileLoc);
       }
-      return getFileDescriptor(fsForPath, fileStatus, iceApiTable,
+      return getHdfsFileDescriptor(fsForPath, fileStatus, iceApiTable,
           requiresDataFilesInTableLocation, hostIndex);
     }
 
-    private static FileDescriptor getFileDescriptor(FileSystem fs,
+    private static FileDescriptor getHdfsFileDescriptor(
+        FileSystem fs,
         FileStatus fileStatus, Table iceApiTable,
         boolean requiresDataFilesInTableLocation,
         ListMap<TNetworkAddress> hostIndex) throws IOException {

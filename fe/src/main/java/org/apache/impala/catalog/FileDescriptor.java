@@ -21,6 +21,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.MoreObjects.ToStringHelper;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.flatbuffers.FlatBufferBuilder;
 
@@ -37,7 +38,6 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.fb.FbCompression;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.fb.FbFileDesc;
-import org.apache.impala.fb.FbFileMetadata;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;
@@ -55,27 +55,21 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
   // Internal representation of a file descriptor using a FlatBuffer.
   private final FbFileDesc fbFileDescriptor_;
 
-  // Internal representation of additional file metadata, e.g. Iceberg metadata.
-  private final FbFileMetadata fbFileMetadata_;
-
-  private FileDescriptor(FbFileDesc fileDescData) {
+  protected FileDescriptor(FbFileDesc fileDescData) {
     fbFileDescriptor_ = fileDescData;
-    fbFileMetadata_ = null;
-  }
-
-  public FileDescriptor(FbFileDesc fileDescData, FbFileMetadata fileMetadata) {
-    fbFileDescriptor_ = fileDescData;
-    fbFileMetadata_ = fileMetadata;
   }
 
   public static FileDescriptor fromThrift(THdfsFileDesc desc) {
     ByteBuffer bb = ByteBuffer.wrap(desc.getFile_desc_data());
-    if (desc.isSetFile_metadata()) {
-      ByteBuffer bbMd = ByteBuffer.wrap(desc.getFile_metadata());
-      return new FileDescriptor(FbFileDesc.getRootAsFbFileDesc(bb),
-          FbFileMetadata.getRootAsFbFileMetadata(bbMd));
-    }
+    Preconditions.checkState(!desc.isSetFile_metadata());
     return new FileDescriptor(FbFileDesc.getRootAsFbFileDesc(bb));
+  }
+
+  public THdfsFileDesc toThrift() {
+    THdfsFileDesc fd = new THdfsFileDesc();
+    ByteBuffer bb = fbFileDescriptor_.getByteBuffer();
+    fd.setFile_desc_data(bb);
+    return fd;
   }
 
   /**
@@ -83,6 +77,11 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
    * index 'dstIndex' instead of the original index 'origIndex'.
    */
   public FileDescriptor cloneWithNewHostIndex(
+      List<TNetworkAddress> origIndex, ListMap<TNetworkAddress> dstIndex) {
+    return new FileDescriptor(fbFileDescWithNewHostIndex(origIndex, dstIndex));
+  }
+
+  protected FbFileDesc fbFileDescWithNewHostIndex(
       List<TNetworkAddress> origIndex, ListMap<TNetworkAddress> dstIndex) {
     // First clone the flatbuffer with no changes.
     ByteBuffer oldBuf = fbFileDescriptor_.getByteBuffer();
@@ -103,11 +102,8 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
         it.mutateReplicaHostIdxs(j, FileBlock.makeReplicaIdx(isCached, newHostIdx));
       }
     }
-    return new FileDescriptor(cloned, fbFileMetadata_);
-  }
 
-  public FileDescriptor cloneWithFileMetadata(FbFileMetadata fileMetadata) {
-    return new FileDescriptor(fbFileDescriptor_, fileMetadata);
+    return cloned;
   }
 
   /**
@@ -275,20 +271,6 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
 
   public FbFileDesc getFbFileDescriptor() {
     return fbFileDescriptor_;
-  }
-
-  public FbFileMetadata getFbFileMetadata() {
-    return fbFileMetadata_;
-  }
-
-  public THdfsFileDesc toThrift() {
-    THdfsFileDesc fd = new THdfsFileDesc();
-    ByteBuffer bb = fbFileDescriptor_.getByteBuffer();
-    fd.setFile_desc_data(bb);
-    if (fbFileMetadata_ != null) {
-      fd.setFile_metadata(fbFileMetadata_.getByteBuffer());
-    }
-    return fd;
   }
 
   @Override

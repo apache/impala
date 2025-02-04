@@ -61,7 +61,7 @@ public class FileMetadataLoader {
 
   protected final Path partDir_;
   protected final boolean recursive_;
-  protected final ImmutableMap<String, FileDescriptor> oldFdsByPath_;
+  protected final ImmutableMap<String, ? extends FileDescriptor> oldFdsByPath_;
   private final ListMap<TNetworkAddress> hostIndex_;
   @Nullable
   private final ValidWriteIdList writeIds_;
@@ -97,7 +97,7 @@ public class FileMetadataLoader {
    *   this loader will filter files based on Hudi's HoodieROTablePathFilter method
    */
   public FileMetadataLoader(Path partDir, boolean recursive,
-      Iterable<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
+      Iterable<? extends FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
       @Nullable ValidTxnList validTxnList, @Nullable ValidWriteIdList writeIds,
       @Nullable HdfsFileFormat fileFormat) {
     // Either both validTxnList and writeIds are null, or none of them.
@@ -118,7 +118,7 @@ public class FileMetadataLoader {
   }
 
   public FileMetadataLoader(Path partDir, boolean recursive,
-      Iterable<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
+      Iterable<? extends FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
       @Nullable ValidTxnList validTxnList, @Nullable ValidWriteIdList writeIds) {
     this(partDir, recursive, oldFds, hostIndex, validTxnList, writeIds, null);
   }

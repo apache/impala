@@ -22,6 +22,7 @@ import static org.apache.impala.catalog.ParallelFileMetadataLoader.createPool;
 import static org.apache.impala.catalog.ParallelFileMetadataLoader.getPoolSize;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -42,8 +43,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.hive.common.ValidTxnList;
-import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.iceberg.ContentFile;
 import org.apache.impala.catalog.FeIcebergTable.Utils;
 import org.apache.impala.catalog.HdfsTable.FileMetadataStats;
@@ -82,14 +81,14 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   private boolean useParallelListing_;
 
   public IcebergFileMetadataLoader(org.apache.iceberg.Table iceTbl,
-      Iterable<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
+      Iterable<IcebergFileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
       GroupedContentFiles icebergFiles, boolean requiresDataFilesInTableLocation) {
     this(iceTbl, oldFds, hostIndex, icebergFiles, requiresDataFilesInTableLocation,
         BackendConfig.INSTANCE.icebergReloadNewFilesThreshold());
   }
 
   public IcebergFileMetadataLoader(org.apache.iceberg.Table iceTbl,
-      Iterable<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
+      Iterable<IcebergFileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
       GroupedContentFiles icebergFiles, boolean requiresDataFilesInTableLocation,
       int newFilesThresholdParam) {
     super(FileSystemUtil.createFullyQualifiedPath(new Path(iceTbl.location())), true,
@@ -115,6 +114,14 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     } finally {
       FileMetadataLoader.TOTAL_TASKS.decrementAndGet();
     }
+  }
+
+  public List<IcebergFileDescriptor> getLoadedIcebergFds() {
+    Preconditions.checkState(loadedFds_ != null,
+        "Must have successfully loaded first");
+    return loadedFds_.stream()
+        .map(fd -> (IcebergFileDescriptor)fd)
+        .collect(Collectors.toList());
   }
 
   private void loadInternal() throws CatalogException, IOException {
@@ -144,7 +151,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       if (FileSystemUtil.supportsStorageIds(fsForPath)) {
         filesSupportsStorageIds.add(Pair.create(fsForPath, contentFile));
       } else {
-        FileDescriptor fd = createFd(fsForPath, contentFile, null, null);
+        IcebergFileDescriptor fd = createFd(fsForPath, contentFile, null, null);
         loadedFds_.add(fd);
         fileMetadataStats_.accumulate(fd);
         ++loadStats_.loadedFiles;
@@ -164,7 +171,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       Path path = FileSystemUtil.createFullyQualifiedPath(
           new Path(contentFileInfo.getSecond().path().toString()));
       FileStatus stat = nameToFileStatus.get(path);
-      FileDescriptor fd = createFd(contentFileInfo.getFirst(),
+      IcebergFileDescriptor fd = createFd(contentFileInfo.getFirst(),
           contentFileInfo.getSecond(), stat, numUnknownDiskIds);
       loadedFds_.add(fd);
       fileMetadataStats_.accumulate(fd);
@@ -203,7 +210,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     return newContentFiles;
   }
 
-  private FileDescriptor createFd(FileSystem fs, ContentFile<?> contentFile,
+  private IcebergFileDescriptor createFd(FileSystem fs, ContentFile<?> contentFile,
       FileStatus stat, Reference<Long> numUnknownDiskIds) throws IOException {
     if (stat == null) {
       Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
@@ -226,8 +233,9 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
         absPath = stat.getPath().toString();
       }
     }
-    FileDescriptor fsFd = createFd(fs, stat, relPath, numUnknownDiskIds, absPath);
-    return fsFd.cloneWithFileMetadata(
+
+    return IcebergFileDescriptor.cloneWithFileMetadata(
+        createFd(fs, stat, relPath, numUnknownDiskIds, absPath),
         IcebergUtil.createIcebergMetadata(iceTbl_, contentFile));
   }
 
@@ -291,7 +299,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     return null;
   }
 
-  FileDescriptor getOldFd(ContentFile<?> contentFile) throws IOException {
+  IcebergFileDescriptor getOldFd(ContentFile<?> contentFile) throws IOException {
     Path contentFilePath = FileSystemUtil.createFullyQualifiedPath(
         new Path(contentFile.path().toString()));
     String lookupPath = FileSystemUtil.relativizePathNoThrow(contentFilePath, partDir_);
@@ -303,6 +311,10 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
         lookupPath = contentFilePath.toString();
       }
     }
-    return oldFdsByPath_.get(lookupPath);
+    FileDescriptor fd = oldFdsByPath_.get(lookupPath);
+    if (fd == null) return null;
+
+    Preconditions.checkState(fd instanceof IcebergFileDescriptor);
+    return (IcebergFileDescriptor) fd;
   }
 }
