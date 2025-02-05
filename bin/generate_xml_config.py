@@ -40,7 +40,6 @@ REPL:
 """
 
 from __future__ import absolute_import, division, print_function
-import imp
 import os
 import re
 import sys
@@ -95,6 +94,33 @@ def dump_config(d, source_path, out):
   print("</configuration>", file=out)
 
 
+def load_source_with_importlib(modname, filename):
+  """"Emulate imp.load_source() of Python2 for Python3 using importlib
+      Code taken from published Python documentation, see
+      https://docs.python.org/3/whatsnew/3.12.html#imp"""
+  import importlib.util
+  import importlib.machinery
+
+  loader = importlib.machinery.SourceFileLoader(modname, filename)
+  spec = importlib.util.spec_from_file_location(modname, filename, loader=loader)
+  module = importlib.util.module_from_spec(spec)
+  # The module is always executed and not cached in sys.modules.
+  # Uncomment the following line to cache the module.
+  # sys.modules[module.__name__] = module
+  loader.exec_module(module)
+  return module
+
+
+def import_template(name, module_path):
+  """Handle module import differences between Python2 and Python3"""
+  mod = None
+  if sys.version_info.major < 3:
+    import imp
+    mod = imp.load_source('template', module_path)
+  else:
+    mod = load_source_with_importlib(name, module_path)
+  return mod
+
 def main():
   if len(sys.argv) != 3:
     print("usage: {prog} <template> <out>".format(prog=sys.argv[0]), file=sys.stderr)
@@ -102,7 +128,7 @@ def main():
 
   _, in_path, out_path = sys.argv
   try:
-    mod = imp.load_source('template', in_path)
+    mod = import_template('template', in_path)
   except:  # noqa
     print("Unable to load template: %s" % in_path, file=sys.stderr)
     raise
