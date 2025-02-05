@@ -37,7 +37,7 @@ class TestQueryLive(CustomClusterTestSuite):
     self.wait_for_wm_init_complete()
 
     # Wait until sys.impala_query_live is available in the coordinator's catalog cache.
-    def table_exists(last_iteration):
+    def table_exists():
       catalog_objs = self.cluster.get_first_impalad() \
           .service.read_debug_webpage("catalog?json")
       return "impala_query_live" in catalog_objs

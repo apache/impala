@@ -410,7 +410,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     catalog_log = self.assert_catalogd_log_contains("INFO", r'A catalog update with \d+ '
         r'entries is assembled. Catalog version: (\d+)', timeout_s=10, expected_count=-1)
 
-    def assert_func(last_iteration):
+    def assert_func():
       coord_log = self.assert_impalad_log_contains("INFO", r'Catalog topic update '
           r'applied with version: (\d+)', timeout_s=5, expected_count=-1)
       return int(coord_log.group(1)) >= int(catalog_log.group(1))
