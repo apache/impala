@@ -75,11 +75,13 @@ under the License.
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <iceberg.version>${env.IMPALA_ICEBERG_VERSION}</iceberg.version>
     <pac4j.version>${env.IMPALA_PAC4J_VERSION}</pac4j.version>
-    <!-- xmlsec, bcprov-jdk15on and springframework are not used by Impala directly,
-         but they are needed by pac4j. This uses newer versions to address CVEs. -->
+    <!-- xmlsec, bcprov-jdk18on, springframework, and velocity-engine-core are not used by
+         Impala directly, but they are needed by pac4j. This uses newer versions to
+         address CVEs. -->
     <xmlsec.version>${env.IMPALA_XMLSEC_VERSION}</xmlsec.version>
     <bouncy-castle.version>${env.IMPALA_BOUNCY_CASTLE_VERSION}</bouncy-castle.version>
     <springframework.version>${env.IMPALA_SPRINGFRAMEWORK_VERSION}</springframework.version>
+    <velocity-engine-core.version>${env.IMPALA_VELOCITY_ENGINE_CORE_VERSION}</velocity-engine-core.version>
     <json-smart.version>${env.IMPALA_JSON_SMART_VERSION}</json-smart.version>
     <commons-dbcp2.version>${env.IMPALA_DBCP2_VERSION}</commons-dbcp2.version>
     <log4j2.version>${env.IMPALA_LOG4J2_VERSION}</log4j2.version>
@@ -340,6 +342,12 @@ under the License.
         <groupId>org.springframework</groupId>
         <artifactId>spring-core</artifactId>
         <version>${springframework.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.velocity</groupId>
+        <artifactId>velocity-engine-core</artifactId>
+        <version>${velocity-engine-core.version}</version>
       </dependency>
 
       <dependency>
