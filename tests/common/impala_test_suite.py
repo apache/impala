@@ -1631,9 +1631,7 @@ class ImpalaTestSuite(BaseTestSuite):
     """
     actual_log_path = self.__build_log_path(daemon, level)
 
-    def exists_func(is_last_try):
-      if is_last_try:
-        LOG.info("Checking existence of {} for the last time.".format(actual_log_path))
+    def exists_func():
       return os.path.exists(actual_log_path)
 
     assert retry(exists_func, max_attempts, sleep_time_s, 1, True), "file '{}' did not " \
