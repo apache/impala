@@ -146,7 +146,7 @@ class ExecutorGroup {
   ExecutorIpAddressMap executor_ip_map_;
 
   /// All executors are kept in a hash ring to allow a consistent mapping from filenames
-  /// to executors.
+  /// to executors. Must be updated whenever executor_map_ changes.
   HashRing executor_ip_hash_ring_;
 
   /// The minimum memory limit in bytes for admission across all backends. Used by
