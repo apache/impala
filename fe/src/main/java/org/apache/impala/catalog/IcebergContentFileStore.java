@@ -20,10 +20,8 @@ package org.apache.impala.catalog;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,12 +33,13 @@ import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
-import org.apache.iceberg.FileContent;
+import org.apache.iceberg.Table;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.Pair;
 import org.apache.impala.fb.FbFileDesc;
 import org.apache.impala.fb.FbFileMetadata;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
+import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.TIcebergContentFileStore;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -191,38 +190,36 @@ public class IcebergContentFileStore {
   public IcebergContentFileStore() {}
 
   public IcebergContentFileStore(
-      FeIcebergTable icebergTable, GroupedContentFiles icebergFiles) {
-    Preconditions.checkNotNull(icebergTable);
+      Table iceApiTable, List<FileDescriptor> fileDescriptors,
+      GroupedContentFiles icebergFiles) {
+    Preconditions.checkNotNull(iceApiTable);
+    Preconditions.checkNotNull(fileDescriptors);
     Preconditions.checkNotNull(icebergFiles);
 
     Map<String, FileDescriptor> hdfsFileDescMap = new HashMap<>();
-    Collection<? extends FeFsPartition> partitions =
-        FeCatalogUtils.loadAllPartitions(icebergTable.getFeFsTable());
-    for (FeFsPartition partition : partitions) {
-      for (FileDescriptor fileDesc : partition.getFileDescriptors()) {
-        Path path = new Path(fileDesc.getAbsolutePath(icebergTable.getHdfsBaseDir()));
-        hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
-      }
+    for (FileDescriptor fileDesc : fileDescriptors) {
+      Path path = new Path(fileDesc.getAbsolutePath(iceApiTable.location()));
+      hdfsFileDescMap.put(path.toUri().getPath(), fileDesc);
     }
 
     for (DataFile dataFile : icebergFiles.dataFilesWithoutDeletes) {
       Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(icebergTable, dataFile, hdfsFileDescMap);
+          getPathHashAndFd(dataFile, hdfsFileDescMap);
       dataFilesWithoutDeletes_.add(pathHashAndFd.first, pathHashAndFd.second);
     }
     for (DataFile dataFile : icebergFiles.dataFilesWithDeletes) {
       Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(icebergTable, dataFile, hdfsFileDescMap);
+          getPathHashAndFd(dataFile, hdfsFileDescMap);
       dataFilesWithDeletes_.add(pathHashAndFd.first, pathHashAndFd.second);
     }
     for (DeleteFile deleteFile : icebergFiles.positionDeleteFiles) {
       Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(icebergTable, deleteFile, hdfsFileDescMap);
+          getPathHashAndFd(deleteFile, hdfsFileDescMap);
       positionDeleteFiles_.add(pathHashAndFd.first, pathHashAndFd.second);
     }
     for (DeleteFile deleteFile : icebergFiles.equalityDeleteFiles) {
       Pair<String, EncodedFileDescriptor> pathHashAndFd =
-          getPathHashAndFd(icebergTable, deleteFile, hdfsFileDescMap);
+          getPathHashAndFd(deleteFile, hdfsFileDescMap);
       equalityDeleteFiles_.add(pathHashAndFd.first, pathHashAndFd.second);
     }
   }
@@ -291,11 +288,10 @@ public class IcebergContentFileStore {
   public boolean hasOrc() { return hasOrc_; }
   public boolean hasParquet() { return hasParquet_; }
 
-  private void updateFileFormats(FbFileMetadata icebergMetadata) {
+  private void updateFileFormats(FbIcebergMetadata icebergMetadata) {
     Preconditions.checkNotNull(icebergMetadata);
-    Preconditions.checkNotNull(icebergMetadata.icebergMetadata());
 
-    byte fileFormat = icebergMetadata.icebergMetadata().fileFormat();
+    byte fileFormat = icebergMetadata.fileFormat();
     if (fileFormat == FbIcebergDataFileFormat.PARQUET) {
       hasParquet_ = true;
     } else if (fileFormat == FbIcebergDataFileFormat.ORC) {
@@ -306,37 +302,22 @@ public class IcebergContentFileStore {
   }
 
   private Pair<String, EncodedFileDescriptor> getPathHashAndFd(
-      FeIcebergTable icebergTable,
-      ContentFile<?> contentFile,
-      Map<String, FileDescriptor> hdfsFileDescMap) {
+      ContentFile<?> contentFile, Map<String, FileDescriptor> hdfsFileDescMap) {
     return new Pair<>(
         IcebergUtil.getFilePathHash(contentFile),
-        getOrCreateIcebergFd(icebergTable, hdfsFileDescMap, contentFile));
+        getIcebergFd(hdfsFileDescMap, contentFile));
   }
 
-  private EncodedFileDescriptor getOrCreateIcebergFd(
-      FeIcebergTable icebergTable,
+  private EncodedFileDescriptor getIcebergFd(
       Map<String, FileDescriptor> hdfsFileDescMap,
       ContentFile<?> contentFile) {
     Path path = new Path(contentFile.path().toString());
-    FileDescriptor fileDesc = null;
-    if (hdfsFileDescMap.containsKey(path.toUri().getPath())) {
-      fileDesc = hdfsFileDescMap.get(path.toUri().getPath());
-    } else {
-      if (FeIcebergTable.Utils.requiresDataFilesInTableLocation(icebergTable)) {
-        LOG.warn("Iceberg file '{}' cannot be found in the HDFS recursive"
-            + "file listing results.", path);
-      }
-      try {
-        fileDesc = FeIcebergTable.Utils.getFileDescriptor(contentFile, icebergTable);
-      } catch (IOException e) {
-        throw new IllegalArgumentException(e.getMessage());
-      }
-    }
-    Preconditions.checkNotNull(fileDesc);
+    FileDescriptor fileDesc = hdfsFileDescMap.get(path.toUri().getPath());
 
-    FbFileMetadata icebergMetadata =
-        IcebergUtil.createIcebergMetadata(icebergTable, contentFile);
+    FbFileMetadata fileMetadata = fileDesc.getFbFileMetadata();
+    Preconditions.checkState(fileMetadata != null);
+    FbIcebergMetadata icebergMetadata = fileMetadata.icebergMetadata();
+    Preconditions.checkState(icebergMetadata != null);
 
     updateFileFormats(icebergMetadata);
 
@@ -357,9 +338,6 @@ public class IcebergContentFileStore {
     return ret;
   }
 
-  // TODO IMPALA-11265: After converting to/from thrift the byte arrays representing the
-  // file descriptors won't be shared between the HdfsTable and IcebergContentFileStore.
-  // This redundancy causes unnecessary JVM heap memory usage on the coordinator.
   public static IcebergContentFileStore fromThrift(TIcebergContentFileStore tFileStore,
       List<TNetworkAddress> networkAddresses,
       ListMap<TNetworkAddress> hostIndex) {

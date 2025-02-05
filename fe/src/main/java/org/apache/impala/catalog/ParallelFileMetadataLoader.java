@@ -34,7 +34,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.HdfsPartition.Builder;
-import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
@@ -81,15 +80,6 @@ public class ParallelFileMetadataLoader {
       ValidWriteIdList writeIdList, ValidTxnList validTxnList, boolean isRecursive,
       @Nullable ListMap<TNetworkAddress> hostIndex, String debugAction,
       String logPrefix) {
-    this(fs, partBuilders, writeIdList, validTxnList, isRecursive, hostIndex, debugAction,
-        logPrefix, new GroupedContentFiles(), false);
-  }
-
-  public ParallelFileMetadataLoader(FileSystem fs,
-      Collection<Builder> partBuilders,
-      ValidWriteIdList writeIdList, ValidTxnList validTxnList, boolean isRecursive,
-      @Nullable ListMap<TNetworkAddress> hostIndex, String debugAction, String logPrefix,
-      GroupedContentFiles icebergFiles, boolean canDataBeOutsideOfTableLocation) {
     if (writeIdList != null || validTxnList != null) {
       // make sure that both either both writeIdList and validTxnList are set or both
       // of them are not.
@@ -109,14 +99,9 @@ public class ParallelFileMetadataLoader {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
       FileMetadataLoader loader;
       HdfsFileFormat format = e.getValue().get(0).getFileFormat();
-      if (format.equals(HdfsFileFormat.ICEBERG)) {
-        loader = new IcebergFileMetadataLoader(e.getKey(), isRecursive, oldFds, hostIndex,
-            validTxnList, writeIdList, Preconditions.checkNotNull(icebergFiles),
-            canDataBeOutsideOfTableLocation);
-      } else {
-        loader = new FileMetadataLoader(e.getKey(), isRecursive, oldFds, hostIndex,
-            validTxnList, writeIdList, format);
-      }
+      Preconditions.checkState(!HdfsFileFormat.ICEBERG.equals(format));
+      loader = new FileMetadataLoader(e.getKey(), isRecursive, oldFds, hostIndex,
+          validTxnList, writeIdList, format);
       // If there is a cached partition mapped to this path, we recompute the block
       // locations even if the underlying files have not changed.
       // This is done to keep the cached block metadata up to date.

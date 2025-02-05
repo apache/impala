@@ -58,7 +58,6 @@ import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
-import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -244,10 +243,11 @@ public class HdfsTable extends Table implements FeFsTable {
   // Declared as protected to allow third party extension visibility.
   protected final Map<Long, HdfsPartition> partitionMap_ = new HashMap<>();
 
-  // The data and delete files of the table, for Iceberg tables only.
-  private GroupedContentFiles icebergFiles_;
-  // Whether the data and delete files of The Iceberg tables can be outside the location.
-  private boolean canDataBeOutsideOfTableLocation_;
+  // Whether to skip file metadata loading. Iceberg tables take care of file metadata
+  // loading themselves, so it is true iff this HdfsTable is part of an
+  // IcebergTable object.
+  // TODO(IMPALA-13734/IMPALA-13738): Remove this flag.
+  private boolean skipIcebergFileMetadataLoading_ = false;
 
   // Map of partition name to HdfsPartition object. Used for speeding up
   // table metadata loading. It is only populated if this table object is stored in
@@ -339,13 +339,8 @@ public class HdfsTable extends Table implements FeFsTable {
   // to determine if we can skip the table from the topic update.
   private long lastVersionSeenByTopicUpdate_ = -1;
 
-  public void setIcebergFiles(GroupedContentFiles icebergFiles) {
-    icebergFiles_ = icebergFiles;
-  }
-
-  public void setCanDataBeOutsideOfTableLocation(
-      boolean canDataBeOutsideOfTableLocation) {
-    canDataBeOutsideOfTableLocation_ = canDataBeOutsideOfTableLocation;
+  public void setSkipIcebergFileMetadataLoading(boolean skipIcebergFileMetadataLoading) {
+    skipIcebergFileMetadataLoading_ = skipIcebergFileMetadataLoading;
   }
 
   // Represents a set of storage-related statistics aggregated at the table or partition
@@ -425,8 +420,6 @@ public class HdfsTable extends Table implements FeFsTable {
     super(msTbl, db, name, owner);
     partitionLocationCompressor_ =
         new HdfsPartitionLocationCompressor(numClusteringCols_);
-    icebergFiles_ = new GroupedContentFiles();
-    canDataBeOutsideOfTableLocation_ = false;
   }
 
   @Override // FeFsTable
@@ -814,15 +807,18 @@ public class HdfsTable extends Table implements FeFsTable {
         isRefresh ? "Refreshing" : "Loading", partBuilders.size(),
         getFullName());
 
-    // Actually load the partitions.
-    // TODO(IMPALA-8406): if this fails to load files from one or more partitions, then
-    // we'll throw an exception here and end up bailing out of whatever catalog operation
-    // we're in the middle of. This could cause a partial metadata update -- eg we may
-    // have refreshed the top-level table properties without refreshing the files.
-    new ParallelFileMetadataLoader(getFileSystem(), partBuilders, validWriteIds_,
-        validTxnList, Utils.shouldRecursivelyListPartitions(this),
-        getHostIndex(), debugActions, logPrefix, icebergFiles_,
-        canDataBeOutsideOfTableLocation_).load();
+
+    if (!skipIcebergFileMetadataLoading_) {
+      // Actually load the partitions.
+      // TODO(IMPALA-8406): if this fails to load files from one or more partitions, then
+      // we'll throw an exception here and end up bailing out of whatever catalog
+      // operation we're in the middle of. This could cause a partial metadata update
+      // -- eg we may have refreshed the top-level table properties without refreshing the
+      // files.
+      new ParallelFileMetadataLoader(getFileSystem(), partBuilders, validWriteIds_,
+          validTxnList, Utils.shouldRecursivelyListPartitions(this),
+          getHostIndex(), debugActions, logPrefix).load();
+    }
 
     // TODO(todd): would be good to log a summary of the loading process:
     // - how many block locations did we reuse/load individually/load via batch

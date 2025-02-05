@@ -708,7 +708,9 @@ public interface FeIcebergTable extends FeFsTable {
      * Get FileDescriptor by data file location
      */
     public static FileDescriptor getFileDescriptor(
-        ContentFile<?> contentFile, FeIcebergTable table) throws IOException {
+        ContentFile<?> contentFile, Table iceApiTable,
+        boolean requiresDataFilesInTableLocation,
+        ListMap<TNetworkAddress> hostIndex) throws IOException {
       Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
           new Path(contentFile.path().toString()));
       FileSystem fsForPath = FileSystemUtil.getFileSystemForPath(fileLoc);
@@ -719,19 +721,22 @@ public interface FeIcebergTable extends FeFsTable {
         // For OSS service (e.g. S3A, COS, OSS, etc), we create FileStatus ourselves.
         fileStatus = createFileStatus(contentFile, fileLoc);
       }
-      return getFileDescriptor(fsForPath, fileStatus, table);
+      return getFileDescriptor(fsForPath, fileStatus, iceApiTable,
+          requiresDataFilesInTableLocation, hostIndex);
     }
 
     private static FileDescriptor getFileDescriptor(FileSystem fs,
-        FileStatus fileStatus, FeIcebergTable table) throws IOException {
+        FileStatus fileStatus, Table iceApiTable,
+        boolean requiresDataFilesInTableLocation,
+        ListMap<TNetworkAddress> hostIndex) throws IOException {
       Reference<Long> numUnknownDiskIds = new Reference<>(0L);
 
       String absPath = null;
-      Path tableLoc = new Path(table.getIcebergTableLocation());
+      Path tableLoc = new Path(iceApiTable.location());
       String relPath = FileSystemUtil.relativizePathNoThrow(
           fileStatus.getPath(), tableLoc);
       if (relPath == null) {
-        if (Utils.requiresDataFilesInTableLocation(table)) {
+        if (requiresDataFilesInTableLocation) {
           throw new RuntimeException(fileStatus.getPath()
               + " is outside of the Iceberg table location " + tableLoc);
         }
@@ -751,7 +756,7 @@ public interface FeIcebergTable extends FeFsTable {
       }
 
       return FileDescriptor.create(fileStatus, relPath, locations,
-          table.getHostIndex(), fileStatus.isEncrypted(), fileStatus.isErasureCoded(),
+          hostIndex, fileStatus.isEncrypted(), fileStatus.isErasureCoded(),
           numUnknownDiskIds, absPath);
     }
 

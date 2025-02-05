@@ -730,7 +730,10 @@ public class IcebergScanPlanner {
       }
       cachehit = false;
       try {
-        fileDesc = FeIcebergTable.Utils.getFileDescriptor(cf, getIceTable());
+        fileDesc = FeIcebergTable.Utils.getFileDescriptor(cf,
+            getIceTable().getIcebergApiTable(),
+            FeIcebergTable.Utils.requiresDataFilesInTableLocation(getIceTable()),
+            getIceTable().getHostIndex());
       } catch (IOException ex) {
         throw new ImpalaRuntimeException(
             "Cannot load file descriptor for " + cf.path(), ex);
@@ -741,7 +744,7 @@ public class IcebergScanPlanner {
       }
       // Add file descriptor to the cache.
       fileDesc = fileDesc.cloneWithFileMetadata(
-          IcebergUtil.createIcebergMetadata(getIceTable(), cf));
+          IcebergUtil.createIcebergMetadata(getIceTable().getIcebergApiTable(), cf));
       fileStore.addOldFileDescriptor(pathHash, fileDesc);
     }
     return new Pair<>(fileDesc, cachehit);

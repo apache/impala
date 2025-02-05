@@ -238,7 +238,9 @@ public class OptimizeStmt extends DmlStatementBase {
     GroupedContentFiles selectedContentFiles = new GroupedContentFiles();
     selectedContentFiles.dataFilesWithoutDeletes = contentFiles;
     IcebergContentFileStore selectedFiles =
-        new IcebergContentFileStore(iceTable, selectedContentFiles);
+        new IcebergContentFileStore(iceTable.getIcebergApiTable(),
+            iceTable.getContentFileStore().getDataFilesWithoutDeletes(),
+            selectedContentFiles);
     return selectedFiles.getDataFilesWithoutDeletes();
   }
 

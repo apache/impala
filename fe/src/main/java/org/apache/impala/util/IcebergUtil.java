@@ -817,6 +817,7 @@ public class IcebergUtil {
   public static Object getPartitionValue(Type type,
       TIcebergPartitionTransformType transformType, String stringValue)
       throws ImpalaRuntimeException {
+    // This needs to be consistent with createPartitionTransformValue().
     String HIVE_NULL = MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE;
     if (stringValue == null || stringValue.equals(HIVE_NULL)) return null;
 
@@ -1040,15 +1041,14 @@ public class IcebergUtil {
   }
 
   /**
-   * Extracts metadata from Iceberg data file object 'df'. Such metadata is the file
+   * Extracts metadata from Iceberg data file object 'cf'. Such metadata is the file
    * format of the data file, also the partition information the data file belongs.
    * It creates a flatbuffer so it can be passed between machines and processes without
    * further de/serialization.
    */
-  public static FbFileMetadata createIcebergMetadata(FeIcebergTable feTbl,
-      ContentFile cf) {
+  public static FbFileMetadata createIcebergMetadata(Table iceApiTbl, ContentFile cf) {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-    int iceOffset = createIcebergMetadata(feTbl, fbb, cf);
+    int iceOffset = createIcebergMetadata(iceApiTbl, fbb, cf);
     fbb.finish(FbFileMetadata.createFbFileMetadata(fbb, iceOffset));
     ByteBuffer bb = fbb.dataBuffer().slice();
     ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
@@ -1056,12 +1056,12 @@ public class IcebergUtil {
     return FbFileMetadata.getRootAsFbFileMetadata((ByteBuffer)compressedBb.flip());
   }
 
-  private static int createIcebergMetadata(FeIcebergTable feTbl, FlatBufferBuilder fbb,
+  private static int createIcebergMetadata(Table iceApiTbl, FlatBufferBuilder fbb,
       ContentFile cf) {
     int partKeysOffset = -1;
-    PartitionSpec spec = feTbl.getIcebergApiTable().specs().get(cf.specId());
+    PartitionSpec spec = iceApiTbl.specs().get(cf.specId());
     if (spec != null && !spec.fields().isEmpty()) {
-      partKeysOffset = createPartitionKeys(feTbl, fbb, spec, cf);
+      partKeysOffset = createPartitionKeys(fbb, spec, cf);
     }
     int eqFieldIdsOffset = -1;
     List<Integer> eqFieldIds = cf.equalityFieldIds();
@@ -1101,18 +1101,18 @@ public class IcebergUtil {
     return FbIcebergMetadata.endFbIcebergMetadata(fbb);
   }
 
-  private static int createPartitionKeys(FeIcebergTable feTbl, FlatBufferBuilder fbb,
+  private static int createPartitionKeys(FlatBufferBuilder fbb,
       PartitionSpec spec, ContentFile cf) {
     Preconditions.checkState(spec.fields().size() == cf.partition().size());
     int[] partitionKeyOffsets = new int[spec.fields().size()];
     for (int i = 0; i < spec.fields().size(); ++i) {
       partitionKeyOffsets[i] =
-          createPartitionTransformValue(feTbl, fbb, spec, cf, i);
+          createPartitionTransformValue(fbb, spec, cf, i);
     }
     return FbIcebergMetadata.createPartitionKeysVector(fbb, partitionKeyOffsets);
   }
 
-  private static int createPartitionTransformValue(FeIcebergTable feTbl,
+  private static int createPartitionTransformValue(
       FlatBufferBuilder fbb, PartitionSpec spec, ContentFile cf, int fieldIndex) {
     PartitionField field = spec.fields().get(fieldIndex);
     Pair<Byte, Integer> transform = getFbTransform(spec.schema(), field);
@@ -1123,7 +1123,8 @@ public class IcebergUtil {
       if (partValue != null) {
         partValueString = partValue.toString();
       } else {
-        partValueString = feTbl.getNullPartitionKeyValue();
+        // This needs to be consistent with getPartitionValue().
+        partValueString = MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE;
       }
       valueOffset = fbb.createString(partValueString);
     }

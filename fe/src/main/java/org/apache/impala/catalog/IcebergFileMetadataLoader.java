@@ -53,6 +53,7 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.ThreadNameAnnotator;
 
@@ -70,32 +71,32 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   // invalid value.
   private final int NEW_FILES_THRESHOLD_DEFAULT = 100;
 
+  private final org.apache.iceberg.Table iceTbl_;
+
   // If there are more new files than 'newFilesThreshold_', we should fall back
   // to regular file metadata loading.
   private final int newFilesThreshold_;
 
   private final GroupedContentFiles icebergFiles_;
-  private final boolean canDataBeOutsideOfTableLocation_;
+  private final boolean requiresDataFilesInTableLocation_;
   private boolean useParallelListing_;
 
-  public IcebergFileMetadataLoader(Path partDir, boolean recursive,
-      List<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
-      ValidTxnList validTxnList, ValidWriteIdList writeIds,
-      GroupedContentFiles icebergFiles, boolean canDataBeOutsideOfTableLocation) {
-    this(partDir, recursive, oldFds, hostIndex, validTxnList, writeIds,
-        icebergFiles, canDataBeOutsideOfTableLocation,
+  public IcebergFileMetadataLoader(org.apache.iceberg.Table iceTbl,
+      Iterable<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
+      GroupedContentFiles icebergFiles, boolean requiresDataFilesInTableLocation) {
+    this(iceTbl, oldFds, hostIndex, icebergFiles, requiresDataFilesInTableLocation,
         BackendConfig.INSTANCE.icebergReloadNewFilesThreshold());
   }
 
-  public IcebergFileMetadataLoader(Path partDir, boolean recursive,
-      List<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
-      ValidTxnList validTxnList, ValidWriteIdList writeIds,
-      GroupedContentFiles icebergFiles, boolean canDataBeOutsideOfTableLocation,
+  public IcebergFileMetadataLoader(org.apache.iceberg.Table iceTbl,
+      Iterable<FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
+      GroupedContentFiles icebergFiles, boolean requiresDataFilesInTableLocation,
       int newFilesThresholdParam) {
-    super(partDir, recursive, oldFds, hostIndex, validTxnList, writeIds,
-        HdfsFileFormat.ICEBERG);
+    super(FileSystemUtil.createFullyQualifiedPath(new Path(iceTbl.location())), true,
+        oldFds, hostIndex, null, null, HdfsFileFormat.ICEBERG);
+    iceTbl_ = iceTbl;
     icebergFiles_ = icebergFiles;
-    canDataBeOutsideOfTableLocation_ = canDataBeOutsideOfTableLocation;
+    requiresDataFilesInTableLocation_ = requiresDataFilesInTableLocation;
     if (newFilesThresholdParam >= 0) {
       newFilesThreshold_ = newFilesThresholdParam;
     } else {
@@ -131,9 +132,9 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     FileSystem defaultFs = FileSystemUtil.getDefaultFileSystem();
     for (ContentFile<?> contentFile : newContentFiles) {
       FileSystem fsForPath = fsForTable;
-      // If canDataBeOutsideOfTableLocation is not true, we assume that the file system
+      // If requiresDataFilesInTableLocation_ is true, we assume that the file system
       // for all ContentFiles is the same as fsForTable
-      if (canDataBeOutsideOfTableLocation_) {
+      if (!requiresDataFilesInTableLocation_) {
         Path path = new Path(contentFile.path().toString());
         fsForPath = path.toUri().getScheme() != null ?
             FileSystemUtil.getFileSystemForPath(path) : defaultFs;
@@ -218,14 +219,16 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     String absPath = null;
     String relPath = FileSystemUtil.relativizePathNoThrow(stat.getPath(), partDir_);
     if (relPath == null) {
-      if (canDataBeOutsideOfTableLocation_) {
-        absPath = stat.getPath().toString();
-      } else {
+      if (requiresDataFilesInTableLocation_) {
         throw new IOException(String.format("Failed to load Iceberg datafile %s, because "
             + "it's outside of the table location", stat.getPath().toUri()));
+      } else {
+        absPath = stat.getPath().toString();
       }
     }
-    return createFd(fs, stat, relPath, numUnknownDiskIds, absPath);
+    FileDescriptor fsFd = createFd(fs, stat, relPath, numUnknownDiskIds, absPath);
+    return fsFd.cloneWithFileMetadata(
+        IcebergUtil.createIcebergMetadata(iceTbl_, contentFile));
   }
 
   /**
@@ -293,11 +296,11 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
         new Path(contentFile.path().toString()));
     String lookupPath = FileSystemUtil.relativizePathNoThrow(contentFilePath, partDir_);
     if (lookupPath == null) {
-      if (canDataBeOutsideOfTableLocation_) {
-        lookupPath = contentFilePath.toString();
-      } else {
+      if (requiresDataFilesInTableLocation_) {
         throw new IOException(String.format("Failed to load Iceberg datafile %s, because "
             + "it's outside of the table location", contentFilePath));
+      } else {
+        lookupPath = contentFilePath.toString();
       }
     }
     return oldFdsByPath_.get(lookupPath);

@@ -20,12 +20,15 @@ package org.apache.impala.catalog;
 import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
@@ -443,19 +446,21 @@ public class IcebergTable extends Table implements FeIcebergTable {
         GroupedContentFiles icebergFiles = IcebergUtil.getIcebergFiles(this,
             new ArrayList<>(), /*timeTravelSpec=*/null);
         catalogTimeline.markEvent("Loaded Iceberg files");
-        hdfsTable_.setIcebergFiles(icebergFiles);
-        hdfsTable_.setCanDataBeOutsideOfTableLocation(
-            !Utils.requiresDataFilesInTableLocation(this));
+        hdfsTable_.setSkipIcebergFileMetadataLoading(true);
         hdfsTable_.load(reuseMetadata, msClient, msTable_, reason, catalogTimeline);
-        fileStore_ = new IcebergContentFileStore(this, icebergFiles);
+        IcebergFileMetadataLoader loader = new IcebergFileMetadataLoader(
+            icebergApiTable_,
+            fileStore_ == null ? Collections.emptyList() : fileStore_.getAllFiles(),
+            getHostIndex(), Preconditions.checkNotNull(icebergFiles),
+            Utils.requiresDataFilesInTableLocation(this));
+        loader.load();
+        fileStore_ = new IcebergContentFileStore(
+            icebergApiTable_, loader.getLoadedFds(), icebergFiles);
         partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
         setIcebergTableStats();
         loadAllColumnStats(msClient, catalogTimeline);
         applyPuffinNdvStats(catalogTimeline);
         setAvroSchema(msClient, msTbl, fileStore_, catalogTimeline);
-
-        // We no longer need to keep Iceberg's content files in memory.
-        hdfsTable_.setIcebergFiles(null);
       } catch (Exception e) {
         throw new IcebergTableLoadingException("Error loading metadata for Iceberg table "
             + icebergTableLocation_, e);
