@@ -178,7 +178,7 @@ void SetJavaLogLevelCallback(const Webserver::WebRequest& req, Document* documen
         "is empty.", "error", document);
     return;
   }
-  VLOG(1) << "New Java log level set: " << result;
+  VLOG(1) << "New Java log level set: " << classname->second << " : " << result;
   AddDocumentMember(result, "set_java_loglevel_result", document);
 }
 
