@@ -151,14 +151,22 @@ void ExecutorGroup::RemoveExecutor(const BackendDescriptorPB& be_desc) {
                 << be_desc.krpc_address();
     return;
   }
+
+  // Copy the data necessary to update the internal state variables since the erase call
+  // has the potential to destroy the object referenced by be_desc.
+  const std::string be_hostname = be_desc.address().hostname();
+  const std::string be_ip_address = be_desc.ip_address();
+  const int64_t be_admin_mem_limit = be_desc.admit_mem_limit();
+
   be_descs.erase(remove_it);
-  if (per_executor_admit_mem_limit_ == be_desc.admit_mem_limit()) {
+
+  if (per_executor_admit_mem_limit_ == be_admin_mem_limit) {
     CalculatePerExecutorMemLimitForAdmission();
   }
   if (be_descs.empty()) {
     executor_map_.erase(be_descs_it);
-    executor_ip_map_.erase(be_desc.address().hostname());
-    executor_ip_hash_ring_.RemoveNode(be_desc.ip_address());
+    executor_ip_map_.erase(be_hostname);
+    executor_ip_hash_ring_.RemoveNode(be_ip_address);
   }
 }
 

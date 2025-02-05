@@ -81,6 +81,14 @@ TEST(ExecutorGroupTest, RemoveExecutor) {
   ASSERT_TRUE(group1.LookUpExecutorIp("host_1", &backend_ip));
   EXPECT_EQ("10.0.0.1", backend_ip);
   ASSERT_FALSE(group1.LookUpExecutorIp("host_2", &backend_ip));
+
+  // When the last executor for a host is be removed from the group, that host is also
+  // removed from the group. Asserts that process completes successfully even when the
+  // RemoveExecutor function is provided the same object that will be erased.
+  const BackendDescriptorPB* actual_exec1 = group1.LookUpBackendDesc(executor1.address());
+  ASSERT_NE(nullptr, actual_exec1);
+  group1.RemoveExecutor(*actual_exec1);
+  ASSERT_EQ(0, group1.NumExecutors());
 }
 
 /// Test removing one of multiple backends on the same host (IMPALA-3944).
