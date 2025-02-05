@@ -721,16 +721,12 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     client2 = self.create_client_for_nth_impalad(1, vector.get_value('protocol'))
 
     try:
-      def assert_func(last_iteration):
+      def assert_func():
         results = client2.execute("select query_id,sql from {0} where query_id in "
                                   "('{1}','{2}','{3}')".format(self.QUERY_TBL,
                                   sql1.query_id, sql2.query_id, sql3.query_id))
 
-        success = len(results.data) == 3
-        if last_iteration:
-          assert len(results.data) == 3
-
-        return success
+        return len(results.data) == 3
 
       assert retry(func=assert_func, max_attempts=5, sleep_time_s=3)
     finally:
