@@ -18,12 +18,15 @@
 package org.apache.impala.customcluster;
 
 import static org.apache.impala.testutil.LdapUtil.*;
+import static org.apache.impala.testutil.TestUtils.retryUntilSuccess;
+import static org.apache.impala.testutil.TestUtils.writeCookieSecret;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Range;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -37,6 +40,8 @@ import org.apache.impala.testutil.WebClient;
 import org.junit.After;
 import org.junit.Assume;
 import org.junit.ClassRule;
+import org.junit.Rule;
+import org.junit.rules.TemporaryFolder;
 
 /**
  * Impala shell connectivity tests for LDAP authentication. This class contains the common
@@ -48,6 +53,9 @@ import org.junit.ClassRule;
 public class LdapImpalaShellTest {
   @ClassRule
   public static CreateLdapServerRule serverRule = new CreateLdapServerRule();
+
+  @Rule
+  public TemporaryFolder tempFolder = new TemporaryFolder();
 
   // The cluster will be set up to allow TEST_USER_1 to act as a proxy for delegateUser_.
   // Includes a special character to test HTTP path encoding.
@@ -280,6 +288,61 @@ public class LdapImpalaShellTest {
     command = buildCommand(
         query, "hs2-http", TEST_USER_1, TEST_PASSWORD_1, "/?doAs=" + delegateUser_);
     RunShellCommand.Run(command, /* shouldSucceed */ true, delegateUser_, "");
+  }
+
+  /**
+   * Used to configure and return a temporary cookie secret file. This is needed to set
+   * --cookie_secret_file=file.getCanonicalPath() and pass to testCookieRefreshImpl.
+   */
+  protected File getCookieSecretFile() throws Exception {
+    // Write a temporary key file for the cookie secret.
+    File keyFile = tempFolder.newFile();
+    writeCookieSecret(keyFile);
+    return keyFile;
+  }
+
+  /**
+   * Tests cookie rotation during a query does not interrupt the session.
+   */
+  protected void testCookieRefreshImpl(File keyFile) throws Exception {
+    String query = "select sleep(3000)";
+    String[] command =
+        buildCommand(query, "hs2-http", TEST_USER_1, TEST_PASSWORD_1, "/cliservice");
+    final RunShellCommand.Output[] resultHolder = new RunShellCommand.Output[1];
+    Thread thread = new Thread(() -> {
+      try {
+        resultHolder[0] = RunShellCommand.Run(command,
+            /* shouldSucceed */ true, /* sleep returns true */ "true",
+            "Starting Impala Shell with LDAP-based authentication");
+      } catch (Throwable e) {
+        resultHolder[0] = new RunShellCommand.Output("", e.getMessage());
+      }
+    });
+    thread.start();
+
+    // Poll the metric until authentication succeeds, then update the cookie secret file.
+    // Success can be seen from timing: client authenticates, key is updated, client
+    // continues and finishes the query. The relevant log lines are:
+    //   Loaded authentication key from ...
+    //   Opened session
+    //   Loaded authentication key from ...
+    //   Invalid cookie provided
+    //   Closed session
+    retryUntilSuccess(() -> {
+      long success = (long) client_.getMetric(
+          "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-success");
+      if (success < 1L)  throw new Exception("Authentication not yet succeeded.");
+      return null;
+    }, 20, 100);
+
+    writeCookieSecret(keyFile);
+    thread.join();
+    RunShellCommand.Output result = resultHolder[0];
+    assertTrue(result.stderr,
+        result.stderr.contains("Preserving cookies: impala.auth"));
+    // Cookie auth should fail once due to key change, requiring two basic auths.
+    // Cookie auth is expected to succeed at least once, possibly many times.
+    verifyMetrics(Range.closed(2L, 2L), zero, Range.atLeast(1L), one);
   }
 
   /**

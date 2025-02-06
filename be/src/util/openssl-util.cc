@@ -21,8 +21,10 @@
 #include <string_view>
 
 #include <limits.h>
+#include <mutex>
 #include <sstream>
 #include <iostream>
+#include <sys/inotify.h>
 
 #include <glog/logging.h>
 #include <openssl/bio.h>
@@ -43,11 +45,16 @@
 #include "common/names.h"
 #include "cpu-info.h"
 #include "kudu/util/openssl_util.h"
+#include "util/time.h"
 
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_cipher_list);
+
+DEFINE_int32(hash_reload_grace_period_s, 300, "The time in seconds to allow "
+    "authentication hash reload to fail before terminating Impala. A negative value "
+    "indicates to never terminate Impala.");
 
 /// OpenSSL 1.0.1d
 #define OPENSSL_VERSION_1_0_1D 0x1000104fL
@@ -266,6 +273,126 @@ bool AuthenticationHash::Verify(
     return false;
   }
   return memcmp(signature, out, HashLen()) == 0;
+}
+
+AuthenticationHashFromFile::~AuthenticationHashFromFile() {
+  // Signal the reload thread to stop.
+  if (stop_pipe_write_fd_ >= 0) {
+    write(stop_pipe_write_fd_, "x", 1); // Write a byte to signal shutdown.
+    close(stop_pipe_write_fd_);
+  }
+  if (reload_thread_.joinable()) {
+    reload_thread_.join();
+  }
+}
+
+Status AuthenticationHashFromFile::Init() {
+  RETURN_IF_ERROR(LoadKey());
+
+  // Start a thread to handle inotify-triggered reload.
+  int pipefd[2];
+  if (pipe(pipefd) != 0) {
+    return Status(Substitute("Failed to create pipe for reload thread: $0",
+        strerror(errno)));
+  }
+  stop_pipe_read_fd_ = pipefd[0];
+  stop_pipe_write_fd_ = pipefd[1];
+
+  int fd = inotify_init1(IN_NONBLOCK);
+  if (fd < 0) {
+    close(stop_pipe_read_fd_);
+    return Status(
+        Substitute("Failed to initialize inotify for $0: $1", path_, strerror(errno)));
+  }
+
+  int wd = inotify_add_watch(
+      fd, path_.c_str(), IN_MODIFY | IN_CLOSE_WRITE | IN_MOVE_SELF | IN_ATTRIB);
+  if (wd < 0) {
+    close(stop_pipe_read_fd_);
+    close(fd);
+    return Status(
+        Substitute("Failed to add inotify watch for $0: $1", path_, strerror(errno)));
+  }
+
+  reload_thread_ = std::thread([this, fd, wd] { ReloadMonitor(fd, wd); });
+  return Status::OK();
+}
+
+Status AuthenticationHashFromFile::Compute(
+    const uint8_t* data, int64_t len, uint8_t* out) const {
+  DCHECK(reload_thread_.joinable()) << "Compute() called before Init()";
+  // Ensure key_ isn't updated during HMAC calculation.
+  std::shared_lock<std::shared_mutex> l(key_lock_);
+  return AuthenticationHash::Compute(data, len, out);
+}
+
+Status AuthenticationHashFromFile::LoadKey() {
+  FILE* hashfile = fopen(path_.c_str(), "rb");
+  if (!hashfile) {
+    return Status(Substitute("Unable to load authentication hash from $0: $1",
+        path_, strerror(errno)));
+  }
+
+  uint8_t new_key[SHA256_DIGEST_LENGTH];
+  size_t n = fread(new_key, sizeof(uint8_t), SHA256_DIGEST_LENGTH, hashfile);
+  fclose(hashfile);
+  if (n != SHA256_DIGEST_LENGTH) {
+    return Status(Substitute("Authentication hash from $0 did not contain $1 bytes",
+        path_, SHA256_DIGEST_LENGTH));
+  }
+
+  LOG(INFO) << "Loaded authentication key from " << path_;
+  std::unique_lock<std::shared_mutex> l(key_lock_);
+  memcpy(key_, new_key, SHA256_DIGEST_LENGTH);
+  return Status::OK();
+}
+
+void AuthenticationHashFromFile::ReloadMonitor(int fd, int wd) {
+  LOG(INFO) << "Started reload thread for authentication key at " << path_;
+  char buf[sizeof(struct inotify_event) + PATH_MAX + 1]
+      __attribute__((aligned(__alignof__(struct inotify_event))));
+  while (true) {
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(fd, &readfds);
+    FD_SET(stop_pipe_read_fd_, &readfds);
+    int maxfd = std::max(fd, stop_pipe_read_fd_) + 1;
+    int ret = select(maxfd, &readfds, nullptr, nullptr, nullptr);
+    if (ret < 0) {
+      if (errno == EINTR) continue;
+      LOG(FATAL) << "select() failed in reload thread for authentication key at "
+                 << path_ << ": " << strerror(errno);
+    }
+    if (FD_ISSET(stop_pipe_read_fd_, &readfds)) {
+      // Stop signal received.
+      LOG(INFO) << "Stopping reload thread for authentication key at " << path_;
+      break;
+    }
+
+    if (FD_ISSET(fd, &readfds)) {
+      ssize_t len = read(fd, buf, sizeof(buf));
+      if (len > 0) {
+        // Reload key on any event.
+        int64_t start = MonotonicSeconds();
+        Status stat;
+        while (!(stat = LoadKey()).ok()) {
+          if (FLAGS_hash_reload_grace_period_s >= 0 &&
+              MonotonicSeconds() >= start + FLAGS_hash_reload_grace_period_s) {
+            LOG(FATAL) << "Authentication key reload failed for more than "
+                       << FLAGS_hash_reload_grace_period_s
+                       << " seconds; terminating Impala. Last error: " << stat;
+          }
+          LOG(ERROR) << stat;
+          SleepForMs(1000);
+        }
+      } else if (len < 0 && errno != EAGAIN) {
+        LOG(FATAL) << "Failed to read inotify event: " << strerror(errno);
+      }
+    }
+  }
+  inotify_rm_watch(fd, wd);
+  close(stop_pipe_read_fd_);
+  close(fd);
 }
 
 int GetKeyLenForMode(AES_CIPHER_MODE m) {

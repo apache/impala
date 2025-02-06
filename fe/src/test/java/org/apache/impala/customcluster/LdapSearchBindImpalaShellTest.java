@@ -30,6 +30,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.io.File;
 import java.io.IOException;
 
 /**
@@ -111,6 +112,18 @@ public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
             + "--ldap_user_filter=(cn={0})",
         TEST_USER_1, delegateUser_));
     testHttpImpersonationImpl();
+  }
+
+  /**
+   * Tests cookie rotation during a query does not interrupt the session.
+   */
+  @Test
+  public void testCookieRefresh() throws Exception {
+    File cookieSecretFile = getCookieSecretFile();
+    setUp(String.format("--ldap_user_search_basedn=dc=myorg,dc=com "
+            + "--ldap_user_filter=(&(objectClass=person)(cn={0})) "
+            + "--cookie_secret_file=%s", cookieSecretFile.getCanonicalPath()));
+    testCookieRefreshImpl(cookieSecretFile);
   }
 
   /**

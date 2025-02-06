@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <fstream>
 #include <random>
 
 #include <glog/logging.h>
@@ -28,13 +29,17 @@
 #include "kudu/util/env.h"
 #include "kudu/util/faststring.h"
 #include "kudu/util/status.h"
+#include "testutil/death-test-util.h"
 #include "testutil/gtest-util.h"
 #include "util/openssl-util.h"
+#include "util/time.h"
 
 using std::uniform_int_distribution;
 using std::mt19937_64;
 using strings::Substitute;
 using std::string;
+
+DECLARE_int32(hash_reload_grace_period_s);
 
 namespace impala {
 
@@ -61,6 +66,26 @@ class OpenSSLUtilTest : public ::testing::Test {
     for (int64_t i = 0; i < len; i++) {
       data[i] = uniform_int_distribution<uint8_t>(0, UINT8_MAX)(rng_);
     }
+  }
+
+  struct KeyFile {
+    ~KeyFile() {
+      unlink(path.c_str());
+    }
+    string path;
+  };
+
+  void WriteRandomKeyToFile(const string& path, int key_len) {
+    vector<uint8_t> key(key_len);
+    std::ofstream key_file(path, std::ios::binary);
+    GenerateRandomBytes(key.data(), key_len);
+    key_file.write(reinterpret_cast<const char*>(key.data()), key.size());
+  }
+
+  KeyFile MakeKeyFile(int key_len = AuthenticationHash::HashLen()) {
+    string key_path = Substitute("/tmp/auth_key_$0", getpid());
+    WriteRandomKeyToFile(key_path, key_len);
+    return KeyFile{move(key_path)};
   }
 
   void TestEncryptionDecryption(const int64_t buffer_size) {
@@ -461,6 +486,111 @@ TEST_F(OpenSSLUtilTest, ValidatePemBundleOneExpiredOneFutureDated) {
   // Future dated cert is first in the bundle.
   ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1", read_cert(FUTURE_CERT),
       read_cert(EXPIRED_CERT))), _msg_time(1, 1));
+}
+
+TEST_F(OpenSSLUtilTest, AuthenticationHash) {
+  // Create an AuthenticationHash and verify we can Compute a signature and Verify it.
+  const int buffer_size = 1024 * 1024;
+  vector<uint8_t> buf(buffer_size);
+  GenerateRandomData(buf.data(), buffer_size);
+
+  AuthenticationHash auth_hash;
+  uint8_t signature[AuthenticationHash::HashLen()];
+  ASSERT_OK(auth_hash.Compute(buf.data(), buffer_size, signature));
+
+  // Should verify with the same data
+  EXPECT_TRUE(auth_hash.Verify(buf.data(), buffer_size, signature));
+
+  // Should not verify with different data
+  buf[0] ^= 0xFF;
+  EXPECT_FALSE(auth_hash.Verify(buf.data(), buffer_size, signature));
+}
+
+TEST_F(OpenSSLUtilTest, AuthenticationHashFromFile) {
+  // Create a temporary file with a random key.
+  KeyFile key = MakeKeyFile();
+
+  // Create an AuthenticationHashFromFile and verify we can Compute a signature and Verify
+  // it.
+  const int buffer_size = 1024 * 1024;
+  vector<uint8_t> buf(buffer_size);
+  GenerateRandomData(buf.data(), buffer_size);
+
+  // On exit the destructor will halt and join with the reload thread.
+  AuthenticationHashFromFile auth_hash(key.path);
+  ASSERT_OK(auth_hash.Init());
+  uint8_t signature[AuthenticationHash::HashLen()];
+  ASSERT_OK(auth_hash.Compute(buf.data(), buffer_size, signature));
+
+  // Should verify with the same data
+  EXPECT_TRUE(auth_hash.Verify(buf.data(), buffer_size, signature));
+
+  // Overwrite the temporary file with a bad value.
+  WriteRandomKeyToFile(key.path, 1); // Too short
+  // Wait for the reload thread to pick up the new key.
+  SleepForMs(500);
+  // Should still verify with the original signature, since the key is cached.
+  EXPECT_TRUE(auth_hash.Verify(buf.data(), buffer_size, signature));
+  // Note that a single read error isn't fatal.
+
+  // Now overwrite the file with a new valid key.
+  WriteRandomKeyToFile(key.path, AuthenticationHash::HashLen());
+  // Retry for a few seconds until the reload thread picks up the new key.
+  const int max_retries = 20;
+  int retries = 0;
+  while (retries++ < max_retries) {
+    SleepForMs(100);
+    if (!auth_hash.Verify(buf.data(), buffer_size, signature)) break;
+  }
+  ASSERT_LT(retries, max_retries) << "Timed out waiting for key reload";
+
+  // Should not verify with the original signature, since the key has changed.
+  EXPECT_FALSE(auth_hash.Verify(buf.data(), buffer_size, signature));
+}
+
+TEST_F(OpenSSLUtilTest, MissingAuthenticationHashFromFile) {
+  // Try to create an AuthenticationHashFromFile with a non-existent key file.
+  string missing_key_path = Substitute("/tmp/auth_key_missing_$0", getpid());
+  // Ensure the file does not exist.
+  unlink(missing_key_path.c_str());
+  AuthenticationHashFromFile missing_hash(missing_key_path);
+  ASSERT_ERROR_MSG(missing_hash.Init(),
+      Substitute("Unable to load authentication hash from $0: "
+          "No such file or directory", missing_key_path));
+}
+
+TEST_F(OpenSSLUtilTest, ShortAuthenticationHashFromFile) {
+  // Create a temporary file with a key that's too short.
+  KeyFile short_key = MakeKeyFile(AuthenticationHash::HashLen()-1);
+  AuthenticationHashFromFile short_hash(short_key.path);
+  ASSERT_ERROR_MSG(short_hash.Init(),
+      Substitute("Authentication hash from $0 did not contain 32 bytes", short_key.path));
+}
+
+TEST_F(OpenSSLUtilTest, EmptyAuthenticationHashFromFile) {
+  // Create a temporary file with an empty key.
+  KeyFile empty_key{Substitute("/tmp/auth_key_$0", getpid())};
+  {
+    std::ofstream key_file(empty_key.path, std::ios::binary);
+  }
+  AuthenticationHashFromFile empty_hash(empty_key.path);
+  ASSERT_ERROR_MSG(empty_hash.Init(),
+      Substitute("Authentication hash from $0 did not contain 32 bytes", empty_key.path));
+}
+
+TEST_F(OpenSSLUtilTest, AuthenticationHashFatal) {
+  // Create a temporary file with a random key.
+  KeyFile key = MakeKeyFile();
+
+  // Initialize the hash, then remove the key file.
+  FLAGS_hash_reload_grace_period_s = 1; // Shorten grace period for test.
+  AuthenticationHashFromFile auth_hash(key.path);
+  [[maybe_unused]] auto runReloadThreadAndWait = [&auth_hash, &key]() {
+    ASSERT_OK(auth_hash.Init());
+    chmod(key.path.c_str(), 0); // Remove all permissions to create an unreadable file.
+    SleepForMs(2500);
+  };
+  IMPALA_ASSERT_DEBUG_DEATH(runReloadThreadAndWait(), "");
 }
 
 } // namespace impala

@@ -18,6 +18,8 @@
 package org.apache.impala.customcluster;
 
 import static org.apache.impala.testutil.LdapUtil.*;
+import static org.apache.impala.testutil.TestUtils.retryUntilSuccess;
+import static org.apache.impala.testutil.TestUtils.writeCookieSecret;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -53,7 +55,9 @@ import org.apache.thrift.transport.THttpClient;
 import org.json.simple.JSONObject;
 import org.junit.After;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 @CreateDS(name = "myDS",
     partitions = { @CreatePartition(name = "test", suffix = "dc=myorg,dc=com") })
@@ -65,6 +69,11 @@ public class LdapWebserverTest {
   public static CreateLdapServerRule serverRule = new CreateLdapServerRule();
 
   private static final Range<Long> zero = Range.closed(0L, 0L);
+
+  // Temp folder where the config files are copied so we can modify them in place.
+  // The JUnit @Rule creates and removes the temp folder between every test.
+  @Rule
+  public TemporaryFolder tempFolder = new TemporaryFolder();
 
   WebClient client_ = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
 
@@ -163,6 +172,47 @@ public class LdapWebserverTest {
       assertTrue(result, result.contains("Must authenticate with Basic authentication."));
       // Check that there is now two unsuccessful auth attempts.
       verifyMetrics(Range.atLeast(1L), Range.closed(2L, 2L), Range.atLeast(1L), zero);
+    }
+  }
+
+  @Test
+  public void testWebserverSharedCookie() throws Exception {
+    // Write a temporary key file for the cookie secret.
+    File keyFile = tempFolder.newFile();
+    writeCookieSecret(keyFile);
+
+    setUp(String.format("--cookie_secret_file=%s", keyFile.getCanonicalPath()),
+        "", "", "", "");
+    // start-impala-cluster contacts the webui to confirm the impalads have started, so
+    // there will already be some successful auth attempts.
+    verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
+
+    // Attempt to access the webserver without a username/password, only the cookie from
+    // the verifyMetrics calls.
+    try (WebClient cookieOnly = new WebClient("", "", 25000, client_.getCookies())) {
+      String result = cookieOnly.readContent("/");
+      assertTrue(result, result.contains("<title>Apache Impala</title>"));
+      // Check that there were no unsuccessful auth attempts.
+      verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
+    }
+
+    // Access a different webserver with the same cookie, should succeed.
+    try (WebClient cookieOnly = new WebClient("", "", 25001, client_.getCookies())) {
+      String result = cookieOnly.readContent("/");
+      assertTrue(result, result.contains("<title>Apache Impala</title>"));
+
+      // Cookie should be reloaded with the new key.
+      writeCookieSecret(keyFile);
+      result = retryUntilSuccess(() -> {
+        String res = cookieOnly.readContent("/");
+        if (res.contains("<title>Apache Impala</title>")) {
+          throw new Exception("Cookie should be invalid after key change.");
+        }
+        return res;
+      }, 20, 100);
+      assertTrue(result, result.contains("Must authenticate with Basic authentication."));
+      // Check that there is an unsuccessful cookie attempt.
+      verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), Range.closed(1L, 1L));
     }
   }
 

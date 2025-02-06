@@ -285,9 +285,6 @@ class Webserver {
   /// Catch-all handler for error messages
   UrlHandler error_handler_;
 
-  /// Used to generate and verify signatures for cookies.
-  AuthenticationHash hash_;
-
   /// If true and SPNEGO is in use, cookies will be used for authentication.
   bool use_cookies_;
 

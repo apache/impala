@@ -175,9 +175,6 @@ class SecureAuthProvider : public AuthProvider {
   /// Principal's realm, again derived from principal.
   std::string realm_;
 
-  /// Used to generate and verify signatures for cookies.
-  AuthenticationHash hash_;
-
   /// One-time kerberos-specific environment variable setup.  Called by InitKerberos().
   Status InitKerberosEnv() WARN_UNUSED_RESULT;
 };

@@ -308,12 +308,40 @@ under the License.
             <p>
               Each <codeph>impalad</codeph> uses its own key to generate the signature, so
               clients that reconnect to a different <codeph>impalad</codeph> have to
-              re-authenticate.
+              re-authenticate. On a single <codeph>impalad</codeph>, cookies are valid
+              across sessions and connections. See <codeph>--cookie_secret_file</codeph>
+              to configure a consistent secret across <codeph>impalad</codeph> instances.
             </p>
+          </dd>
 
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            --cookie_secret_file
+          </dt>
+
+          <dd>
+            Starting in Impala 5.0.0, the secret used to construct an HMAC for cookie
+            verification for both HS2-HTTP clients and the Impala Web User Interface can
+            be shared across instances and service restart rather than being generated on
+            startup. Use the <codeph>--cookie_secret_file</codeph> startup flag to provide
+            the path to a file containing a 256-bit (32-byte) secret in binary format.
             <p>
-              On a single <codeph>impalad</codeph>, cookies are valid across sessions and
-              connections.
+              The default value of an empty string indicates that Impala should generate a
+              random secret on startup and store it in memory.
+            </p>
+            <p>
+              If a file path is provided, Impala reads the secret from the file on
+              startup. It then starts a thread to monitor the file for changes and reloads
+              the secret if the file is modified. Any errors in the monitor thread will
+              be logged as an error; after 300 seconds of failure to reload the secret,
+              the error will become fatal and Impala will exit to avoid incorrectly
+              authenticated access. The 300 second grace period can be changed using the
+              <codeph>--hash_reload_grace_period_s</codeph> flag, or disabled with a
+              negative value. Successful reloads will log an informational message
+              "Loaded authentication key from &lt;file_path&gt;".
             </p>
           </dd>
 

@@ -17,7 +17,9 @@
 
 #pragma once
 
+#include <shared_mutex>
 #include <string_view>
+#include <thread>
 
 #include <openssl/aes.h>
 #include <openssl/crypto.h>
@@ -129,24 +131,63 @@ class IntegrityHash {
 /// authentication, eg. checking signatures of cookies. A SHA256 hash is used internally.
 class AuthenticationHash {
  public:
+  /// Generates a random key_ for authentication.
   AuthenticationHash();
+
+  /// Default destructor for override in derived classes.
+  virtual ~AuthenticationHash() = default;
+
+  virtual Status Init() { return Status::OK(); }
 
   /// Computes the HMAC of 'data', which has length 'len', and stores it in 'out', which
   /// must already be allocated with a length of HashLen() bytes. Returns an error if
   /// computing the hash was unsuccessful.
-  Status Compute(const uint8_t* data, int64_t len, uint8_t* out) const WARN_UNUSED_RESULT;
+  virtual Status Compute(const uint8_t* data, int64_t len, uint8_t* out)
+      const WARN_UNUSED_RESULT;
 
   /// Computes the HMAC of 'data', which has length 'len', and returns true if it matches
   /// 'signature', which is expected to have length HashLen().
-  bool Verify(const uint8_t* data, int64_t len,
-      const uint8_t* signature) const WARN_UNUSED_RESULT;
+  bool Verify(const uint8_t* data, int64_t len, const uint8_t* signature)
+      const WARN_UNUSED_RESULT;
 
   /// Returns the length in bytes of the generated hashes. Currently we always use SHA256.
   static int HashLen() { return SHA256_DIGEST_LENGTH; }
 
- private:
+ protected:
   /// An AES 256-bit key.
   uint8_t key_[SHA256_DIGEST_LENGTH];
+};
+
+class AuthenticationHashFromFile : public AuthenticationHash {
+ public:
+  /// Initializes key_ from a file.
+  AuthenticationHashFromFile(std::string path) : path_(std::move(path)) {}
+
+  /// Destructor to shut down the reload thread and signal it to stop.
+  ~AuthenticationHashFromFile() override;
+
+  Status Init() override;
+
+  Status Compute(const uint8_t* data, int64_t len, uint8_t* out)
+      const override WARN_UNUSED_RESULT;
+
+ private:
+  Status LoadKey();
+
+  // Thread function to monitor file changes and reload key_.
+  void ReloadMonitor(int fd, int wd);
+
+  // Path to read and watch for updates.
+  std::string path_;
+
+  // Write pipe to signal the reload thread to stop.
+  int stop_pipe_read_fd_{-1}, stop_pipe_write_fd_{-1};
+
+  // Thread to reload key_ from path_ on file changes.
+  std::thread reload_thread_;
+
+  // Mutex guarding updates to key_. Allow holding lock in read-only const functions.
+  mutable std::shared_mutex key_lock_;
 };
 
 /// The key and initialization vector (IV) required to encrypt and decrypt a buffer of

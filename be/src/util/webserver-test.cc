@@ -599,15 +599,6 @@ TEST(Webserver, TestGetWithSpnego) {
     CheckAuthMetrics(&metrics, 1, (curl_7_64_or_above ? 1 : 2), 1, 0);
     // Validate authentication mechanism stored in the cookie
     ASSERT_EQ(cookie.auth_mech(), "SPNEGO");
-
-    webserver.Stop();
-    MetricGroup metrics2("webserver-test");
-    Webserver webserver2("", FLAGS_webserver_port, &metrics2);
-    ASSERT_OK(webserver2.Start());
-    // Run the command again. We should get a failed cookie attempt because the new
-    // webserver uses a different HMAC key. See above note about curl 7.64.0 or above.
-    system(curl_cmd.c_str());
-    CheckAuthMetrics(&metrics2, 1, (curl_7_64_or_above ? 0 : 1), 0, 1);
   } else {
     cout << "Skipping test, curl was not present or did not have the required "
          << "features: " << curl_output << endl;

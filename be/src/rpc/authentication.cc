@@ -95,6 +95,9 @@ DECLARE_bool(use_system_auth_to_local);
 
 DECLARE_int64(max_cookie_lifetime_s);
 
+DEFINE_string(cookie_secret_file, "", "Path to file containing cookie secret used to "
+    "construct an HMAC for verification.");
+
 DECLARE_int32(hs2_http_port);
 
 DEFINE_string(sasl_path, "", "Colon separated list of paths to look for SASL "
@@ -1569,6 +1572,7 @@ void SecureAuthProvider::SetupConnectionContext(
       THttpServer* http_input_transport = down_cast<THttpServer*>(input_transport);
       THttpServer* http_output_transport = down_cast<THttpServer*>(output_transport);
       THttpServer::HttpCallbacks callbacks;
+      const AuthenticationHash& hash = AuthManager::GetInstance()->GetAuthHash();
 
       string saml_path;
       if (has_saml_) {
@@ -1580,16 +1584,16 @@ void SecureAuthProvider::SetupConnectionContext(
           std::placeholders::_2, std::placeholders::_3);
       callbacks.return_headers_fn = std::bind(ReturnHeaders, connection_ptr.get());
       callbacks.cookie_auth_fn =
-          std::bind(CookieAuth, connection_ptr.get(), hash_, std::placeholders::_1);
+          std::bind(CookieAuth, connection_ptr.get(), hash, std::placeholders::_1);
       callbacks.trusted_domain_check_fn = std::bind(TrustedDomainCheck,
-          connection_ptr.get(), hash_, std::placeholders::_1, std::placeholders::_2);
+          connection_ptr.get(), hash, std::placeholders::_1, std::placeholders::_2);
       if (has_ldap_) {
         callbacks.basic_auth_fn =
-            std::bind(BasicAuth, connection_ptr.get(), hash_, std::placeholders::_1);
+            std::bind(BasicAuth, connection_ptr.get(), hash, std::placeholders::_1);
       }
       if (!principal_.empty()) {
         callbacks.negotiate_auth_fn = std::bind(NegotiateAuth, connection_ptr.get(),
-            hash_, std::placeholders::_1, std::placeholders::_2);
+            hash, std::placeholders::_1, std::placeholders::_2);
       }
       if (has_saml_) {
         callbacks.init_wrapped_http_request_fn = std::bind(
@@ -1597,21 +1601,21 @@ void SecureAuthProvider::SetupConnectionContext(
         callbacks.get_saml_redirect_fn =
             std::bind(GetSaml2Redirect, connection_ptr.get());
         callbacks.validate_saml2_authn_response_fn =
-            std::bind(ValidateSaml2AuthnResponse, connection_ptr.get(), hash_);
+            std::bind(ValidateSaml2AuthnResponse, connection_ptr.get(), hash);
         callbacks.validate_saml2_bearer_fn =
-            std::bind(ValidateSaml2Bearer, connection_ptr.get(), hash_);
+            std::bind(ValidateSaml2Bearer, connection_ptr.get(), hash);
       }
       if (has_jwt_ ) {
-        callbacks.jwt_token_auth_fn =
-            std::bind(JWTTokenAuth, connection_ptr.get(), hash_, std::placeholders::_1);
+        callbacks.jwt_token_auth_fn = std::bind(
+            JWTTokenAuth, connection_ptr.get(), hash, std::placeholders::_1);
       }
       if (has_oauth_) {
-        callbacks.oauth_token_auth_fn =
-            std::bind(OAuthTokenAuth, connection_ptr.get(), hash_, std::placeholders::_1);
+        callbacks.oauth_token_auth_fn = std::bind(
+            OAuthTokenAuth, connection_ptr.get(), hash, std::placeholders::_1);
       }
       if (!FLAGS_trusted_auth_header.empty()) {
         callbacks.trusted_auth_header_handle_fn = std::bind(
-            HandleTrustedAuthHeader, connection_ptr.get(), hash_, std::placeholders::_1);
+            HandleTrustedAuthHeader, connection_ptr.get(), hash, std::placeholders::_1);
       }
       callbacks.set_http_origin_fn = std::bind(SetOrigin, connection_ptr.get(),
           std::placeholders::_1);
@@ -1754,6 +1758,17 @@ Status AuthManager::Init() {
     RETURN_IF_ERROR(
         ImpalaLdap::CreateLdap(&ldap_, FLAGS_ldap_user_filter, FLAGS_ldap_group_filter));
   }
+
+  unique_ptr<AuthenticationHash> hash;
+  if (!FLAGS_cookie_secret_file.empty()) {
+    LOG(INFO) << "Using cookie secret file: " << FLAGS_cookie_secret_file;
+    hash.reset(new AuthenticationHashFromFile(FLAGS_cookie_secret_file));
+  } else {
+    LOG(INFO) << "Using auto-generated cookie secret";
+    hash.reset(new AuthenticationHash());
+  }
+  RETURN_IF_ERROR(hash->Init());
+  hash_.reset(hash.release());
 
   if (FLAGS_principal.empty() && !FLAGS_be_principal.empty()) {
     return Status("A back end principal (--be_principal) was supplied without "

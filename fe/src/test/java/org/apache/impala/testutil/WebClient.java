@@ -74,6 +74,13 @@ public class WebClient implements AutoCloseable {
     cookieStore_ = new BasicCookieStore();
   }
 
+  public WebClient(String username, String password, int port, List<Cookie> cookies) {
+    this(username, password, port);
+    for (Cookie cookie: cookies) {
+      cookieStore_.addCookie(cookie);
+    }
+  }
+
   public void close() throws IOException { httpClient_.close(); }
 
   public List<Cookie> getCookies() { return cookieStore_.getCookies(); }

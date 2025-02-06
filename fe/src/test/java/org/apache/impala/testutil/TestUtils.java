@@ -19,6 +19,8 @@ package org.apache.impala.testutil;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
@@ -35,6 +37,8 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.TimeZone;
 import java.util.regex.Pattern;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ThreadLocalRandom;
 
 import javax.json.Json;
 import javax.json.JsonObject;
@@ -510,5 +514,32 @@ public class TestUtils {
     // Impala tests shouldn't see java version < 8.
     Preconditions.checkState(result >= 8);
     return result;
+  }
+
+  public static void writeCookieSecret(File keyFile) throws IOException {
+    byte[] key = new byte[32];
+    // Used for testing, so prefer performance over strong randomness.
+    ThreadLocalRandom.current().nextBytes(key);
+    try (FileOutputStream keyWriter = new FileOutputStream(keyFile)) {
+      keyWriter.write(key);
+    }
+  }
+
+  public static <T> T retryUntilSuccess(Callable<T> callable, int maxAttempts,
+      long waitMillis) throws InterruptedException {
+    int attempts = 0;
+    while (true) {
+      try {
+        return callable.call();
+      } catch (Exception e) {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          throw new RuntimeException(
+              String.format("Failed after %d attempts", attempts), e);
+        }
+        LOG.warn("Attempt {} failed: {}", attempts, e.getMessage());
+        Thread.sleep(waitMillis);
+      }
+    }
   }
 }

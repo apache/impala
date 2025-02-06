@@ -159,6 +159,7 @@ DECLARE_bool(enable_ldap_auth);
 DECLARE_string(hostname);
 DECLARE_bool(is_coordinator);
 DECLARE_int64(max_cookie_lifetime_s);
+DECLARE_string(cookie_secret_file);
 DECLARE_string(ssl_minimum_version);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(tls_ciphersuites);
@@ -819,9 +820,9 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     string username;
     string auth_mech;
     if (cookie_header != nullptr) {
-      Status cookie_status =
-          AuthenticateCookie(hash_, cookie_header, &username, &auth_mech,
-              &cookie_rand_value);
+      const AuthenticationHash& hash = AuthManager::GetInstance()->GetAuthHash();
+      Status cookie_status = AuthenticateCookie(
+          hash, cookie_header, &username, &auth_mech, &cookie_rand_value);
       if (cookie_status.ok()) {
         authenticated = true;
         cookie_authenticated = true;
@@ -1253,8 +1254,9 @@ void Webserver::AddCookie(const char* user, vector<string>* response_headers,
       response_headers->erase(it);
     }
     // Generate a cookie to return.
+    const AuthenticationHash& hash = AuthManager::GetInstance()->GetAuthHash();
     response_headers->push_back(Substitute("Set-Cookie: $0",
-        GenerateCookie(user, hash_, authMech, cookie_rand_value)));
+        GenerateCookie(user, hash, authMech, cookie_rand_value)));
   }
 }
 

@@ -18,7 +18,10 @@
 package org.apache.impala.customcluster;
 
 import static org.apache.impala.testutil.LdapUtil.*;
+import static org.apache.impala.testutil.TestUtils.retryUntilSuccess;
+import static org.apache.impala.testutil.TestUtils.writeCookieSecret;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -35,12 +38,19 @@ import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.hive.service.rpc.thrift.*;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpResponseInterceptor;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.protocol.HttpContext;
 import org.apache.impala.testutil.WebClient;
 import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.junit.After;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +68,11 @@ public class LdapHS2Test {
 
   @ClassRule
   public static CreateLdapServerRule serverRule = new CreateLdapServerRule();
+
+  // Temp folder where the config files are copied so we can modify them in place.
+  // The JUnit @Rule creates and removes the temp folder between every test.
+  @Rule
+  public TemporaryFolder tempFolder = new TemporaryFolder();
 
   WebClient client_ = new WebClient();
 
@@ -957,5 +972,101 @@ public class LdapHS2Test {
 
     // Two successful authentications for each ExecAndFetch().
     verifyMetrics(23, 0);
+  }
+
+  /**
+   * Tests that cookie can be shared across multiple coordinators.
+   */
+  @Test
+  public void testHiveserver2SharedCookie() throws Exception {
+    // Write a temporary key file for the cookie secret.
+    File keyFile = tempFolder.newFile();
+    writeCookieSecret(keyFile);
+
+    setUp(String.format("--cookie_secret_file=%s", keyFile.getCanonicalPath()));
+    verifyMetrics(0, 0);
+
+    // Use HttpClient so we can access the returned cookie. Final array is used
+    // so we can store a cookie from an anonymous function.
+    final String[] cookie = new String[1];
+    HttpResponseInterceptor cookieSaver = new HttpResponseInterceptor() {
+      @Override public void process(HttpResponse response, HttpContext context) {
+        if (response.containsHeader("Set-Cookie")) {
+          cookie[0] = response.getFirstHeader("Set-Cookie").getValue();
+        } else {
+          assertNotNull("First response is expected to Set-Cookie", cookie[0]);
+        }
+      }
+    };
+
+    try (CloseableHttpClient clientImpl =
+            HttpClients.custom().addInterceptorFirst(cookieSaver).build();
+        THttpClient transport = new THttpClient("http://localhost:28000", clientImpl)) {
+      Map<String, String> headers = new HashMap<String, String>();
+      // Authenticate as 'Test1Ldap' with password '12345'
+      headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
+      transport.setCustomHeaders(headers);
+      transport.open();
+      TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+      // Open a session which will get username 'Test1Ldap'.
+      TOpenSessionReq openReq = new TOpenSessionReq();
+      TOpenSessionResp openResp = client.OpenSession(openReq);
+      // One successful authentication.
+      verifyMetrics(1, 0);
+
+      // Running a query with only the cookie should succeed.
+      headers.remove("Authorization");
+      headers.put("Cookie", cookie[0]);
+      transport.setCustomHeaders(headers);
+      execAndFetch(
+          client, openResp.getSessionHandle(), "select logged_in_user()", "Test1Ldap");
+      // Two successful authentications - for the Exec() and the Fetch().
+      verifyCookieMetrics(2, 0);
+    }
+
+    // Cookie should be re-usable with another server.
+    try (WebClient webClient = new WebClient(25001);
+         THttpClient transport = new THttpClient("http://localhost:28001")) {
+      transport.setCustomHeader("Cookie", cookie[0]);
+      transport.open();
+      TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+      // Open a session which will get username 'Test1Ldap'.
+      TOpenSessionReq openReq = new TOpenSessionReq();
+      TOpenSessionResp openResp = client.OpenSession(openReq);
+      // One successful cookie authentication.
+      long actualCookieAuthSuccess = (long) webClient.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-success");
+      assertEquals(1, actualCookieAuthSuccess);
+
+      execAndFetch(
+          client, openResp.getSessionHandle(), "select logged_in_user()", "Test1Ldap");
+      // Two more successful authentications - for the Exec() and the Fetch().
+      actualCookieAuthSuccess = (long) webClient.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-success");
+      assertEquals(3, actualCookieAuthSuccess);
+    }
+
+    // Cookie should be reloaded with the new key.
+    writeCookieSecret(keyFile);
+    String respMessage = retryUntilSuccess(() -> {
+      try (THttpClient transport = new THttpClient("http://localhost:28000")) {
+        transport.setCustomHeader("Cookie", cookie[0]);
+        transport.open();
+        TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+        // Open a session which will get username 'Test1Ldap'. Failure is expected since
+        // the cookie_secret_file has changed.
+        TOpenSessionReq openReq = new TOpenSessionReq();
+        try {
+          client.OpenSession(openReq);
+          throw new Exception("Expected failure due to changed cookie secret.");
+        } catch (Exception e) {
+          return e.getMessage();
+        }
+      }
+    }, 20, 100);
+    assertEquals(respMessage, "HTTP Response code: 401");
   }
 }

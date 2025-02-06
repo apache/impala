@@ -30,6 +30,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.io.File;
 import java.io.IOException;
 
 /**
@@ -107,6 +108,16 @@ public class LdapSimpleBindImpalaShellTest extends LdapImpalaShellTest {
     setUp(String.format(
         "--authorized_proxy_user_config=%s=%s", TEST_USER_1, delegateUser_));
     testHttpImpersonationImpl();
+  }
+
+  /**
+   * Tests cookie rotation during a query does not interrupt the session.
+   */
+  @Test
+  public void testCookieRefresh() throws Exception {
+    File cookieSecretFile = getCookieSecretFile();
+    setUp(String.format("--cookie_secret_file=%s", cookieSecretFile.getCanonicalPath()));
+    testCookieRefreshImpl(cookieSecretFile);
   }
 
   /**

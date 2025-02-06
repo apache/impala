@@ -78,7 +78,11 @@ class AuthManager {
   /// connection this applies to would be backend <-> statestore.
   AuthProvider* GetInternalAuthProvider();
 
-  ImpalaLdap* GetLdap() { return ldap_.get(); }
+  ImpalaLdap* GetLdap() const { return ldap_.get(); }
+
+  /// Returns the AuthenticationHash used to generate and verify signatures for cookies.
+  /// The returned reference is valid as long as the AuthManager instance is valid.
+  const AuthenticationHash& GetAuthHash() const { return *hash_.get(); }
 
  private:
   /// One-time kerberos-specific environment variable setup. Sets variables like
@@ -99,6 +103,9 @@ class AuthManager {
 
   /// Used to authenticate usernames and passwords to LDAP.
   std::unique_ptr<ImpalaLdap> ldap_;
+
+  /// Used to generate and verify signatures for cookies.
+  std::unique_ptr<const AuthenticationHash> hash_;
 };
 
 
