@@ -1795,7 +1795,7 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     method.__dict__[START_ARGS] = start_args
     if IMPALAD_ARGS in method.__dict__:
       method.__dict__[ADMISSIOND_ARGS] = method.__dict__[IMPALAD_ARGS]
-    super(TestAdmissionController, self).setup_method(method)
+    super(TestAdmissionControllerWithACService, self).setup_method(method)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially
@@ -2617,4 +2617,4 @@ class TestAdmissionControllerStressWithACService(TestAdmissionControllerStress):
     method.__dict__[START_ARGS] = start_args
     if IMPALAD_ARGS in method.__dict__:
       method.__dict__[ADMISSIOND_ARGS] = method.__dict__[IMPALAD_ARGS]
-    super(TestAdmissionControllerStress, self).setup_method(method)
+    super(TestAdmissionControllerStressWithACService, self).setup_method(method)
