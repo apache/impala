@@ -128,6 +128,7 @@ endif()
 
 set(CPACK_PACKAGING_INSTALL_PREFIX "/opt")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "impala")
+set(CPACK_RPM_SPEC_MORE_DEFINE "%global __python %{__python3}")
 
 execute_process(
   COMMAND bash -c "${CMAKE_SOURCE_DIR}/docker/install_os_packages.sh --dry-run | tail -n1"
