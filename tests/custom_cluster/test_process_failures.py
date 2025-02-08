@@ -23,7 +23,7 @@ from beeswaxd.BeeswaxService import QueryState
 from tests.common.custom_cluster_test_suite import (
     DEFAULT_CLUSTER_SIZE,
     CustomClusterTestSuite)
-from tests.common.test_result_verifier import error_msg_expected
+from tests.common.test_result_verifier import error_msg_startswith
 
 # The exact query doesn't matter much for these tests, just want a query that touches
 # data on all nodes.
@@ -154,7 +154,7 @@ class TestProcessFailures(CustomClusterTestSuite):
     query_id = handle.get_handle().id
     error_state = "Failed due to unreachable impalad"
     assert impalad.service.wait_for_query_status(client, query_id, error_state)
-    assert error_msg_expected(client.get_log(handle), error_state, query_id)
+    assert error_msg_startswith(client.get_log(handle), error_state, query_id)
 
     # Assert that the query status on the query profile web page contains the expected
     # failed hostport.

@@ -58,7 +58,7 @@ from tests.common.test_dimensions import (
     get_dataset_from_workload,
     load_table_info_dimension)
 from tests.common.test_result_verifier import (
-    error_msg_expected,
+    error_msg_startswith,
     try_compile_regex,
     verify_lineage,
     verify_raw_results,
@@ -877,7 +877,7 @@ class ImpalaTestSuite(BaseTestSuite):
         except Exception as e:
           if 'CATCH' in test_section:
             self.__verify_exceptions(test_section['CATCH'], str(e), use_db)
-            assert error_msg_expected(str(e))
+            assert error_msg_startswith(str(e))
             continue
           raise
 

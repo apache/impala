@@ -26,7 +26,7 @@ from subprocess import check_call
 from tests.util.filesystem_utils import get_fs_path
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIf, SkipIfFS
-from tests.common.test_result_verifier import error_msg_expected
+from tests.common.test_result_verifier import error_msg_startswith
 
 LOG = logging.getLogger('test_coordinators')
 LOG.setLevel(level=logging.DEBUG)
@@ -321,7 +321,7 @@ class TestCoordinators(CustomClusterTestSuite):
     result = self.execute_query_expect_failure(self.client, query)
     expected_error = "Admission for query exceeded timeout 2000ms in pool " \
                      "default-pool. Queued reason: Waiting for executors to start."
-    assert error_msg_expected(str(result), expected_error)
+    assert error_msg_startswith(str(result), expected_error)
     # Now pick a coordinator only query.
     query = "select 1"
     self.execute_query_expect_success(self.client, query)

@@ -21,7 +21,7 @@ from time import sleep
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_connection import create_connection
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_result_verifier import error_msg_expected
+from tests.common.test_result_verifier import error_msg_startswith
 
 
 class QueryToKill:
@@ -55,11 +55,11 @@ class QueryToKill:
     # If ImpalaServer::UnregisterQuery() happens before the last polling, the error
     # message will be "Invalid or unknown query handle". Otherwise, the error message
     # will be "Cancelled".
-    assert error_msg_expected(
+    assert error_msg_startswith(
         str(self.exc),
         "Invalid or unknown query handle",
         self.client.get_query_id(self.handle),
-    ) or error_msg_expected(
+    ) or error_msg_startswith(
         str(self.exc),
         "Cancelled",
         self.client.get_query_id(self.handle),
@@ -86,7 +86,7 @@ def assert_kill_error(client, error_msg, query_id=None, sql=None, user=None):
     client.execute(sql, user=user)
     assert False, "Failed to catch the exception."
   except Exception as exc:
-    assert error_msg_expected(str(exc), error_msg)
+    assert error_msg_startswith(str(exc), error_msg)
 
 
 def cancel_query_and_validate_state(client, query, exec_option, table_format,

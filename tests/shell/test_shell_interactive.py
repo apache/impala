@@ -46,7 +46,7 @@ from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import (
   create_client_protocol_dimension, create_client_protocol_strict_dimension,
   create_uncompressed_text_dimension, create_single_exec_option_dimension)
-from tests.common.test_result_verifier import error_msg_expected
+from tests.common.test_result_verifier import error_msg_startswith
 from tests.shell.util import (assert_var_substitution, ImpalaShell, get_impalad_port,
   get_shell_cmd, get_open_sessions_metric, spawn_shell, get_unused_port,
   create_impala_shell_executable_dimension, get_impala_shell_executable,
@@ -1163,7 +1163,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       assert "ParseException" in result.stderr,\
              result.stderr
     else:
-      assert error_msg_expected(
+      assert error_msg_startswith(
           stderr_get_first_error_msg(result.stderr),
           "ParseException: Unmatched string literal"
       )
@@ -1176,7 +1176,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     query = "select cast(now() as string format 'yyyy年MM月dd日')"
     shell.send_cmd(query)
     result = shell.get_result()
-    assert error_msg_expected(
+    assert error_msg_startswith(
         stderr_get_first_error_msg(result.stderr),
         "Bad date/time conversion format: yyyy年MM月dd日"
     )

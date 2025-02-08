@@ -823,34 +823,38 @@ def assert_codegen_cache_hit(profile_string, expect_hit):
 QUERY_ID_REGEX = r"(?!0{16})[0-9a-z]{16}:(?!0{16})[0-9a-z]{16}"
 
 
-def error_msg_expected(actual_msg, expected_msg="", query_id=None):
+def error_msg_startswith(actual_msg, expected_msg="", query_id=None):
   """
-  Check if the actual error message is expected.
-
   As defined in `ImpalaServer::QUERY_ERROR_FORMAT`, an error message is expected to
   has the following form:
 
     Query <query_id> failed:\n<error_detail>\n
 
-  - For `query_id`,
-      - If a query id is specified in the parameter, it checks if the actual error
-        message contains exactly the query id.
-      - Otherwise, it checks whether `query_id` match the format using a
-        regular expresssion.
-  - For `error_detail`, it checks whether this part starts with the `expected_msg` if it
-    is specified in the parameter. This is sufficient to distinguish one kind of error
-    from another.
+  This function returns True if
+  1. `actual_msg` contains the error prompt "Query <query_id> failed:\n", and
+  2. `expected_msg` follows right after the error prompt.
+
+  For `query_id`,
+  - If the query_id argument is not None, the function checks if the actual error
+    message contains exactly the query id.
+  - Otherwise, it checks if the `query_id` part in the actual error message matches the
+    format using the regular expression.
+
+  NOTE: Messages of errors such as "Invalid session id" do not contain a query id
+  since such an error may occur before a query id is generated.
   """
-  if query_id is None:
-    ERROR_REGEX = "^Query " + QUERY_ID_REGEX + " failed:\n"
-    m = re.search(ERROR_REGEX, actual_msg)
+  if query_id is not None:
+    ERROR_PROMPT = "Query " + query_id + " failed:\n"
+    start = actual_msg.find(ERROR_PROMPT)
+    if start == -1:
+      return False
+    return actual_msg.startswith(expected_msg, start + len(ERROR_PROMPT))
+  else:
+    ERROR_PROMPT = "Query " + QUERY_ID_REGEX + " failed:\n"
+    m = re.search(ERROR_PROMPT, actual_msg)
     if m is None:
       return False
-    return actual_msg.find(expected_msg, m.end()) != -1
-
-  # The beginning of `ImpalaServer::QUERY_ERROR_FORMAT`
-  ERROR_PROMPT = "Query {} failed:\n{}"
-  return actual_msg.startswith(ERROR_PROMPT.format(query_id, expected_msg))
+    return actual_msg.startswith(expected_msg, m.end())
 
 
 def error_msg_equal(msg1, msg2):

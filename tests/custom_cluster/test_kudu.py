@@ -27,7 +27,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.skip import SkipIfKudu, SkipIfBuildType, SkipIf
 from tests.common.test_dimensions import BEESWAX, add_mandatory_exec_option
-from tests.common.test_result_verifier import error_msg_expected
+from tests.common.test_result_verifier import error_msg_startswith
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
 LOG = logging.getLogger(__name__)
@@ -441,19 +441,19 @@ class TestKuduTransactionBase(CustomClusterTestSuite):
       self.execute_query(self._update_query.format(table_name))
       assert False, "query was expected to fail"
     except ImpalaBeeswaxException as e:
-      assert error_msg_expected(str(e), "Kudu reported error: Not implemented")
+      assert error_msg_startswith(str(e), "Kudu reported error: Not implemented")
 
     try:
       self.execute_query(self._upsert_query.format(table_name))
       assert False, "query was expected to fail"
     except ImpalaBeeswaxException as e:
-      assert error_msg_expected(str(e), "Kudu reported error: Not implemented")
+      assert error_msg_startswith(str(e), "Kudu reported error: Not implemented")
 
     try:
       self.execute_query(self._delete_query.format(table_name))
       assert False, "query was expected to fail"
     except ImpalaBeeswaxException as e:
-      assert error_msg_expected(str(e), "Kudu reported error: Not implemented")
+      assert error_msg_startswith(str(e), "Kudu reported error: Not implemented")
 
     # Verify that number of rows has not been changed.
     cursor.execute(self._row_num_query.format(table_name))

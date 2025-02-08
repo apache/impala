@@ -20,7 +20,7 @@ from __future__ import absolute_import, division, print_function
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.test_result_verifier import error_msg_expected
+from tests.common.test_result_verifier import error_msg_startswith
 
 
 class TestSysDb(CustomClusterTestSuite):
@@ -60,6 +60,6 @@ class TestSysDb(CustomClusterTestSuite):
     except ImpalaBeeswaxException as e:
       expected_error = "IllegalStateException: Can't create blacklisted table: {0}" \
           .format(table_name)
-      assert error_msg_expected(str(e), expected_error), \
+      assert error_msg_startswith(str(e), expected_error), \
           "table '{0}' failed to create but for the wrong reason:\n{1}\n" \
           .format(table_name, str(e))

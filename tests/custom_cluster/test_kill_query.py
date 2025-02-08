@@ -21,7 +21,7 @@ import pytest
 
 import tests.common.cluster_config as cluster_config
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.test_result_verifier import error_msg_expected
+from tests.common.test_result_verifier import error_msg_startswith
 from tests.util.cancel_util import (
     QueryToKill,
     assert_kill_error,
@@ -107,7 +107,7 @@ class TestKillQuery(CustomClusterTestSuite):
             "Rejected query from pool default-pool: "
             "disabled by requests limit set to 0"
         )
-        assert error_msg_expected(str(e), expected_msg)
+        assert error_msg_startswith(str(e), expected_msg)
       assert_kill_error(
           client,
           "Could not find query on any coordinator",

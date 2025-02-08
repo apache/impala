@@ -21,7 +21,7 @@ from __future__ import absolute_import, division, print_function
 from builtins import range
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.test_result_verifier import error_msg_expected
+from tests.common.test_result_verifier import error_msg_startswith
 from tests.util.concurrent_workload import ConcurrentWorkload
 
 import json
@@ -536,7 +536,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
                      "start. Only DDL queries and queries scheduled only on the " \
                      "coordinator (either NUM_NODES set to 1 or when small query " \
                      "optimization is triggered) can currently run."
-    assert error_msg_expected(str(result), expected_error)
+    assert error_msg_startswith(str(result), expected_error)
     assert self._get_num_executor_groups(only_healthy=True) == 0
 
   @pytest.mark.execute_serially
