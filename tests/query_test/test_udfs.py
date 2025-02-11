@@ -28,12 +28,12 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import (
-    create_exec_option_dimension,
     create_exec_option_dimension_from_dict,
     create_uncompressed_text_dimension)
 from tests.util.calculation_util import get_random_id
 from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
 from tests.verifiers.metric_verifier import MetricVerifier
+
 
 class TestUdfBase(ImpalaTestSuite):
   """
@@ -109,12 +109,14 @@ returns date intermediate date location '{location}'
 init_fn='AggDateIntermediateInit' update_fn='AggDateIntermediateUpdate'
 merge_fn='AggDateIntermediateMerge' finalize_fn='AggDateIntermediateFinalize';
 
-create aggregate function {database}.agg_string_intermediate(decimal(20,10), bigint, string)
+create aggregate function {database}.agg_string_intermediate(
+  decimal(20,10), bigint, string)
 returns decimal(20,0) intermediate string location '{location}'
 init_fn='AggStringIntermediateInit' update_fn='AggStringIntermediateUpdate'
 merge_fn='AggStringIntermediateMerge' finalize_fn='AggStringIntermediateFinalize';
 
-create aggregate function {database}.agg_binary_intermediate(decimal(20,10), bigint, binary)
+create aggregate function {database}.agg_binary_intermediate(
+  decimal(20,10), bigint, binary)
 returns decimal(20,0) intermediate binary location '{location}'
 init_fn='AggStringIntermediateInit' update_fn='AggStringIntermediateUpdate'
 merge_fn='AggStringIntermediateMerge' finalize_fn='AggStringIntermediateFinalize';
@@ -234,7 +236,8 @@ create function {database}.count_rows() returns bigint
 location '{location}' symbol='Count' prepare_fn='CountPrepare' close_fn='CountClose';
 
 create function {database}.constant_arg(int) returns int
-location '{location}' symbol='ConstantArg' prepare_fn='ConstantArgPrepare' close_fn='ConstantArgClose';
+location '{location}' symbol='ConstantArg' prepare_fn='ConstantArgPrepare'
+close_fn='ConstantArgClose';
 
 create function {database}.validate_open(int) returns boolean
 location '{location}' symbol='ValidateOpen'
@@ -271,10 +274,11 @@ create function {database}.twenty_args(int, int, int, int, int, int, int, int, i
     int, int, int, int, int, int, int, int, int, int) returns int
 location '{location}' symbol='TwentyArgs';
 
-create function {database}.twenty_one_args(int, int, int, int, int, int, int, int, int, int,
-    int, int, int, int, int, int, int, int, int, int, int) returns int
+create function {database}.twenty_one_args(int, int, int, int, int, int, int, int, int,
+    int, int, int, int, int, int, int, int, int, int, int, int) returns int
 location '{location}' symbol='TwentyOneArgs';
 """
+
 
 class TestUdfExecution(TestUdfBase):
   """Test execution of UDFs with a combination of different query options."""
@@ -286,10 +290,10 @@ class TestUdfExecution(TestUdfBase):
   def add_test_dimensions(cls):
     super(TestUdfExecution, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
-        create_exec_option_dimension_from_dict({"disable_codegen" : [False, True],
-          "disable_codegen_rows_threshold" : [0],
-          "exec_single_node_rows_threshold" : [0,100],
-          "enable_expr_rewrites" : [False, True]}))
+        create_exec_option_dimension_from_dict({"disable_codegen": [False, True],
+          "disable_codegen_rows_threshold": [0],
+          "exec_single_node_rows_threshold": [0, 100],
+          "enable_expr_rewrites": [False, True]}))
     # There is no reason to run these tests using all dimensions.
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
@@ -448,7 +452,7 @@ class TestUdfTargeted(TestUdfBase):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
-  def test_udf_invalid_symbol(self, vector, unique_database):
+  def test_udf_invalid_symbol(self, unique_database):
     """ IMPALA-1642: Impala crashes if the symbol for a Hive UDF doesn't exist
         Invalid symbols are checked at UDF creation time."""
     src_udf_path = os.path.join(
@@ -467,7 +471,7 @@ class TestUdfTargeted(TestUdfBase):
     ex = self.execute_query_expect_failure(self.client, create_fn_stmt)
     assert "ClassNotFoundException" in str(ex)
 
-  def test_hidden_symbol(self, vector, unique_database):
+  def test_hidden_symbol(self, unique_database):
     """Test that symbols in the test UDFs are hidden by default and that therefore
     they cannot be used as a UDF entry point."""
     symbol = "_Z16UnexportedSymbolPN10impala_udf15FunctionContextE"
@@ -478,7 +482,7 @@ class TestUdfTargeted(TestUdfBase):
     assert "Could not find symbol '{0}'".format(symbol) in str(ex), str(ex)
     # IMPALA-8196: IR UDFs ignore whether symbol is hidden or not. Exercise the current
     # behaviour, where the UDF can be created and executed.
-    result = self.execute_query_expect_success(self.client, """
+    self.execute_query_expect_success(self.client, """
         create function `{0}`.unexported() returns BIGINT LOCATION '{1}'
         SYMBOL='{2}'""".format(
         unique_database, get_fs_path('/test-warehouse/test-udfs.ll'), symbol))
@@ -528,7 +532,8 @@ class TestUdfTargeted(TestUdfBase):
       assert "Failed to get file info" in str(e)
 
   def test_libs_with_same_filenames(self, vector, unique_database):
-    self.run_test_case('QueryTest/libs_with_same_filenames', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/libs_with_same_filenames', vector,
+                       use_db=unique_database)
 
   def test_udf_update_via_drop(self, vector, unique_database):
     """Test updating the UDF binary without restarting Impala. Dropping
@@ -638,7 +643,7 @@ class TestUdfTargeted(TestUdfBase):
     assert results.success
     assert len(results.data) == 9999
 
-  def test_udf_profile(self, vector, unique_database):
+  def test_udf_profile(self, unique_database):
     """Test to validate that explain plans and runtime profiles contain information about
     any custom UDFs used in an Impala query."""
     self.client.execute(
@@ -649,13 +654,13 @@ class TestUdfTargeted(TestUdfBase):
         "select {0}.hive_substring(string_col, 1), {0}.hive_substring(string_col, 2) "
         "from functional.alltypes limit 10".format(unique_database)).runtime_profile
 
-    assert re.search("output exprs.*hive_substring.*/\* JAVA UDF \*/", profile)
+    assert re.search(r"output exprs.*hive_substring.*/\* JAVA UDF \*/", profile)
     # Ensure that hive_substring only shows up once in the list of UDFs.
     assert re.search(
-        "User Defined Functions \(UDFs\): {0}\.hive_substring\s*[\r\n]".format(
+        r"User Defined Functions \(UDFs\): {0}\.hive_substring\s*[\r\n]".format(
             unique_database), profile)
 
-  def test_set_fallback_db_for_functions(self, vector, unique_database):
+  def test_set_fallback_db_for_functions(self, unique_database):
     """IMPALA-11728: Set fallback database for functions."""
     create_function_stmt = "create function `{0}`.fn() returns int "\
           "location '{1}/libTestUdfs.so' symbol='NoArgs'".format(unique_database,
