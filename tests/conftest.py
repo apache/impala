@@ -86,7 +86,7 @@ def configure_logging():
   # Verify that the logging level is set to the correct value.
   rootLoggerLevel = logging.getLogger().getEffectiveLevel()
   print("rootLoggerLevel = {0}".format(logging.getLevelName(rootLoggerLevel)))
-  assert(rootLoggerLevel == logging.INFO)
+  assert (rootLoggerLevel == logging.INFO)
 
 
 def pytest_addoption(parser):
@@ -193,6 +193,12 @@ def pytest_addoption(parser):
   parser.addoption("--default_test_protocol", default=DEFAULT_TEST_PROTOCOL,
                    choices=VALID_TEST_PROTOCOLS,
                    help="Impala protocol to run test if test does not specify any.")
+
+
+def assert_impala_test_suite(request):
+  assert issubclass(request.cls, tests.common.impala_test_suite.ImpalaTestSuite), (
+    "This fixture is only applicable to ImpalaTestSuite subclasses."
+  )
 
 
 def pytest_assertrepr_compare(op, left, right):
@@ -359,6 +365,7 @@ def unique_database(request, testid_checksum):
   assert 'function' == request.scope, ('This fixture must have scope "function" since '
                                        'the fixture must guarantee unique per-test '
                                        'databases.')
+  assert_impala_test_suite(request)
 
   db_name_prefix = request.function.__name__
   sync_ddl = False
@@ -382,11 +389,10 @@ def unique_database(request, testid_checksum):
                        ' test function name or any prefixes for long length or invalid '
                        'characters.'.format(db_name))
 
-  def cleanup_database(db_name, must_exist):
-    request.instance.execute_query_expect_success(request.instance.client,
-        'DROP DATABASE {0} `{1}` CASCADE'.format(
-            "" if must_exist else "IF EXISTS", db_name),
-        {'sync_ddl': sync_ddl})
+  def cleanup_database(client, db_name, must_exist):
+    result = client.execute('DROP DATABASE {0} `{1}` CASCADE'.format(
+      "" if must_exist else "IF EXISTS", db_name))
+    assert result.success
     # The database directory may not be removed if there are external tables in the
     # database when it is dropped. The external locations are not removed by cascade.
     # These preexisting files/directories can cause errors when tests run repeatedly or
@@ -397,21 +403,25 @@ def unique_database(request, testid_checksum):
 
   def cleanup():
     # Make sure we don't try to drop the current session database
+    # TODO: clean this up via IMPALA-13758.
     request.instance.execute_query_expect_success(request.instance.client, "use default")
-    for db_name in db_names:
-      cleanup_database(db_name, True)
-      LOG.info('Dropped database "{0}" for test ID "{1}"'.format(
+    with request.cls.create_impala_client(protocol=HS2) as client:
+      client.set_configuration({'sync_ddl': sync_ddl})
+      for db_name in db_names:
+        cleanup_database(client, db_name, True)
+        LOG.info('Dropped database "{0}" for test ID "{1}"'.format(
           db_name, str(request.node.nodeid)))
 
   request.addfinalizer(cleanup)
 
-  for db_name in db_names:
-    cleanup_database(db_name, False)
-    request.instance.execute_query_expect_success(
-        request.instance.client, 'CREATE DATABASE `{0}`'.format(db_name),
-        {'sync_ddl': sync_ddl})
-    LOG.info('Created database "{0}" for test ID "{1}"'.format(db_name,
-                                                               str(request.node.nodeid)))
+  with request.cls.create_impala_client(protocol=HS2) as client:
+    client.set_configuration({'sync_ddl': sync_ddl})
+    for db_name in db_names:
+      cleanup_database(client, db_name, False)
+      result = client.execute('CREATE DATABASE `{0}`'.format(db_name))
+      assert result.success
+      LOG.info('Created database "{0}" for test ID "{1}"'.format(
+        db_name, str(request.node.nodeid)))
   return first_db_name
 
 

@@ -31,8 +31,12 @@ from tests.common.environ import (HIVE_MAJOR_VERSION)
 from tests.common.file_utils import create_table_from_orc
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import (SkipIf, SkipIfFS, SkipIfKudu, SkipIfLocal,
-                               SkipIfCatalogV2, SkipIfHive2, SkipIfDockerizedCluster)
+from tests.common.skip import (
+    SkipIfDockerizedCluster,
+    SkipIfFS,
+    SkipIfHive2,
+    SkipIfKudu,
+    SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import (create_exec_option_dimension,
     create_client_protocol_dimension, create_exec_option_dimension_from_dict)
@@ -55,6 +59,7 @@ def get_trash_path(bucket, path):
     return get_fs_path('/{0}/.Trash/{1}/Current{2}/{0}/{3}'.format(bucket,
         getpass.getuser(), WAREHOUSE_PREFIX, path))
   return '/user/{0}/.Trash/Current/{1}/{2}'.format(getpass.getuser(), bucket, path)
+
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):
@@ -129,7 +134,7 @@ class TestDdlStatements(TestDdlBase):
     self._create_db(unique_database)
     self.client.execute("create table {0}.t1(i int)".format(unique_database))
     self.client.execute("create table {0}.t2(i int)".format(unique_database))
-    result = self.client.execute("create external table {0}.t3(i int) "
+    self.client.execute("create external table {0}.t3(i int) "
         "location '{1}/{0}/t3/'".format(unique_database, WAREHOUSE))
     self.client.execute("drop database {0} cascade".format(unique_database))
     assert not self.filesystem_client.exists(
@@ -184,7 +189,8 @@ class TestDdlStatements(TestDdlBase):
       assert len(self.filesystem_client.ls(
           "{1}/{0}.db/t2/p=1".format(unique_database, WAREHOUSE))) == 1
 
-      # Truncating the table removes the data files and preserves the partition's directory
+      # Truncating the table removes the data files and preserves the partition's
+      # directory
       self.client.execute("truncate table {0}.t2".format(unique_database))
       assert self.filesystem_client.exists(
           "{1}/{0}.db/t2/p=1".format(unique_database, WAREHOUSE))
@@ -208,7 +214,7 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/create-database', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
 
-  def test_comment_on_database(self, vector, unique_database):
+  def test_comment_on_database(self, unique_database):
     comment = self._get_db_comment(unique_database)
     assert '' == comment
 
@@ -220,7 +226,8 @@ class TestDdlStatements(TestDdlBase):
     comment = self._get_db_comment(unique_database)
     assert '' == comment
 
-    self.client.execute("comment on database {0} is '\\'comment\\''".format(unique_database))
+    self.client.execute("comment on database {0} is '\\'comment\\''".format(
+      unique_database))
     comment = self._get_db_comment(unique_database)
     assert "\\'comment\\'" == comment
 
@@ -228,7 +235,7 @@ class TestDdlStatements(TestDdlBase):
     comment = self._get_db_comment(unique_database)
     assert '' == comment
 
-  def test_alter_database_set_owner(self, vector, unique_database):
+  def test_alter_database_set_owner(self, unique_database):
     self.client.execute("alter database {0} set owner user foo_user".format(
       unique_database))
     properties = self._get_db_owner_properties(unique_database)
@@ -241,7 +248,7 @@ class TestDdlStatements(TestDdlBase):
     assert len(properties) == 1
     assert {'foo_role': 'ROLE'} == properties
 
-  def test_metadata_after_alter_database(self, vector, unique_database):
+  def test_metadata_after_alter_database(self, unique_database):
     self.client.execute("create table {0}.tbl (i int)".format(unique_database))
     self.client.execute("create function {0}.f() returns int "
                         "location '{1}/libTestUdfs.so' symbol='NoArgs'"
@@ -255,7 +262,7 @@ class TestDdlStatements(TestDdlBase):
       unique_database)).get_data()
     assert "INT\tf()\tNATIVE\ttrue" == func_names
 
-  def test_alter_table_set_owner(self, vector, unique_database):
+  def test_alter_table_set_owner(self, unique_database):
     table_name = "{0}.test_owner_tbl".format(unique_database)
     self.client.execute("create table {0}(i int)".format(table_name))
     self.client.execute("alter table {0} set owner user foo_user".format(table_name))
@@ -266,7 +273,7 @@ class TestDdlStatements(TestDdlBase):
     owner = self._get_table_or_view_owner(table_name)
     assert ('foo_role', 'ROLE') == owner
 
-  def test_alter_view_set_owner(self, vector, unique_database):
+  def test_alter_view_set_owner(self, unique_database):
     view_name = "{0}.test_owner_tbl".format(unique_database)
     self.client.execute("create view {0} as select 1".format(view_name))
     self.client.execute("alter view {0} set owner user foo_user".format(view_name))
@@ -333,7 +340,7 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
 
-  def test_comment_on_table(self, vector, unique_database):
+  def test_comment_on_table(self, unique_database):
     table = '{0}.comment_table'.format(unique_database)
     self.client.execute("create table {0} (i int)".format(table))
 
@@ -356,7 +363,7 @@ class TestDdlStatements(TestDdlBase):
     comment = self._get_table_or_view_comment(table)
     assert comment is None
 
-  def test_comment_on_view(self, vector, unique_database):
+  def test_comment_on_view(self, unique_database):
     view = '{0}.comment_view'.format(unique_database)
     self.client.execute("create view {0} as select 1".format(view))
 
@@ -379,7 +386,7 @@ class TestDdlStatements(TestDdlBase):
     comment = self._get_table_or_view_comment(view)
     assert comment is None
 
-  def test_comment_on_column(self, vector, unique_database):
+  def test_comment_on_column(self, unique_database):
     table = "{0}.comment_table".format(unique_database)
     self.client.execute("create table {0} (i int) partitioned by (j int)".format(table))
 
@@ -431,7 +438,7 @@ class TestDdlStatements(TestDdlBase):
     assert "" == comment
 
   @UniqueDatabase.parametrize(sync_ddl=True)
-  def test_sync_ddl_drop(self, vector, unique_database):
+  def test_sync_ddl_drop(self, unique_database):
     """Verifies the catalog gets updated properly when dropping objects with sync_ddl
     enabled"""
     self.client.set_configuration({'sync_ddl': 1})
@@ -479,7 +486,7 @@ class TestDdlStatements(TestDdlBase):
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
   @SkipIfLocal.hdfs_client
-  def test_drop_partition_with_purge(self, vector, unique_database):
+  def test_drop_partition_with_purge(self, unique_database):
     """Verfies whether alter <tbl> drop partition purge actually skips trash"""
     self.client.execute(
         "create table {0}.t1(i int) partitioned by (j int)".format(unique_database))
@@ -497,8 +504,8 @@ class TestDdlStatements(TestDdlBase):
     assert self.filesystem_client.exists('{}/t1/j=1/j1.txt'.format(trash))
     assert self.filesystem_client.exists('{}/t1/j=1'.format(trash))
     # Drop the partition (with purge) and make sure it doesn't exist in trash
-    self.client.execute("alter table {0}.t1 drop partition(j=2) purge".\
-        format(unique_database));
+    self.client.execute("alter table {0}.t1 drop partition(j=2) purge".format(
+      unique_database))
     if not IS_S3 and not IS_ADLS:
       # In S3, deletes are eventual. So even though we dropped the partition, the files
       # belonging to this partition may still be visible for some unbounded time. This
@@ -518,7 +525,7 @@ class TestDdlStatements(TestDdlBase):
         multiple_impalad=self._use_multiple_impalad(vector))
 
   @UniqueDatabase.parametrize()
-  def test_view_hints(self, vector, unique_database):
+  def test_view_hints(self, unique_database):
     # Test that plan hints are stored in the view's comment field; this should work
     # regardless of how Hive formats the output.  Getting this to work with the
     # automated test case runner is rather difficult, so verify directly.  There
@@ -530,7 +537,7 @@ class TestDdlStatements(TestDdlBase):
         inner join /* +shuffle */ functional.alltypessmall c on b.id = c.id
         """.format(unique_database))
     results = self.execute_query("describe formatted %s.hints_test" % unique_database)
-    sj, bc, shuf = 0,0,0
+    sj, bc, shuf = 0, 0, 0
     for row in results.data:
         sj += '-- +straight_join' in row
         bc += '-- +broadcast' in row
@@ -547,7 +554,7 @@ class TestDdlStatements(TestDdlBase):
 
     # Test the plan to make sure hints were applied correctly
     plan = self.execute_query("explain select * from %s.hints_test" % unique_database,
-        query_options={'explain_level':0})
+        query_options={'explain_level': 0})
     plan_match = """PLAN-ROOT SINK
 08:EXCHANGE [UNPARTITIONED]
 04:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -580,7 +587,7 @@ class TestDdlStatements(TestDdlBase):
           try:
             result = self.execute_query_expect_success(
                 client, "describe formatted %s" % view_name)
-            exp_line = [l for l in result.data if 'View Expanded' in l][0]
+            exp_line = [line for line in result.data if 'View Expanded' in line][0]
           except ImpalaBeeswaxException as e:
             # In non-SYNC_DDL tests, it's OK to get a "missing view" type error
             # until the metadata propagates.
@@ -590,7 +597,6 @@ class TestDdlStatements(TestDdlBase):
           time.sleep(1)
       finally:
         client.close()
-
 
   def test_views_describe(self, vector, unique_database):
     # IMPALA-6896: Tests that altered views can be described by all impalads.
@@ -617,14 +623,13 @@ class TestDdlStatements(TestDdlBase):
     finally:
       first_client.close()
 
-
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_functions_ddl(self, vector, unique_database):
     self.run_test_case('QueryTest/functions-ddl', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
 
   @SkipIfLocal.hdfs_client
-  def test_create_alter_bulk_partition(self, vector, unique_database):
+  def test_create_alter_bulk_partition(self, unique_database):
     # Change the scale depending on the exploration strategy, with 50 partitions this
     # test runs a few minutes, with 10 partitions it takes ~50s for two configurations.
     num_parts = 50 if self.exploration_strategy() == 'exhaustive' else 10
@@ -667,7 +672,7 @@ class TestDdlStatements(TestDdlBase):
     assert '1' == self.execute_scalar("select count(*) from {0}".format(fq_tbl_name))
 
   @SkipIfLocal.hdfs_client
-  def test_alter_table_set_fileformat(self, vector, unique_database):
+  def test_alter_table_set_fileformat(self, unique_database):
     # Tests that SET FILEFORMAT clause is set for ALTER TABLE ADD PARTITION statement
     fq_tbl_name = unique_database + ".p_fileformat"
     self.client.execute(
@@ -689,7 +694,7 @@ class TestDdlStatements(TestDdlBase):
     assert 1 == len([line for line in result.data if line.find("PARQUET") != -1])
     assert 2 == len([line for line in result.data if line.find("ORC") != -1])
 
-  def test_alter_table_create_many_partitions(self, vector, unique_database):
+  def test_alter_table_create_many_partitions(self, unique_database):
     """
     Checks that creating more partitions than the MAX_PARTITION_UPDATES_PER_RPC
     batch size works, in that it creates all the underlying partitions.
@@ -709,7 +714,7 @@ class TestDdlStatements(TestDdlBase):
     assert list(map(int, PARTITION_RE.findall(str(partitions)))) == \
         list(range(MAX_PARTITION_UPDATES_PER_RPC + 2))
 
-  def test_create_alter_tbl_properties(self, vector, unique_database):
+  def test_create_alter_tbl_properties(self, unique_database):
     fq_tbl_name = unique_database + ".test_alter_tbl"
 
     # Specify TBLPROPERTIES and SERDEPROPERTIES at CREATE time
@@ -756,7 +761,7 @@ class TestDdlStatements(TestDdlBase):
     assert properties[''] == ''
 
   @SkipIfHive2.acid
-  def test_create_insertonly_tbl(self, vector, unique_database):
+  def test_create_insertonly_tbl(self, unique_database):
     insertonly_tbl = unique_database + ".test_insertonly"
     self.client.execute("""create table {0} (coli int) stored as parquet tblproperties(
         'transactional'='true', 'transactional_properties'='insert_only')"""
@@ -764,7 +769,7 @@ class TestDdlStatements(TestDdlBase):
     properties = self._get_tbl_properties(insertonly_tbl)
     assert properties['OBJCAPABILITIES'] == 'HIVEMANAGEDINSERTREAD,HIVEMANAGEDINSERTWRITE'
 
-  def test_alter_tbl_properties_reload(self, vector, unique_database):
+  def test_alter_tbl_properties_reload(self, unique_database):
     # IMPALA-8734: Force a table schema reload when setting table properties.
     tbl_name = "test_tbl"
     self.execute_query_expect_success(self.client, "create table {0}.{1} (c1 string)"
@@ -792,7 +797,7 @@ class TestDdlStatements(TestDdlBase):
       self.run_test_case('QueryTest/partition-ddl-predicates-hdfs-only', vector,
           use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
-  def test_create_table_file_format(self, vector, unique_database):
+  def test_create_table_file_format(self, unique_database):
     # When default_file_format query option is not specified, the default table file
     # format is TEXT.
     text_table = "{0}.text_tbl".format(unique_database)
@@ -826,7 +831,7 @@ class TestDdlStatements(TestDdlBase):
     assert any("ORC" in x for x in result.data)
 
   @SkipIfHive2.acid
-  def test_create_table_transactional_type(self, vector, unique_database):
+  def test_create_table_transactional_type(self, unique_database):
     # When default_transactional_type query option is not specified, the transaction
     # related table properties are not set.
     non_acid_table = "{0}.non_acid_tbl".format(unique_database)
@@ -876,7 +881,7 @@ class TestDdlStatements(TestDdlBase):
     assert "transactional" not in props
     assert "transactional_properties" not in props
 
-  def test_kudu_column_comment(self, vector, unique_database):
+  def test_kudu_column_comment(self, unique_database):
     table = "{0}.kudu_table0".format(unique_database)
     self.client.execute("create table {0}(x int comment 'x' primary key) \
                         stored as kudu".format(table))
@@ -925,6 +930,7 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/describe-materialized-view', vector,
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
+
 # IMPALA-10811: RPC to submit query getting stuck for AWS NLB forever
 # Test HS2, Beeswax and HS2-HTTP three clients.
 class TestAsyncDDL(TestDdlBase):
@@ -942,7 +948,7 @@ class TestAsyncDDL(TestDdlBase):
   def test_async_ddl(self, vector, unique_database):
     self.run_test_case('QueryTest/async_ddl', vector, use_db=unique_database)
 
-  def test_async_ddl_with_JDBC(self, vector, unique_database):
+  def test_async_ddl_with_JDBC(self, unique_database):
     self.exec_with_jdbc("drop table if exists {0}.test_table".format(unique_database))
     self.exec_with_jdbc_and_compare_result(
         "create table {0}.test_table(a int)".format(unique_database),
