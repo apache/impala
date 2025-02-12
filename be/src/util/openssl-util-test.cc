@@ -144,12 +144,14 @@ TEST_F(OpenSSLUtilTest, Encryption) {
 TEST_F(OpenSSLUtilTest, ValidateInitialize) {
   EncryptionKey key;
   uint8_t IV[AES_BLOCK_SIZE] = {};
-  uint8_t key16bits[16] = {};
+  uint8_t key32bits[32] = {};
+  // Using AES_256_CFB mode to test since it's supported in all Impala
+  // supported OpenSSL versions.
   Status status_initialize_fields = key.InitializeFields
-      (key16bits,16, IV, AES_BLOCK_SIZE, AES_CIPHER_MODE::AES_256_GCM);
+      (key32bits, 16, IV, AES_BLOCK_SIZE, AES_CIPHER_MODE::AES_256_CFB);
   ASSERT_FALSE(status_initialize_fields.ok());
-  ASSERT_OK(key.InitializeFields(key16bits,
-      16, IV, AES_BLOCK_SIZE, AES_CIPHER_MODE::AES_128_GCM));
+  ASSERT_OK(key.InitializeFields(key32bits,
+      32, IV, AES_BLOCK_SIZE, AES_CIPHER_MODE::AES_256_CFB));
 }
 
 /// Test that encryption and decryption work in-place.
