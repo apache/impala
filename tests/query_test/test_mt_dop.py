@@ -85,11 +85,12 @@ class TestMtDop(ImpalaTestSuite):
       expected_results = "Updated 24 partition(s) and 11 column(s)."
     else:
       # Create a second table in the same format pointing to the same data files.
-      # This function switches to the format-specific DB in 'vector'.
-      table_loc = self._get_table_location("alltypes", vector)
-      self.execute_query_using_client(self.client,
-        "create external table %s like alltypes location '%s'"
-        % (fq_table_name, table_loc), vector)
+      # This switches the client momentarily to the format-specific DB in 'vector'.
+      with self.change_database(self.client, vector.get_table_format()):
+        table_loc = self._get_table_location("alltypes", vector)
+        self.execute_query_using_client(self.client,
+          "create external table %s like alltypes location '%s'"
+          % (fq_table_name, table_loc), vector)
       # Recover partitions for HDFS tables.
       self.execute_query("alter table %s recover partitions" % fq_table_name)
       expected_results = "Updated 24 partition(s) and 11 column(s)."
@@ -152,7 +153,7 @@ class TestMtDopNonZeroParquet(ImpalaTestSuite):
         test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
         .get_db_name_from_format(vector.get_value('table_format'))})
 
-  def test_mt_dop_only_joins(self, vector, unique_database):
+  def test_mt_dop_only_joins(self, vector):
     """MT_DOP specific tests for joins."""
     new_vector = deepcopy(vector)
     # Allow test to override num_nodes.

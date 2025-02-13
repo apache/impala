@@ -91,9 +91,10 @@ class TestNestedTypes(ImpalaTestSuite):
 class TestNestedTypesSingleNode(ImpalaTestSuite):
   """Functional tests for nested types, run for all file formats that support nested
   types. All tests here runs with single node only."""
+
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
+  def get_workload(cls):
+    return 'tpch_nested'
 
   @classmethod
   def add_test_dimensions(cls):

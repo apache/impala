@@ -323,9 +323,10 @@ class TestUnmatchedSchema(ImpalaTestSuite):
           'invalidate metadata {0}.jointbl_test'.format(unique_database),
           vector)
     else:
+      origin_db = self.get_db_name_from_format(vector.get_table_format())
       self.execute_query_using_client(self.client,
-          "create external table {0}.jointbl_test like jointbl".format(
-              unique_database), vector)
+          "create external table {0}.jointbl_test like {1}.jointbl".format(
+              unique_database, origin_db), vector)
 
       # Update the location of the new table to point the same location as the old table
       location = self._get_table_location('jointbl', vector)
@@ -439,8 +440,8 @@ class TestHdfsScannerSkew(ImpalaTestSuite):
     super(TestHdfsScannerSkew, cls).add_test_dimensions()
     add_mandatory_exec_option(cls, 'mt_dop', 2)
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ('text') and
-        v.get_value('table_format').compression_codec == 'none')
+        v.get_value('table_format').file_format in ('text')
+        and v.get_value('table_format').compression_codec == 'none')
 
   @SkipIfLocal.multiple_impalad
   @pytest.mark.execute_serially
@@ -1499,9 +1500,11 @@ class TestTextScanRangeLengths1(ImpalaTestSuite):
     # the count(col) result because if the scan range is split right after the escape
     # char, the escape char has no effect because we cannot scan backwards to the
     # previous scan range.
-    for t in self.ESCAPE_TABLE_LIST:
-      expected_result = self.client.execute("select count(col) from " + t)
-      result = self.client.execute("select count(*) from " + t)
+    db_name = self.get_db_name_from_format(vector.get_table_format())
+    for table_name in self.ESCAPE_TABLE_LIST:
+      fq_table_name = db_name + '.' + table_name
+      expected_result = self.client.execute("select count(col) from " + fq_table_name)
+      result = self.client.execute("select count(*) from " + fq_table_name)
       assert result.data == expected_result.data
 
 
@@ -1548,10 +1551,10 @@ class TestTextSplitDelimiters(ImpalaTestSuite):
     in the main text parsing algorithm. The second scan range exercises correctly
     identifying a split delimiter as the first in a scan range."""
     DEFAULT_IO_BUFFER_SIZE = 8 * 1024 * 1024
-    data = ('a' * (DEFAULT_IO_BUFFER_SIZE - 1) + "\r\n" +  # first scan range
-            'b' * (DEFAULT_IO_BUFFER_SIZE - 3) + "\r\n" +
-            'a' * (DEFAULT_IO_BUFFER_SIZE - 1) + "\r\n" +  # second scan range
-            'b' * (DEFAULT_IO_BUFFER_SIZE - 1))
+    data = ('a' * (DEFAULT_IO_BUFFER_SIZE - 1) + "\r\n"  # first scan range
+            + 'b' * (DEFAULT_IO_BUFFER_SIZE - 3) + "\r\n"
+            + 'a' * (DEFAULT_IO_BUFFER_SIZE - 1) + "\r\n"  # second scan range
+            + 'b' * (DEFAULT_IO_BUFFER_SIZE - 1))
     assert len(data) == DEFAULT_IO_BUFFER_SIZE * 4
 
     max_scan_range_length = DEFAULT_IO_BUFFER_SIZE * 2
@@ -1594,8 +1597,8 @@ class TestTextScanRangeLengths2(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestTextScanRangeLengths2, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec in ['none', 'gzip'])
+        v.get_value('table_format').file_format == 'text'
+        and v.get_value('table_format').compression_codec in ['none', 'gzip'])
 
   def test_text_scanner_with_header(self, vector, unique_database):
     # Remove to allow .test file to set abort_on_error.

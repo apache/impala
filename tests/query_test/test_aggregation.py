@@ -147,11 +147,11 @@ class TestAggregation(ImpalaTestSuite):
     exec_option = vector.get_value('exec_option')
     disable_codegen = exec_option['disable_codegen']
     data_type, agg_func = (vector.get_value('data_type'), vector.get_value('agg_func'))
+    db_name = self.get_db_name_from_format(vector.get_table_format())
 
-    query = 'select %s(%s_col) from alltypesagg where day is not null' % (agg_func,
-        data_type)
-    result = self.execute_query(query, exec_option,
-       table_format=vector.get_value('table_format'))
+    query = 'select {0}({1}_col) from {2}.alltypesagg where day is not null'.format(
+      agg_func, data_type, db_name)
+    result = self.execute_query(query, exec_option)
     assert len(result.data) == 1
     self.verify_agg_result(agg_func, data_type, False, result.data[0])
 
@@ -160,9 +160,9 @@ class TestAggregation(ImpalaTestSuite):
       # It is deliberately disabled for the merge aggregation.
       assert_codegen_enabled(result.runtime_profile, [1])
 
-    query = 'select %s(DISTINCT(%s_col)) from alltypesagg where day is not null' % (
-        agg_func, data_type)
-    result = self.execute_query(query, vector.get_value('exec_option'))
+    query = ('select {0}(DISTINCT({1}_col)) from {2}.alltypesagg '
+             'where day is not null').format(agg_func, data_type, db_name)
+    result = self.execute_query(query, exec_option)
     assert len(result.data) == 1
     self.verify_agg_result(agg_func, data_type, True, result.data[0])
 

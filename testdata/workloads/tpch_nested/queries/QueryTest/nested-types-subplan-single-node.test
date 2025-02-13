@@ -1,8 +1,5 @@
 ====
 ---- QUERY
-use tpch_nested_parquet
-====
----- QUERY
 # IMPALA-2289: Test proper handling of AtCapacity() inside the subplan node.
 # num_nodes is set to 1 in the python test to make it very likely to hit the once buggy
 # code path because a single scan node instance must process all input files.

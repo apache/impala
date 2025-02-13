@@ -63,6 +63,7 @@ import logging
 
 
 LOG = logging.getLogger(__name__)
+VECTOR = 'vector'
 # Literal constants to refer to some standard dimension names.
 EXEC_OPTION = 'exec_option'
 PROTOCOL = 'protocol'

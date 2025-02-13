@@ -402,9 +402,6 @@ def unique_database(request, testid_checksum):
     request.instance.filesystem_client.delete_file_dir(db_location, recursive=True)
 
   def cleanup():
-    # Make sure we don't try to drop the current session database
-    # TODO: clean this up via IMPALA-13758.
-    request.instance.execute_query_expect_success(request.instance.client, "use default")
     with request.cls.create_impala_client(protocol=HS2) as client:
       client.set_configuration({'sync_ddl': sync_ddl})
       for db_name in db_names:

@@ -97,6 +97,10 @@ class TestFailpoints(ImpalaTestSuite):
   # killer on machines with 30GB RAM. This makes the test run in 4 minutes instead of 1-2.
   @pytest.mark.execute_serially
   def test_failpoints(self, vector):
+    with self.change_database(self.client, vector.get_table_format()):
+      self.__run_failpoints(vector)
+
+  def __run_failpoints(self, vector):
     query = vector.get_value('query')
     action = vector.get_value('action')
     location = vector.get_value('location')
@@ -131,9 +135,8 @@ class TestFailpoints(ImpalaTestSuite):
   def __parse_plan_nodes_from_explain(self, query, vector):
     """Parses the EXPLAIN <query> output and returns a list of node ids.
     Expects format of <ID>:<NAME>"""
-    explain_result =\
-        self.execute_query("explain " + query, vector.get_value('exec_option'),
-                           table_format=vector.get_value('table_format'))
+    explain_result = self.execute_query("explain " + query,
+                                        vector.get_value('exec_option'))
     node_ids = []
     for row in explain_result.data:
       match = re.search(r'\s*(?P<node_id>\d+)\:(?P<node_type>\S+\s*\S+)', row)
@@ -190,8 +193,7 @@ class TestFailpoints(ImpalaTestSuite):
 
   def __execute_fail_action(self, query, vector):
     try:
-      self.execute_query(query, vector.get_value('exec_option'),
-                         table_format=vector.get_value('table_format'))
+      self.execute_query(query, vector.get_value('exec_option'))
       assert 'Expected Failure'
     except ImpalaBeeswaxException as e:
       LOG.debug(e)
@@ -200,8 +202,7 @@ class TestFailpoints(ImpalaTestSuite):
 
   def __execute_cancel_action(self, query, vector):
     LOG.info('Starting async query execution')
-    handle = self.execute_query_async(query, vector.get_value('exec_option'),
-                                      table_format=vector.get_value('table_format'))
+    handle = self.execute_query_async(query, vector.get_value('exec_option'))
     LOG.info('Sleeping')
     sleep(3)
     cancel_result = self.client.cancel(handle)

@@ -95,7 +95,7 @@ class TestBlacklistedDbsAndTables(CustomClusterTestSuite):
                  "--blacklisted_tables=functional.alltypes,functional_parquet.alltypes",
     catalogd_args="--blacklisted_dbs=functional_rc,functional_seq "
                   "--blacklisted_tables=functional.alltypes,functional_parquet.alltypes")
-  def test_blacklisted_dbs_and_tables(self, vector):
+  def test_blacklisted_dbs_and_tables(self):
     self.__check_db_not_visible("functional_rc")
     self.__check_db_not_visible("functional_seq")
     self.__check_table_not_visible("functional", "alltypes")
@@ -128,7 +128,7 @@ class TestBlacklistedDbsAndTables(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args="--blacklisted_tables=alltypes_def,functional.alltypes",
     catalogd_args="--blacklisted_tables=alltypes_def,functional.alltypes")
-  def test_resolving_default_database(self, vector):
+  def test_resolving_default_database(self):
     # Check that "alltypes_def" is resolved as "default.alltypes_def"
     table = self.hive_client.get_table("functional", "alltypes")
     table.dbName = "default"
@@ -138,8 +138,8 @@ class TestBlacklistedDbsAndTables(CustomClusterTestSuite):
     self.hive_client.drop_table("default", "alltypes_def", True)
 
     # Check non fully qualified table names are recognized correctly
-    self.change_database(self.client, db_name="functional")
-    self.__check_create_drop_table(use_fully_qualified_table_name=False)
+    with self.change_database(self.client, db_name="functional"):
+      self.__check_create_drop_table(use_fully_qualified_table_name=False)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -147,7 +147,7 @@ class TestBlacklistedDbsAndTables(CustomClusterTestSuite):
                   "--blacklisted_tables=functional.alltypes",
     impalad_args="--blacklisted_dbs=functional_seq "
                   "--blacklisted_tables=functional.alltypestiny")
-  def test_inconsistent_blacklist(self, vector):
+  def test_inconsistent_blacklist(self):
     """Test the error handling when blacklists are accidentally set differently between
     coordinators and the catalogd"""
     self.__expect_error_in_query(

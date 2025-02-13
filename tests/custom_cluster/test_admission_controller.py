@@ -41,7 +41,6 @@ from tests.common.custom_cluster_test_suite import (
     START_ARGS,
     CustomClusterTestSuite)
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
-from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.resource_pool_config import ResourcePoolConfig
 from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
@@ -74,8 +73,8 @@ SLOW_QUERY = "select count(*) from functional.alltypes where int_col = sleep(200
 # The unpartitioned fragments are both interior fragments that consume input
 # from a scan fragment and non-interior fragments with a constant UNION.
 QUERY_WITH_UNPARTITIONED_FRAGMENTS = """
-    select *, (select count(distinct int_col) from alltypestiny) subquery1,
-           (select count(distinct int_col) from alltypes) subquery2,
+    select *, (select count(distinct int_col) from functional.alltypestiny) subquery1,
+           (select count(distinct int_col) from functional.alltypes) subquery2,
            (select 1234) subquery3
     from (""" + QUERY + """) v"""
 
@@ -579,7 +578,6 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def test_sanity_checks_dedicated_coordinator(self, vector, unique_database):
     """Sanity tests for verifying targeted dedicated coordinator memory estimations and
     behavior."""
-    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
     self.client.set_configuration_option('request_pool', "root.regularPool")
     exec_options = vector.get_value('exec_option')
     # Make sure query option MAX_MEM_ESTIMATE_FOR_ADMISSION is enforced on the dedicated
@@ -625,8 +623,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     the actual vs expected values for mem admitted and mem limit for both coord and
     executor. Also verifies that those memory values are different if
     'using_dedicated_coord_estimates' is true."""
-    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
-    self.client.set_configuration_option('request_pool', "root.regularPool")
+    vector.set_exec_option('request_pool', 'root.regularPool')
+    self.client.set_configuration(vector.get_exec_option_dict())
     # Use a test query that has unpartitioned non-coordinator fragments to make
     # sure those are handled correctly (IMPALA-10036).
     for query in [QUERY, QUERY_WITH_UNPARTITIONED_FRAGMENTS]:
@@ -707,10 +705,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1, cluster_size=2)
-  def test_mem_limit_executors(self, vector):
+  def test_mem_limit_executors(self):
     """Verify that the query option mem_limit_executors is only enforced on the
     executors."""
-    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
     expected_exec_mem_limit = "999999999"
     self.client.set_configuration({"MEM_LIMIT_EXECUTORS": expected_exec_mem_limit})
     handle = self.client.execute_async(QUERY.format(1))
@@ -726,10 +723,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1, cluster_size=2,
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
           pool_max_mem=2 * 1024 * 1024 * 1024, proc_mem_limit=3 * 1024 * 1024 * 1024))
-  def test_mem_limit_coordinators(self, vector):
+  def test_mem_limit_coordinators(self):
     """Verify that the query option mem_limit_coordinators is only enforced on the
     coordinators."""
-    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
     expected_exec_mem_limit = "999999999"
     expected_coord_mem_limit = "111111111"
     self.client.set_configuration({"MEM_LIMIT_EXECUTORS": expected_exec_mem_limit,
@@ -747,10 +743,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1, cluster_size=2,
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
           pool_max_mem=2 * 1024 * 1024 * 1024, proc_mem_limit=3 * 1024 * 1024 * 1024))
-  def test_mem_limits(self, vector):
+  def test_mem_limits(self):
     """Verify that the query option mem_limit_coordinators and mem_limit_executors are
     ignored when mem_limit is set."""
-    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
     exec_mem_limit = "999999999"
     coord_mem_limit = "111111111"
     mem_limit = "888888888"
@@ -2475,7 +2470,6 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
           query = QUERY.format(self.query_num)
           self.query_state = 'SUBMITTING'
           client = self.impalad.service.create_beeswax_client()
-          ImpalaTestSuite.change_database(client, self.vector.get_value('table_format'))
           client.set_configuration(exec_options)
 
           LOG.info("Submitting query %s with ending behavior %s",

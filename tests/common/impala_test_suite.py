@@ -19,6 +19,7 @@
 
 from __future__ import absolute_import, division, print_function
 from builtins import range, round
+import contextlib
 import glob
 import grp
 import hashlib
@@ -63,7 +64,7 @@ from tests.common.test_result_verifier import (
     verify_raw_results,
     verify_runtime_profile)
 from tests.common.test_vector import (
-  EXEC_OPTION, PROTOCOL, TABLE_FORMAT,
+  EXEC_OPTION, PROTOCOL, TABLE_FORMAT, VECTOR,
   BEESWAX, HS2, HS2_HTTP,
   ImpalaTestDimension)
 from tests.performance.query import Query
@@ -752,8 +753,9 @@ class ImpalaTestSuite(BaseTestSuite):
     # Change the database to reflect the file_format, compression codec etc, or the
     # user specified database for all targeted impalad.
     for impalad_client in target_impalad_clients:
-      ImpalaTestSuite.change_database(impalad_client,
-          table_format_info, use_db, pytest.config.option.scale_factor)
+      ImpalaTestSuite.__change_client_database(
+        impalad_client, table_format=table_format_info, db_name=use_db,
+        scale_factor=pytest.config.option.scale_factor)
       impalad_client.set_configuration(exec_options)
 
     def __exec_in_impala(query, user=None):
@@ -984,6 +986,10 @@ class ImpalaTestSuite(BaseTestSuite):
         os.makedirs(output_dir)
       write_test_file(output_file, sections, encoding=encoding)
 
+    # Revert target_impalad_clients back to default database.
+    for impalad_client in target_impalad_clients:
+      ImpalaTestSuite.__change_client_database(impalad_client, db_name='default')
+
   def get_query_lineage(self, query_id, lineage_dir):
     """Walks through the lineage files in lineage_dir to look for a given query_id.
     This is an expensive operation is lineage_dir is large, so use carefully."""
@@ -1010,18 +1016,50 @@ class ImpalaTestSuite(BaseTestSuite):
   def get_db_name_from_format(table_format, scale_factor=''):
     return QueryTestSectionReader.get_db_name(table_format, scale_factor)
 
-  @classmethod
-  def change_database(cls, impala_client, table_format=None,
-      db_name=None, scale_factor=None):
+  @staticmethod
+  def __change_client_database(impala_client, table_format=None, db_name=None,
+                               scale_factor=None):
+    """Change 'impala_client' to point to either 'db_name' or workload-specific
+    database described by 'table_format' and 'scale_vector'.
+    Restore client configuration back to its default. This is intended for internal use
+    within ImpalaTestSuite. For changing database in ImpalaTestSuite subclasses, please
+    refer to ImpalaTestSuite.change_database(), which provide a more consistent way to
+    temporarily change database and reverting back to default database.
+    """
     if db_name is None:
       assert table_format is not None
-      db_name = QueryTestSectionReader.get_db_name(table_format,
-          scale_factor if scale_factor else '')
-    query = 'use %s' % db_name
+      db_name = ImpalaTestSuite.get_db_name_from_format(
+        table_format, scale_factor if scale_factor else '')
     # Clear the exec_options before executing a USE statement.
     # The USE statement should not fail for negative exec_option tests.
     impala_client.clear_configuration()
-    impala_client.execute(query)
+    impala_client.execute('use ' + db_name)
+
+  @classmethod
+  @contextlib.contextmanager
+  def change_database(cls, impala_client, table_format=None, db_name=None,
+                      scale_factor=None):
+    """Change impala_client to point to approriate database under test and revert
+    it to default database once it exit the with scope.
+    Restore client configuration back to its default when getting in and getting out of
+    'with' scope. Test method should try to use fully qualified table name in the test
+    query as much as possible and only use this context manager function when it is
+    not practical to do so.
+    Sample usage:
+
+      with ImpalaTestSuite.change_database(client, db_name='functional_parquet'):
+        # client clear configuration and pointing to 'functional_parquet' database here.
+        client.execute('show tables')
+      # client clear configuration and pointing to 'default' database after it exit the
+      # 'with' scope.
+      client.execute('show tables')
+    """
+    try:
+      cls.__change_client_database(impala_client, table_format=table_format,
+                                   db_name=db_name, scale_factor=scale_factor)
+      yield
+    finally:
+      cls.__change_client_database(impala_client, db_name='default')
 
   def execute_wrapper(function):
     """
@@ -1031,6 +1069,8 @@ class ImpalaTestSuite(BaseTestSuite):
     remaining the same. A use database is issued before query execution. As such,
     database names need to be build pre execution, this method wraps around the different
     execute methods and provides a common interface to issue the proper use command.
+    IMPALA-13766: Remove this function decorator and let test method to change database
+    by themself.
     """
     @wraps(function)
     def wrapper(*args, **kwargs):
@@ -1038,13 +1078,16 @@ class ImpalaTestSuite(BaseTestSuite):
       if kwargs.get(TABLE_FORMAT):
         table_format = kwargs.get(TABLE_FORMAT)
         del kwargs[TABLE_FORMAT]
-      if kwargs.get('vector'):
-        table_format = kwargs.get('vector').get_table_format()
-        del kwargs['vector']
+      if kwargs.get(VECTOR):
+        ImpalaTestSuite.validate_exec_option_dimension(kwargs.get(VECTOR))
+        table_format = kwargs.get(VECTOR).get_table_format()
+        del kwargs[VECTOR]
         # self is the implicit first argument
       if table_format is not None:
-        args[0].change_database(args[0].client, table_format)
-      return function(*args, **kwargs)
+        with ImpalaTestSuite.change_database(args[0].client, table_format):
+          return function(*args, **kwargs)
+      else:
+        return function(*args, **kwargs)
     return wrapper
 
   @classmethod
@@ -1101,16 +1144,16 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def execute_query_using_client(self, client, query, vector):
     self.validate_exec_option_dimension(vector)
-    self.change_database(client, vector.get_table_format())
     query_options = vector.get_value(EXEC_OPTION)
-    if query_options is not None: client.set_configuration(query_options)
+    if query_options is not None:
+      client.set_configuration(query_options)
     return client.execute(query)
 
   def execute_query_async_using_client(self, client, query, vector):
     self.validate_exec_option_dimension(vector)
-    self.change_database(client, vector.get_table_format())
     query_options = vector.get_value(EXEC_OPTION)
-    if query_options is not None: client.set_configuration(query_options)
+    if query_options is not None:
+      client.set_configuration(query_options)
     return client.execute_async(query)
 
   def close_query_using_client(self, client, query):
@@ -1248,7 +1291,10 @@ class ImpalaTestSuite(BaseTestSuite):
     assert abs(a - b) / float(max(abs(a), abs(b))) <= diff_perc
 
   def _get_table_location(self, table_name, vector):
-    """ Returns the HDFS location of the table """
+    """ Returns the HDFS location of the table.
+    This method changes self.client to point to the dabatase described by 'vector'."""
+    db_name = self.get_db_name_from_format(vector.get_table_format())
+    self.__change_client_database(self.client, db_name=db_name)
     result = self.execute_query_using_client(self.client,
         "describe formatted %s" % table_name, vector)
     for row in result.data:
@@ -1626,7 +1672,8 @@ class ImpalaTestSuite(BaseTestSuite):
             str(e))
         time.sleep(1)
 
-  def validate_exec_option_dimension(self, vector):
+  @staticmethod
+  def validate_exec_option_dimension(vector):
     """Validate that test dimension with name matching query option name is
     also registered in 'exec_option' dimension."""
     option_dim_names = []
@@ -1641,7 +1688,6 @@ class ImpalaTestSuite(BaseTestSuite):
       return
 
     for name in option_dim_names:
-      # TODO: enforce these warnings by changing them into pytest.fail()
       if name not in exec_option:
         pytest.fail("Exec option {} declared as independent dimension but not inserted "
             "into {} dimension. Consider using helper function "

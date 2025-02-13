@@ -82,7 +82,8 @@ class TestDataCache(CustomClusterTestSuite):
     # Expect all cache hits results in no opened files.
     opened_file_handles_metric = 'impala-server.io.mgr.cached-file-handles-miss-count'
     baseline = self.get_metric(opened_file_handles_metric)
-    self.execute_query("select count(distinct l_orderkey) from test_parquet")
+    self.execute_query("select count(distinct l_orderkey) from {0}.test_parquet".format(
+      unique_database))
     assert self.get_metric(opened_file_handles_metric) == baseline
 
   @pytest.mark.execute_serially
@@ -106,7 +107,7 @@ class TestDataCache(CustomClusterTestSuite):
   def test_data_cache_deterministic_no_file_handle_cache(self, vector, unique_database):
     self.__test_data_cache_deterministic(vector, unique_database)
 
-  def __test_data_cache(self, vector):
+  def __test_data_cache(self):
     """ This test scans the same table twice and verifies the cache hit count metrics
     are correct. The exact number of bytes hit is non-deterministic between runs due
     to different mtime of files and multiple shards in the cache.
@@ -132,16 +133,16 @@ class TestDataCache(CustomClusterTestSuite):
       impalad_args=get_impalad_args("LRU", high_write_concurrency=False,
                                     force_single_shard=False),
       start_args=CACHE_START_ARGS, cluster_size=1)
-  def test_data_cache_lru(self, vector):
-    self.__test_data_cache(vector)
+  def test_data_cache_lru(self):
+    self.__test_data_cache()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=get_impalad_args("LIRS", high_write_concurrency=False,
                                     force_single_shard=False),
       start_args=CACHE_START_ARGS, cluster_size=1)
-  def test_data_cache_lirs(self, vector):
-    self.__test_data_cache(vector)
+  def test_data_cache_lirs(self):
+    self.__test_data_cache()
 
   def __test_data_cache_disablement(self, vector):
     # Verifies that the cache metrics are all zero.
@@ -185,7 +186,7 @@ class TestDataCache(CustomClusterTestSuite):
       impalad_args=get_impalad_args("LIRS", high_write_concurrency=False),
       start_args="--data_cache_dir=/tmp --data_cache_size=9MB",
       cluster_size=1)
-  def test_data_cache_lirs_instant_evictions(self, vector):
+  def test_data_cache_lirs_instant_evictions(self):
     # The setup for this test is intricate. For Allocate() to succeed, the request
     # needs to be smaller than the protected size (95% of the cache). For Insert() to
     # fail, the request needs to be larger than the unprotected size (5% of the cache).
@@ -215,7 +216,7 @@ class TestDataCache(CustomClusterTestSuite):
     assert self.get_data_cache_metric('num-writes') >= 0
     assert self.get_data_cache_metric('total-bytes') >= 0
 
-  def __test_data_cache_keep_across_restarts(self, vector, test_reduce_size=False):
+  def __test_data_cache_keep_across_restarts(self, test_reduce_size=False):
     QUERY = "select * from tpch_parquet.lineitem"
     # Execute a query, record the total bytes and the number of entries of cache before
     # cache dump.
@@ -260,31 +261,31 @@ class TestDataCache(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       impalad_args=get_impalad_args("LRU", keep_across_restarts=True),
       start_args=CACHE_START_ARGS, cluster_size=1)
-  def test_data_cache_keep_across_restarts_lru(self, vector):
-    self.__test_data_cache_keep_across_restarts(vector)
+  def test_data_cache_keep_across_restarts_lru(self):
+    self.__test_data_cache_keep_across_restarts()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=get_impalad_args("LIRS", keep_across_restarts=True),
       start_args=CACHE_START_ARGS, cluster_size=1)
-  def test_data_cache_keep_across_restarts_lirs(self, vector):
-    self.__test_data_cache_keep_across_restarts(vector)
+  def test_data_cache_keep_across_restarts_lirs(self):
+    self.__test_data_cache_keep_across_restarts()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=get_impalad_args("LRU", keep_across_restarts=True),
       start_args=CACHE_START_ARGS, cluster_size=1)
-  def test_data_cache_reduce_size_restarts_lru(self, vector):
-    self.__test_data_cache_keep_across_restarts(vector, test_reduce_size=True)
+  def test_data_cache_reduce_size_restarts_lru(self):
+    self.__test_data_cache_keep_across_restarts(test_reduce_size=True)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=get_impalad_args("LIRS", keep_across_restarts=True),
       start_args=CACHE_START_ARGS, cluster_size=1)
-  def test_data_cache_reduce_size_restarts_lirs(self, vector):
-    self.__test_data_cache_keep_across_restarts(vector, test_reduce_size=True)
+  def test_data_cache_reduce_size_restarts_lirs(self):
+    self.__test_data_cache_keep_across_restarts(test_reduce_size=True)
 
-  def __test_data_cache_readonly(self, vector):
+  def __test_data_cache_readonly(self):
     QUERY = "select * from tpch_parquet.lineitem"
     # Execute the query asynchronously, wait a short while, and do gracefully shutdown
     # immediately to test the race between cache writes and setting cache read-only.
@@ -310,12 +311,12 @@ class TestDataCache(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       impalad_args=get_impalad_args("LRU", keep_across_restarts=True),
       start_args=CACHE_START_ARGS, cluster_size=1, disable_log_buffering=True)
-  def test_data_cache_readonly_lru(self, vector):
-    self.__test_data_cache_readonly(vector)
+  def test_data_cache_readonly_lru(self):
+    self.__test_data_cache_readonly()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=get_impalad_args("LIRS", keep_across_restarts=True),
       start_args=CACHE_START_ARGS, cluster_size=1, disable_log_buffering=True)
-  def test_data_cache_readonly_lirs(self, vector):
-    self.__test_data_cache_readonly(vector)
+  def test_data_cache_readonly_lirs(self):
+    self.__test_data_cache_readonly()

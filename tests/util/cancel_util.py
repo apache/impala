@@ -102,9 +102,17 @@ def cancel_query_and_validate_state(client, query, exec_option, table_format,
   statement will be executed to cancel and close the query, instead of sending the Thrift
   RPCs directly.
   """
+  assert table_format is not None
+  with ImpalaTestSuite.change_database(client, table_format):
+    __run_cancel_query_and_validate_state(
+      client, query, exec_option, cancel_delay, join_before_close,
+      use_kill_query_statement)
+
+
+def __run_cancel_query_and_validate_state(client, query, exec_option,
+    cancel_delay, join_before_close=False, use_kill_query_statement=False):
   assert not (join_before_close and use_kill_query_statement)
 
-  if table_format: ImpalaTestSuite.change_database(client, table_format)
   if exec_option: client.set_configuration(exec_option)
   handle = client.execute_async(query)
 
@@ -160,8 +168,8 @@ def cancel_query_and_validate_state(client, query, exec_option, table_format,
   # that the synchronous phase of query unregistration has finished and the profile
   # is final.
   profile = client.get_runtime_profile(handle)
-  if ("- Completed admission: " in profile and
-      ("- First row fetched:" in profile or "- Request finished:" in profile)):
+  if ("- Completed admission: " in profile
+      and ("- First row fetched:" in profile or "- Request finished:" in profile)):
     # TotalBytesRead is a sentinel that will only be created if ComputeQuerySummary()
     # has been run by the cancelling thread.
     assert "- TotalBytesRead:" in profile, profile

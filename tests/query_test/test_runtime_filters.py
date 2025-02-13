@@ -116,8 +116,10 @@ class TestRuntimeFilters(ImpalaTestSuite):
     get woken up and exit promptly when the query is cancelled."""
     # Make sure the cluster is quiesced before we start this test
     self._verify_no_fragments_running()
+    with self.change_database(self.client, vector.get_value('table_format')):
+      self.__run_wait_time_cancellation(vector)
 
-    self.change_database(self.client, vector.get_value('table_format'))
+  def __run_wait_time_cancellation(self, vector):
     # Set up a query where a scan (plan node 0, scanning alltypes) will wait
     # indefinitely for a filter to arrive. The filter arrival is delayed
     # by adding a wait to the scan of alltypestime (plan node 0).
@@ -150,8 +152,11 @@ class TestRuntimeFilters(ImpalaTestSuite):
 
   def test_file_filtering(self, vector):
     if 'kudu' in str(vector.get_value('table_format')):
-      return
-    self.change_database(self.client, vector.get_value('table_format'))
+      pytest.skip('Skip test against kudu')
+    with self.change_database(self.client, vector.get_value('table_format')):
+      self.__run_file_filtering(vector)
+
+  def __run_file_filtering(self, vector):
     self.execute_query("SET RUNTIME_FILTER_MODE=GLOBAL")
     self.execute_query("SET RUNTIME_FILTER_WAIT_TIME_MS=10000")
     result = self.execute_query("""select STRAIGHT_JOIN * from alltypes inner join
@@ -165,8 +170,11 @@ class TestRuntimeFilters(ImpalaTestSuite):
     """Test that late-arriving filters are applied to files when the scanner starts processing
     each scan range."""
     if 'kudu' in str(vector.get_value('table_format')):
-      return
-    self.change_database(self.client, vector.get_value('table_format'))
+      pytest.skip('Skip test against kudu')
+    with self.change_database(self.client, vector.get_value('table_format')):
+      self.__run_file_filtering_late_arriving_filter(vector)
+
+  def __run_file_filtering_late_arriving_filter(self, vector):
     self.execute_query("SET RUNTIME_FILTER_MODE=GLOBAL")
     self.execute_query("SET RUNTIME_FILTER_WAIT_TIME_MS=1")
     self.execute_query("SET NUM_SCANNER_THREADS=1")
@@ -357,7 +365,7 @@ class TestOverlapMinMaxFilters(ImpalaTestSuite):
                        unique_database, test_file_vars=DEFAULT_VARS)
 
   @SkipIfLocal.hdfs_client
-  def test_partition_column_in_parquet_data_file(self, vector, unique_database):
+  def test_partition_column_in_parquet_data_file(self, unique_database):
     """IMPALA-11147: Test that runtime min/max filters still work on data files that
     contain the partitioning columns."""
     tbl_name = "part_col_in_data_file"

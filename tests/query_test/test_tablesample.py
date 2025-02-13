@@ -18,11 +18,11 @@
 # Tests the TABLESAMPLE clause.
 
 from __future__ import absolute_import, division, print_function
-import pytest
 import subprocess
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension
+
 
 class TestTableSample(ImpalaTestSuite):
   @classmethod
@@ -36,19 +36,23 @@ class TestTableSample(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('filtered', *[True, False]))
     # Tablesample is only supported on HDFS tables.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-      v.get_value('table_format').file_format != 'kudu' and
-      v.get_value('table_format').file_format != 'hbase')
+      v.get_value('table_format').file_format != 'kudu'
+      and v.get_value('table_format').file_format != 'hbase')
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on core testing time by limiting the file formats.
       cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'parquet' or
-        v.get_value('table_format').file_format == 'text')
+        v.get_value('table_format').file_format == 'parquet'
+        or v.get_value('table_format').file_format == 'text')
 
   def test_tablesample(self, vector):
     # Do not use a .test to avoid making this test flaky.
     # 1. Queries without the repeatable clause are non-deterministic.
     # 2. The results of queries without a repeatable clause could change due to
     # changes in data loading that affect the number or size of files.
+    with self.change_database(self.client, vector.get_value('table_format')):
+      self.__run_tablesample(vector)
+
+  def __run_tablesample(self, vector):
     repeatable = vector.get_value('repeatable')
     filtered = vector.get_value('filtered')
 
@@ -56,7 +60,6 @@ class TestTableSample(ImpalaTestSuite):
     if filtered:
       where_clause = "where month between 1 and 6"
 
-    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
     result = self.client.execute("select count(*) from alltypes %s" % where_clause)
     baseline_count = int(result.data[0])
     prev_count = None

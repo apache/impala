@@ -327,7 +327,7 @@ class TestScanMemLimit(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
     cls.ImpalaTestMatrix.add_dimension(create_avro_snappy_dimension(cls.get_workload()))
 
-  def test_wide_avro_mem_usage(self, vector, unique_database):
+  def test_wide_avro_mem_usage(self, unique_database):
     """Create a wide avro table with large strings and test scans that can cause OOM."""
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip("only run resource-intensive query on exhaustive")
@@ -409,12 +409,12 @@ class TestHashJoinMemLimit(ImpalaTestSuite):
     """Selective scan with hash join and aggregate above it. Regression test for
     IMPALA-9712 - before the fix this ran out of memory."""
     OPTS = {'mem_limit': "80MB", 'mt_dop': 1}
-    self.change_database(self.client, vector.get_value('table_format'))
-    result = self.execute_query_expect_success(self.client,
-        """select sum(l_extendedprice * (1 - l_discount)) as revenue
-           from lineitem join part on p_partkey = l_partkey
-           where l_comment like 'ab%'""", query_options=OPTS)
-    assert result.data[0] == '440443181.0505'
+    with self.change_database(self.client, vector.get_value('table_format')):
+      result = self.execute_query_expect_success(self.client,
+          """select sum(l_extendedprice * (1 - l_discount)) as revenue
+             from lineitem join part on p_partkey = l_partkey
+             where l_comment like 'ab%'""", query_options=OPTS)
+      assert result.data[0] == '440443181.0505'
 
 
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
