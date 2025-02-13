@@ -2918,6 +2918,7 @@ void AggregatedRuntimeProfile::ToThriftSubclass(
   }
 }
 
+
 void AggregatedRuntimeProfile::ToJsonSubclass(
     Verbosity verbosity, Value* parent, Document* d) const {
   Document::AllocatorType& allocator = d->GetAllocator();
@@ -3012,7 +3013,7 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value*& val,
     // Note: The value part of 'labels' map is being used to order events initially.
   }
 
-  // Order labels chronologically, while mantaining a reference to the previous order
+  // Order labels chronologically, while maintaining a reference to the previous order
   // Note: Only if a complete order is available from an instance
   vector<Value> labels_ordered(events_count);
   vector<int32_t> labels_order(events_count);
@@ -3029,14 +3030,14 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value*& val,
   }
 
   // In case of missing event timestamps, order them according to 'labels_ordered',
-  // mantain alignment by substituting zeros, for skipping them later
+  // maintain alignment by substituting zeros, for skipping them later
   size_t num_instances = timestamps.size();
   std::unordered_set<size_t> missing_event_instances;
   if (order_found) {
     // Order and align timestamps using stored index references
     for (size_t instance_idx = 0; instance_idx < num_instances; ++instance_idx) {
       if (timestamps[instance_idx].size() < events_count) {
-        vector<int64_t>& inst_timestamps = timestamps[instance_idx];
+        vector<int64_t> inst_timestamps = std::move(timestamps[instance_idx]);
         timestamps[instance_idx] = vector<int64_t>(events_count);
         const vector<int32_t>& idxs = label_idxs[instance_idx];
         int32_t inst_event_count = idxs.size();
@@ -3075,9 +3076,7 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value*& val,
       // For each event collect timestamps across all instances
       Value ts_list(kArrayType);
       for (const vector<int64_t>& inst_timestamps : timestamps) {
-        if (inst_timestamps[event_idx] != 0) {
-          ts_list.PushBack(inst_timestamps[event_idx], allocator);
-        }
+        ts_list.PushBack(inst_timestamps[event_idx], allocator);
       }
       Value event(kObjectType);
       event.AddMember("label", labels_ordered[event_idx], allocator);

@@ -1744,7 +1744,7 @@
 						"event_sequences": [{
 								"events": [{
 										"label": "Prepare Finished",
-										"ts_list": []
+										"ts_list": [0]
 									}, {
 										"label": "Open Finished",
 										"ts_list": [1135987390]

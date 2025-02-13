@@ -1928,27 +1928,32 @@ TEST(ToJson, AggregatedInfoStringsToJsonTest) {
   EXPECT_STREQ(plan_node_profile["info_strings"][0]["values"][2].GetString(), "C_TABLE");
 }
 
-
 class AggregatedEventSequenceToJsonTest : public ::testing::Test {
  protected:
   // Common event timeline names and event labels
   const string NODE_LIFECYCLE_EVENT_TIMELINE;
   const string NODE_LIFECYCLE_EVENT_LABELS[6];
-  // Mantain rapidjson::Document across methods, with support for tearing down
+  const size_t MAX_SETUP_RETRIES;
+  // Maintain rapidjson::Document across methods, with support for tearing down
   rapidjson::Document doc;
   rapidjson::Value plan_node_profile;
   // Randomly generated sizes, with constraints based on setup parameters
   size_t NUM_PROFILES;
   size_t BUCKET_SIZE;
+  bool EVENT_COMPLETENESS;
   // Record instances with missing instances to validate
-  std::unordered_set<size_t> missing_event_instances;
+  std::unordered_set<size_t> missing_event_instances_expected;
+  // Keep track of maximum retries for missing events generation
+  size_t setup_retries;
 
   AggregatedEventSequenceToJsonTest() :
     NODE_LIFECYCLE_EVENT_TIMELINE{"Node Lifecycle Event Timeline"},
     NODE_LIFECYCLE_EVENT_LABELS{"Open Started", "Open Finished", "First Batch Requested"
-        "First Batch Returned", "Last Batch Returned", "Closed"},
+        , "First Batch Returned", "Last Batch Returned", "Closed"},
+    MAX_SETUP_RETRIES{3},
     doc{rapidjson::Document(rapidjson::kObjectType)},
-    plan_node_profile(rapidjson::Value(rapidjson::kObjectType)) {
+    plan_node_profile(rapidjson::Value(rapidjson::kObjectType)),
+    setup_retries{0} {
   }
 
   void SetUp() override {}
@@ -1958,19 +1963,21 @@ class AggregatedEventSequenceToJsonTest : public ::testing::Test {
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    std::uniform_int_distribution<> uni_dis_instances(1, 50);
+    std::uniform_int_distribution<> uni_dis_instances(1, 30);
+
     NUM_PROFILES = uni_dis_instances(gen);
     if (timestamp_aggregation) {
       // Generate a bucket size smaller than number of instances
+      if (NUM_PROFILES <= 1) ++NUM_PROFILES;
       std::uniform_int_distribution<> uni_dis_granularity(1, NUM_PROFILES - 1);
       BUCKET_SIZE = uni_dis_granularity(gen);
     } else if (is_zero_bucket_size) {
       // Set bucket size equal to the 0
       BUCKET_SIZE = 0;
     } else {
-      // Generate a bucket size or equal to number of instances
+      // Generate a bucket size greater than or equal to number of instances
       std::uniform_int_distribution<> uni_dis_granularity(NUM_PROFILES,
-          NUM_PROFILES + 2);
+          NUM_PROFILES * 2);
       BUCKET_SIZE = uni_dis_granularity(gen);
     }
 
@@ -1995,33 +2002,44 @@ class AggregatedEventSequenceToJsonTest : public ::testing::Test {
       seqs[i]->Start();
     }
 
-    int64_t dummy_event_duration = 2000 / NUM_PROFILES;
+    int64_t dummy_event_duration = 5;
 
     // Simulate parallel execution of events across instances
     if (events_completeness >= 1.0f) {
+      EVENT_COMPLETENESS = true;
       // Add complete set of events to the event sequence
       for (const string& event : NODE_LIFECYCLE_EVENT_LABELS) {
+        SleepForMs(dummy_event_duration);
         for (int i = 0; i < NUM_PROFILES; ++i) {
           seqs[i]->MarkEvent(event);
-          SleepForMs(1);
         }
-        SleepForMs(2000 / NUM_PROFILES);
       }
     } else {
+      EVENT_COMPLETENESS = false;
       // Add partial set of events to the event sequence
       std::bernoulli_distribution ber_dis_event_probability(events_completeness);
       for (const string& event : NODE_LIFECYCLE_EVENT_LABELS) {
+        SleepForMs(dummy_event_duration);
         for (int i = 0; i < NUM_PROFILES - 1; ++i) {
           if (ber_dis_event_probability(gen)){
             seqs[i]->MarkEvent(event);
           } else {
-            missing_event_instances.insert(i);
+            missing_event_instances_expected.insert(i);
           }
-          SleepForMs(1);
         }
         seqs[NUM_PROFILES - 1]->MarkEvent(event);
-        SleepForMs(dummy_event_duration);
       }
+    }
+
+    // Retry until maximum setup retries
+    if (!EVENT_COMPLETENESS && missing_event_instances_expected.size() <= 0
+        && setup_retries < MAX_SETUP_RETRIES) {
+      ++setup_retries;
+      SetUp(events_completeness, timestamp_aggregation, is_zero_bucket_size);
+      return;
+    } else if (setup_retries >= MAX_SETUP_RETRIES) {
+      ASSERT_TRUE(false) << "SetUp failed to create desired test case after "
+          << MAX_SETUP_RETRIES << "retries.";
     }
 
     AggregatedRuntimeProfile* aggregated_profile = AggregatedRuntimeProfile::Create(
@@ -2033,20 +2051,26 @@ class AggregatedEventSequenceToJsonTest : public ::testing::Test {
     // This test fixture class has been added as a friend within RuntimeProfileBase
     // AggEventSequence::ToJson() method is invoked and tested through the ToJsonHelper()
     aggregated_profile->ToJsonHelper(RuntimeProfile::Verbosity::DEFAULT,
-      &plan_node_profile, &doc);
+        &plan_node_profile, &doc);
 
     // Validate the basic structure of event sequences
     ASSERT_TRUE(plan_node_profile.HasMember("event_sequences"));
     ASSERT_EQ(plan_node_profile["event_sequences"].Size(), 1);
     ASSERT_TRUE(plan_node_profile["event_sequences"][0].HasMember("events"));
+
+    RecordProperty("NumberOfProfiles", NUM_PROFILES);
+    RecordProperty("BucketSize", BUCKET_SIZE);
+    RecordProperty("EventCompletenessFactor", events_completeness);
   }
 
   void TearDown() override {
     // Reset the rapidjson document
+    setup_retries = 0;
     plan_node_profile.RemoveAllMembers();
     doc.RemoveAllMembers();
+
     // Clear missing_event_instances
-    missing_event_instances.clear();
+    missing_event_instances_expected.clear();
   }
 
   // Structure of event sequence JSON
@@ -2071,65 +2095,13 @@ class AggregatedEventSequenceToJsonTest : public ::testing::Test {
   //     }, <...other plan node's events>
   //     ],
   //     // This field is only included, if there are missing / unreported events
-  //     missing_event_instance_idxs : [ 3, 5, 0 ]
+  //     unreported_event_instance_idxs : [ 3, 5, 0 ]
   //   }],
   //   counters : <COUNTERS_OBJECT_ARRAY>,
   //   child_profiles : <CHILD_PROFILES>
   // }
 
-  // Methods for validating the structure of event sequence JSON
-  void ValidateCompleteEventSequenceJson() {
-    rapidjson::Value& events_json = plan_node_profile["event_sequences"][0]["events"];
-    // Validate the number of recorded events
-    EXPECT_EQ(events_json.Size(), sizeof(NODE_LIFECYCLE_EVENT_LABELS) /
-        sizeof(NODE_LIFECYCLE_EVENT_LABELS[0]));
-
-    // Validate the order of event labels in the event sequence
-    for (size_t i = 0; i < events_json.Size(); ++i) {
-      EXPECT_STREQ(events_json[i]["label"].GetString(),
-          NODE_LIFECYCLE_EVENT_LABELS[i].c_str());
-    }
-
-    // Missing events field should not exist
-    EXPECT_FALSE(plan_node_profile["event_sequences"][0].HasMember(
-        "unreported_event_instance_idxs"));
-    if (NUM_PROFILES <= BUCKET_SIZE || BUCKET_SIZE == 0) {
-      // Verify the structure of timestamps
-      EXPECT_TRUE(events_json[0].HasMember("ts_list"));
-      rapidjson::Value& ts_list_prev_json = events_json[0]["ts_list"];
-      for (size_t i = 1; i < events_json.Size(); ++i) {
-        EXPECT_TRUE(events_json[i].HasMember("ts_list"));
-        rapidjson::Value& ts_list_cur_json = events_json[i]["ts_list"];
-        // Number of instance timestamps across events should be same
-        EXPECT_EQ(ts_list_cur_json.Size(), ts_list_prev_json.Size());
-        // Each instance must have event timestamps in increasing order
-        for (int j = 0; j < ts_list_cur_json.Size(); ++j) {
-          EXPECT_GT(ts_list_cur_json[j].GetInt64(), ts_list_prev_json[j].GetInt64());
-        }
-        ts_list_prev_json = ts_list_cur_json;
-      }
-    } else {
-      // Verify the structure of timestamps
-      EXPECT_TRUE(events_json[0].HasMember("ts_stat"));
-      rapidjson::Value& ts_stat_prev_json = events_json[0]["ts_stat"];
-      VerifyAggregatedTimestamps(ts_stat_prev_json, NUM_PROFILES, 0);
-      for (size_t i = 1; i < events_json.Size(); ++i) {
-        // Each event's timestamp aggregate should be in increasing order
-        EXPECT_TRUE(events_json[i].HasMember("ts_stat"));
-        rapidjson::Value& ts_stat_cur_json = events_json[i]["ts_stat"];
-        VerifyAggregatedTimestamps(ts_stat_cur_json, NUM_PROFILES, 0);
-        EXPECT_GT(GetFirstNonZeroValueUint64(ts_stat_cur_json["min"]),
-            GetFirstNonZeroValueUint64(ts_stat_prev_json["min"]));
-        EXPECT_GT(GetFirstNonZeroValueDouble(ts_stat_cur_json["avg"]),
-            GetFirstNonZeroValueDouble(ts_stat_prev_json["avg"]));
-        EXPECT_GT(GetFirstNonZeroValueUint64(ts_stat_cur_json["max"]),
-            GetFirstNonZeroValueUint64(ts_stat_prev_json["max"]));
-        ts_stat_prev_json = ts_stat_cur_json;
-      }
-    }
-  }
-
-  void ValidateMissingEventSequenceJson() {
+  void Validate() {
     // When at least one set of complete events are present from one of the instances,
     // the labels and timestamps of the events are rebuilt with proper ordering and
     // alignment.
@@ -2147,20 +2119,23 @@ class AggregatedEventSequenceToJsonTest : public ::testing::Test {
     // Validate the order of event labels in the event sequence
     for (size_t i = 0; i < events_json.Size(); ++i) {
       EXPECT_STREQ(events_json[i]["label"].GetString(),
-        NODE_LIFECYCLE_EVENT_LABELS[i].c_str());
+          NODE_LIFECYCLE_EVENT_LABELS[i].c_str());
     }
 
-    // Verify reported missing event instance indexes
-    if (plan_node_profile["event_sequences"][0]
-        .HasMember("unreported_event_instance_idxs"))
-    {
-      const rapidjson::Value& missing_event_instance_idxs =
-          plan_node_profile["event_sequences"][0]["unreported_event_instance_idxs"];
-      EXPECT_EQ(missing_event_instance_idxs.Size(), missing_event_instances.size());
-      for (const rapidjson::Value& idx : missing_event_instance_idxs.GetArray()) {
-        EXPECT_EQ(missing_event_instances.count(idx.GetUint64()), 1);
+    // Parse and verify reported instances with missing events
+    std::unordered_set<size_t> missing_event_instances;
+    if (plan_node_profile["event_sequences"][0].HasMember(
+        "unreported_event_instance_idxs")) {
+      rapidjson::Value& missing_events_json = plan_node_profile["event_sequences"][0]
+          ["unreported_event_instance_idxs"];
+      for (size_t i = 0; i < missing_events_json.Size(); ++i) {
+        missing_event_instances.insert(missing_events_json[i].GetUint64());
+        EXPECT_EQ(missing_event_instances_expected.count(
+            missing_events_json[i].GetUint64()), 1);
       }
     }
+    EXPECT_TRUE(EVENT_COMPLETENESS == missing_event_instances_expected.empty());
+    EXPECT_EQ(missing_event_instances_expected.size(), missing_event_instances.size());
 
     if (NUM_PROFILES <= BUCKET_SIZE || BUCKET_SIZE == 0) {
       // Verify the structure of timestamps
@@ -2191,50 +2166,68 @@ class AggregatedEventSequenceToJsonTest : public ::testing::Test {
       }
     } else {
       // Verify the structure of timestamps
-      EXPECT_TRUE(events_json[0].HasMember("ts_stat"));
       for (size_t i = 0; i < events_json.Size(); ++i) {
         EXPECT_TRUE(events_json[i].HasMember("ts_stat"));
         VerifyAggregatedTimestamps(events_json[i]["ts_stat"], NUM_PROFILES,
-            missing_event_instances.size());
+            BUCKET_SIZE, missing_event_instances.size());
+      }
+
+      if (missing_event_instances.size() == 0) {
+        rapidjson::Value& ts_stat_prev_json = events_json[0]["ts_stat"];
+        for (size_t i = 1; i < events_json.Size(); ++i) {
+          // Each event's timestamp aggregate should be in increasing order
+          rapidjson::Value& ts_stat_cur_json = events_json[i]["ts_stat"];
+          EXPECT_GT(GetFirstNonZeroValueUint64(ts_stat_cur_json["min"]),
+              GetFirstNonZeroValueUint64(ts_stat_prev_json["min"]));
+          EXPECT_GT(GetFirstNonZeroValueDouble(ts_stat_cur_json["avg"]),
+              GetFirstNonZeroValueDouble(ts_stat_prev_json["avg"]));
+          EXPECT_GT(GetFirstNonZeroValueUint64(ts_stat_cur_json["max"]),
+              GetFirstNonZeroValueUint64(ts_stat_prev_json["max"]));
+          ts_stat_prev_json = ts_stat_cur_json;
+        }
       }
     }
   }
 
-  inline void VerifyAggregatedTimestamps(const rapidjson::Value& ts_stat_json,
-      size_t inst_count, size_t missing_events_instance_count) {
+  static inline void VerifyAggregatedTimestamps(const rapidjson::Value& ts_stat_json,
+      size_t inst_count, size_t bucket_size, size_t missing_events_instance_count = 0) {
     // Verify the structure of aggregated values
     EXPECT_TRUE(ts_stat_json.HasMember("min"));
     EXPECT_TRUE(ts_stat_json.HasMember("max"));
     EXPECT_TRUE(ts_stat_json.HasMember("avg"));
     EXPECT_TRUE(ts_stat_json.HasMember("count"));
-    EXPECT_EQ(BUCKET_SIZE, ts_stat_json["min"].Size());
-    EXPECT_EQ(BUCKET_SIZE, ts_stat_json["max"].Size());
-    EXPECT_EQ(BUCKET_SIZE, ts_stat_json["avg"].Size());
-    EXPECT_EQ(BUCKET_SIZE, ts_stat_json["count"].Size());
+    EXPECT_EQ(bucket_size, ts_stat_json["min"].Size());
+    EXPECT_EQ(bucket_size, ts_stat_json["max"].Size());
+    EXPECT_EQ(bucket_size, ts_stat_json["avg"].Size());
+    EXPECT_EQ(bucket_size, ts_stat_json["count"].Size());
     uint64_t inst_count_cur = 0;
     // Validate quantitative relationships between aggregated values
-    for (size_t i = 0; i < BUCKET_SIZE; ++i) {
+    for (size_t i = 0; i < bucket_size; ++i) {
       EXPECT_GE(ts_stat_json["max"][i].GetUint64(), ts_stat_json["avg"][i].GetDouble());
       EXPECT_GE(ts_stat_json["avg"][i].GetDouble(), ts_stat_json["min"][i].GetUint64());
       inst_count_cur += ts_stat_json["count"][i].GetUint64();
     }
-    if (missing_events_instance_count == 0) {
-      EXPECT_EQ(inst_count_cur, NUM_PROFILES);
-    } else {
-      EXPECT_GE(inst_count_cur, NUM_PROFILES - missing_events_instance_count);
-    }
+    EXPECT_GE(inst_count_cur, inst_count - missing_events_instance_count);
   }
 
   static inline int64_t GetFirstNonZeroValueUint64(const rapidjson::Value& json_array) {
-    return std::find_if(json_array.GetArray().Begin(), json_array.GetArray().End(),
-        [](const rapidjson::Value& cur_val) { return cur_val.GetInt64() != 0;})
-        ->GetInt64();
+    auto it = std::find_if(json_array.GetArray().Begin(), json_array.GetArray().End(),
+        [](const rapidjson::Value& cur_val) { return cur_val.GetInt64() != 0;});
+    if (it != json_array.GetArray().End()) {
+      return it->GetInt64();
+    } else {
+      return 0;
+    }
   }
 
   static inline double GetFirstNonZeroValueDouble(const rapidjson::Value& json_array) {
-    return std::find_if(json_array.GetArray().Begin(), json_array.GetArray().End(),
-        [](const rapidjson::Value& cur_val) { return cur_val.GetDouble() != 0;})
-        ->GetDouble();
+    auto it = std::find_if(json_array.GetArray().Begin(), json_array.GetArray().End(),
+        [](const rapidjson::Value& cur_val) { return cur_val.GetDouble() != 0;});
+    if (it != json_array.GetArray().End()) {
+      return it->GetDouble();
+    } else {
+      return 0;
+    }
   }
 };
 
@@ -2245,11 +2238,11 @@ TEST_F(AggregatedEventSequenceToJsonTest, CompleteEvents_GroupedAndAggregatedCas
 
   // Run 2 deterministic tests with random size of events and instances
   SetUp(1.0f, true);
-  ValidateCompleteEventSequenceJson();
+  Validate();
   TearDown();
 
   SetUp(1.0f, true);
-  ValidateCompleteEventSequenceJson();
+  Validate();
   // TearDown is implicitly invoked
 }
 
@@ -2259,15 +2252,15 @@ TEST_F(AggregatedEventSequenceToJsonTest, CompleteEvents_GroupedAndUnggregatedCa
 
   // Run 3 deterministic tests with random size of events and instances
   SetUp(1.0f, false);
-  ValidateCompleteEventSequenceJson();
+  Validate();
   TearDown();
 
   SetUp(1.0f, false);
-  ValidateCompleteEventSequenceJson();
+  Validate();
   TearDown();
 
   SetUp(1.0f, false, true);
-  ValidateCompleteEventSequenceJson();
+  Validate();
   // TearDown is implicitly invoked
 }
 
@@ -2278,11 +2271,11 @@ TEST_F(AggregatedEventSequenceToJsonTest, MissingEvents_GroupedAndAggregatedCase
 
   // Run 2 deterministic tests with random size of events and instances
   SetUp(0.5f, true);
-  ValidateMissingEventSequenceJson();
+  Validate();
   TearDown();
 
-  SetUp(0.5f, true);
-  ValidateMissingEventSequenceJson();
+  SetUp(0.8f, true);
+  Validate();
   // TearDown is implicitly invoked
 }
 
@@ -2292,15 +2285,15 @@ TEST_F(AggregatedEventSequenceToJsonTest, MissingEvents_GroupedAndUnaggregatedCa
 
   // Run 3 deterministic tests with random size of events and instances
   SetUp(0.5f, false);
-  ValidateMissingEventSequenceJson();
+  Validate();
   TearDown();
 
-  SetUp(0.5f, false);
-  ValidateMissingEventSequenceJson();
+  SetUp(0.8f, false);
+  Validate();
   TearDown();
 
   SetUp(0.5f, false, true);
-  ValidateMissingEventSequenceJson();
+  Validate();
   // TearDown is implicitly invoked
 }
 
