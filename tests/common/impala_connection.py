@@ -75,6 +75,9 @@ def collect_default_query_options(options, name, val, kind):
   if ',' in val:
     # Value is a list. Wrap it with double quote.
     val = '"{}"'.format(val)
+  if not val:
+    # Value is optional with None as default.
+    val = '""'
   options[name] = val
 
 

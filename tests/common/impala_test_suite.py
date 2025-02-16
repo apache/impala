@@ -533,7 +533,12 @@ class ImpalaTestSuite(BaseTestSuite):
       if query_option not in self.default_query_options:
         continue
       default_val = self.default_query_options[query_option]
-      query_str = 'SET ' + query_option + '="' + default_val + '"'
+      # No need to quote default_val because get_default_configuration() returns
+      # map values that already contain double quote if needed
+      # (see collect_default_query_options() in impala_connection.py).
+      # The "restore option" comment is there to differentiate between SET issued
+      # by test method and SET issued by this method.
+      query_str = "SET {0}={1}; -- restore option".format(query_option, default_val)
       try:
         impalad_client.execute(query_str)
       except Exception as e:
