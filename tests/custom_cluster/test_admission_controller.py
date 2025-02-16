@@ -1833,8 +1833,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         'llama-site-onlycoords.xml'."""
 
     vector.set_exec_option('request_pool', 'onlycoords')
-    result = self.execute_query_using_vector(query, vector)
-    assert result.success
+    with self.create_impala_client(protocol=vector.get_value('protocol')) as client:
+      result = self.execute_query_using_client(client, query, vector)
+      assert result.success
 
     self.__assert_systables_query(result.runtime_profile, expected_coords,
       expected_frag_counts)
@@ -1860,7 +1861,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # without running any on the executors.
     self.__run_assert_systables_query(
         vector=vector,
-        expected_frag_counts=[4, 2, 2,],
+        expected_frag_counts=[4, 2, 2],
         query="select a.test_name, b.db_user from functional.jointbl a inner join "
               "sys.impala_query_live b on a.test_name = b.db_name"),
 
@@ -1915,13 +1916,12 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     coord_to_term.kill()
 
     vector.set_exec_option('request_pool', 'onlycoords')
-    client = self.default_impala_client(vector.get_value('protocol'))
 
     done_waiting = False
     iterations = 0
     while not done_waiting and iterations < 20:
       try:
-        result = self.execute_query_using_client(client, ACTIVE_SQL, vector)
+        result = self.execute_query_using_client(self.client, ACTIVE_SQL, vector)
         assert result.success
         done_waiting = True
       except Exception as e:
@@ -1987,25 +1987,33 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
     # Assert queries can be run when no executors are started.
     self.__run_assert_systables_query(vector)
+    # If not using admissiond, there should be 2 statestore subscribers now
+    # (1 impalad and 1 catalogd). Otherwise, admissiond is the 3rd statestore subscriber.
+    expected_subscribers = 3 if self.get_ac_log_name() == 'admissiond' else 2
+    expected_num_impalads = 1
 
     # Add a single executor for the small executor group set.
+    expected_subscribers += 1
+    expected_num_impalads += 1
     self._start_impala_cluster(
         options=[
             "--impalad_args=--executor_groups=root.group-set-small-group-000:1"],
         add_executors=True,
         cluster_size=1,
-        wait_for_backends=False)
-    self.cluster.statestored.service.wait_for_live_subscribers(3, timeout=30)
+        expected_subscribers=expected_subscribers,
+        expected_num_impalads=expected_num_impalads)
     self.__run_assert_systables_query(vector)
 
     # Add two executors for the large executor group set.
+    expected_subscribers += 2
+    expected_num_impalads += 2
     self._start_impala_cluster(
         options=[
             "--impalad_args=--executor_groups=root.group-set-small-group-000:2"],
         add_executors=True,
         cluster_size=2,
-        wait_for_backends=False)
-    self.cluster.statestored.service.wait_for_live_subscribers(5, timeout=30)
+        expected_subscribers=expected_subscribers,
+        expected_num_impalads=expected_num_impalads)
     self.__run_assert_systables_query(vector)
 
 
