@@ -1083,12 +1083,50 @@ void ImpalaHttpHandler::CatalogObjectsHandler(const Webserver::WebRequest& req,
 
 namespace {
 
+// Summary is stored with -1 as id if it is for a data sink at the root of a fragment.
+constexpr int SINK_ID = -1;
+
+void ExecStatsToJsonHelper(
+    const TPlanNodeExecSummary& summary, rapidjson::Document* document, Value* value) {
+  int64_t cardinality = 0;
+  int64_t max_time = 0;
+  int64_t total_time = 0;
+  for (const TExecStats& stat : summary.exec_stats) {
+    if (summary.is_broadcast) {
+      // Avoid multiple-counting for recipients of broadcasts.
+      cardinality = ::max(cardinality, stat.cardinality);
+    } else {
+      cardinality += stat.cardinality;
+    }
+    total_time += stat.latency_ns;
+    max_time = ::max(max_time, stat.latency_ns);
+  }
+  value->AddMember("output_card", cardinality, document->GetAllocator());
+  value->AddMember("num_instances", static_cast<uint64_t>(summary.exec_stats.size()),
+      document->GetAllocator());
+  if (summary.is_broadcast) {
+    value->AddMember("is_broadcast", true, document->GetAllocator());
+  }
+
+  const string& max_time_str = PrettyPrinter::Print(max_time, TUnit::TIME_NS);
+  Value max_time_str_json(max_time_str, document->GetAllocator());
+  value->AddMember("max_time", max_time_str_json, document->GetAllocator());
+  value->AddMember("max_time_val", max_time, document->GetAllocator());
+
+  // Round to the nearest ns, to workaround a bug in pretty-printing a fraction of a
+  // ns. See IMPALA-1800.
+  const string& avg_time_str = PrettyPrinter::Print(
+      // A bug may occasionally cause 1-instance nodes to appear to have 0 instances.
+      total_time / ::max(static_cast<int>(summary.exec_stats.size()), 1), TUnit::TIME_NS);
+  Value avg_time_str_json(avg_time_str, document->GetAllocator());
+  value->AddMember("avg_time", avg_time_str_json, document->GetAllocator());
+}
+
 // Helper for PlanToJson(), processes a single list of plan nodes which are the
 // DFS-flattened representation of a single plan fragment. Called recursively, the
 // iterator parameter is updated in place so that when a recursive call returns, the
 // caller is pointing at the next of its children.
 void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
-    const vector<TPlanNode>& nodes,
     vector<TPlanNode>::const_iterator* it, rapidjson::Document* document, Value* value) {
   Value children(kArrayType);
   Value label((*it)->label, document->GetAllocator());
@@ -1098,51 +1136,64 @@ void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
   value->AddMember("label_detail", label_detail, document->GetAllocator());
 
   TPlanNodeId id = (*it)->node_id;
-  map<TPlanNodeId, TPlanNodeExecSummary>::const_iterator summary = summaries.find(id);
-  if (summary != summaries.end()) {
-    int64_t cardinality = 0;
-    int64_t max_time = 0L;
-    int64_t total_time = 0;
-    for (const TExecStats& stat: summary->second.exec_stats) {
-      if (summary->second.is_broadcast) {
-        // Avoid multiple-counting for recipients of broadcasts.
-        cardinality = ::max(cardinality, stat.cardinality);
-      } else {
-        cardinality += stat.cardinality;
-      }
-      total_time += stat.latency_ns;
-      max_time = ::max(max_time, stat.latency_ns);
-    }
-    value->AddMember("output_card", cardinality, document->GetAllocator());
-    value->AddMember("num_instances",
-        static_cast<uint64_t>(summary->second.exec_stats.size()),
-        document->GetAllocator());
-    if (summary->second.is_broadcast) {
-      value->AddMember("is_broadcast", true, document->GetAllocator());
-    }
-
-    const string& max_time_str = PrettyPrinter::Print(max_time, TUnit::TIME_NS);
-    Value max_time_str_json(max_time_str, document->GetAllocator());
-    value->AddMember("max_time", max_time_str_json, document->GetAllocator());
-    value->AddMember("max_time_val", max_time, document->GetAllocator());
-
-    // Round to the nearest ns, to workaround a bug in pretty-printing a fraction of a
-    // ns. See IMPALA-1800.
-    const string& avg_time_str = PrettyPrinter::Print(
-        // A bug may occasionally cause 1-instance nodes to appear to have 0 instances.
-        total_time / ::max(static_cast<int>(summary->second.exec_stats.size()), 1),
-        TUnit::TIME_NS);
-    Value avg_time_str_json(avg_time_str, document->GetAllocator());
-    value->AddMember("avg_time", avg_time_str_json, document->GetAllocator());
+  map<TPlanNodeId, TPlanNodeExecSummary>::const_iterator summary_it = summaries.find(id);
+  if (summary_it != summaries.end()) {
+    ExecStatsToJsonHelper(summary_it->second, document, value);
   }
 
   int num_children = (*it)->num_children;
   for (int i = 0; i < num_children; ++i) {
     ++(*it);
     Value container(kObjectType);
-    PlanToJsonHelper(summaries, nodes, it, document, &container);
+    PlanToJsonHelper(summaries, it, document, &container);
     children.PushBack(container, document->GetAllocator());
   }
+  value->AddMember("children", children, document->GetAllocator());
+}
+
+// Helper for PlanToJson(), called only when the plan fragment's root data sink must be
+// one of the following types:
+//  - table sink,
+//  - multi data sink,
+//  - merge sink.
+// Plan nodes of the plan fragment will be listed as children of the root data sink.
+void SinkToJsonHelper(const TDataSink& sink,
+    const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
+    vector<TPlanNode>::const_iterator* it, rapidjson::Document* document, Value* value) {
+  Value label(sink.label, document->GetAllocator());
+  value->AddMember("label", label, document->GetAllocator());
+
+  string label_detail_str = "";
+  switch (sink.type) {
+    case TDataSinkType::type::MERGE_SINK:
+    case TDataSinkType::type::MULTI_DATA_SINK:
+      label_detail_str = sink.child_data_sinks.at(0).label;
+      for (std::size_t i = 1; i < sink.child_data_sinks.size(); ++i) {
+        label_detail_str += ", ";
+        label_detail_str += sink.child_data_sinks.at(i).label;
+      }
+      break;
+    case TDataSinkType::type::TABLE_SINK:
+      label_detail_str = to_string(sink.table_sink.action);
+      break;
+    default:
+      // Should not call SinkToJsonHelper() with any other sink type.
+      DCHECK(false) << "Invalid sink type: " << sink.type;
+  }
+  Value label_detail(label_detail_str, document->GetAllocator());
+  value->AddMember("label_detail", label_detail, document->GetAllocator());
+
+  map<TPlanNodeId, TPlanNodeExecSummary>::const_iterator summary_it =
+      summaries.find(SINK_ID);
+  DCHECK(summary_it != summaries.end());
+  ExecStatsToJsonHelper(summary_it->second, document, value);
+
+  Value children(kArrayType);
+
+  Value container(kObjectType);
+  PlanToJsonHelper(summaries, it, document, &container);
+  children.PushBack(container, document->GetAllocator());
+
   value->AddMember("children", children, document->GetAllocator());
 }
 
@@ -1153,32 +1204,43 @@ void impala::PlanToJson(const vector<TPlanFragment>& fragments,
   // Build a map from id to label so that we can resolve the targets of data-stream sinks
   // and connect plan fragments.
   map<TPlanNodeId, string> label_map;
-  for (const TPlanFragment& fragment: fragments) {
-    for (const TPlanNode& node: fragment.plan.nodes) {
+  for (const TPlanFragment& fragment : fragments) {
+    for (const TPlanNode& node : fragment.plan.nodes) {
       label_map[node.node_id] = node.label;
     }
   }
 
   map<TPlanNodeId, TPlanNodeExecSummary> exec_summaries;
-  for (const TPlanNodeExecSummary& s: summary.nodes) {
-    exec_summaries[s.node_id] = s;
+  for (const TPlanNodeExecSummary& s : summary.nodes) {
+    // All sink has -1 as node_id, we want to store the summary of the first one (the root
+    // of the plan tree) and insert will not overwrite the existing value
+    // if the key is already present.
+    exec_summaries.insert({s.node_id, s});
   }
 
   Value nodes(kArrayType);
-  for (const TPlanFragment& fragment: fragments) {
+  for (const TPlanFragment& fragment : fragments) {
     Value plan_fragment(kObjectType);
     vector<TPlanNode>::const_iterator it = fragment.plan.nodes.begin();
-    PlanToJsonHelper(exec_summaries, fragment.plan.nodes, &it, document, &plan_fragment);
-    if (fragment.__isset.output_sink) {
-      const TDataSink& sink = fragment.output_sink;
-      if (sink.__isset.stream_sink) {
-        Value target(label_map[sink.stream_sink.dest_node_id],
-            document->GetAllocator());
-        plan_fragment.AddMember("data_stream_target", target, document->GetAllocator());
-      } else if (sink.__isset.join_build_sink) {
-        Value target(label_map[sink.join_build_sink.dest_node_id],
-            document->GetAllocator());
-        plan_fragment.AddMember("join_build_target", target, document->GetAllocator());
+    if (fragment.__isset.output_sink
+        && (fragment.output_sink.type == TDataSinkType::type::MERGE_SINK
+            || fragment.output_sink.type == TDataSinkType::type::MULTI_DATA_SINK
+            || fragment.output_sink.type == TDataSinkType::type::TABLE_SINK)) {
+      SinkToJsonHelper(
+          fragment.output_sink, exec_summaries, &it, document, &plan_fragment);
+    } else {
+      PlanToJsonHelper(exec_summaries, &it, document, &plan_fragment);
+      if (fragment.__isset.output_sink) {
+        const TDataSink& sink = fragment.output_sink;
+        if (sink.__isset.stream_sink) {
+          Value target(
+              label_map[sink.stream_sink.dest_node_id], document->GetAllocator());
+          plan_fragment.AddMember("data_stream_target", target, document->GetAllocator());
+        } else if (sink.__isset.join_build_sink) {
+          Value target(
+              label_map[sink.join_build_sink.dest_node_id], document->GetAllocator());
+          plan_fragment.AddMember("join_build_target", target, document->GetAllocator());
+        }
       }
     }
     nodes.PushBack(plan_fragment, document->GetAllocator());
