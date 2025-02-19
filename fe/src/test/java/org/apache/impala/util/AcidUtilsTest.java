@@ -598,6 +598,24 @@ public class AcidUtilsTest {
   }
 
   @Test
+  public void testOpenWriteIdBeforeInsertOverwrite() {
+    assertFiltering(new String[]{
+            "base_000001/",
+            "base_000001/0000_0",
+            "delta_000002_000002_0000/",
+            "delta_000002_000002_0000/0000",
+            "base_000003/",
+            "base_000003/0000_0"},
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:3:2:1:",
+        new String[]{
+            // As there is no visibilityTxnId, it is assumed that base_000003 was produced
+            // by an insert overwrite and is accepted even though there is an earlier open
+            // write id (regression test for IMPALA-13759).
+            "base_000003/0000_0"});
+  }
+
+  @Test
   public void testWriteIdListCompare() {
     ValidWriteIdList a =
             new ValidReaderWriteIdList("default.test:1:1:1:");

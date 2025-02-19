@@ -231,6 +231,12 @@ class TestAcid(ImpalaTestSuite):
     commit_req.txnid = txn_id
     return self.hive_client.commit_txn(commit_req)
 
+  def _create_insert_only_acid_table(self, tbl, cols, part_cols=None):
+    part_part = ("partitioned by (%s)" % part_cols) if part_cols else ""
+    self.execute_query("create table {} ({}) {} tblproperties"
+        "('transactional'='true',"
+        "'transactional_properties'='insert_only')".format(tbl, cols, part_part))
+
   @SkipIfFS.hive
   def test_lock_timings(self, vector, unique_database):
     def elapsed_time_for_query(query):
@@ -360,3 +366,22 @@ class TestAcid(ImpalaTestSuite):
     # Create a new table and load it in catalogd. Catalogd should not hang.
     self.client.execute("CREATE TABLE {0}.tbl (i int)".format(unique_database))
     self.client.execute("DESCRIBE {0}.tbl".format(unique_database))
+
+  def test_insert_overwrite_base_detection(self, unique_database):
+    """"Regression test for IMPALA-13759. Checks that the base directory created by
+    INSERT OVERWRITE is detected correctly even if there is an earlier open writeId
+    in another partition."""
+    tbl = unique_database + ".insert_only_table"
+    self._create_insert_only_acid_table(tbl, "i int", "p string")
+    sleep_time_ms = 15000
+    other_partition_insert_handle = self.execute_query_async(
+        'insert into %s partition (p="a") values (sleep(%d))' % (tbl, sleep_time_ms))
+    self.execute_query('insert into %s partition (p="b") values (2)' % tbl)
+    self.execute_query('insert overwrite %s partition (p="b") values (3)' % tbl)
+    self.execute_query('insert into %s partition (p="b") values (4)' % tbl)
+    result = self.execute_query("select * from %s order by i" % tbl)
+    assert result.data == ['3\tb', '4\tb']
+    self.client.wait_for_finished_timeout(
+        other_partition_insert_handle, 0.001 * sleep_time_ms)
+    result = self.execute_query("select * from %s order by i" % tbl)
+    assert result.data == ['1\ta', '3\tb', '4\tb']
