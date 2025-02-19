@@ -257,9 +257,25 @@ public class AcidUtils {
 
     public boolean check(String dirPath) throws CatalogException {
       ParsedBase parsedBase = parseBase(dirPath);
+      // The logic below is not completely in sync with the way Hive works currently:
+      // https://github.com/apache/hive/blob/0759352ddddc793c0e717c460f0e08eb3f14c1e9/ql/src/java/org/apache/hadoop/hive/ql/io/AcidUtils.java#L1774-L1797
+      // The main difference is that metadata files are ignored, so Impala cannot
+      // differentiate between bases created by INSERT OVERWRITE / TRUNCATE and compacted
+      // bases created by older Hives (that did not use visibiliyTxnId). See IMPALA-13759
+      // for more info.
       if (parsedBase.writeId != SENTINEL_BASE_WRITE_ID) {
-        boolean isValid = writeIdList.isValidBase(parsedBase.writeId) &&
-               isTxnValid(parsedBase.visibilityTxnId);
+        boolean isValid = false;
+        if (parsedBase.visibilityTxnId != -1) {
+          // Assume that the base is produced by a compaction.
+          isValid = writeIdList.isValidBase(parsedBase.writeId) &&
+              isTxnValid(parsedBase.visibilityTxnId);
+        } else {
+          // Assume that the base is produced by INSERT OVERWRITE or TRUNCATE. It is
+          // possible for isValidBase() to fail in this case, for example if there is
+          // an earlier open writeId in a different partition, so only check whether
+          // the writeId is committed.
+          isValid = writeIdList.isWriteIdValid(parsedBase.writeId);
+        }
         if (doStrictCheck && !isValid) {
           throw new CatalogException("Invalid base file found " + dirPath);
         }
