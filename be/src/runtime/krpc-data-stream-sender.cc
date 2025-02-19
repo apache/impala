@@ -1133,7 +1133,8 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     }
     // At this point no RPCs can still refer to the old in_flight_batch_.
     in_flight_batch_.swap(serialization_batch_);
-  } else if (partition_type_ == TPartitionType::RANDOM || channels_.size() == 1) {
+  } else if (partition_type_ == TPartitionType::RANDOM ||
+      (channels_.size() == 1 && partition_type_ != TPartitionType::DIRECTED)) {
     // Round-robin batches among channels. Wait for the current channel to finish its
     // rpc before overwriting its batch.
     Channel* current_channel = channels_[current_channel_idx_].get();
@@ -1171,7 +1172,6 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     const int num_rows = batch->num_rows();
     char* prev_filename_ptr = nullptr;
     vector<IcebergPositionDeleteChannel*> prev_channels;
-    bool skipped_prev_row = false;
     for (int row_idx = 0; row_idx < num_rows; ++row_idx) {
       DCHECK_EQ(batch->num_tuples_per_row(), 1);
       TupleRow* tuple_row = batch->GetRow(row_idx);
@@ -1182,24 +1182,22 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
       if (filename_value_ss.ptr == prev_filename_ptr) {
         // If the filename pointer is the same as the previous one then we can instantly
         // send the row to the same channels as the previous row.
-        DCHECK(skipped_prev_row || !prev_channels.empty() ||
-            (filename_value_ss.len == 0 && prev_channels.empty()));
         for (IcebergPositionDeleteChannel* ch : prev_channels) {
           RETURN_IF_ERROR(ch->AddRow(tuple_row));
         }
         continue;
       }
+      prev_channels.clear();
       prev_filename_ptr = filename_value_ss.ptr;
       string filename(filename_value_ss.ptr, filename_value_ss.len);
 
       const auto filepath_to_hosts_it = filepath_to_hosts_.find(filename);
       if (filepath_to_hosts_it == filepath_to_hosts_.end()) {
-        // This can happen when e.g. compaction removed some data files from a snapshot
-        // but a delete file referencing them remained because it references other data
-        // files that remains in the new snapshot.
-        // Another use-case is table sampling where we read only a subset of the data
-        // files.
-        // A third case is when the delete record is invalid.
+        // This can happen due to file pruning, or when compaction removed some data
+        // files from a snapshot but a delete file referencing them remained because
+        // it references other data files that are still present in the new snapshot.
+        // Another case is table sampling where we read only a subset of the data files.
+        // Or, when simply the delete record is invalid.
         if (UNLIKELY(filename_value_ss.len == 0)) {
           state->LogError(
             ErrorMsg(TErrorCode::GENERAL, "NULL found as file_path in delete file"));
@@ -1207,12 +1205,10 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
           VLOG(3) << "Row from delete file refers to a non-existing data file: " <<
               filename;
         }
-        skipped_prev_row = true;
+        DCHECK(prev_channels.empty());
         continue;
       }
-      skipped_prev_row = false;
 
-      prev_channels.clear();
       for (const NetworkAddressPB& host_addr : filepath_to_hosts_it->second) {
         const auto channel_map_it = host_to_channel_.find(host_addr);
         if (channel_map_it == host_to_channel_.end()) {

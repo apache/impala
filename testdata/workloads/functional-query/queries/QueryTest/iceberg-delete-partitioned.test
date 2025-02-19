@@ -803,3 +803,33 @@ delete from ice_alltypes_part_v2 where i=1;
 ---- TYPES
 INT, BOOLEAN, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, DATE, STRING
 ====
+---- QUERY
+# Create table to test IMPALA-13768. It will have multiple partitions, with
+# multiple data files in each partition, where min/max ranges of column 'bi'
+# is disjunct for data files (in same partition).
+create table ice_invalid_deletes (bi bigint, year int)
+partitioned by spec (year)
+stored as iceberg tblproperties ('format-version'='2');
+insert into ice_invalid_deletes
+    select bigint_col, year from functional.alltypes where month = 10;
+with v as (select max(bi) as max_bi from ice_invalid_deletes)
+insert into ice_invalid_deletes select bi + v.max_bi, year from v, ice_invalid_deletes;
+delete from ice_invalid_deletes where bi % 11 = 0;
+====
+---- QUERY
+# Scan single data file (single channel in EXCHANGE sender) with delete file
+# that have references to other data files.
+select count(*) from ice_invalid_deletes where year=2010 and bi = 180;
+---- RESULTS
+31
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Scan single data file per partition with delete files that reference other data files.
+select count(*) from ice_invalid_deletes where year>2000 and bi = 180;
+---- RESULTS
+62
+---- TYPES
+BIGINT
+====
