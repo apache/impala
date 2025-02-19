@@ -300,12 +300,15 @@ void ClusterMembershipMgr::UpdateMembership(
             RemoveExecutorAndGroup(be_desc, group, new_executor_groups);
           }
         }
-        new_backend_map->erase(item.key);
 
         // If a coordinator is not shutdown gracefully, then it will be deleted here.
         if (be_desc.is_coordinator()) {
           _removeCoordIfExists(new_state, be_desc);
         }
+
+        // Note: be_desc is a reference to item.key, thus this erase must come at the end
+        // of the loop where be_desc is initialized.
+        new_backend_map->erase(item.key);
       }
       continue;
     }
