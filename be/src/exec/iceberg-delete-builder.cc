@@ -261,16 +261,19 @@ Status IcebergDeleteBuilder::AddToDeletedRows(const StringValue& path,
   } else if (path.Len() == 0) {
     return Status("NULL found as file_path in delete file");
   } else {
-    // 'deleted_rows_' should contain all data file paths that this join
-    // processes.
-    stringstream ss;
-    ss << "Invalid file path arrived at builder: " << path << " Paths expected: [";
-    for (auto& [vec_path, unused] : deleted_rows_) {
-      ss << vec_path << ", ";
+    // We received a path of a data file that is not scheduled for this fragment.
+    if (is_separate_build_) {
+      // When the build is in its own fragment we assume that delete records are filtered
+      // in the sender by DIRECTED distribution mode. Therefore we should never see
+      // dangling delete records.
+      stringstream ss;
+      ss << "Invalid file path arrived at builder: " << path << " Paths expected: [";
+      for (auto& [vec_path, unused] : deleted_rows_) {
+        ss << vec_path << ", ";
+      }
+      ss << "]";
+      return Status(ss.str());
     }
-    ss << "]";
-    DCHECK(false) << ss.str();
-    return Status(ss.str());
   }
   return Status::OK();
 }
