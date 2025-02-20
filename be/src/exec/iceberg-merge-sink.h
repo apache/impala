@@ -46,6 +46,8 @@ class IcebergMergeSinkConfig : public DataSinkConfig {
 
   ScalarExpr* merge_action() const { return merge_action_; }
 
+  virtual void Close() override;
+
  protected:
   Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
       FragmentState* state) override;

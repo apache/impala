@@ -139,3 +139,32 @@ when not matched then insert *
 ---- TYPES
 INT,BOOLEAN,INT,FLOAT,DECIMAL,DATE,STRING
 ====
+
+---- QUERY
+# Regression test for IMPALA-13770: using a native UDF as a filter predicate and target
+# value of a MERGE statement.
+# Note: even with the incorrect behaviour before IMPALA-13770 the test may pass and the
+# values can also be updated successfully. This is because the crash happens after the
+# query is closed, when releasing resources. This test is a valid regression test because
+# even if it passes, there will be a crash: some later queries are likely to fail and
+# there will be a minidump in the build artifacts, so the build will be marked FAILED.
+create function if not exists identity(int) returns int location 'UDF_LOCATION' symbol='Identity';
+create table merge_with_udf(int_col INT)
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into merge_with_udf values (1), (2);
+====
+---- QUERY
+merge into merge_with_udf t
+using merge_with_udf s on s.int_col = t.int_col
+when matched and s.int_col != identity(t.int_col) + 1
+  then update set int_col = identity(s.int_col)
+---- DML_RESULTS: merge_with_udf
+1
+2
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumDeletedRows: 2
+====
