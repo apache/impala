@@ -283,6 +283,11 @@ void IcebergMergeNode::Close(RuntimeState* state) {
   row_present_evaluator_->Close(state);
   ScalarExprEvaluator::Close(position_meta_evaluators_, state);
   ScalarExprEvaluator::Close(partition_meta_evaluators_, state);
+
+  row_present_->Close();
+  ScalarExpr::Close(position_meta_exprs_);
+  ScalarExpr::Close(partition_meta_exprs_);
+
   ExecNode::Close(state);
 }
 
@@ -326,6 +331,8 @@ Status IcebergMergeCase::Open(RuntimeState* state) {
 void IcebergMergeCase::Close(RuntimeState* state) {
   ScalarExprEvaluator::Close(filter_evaluators_, state);
   ScalarExprEvaluator::Close(output_evaluators_, state);
+  ScalarExpr::Close(output_exprs_);
+  ScalarExpr::Close(filter_conjuncts_);
 }
 
 } // namespace impala

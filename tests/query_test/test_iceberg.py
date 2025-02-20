@@ -1694,8 +1694,9 @@ class TestIcebergV2Table(IcebergTestSuite):
     assert hive_output == "id\n4\n5\n6\n7\n8\n"
 
   def test_update_basic(self, vector, unique_database):
+    udf_location = get_fs_path('/test-warehouse/libTestUdfs.so')
     self.run_test_case('QueryTest/iceberg-update-basic', vector,
-        unique_database)
+        unique_database, test_file_vars={'UDF_LOCATION': udf_location})
     self._test_update_basic_snapshots(unique_database)
     if IS_HDFS and self.should_run_for_hive(vector):
       self._update_basic_hive_tests(unique_database)
@@ -1993,7 +1994,9 @@ class TestIcebergV2Table(IcebergTestSuite):
     self._check_file_filtering(tbl_name, 100, "REWRITE_ALL", True)
 
   def test_merge(self, vector, unique_database):
-    self.run_test_case('QueryTest/iceberg-merge', vector, unique_database)
+    udf_location = get_fs_path('/test-warehouse/libTestUdfs.so')
+    self.run_test_case('QueryTest/iceberg-merge', vector, unique_database,
+        test_file_vars={'UDF_LOCATION': udf_location})
 
   def test_merge_partition(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-merge-partition', vector, unique_database)
