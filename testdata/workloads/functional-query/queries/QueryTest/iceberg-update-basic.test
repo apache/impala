@@ -404,3 +404,28 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_transforms/data/ts_day
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
+
+---- QUERY
+# Regression test for IMPALA-13770: using a native UDF in the target value of an UPDATE
+# Note: even with the incorrect behaviour before IMPALA-13770 the test may pass and the
+# values can also be updated successfully. This is because the crash happens after the
+# query is closed, when releasing resources. This test is a valid regression test because
+# even if it passes, there will be a crash: some later queries are likely to fail and
+# there will be a minidump in the build artifacts, so the build will be marked FAILED.
+create function if not exists identity(int) returns int location 'UDF_LOCATION' symbol='Identity';
+create table update_with_udf(int_col INT)
+stored by iceberg
+tblproperties ('format-version'='2');
+insert into update_with_udf values (1), (2);
+====
+---- QUERY
+update update_with_udf set int_col = identity(int_col);
+---- DML_RESULTS: update_with_udf
+1
+2
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
+NumDeletedRows: 2
+====

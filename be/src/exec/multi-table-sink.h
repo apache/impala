@@ -39,6 +39,8 @@ class MultiTableSinkConfig : public DataSinkConfig {
     return table_sink_configs_;
   }
 
+  virtual void Close() override;
+
   ~MultiTableSinkConfig() override {}
 
  protected:

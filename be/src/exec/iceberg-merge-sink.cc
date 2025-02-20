@@ -65,6 +65,12 @@ DataSink* IcebergMergeSinkConfig::CreateSink(RuntimeState* state) const {
   return state->obj_pool()->Add(new IcebergMergeSink(sink_id, *this, *tsink_, state));
 }
 
+void IcebergMergeSinkConfig::Close() {
+  delete_sink_config_->Close();
+  insert_sink_config_->Close();
+  DataSinkConfig::Close();
+}
+
 IcebergMergeSink::IcebergMergeSink(TDataSinkId sink_id,
     const IcebergMergeSinkConfig& sink_config, const TDataSink& dsink,
     RuntimeState* state)

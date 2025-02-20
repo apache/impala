@@ -44,6 +44,13 @@ DataSink* MultiTableSinkConfig::CreateSink(RuntimeState* state) const {
     new MultiTableSink(sink_id, *this, *tsink_, state));
 }
 
+void MultiTableSinkConfig::Close() {
+  for (TableSinkBaseConfig* table_sink_config : table_sink_configs_) {
+    table_sink_config->Close();
+  }
+  DataSinkConfig::Close();
+}
+
 MultiTableSink::MultiTableSink(TDataSinkId sink_id,
     const MultiTableSinkConfig& sink_config, const TDataSink& dsink,
     RuntimeState* state) : DataSink(sink_id, sink_config, "MultiTableSink", state) {
