@@ -22,7 +22,7 @@ import os
 from SystemTables.ttypes import TQueryTableColumn
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from test_query_log import TestQueryLogTableBase
-from tests.util.workload_management import assert_csv_col
+from tests.util.workload_management import assert_csv_col, QUERY_TBL_LOG
 
 
 class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
@@ -63,27 +63,27 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         "impala-server.completed-queries.written", 1, 60)
 
     # Assert tables queried.
-    assert_csv_col(client, self.QUERY_TBL, TQueryTableColumn.TABLES_QUERIED, res.query_id,
+    assert_csv_col(client, QUERY_TBL_LOG, TQueryTableColumn.TABLES_QUERIED, res.query_id,
         expected_tables_queried, db)
 
     # Assert select columns.
-    assert_csv_col(client, self.QUERY_TBL, TQueryTableColumn.SELECT_COLUMNS, res.query_id,
+    assert_csv_col(client, QUERY_TBL_LOG, TQueryTableColumn.SELECT_COLUMNS, res.query_id,
         expected_select_cols, db)
 
     # Assert where columns.
-    assert_csv_col(client, self.QUERY_TBL, TQueryTableColumn.WHERE_COLUMNS, res.query_id,
+    assert_csv_col(client, QUERY_TBL_LOG, TQueryTableColumn.WHERE_COLUMNS, res.query_id,
         expected_where_cols, db)
 
     # Assert join columns.
-    assert_csv_col(client, self.QUERY_TBL, TQueryTableColumn.JOIN_COLUMNS, res.query_id,
+    assert_csv_col(client, QUERY_TBL_LOG, TQueryTableColumn.JOIN_COLUMNS, res.query_id,
         expected_join_cols, db)
 
     # Aggregate Columns
-    assert_csv_col(client, self.QUERY_TBL, TQueryTableColumn.AGGREGATE_COLUMNS,
+    assert_csv_col(client, QUERY_TBL_LOG, TQueryTableColumn.AGGREGATE_COLUMNS,
         res.query_id, expected_aggregate_cols, db)
 
     # OrderBy Columns
-    assert_csv_col(client, self.QUERY_TBL, TQueryTableColumn.ORDERBY_COLUMNS,
+    assert_csv_col(client, QUERY_TBL_LOG, TQueryTableColumn.ORDERBY_COLUMNS,
         res.query_id, expected_orderby_cols, db)
 
   def _run_test(self, vector, tpcds_query_num, expected_tables_queried, expected_select,

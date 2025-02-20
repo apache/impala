@@ -19,6 +19,7 @@ from __future__ import absolute_import, division, print_function
 
 import os
 import string
+from time import sleep, time
 
 from getpass import getuser
 from ImpalaService import ImpalaHiveServer2Service
@@ -28,20 +29,18 @@ from TCLIService import TCLIService
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
+from tests.common.cluster_config import impalad_admission_ctrl_config_args
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.retry import retry
-from tests.util.workload_management import assert_query
-from time import sleep, time
+from tests.util.workload_management import assert_query, WM_DB, QUERY_TBL_LOG
 
 
 class TestQueryLogTableBase(CustomClusterTestSuite):
   """Base class for all query log tests. Sets up the tests to use the Beeswax and HS2
      client protocols."""
 
-  WM_DB = "sys"
-  QUERY_TBL = "{0}.impala_query_log".format(WM_DB)
   PROTOCOL_BEESWAX = "beeswax"
   PROTOCOL_HS2 = "hs2"
 
@@ -111,10 +110,10 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
         "impala-server.completed-queries.written", 1, 60)
 
     # Force Impala to process the inserts to the completed queries table.
-    client.execute("refresh " + self.QUERY_TBL)
+    client.execute("refresh " + QUERY_TBL_LOG)
 
     res = client.execute("select length(sql),plan from {0} where query_id='{1}'"
-        .format(self.QUERY_TBL, query_id))
+        .format(QUERY_TBL_LOG, query_id))
     assert res.success
     assert len(res.data) == 1
 
@@ -146,11 +145,11 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
         "impala-server.completed-queries.written", 1, 60)
 
     # Force Impala to process the inserts to the completed queries table.
-    client.execute("refresh " + self.QUERY_TBL)
+    client.execute("refresh " + QUERY_TBL_LOG)
 
     client.set_configuration_option("MAX_ROW_SIZE", 35000000)
     res = client.execute("select length(sql),plan from {0} where query_id='{1}'"
-        .format(self.QUERY_TBL, query_id))
+        .format(QUERY_TBL_LOG, query_id))
     assert res.success
     assert len(res.data) == 1
     data = res.data[0].split("\t")
@@ -182,10 +181,10 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
         "impala-server.completed-queries.written", 1, 60)
 
     # Force Impala to process the inserts to the completed queries table.
-    client.execute("refresh " + self.QUERY_TBL)
+    client.execute("refresh " + QUERY_TBL_LOG)
 
     actual = client.execute("select sql from {0} where query_id='{1}'".format(
-        self.QUERY_TBL, res.query_id))
+        QUERY_TBL_LOG, res.query_id))
     assert actual.success
     assert len(actual.data) == 1
     assert actual.data[0] == select_sql
@@ -225,7 +224,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     self.cluster.get_first_impalad().service.wait_for_metric_value(
         "impala-server.completed-queries.written", warming_query_count + 1, 60)
 
-    data = assert_query(self.QUERY_TBL, client, "test_query_hist_2",
+    data = assert_query(QUERY_TBL_LOG, client, "test_query_hist_2",
         res.runtime_profile)
 
     # Since the assert_query function only asserts that the bytes read from cache
@@ -255,7 +254,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     impalad = self.cluster.get_first_impalad()
     client = self.get_client(vector.get_value('protocol'))
 
-    res = client.execute("drop table {0} purge".format(self.QUERY_TBL))
+    res = client.execute("drop table {0} purge".format(QUERY_TBL_LOG))
     assert res.success
     impalad.service.wait_for_metric_value(
         "impala-server.completed-queries.scheduled-writes", 3, 60)
@@ -270,7 +269,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     with open(os.path.join(log_dir, "impalad.ERROR")) as file:
       for line in file:
         if line.find('could not write completed query table="{0}" query_id="{1}"'
-                          .format(self.QUERY_TBL, res.query_id)) >= 0:
+                          .format(QUERY_TBL_LOG, res.query_id)) >= 0:
           query_count += 1
 
     assert query_count == 1
@@ -310,7 +309,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     test_sql = "select '{0}','{1}'".format(rand_str,
         self.FLUSH_MAX_RECORDS_CLUSTER_ID)
     test_sql_assert = "select '{0}', count(*) from {1} where sql='{2}'".format(
-        rand_str, self.QUERY_TBL, test_sql.replace("'", r"\'"))
+        rand_str, QUERY_TBL_LOG, test_sql.replace("'", r"\'"))
 
     for _ in range(0, self.FLUSH_MAX_RECORDS_QUERY_COUNT):
       res = client.execute(test_sql)
@@ -332,12 +331,12 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
         self.FLUSH_MAX_RECORDS_QUERY_COUNT + 1, 60)
 
     # Force Impala to process the inserts to the completed queries table.
-    client.execute("refresh " + self.QUERY_TBL)
+    client.execute("refresh " + QUERY_TBL_LOG)
 
     # This query will remain queued due to the long write interval and max queued
     # records limit not being reached.
     res = client.execute(r"select count(*) from {0} where sql like 'select \'{1}\'%'"
-        .format(self.QUERY_TBL, rand_str))
+        .format(QUERY_TBL_LOG, rand_str))
     assert res.success
     assert 1 == len(res.data)
     assert str(self.FLUSH_MAX_RECORDS_QUERY_COUNT + 1) == res.data[0]
@@ -376,7 +375,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     client2 = self.create_client_for_nth_impalad(1, vector.get_value('protocol'))
     try:
       assert client2 is not None
-      assert_query(self.QUERY_TBL, client2, "",
+      assert_query(QUERY_TBL_LOG, client2, "",
           res.runtime_profile)
     finally:
       client2.close()
@@ -406,7 +405,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     client2 = self.create_client_for_nth_impalad(1, vector.get_value('protocol'))
     try:
       assert client2 is not None
-      assert_query(self.QUERY_TBL, client2, "",
+      assert_query(QUERY_TBL_LOG, client2, "",
           res.runtime_profile)
     finally:
       client2.close()
@@ -416,8 +415,6 @@ class TestQueryLogOtherTable(TestQueryLogTableBase):
   """Tests to assert that query_log_table_name works with non-default value."""
 
   OTHER_TBL = "completed_queries_table_{0}".format(int(time()))
-  # Used in TestQueryLogTableBase.setup_method
-  QUERY_TBL = "{0}.{1}".format(TestQueryLogTableBase.WM_DB, OTHER_TBL)
 
   @classmethod
   def add_test_dimensions(cls):
@@ -442,10 +439,10 @@ class TestQueryLogOtherTable(TestQueryLogTableBase):
     client = self.get_client(vector.get_value('protocol'))
 
     try:
-      res = client.execute("show tables in {0}".format(self.WM_DB))
+      res = client.execute("show tables in {0}".format(WM_DB))
       assert res.success
       assert len(res.data) > 0, "could not find any tables in database {0}" \
-          .format(self.WM_DB)
+          .format(WM_DB)
 
       tbl_found = False
       for tbl in res.data:
@@ -453,9 +450,9 @@ class TestQueryLogOtherTable(TestQueryLogTableBase):
           tbl_found = True
           break
       assert tbl_found, "could not find table '{0}' in database '{1}'" \
-          .format(self.OTHER_TBL, self.WM_DB)
+          .format(self.OTHER_TBL, WM_DB)
     finally:
-      client.execute("drop table {0}.{1} purge".format(self.WM_DB, self.OTHER_TBL))
+      client.execute("drop table {0}.{1} purge".format(WM_DB, self.OTHER_TBL))
 
 
 class TestQueryLogTableHS2(TestQueryLogTableBase):
@@ -534,7 +531,7 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
       # Test the get_tables query.
       get_tables_req = TCLIService.TGetTablesReq()
       get_tables_req.sessionHandle = open_sess_resp.sessionHandle
-      get_tables_req.schemaName = self.WM_DB
+      get_tables_req.schemaName = WM_DB
       get_tables_resp = hs2_client.GetTables(get_tables_req)
       assert_resp(get_tables_resp)
       close_op(hs2_client, get_tables_resp)
@@ -542,7 +539,7 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
       # Test the get_table_types query.
       get_tbl_typ_req = TCLIService.TGetTableTypesReq()
       get_tbl_typ_req.sessionHandle = open_sess_resp.sessionHandle
-      get_tbl_typ_req.schemaName = self.WM_DB
+      get_tbl_typ_req.schemaName = WM_DB
       get_tbl_typ_resp = hs2_client.GetTableTypes(get_tbl_typ_req)
       assert_resp(get_tbl_typ_resp)
       close_op(hs2_client, get_tbl_typ_resp)
@@ -591,11 +588,11 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
           "impala-server.completed-queries.written", 1, 30)
 
     # Force Impala to process the inserts to the completed queries table.
-    client.execute("refresh {}".format(self.QUERY_TBL))
+    client.execute("refresh {}".format(QUERY_TBL_LOG))
 
     # Assert only the one expected query was written to the completed queries table.
     assert_results = client.execute("select count(*) from {} where cluster_id='{}'"
-        .format(self.QUERY_TBL, self.HS2_OPERATIONS_CLUSTER_ID))
+        .format(QUERY_TBL_LOG, self.HS2_OPERATIONS_CLUSTER_ID))
     assert assert_results.success
     assert assert_results.data[0] == "1"
 
@@ -624,7 +621,7 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     client2 = self.create_client_for_nth_impalad(1, vector.get_value('protocol'))
     try:
       assert client2 is not None
-      assert_query(self.QUERY_TBL, client2, "test_query_hist_mult", res.runtime_profile,
+      assert_query(QUERY_TBL_LOG, client2, "test_query_hist_mult", res.runtime_profile,
           max_mem_for_admission=10485760)
     finally:
       client2.close()
@@ -659,7 +656,7 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     client2 = self.create_client_for_nth_impalad(2, vector.get_value('protocol'))
     try:
       assert client2 is not None
-      assert_query(self.QUERY_TBL, client2, "test_query_hist_3", res.runtime_profile)
+      assert_query(QUERY_TBL_LOG, client2, "test_query_hist_3", res.runtime_profile)
     finally:
       client2.close()
 
@@ -723,7 +720,7 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     try:
       def assert_func():
         results = client2.execute("select query_id,sql from {0} where query_id in "
-                                  "('{1}','{2}','{3}')".format(self.QUERY_TBL,
+                                  "('{1}','{2}','{3}')".format(QUERY_TBL_LOG,
                                   sql1.query_id, sql2.query_id, sql3.query_id))
 
         return len(results.data) == 3
@@ -767,6 +764,37 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
       r"Up to '3' queries may have been lost",
       timeout_s=60)
 
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--enable_workload_mgmt "
+      "--query_log_write_interval_s=3 "
+      "--query_log_dml_exec_timeout_s=1 "
+      "--debug_actions=INTERNAL_SERVER_AFTER_SUBMIT:SLEEP@2000",
+      catalogd_args="--enable_workload_mgmt",
+      impalad_graceful_shutdown=True, cluster_size=1, disable_log_buffering=True)
+  def test_exec_timeout(self, vector):
+    """Asserts the --query_log_dml_exec_timeout_s startup flag is added to the workload
+       management insert DML and the DML will be cancelled when its execution time exceeds
+       the value of the startup flag. Also asserts the workload management code
+       detects the query was cancelled and handles the DML failure properly."""
+    client = self.get_client(vector.get_value('protocol'))
+
+    # Run a query to completion so the completed queries queue has 1 entry.
+    assert client.execute("select 1").success
+
+    # Helper function that waits for the workload management insert DML to start.
+    def wait_for_insert_query():
+      self.insert_query_id = _find_query_in_ui(self.cluster.get_first_impalad().service,
+          "in_flight_queries", _is_insert_query)
+      return self.insert_query_id
+
+    assert retry(func=wait_for_insert_query, max_attempts=10, sleep_time_s=1, backoff=1)
+    self.assert_impalad_log_contains("INFO", "Expiring query {} due to execution time "
+                                     "limit of 1s.".format(self.insert_query_id))
+    self.assert_impalad_log_contains("INFO", "failed to write completed queries table=\""
+                                     "{}\"".format(QUERY_TBL_LOG))
+    self.assert_impalad_log_contains("INFO", "Query {} expired due to execution time "
+                                     "limit of 1s000ms".format(self.insert_query_id))
+
 
 class TestQueryLogTableAll(TestQueryLogTableBase):
   """Tests to assert the query log table is correctly populated when using all the
@@ -795,7 +823,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     client2 = self.create_client_for_nth_impalad(2, vector.get_value('protocol'))
     try:
       assert client2 is not None
-      assert_query(self.QUERY_TBL, client2, "test_query_hist_2", res.runtime_profile)
+      assert_query(QUERY_TBL_LOG, client2, "test_query_hist_2", res.runtime_profile)
     finally:
       client2.close()
 
@@ -829,7 +857,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     client2 = self.create_client_for_nth_impalad(2, vector.get_value('protocol'))
     try:
       assert client2 is not None
-      assert_query(self.QUERY_TBL, client2, "test_query_hist_3", res.runtime_profile)
+      assert_query(QUERY_TBL_LOG, client2, "test_query_hist_3", res.runtime_profile)
     finally:
       client2.close()
 
@@ -858,12 +886,12 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
         60)
 
     result = client.execute("select query_id from {0} where sql='{1}'"
-                            .format(self.QUERY_TBL, unix_now),
+                            .format(QUERY_TBL_LOG, unix_now),
                             fetch_profile_after_close=True)
     assert result.success
     assert len(result.data) == 1
 
-    assert_query(query_tbl=self.QUERY_TBL, client=client,
+    assert_query(query_tbl=QUERY_TBL_LOG, client=client,
         expected_cluster_id="test_query_hist_2", impalad=impalad, query_id=result.data[0])
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
@@ -891,7 +919,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     sqls["show tables"] = False
     sqls["SHOW tables"] = False
     sqls["ShoW tables"] = False
-    sqls["ShoW create table {0}".format(self.QUERY_TBL)] = False
+    sqls["ShoW create table {0}".format(QUERY_TBL_LOG)] = False
     sqls["show databases"] = False
     sqls["SHOW databases"] = False
     sqls["ShoW databases"] = False
@@ -901,19 +929,19 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     sqls["--mycomment\nshow tables"] = False
     sqls["/*mycomment*/ show tables"] = False
     sqls["/*mycomment*/ show tables"] = False
-    sqls["/*mycomment*/ show create table {0}".format(self.QUERY_TBL)] = False
-    sqls["/*mycomment*/ show files in {0}".format(self.QUERY_TBL)] = False
+    sqls["/*mycomment*/ show create table {0}".format(QUERY_TBL_LOG)] = False
+    sqls["/*mycomment*/ show files in {0}".format(QUERY_TBL_LOG)] = False
     sqls["/*mycomment*/ show functions"] = False
     sqls["/*mycomment*/ show data sources"] = False
     sqls["/*mycomment*/ show views"] = False
-    sqls["show metadata tables in {0}".format(self.QUERY_TBL)] = False
+    sqls["show metadata tables in {0}".format(QUERY_TBL_LOG)] = False
 
     sqls["describe database default"] = False
     sqls["/*mycomment*/ describe database default"] = False
-    sqls["describe {0}".format(self.QUERY_TBL)] = False
-    sqls["/*mycomment*/ describe {0}".format(self.QUERY_TBL)] = False
-    sqls["describe history {0}".format(self.QUERY_TBL)] = False
-    sqls["/*mycomment*/ describe history {0}".format(self.QUERY_TBL)] = False
+    sqls["describe {0}".format(QUERY_TBL_LOG)] = False
+    sqls["/*mycomment*/ describe {0}".format(QUERY_TBL_LOG)] = False
+    sqls["describe history {0}".format(QUERY_TBL_LOG)] = False
+    sqls["/*mycomment*/ describe history {0}".format(QUERY_TBL_LOG)] = False
     sqls["select 1"] = True
 
     control_queries_count = 0
@@ -935,7 +963,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
         sql_results = None
         for _ in range(6):
           sql_results = client.execute("select * from {0} where query_id='{1}'".format(
-            self.QUERY_TBL, results.query_id))
+            QUERY_TBL_LOG, results.query_id))
           control_queries_count += 1
           if sql_results.success and len(sql_results.data) == 1:
             break
@@ -949,7 +977,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
 
     for sql, query_id in sqls.items():
       log_results = client.execute("select * from {0} where query_id='{1}'"
-                                    .format(self.QUERY_TBL, query_id))
+                                    .format(QUERY_TBL_LOG, query_id))
       assert log_results.success
       assert len(log_results.data) == 0, "found query in query log table: {0}".format(sql)
 
@@ -979,7 +1007,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     self.__run_sql_inject(impalad, client, sql1_str, "closing quotes", 4)
 
     # Try a sql inject attack with terminating quote and semicolon.
-    sql2_str = "select 1'); drop table {0}; select('".format(self.QUERY_TBL)
+    sql2_str = "select 1'); drop table {0}; select('".format(QUERY_TBL_LOG)
     self.__run_sql_inject(impalad, client, sql2_str, "terminating semicolon", 7)
 
     # Attempt to cause an error using multiline comments.
@@ -1013,12 +1041,12 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
         "impala-server.completed-queries.written", expected_writes, 60)
 
     # Force Impala to process the inserts to the completed queries table.
-    client.execute("refresh " + self.QUERY_TBL)
+    client.execute("refresh " + QUERY_TBL_LOG)
 
     if expect_success:
       sql_verify = client.execute(
           "select sql from {0} where query_id='{1}'"
-          .format(self.QUERY_TBL, sql_result.query_id))
+          .format(QUERY_TBL_LOG, sql_result.query_id))
 
       assert sql_verify.success, test_case
       assert len(sql_verify.data) == 1, "did not find query '{0}' in query log " \
@@ -1030,7 +1058,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
       esc_sql = sql.replace("'", "\\'")
       sql_verify = client.execute("select sql from {0} where sql='{1}' "
                                   "and start_time_utc > '{2}'"
-                                  .format(self.QUERY_TBL, esc_sql, start_time))
+                                  .format(QUERY_TBL_LOG, esc_sql, start_time))
       assert sql_verify.success, test_case
       assert len(sql_verify.data) == 1, "did not find query '{0}' in query log " \
                                         "table for test case '{1}" \
@@ -1085,7 +1113,7 @@ class TestQueryLogTableBufferPool(TestQueryLogTableBase):
     client2 = self.create_client_for_nth_impalad(2, vector.get_value('protocol'))
     try:
       assert client2 is not None
-      data = assert_query(self.QUERY_TBL, client2, "test_query_hist_1",
+      data = assert_query(QUERY_TBL_LOG, client2, "test_query_hist_1",
           res.runtime_profile, max_mem_for_admission=10485760)
     finally:
       client2.close()
@@ -1098,3 +1126,107 @@ class TestQueryLogTableBufferPool(TestQueryLogTableBase):
       # data that was spilled.
       assert data["COMPRESSED_BYTES_SPILLED"] != "0", "compressed bytes spilled total " \
           "was zero, test did not assert anything"
+
+
+class TestQueryLogQueuedQueries(CustomClusterTestSuite):
+  """Simulates a cluster that is under load and has queries that are queueing in
+     admission control."""
+
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_config_args(
+          fs_allocation_file="fair-scheduler-one-query.xml",
+          llama_site_file="llama-site-one-query.xml",
+          additional_args="--query_log_write_interval_s=5"),
+      impalad_graceful_shutdown=True, workload_mgmt=True,
+      num_exclusive_coordinators=1, cluster_size=2,
+      default_query_options=[('fetch_rows_timeout_ms', '1000')])
+  def test_query_queued(self):
+    """Tests the situation where a cluster is under heavy load and the workload management
+       insert DML is queued in admission control and has to wait for an admission control
+       slot to become available.
+
+       The overall flow is:
+         1. Run a query to completion so the 'insert into sys.impala_query_log' DML runs.
+         2. Start a query that will block the only available admission control slot.
+         3. Wait for the 'insert into sys.impala_query_log' DML to start.
+         4. Wait 2 seconds to ensure the 1 second FETCH_ROWS_TIMEOUT_MS does not cause the
+              insert query to fail.
+         5. Fetch all rows of the original blocking query to cause it to finish and
+              release its admission control slot.
+         6. Assert the 'insert into sys.impala_query_log' DML is in the list of completed
+              queries.
+       """
+    resp = self.hs2_client.execute_async("SELECT * FROM functional.alltypes LIMIT 5")
+    self.wait_for_state(resp, 'FINISHED_STATE', 60, client=self.hs2_client)
+    self.hs2_client.close_query(resp)
+
+    # Start a query that will consume the only available slot since its rows are not
+    # fetched until later.
+    ROW_LIMIT = 5
+    long_query_resp = self.hs2_client.execute_async(
+        "SELECT * FROM functional.alltypes LIMIT {}".format(ROW_LIMIT))
+
+    # Helper function that waits for the workload management insert DML to start.
+    def wait_for_insert_query():
+      self.insert_query_id = _find_query_in_ui(self.cluster.get_first_impalad().service,
+          "in_flight_queries", _is_insert_query)
+      return self.insert_query_id
+
+    assert retry(func=wait_for_insert_query, max_attempts=10, sleep_time_s=1, backoff=1)
+
+    # Wait 2 seconds to ensure the insert into DML is not killed by the fetch rows
+    # timeout (set to 1 second in this test's annotations).
+    sleep(2)
+
+    # Helper function that checks if a query matches the workload management insert DML
+    # that had to wait for the one admission control to become available.
+    def is_insert_query_queryid(query):
+      return query["query_id"] == self.insert_query_id
+
+    # Assert the workload management insert DML did not get cancelled early and is still
+    # waiting.
+    assert _find_query_in_ui(self.cluster.get_first_impalad().service,
+        "in_flight_queries", is_insert_query_queryid), \
+        "Did not find the workload management insert into query having id '{}' in the " \
+        "list of in-flight queries".format(self.insert_query_id)
+
+    # Retrieve all rows of the original blocking query to cause it to complete.
+    self.wait_for_state(long_query_resp, 'FINISHED_STATE', 60, client=self.hs2_client)
+    self.hs2_client.close_query(long_query_resp)
+
+    # Helper function that checks if a query matches the workload management insert DML
+    # that had to wait for the one admission control slot to become available.
+    def is_insert_query_queryid_success(query):
+      return query["query_id"] == self.insert_query_id and query['state'] == "FINISHED"
+
+    # Ensure the insert into DML has finished successfully. The previous row retrieval
+    # ended the blocking query and thus should open up the one admission control slot for
+    # the workload management DML to run.
+    def find_completed_insert_query():
+      return _find_query_in_ui(self.cluster.get_first_impalad().service,
+          "completed_queries", is_insert_query_queryid_success)
+    assert retry(func=find_completed_insert_query, max_attempts=10, sleep_time_s=1,
+                 backoff=1)
+
+
+# Helper function to determine if a query from the debug UI is a workload management
+# insert DML.
+def _is_insert_query(query):
+  return query["stmt"].lower().startswith("insert into {}".format(QUERY_TBL_LOG))
+
+
+def _find_query_in_ui(service, section, func):
+  """Calls to the debug UI's queries page and loops over all queries in the specified
+      section calling the provided func for each query, Returns the string id of the
+      first query that matches or None if no query matches."""
+  assert section == "completed_queries" or section == "in_flight_queries"
+
+  queries_json = service.get_debug_webpage_json('/queries')
+  query_id = None
+
+  for query in queries_json[section]:
+    if func(query):
+      query_id = query['query_id']
+      break
+
+  return query_id

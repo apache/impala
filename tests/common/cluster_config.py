@@ -19,11 +19,17 @@
 
 from __future__ import absolute_import, division, print_function
 
+import os
+import shutil
+
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 
 # Same as in tests/authorization/test_ranger.py
 ADMIN = "admin"
+
+# The path to resources directory which contains the admission control config files.
+RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test", "resources")
 
 enable_authorization = CustomClusterTestSuite.with_args(
     # Same as IMPALAD_ARGS and CATALOGD_ARGS in tests/authorization/test_ranger.py
@@ -63,3 +69,24 @@ admit_no_query = CustomClusterTestSuite.with_args(
 single_coordinator = CustomClusterTestSuite.with_args(
     num_exclusive_coordinators=1
 )
+
+
+def impalad_admission_ctrl_config_args(fs_allocation_file, llama_site_file,
+                                        additional_args="", make_copy=False):
+  """Generates impalad startup flags configuring the fair scheduler and llama site path
+     options and setting logging for admission control to VLOG_ROW.
+
+     The specified fair scheduler and llama site files are copied first, and the copies
+     are used as the value for the relevant startup flags."""
+  fs_allocation_path = os.path.join(RESOURCES_DIR, fs_allocation_file)
+  llama_site_path = os.path.join(RESOURCES_DIR, llama_site_file)
+  if make_copy:
+    copy_fs_allocation_path = os.path.join(RESOURCES_DIR, "copy-" + fs_allocation_file)
+    copy_llama_site_path = os.path.join(RESOURCES_DIR, "copy-" + llama_site_file)
+    shutil.copy2(fs_allocation_path, copy_fs_allocation_path)
+    shutil.copy2(llama_site_path, copy_llama_site_path)
+    fs_allocation_path = copy_fs_allocation_path
+    llama_site_path = copy_llama_site_path
+  return ("-vmodule admission-controller=3 -fair_scheduler_allocation_path %s "
+          "-llama_site_path %s %s" % (fs_allocation_path, llama_site_path,
+                                      additional_args))

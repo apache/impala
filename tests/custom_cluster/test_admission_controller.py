@@ -24,7 +24,6 @@ import logging
 import os
 import pytest
 import re
-import shutil
 import signal
 import sys
 import threading
@@ -34,7 +33,10 @@ from time import sleep, time
 from beeswaxd.BeeswaxService import QueryState
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.cluster_config import impalad_admission_ctrl_flags
+from tests.common.cluster_config import (
+    impalad_admission_ctrl_flags,
+    impalad_admission_ctrl_config_args,
+    RESOURCES_DIR)
 from tests.common.custom_cluster_test_suite import (
     ADMISSIOND_ARGS,
     IMPALAD_ARGS,
@@ -49,6 +51,7 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension)
 from tests.common.test_vector import ImpalaTestDimension
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
+from tests.util.workload_management import QUERY_TBL_LIVE
 from tests.util.web_pages_util import (
     get_num_completed_backends,
     get_mem_admitted_backends_debug_page)
@@ -139,32 +142,8 @@ STALE_TOPIC_THRESHOLD_MS = 500
 INITIAL_QUEUE_REASON_REGEX = \
     "Initial admission queue reason: waited [0-9]* ms, reason: .*"
 
-# The path to resources directory which contains the admission control config files.
-RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test", "resources")
-
 # SQL statement that selects all records for the active queries table.
-ACTIVE_SQL = "select * from sys.impala_query_live"
-
-
-def impalad_admission_ctrl_config_args(fs_allocation_file, llama_site_file,
-                                        additional_args="", make_copy=False):
-  """Generates impalad startup flags configuring the fair scheduler and llama site path
-     options and setting logging for admission control to VLOG_ROW.
-
-     The specified fair scheduler and llama site files are copied first, and the copies
-     are used as the value for the relevant startup flags."""
-  fs_allocation_path = os.path.join(RESOURCES_DIR, fs_allocation_file)
-  llama_site_path = os.path.join(RESOURCES_DIR, llama_site_file)
-  if make_copy:
-    copy_fs_allocation_path = os.path.join(RESOURCES_DIR, "copy-" + fs_allocation_file)
-    copy_llama_site_path = os.path.join(RESOURCES_DIR, "copy-" + llama_site_file)
-    shutil.copy2(fs_allocation_path, copy_fs_allocation_path)
-    shutil.copy2(llama_site_path, copy_llama_site_path)
-    fs_allocation_path = copy_fs_allocation_path
-    llama_site_path = copy_llama_site_path
-  return ("-vmodule admission-controller=3 -fair_scheduler_allocation_path %s "
-          "-llama_site_path %s %s" % (fs_allocation_path, llama_site_path,
-                                      additional_args))
+ACTIVE_SQL = "select * from {}".format(QUERY_TBL_LIVE)
 
 
 def log_metrics(log_prefix, metrics):
@@ -1860,7 +1839,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         vector=vector,
         expected_frag_counts=[4, 2, 2],
         query="select a.test_name, b.db_user from functional.jointbl a inner join "
-              "sys.impala_query_live b on a.test_name = b.db_name"),
+              "{} b on a.test_name = b.db_name".format(QUERY_TBL_LIVE)),
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(num_exclusive_coordinators=3, cluster_size=3,

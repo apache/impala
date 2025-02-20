@@ -25,20 +25,21 @@ from logging import getLogger
 
 from SystemTables.ttypes import TQueryTableColumn
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.util.workload_management import assert_query
+from tests.util.workload_management import (
+    assert_query,
+    WM_DB,
+    QUERY_TBL_LOG_NAME,
+    QUERY_TBL_LOG,
+    QUERY_TBL_LIVE_NAME,
+    QUERY_TBL_LIVE)
 
 LOG = getLogger(__name__)
+QUERY_TBL_ALL = "{},{}".format(QUERY_TBL_LOG_NAME, QUERY_TBL_LIVE_NAME)
 
 
 class TestWorkloadManagementInitBase(CustomClusterTestSuite):
 
   """Defines common setup and methods for all workload management init tests."""
-
-  WM_DB = "sys"
-  QUERY_TBL_LOG_NAME = "impala_query_log"
-  QUERY_TBL_LOG = "{0}.{1}".format(WM_DB, QUERY_TBL_LOG_NAME)
-  QUERY_TBL_LIVE_NAME = "impala_query_live"
-  QUERY_TBL_LIVE = "{0}.{1}".format(WM_DB, QUERY_TBL_LIVE_NAME)
 
   LATEST_SCHEMA = "1.2.0"
 
@@ -121,15 +122,15 @@ class TestWorkloadManagementInitBase(CustomClusterTestSuite):
     """Asserts a given regex is found in the catalog log file for each workload management
       table. The regex is passed the fully qualified table name using python string
       substitution."""
-    for table in (self.QUERY_TBL_LOG, self.QUERY_TBL_LIVE):
+    for table in (QUERY_TBL_LOG, QUERY_TBL_LIVE):
       self.assert_catalogd_log_contains("INFO", line_regex.format(table))
 
   def check_schema(self, schema_ver, vector, multiple_impalad=False):
     """Asserts that all workload management tables have the correct columns and are at the
        specified schema version."""
-    for tbl_name in (self.QUERY_TBL_LOG_NAME, self.QUERY_TBL_LIVE_NAME):
+    for tbl_name in (QUERY_TBL_LOG_NAME, QUERY_TBL_LIVE_NAME):
       self.run_test_case('QueryTest/workload-mgmt-{}-v{}'.format(tbl_name, schema_ver),
-          vector, self.WM_DB, multiple_impalad=multiple_impalad)
+          vector, WM_DB, multiple_impalad=multiple_impalad)
 
 
 class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
@@ -160,7 +161,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
       impalad_args="--enable_workload_mgmt --workload_mgmt_schema_version=1.0.0",
       catalogd_args="--enable_workload_mgmt "
                     "--workload_mgmt_schema_version=1.0.0 "
-                    "--workload_mgmt_drop_tables=impala_query_log,impala_query_live")
+                    "--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL))
   def test_create_on_version_1_0_0(self, vector):
     """Asserts that workload management tables are properly created on version 1.0.0 using
        a 10 node cluster when no tables exist."""
@@ -171,7 +172,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
       impalad_args="--enable_workload_mgmt --workload_mgmt_schema_version=1.1.0",
       catalogd_args="--enable_workload_mgmt "
                     "--workload_mgmt_schema_version=1.1.0 "
-                    "--workload_mgmt_drop_tables=impala_query_log,impala_query_live")
+                    "--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL))
   def test_create_on_version_1_1_0(self, vector):
     """Asserts that workload management tables are properly created on version 1.1.0 using
        a 10 node cluster when no tables exist."""
@@ -181,7 +182,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
       log_symlinks=True,
       impalad_args="--enable_workload_mgmt",
       catalogd_args="--enable_workload_mgmt "
-                    "--workload_mgmt_drop_tables=impala_query_log,impala_query_live")
+                    "--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL))
   def test_create_on_version_1_2_0(self, vector):
     """Asserts that workload management tables are properly created on the latest version
        using a 10 node cluster when no tables exist."""
@@ -191,7 +192,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
       impalad_args="--enable_workload_mgmt --workload_mgmt_schema_version=1.0.0",
       catalogd_args="--enable_workload_mgmt "
                     "--workload_mgmt_schema_version=1.0.0 "
-                    "--workload_mgmt_drop_tables=impala_query_log,impala_query_live",
+                    "--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL),
       disable_log_buffering=True)
   def test_upgrade_1_0_0_to_1_1_0(self, vector):
     """Asserts that an upgrade from version 1.0.0 to 1.1.0 succeeds when starting with no
@@ -215,7 +216,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
       impalad_args="--enable_workload_mgmt --workload_mgmt_schema_version=1.1.0",
       catalogd_args="--enable_workload_mgmt "
                     "--workload_mgmt_schema_version=1.1.0 "
-                    "--workload_mgmt_drop_tables=impala_query_log,impala_query_live",
+                    "--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL),
       disable_log_buffering=True)
   def test_upgrade_1_1_0_to_1_2_0(self, vector):
     """Asserts that an upgrade from version 1.1.0 to 1.2.0 succeeds when starting with no
@@ -239,7 +240,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
       impalad_args="--enable_workload_mgmt --workload_mgmt_schema_version=1.0.0",
       catalogd_args="--enable_workload_mgmt "
                     "--workload_mgmt_schema_version=1.0.0 "
-                    "--workload_mgmt_drop_tables=impala_query_log,impala_query_live",
+                    "--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL),
       disable_log_buffering=True)
   def test_upgrade_1_0_0_to_1_2_0(self, vector):
     """Asserts that an upgrade from version 1.0.0 to 1.2.0 succeeds when starting with no
@@ -285,7 +286,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     impalad = self.cluster.get_first_impalad()
 
     # Check the live queries table first.
-    assert_query(self.QUERY_TBL_LIVE, self.client, impalad=impalad, query_id=res.query_id,
+    assert_query(QUERY_TBL_LIVE, self.client, impalad=impalad, query_id=res.query_id,
         expected_overrides={
           TQueryTableColumn.SELECT_COLUMNS: "",
           TQueryTableColumn.WHERE_COLUMNS: "",
@@ -298,7 +299,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     # Check the query log table.
     impalad.service.wait_for_metric_value(
         "impala-server.completed-queries.written", 2, 60)
-    assert_query(self.QUERY_TBL_LOG, self.client, impalad=impalad, query_id=res.query_id,
+    assert_query(QUERY_TBL_LOG, self.client, impalad=impalad, query_id=res.query_id,
         expected_overrides={
           TQueryTableColumn.SELECT_COLUMNS: "NULL",
           TQueryTableColumn.WHERE_COLUMNS: "NULL",
@@ -313,24 +314,24 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
       impalad_args="--enable_workload_mgmt",
       catalogd_args="--enable_workload_mgmt "
                     "--query_log_table_props=\"foo=bar,foo1=bar1\" "
-                    "--workload_mgmt_drop_tables=impala_query_log,impala_query_live")
+                    "--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL))
   def test_create_table_with_custom_props(self):
     """Asserts that creating workload management tables with additional properties
        specified adds those properties."""
 
-    self.assert_table_prop(self.QUERY_TBL_LOG, "foo", "bar")
-    self.assert_table_prop(self.QUERY_TBL_LIVE, "foo", "bar")
+    self.assert_table_prop(QUERY_TBL_LOG, "foo", "bar")
+    self.assert_table_prop(QUERY_TBL_LIVE, "foo", "bar")
 
   @CustomClusterTestSuite.with_args(cluster_size=1, disable_log_buffering=True,
       log_symlinks=True,
       impalad_args="--enable_workload_mgmt",
       catalogd_args="--enable_workload_mgmt "
-                    "--workload_mgmt_drop_tables=impala_query_log,impala_query_live")
+                    "--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL))
   def test_create_from_scratch(self, vector):
     """Tests the conditions that exist when workload management is first started by
        deleteing the workload management tables and the sys db and restarting."""
     assert self.client.execute("drop database {} cascade"
-        .format(self.WM_DB)).success
+        .format(WM_DB)).success
 
     self.restart_cluster(vector, log_symlinks=True)
     self.check_schema(self.LATEST_SCHEMA, vector)
@@ -362,8 +363,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
             "Found minidumps but none should exist."
     finally:
       self.restart_cluster(vector, cluster_size=1,
-          additional_catalogd_opts="--workload_mgmt_drop_tables=impala_query_log,"
-          "impala_query_live")
+          additional_catalogd_opts="--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL))
 
   @CustomClusterTestSuite.with_args(cluster_size=1, log_symlinks=True,
       impalad_args="--enable_workload_mgmt --minidump_path={invalid_schema}",
@@ -374,7 +374,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     """Tests that startup succeeds when the 'schema_version' table property on the
        sys.impala_query_log table contains an invalid value but the wm_schema_version
        table property contains a valid value."""
-    self._run_invalid_table_prop_test(self.QUERY_TBL_LOG, "schema_version", vector, True)
+    self._run_invalid_table_prop_test(QUERY_TBL_LOG, "schema_version", vector, True)
 
   @CustomClusterTestSuite.with_args(cluster_size=1, log_symlinks=True,
       impalad_args="--enable_workload_mgmt --minidump_path={invalid_schema}",
@@ -384,7 +384,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
   def test_invalid_wm_schema_version_log_table_prop(self, vector):
     """Tests that startup fails when the 'wm_schema_version' table property on the
        sys.impala_query_log table contains an invalid value."""
-    self._run_invalid_table_prop_test(self.QUERY_TBL_LOG, "wm_schema_version", vector)
+    self._run_invalid_table_prop_test(QUERY_TBL_LOG, "wm_schema_version", vector)
 
   @CustomClusterTestSuite.with_args(cluster_size=1, log_symlinks=True,
       impalad_args="--enable_workload_mgmt --minidump_path={invalid_schema}",
@@ -395,7 +395,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     """Tests that startup succeeds when the 'schema_version' table property on the
        sys.impala_query_live table contains an invalid value but the wm_schema_version
        table property contains a valid value."""
-    self._run_invalid_table_prop_test(self.QUERY_TBL_LIVE, "schema_version", vector, True)
+    self._run_invalid_table_prop_test(QUERY_TBL_LIVE, "schema_version", vector, True)
 
   @CustomClusterTestSuite.with_args(cluster_size=1, log_symlinks=True,
       impalad_args="--enable_workload_mgmt --minidump_path={invalid_schema}",
@@ -405,7 +405,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
   def test_invalid_wm_schema_version_live_table_prop(self, vector):
     """Tests that startup fails when the 'wm_schema_version' table property on the
        sys.impala_query_live table contains an invalid value."""
-    self._run_invalid_table_prop_test(self.QUERY_TBL_LIVE, "wm_schema_version", vector)
+    self._run_invalid_table_prop_test(QUERY_TBL_LIVE, "wm_schema_version", vector)
 
   @CustomClusterTestSuite.with_args(cluster_size=1, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt",
@@ -414,10 +414,10 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     """Simulated an upgrade situation from workload management tables created by previous
        builds of Impala."""
 
-    for table in (self.QUERY_TBL_LOG, self.QUERY_TBL_LIVE):
+    for table in (QUERY_TBL_LOG, QUERY_TBL_LIVE):
       assert self.client.execute("drop table if exists {} purge".format(table)).success
 
-    for table in (self.QUERY_TBL_LOG_NAME, self.QUERY_TBL_LIVE_NAME):
+    for table in (QUERY_TBL_LOG_NAME, QUERY_TBL_LIVE_NAME):
       with open("{}/testdata/workload_mgmt/create_{}_table.sql"
           .format(os.environ["IMPALA_HOME"], table), "r") as f:
         create_sql = f.read()
@@ -434,12 +434,12 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     impalad = self.cluster.get_first_impalad()
 
     # Check the live queries table first.
-    assert_query(self.QUERY_TBL_LIVE, self.client, impalad=impalad, query_id=res.query_id)
+    assert_query(QUERY_TBL_LIVE, self.client, impalad=impalad, query_id=res.query_id)
 
     # Check the query log table.
     impalad.service.wait_for_metric_value(
         "impala-server.completed-queries.written", 2, 60)
-    assert_query(self.QUERY_TBL_LOG, self.client, impalad=impalad, query_id=res.query_id)
+    assert_query(QUERY_TBL_LOG, self.client, impalad=impalad, query_id=res.query_id)
 
   @CustomClusterTestSuite.with_args(cluster_size=1, disable_log_buffering=True,
       impalad_args="--enable_workload_mgmt",
@@ -449,10 +449,10 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
        workload management code, and the current code is started at workload management
        schema version 1.0.0 (even though that version is not the latest)."""
 
-    for table in (self.QUERY_TBL_LOG, self.QUERY_TBL_LIVE):
+    for table in (QUERY_TBL_LOG, QUERY_TBL_LIVE):
       assert self.client.execute("drop table if exists {} purge".format(table)).success
 
-    for table in (self.QUERY_TBL_LOG_NAME, self.QUERY_TBL_LIVE_NAME):
+    for table in (QUERY_TBL_LOG_NAME, QUERY_TBL_LIVE_NAME):
       with open("{}/testdata/workload_mgmt/create_{}_table.sql"
           .format(os.environ["IMPALA_HOME"], table), "r") as f:
         create_sql = f.read()
@@ -461,7 +461,7 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     self.restart_cluster(vector, schema_version="1.0.0", log_symlinks=True,
         additional_impalad_opts="--query_log_write_interval_s=15")
 
-    for table in (self.QUERY_TBL_LOG, self.QUERY_TBL_LIVE):
+    for table in (QUERY_TBL_LOG, QUERY_TBL_LIVE):
       self.assert_table_prop(table, "schema_version", "1.0.0")
       self.assert_table_prop(table, "wm_schema_version", should_exist=False)
 
@@ -471,10 +471,10 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
 
     # Check the live queries table first.
     live_results = self.client.execute("select * from {} where query_id='{}'".format(
-        self.QUERY_TBL_LIVE, res.query_id))
+        QUERY_TBL_LIVE, res.query_id))
     assert live_results.success
     assert len(live_results.data) == 1, "did not find query in '{}' table '{}'".format(
-        res.query_id, self.QUERY_TBL_LIVE)
+        res.query_id, QUERY_TBL_LIVE)
     assert len(live_results.column_labels) == 49
     data = live_results.data[0].split("\t")
     assert len(data) == len(live_results.column_labels)
@@ -483,10 +483,10 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
     self.cluster.get_first_impalad().service.wait_for_metric_value(
         "impala-server.completed-queries.written", 2, 60)
     log_results = self.client.execute("select * from {} where query_id='{}'".format(
-        self.QUERY_TBL_LOG, res.query_id))
+        QUERY_TBL_LOG, res.query_id))
     assert log_results.success
     assert len(log_results.data) == 1, "did not find query in '{}' table '{}'".format(
-        res.query_id, self.QUERY_TBL_LOG)
+        res.query_id, QUERY_TBL_LOG)
     assert len(log_results.column_labels) == 49
     data = log_results.data[0].split("\t")
     assert len(data) == len(log_results.column_labels)
@@ -517,8 +517,9 @@ class TestWorkloadManagementInitNoWait(TestWorkloadManagementInitBase):
   @CustomClusterTestSuite.with_args(cluster_size=1, log_symlinks=True,
       impalad_args="--enable_workload_mgmt --query_log_write_interval_s=3",
       catalogd_args="--enable_workload_mgmt "
-                    "--workload_mgmt_drop_tables=impala_query_log,impala_query_live "
-                    "--debug_actions=CATALOG_WORKLOADMGMT_STARTUP:SLEEP@15000",
+                    "--workload_mgmt_drop_tables={} "
+                    "--debug_actions=CATALOG_WORKLOADMGMT_STARTUP:SLEEP@15000"
+                    .format(QUERY_TBL_ALL),
       disable_log_buffering=True)
   def test_catalog_init_delay(self):
     # Workload management init is slightly delayed after catalogd startup, wait for the

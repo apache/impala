@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<allocations>
+    <queue name="root">
+        <queue name="default">
+            <maxResources>200000 mb, 0 vcores</maxResources>
+            <aclSubmitApps>* </aclSubmitApps>
+        </queue>
+    </queue>
+    <queuePlacementPolicy>
+        <rule name="specified" create="false"/>
+        <rule name="default" />
+    </queuePlacementPolicy>
+</allocations>

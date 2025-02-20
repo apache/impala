@@ -27,6 +27,11 @@ from tests.util.assert_time import assert_time_str, convert_to_milliseconds
 from tests.util.memory import assert_byte_str, convert_to_bytes
 
 DEDICATED_COORD_SAFETY_BUFFER_BYTES = 104857600
+WM_DB = "sys"
+QUERY_TBL_LOG_NAME = "impala_query_log"
+QUERY_TBL_LOG = "{0}.{1}".format(WM_DB, QUERY_TBL_LOG_NAME)
+QUERY_TBL_LIVE_NAME = "impala_query_live"
+QUERY_TBL_LIVE = "{0}.{1}".format(WM_DB, QUERY_TBL_LIVE_NAME)
 
 
 def round_to_3(val):
@@ -62,7 +67,7 @@ def assert_query(query_tbl, client, expected_cluster_id="", raw_profile=None,
   profile_lines = profile_text.split("\n")
 
   # Force Impala to process the inserts to the completed queries table.
-  if query_tbl != 'sys.impala_query_live':
+  if query_tbl != QUERY_TBL_LIVE:
     client.execute("refresh " + query_tbl)
 
   # Assert the query was written correctly to the query log table.
@@ -671,7 +676,7 @@ def assert_csv_col(client, query_tbl, col, query_id, expected_list, db="tpcds"):
   print("Query Id: {0}".format(query_id))
 
   # Force Impala to process the inserts to the completed queries table.
-  if query_tbl != 'sys.impala_query_live':
+  if query_tbl != QUERY_TBL_LIVE:
     client.execute("refresh " + query_tbl)
 
   # Assert the query was written correctly to the query log table.

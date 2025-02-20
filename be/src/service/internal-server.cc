@@ -161,6 +161,11 @@ Status ImpalaServer::SubmitAndWait(const string& user_name, const string& sql,
   RETURN_IF_ERROR(OpenSession(user_name, new_session_id, query_opts));
   RETURN_IF_ERROR(SubmitQuery(sql, new_session_id, new_query_id, persist_in_db));
 
+  if (const auto& debug_action = query_opts.find(TImpalaQueryOptions::DEBUG_ACTION);
+      debug_action != query_opts.end()) {
+    RETURN_IF_ERROR(DebugAction(debug_action->second, "INTERNAL_SERVER_AFTER_SUBMIT"));
+  }
+
   return WaitForResults(new_query_id);
 } // ImpalaServer::SubmitAndWait
 
@@ -180,7 +185,7 @@ Status ImpalaServer::WaitForResults(TUniqueId& query_id) {
     return Status::Expected("query timed out waiting for results");
   }
 
-  return Status::OK();
+  return query_handle->query_status();
 } // ImpalaServer::WaitForResults
 
 Status ImpalaServer::SubmitQuery(const string& sql, const TUniqueId& session_id,

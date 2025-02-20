@@ -326,7 +326,7 @@ TEST(InternalServerTest, RetryFailedQuery) {
   orig_query_id = query_id;
 
   Status wait_status = fixture->WaitForResults(query_id);
-  ASSERT_OK(wait_status);
+  ASSERT_FALSE(wait_status.ok());
 
   EXPECT_TRUE(orig_query_id != query_id);
 

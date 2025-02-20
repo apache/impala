@@ -67,6 +67,7 @@ using kudu::Version;
 
 DECLARE_bool(enable_workload_mgmt);
 DECLARE_int32(query_log_write_interval_s);
+DECLARE_int32(query_log_dml_exec_timeout_s);
 DECLARE_int32(query_log_max_insert_attempts);
 DECLARE_int32(query_log_max_queued);
 DECLARE_int32(query_log_shutdown_timeout_s);
@@ -670,6 +671,12 @@ void ImpalaServer::WorkloadManagementWorker(const Version& target_schema_version
                                             FLAGS_query_log_write_timeout_s);
   if (!FLAGS_query_log_request_pool.empty()) {
     insert_query_opts[TImpalaQueryOptions::REQUEST_POOL] = FLAGS_query_log_request_pool;
+  }
+  insert_query_opts[TImpalaQueryOptions::FETCH_ROWS_TIMEOUT_MS] = "0";
+  insert_query_opts[TImpalaQueryOptions::EXEC_TIME_LIMIT_S] =
+      std::to_string(FLAGS_query_log_dml_exec_timeout_s);
+  if (!FLAGS_debug_actions.empty()) {
+    insert_query_opts[TImpalaQueryOptions::DEBUG_ACTION] = FLAGS_debug_actions;
   }
 
   while (true) {
