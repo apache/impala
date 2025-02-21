@@ -674,6 +674,7 @@ class DataStreamTest : public testing::Test {
     sender->Close(&state);
     info->num_bytes_sent = static_cast<KrpcDataStreamSender*>(
         sender.get())->GetNumDataBytesSent();
+    data_sink->Close();
 
     batch->Reset();
     state.ReleaseResources();

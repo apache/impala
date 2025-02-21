@@ -118,6 +118,10 @@ class Expr {
   friend class ExprTest;
   friend class ExprCodegenTest;
 
+#ifndef NDEBUG
+  bool closed_ = false;
+#endif
+
   /// Creates an expression tree rooted at 'root' via depth-first traversal.
   /// Called recursively to create children expr trees for sub-expressions.
   ///

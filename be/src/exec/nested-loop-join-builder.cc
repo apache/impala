@@ -244,6 +244,13 @@ void NljBuilder::Close(RuntimeState* state) {
     if (ctx.expr_eval != nullptr) ctx.expr_eval->Close(state);
   }
 
+  if (!is_separate_build_) {
+    // If we are using embedded mode, the sink config is created by
+    // NljBuilder::CreateEmbeddedBuilder, so we must close it ourselves.
+    // TODO: Remove const-cast.
+    const_cast<DataSinkConfig&>(sink_config_).Close();
+  }
+
   DataSink::Close(state);
   closed_ = true;
 }

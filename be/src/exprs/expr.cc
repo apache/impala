@@ -44,6 +44,9 @@ Expr::Expr(const TExprNode& node)
 }
 
 Expr::~Expr() {
+#ifndef NDEBUG
+  DCHECK(closed_);
+#endif
   DCHECK(cache_entry_ == nullptr);
 }
 
@@ -97,6 +100,9 @@ void Expr::Close() {
     LibCache::instance()->DecrementUseCount(cache_entry_);
     cache_entry_ = nullptr;
   }
+#ifndef NDEBUG
+  closed_ = true;
+#endif
 }
 
 }

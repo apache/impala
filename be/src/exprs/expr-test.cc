@@ -1524,6 +1524,7 @@ TEST_P(ExprTest, NullLiteral) {
     EXPECT_OK(eval->Open(&state));
     EXPECT_TRUE(eval->GetValue(nullptr) == nullptr);
     eval->Close(&state);
+    expr.Close();
     state.ReleaseResources();
   }
 }
@@ -9165,7 +9166,9 @@ TEST_P(ExprTest, ResultsLayoutTest) {
 
   expected_offsets.clear();
   for (const ColumnType& t: types) {
+    ScalarExpr::Close(exprs);
     exprs.clear();
+
     expected_offsets.clear();
     // With one expr, all offsets should be 0.
     expected_offsets[t.GetByteSize()] = set<int>({0});
@@ -9184,6 +9187,8 @@ TEST_P(ExprTest, ResultsLayoutTest) {
   int expected_byte_size = 0;
   int expected_var_begin = 0;
   expected_offsets.clear();
+
+  ScalarExpr::Close(exprs);
   exprs.clear();
 
   // Test layout adding a bunch of exprs.  Previously, this triggered padding.
@@ -9259,6 +9264,8 @@ TEST_P(ExprTest, ResultsLayoutTest) {
     std::random_shuffle(exprs.begin(), exprs.end());
     ValidateLayout(exprs, expected_byte_size, expected_var_begin, expected_offsets);
   }
+
+  ScalarExpr::Close(exprs);
 }
 
 // TODO: is there an easy way to templatize/parametrize these tests?

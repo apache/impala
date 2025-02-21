@@ -90,6 +90,7 @@ class TupleRowCompareTest : public testing::Test {
 
   template <typename... Types>
   void CreateComperator(Types... types) {
+    ScalarExpr::Close(ordering_exprs_);
     ordering_exprs_.clear();
     LoadComperator(1, types...);
   }
