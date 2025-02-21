@@ -371,10 +371,10 @@ class Report(object):
         self.delta_avg = float('-inf')
         self.perf_change_str = ''
       else:
-        median = results[SORTED][int(len(results[SORTED]) / 2)]
+        base_median = ref_results[SORTED][int(len(results[SORTED]) / 2)]
         all_diffs = [x - y for x in results[SORTED] for y in ref_results[SORTED]]
         all_diffs.sort()
-        self.median_diff = all_diffs[int(len(all_diffs) / 2)] / median
+        self.median_diff = all_diffs[int(len(all_diffs) / 2)] / base_median
         self.perf_change, self.zval, self.tval = (
           self.__check_perf_change_significance(results, ref_results))
         self.base_avg = ref_results[AVG]
