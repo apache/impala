@@ -1044,7 +1044,9 @@ public class FileSystemUtil {
 
   public static final String DOT = ".";
   public static final String HIVE_TEMP_FILE_PREFIX = "_tmp.";
+  public static final String HIVE_NEW_TEMP_FILE_PREFIX = "-tmp.";
   public static final String SPARK_TEMP_FILE_PREFIX = "_spark_metadata";
+  public static final String IMPALA_STAGING_DIR_PREFIX = "_impala_insert_staging";
 
   /**
    * Prefix string used by tools like hive/spark/flink to write certain temporary or
@@ -1059,7 +1061,9 @@ public class FileSystemUtil {
         || BackendConfig.INSTANCE.getIgnoredDirPrefixList() == null) {
       TMP_DIR_PREFIX_LIST.add(DOT);
       TMP_DIR_PREFIX_LIST.add(HIVE_TEMP_FILE_PREFIX);
+      TMP_DIR_PREFIX_LIST.add(HIVE_NEW_TEMP_FILE_PREFIX);
       TMP_DIR_PREFIX_LIST.add(SPARK_TEMP_FILE_PREFIX);
+      TMP_DIR_PREFIX_LIST.add(IMPALA_STAGING_DIR_PREFIX);
       LOG.warn("BackendConfig.INSTANCE uninitialized. Use hard-coded prefix-list.");
     } else {
       String s = BackendConfig.INSTANCE.getIgnoredDirPrefixList();

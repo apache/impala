@@ -222,7 +222,8 @@ DEFINE_bool(use_hms_column_order_for_hbase_tables, false,
     "Use the column order in HMS for HBase tables instead of ordering the columns by "
     "family/qualifier. Keeping the default as false for backward compatibility.");
 
-DEFINE_string(ignored_dir_prefix_list, ".,_tmp.,_spark_metadata",
+DEFINE_string(ignored_dir_prefix_list,
+    ".,_tmp.,-tmp.,_spark_metadata,_impala_insert_staging",
     "Comma separated list to specify the prefix for tmp/staging dirs that catalogd should"
     " skip in loading file metadata.");
 

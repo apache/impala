@@ -108,14 +108,16 @@ class TestRecursiveListing(ImpalaTestSuite):
 
     # Create files in the nested hidden directories and refresh. Make sure it does not
     # show up
-    self.filesystem_client.make_dir("{0}/.hive-staging".format(part_path))
-    self.filesystem_client.create_file(
-        "{0}/.hive-staging/file3.txt".format(part_path),
-        "data-should-be-ignored-by-impala")
-    self.filesystem_client.make_dir("{0}/_tmp.base_000000_1".format(part_path))
-    self.filesystem_client.create_file(
-        "{0}/_tmp.base_000000_1/000000_0.manifest".format(part_path),
-        "manifest-file_contents")
+    dir_file_list = [
+      (".hive-staging", "file3.txt"),
+      ("_tmp.base_000000_1", "000000_0.manifest"),
+      ("-tmp.base_000000_1", "000000_0.manifest"),
+      ("_impala_insert_staging", "bc4e15747fc7d788-f632b3b300000000_944410164_data.0.txt")
+    ]
+    for (dir, file) in dir_file_list:
+      self.filesystem_client.make_dir("{0}/{1}".format(part_path, dir))
+      self.filesystem_client.create_file(
+          "{0}/{1}/{2}".format(part_path, dir, file), "shouldntreadthis")
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 3
     assert len(self._get_rows(fq_tbl_name)) == 3
