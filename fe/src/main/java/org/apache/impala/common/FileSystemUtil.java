@@ -736,6 +736,21 @@ public class FileSystemUtil {
     return p.getFileSystem(CONF);
   }
 
+  /**
+   * Returns the FileSystem object for a path string (might not be fully-qualified).
+   * I.e. a wrapper for getFileSystemForPath(createFullyQualifiedPath(new Path(p))).
+   */
+  public static FileSystem getFileSystemForPath(String p) throws IOException {
+    Path location = new Path(p);
+    URI defaultUri = FileSystem.getDefaultUri(CONF);
+    URI locationUri = location.toUri();
+    if (locationUri.getScheme() == null ||
+        locationUri.getScheme().equalsIgnoreCase(defaultUri.getScheme())) {
+      return getDefaultFileSystem();
+    }
+    return location.getFileSystem(CONF);
+  }
+
   public static DistributedFileSystem getDistributedFileSystem() throws IOException {
     FileSystem fs = getDefaultFileSystem();
     Preconditions.checkState(fs instanceof DistributedFileSystem);

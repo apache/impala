@@ -59,7 +59,7 @@ public class FileMetadataLoader {
   // at the end of load().
   public static final AtomicInteger TOTAL_TASKS = new AtomicInteger();
 
-  protected final Path partDir_;
+  protected final String partDir_;
   protected final boolean recursive_;
   protected final ImmutableMap<String, ? extends FileDescriptor> oldFdsByPath_;
   private final ListMap<TNetworkAddress> hostIndex_;
@@ -96,7 +96,7 @@ public class FileMetadataLoader {
    * @param fileFormat if non-null and equal to HdfsFileFormat.HUDI_PARQUET,
    *   this loader will filter files based on Hudi's HoodieROTablePathFilter method
    */
-  public FileMetadataLoader(Path partDir, boolean recursive,
+  public FileMetadataLoader(String partDir, boolean recursive,
       Iterable<? extends FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
       @Nullable ValidTxnList validTxnList, @Nullable ValidWriteIdList writeIds,
       @Nullable HdfsFileFormat fileFormat) {
@@ -117,7 +117,7 @@ public class FileMetadataLoader {
     TOTAL_TASKS.incrementAndGet();
   }
 
-  public FileMetadataLoader(Path partDir, boolean recursive,
+  public FileMetadataLoader(String partDir, boolean recursive,
       Iterable<? extends FileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
       @Nullable ValidTxnList validTxnList, @Nullable ValidWriteIdList writeIds) {
     this(partDir, recursive, oldFds, hostIndex, validTxnList, writeIds, null);
@@ -158,7 +158,7 @@ public class FileMetadataLoader {
     return loadStats_;
   }
 
-  Path getPartDir() { return partDir_; }
+  String getPartDir() { return partDir_; }
 
   /**
    * Load the file descriptors, which may later be fetched using {@link #getLoadedFds()}.
@@ -181,9 +181,10 @@ public class FileMetadataLoader {
 
   private void loadInternal() throws CatalogException, IOException {
     Preconditions.checkState(loadStats_ == null, "already loaded");
+    Path partPath = FileSystemUtil.createFullyQualifiedPath(new Path(partDir_));
     loadStats_ = new LoadStats(partDir_);
     fileMetadataStats_ = new FileMetadataStats();
-    FileSystem fs = partDir_.getFileSystem(CONF);
+    FileSystem fs = partPath.getFileSystem(CONF);
 
     // If we don't have any prior FDs from which we could re-use old block location info,
     // we'll need to fetch info for every returned file. In this case we can inline
@@ -200,7 +201,7 @@ public class FileMetadataLoader {
         listWithLocations ? " with eager location-fetching" : "", partDir_);
     LOG.trace(msg);
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(msg)) {
-      List<FileStatus> fileStatuses = getFileStatuses(fs, listWithLocations);
+      List<FileStatus> fileStatuses = getFileStatuses(fs, partPath, listWithLocations);
 
       loadedFds_ = new ArrayList<>();
       if (fileStatuses == null) return;
@@ -208,7 +209,7 @@ public class FileMetadataLoader {
       Reference<Long> numUnknownDiskIds = new Reference<>(0L);
 
       if (writeIds_ != null) {
-        fileStatuses = AcidUtils.filterFilesForAcidState(fileStatuses, partDir_,
+        fileStatuses = AcidUtils.filterFilesForAcidState(fileStatuses, partPath,
             validTxnList_, writeIds_, loadStats_);
       }
 
@@ -227,7 +228,7 @@ public class FileMetadataLoader {
         }
 
         FileDescriptor fd = getFileDescriptor(fs, listWithLocations, numUnknownDiskIds,
-            fileStatus);
+            fileStatus, partPath);
         loadedFds_.add(Preconditions.checkNotNull(fd));
         fileMetadataStats_.accumulate(fd);
       }
@@ -257,8 +258,9 @@ public class FileMetadataLoader {
    * Return fd created by the given fileStatus or from the cache(oldFdsByPath_).
    */
   protected FileDescriptor getFileDescriptor(FileSystem fs, boolean listWithLocations,
-      Reference<Long> numUnknownDiskIds, FileStatus fileStatus) throws IOException {
-    String relPath = FileSystemUtil.relativizePath(fileStatus.getPath(), partDir_);
+      Reference<Long> numUnknownDiskIds, FileStatus fileStatus, Path partPath)
+      throws IOException {
+    String relPath = FileSystemUtil.relativizePath(fileStatus.getPath(), partPath);
     FileDescriptor fd = oldFdsByPath_.get(relPath);
     if (listWithLocations || forceRefreshLocations || fd == null ||
         fd.isChanged(fileStatus)) {
@@ -273,15 +275,15 @@ public class FileMetadataLoader {
   /**
    * Return located file status list when listWithLocations is true.
    */
-  protected List<FileStatus> getFileStatuses(FileSystem fs, boolean listWithLocations)
-      throws IOException {
+  protected List<FileStatus> getFileStatuses(FileSystem fs, Path partPath,
+      boolean listWithLocations) throws IOException {
     RemoteIterator<? extends FileStatus> fileStatuses;
     if (listWithLocations) {
       fileStatuses = FileSystemUtil
-          .listFiles(fs, partDir_, recursive_, debugAction_);
+          .listFiles(fs, partPath, recursive_, debugAction_);
     } else {
       fileStatuses = FileSystemUtil
-          .listStatus(fs, partDir_, recursive_, debugAction_);
+          .listStatus(fs, partPath, recursive_, debugAction_);
       // TODO(todd): we could look at the result of listing without locations, and if
       // we see that a substantial number of the files have changed, it may be better
       // to go back and re-list with locations vs doing an RPC per file.
@@ -349,8 +351,8 @@ public class FileMetadataLoader {
 
   // File/Block metadata loading stats for a single HDFS path.
   public static class LoadStats {
-    private final Path partDir_;
-    LoadStats(Path partDir) {
+    private final String partDir_;
+    LoadStats(String partDir) {
       this.partDir_ = Preconditions.checkNotNull(partDir);
     }
     /** Number of files skipped because they pertain to an uncommitted ACID transaction */

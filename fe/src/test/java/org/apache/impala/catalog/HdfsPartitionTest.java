@@ -147,7 +147,7 @@ public class HdfsPartitionTest {
   @Test
   public void testCloneWithNewHostIndex() throws Exception {
     // Fetch some metadata from a directory in HDFS.
-    Path p = new Path("hdfs://localhost:20500/test-warehouse/schemas");
+    String p = "hdfs://localhost:20500/test-warehouse/schemas";
     ListMap<TNetworkAddress> origIndex = new ListMap<>();
     FileMetadataLoader fml = new FileMetadataLoader(p, /* recursive= */false,
         Collections.emptyList(), origIndex, /*validTxnList=*/null, /*writeIds=*/null);

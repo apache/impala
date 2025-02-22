@@ -71,8 +71,8 @@ public class ParallelFileMetadataLoader {
   private static final int MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG = 100;
 
   private final String logPrefix_;
-  private final Map<Path, FileMetadataLoader> loaders_;
-  private final Map<Path, List<HdfsPartition.Builder>> partsByPath_;
+  private final Map<String, FileMetadataLoader> loaders_;
+  private final Map<String, List<HdfsPartition.Builder>> partsByPath_;
   private final FileSystem fs_;
 
   public ParallelFileMetadataLoader(FileSystem fs,
@@ -89,13 +89,12 @@ public class ParallelFileMetadataLoader {
     // path).
     partsByPath_ = Maps.newHashMap();
     for (HdfsPartition.Builder p : partBuilders) {
-      Path partPath = FileSystemUtil.createFullyQualifiedPath(new Path(p.getLocation()));
-      partsByPath_.computeIfAbsent(partPath, (path) -> new ArrayList<>())
+      partsByPath_.computeIfAbsent(p.getLocation(), (path) -> new ArrayList<>())
           .add(p);
     }
     // Create a FileMetadataLoader for each path.
     loaders_ = Maps.newHashMap();
-    for (Map.Entry<Path, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
+    for (Map.Entry<String, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
       FileMetadataLoader loader;
       HdfsFileFormat format = e.getValue().get(0).getFileFormat();
@@ -124,9 +123,8 @@ public class ParallelFileMetadataLoader {
     loadInternal();
 
     // Store the loaded FDs into the partitions.
-    for (Map.Entry<Path, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
-      Path p = e.getKey();
-      FileMetadataLoader loader = loaders_.get(p);
+    for (Map.Entry<String, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
+      FileMetadataLoader loader = loaders_.get(e.getKey());
 
       for (HdfsPartition.Builder partBuilder : e.getValue()) {
         // Checks if we can reuse the old file descriptors. Partition builders in the list

@@ -49,7 +49,7 @@ public class FileMetadataLoaderTest {
   public void testRecursiveLoading() throws IOException, CatalogException {
     //TODO(IMPALA-9042): Remove "throws CatalogException"
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
-    Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/alltypes/");
+    String tablePath = "hdfs://localhost:20500/test-warehouse/alltypes/";
     FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
         /* oldFds = */Collections.emptyList(), hostIndex, null, null);
     fml.load();
@@ -72,9 +72,9 @@ public class FileMetadataLoaderTest {
     assertEquals(fml.getLoadedFds(), refreshFml.getLoadedFds());
 
     // Touch a file and make sure that we reload locations for that file.
-    FileSystem fs = tablePath.getFileSystem(new Configuration());
     FileDescriptor fd = fml.getLoadedFds().get(0);
     Path filePath = new Path(tablePath, fd.getRelativePath());
+    FileSystem fs = filePath.getFileSystem(new Configuration());
     fs.setTimes(filePath, fd.getModificationTime() + 1, /* atime= */-1);
 
     refreshFml = new FileMetadataLoader(tablePath, /* recursive=*/true,
@@ -87,7 +87,7 @@ public class FileMetadataLoaderTest {
   public void testHudiParquetLoading() throws IOException, CatalogException {
     //TODO(IMPALA-9042): Remove "throws CatalogException"
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
-    Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/hudi_parquet/");
+    String tablePath = "hdfs://localhost:20500/test-warehouse/hudi_parquet/";
     FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
         /* oldFds = */ Collections.emptyList(), hostIndex, null, null,
         HdfsFileFormat.HUDI_PARQUET);
@@ -358,8 +358,7 @@ public class FileMetadataLoaderTest {
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
     ValidWriteIdList writeIds =
         MetastoreShim.getValidWriteIdListFromString(validWriteIdString);
-    Path tablePath = new Path(path);
-    FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
+    FileMetadataLoader fml = new FileMetadataLoader(path, /* recursive=*/true,
         /* oldFds = */ Collections.emptyList(), hostIndex, new ValidReadTxnList(""),
         writeIds, format);
     fml.load();
@@ -393,7 +392,7 @@ public class FileMetadataLoaderTest {
     //TODO(IMPALA-9042): Remove "throws CatalogException"
     for (boolean recursive : ImmutableList.of(false, true)) {
       ListMap<TNetworkAddress> hostIndex = new ListMap<>();
-      Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/does-not-exist/");
+      String tablePath = "hdfs://localhost:20500/test-warehouse/does-not-exist/";
       FileMetadataLoader fml = new FileMetadataLoader(tablePath, recursive,
           /* oldFds = */Collections.emptyList(), hostIndex, null, null);
       fml.load();
@@ -405,7 +404,8 @@ public class FileMetadataLoaderTest {
   @Test
   public void testSkipHiddenDirectories() throws IOException, CatalogException {
     Path sourcePath = new Path("hdfs://localhost:20500/test-warehouse/alltypes/");
-    Path tmpTestPath = new Path("hdfs://localhost:20500/tmp/test-filemetadata-loader");
+    String tmpTestPathStr = "hdfs://localhost:20500/tmp/test-filemetadata-loader";
+    Path tmpTestPath = new Path(tmpTestPathStr);
     Configuration conf = new Configuration();
     FileSystem dstFs = tmpTestPath.getFileSystem(conf);
     FileSystem srcFs = sourcePath.getFileSystem(conf);
@@ -421,7 +421,7 @@ public class FileMetadataLoaderTest {
     dstFs.createNewFile(new Path(hiveStaging, "tmp-stats"));
     dstFs.createNewFile(new Path(hiveStaging, ".hidden-tmp-stats"));
 
-    FileMetadataLoader fml = new FileMetadataLoader(tmpTestPath, true,
+    FileMetadataLoader fml = new FileMetadataLoader(tmpTestPathStr, true,
         Collections.emptyList(), new ListMap <>(), null, null);
     fml.load();
     assertEquals(24, fml.getStats().loadedFiles);

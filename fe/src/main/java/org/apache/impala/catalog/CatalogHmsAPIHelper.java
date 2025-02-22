@@ -503,12 +503,11 @@ public class CatalogHmsAPIHelper {
       checkCondition(tbl != null, "Table is null");
       checkCondition(tbl.getSd() != null && tbl.getSd().getLocation() != null,
           "Cannot get the location of table %s.%s", tbl.getDbName(), tbl.getTableName());
-      Path tblPath = new Path(tbl.getSd().getLocation());
       // since this table doesn't exist in catalogd we compute the network addresses
       // for the files which are being returned.
       ListMap<TNetworkAddress> hostIndex = new ListMap<>();
-      FileMetadataLoader fmLoader = new FileMetadataLoader(tblPath, true,
-          Collections.EMPTY_LIST, hostIndex, validTxnList, writeIdList);
+      FileMetadataLoader fmLoader = new FileMetadataLoader(tbl.getSd().getLocation(),
+          true, Collections.EMPTY_LIST, hostIndex, validTxnList, writeIdList);
       boolean success = getFileMetadata(Arrays.asList(fmLoader));
       checkCondition(success,
           "Could not load file-metadata for table %s.%s. See catalogd log for details",
@@ -553,10 +552,9 @@ public class CatalogHmsAPIHelper {
         checkCondition(part.getSd() != null && part.getSd().getLocation() != null,
             "Could not get the location for partition %s of table %s.%s",
             part.getValues(), part.getDbName(), part.getTableName());
-        Path partPath = new Path(part.getSd().getLocation());
         fileMdLoaders.put(part,
-            new FileMetadataLoader(partPath, true, Collections.EMPTY_LIST, hostIndex,
-                txnList, writeIdList));
+            new FileMetadataLoader(part.getSd().getLocation(), true,
+                Collections.EMPTY_LIST, hostIndex, txnList, writeIdList));
       }
       boolean success = getFileMetadata(fileMdLoaders.values());
       checkCondition(success,
@@ -597,7 +595,7 @@ public class CatalogHmsAPIHelper {
    * @return false if there were errors, else returns true.
    */
   private static boolean getFileMetadata(Collection<FileMetadataLoader> loaders) {
-    List<Pair<Path, Future<Void>>> futures = new ArrayList<>(loaders.size());
+    List<Pair<String, Future<Void>>> futures = new ArrayList<>(loaders.size());
     for (FileMetadataLoader fmdLoader : loaders) {
       futures.add(new Pair<>(fmdLoader.getPartDir(), fallbackFdLoaderPool.submit(() -> {
         fmdLoader.load();
@@ -606,7 +604,7 @@ public class CatalogHmsAPIHelper {
     }
     int numberOfErrorsToLog = 100;
     int errors = 0;
-    for (Pair<Path, Future<Void>> pair : futures) {
+    for (Pair<String, Future<Void>> pair : futures) {
       try {
         pair.second.get();
       } catch (InterruptedException | ExecutionException e) {
