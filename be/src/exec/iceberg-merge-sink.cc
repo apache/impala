@@ -68,6 +68,7 @@ DataSink* IcebergMergeSinkConfig::CreateSink(RuntimeState* state) const {
 void IcebergMergeSinkConfig::Close() {
   delete_sink_config_->Close();
   insert_sink_config_->Close();
+  merge_action_->Close();
   DataSinkConfig::Close();
 }
 
@@ -139,6 +140,7 @@ Status IcebergMergeSink::FlushFinal(RuntimeState* state) {
 void IcebergMergeSink::Close(RuntimeState* state) {
   insert_sink_->Close(state);
   delete_sink_->Close(state);
+  merge_action_evaluator_->Close(state);
   DataSink::Close(state);
   DCHECK(closed_);
 }

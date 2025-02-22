@@ -44,6 +44,7 @@ class IcebergMergePlanNode : public PlanNode {
  public:
   Status Init(const TPlanNode& tnode, FragmentState* state) override;
   Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  virtual void Close() override;
 
   IcebergMergePlanNode() = default;
   ~IcebergMergePlanNode() override = default;
@@ -143,6 +144,7 @@ class IcebergMergeCasePlan {
   ~IcebergMergeCasePlan() = default;
   Status Init(const TIcebergMergeCase& tmerge_case, FragmentState* state,
       const RowDescriptor* row_desc);
+  void Close();
 
   IcebergMergeCasePlan(const IcebergMergeCasePlan& other) = delete;
   IcebergMergeCasePlan(IcebergMergeCasePlan&& other) = delete;
