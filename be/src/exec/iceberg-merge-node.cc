@@ -74,10 +74,22 @@ Status IcebergMergeCasePlan::Init(const TIcebergMergeCase& tmerge_case,
   return Status::OK();
 }
 
+void IcebergMergeCasePlan::Close() {
+  ScalarExpr::Close(output_exprs_);
+  ScalarExpr::Close(filter_conjuncts_);
+}
+
 Status IcebergMergePlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
   *node = pool->Add(new IcebergMergeNode(pool, *this, state->desc_tbl()));
   return Status::OK();
+}
+
+void IcebergMergePlanNode::Close() {
+  for (IcebergMergeCasePlan* merge_case_plan : merge_case_plans_) {
+    merge_case_plan->Close();
+  }
+  PlanNode::Close();
 }
 
 IcebergMergeNode::IcebergMergeNode(
@@ -331,8 +343,6 @@ Status IcebergMergeCase::Open(RuntimeState* state) {
 void IcebergMergeCase::Close(RuntimeState* state) {
   ScalarExprEvaluator::Close(filter_evaluators_, state);
   ScalarExprEvaluator::Close(output_evaluators_, state);
-  ScalarExpr::Close(output_exprs_);
-  ScalarExpr::Close(filter_conjuncts_);
 }
 
 } // namespace impala
