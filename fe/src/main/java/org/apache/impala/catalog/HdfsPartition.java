@@ -792,6 +792,9 @@ public class HdfsPartition extends CatalogObjectImpl
     part.setTbl_name(table_.getName());
     part.setPartition_name(partName_);
     part.setId(id_);
+    if (prevId_ != INITIAL_PARTITION_ID - 1) {
+      part.setPrev_id(prevId_);
+    }
     return part;
   }
 

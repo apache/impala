@@ -2318,28 +2318,6 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   public void resetDroppedPartitions() { droppedPartitions_.clear(); }
 
-  /**
-   * Gets catalog objects of new partitions since last catalog update. They are partitions
-   * that coordinators are not aware of.
-   */
-  public List<TCatalogObject> getNewPartitionsSinceLastUpdate() {
-    List<TCatalogObject> result = new ArrayList<>();
-    int numSkippedParts = 0;
-    for (HdfsPartition partition: partitionMap_.values()) {
-      if (partition.getId() <= maxSentPartitionId_) {
-        numSkippedParts++;
-        continue;
-      }
-      TCatalogObject catalogPart =
-          new TCatalogObject(TCatalogObjectType.HDFS_PARTITION, getCatalogVersion());
-      partition.setTCatalogObject(catalogPart);
-      result.add(catalogPart);
-    }
-    LOG.info("Skipped {} partitions of table {} in the incremental update",
-        numSkippedParts, getFullName());
-    return result;
-  }
-
   public TGetPartialCatalogObjectResponse getPartialInfo(
       TGetPartialCatalogObjectRequest req,
       Map<HdfsPartition, TPartialPartitionInfo> missingPartitionInfos)

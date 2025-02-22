@@ -1795,10 +1795,27 @@ public class CatalogServiceCatalog extends Catalog {
 
     // Add updates for new partitions.
     long maxSentId = hdfsTable.getMaxSentPartitionId();
-    for (TCatalogObject catalogPart : hdfsTable.getNewPartitionsSinceLastUpdate()) {
-      maxSentId = Math.max(maxSentId, catalogPart.getHdfs_partition().getId());
+    int numSkippedParts = 0;
+    for (PrunablePartition p: hdfsTable.getPartitions()) {
+      HdfsPartition partition = (HdfsPartition) p;
+      if (partition.getId() <= hdfsTable.getMaxSentPartitionId()) {
+        numSkippedParts++;
+        continue;
+      }
+      maxSentId = Math.max(maxSentId, partition.getId());
+      TCatalogObject catalogPart;
+      if (topicMode_ == TopicMode.FULL || topicMode_ == TopicMode.MIXED) {
+        catalogPart = new TCatalogObject(
+            TCatalogObjectType.HDFS_PARTITION, hdfsTable.getCatalogVersion());
+        partition.setTCatalogObject(catalogPart);
+      } else {
+        Preconditions.checkState(topicMode_ == TopicMode.MINIMAL);
+        catalogPart = partition.toMinimalTCatalogObject();
+      }
       ctx.addCatalogObject(catalogPart, false, updateSummary);
     }
+    LOG.info("Skipped {} partitions of table {} in the incremental update",
+        numSkippedParts, hdfsTable.getFullName());
     hdfsTable.setMaxSentPartitionId(maxSentId);
 
     for (HdfsPartition part : hdfsTable.getDroppedPartitions()) {
