@@ -1001,6 +1001,31 @@ class ImpalaShell(cmd.Cmd, object):
     """Exit the impala shell"""
     return self.do_quit(args)
 
+  @staticmethod
+  def __parse_host_port(addr):
+    """Checks if the host name also contains a port and separates the two.
+    Returns either [host] or [host, port]. Detects if host is an ipv6 address like "[::]"
+    and removes the brackets from it.
+    """
+    split_by_colon = addr.split(':')
+    ipv6addr = len(split_by_colon) > 2
+    host_port = None
+    if ipv6addr:
+      if addr[0] == "[":
+        parts = addr.split("]")
+        host_port = [parts[0][1:]]
+        has_port = parts[1] != ""
+        if has_port:
+          if parts[1][0] != ":": return None
+          host_port.append(parts[1][1:])
+      else:
+        host_port = [addr]
+    else:
+      host_port = [val for val in split_by_colon if val.strip()]
+      # validate the connection string.
+      if ':' in addr and len(host_port) != 2: return None
+    return host_port
+
   def do_connect(self, args):
     """Connect to an Impalad instance:
     Usage: connect, defaults to the fqdn of the localhost and the protocol's default port
@@ -1023,10 +1048,10 @@ class ImpalaShell(cmd.Cmd, object):
 
     if not args: args = socket.getfqdn()
     tokens = args.split(" ")
-    # validate the connection string.
-    host_port = [val for val in tokens[0].split(':') if val.strip()]
+    addr = tokens[0]
+    host_port = self.__parse_host_port(addr)
     protocol = options.protocol.lower()
-    if (':' in tokens[0] and len(host_port) != 2):
+    if not host_port:
       print("Connection string must either be empty, or of the form "
             "<hostname[:port]>", file=sys.stderr)
       return CmdStatus.ERROR

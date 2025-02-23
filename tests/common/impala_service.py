@@ -35,6 +35,7 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 
 from tests.common.impala_connection import create_connection, create_ldap_connection
+from tests.common.network import to_host_port, CERT_TO_CA_MAP
 from tests.common.test_vector import BEESWAX, HS2, HS2_HTTP
 
 LOG = logging.getLogger('impala_service')
@@ -48,7 +49,7 @@ WEBSERVER_PASSWORD = os.environ.get('IMPALA_WEBSERVER_PASSWORD', None)
 # TODO: Refactor the retry/timeout logic into a common place.
 class BaseImpalaService(object):
   def __init__(self, hostname, webserver_interface, webserver_port,
-      webserver_certificate_file):
+      webserver_certificate_file, ssl_client_ca_certificate_file):
     self.hostname = hostname
     self.webserver_interface = webserver_interface
     if webserver_interface == "":
@@ -56,6 +57,7 @@ class BaseImpalaService(object):
       self.webserver_interface = hostname
     self.webserver_port = webserver_port
     self.webserver_certificate_file = webserver_certificate_file
+    self.ssl_client_ca_certificate_file = ssl_client_ca_certificate_file
     self.webserver_username_password = None
     if WEBSERVER_USERNAME is not None and WEBSERVER_PASSWORD is not None:
       self.webserver_username_password = (WEBSERVER_USERNAME, WEBSERVER_PASSWORD)
@@ -68,10 +70,14 @@ class BaseImpalaService(object):
         protocol = "http"
         if self.webserver_certificate_file != "":
           protocol = "https"
-        url = "%s://%s:%d/%s" % \
-            (protocol, self.webserver_interface, int(self.webserver_port), page_name)
-        return requests.get(url, verify=self.webserver_certificate_file,
-            auth=self.webserver_username_password)
+        host_port = to_host_port(self.webserver_interface, self.webserver_port)
+        url = "%s://%s/%s" % (protocol, host_port, page_name)
+        cert = self.webserver_certificate_file
+        # Instead of cert use its CA cert if available.
+        file_part = cert.split("/")[-1]
+        if file_part in CERT_TO_CA_MAP:
+          cert = cert.replace(file_part, CERT_TO_CA_MAP[file_part])
+        return requests.get(url, verify=cert, auth=self.webserver_username_password)
       except Exception as e:
         LOG.info("Debug webpage not yet available: %s", str(e))
       sleep(interval)
@@ -260,11 +266,14 @@ class BaseImpalaService(object):
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
-  def __init__(self, hostname, webserver_interface="", webserver_port=25000,
-      beeswax_port=21000, krpc_port=27000, hs2_port=21050,
-      hs2_http_port=28000, webserver_certificate_file=""):
+  def __init__(self, hostname, webserver_interface="", external_interface="",
+      webserver_port=25000, beeswax_port=21000, krpc_port=27000, hs2_port=21050,
+      hs2_http_port=28000, webserver_certificate_file="",
+      ssl_client_ca_certificate_file=""):
     super(ImpaladService, self).__init__(
-        hostname, webserver_interface, webserver_port, webserver_certificate_file)
+        hostname, webserver_interface, webserver_port, webserver_certificate_file,
+        ssl_client_ca_certificate_file)
+    self.external_interface = external_interface if external_interface else hostname
     self.beeswax_port = beeswax_port
     self.krpc_port = krpc_port
     self.hs2_port = hs2_port
@@ -444,30 +453,32 @@ class ImpaladService(BaseImpalaService):
       sleep(interval)
     return False
 
-  def is_port_open(self, port):
+  def use_ssl_for_clients(self):
+    return self.ssl_client_ca_certificate_file != ""
+
+  def is_port_open(self, host, port):
     try:
-      sock = socket.create_connection((self.hostname, port), timeout=1)
+      sock = socket.create_connection((host, port), timeout=1)
       sock.close()
       return True
     except Exception:
       return False
 
   def webserver_port_is_open(self):
-    return self.is_port_open(self.webserver_port)
+    return self.is_port_open(self.webserver_interface, self.webserver_port)
 
   def create_beeswax_client(self, use_kerberos=False):
     """Creates a new beeswax client connection to the impalad.
     DEPRECATED: Use create_hs2_client() instead."""
-    LOG.warning('beeswax protocol is deprecated.')
-    client = create_connection('%s:%d' % (self.hostname, self.beeswax_port),
-                               use_kerberos, BEESWAX)
+    client = create_connection(to_host_port(self.external_interface, self.beeswax_port),
+                               use_kerberos, BEESWAX, use_ssl=self.use_ssl_for_clients())
     client.connect()
     return client
 
   def beeswax_port_is_open(self):
     """Test if the beeswax port is open. Does not need to authenticate."""
     # Check if the port is open first to avoid chatty logging of Thrift connection.
-    if not self.is_port_open(self.beeswax_port): return False
+    if not self.is_port_open(self.external_interface, self.beeswax_port): return False
 
     try:
       # The beeswax client will connect successfully even if not authenticated.
@@ -475,31 +486,31 @@ class ImpaladService(BaseImpalaService):
       client.close()
       return True
     except Exception as e:
-      LOG.info(e)
       return False
 
   def create_ldap_beeswax_client(self, user, password, use_ssl=False):
-    client = create_ldap_connection('%s:%d' % (self.hostname, self.beeswax_port),
+    client = create_ldap_connection(to_host_port(self.hostname, self.beeswax_port),
                                     user=user, password=password, use_ssl=use_ssl)
     client.connect()
     return client
 
   def create_hs2_client(self, user=None):
     """Creates a new HS2 client connection to the impalad"""
-    client = create_connection('%s:%d' % (self.hostname, self.hs2_port),
-                               protocol=HS2, user=user)
+    client = create_connection('%s:%d' % (self.external_interface, self.hs2_port),
+                               protocol=HS2, user=user,
+                               use_ssl=self.use_ssl_for_clients())
     client.connect()
     return client
 
   def hs2_port_is_open(self):
     """Test if the HS2 port is open. Does not need to authenticate."""
     # Check if the port is open first to avoid chatty logging of Thrift connection.
-    if not self.is_port_open(self.hs2_port): return False
+    if not self.is_port_open(self.external_interface, self.hs2_port): return False
 
     # Impyla will try to authenticate as part of connecting, so preserve previous logic
     # that uses the HS2 thrift code directly.
     try:
-      sock = TSocket(self.hostname, self.hs2_port)
+      sock = TSocket(self.external_interface, self.hs2_port)
       transport = TBufferedTransport(sock)
       transport.open()
       transport.close()
@@ -510,7 +521,7 @@ class ImpaladService(BaseImpalaService):
 
   def hs2_http_port_is_open(self):
     # Only check if the port is open, do not create Thrift transport.
-    return self.is_port_open(self.hs2_http_port)
+    return self.is_port_open(self.external_interface, self.hs2_http_port)
 
   def create_client(self, protocol):
     """Creates a new client connection for given protocol to this impalad"""
@@ -520,7 +531,8 @@ class ImpaladService(BaseImpalaService):
     if protocol == BEESWAX:
       LOG.warning('beeswax protocol is deprecated.')
       port = self.beeswax_port
-    client = create_connection('%s:%d' % (self.hostname, port), protocol=protocol)
+    client = create_connection(to_host_port(self.external_interface, port),
+                               protocol=protocol)
     client.connect()
     return client
 
@@ -537,9 +549,10 @@ class ImpaladService(BaseImpalaService):
 # accessing the debug webpage.
 class StateStoredService(BaseImpalaService):
   def __init__(self, hostname, webserver_interface, webserver_port,
-      webserver_certificate_file, service_port):
+      webserver_certificate_file, ssl_client_ca_certificate_file, service_port):
     super(StateStoredService, self).__init__(
-        hostname, webserver_interface, webserver_port, webserver_certificate_file)
+        hostname, webserver_interface, webserver_port, webserver_certificate_file,
+        ssl_client_ca_certificate_file)
     self.service_port = service_port
 
   def wait_for_live_subscribers(self, num_subscribers, timeout=15, interval=1):
@@ -554,9 +567,10 @@ class StateStoredService(BaseImpalaService):
 # accessing the debug webpage.
 class CatalogdService(BaseImpalaService):
   def __init__(self, hostname, webserver_interface, webserver_port,
-      webserver_certificate_file, service_port):
+      webserver_certificate_file, ssl_client_ca_certificate_file, service_port):
     super(CatalogdService, self).__init__(
-        hostname, webserver_interface, webserver_port, webserver_certificate_file)
+        hostname, webserver_interface, webserver_port, webserver_certificate_file,
+        ssl_client_ca_certificate_file)
     self.service_port = service_port
 
   def get_catalog_version(self, timeout=10, interval=1):
@@ -579,6 +593,7 @@ class CatalogdService(BaseImpalaService):
 
 class AdmissiondService(BaseImpalaService):
   def __init__(self, hostname, webserver_interface, webserver_port,
-      webserver_certificate_file):
+      webserver_certificate_file, ssl_client_ca_certificate_file):
     super(AdmissiondService, self).__init__(
-        hostname, webserver_interface, webserver_port, webserver_certificate_file)
+        hostname, webserver_interface, webserver_port, webserver_certificate_file,
+        ssl_client_ca_certificate_file)

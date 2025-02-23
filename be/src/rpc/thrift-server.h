@@ -309,7 +309,7 @@ class ThriftServer {
       int max_concurrent_connections = 0, int64_t queue_timeout_ms = 0,
       int64_t idle_poll_period_ms = 0,
       TransportType server_transport = TransportType::BINARY,
-      bool is_external_facing = true);
+      bool is_external_facing = true, std::string host = "");
 
   /// Enables secure access over SSL. Must be called before Start(). The first three
   /// arguments are the minimum SSL/TLS version, and paths to certificate and private key
@@ -344,6 +344,9 @@ class ThriftServer {
   /// passed to the constructor, but if this was the wildcard port 0, then this is
   /// replaced with whatever port number the server is listening on.
   int port_;
+
+  /// The host name to bind with.
+  string host_;
 
   /// True if the server socket only accepts SSL connections
   bool ssl_enabled_;
@@ -546,6 +549,11 @@ class ThriftServerBuilder {
     return *this;
   }
 
+  ThriftServerBuilder& host(const string& host) {
+    host_ = host;
+    return *this;
+  }
+
   /// Constructs a new ThriftServer and puts it in 'server', if construction was
   /// successful, returns an error otherwise. In the error case, 'server' will not have
   /// been set and will not need to be freed, otherwise the caller assumes ownership of
@@ -554,7 +562,7 @@ class ThriftServerBuilder {
     std::unique_ptr<ThriftServer> ptr(
         new ThriftServer(name_, processor_, port_, auth_provider_, metrics_,
             max_concurrent_connections_, queue_timeout_ms_, idle_poll_period_ms_,
-            server_transport_type_, is_external_facing_));
+            server_transport_type_, is_external_facing_, host_));
     if (enable_ssl_) {
       RETURN_IF_ERROR(ptr->EnableSsl(
           version_, certificate_, private_key_, pem_password_cmd_, cipher_list_,
@@ -572,6 +580,7 @@ class ThriftServerBuilder {
   int max_concurrent_connections_ = 0;
   std::string name_;
   std::shared_ptr<apache::thrift::TProcessor> processor_;
+  std::string host_;
   int port_ = 0;
   ThriftServer::TransportType server_transport_type_ =
       ThriftServer::TransportType::BINARY;

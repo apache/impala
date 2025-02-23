@@ -39,6 +39,10 @@ class TestRedaction(CustomClusterTestSuite):
      limited to table data and query text since queries may refer to table data.
   '''
 
+  @classmethod
+  def setup_class(cls):
+    super(TestRedaction, cls).setup_class()
+
   @property
   def log_dir(self):
     return os.path.join(self.tmp_dir, "logs")

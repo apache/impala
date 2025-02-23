@@ -82,8 +82,8 @@ class TestIcebergConcurrentUpdateStress(ImpalaTestSuite):
 
   def _impala_role_concurrent_writer(self, tbl_name, col, num_updates):
     """Increments values in column 'total' and in the column which is passed in 'col'."""
-    target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     update_cnt = 0
     while update_cnt < num_updates:
       try:
@@ -107,8 +107,8 @@ class TestIcebergConcurrentUpdateStress(ImpalaTestSuite):
       assert total == a + b + c
       return total
 
-    target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     total = 0
     while total < target_total:
       result = impalad_client.execute("select * from %s" % tbl_name)
@@ -163,8 +163,8 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
 
   def _impala_role_concurrent_deleter(self, tbl_name, all_rows_deleted, num_rows):
     """Deletes every row from the table one by one."""
-    target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     impalad_client.set_configuration_option("SYNC_DDL", "true")
     i = 0
     while i < num_rows:
@@ -181,8 +181,8 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
 
   def _impala_role_concurrent_writer(self, tbl_name, all_rows_deleted):
     """Updates every row in the table in a loop."""
-    target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     impalad_client.set_configuration_option("SYNC_DDL", "true")
     while all_rows_deleted.value != 1:
       try:
@@ -196,8 +196,8 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
 
   def _impala_role_concurrent_optimizer(self, tbl_name, all_rows_deleted):
     """Optimizes the table in a loop."""
-    target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     impalad_client.set_configuration_option("SYNC_DDL", "true")
     while all_rows_deleted.value != 1:
       try:
@@ -253,8 +253,8 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
         prev_j = j
       assert prev_id == num_rows - 1
 
-    target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     while all_rows_deleted.value != 1:
       result = impalad_client.execute("select * from %s order by id" % tbl_name)
       verify_result_set(result)

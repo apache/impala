@@ -24,34 +24,20 @@ import pytest
 import re
 import requests
 import signal
-import ssl
 import socket
 import sys
 import time
 
-from tests.common.environ import IS_REDHAT_DERIVATIVE
+
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
+from tests.common.network import SKIP_SSL_MSG, REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12
 from tests.common.test_dimensions import create_client_protocol_dimension
 from tests.common.test_vector import BEESWAX
 from tests.shell.util import run_impala_shell_cmd, run_impala_shell_cmd_no_expect, \
     ImpalaShell, create_impala_shell_executable_dimension
 
-REQUIRED_MIN_OPENSSL_VERSION = 0x10001000
-# Python supports TLSv1.2 from 2.7.9 officially but on Red Hat/CentOS Python2.7.5
-# with newer python-libs (eg python-libs-2.7.5-77) supports TLSv1.2 already
-if IS_REDHAT_DERIVATIVE:
-  REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12 = (2, 7, 5)
-else:
-  REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12 = (2, 7, 9)
-_openssl_version_number = getattr(ssl, "OPENSSL_VERSION_NUMBER", None)
-if _openssl_version_number is None:
-  SKIP_SSL_MSG = "Legacy OpenSSL module detected"
-elif _openssl_version_number < REQUIRED_MIN_OPENSSL_VERSION:
-  SKIP_SSL_MSG = "Only have OpenSSL version %X, but test requires %X" % (
-    ssl.OPENSSL_VERSION_NUMBER, REQUIRED_MIN_OPENSSL_VERSION)
-else:
-  SKIP_SSL_MSG = None
+
 CERT_DIR = "%s/be/src/testutil" % os.environ['IMPALA_HOME']
 
 
@@ -99,7 +85,6 @@ class TestClientSsl(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args=SSL_ARGS, statestored_args=SSL_ARGS,
                                     catalogd_args=SSL_ARGS)
   def test_ssl(self, vector):
-
     self._verify_negative_cases(vector)
     # TODO: This is really two different tests, but the custom cluster takes too long to
     # start. Make it so that custom clusters can be specified across test suites.
@@ -140,6 +125,7 @@ class TestClientSsl(CustomClusterTestSuite):
     print(result.stderr)
     assert "Query Status: Cancelled" in result.stdout
     assert impalad.wait_for_num_in_flight_queries(0)
+    self.check_connections()
 
   WEBSERVER_SSL_ARGS = ("--webserver_certificate_file=%(cert_dir)s/server-cert.pem "
                         "--webserver_private_key_file=%(cert_dir)s/server-key.pem "
@@ -217,6 +203,7 @@ class TestClientSsl(CustomClusterTestSuite):
 
     self._validate_positive_cases(vector, "%s/wildcardCA.pem" % CERT_DIR,
                                   host="ip4.impala.test")
+    self.check_connections()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=SSL_WILDCARD_SAN_ARGS,
@@ -225,7 +212,6 @@ class TestClientSsl(CustomClusterTestSuite):
   @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
   def test_wildcard_san_ssl(self, vector):
     """ Test for IMPALA-3159: Test with a certificate which has a wildcard as a SAN. """
-
     # This block of code is the same as _validate_positive_cases() but we want to check
     # if retrieving the SAN is supported first.
     args = ["--ssl", "-q", "select 1 + 2", "--ca_cert=%s/wildcardCA.pem" % CERT_DIR]
@@ -239,6 +225,8 @@ class TestClientSsl(CustomClusterTestSuite):
 
     self._validate_positive_cases(vector, "%s/wildcardCA.pem" % CERT_DIR,
                                   host="ip4.impala.test")
+    self.check_connections()
+
 
   def _verify_negative_cases(self, vector, host=""):
     # Expect the shell to not start successfully if we point --ca_cert to an incorrect

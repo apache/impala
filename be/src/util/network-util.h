@@ -42,9 +42,11 @@ bool IsResolvedAddress(const NetworkAddressPB& addr);
 
 /// Looks up all IP addresses associated with a given hostname and returns one of them via
 /// 'address'. If the IP addresses of a host don't change, then subsequent calls will
-/// always return the same address. Returns an error status if any system call failed,
-/// otherwise OK. Even if OK is returned, addresses may still be of zero length.
-Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip) WARN_UNUSED_RESULT;
+/// always return the same address. Returns an error status if any system call failed or
+/// no address was found, otherwise OK.
+/// Returns only ipv6 addresses if 'ipv6' is true, otherwise only ipv4 addresses.
+Status HostnameToIpAddr(
+    const Hostname& hostname, IpAddr* ip, bool ipv6=false) WARN_UNUSED_RESULT;
 
 /// Finds the first non-localhost IP address in the given list. Returns
 /// true if such an address was found, false otherwise.

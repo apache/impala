@@ -49,6 +49,7 @@ from tests.common.environ import (
 from tests.common.errors import Timeout
 from tests.common.impala_connection import create_connection
 from tests.common.impala_service import ImpaladService
+from tests.common.network import to_host_port
 from tests.common.test_dimensions import (
     ALL_BATCH_SIZES,
     ALL_DISABLE_CODEGEN_OPTIONS,
@@ -265,7 +266,11 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.hs2_http_client = None
     cls.hive_client = None
     cls.hive_transport = None
+
+    # In case of custom cluster tests this returns the 1st impalad or None if nothing
+    # is started.
     cls.impalad_test_service = cls.create_impala_service()
+    ImpalaTestSuite.impalad_test_service = cls.impalad_test_service
 
     # Override the shell history path so that commands run by any tests
     # don't write any history into the developer's file.
@@ -377,10 +382,12 @@ class ImpalaTestSuite(BaseTestSuite):
     if protocol is None:
       protocol = cls.default_test_protocol()
     if host_port is None:
-      host_port = cls.__get_default_host_port(protocol)
+      host = cls.impalad_test_service.external_interface
+      host_port = to_host_port(host, cls._get_default_port(protocol))
+    use_ssl = cls.impalad_test_service.use_ssl_for_clients()
     client = create_connection(
         host_port=host_port, use_kerberos=pytest.config.option.use_kerberos,
-        protocol=protocol, is_hive=is_hive, user=user)
+        protocol=protocol, is_hive=is_hive, user=user, use_ssl=use_ssl)
     client.connect()
     return client
 
@@ -413,7 +420,7 @@ class ImpalaTestSuite(BaseTestSuite):
       host, port = host_port.split(':')
       port = str(int(port) + nth)
       host_port = host + ':' + port
-    return ImpalaTestSuite.create_impala_client(host_port, protocol=protocol)
+    return cls.create_impala_client(host_port, protocol=protocol)
 
   @classmethod
   def create_impala_clients(cls):
@@ -448,6 +455,11 @@ class ImpalaTestSuite(BaseTestSuite):
   @classmethod
   def close_impala_clients(cls):
     """Closes Impala clients created by create_impala_clients()."""
+    # cls.client should be equal to one of belove, unless test method implicitly override.
+    # Closing twice would lead to error in some clients (impyla+SSL).
+    if cls.client not in (cls.beeswax_client, cls.hs2_client, cls.hs2_http_client):
+      cls.client.close()
+    cls.client = None
     if cls.beeswax_client:
       cls.beeswax_client.close()
       cls.beeswax_client = None
@@ -457,11 +469,6 @@ class ImpalaTestSuite(BaseTestSuite):
     if cls.hs2_http_client:
       cls.hs2_http_client.close()
       cls.hs2_http_client = None
-    # cls.client should be equal to one of above, unless test method implicitly override.
-    # Closing twice should be OK.
-    if cls.client:
-      cls.client.close()
-      cls.client = None
 
   @classmethod
   def default_impala_client(cls, protocol):
@@ -474,13 +481,13 @@ class ImpalaTestSuite(BaseTestSuite):
     raise Exception("unknown protocol: {0}".format(protocol))
 
   @classmethod
-  def __get_default_host_port(cls, protocol):
+  def _get_default_port(cls, protocol):
     if protocol == BEESWAX:
-      return IMPALAD
+      return IMPALAD_BEESWAX_PORT
     elif protocol == HS2_HTTP:
-      return IMPALAD_HS2_HTTP_HOST_PORT
+      return IMPALAD_HS2_HTTP_PORT
     elif protocol == HS2:
-      return IMPALAD_HS2_HOST_PORT
+      return IMPALAD_HS2_PORT
     else:
       raise NotImplementedError("Not yet implemented: protocol=" + protocol)
 
@@ -497,13 +504,8 @@ class ImpalaTestSuite(BaseTestSuite):
       raise NotImplementedError("Not yet implemented: protocol=" + protocol)
 
   @classmethod
-  def create_impala_service(
-      cls, host_port=IMPALAD, webserver_interface="", webserver_port=25000):
-    host, port = host_port.split(':')
-    if webserver_interface == "":
-      webserver_interface = host
-    return ImpaladService(host, beeswax_port=port,
-        webserver_interface=webserver_interface, webserver_port=webserver_port)
+  def create_impala_service(cls):
+    return ImpaladService(IMPALAD_HOSTNAME)
 
   @classmethod
   def create_hdfs_client(cls):
@@ -773,7 +775,7 @@ class ImpalaTestSuite(BaseTestSuite):
     target_impalad_clients = list()
     if multiple_impalad:
       target_impalad_clients =\
-          [ImpalaTestSuite.create_impala_client(host_port, protocol=protocol)
+          [self.create_impala_client(host_port, protocol=protocol)
            for host_port in self.__get_cluster_host_ports(protocol)]
     else:
       target_impalad_clients = [self.default_impala_client(protocol)]
@@ -822,7 +824,7 @@ class ImpalaTestSuite(BaseTestSuite):
       Helper to execute a query block in Hive. No special handling of query
       options is done, since we use a separate session for each block.
       """
-      h = ImpalaTestSuite.create_impala_client(HIVE_HS2_HOST_PORT, protocol=HS2,
+      h = self.create_impala_client(HIVE_HS2_HOST_PORT, protocol=HS2,
               is_hive=True)
       try:
         result = None
@@ -1788,3 +1790,25 @@ class ImpalaTestSuite(BaseTestSuite):
           break
         properties[fields[1].rstrip()] = fields[2].rstrip()
     return properties
+
+  # Checks if an Impala connection is functional.
+  @staticmethod
+  def check_connection(conn):
+    res = conn.execute("select 1 + 1")
+    assert res.data == ["2"]
+
+  # Checks connections for all protocols.
+  def check_connections(cls, expected_count=3):
+    # default client must exist
+    cls.check_connection(cls.client)
+    count = 0
+    if cls.beeswax_client:
+      cls.check_connection(cls.beeswax_client)
+      count += 1
+    if cls.hs2_client:
+      cls.check_connection(cls.hs2_client)
+      count += 1
+    if cls.hs2_http_client:
+      cls.check_connection(cls.hs2_http_client)
+      count += 1
+    assert count == expected_count

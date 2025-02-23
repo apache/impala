@@ -35,6 +35,7 @@ import sys
 import time
 
 from builtins import filter, map
+
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 from thrift.transport.TTransport import TTransportException
@@ -42,6 +43,7 @@ from thrift.transport.TTransport import TTransportException
 from impala_thrift_gen.beeswax import BeeswaxService
 from impala_thrift_gen.beeswax.BeeswaxService import QueryState
 from impala_thrift_gen.ImpalaService import ImpalaService
+from tests.common.network import split_host_port
 from tests.util.thrift_util import create_transport
 
 LOG = logging.getLogger('impala_beeswax')
@@ -115,12 +117,9 @@ class ImpalaBeeswaxClient(object):
   def __init__(self, impalad, use_kerberos=False, user=None, password=None,
                use_ssl=False):
     self.connected = False
-    split_impalad = impalad.split(":")
-    assert len(split_impalad) in [1, 2]
-    self.impalad_host = split_impalad[0]
-    self.impalad_port = 21000  # Default beeswax port
-    if len(split_impalad) == 2:
-      self.impalad_port = int(split_impalad[1])
+    host, port = split_host_port(impalad)
+    self.impalad_host = host
+    self.impalad_port = port if port else 21000  # Default beeswax port
     self.imp_service = None
     self.transport = None
     self.use_kerberos = use_kerberos
@@ -170,7 +169,7 @@ class ImpalaBeeswaxClient(object):
 
   def close_connection(self):
     """Close the transport if it's still open"""
-    if self.transport:
+    if self.transport and self.connected:
       self.transport.close()
     self.connected = False
 

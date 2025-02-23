@@ -163,6 +163,8 @@ add_dependencies(Util gen-deps)
 # Squeasel requires C99 compatibility to build.
 SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
   PROPERTIES COMPILE_FLAGS -std=c99)
+SET_SOURCE_FILES_PROPERTIES(${SQUEASEL_SRC_DIR}/squeasel.c
+  PROPERTIES COMPILE_FLAGS -DUSE_IPV6)
 
 # shared library which provides native logging support to JVMs over JNI.
 add_library(loggingsupport SHARED

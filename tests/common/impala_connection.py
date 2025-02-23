@@ -40,6 +40,7 @@ from tests.beeswax.impala_beeswax import (
     ImpalaBeeswaxException,
 )
 import tests.common
+from tests.common.network import split_host_port
 from tests.common.patterns import LOG_FORMAT
 from tests.common.test_vector import BEESWAX, HS2, HS2_HTTP
 from tests.util.thrift_util import op_handle_to_query_id, session_handle_to_session_id
@@ -610,13 +611,13 @@ class ImpylaHS2Connection(ImpalaConnection):
     return self.__cursor
 
   def connect(self):
-    host, port = self.__host_port.split(":")
+    host, port = split_host_port(self.__host_port)
     conn_kwargs = {}
     if self._is_hive:
       conn_kwargs['auth_mechanism'] = 'PLAIN'
     try:
       self.__impyla_conn = impyla.connect(
-        host=host, port=int(port), use_http_transport=self.__use_http_transport,
+        host=host, port=port, use_http_transport=self.__use_http_transport,
         http_path=self.__http_path, use_ssl=self.__use_ssl, **conn_kwargs)
       self.log_client("connected to {0} with impyla {1}".format(
         self.__host_port, self.get_test_protocol()))

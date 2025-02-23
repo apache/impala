@@ -614,6 +614,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
       # Failure tests expect cluster to be initialised even if start-impala-cluster fails.
       cls.cluster = ImpalaCluster.get_e2e_test_cluster()
+      cls.impalad_test_service = cls.create_impala_service()
 
     PREVIOUS_CMD_STR = cmd_str
 
@@ -650,3 +651,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       for impalad in cls.cluster.impalads:
         impalad.service.wait_for_num_known_live_backends(expected_num_impalads,
                                                          timeout=impalad_timeout_s)
+
+  @classmethod
+  def create_impala_service(cls):
+    """Override ImpalaTestSuite to return 1st impalad of custom cluster.
+    Returns None if no impalad was started."""
+    return cls.cluster.impalads[0].service if cls.cluster.impalads else None

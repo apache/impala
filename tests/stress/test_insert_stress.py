@@ -37,6 +37,10 @@ class TestInsertStress(ImpalaTestSuite):
     return 'targeted-stress'
 
   @classmethod
+  def setup_class(cls):
+    super(TestInsertStress, cls).setup_class()
+
+  @classmethod
   def add_test_dimensions(cls):
     super(TestInsertStress, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
@@ -46,8 +50,8 @@ class TestInsertStress(ImpalaTestSuite):
   def _impala_role_concurrent_writer(self, tbl_name, wid, num_inserts, counter):
     """Writes ascending numbers up to 'num_inserts' into column 'i'. To column 'wid' it
     writes its identifier passed in parameter 'wid'."""
-    target_impalad = wid % ImpalaTestSuite.get_impalad_cluster_size()
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = wid % self.get_impalad_cluster_size()
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     try:
       insert_cnt = 0
       while insert_cnt < num_inserts:
@@ -72,8 +76,8 @@ class TestInsertStress(ImpalaTestSuite):
         assert sorted_run == list(range(sorted_run[0], sorted_run[-1] + 1)), \
           "wid: %d" % wid
 
-    target_impalad = cid % ImpalaTestSuite.get_impalad_cluster_size()
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = cid % self.get_impalad_cluster_size()
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     try:
       while counter.value != writers:
         result = impalad_client.execute("select * from %s" % tbl_name)

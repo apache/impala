@@ -429,8 +429,7 @@ class ImpalaClient(object):
     # symptoms in case of a problematic remote endpoint. It's better to have a finite
     # timeout so that in case of any connection errors, the client retries have a better
     # chance of succeeding.
-
-    host_and_port = "{0}:{1}".format(self.impalad_host, self.impalad_port)
+    host_and_port = self._to_host_port(self.impalad_host, self.impalad_port)
     assert self.http_path
     # ImpalaHttpClient relies on the URI scheme (http vs https) to open an appropriate
     # connection to the server.
@@ -581,6 +580,13 @@ class ImpalaClient(object):
     if dml_result.rows_deleted:
       num_deleted_rows = sum([int(k) for k in dml_result.rows_deleted.values()])
     return (num_rows, num_deleted_rows, dml_result.num_row_errors)
+
+  @staticmethod
+  def _to_host_port(host, port):
+    # Wrap ipv6 addresses in brackets.
+    is_ipv6_address = ":" in host
+    fmt = "[{0}]:{1}" if is_ipv6_address else "{0}:{1}"
+    return fmt.format(host, port)
 
 
 class ImpalaHS2Client(ImpalaClient):

@@ -35,9 +35,13 @@ PROCESSING_TIMEOUT_S = 10
 LOG = logging.getLogger(__name__)
 
 @SkipIfFS.hive
-class TestEventProcessing(ImpalaTestSuite):
+class TestEventProcessing(TestEventProcessingBase):
   """This class contains tests that exercise the event processing mechanism in the
   catalog."""
+
+  @classmethod
+  def setup_class(cls):
+    super(TestEventProcessing, cls).setup_class()
 
   @classmethod
   def default_test_protocol(cls):
@@ -47,13 +51,13 @@ class TestEventProcessing(ImpalaTestSuite):
   def test_transactional_insert_events(self, unique_database):
     """Executes 'run_test_insert_events' for transactional tables.
     """
-    TestEventProcessingBase._run_test_insert_events_impl(
+    TestEventProcessingBase._run_test_insert_events_impl(self,
         unique_database, is_transactional=True)
 
   def test_insert_events(self, unique_database):
     """Executes 'run_test_insert_events' for non-transactional tables.
     """
-    TestEventProcessingBase._run_test_insert_events_impl(unique_database)
+    TestEventProcessingBase._run_test_insert_events_impl(self, unique_database)
 
   def test_iceberg_inserts(self):
     """IMPALA-10735: INSERT INTO Iceberg table fails during INSERT event generation
@@ -99,13 +103,12 @@ class TestEventProcessing(ImpalaTestSuite):
     self._run_test_empty_partition_events(unique_database, False)
 
   def test_event_based_replication(self):
-    TestEventProcessingBase._run_event_based_replication_tests_impl(
+    self._run_event_based_replication_tests_impl(self,
         self.filesystem_client)
 
   def _run_test_empty_partition_events(self, unique_database, is_transactional):
     test_tbl = unique_database + ".test_events"
-    TBLPROPERTIES = TestEventProcessingBase._get_transactional_tblproperties(
-      is_transactional)
+    TBLPROPERTIES = self._get_transactional_tblproperties(is_transactional)
     self.run_stmt_in_hive("create table {0} (key string, value string) \
       partitioned by (year int) stored as parquet {1}".format(test_tbl, TBLPROPERTIES))
     self.client.set_configuration({

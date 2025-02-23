@@ -570,13 +570,20 @@ class BaseImpalaProcess(Process):
 
   def _get_webserver_certificate_file(self):
     # TODO: if this is containerised, the path will likely not be the same on the host.
+    # TODO: what we need in the client is the CA, not the server cert
     return self._get_arg_value("webserver_certificate_file", "")
+
+  def _get_ssl_client_ca_certificate(self):
+    return self._get_arg_value("ssl_client_ca_certificate", "")
 
   def _get_hostname(self):
     return self._get_arg_value("hostname", socket.gethostname())
 
   def _get_webserver_interface(self):
     return self._get_arg_value("webserver_interface", socket.gethostname())
+
+  def _get_external_interface(self):
+    return self._get_arg_value("external_interface", socket.gethostname())
 
   def _get_arg_value(self, arg_name, default=None):
     """Gets the argument value for given argument name"""
@@ -600,10 +607,12 @@ class BaseImpalaProcess(Process):
 class ImpaladProcess(BaseImpalaProcess):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(ImpaladProcess, self).__init__(cmd, container_id, port_map)
+    self.external_interface = self._get_external_interface()
     self.service = ImpaladService(self.hostname, self.webserver_interface,
+        self.external_interface,
         self.get_webserver_port(), self.__get_beeswax_port(),
         self.__get_krpc_port(), self.__get_hs2_port(), self.__get_hs2_http_port(),
-        self._get_webserver_certificate_file())
+        self._get_webserver_certificate_file(), self._get_ssl_client_ca_certificate())
 
   def _get_default_webserver_port(self):
     return DEFAULT_IMPALAD_WEBSERVER_PORT
@@ -685,7 +694,7 @@ class StateStoreProcess(BaseImpalaProcess):
     super(StateStoreProcess, self).__init__(cmd, container_id, port_map)
     self.service = StateStoredService(self.hostname, self.webserver_interface,
         self.get_webserver_port(), self._get_webserver_certificate_file(),
-        self.__get_port())
+        self._get_ssl_client_ca_certificate(), self.__get_port())
 
   def _get_default_webserver_port(self):
     return DEFAULT_STATESTORED_WEBSERVER_PORT
@@ -712,6 +721,7 @@ class CatalogdProcess(BaseImpalaProcess):
     super(CatalogdProcess, self).__init__(cmd, container_id, port_map)
     self.service = CatalogdService(self.hostname, self.webserver_interface,
         self.get_webserver_port(), self._get_webserver_certificate_file(),
+        self._get_ssl_client_ca_certificate(),
         self.__get_port())
 
   def _get_default_webserver_port(self):
@@ -743,7 +753,8 @@ class AdmissiondProcess(BaseImpalaProcess):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(AdmissiondProcess, self).__init__(cmd, container_id, port_map)
     self.service = AdmissiondService(self.hostname, self.webserver_interface,
-        self.get_webserver_port(), self._get_webserver_certificate_file())
+        self.get_webserver_port(), self._get_webserver_certificate_file(),
+        self._get_ssl_client_ca_certificate())
 
   def _get_default_webserver_port(self):
     return DEFAULT_ADMISSIOND_WEBSERVER_PORT

@@ -27,17 +27,22 @@ EVENT_SYNC_QUERY_OPTIONS = {
 class TestEventProcessingBase(ImpalaTestSuite):
 
   @classmethod
-  def _run_test_insert_events_impl(cls, unique_database, is_transactional=False):
+  def setup_class(cls):
+    super(TestEventProcessingBase, cls).setup_class()
+
+  @classmethod
+  def _run_test_insert_events_impl(cls, suite, unique_database, is_transactional=False):
     """Test for insert event processing. Events are created in Hive and processed in
     Impala. The following cases are tested :
     Insert into table --> for partitioned and non-partitioned table
     Insert overwrite table --> for partitioned and non-partitioned table
     Insert into partition --> for partitioned table
     """
-    with cls.create_impala_client() as impala_client:
+    # TODO: change into an instance method and remove argument "suite" (IMPALA-14174)
+    with suite.create_impala_client() as impala_client:
       # Test table with no partitions.
       tbl_insert_nopart = 'tbl_insert_nopart'
-      cls.run_stmt_in_hive(
+      suite.run_stmt_in_hive(
         "drop table if exists %s.%s" % (unique_database, tbl_insert_nopart))
       tblproperties = ""
       if is_transactional:
@@ -141,16 +146,18 @@ class TestEventProcessingBase(ImpalaTestSuite):
       assert len(result.data) == 0
 
   @classmethod
-  def _run_event_based_replication_tests_impl(cls, filesystem_client, transactional=True):
+  def _run_event_based_replication_tests_impl(cls, suite,
+                                              filesystem_client, transactional=True):
     """Hive Replication relies on the insert events generated on the tables.
     This test issues some basic replication commands from Hive and makes sure
     that the replicated table has correct data."""
+    # TODO: change into an instance method and remove argument "suite" (IMPALA-14174)
     TBLPROPERTIES = cls._get_transactional_tblproperties(transactional)
     source_db = ImpalaTestSuite.get_random_name("repl_source_")
     target_db = ImpalaTestSuite.get_random_name("repl_target_")
     unpartitioned_tbl = "unpart_tbl"
     partitioned_tbl = "part_tbl"
-    impala_client = cls.create_impala_client()
+    impala_client = suite.create_impala_client()
     try:
       cls.run_stmt_in_hive("create database {0}".format(source_db))
       cls.run_stmt_in_hive(

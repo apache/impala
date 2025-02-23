@@ -53,6 +53,7 @@ using std::random_device;
 namespace impala {
 
 const string LOCALHOST_IP_STR("127.0.0.1");
+const string LOCALHOST_IP_V6_STR("::1");
 
 Status GetHostname(string* hostname) {
   char name[HOST_NAME_MAX];
@@ -67,33 +68,44 @@ Status GetHostname(string* hostname) {
   return Status::OK();
 }
 
-Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip){
+Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip, bool ipv6){
   // Try to resolve via the operating system.
   vector<IpAddr> addresses;
   addrinfo hints;
   memset(&hints, 0, sizeof(struct addrinfo));
-  hints.ai_family = AF_INET; // IPv4 addresses only
+  hints.ai_family = ipv6 ? AF_INET6 : AF_INET;
   hints.ai_socktype = SOCK_STREAM;
 
   struct addrinfo* addr_info;
   if (getaddrinfo(hostname.c_str(), NULL, &hints, &addr_info) != 0) {
     stringstream ss;
-    ss << "Could not find IPv4 address for: " << hostname;
+    ss << "Could not find IPv" << (ipv6 ? 6 : 4) << " address for: " << hostname;
     return Status(ss.str());
   }
 
   addrinfo* it = addr_info;
   while (it != NULL) {
-    char addr_buf[64];
-    const char* result =
-        inet_ntop(AF_INET, &((sockaddr_in*)it->ai_addr)->sin_addr, addr_buf, 64);
+    char addr_buf[INET6_ADDRSTRLEN];
+    const char* result = nullptr;
+    bool is_ipv6_addr = it->ai_family == AF_INET6;
+    if (is_ipv6_addr) {
+      result = inet_ntop(AF_INET6, &((sockaddr_in6*)it->ai_addr)->sin6_addr,
+          addr_buf, sizeof(addr_buf));
+    } else {
+      result = inet_ntop(AF_INET, &((sockaddr_in*)it->ai_addr)->sin_addr,
+          addr_buf, sizeof(addr_buf));
+    }
+
     if (result == NULL) {
       stringstream ss;
-      ss << "Could not convert IPv4 address for: " << hostname;
+      ss << "Could not convert IPv" << (is_ipv6_addr ? 6: 4)
+          << "address for: " << hostname;
       freeaddrinfo(addr_info);
       return Status(ss.str());
     }
-    addresses.push_back(string(addr_buf));
+    if (is_ipv6_addr == ipv6) {
+      addresses.push_back(string(addr_buf));
+    }
     it = it->ai_next;
   }
 
@@ -101,7 +113,7 @@ Status HostnameToIpAddr(const Hostname& hostname, IpAddr* ip){
 
   if (addresses.empty()) {
     stringstream ss;
-    ss << "Could not convert IPv4 address for: " << hostname;
+    ss << "Could not convert IPv" << (ipv6 ? 6 : 4) << " address for: " << hostname;
     return Status(ss.str());
   }
 
@@ -130,7 +142,7 @@ bool IsResolvedAddress(const NetworkAddressPB& addr) {
 
 bool FindFirstNonLocalhost(const vector<string>& addresses, string* addr) {
   for (const string& candidate: addresses) {
-    if (candidate != LOCALHOST_IP_STR) {
+    if (candidate != LOCALHOST_IP_STR && candidate != LOCALHOST_IP_V6_STR) {
       *addr = candidate;
       return true;
     }
@@ -226,7 +238,13 @@ bool IsWildcardAddress(const string& ipaddress) {
 
 string TNetworkAddressToString(const TNetworkAddress& address) {
   stringstream ss;
-  ss << address.hostname << ":" << dec << address.port;
+  if (address.hostname.find(':') == string::npos) {
+    // IPv4
+    ss << address.hostname << ":" << dec << address.port;
+  } else {
+    // IPv6
+    ss << "[" << address.hostname << "]:" << dec << address.port;
+  }
   return ss.str();
 }
 

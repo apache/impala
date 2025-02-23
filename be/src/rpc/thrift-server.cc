@@ -270,9 +270,10 @@ ThriftServer::ThriftServer(const string& name,
     const std::shared_ptr<TProcessor>& processor, int port, AuthProvider* auth_provider,
     MetricGroup* metrics, int max_concurrent_connections, int64_t queue_timeout_ms,
     int64_t idle_poll_period_ms, TransportType transport_type,
-    bool is_external_facing)
+    bool is_external_facing, string host)
   : started_(false),
     port_(port),
+    host_(std::move(host)),
     ssl_enabled_(false),
     max_concurrent_connections_(max_concurrent_connections),
     queue_timeout_ms_(queue_timeout_ms),
@@ -342,7 +343,7 @@ Status ThriftServer::CreateSocket(std::shared_ptr<TServerSocket>* socket) {
       socket_factory->loadCertificate(certificate_path_.c_str());
       socket_factory->loadPrivateKey(private_key_path_.c_str());
       ImpalaKeepAliveServerSocket<TSSLServerSocket>* server_socket =
-          new ImpalaKeepAliveServerSocket<TSSLServerSocket>(port_, socket_factory);
+          new ImpalaKeepAliveServerSocket<TSSLServerSocket>(host_, port_, socket_factory);
       server_socket->setKeepAliveOptions(keepalive_probe_period_s_,
           keepalive_retry_period_s_, keepalive_retry_count_);
       socket->reset(server_socket);
@@ -351,7 +352,7 @@ Status ThriftServer::CreateSocket(std::shared_ptr<TServerSocket>* socket) {
     }
   } else {
     ImpalaKeepAliveServerSocket<TServerSocket>* server_socket =
-        new ImpalaKeepAliveServerSocket<TServerSocket>(port_);
+        new ImpalaKeepAliveServerSocket<TServerSocket>(host_, port_);
     server_socket->setKeepAliveOptions(keepalive_probe_period_s_,
         keepalive_retry_period_s_, keepalive_retry_count_);
     socket->reset(server_socket);

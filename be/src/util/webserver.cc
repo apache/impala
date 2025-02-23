@@ -408,17 +408,25 @@ bool Webserver::IsSecure() const {
 Status Webserver::Start() {
   LOG(INFO) << "Starting webserver on " << TNetworkAddressToString(http_address_);
 
-  IpAddr ip;
-  RETURN_IF_ERROR(HostnameToIpAddr(http_address_.hostname, &ip));
-  stringstream listening_spec;
-  listening_spec << ip << ":" << http_address_.port;
+  IpAddr ipv4, ipv6;
+  Status ip_v6_status = HostnameToIpAddr(http_address_.hostname, &ipv6, true);
+  Status ip_v4_status = HostnameToIpAddr(http_address_.hostname, &ipv4, false);
+  if (!ip_v4_status.ok() && !ip_v6_status.ok()) return ip_v6_status;
 
-  if (IsSecure()) {
-    LOG(INFO) << "Webserver: Enabling HTTPS support";
-    // Squeasel makes sockets with 's' suffixes accept SSL traffic only
-    listening_spec << "s";
+  if (IsSecure()) LOG(INFO) << "Webserver: Enabling HTTPS support";
+  stringstream listening_spec;
+  if (ip_v6_status.ok()) {
+    listening_spec << "[" << ipv6 << "]:" << http_address_.port;
+    if (IsSecure()) listening_spec << "s";
+  }
+  if (ip_v4_status.ok()) {
+    if (ip_v6_status.ok()) listening_spec << ",";
+    listening_spec << ipv4 << ":" << http_address_.port;
+    if (IsSecure()) listening_spec << "s";
   }
   string listening_str = listening_spec.str();
+  LOG(INFO) << "Starting webserver listening to " << listening_str;
+
   vector<const char*> options;
 
   if (!FLAGS_webserver_doc_root.empty() && FLAGS_enable_webserver_doc_root) {

@@ -157,6 +157,9 @@ DEFINE_bool(enable_external_fe_http, false,
     "if true enables http transport for external_fe_port otherwise binary transport is "
     "used");
 
+DEFINE_string(external_interface, "",
+    "Host name to bind with in beeswax/hs2/hs2-http. \"::\" allows IPv6 (dual stack).");
+
 DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
 DEFINE_string(default_query_options, "", "key=value pair of default query options for"
@@ -3238,6 +3241,7 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
           .keepalive(FLAGS_client_keepalive_probe_period_s,
               FLAGS_client_keepalive_retry_period_s,
               FLAGS_client_keepalive_retry_count)
+          .host(FLAGS_external_interface)
           .Build(&server));
       beeswax_server_.reset(server);
       beeswax_server_->SetConnectionHandler(this);
@@ -3270,6 +3274,7 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
           .keepalive(FLAGS_client_keepalive_probe_period_s,
               FLAGS_client_keepalive_retry_period_s,
               FLAGS_client_keepalive_retry_count)
+          .host(FLAGS_external_interface)
           .Build(&server));
       hs2_server_.reset(server);
       hs2_server_->SetConnectionHandler(this);
@@ -3305,6 +3310,8 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
                   FLAGS_client_keepalive_retry_period_s,
                   FLAGS_client_keepalive_retry_count)
               .Build(&server));
+      // FLAGS_external_interface is not passed to external external_fe_port. If this is
+      // needed (e.g. for dual stack) then another subtask can be added to IMPALA-13819.
       external_fe_server_.reset(server);
       external_fe_server_->SetConnectionHandler(this);
     }
@@ -3338,6 +3345,7 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
               .keepalive(FLAGS_client_keepalive_probe_period_s,
                   FLAGS_client_keepalive_retry_period_s,
                   FLAGS_client_keepalive_retry_count)
+              .host(FLAGS_external_interface)
               .Build(&http_server));
       hs2_http_server_.reset(http_server);
       hs2_http_server_->SetConnectionHandler(this);

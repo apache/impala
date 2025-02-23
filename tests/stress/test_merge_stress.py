@@ -41,8 +41,8 @@ class TestIcebergConcurrentMergeStress(ImpalaTestSuite):
 
   def _impala_role_concurrent_updater(self, tbl_name, col, num_writes):
     """Increments values in column 'total' and in the column which is passed in 'col'."""
-    target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     merge_stmt = """merge into {0} target using
         {0} source on source.total = target.total
         when matched then update set
@@ -61,8 +61,8 @@ class TestIcebergConcurrentMergeStress(ImpalaTestSuite):
 
   def _impala_role_concurrent_writer(self, tbl_name, num_inserts):
     """Adds a new row based on the maximum 'total' value."""
-    target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     merge_stmt = """merge into {0} target using
         (select total, a, b, c from {0} order by total desc limit 1) source
         on source.total +1 = target.total
@@ -92,8 +92,8 @@ class TestIcebergConcurrentMergeStress(ImpalaTestSuite):
         assert total == a + b + c
       return max_total
 
-    target_impalad = random.randint(0, ImpalaTestSuite.get_impalad_cluster_size() - 1)
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    target_impalad = random.randint(0, self.get_impalad_cluster_size() - 1)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     total = 0
     while total < target_total:
       result = impalad_client.execute("select * from %s" % tbl_name)

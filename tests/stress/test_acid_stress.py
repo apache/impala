@@ -93,7 +93,7 @@ class TestAcidInsertsBasic(TestAcidStress):
   def _impala_role_write_inserts(self, tbl_name, partitioned):
     """INSERT INTO/OVERWRITE a table several times from Impala."""
     try:
-      impalad_client = ImpalaTestSuite.create_impala_client()
+      impalad_client = self.create_impala_client()
       part_expr = "partition (p=1)" if partitioned else ""
       for run in range(0, NUM_OVERWRITES + 1):
         OVERWRITE_SQL = """insert overwrite table %s %s values (%i, %i)
@@ -109,7 +109,7 @@ class TestAcidInsertsBasic(TestAcidStress):
   def _impala_role_read_inserts(self, tbl_name, needs_refresh, sleep_seconds):
     """SELECT from a table many times until the expected final values are found."""
     try:
-      impalad_client = ImpalaTestSuite.create_impala_client()
+      impalad_client = self.create_impala_client()
       expected_result = {"run": -1, "i": 0}
       accept_empty_table = True
       while expected_result["run"] != NUM_OVERWRITES and \
@@ -182,7 +182,7 @@ class TestAcidInsertsBasic(TestAcidStress):
   def _impala_role_partition_writer(self, tbl_name, partition, is_overwrite, sleep_sec):
     insert_op = "OVERWRITE" if is_overwrite else "INTO"
     try:
-      impalad_client = ImpalaTestSuite.create_impala_client()
+      impalad_client = self.create_impala_client()
       impalad_client.execute(
           """insert {op} table {tbl_name} partition({partition})
              select sleep({sleep_ms})""".format(op=insert_op, tbl_name=tbl_name,
