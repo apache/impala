@@ -2002,7 +2002,7 @@ class AggregatedEventSequenceToJsonTest : public ::testing::Test {
       seqs[i]->Start();
     }
 
-    int64_t dummy_event_duration = 5;
+    int64_t dummy_event_duration = 50;
 
     // Simulate parallel execution of events across instances
     if (events_completeness >= 1.0f) {
