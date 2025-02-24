@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -237,6 +238,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   private Map<Integer, IcebergColumn> icebergFieldIdToCol_;
   private Map<String, TIcebergPartitionStats> partitionStats_;
 
+  private final FileMetadataStats fileMetadataStats_ = new FileMetadataStats();
+
   protected IcebergTable(org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
     super(msTable, db, name, owner);
@@ -405,6 +408,27 @@ public class IcebergTable extends Table implements FeIcebergTable {
     return table;
   }
 
+  @Override
+  public void initMetrics() {
+    super.initMetrics();
+    metrics_.addGauge(NUM_FILES_METRIC, new Gauge<Long>() {
+      @Override
+      public Long getValue() { return fileMetadataStats_.numFiles; }
+    });
+    metrics_.addGauge(NUM_BLOCKS_METRIC, new Gauge<Long>() {
+      @Override
+      public Long getValue() { return fileMetadataStats_.numBlocks; }
+    });
+    metrics_.addGauge(TOTAL_FILE_BYTES_METRIC, new Gauge<Long>() {
+      @Override
+      public Long getValue() { return fileMetadataStats_.totalFileBytes; }
+    });
+    metrics_.addGauge(MEMORY_ESTIMATE_METRIC, new Gauge<Long>() {
+      @Override
+      public Long getValue() { return getEstimatedMetadataSize(); }
+    });
+  }
+
   /**
    * Loads the metadata of an Iceberg table.
    * <p>
@@ -461,17 +485,25 @@ public class IcebergTable extends Table implements FeIcebergTable {
         loadAllColumnStats(msClient, catalogTimeline);
         applyPuffinNdvStats(catalogTimeline);
         setAvroSchema(msClient, msTbl, fileStore_, catalogTimeline);
+        updateMetrics(loader.getFileMetadataStats());
       } catch (Exception e) {
         throw new IcebergTableLoadingException("Error loading metadata for Iceberg table "
             + icebergTableLocation_, e);
       } finally {
         storageMetadataLoadTime_ = ctxStorageLdTime.stop();
       }
-
       refreshLastUsedTime();
     } finally {
       context.stop();
     }
+  }
+
+  private void updateMetrics(FileMetadataStats stats) {
+    long memUsageEstimate = stats.numFiles * PER_FD_MEM_USAGE_BYTES +
+        stats.numBlocks * PER_BLOCK_MEM_USAGE_BYTES;
+    setEstimatedMetadataSize(memUsageEstimate);
+    setNumFiles(stats.numFiles);
+    fileMetadataStats_.set(stats);
   }
 
   // Reads NDV stats from Puffin files belonging to the table (if any).

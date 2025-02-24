@@ -21,6 +21,7 @@ from tests.common.file_utils import grep_dir
 from tests.common.skip import SkipIfBuildType, SkipIfDockerizedCluster
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.util.filesystem_utils import IS_HDFS
 from tests.util.parse_util import parse_duration_string_ms
 from datetime import datetime
 from multiprocessing import Process, Queue
@@ -1004,6 +1005,28 @@ class TestWebPage(ImpalaTestSuite):
     assert "catalog.num-functions" in metric_keys
     assert "catalog.hms-client-pool.num-idle" in metric_keys
     assert "catalog.hms-client-pool.num-in-use" in metric_keys
+
+  def test_iceberg_table_metrics(self):
+    assert '23448' == self.__get_table_metric(
+        "functional_parquet", "iceberg_non_partitioned", "total-file-size-bytes")
+    assert '20' == self.__get_table_metric(
+        "functional_parquet", "iceberg_non_partitioned", "num-files")
+    assert '13000' == self.__get_table_metric(
+        "functional_parquet", "iceberg_non_partitioned", "memory-estimate-bytes")
+    if IS_HDFS:
+      assert '20' == self.__get_table_metric(
+          "functional_parquet", "iceberg_non_partitioned", "num-blocks")
+
+  def __get_table_metric(self, db_name, tbl_name, metric):
+    self.client.execute("refresh %s.%s" % (db_name, tbl_name))
+    responses = self.get_and_check_status(self.TABLE_METRICS_URL + "?name=%s.%s&json" %
+        (db_name, tbl_name), metric, ports_to_test=self.CATALOG_TEST_PORT)
+    response_json = json.loads(responses[0].text)
+    metrics_text = response_json['table_metrics']
+    for line in metrics_text.split('\n'):
+      if line.startswith(metric):
+        return line.split(": ")[1]
+    return None
 
   def test_query_progress(self):
     """Tests that /queries page shows query progress."""

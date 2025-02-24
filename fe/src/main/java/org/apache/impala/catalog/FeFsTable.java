@@ -82,9 +82,76 @@ public interface FeFsTable extends FeTable {
   // Internal table property that specifies the total size of the table.
   public static final String TOTAL_SIZE = "totalSize";
 
+  // FS table specific metrics
+  public static final String NUM_FILES_METRIC = "num-files";
+  public static final String NUM_BLOCKS_METRIC = "num-blocks";
+  public static final String TOTAL_FILE_BYTES_METRIC = "total-file-size-bytes";
+  public static final String MEMORY_ESTIMATE_METRIC = "memory-estimate-bytes";
+
   // Internal table property that specifies the number of erasure coded files in the
   // table.
   public static final String NUM_ERASURE_CODED_FILES = "numFilesErasureCoded";
+
+  // Average memory requirements (in bytes) for storing a file descriptor.
+  public static final long PER_FD_MEM_USAGE_BYTES = 500;
+
+  // Average memory requirements (in bytes) for storing a block.
+  public static final long PER_BLOCK_MEM_USAGE_BYTES = 150;
+
+  // Represents a set of storage-related statistics aggregated at the table or partition
+  // level.
+  public final static class FileMetadataStats {
+    // Number of files in a table/partition.
+    public long numFiles = 0;
+    // Number of blocks in a table/partition.
+    public long numBlocks = 0;
+    // Total size (in bytes) of all files in a table/partition.
+    public long totalFileBytes = 0;
+
+    public FileMetadataStats() {}
+
+    /**
+     * This constructor allows third party extensions to instantiate a FileMetadataStats
+     * with a List of FileDescriptor's.
+     */
+    public FileMetadataStats(List<FileDescriptor> fds) {
+      for (FileDescriptor fd : fds) {
+        accumulate(fd);
+      }
+    }
+
+    // Initializes the values of the storage stats.
+    public void init() {
+      numFiles = 0;
+      numBlocks = 0;
+      totalFileBytes = 0;
+    }
+
+    public void set(FileMetadataStats stats) {
+      numFiles = stats.numFiles;
+      numBlocks = stats.numBlocks;
+      totalFileBytes = stats.totalFileBytes;
+    }
+
+    public void merge(FileMetadataStats other) {
+      numFiles += other.numFiles;
+      numBlocks += other.numBlocks;
+      totalFileBytes += other.totalFileBytes;
+    }
+
+    public void remove(FileMetadataStats other) {
+      numFiles -= other.numFiles;
+      numBlocks -= other.numBlocks;
+      totalFileBytes -= other.totalFileBytes;
+    }
+
+    // Accumulate the statistics of the fd into this FileMetadataStats.
+    public void accumulate(FileDescriptor fd) {
+      numBlocks += fd.getNumFileBlocks();
+      totalFileBytes += fd.getFileLength();
+      ++numFiles;
+    }
+  }
 
   /**
    * @return true if the table and all its partitions reside at locations which

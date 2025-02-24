@@ -44,7 +44,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
-import org.apache.impala.catalog.HdfsTable.FileMetadataStats;
+import org.apache.impala.catalog.FeFsTable.FileMetadataStats;
 import org.apache.impala.catalog.events.InFlightEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.common.FileSystemUtil;
@@ -275,7 +275,7 @@ public class HdfsPartition extends CatalogObjectImpl
         isMarkedCached, accessLevel, hmsParameters, cachedMsPartitionDescriptor,
         partitionStats, hasIncrementalStats, numRows, writeId,
         inFlightEvents, /*createEventId=*/-1L, /*lastCompactionId*/-1L,
-        /*lastRefreshEventId*/-1L, new HdfsTable.FileMetadataStats());
+        /*lastRefreshEventId*/-1L, new FileMetadataStats());
   }
 
   /**
