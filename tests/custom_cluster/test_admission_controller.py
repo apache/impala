@@ -1077,14 +1077,16 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=100, max_queued=10,
-          pool_max_mem=-1, admission_control_slots=4,
+          pool_max_mem=-1, admission_control_slots=8,
           executor_groups="default-pool-group1"),
       statestored_args=_STATESTORED_ARGS)
   def test_queue_reasons_slots(self):
     """Test that queue details appear in the profile when queued based on number of
     slots."""
     # Run a bunch of queries - one should get admitted immediately, the rest should
-    # be dequeued one-by-one.
+    # be dequeued one-by-one. This is achieved by running 5 Aggregation queries in
+    # parallel with MT_DOP option equals to available number of slots in each Impalad
+    # executor.
     STMT = "select min(ss_wholesale_cost) from tpcds_parquet.store_sales"
     TIMEOUT_S = 60
     EXPECTED_REASON = "Latest admission queue reason: Not enough admission control " +\
@@ -1095,7 +1097,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     original_metric_value = self.get_ac_process().service.get_metric_value(
         coordinator_limited_metric)
     profiles = self._execute_and_collect_profiles([STMT for i in range(NUM_QUERIES)],
-        TIMEOUT_S, config_options={"mt_dop": 4})
+        TIMEOUT_S, config_options={"mt_dop": 8})
 
     num_reasons = len([profile for profile in profiles if EXPECTED_REASON in profile])
     assert num_reasons == NUM_QUERIES - 1, \
