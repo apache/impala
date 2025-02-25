@@ -199,7 +199,7 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
           queries may be automatically routed to the request pool.  For example, if the
           coordinator is configured with
           <codeph>--expected_executor_group_sets=prefix1:10</codeph>, then an only coordinators
-          request pool named <codeph>prefix1-onlycoords<codeph> will potentially have
+          request pool named <codeph>prefix1-onlycoords</codeph> will potentially have
           queries routed to it.
         </p>
 
