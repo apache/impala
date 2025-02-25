@@ -338,6 +338,13 @@ public class CoerceOperandShuttle extends RexShuttle {
   private static RelDataType getCastedToType(RelDataType fromType,
       Type toImpalaType, RelDataTypeFactory factory) {
 
+    // Special case: If the "to" type is a generic CHAR (where len = -1),
+    // there is no casting needed if the "from" type is also a CHAR.
+    if (toImpalaType.equals(Type.CHAR) &&
+        fromType.getSqlTypeName().equals(SqlTypeName.CHAR)) {
+      return fromType;
+    }
+
     if (!toImpalaType.isDecimal() || SqlTypeUtil.isNull(fromType)) {
       return ImpalaTypeConverter.getRelDataType(toImpalaType);
     }
