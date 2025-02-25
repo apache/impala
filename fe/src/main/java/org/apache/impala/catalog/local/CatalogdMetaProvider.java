@@ -466,9 +466,8 @@ public class CatalogdMetaProvider implements MetaProvider {
     }
     resp = new TGetPartialCatalogObjectResponse();
     new TDeserializer().deserialize(resp, ret);
-    if (resp.status.status_code != TErrorCode.OK) {
-      // TODO(todd) do reasonable error handling
-      throw new TException(resp.toString());
+    if (resp.isSetStatus() && resp.status.status_code != TErrorCode.OK) {
+      throw new TException(String.join("\n", resp.status.error_msgs));
     }
 
     // If we get a "not found" response, then we assume that this was a case of an
@@ -746,7 +745,7 @@ public class CatalogdMetaProvider implements MetaProvider {
     return res.values();
   }
 
-  private TGetPartialCatalogObjectRequest newReqForTable(String dbName,
+  private static TGetPartialCatalogObjectRequest newReqForTable(String dbName,
       String tableName) {
     TGetPartialCatalogObjectRequest req = new TGetPartialCatalogObjectRequest();
     req.object_desc = new TCatalogObject();
@@ -756,13 +755,27 @@ public class CatalogdMetaProvider implements MetaProvider {
     return req;
   }
 
-  private TGetPartialCatalogObjectRequest newReqForTable(TableMetaRef table) {
+  private static TGetPartialCatalogObjectRequest newReqForTable(TableMetaRef table) {
     Preconditions.checkArgument(table instanceof TableMetaRefImpl,
         "table ref %s was not created by CatalogdMetaProvider", table);
     TGetPartialCatalogObjectRequest req = newReqForTable(
         ((TableMetaRefImpl)table).dbName_,
         ((TableMetaRefImpl)table).tableName_);
     req.object_desc.setCatalog_version(((TableMetaRefImpl)table).catalogVersion_);
+    return req;
+  }
+
+  private static TGetPartialCatalogObjectRequest newReqForPartitions(
+      TableMetaRefImpl table, List<Long> partIds) {
+    TGetPartialCatalogObjectRequest req = newReqForTable(table);
+    req.table_info_selector.partition_ids = partIds;
+    req.table_info_selector.want_partition_metadata = true;
+    req.table_info_selector.want_partition_files = true;
+    if (BackendConfig.INSTANCE.isAutoCheckCompaction()) {
+      req.table_info_selector.valid_write_ids = table.validWriteIds_;
+    }
+    // TODO(IMPALA-7535): fetch incremental stats on-demand
+    req.table_info_selector.want_partition_stats = true;
     return req;
   }
 
@@ -967,7 +980,7 @@ public class CatalogdMetaProvider implements MetaProvider {
       List<String> partitionColumnNames,
       ListMap<TNetworkAddress> hostIndex,
       List<PartitionRef> partitionRefs)
-      throws MetaException, TException {
+      throws CatalogException, TException {
     Preconditions.checkArgument(table instanceof TableMetaRefImpl);
     TableMetaRefImpl refImpl = (TableMetaRefImpl)table;
     Stopwatch sw = Stopwatch.createStarted();
@@ -1071,31 +1084,39 @@ public class CatalogdMetaProvider implements MetaProvider {
    */
   private Map<PartitionRef, PartitionMetadata> loadPartitionsFromCatalogd(
       TableMetaRefImpl table, ListMap<TNetworkAddress> hostIndex,
-      List<PartitionRef> partRefs) throws TException {
+      List<PartitionRef> partRefs) throws CatalogException, TException {
     List<Long> ids = Lists.newArrayListWithCapacity(partRefs.size());
     for (PartitionRef partRef: partRefs) {
       ids.add(((PartitionRefImpl)partRef).getId());
     }
 
-    TGetPartialCatalogObjectRequest req = newReqForTable(table);
-    req.table_info_selector.partition_ids = ids;
-    req.table_info_selector.want_partition_metadata = true;
-    req.table_info_selector.want_partition_files = true;
-    if (BackendConfig.INSTANCE.isAutoCheckCompaction()) {
-      req.table_info_selector.valid_write_ids = table.validWriteIds_;
-    }
-    // TODO(todd): fetch incremental stats on-demand for compute-incremental-stats.
-    req.table_info_selector.want_partition_stats = true;
+    TGetPartialCatalogObjectRequest req = newReqForPartitions(table, ids);
     TGetPartialCatalogObjectResponse resp = sendRequest(req);
     checkResponse(resp.table_info != null && resp.table_info.partitions != null,
         req, "missing partition list result");
     checkResponse(resp.table_info.network_addresses != null,
         req, "missing network addresses");
-    checkResponse(resp.table_info.partitions.size() == ids.size(),
-        req, "returned %d partitions instead of expected %d",
-        resp.table_info.partitions.size(), ids.size());
     addTableMetadatStorageLoadTimeToProfile(
         resp.table_info.storage_metadata_load_time_ns);
+    boolean logProgress = false;
+    while (resp.table_info.partitions.size() < ids.size()) {
+      logProgress = true;
+      int numFetchedParts = resp.table_info.partitions.size();
+      LOG.info("Fetched {}/{} partitions for {}. Sending new requests.",
+          numFetchedParts, ids.size(), table);
+      List<Long> remainingIds = Lists.newArrayListWithCapacity(
+          ids.size() - numFetchedParts);
+      for (int i = numFetchedParts; i < ids.size(); i++) {
+        remainingIds.add(ids.get(i));
+      }
+
+      TGetPartialCatalogObjectRequest nextReq = newReqForPartitions(table, remainingIds);
+      TGetPartialCatalogObjectResponse nextResp = sendRequest(nextReq);
+      resp.table_info.partitions.addAll(nextResp.table_info.partitions);
+    }
+    if (logProgress) {
+      LOG.info("Fetched {} partitions for {}", ids.size(), table);
+    }
     Map<PartitionRef, PartitionMetadata> ret = new HashMap<>();
     for (int i = 0; i < ids.size(); i++) {
       PartitionRef partRef = partRefs.get(i);
@@ -1142,7 +1163,7 @@ public class CatalogdMetaProvider implements MetaProvider {
 
       PartitionMetadata oldVal = ret.put(partRef, metaImpl);
       if (oldVal != null) {
-        throw new RuntimeException("catalogd returned partition " + part.id +
+        throw new CatalogException("catalogd returned partition " + part.id +
             " multiple times");
       }
     }
@@ -1254,7 +1275,7 @@ public class CatalogdMetaProvider implements MetaProvider {
       TGetPartialCatalogObjectRequest req, String msg, Object... args) throws TException {
     if (condition) return;
     throw new TException(String.format("Invalid response from catalogd for request " +
-        req.toString() + ": " + msg, args));
+        StringUtils.abbreviate(req.toString(), 1000) + ": " + msg, args));
   }
 
   @Override

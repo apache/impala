@@ -323,4 +323,6 @@ struct TBackendGflags {
   145: required bool catalogd_deployed
 
   146: required string catalog_config_dir
+
+  147: required i32 catalog_partial_fetch_max_files
 }

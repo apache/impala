@@ -595,6 +595,12 @@ public class HdfsPartition extends CatalogObjectImpl
            encodedDeleteFileDescriptors_.size();
   }
 
+  public static int getNumFds(TPartialPartitionInfo partInfo) {
+    return partInfo.getFile_descriptorsSize() +
+        partInfo.getInsert_file_descriptorsSize() +
+        partInfo.getDelete_file_descriptorsSize();
+  }
+
   /**
    * Returns the requested partitions info and the number of files filtered out based on
    * the ACID writeIdList.

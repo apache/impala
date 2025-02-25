@@ -73,6 +73,7 @@ import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsPartition;
@@ -83,6 +84,7 @@ import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TSqlConstraints;
+import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
@@ -2288,6 +2290,7 @@ public class HdfsTable extends Table implements FeFsTable {
     Counter misses = metrics_.getCounter(FILEMETADATA_CACHE_MISS_METRIC);
     Counter hits = metrics_.getCounter(FILEMETADATA_CACHE_HIT_METRIC);
     int numFilesFiltered = 0;
+    int numFilesCollected = 0;
     if (partIds != null) {
       resp.table_info.partitions = Lists.newArrayListWithCapacity(partIds.size());
       for (long partId : partIds) {
@@ -2302,6 +2305,9 @@ public class HdfsTable extends Table implements FeFsTable {
             part.getPartialPartitionInfo(req, reqWriteIdList);
         if (partInfoStatus.second != null) {
           hits.inc();
+          int numFds = HdfsPartition.getNumFds(partInfoStatus.first);
+          if (hitNumFilesLimit(resp, partIds, part, numFds, numFilesCollected)) break;
+          numFilesCollected += numFds;
           numFilesFiltered += partInfoStatus.second;
         } else {
           misses.inc();
@@ -2309,6 +2315,7 @@ public class HdfsTable extends Table implements FeFsTable {
         }
         resp.table_info.partitions.add(partInfoStatus.first);
       }
+      if (resp.isSetStatus() && resp.status.status_code != TErrorCode.OK) return resp;
     }
     // In most of the cases, the prefix map only contains one item for the table location.
     // Here we always send it since it's small.
@@ -2336,6 +2343,33 @@ public class HdfsTable extends Table implements FeFsTable {
     // it again which requires additional HDFS RPCs.
     resp.table_info.setIs_marked_cached(isMarkedCached_);
     return resp;
+  }
+
+  private boolean hitNumFilesLimit(TGetPartialCatalogObjectResponse resp,
+      Collection<Long> partIds, HdfsPartition part, int numFds, int numFilesCollected) {
+    if (numFilesCollected + numFds >
+        BackendConfig.INSTANCE.getCatalogPartialFetchMaxFiles()) {
+      if (numFilesCollected == 0) {
+        // Even collecting the first partition will exceed the limit which means no files
+        // can be returned. Return an unrecoverable error to the coordinator.
+        String err = String.format("Too many files to collect in table %s%s: %d. " +
+            "Current limit is %d configured by startup flag " +
+            "'catalog_partial_fetch_max_files'. Consider compacting files of the table.",
+            full_name_, isPartitioned() ? " partition " + part.getPartitionName() : "",
+            numFds, BackendConfig.INSTANCE.getCatalogPartialFetchMaxFiles());
+        LOG.error(err);
+        resp.setStatus(new TStatus(TErrorCode.INTERNAL_ERROR, Lists.newArrayList(err)));
+      } else {
+        LOG.warn("Returning {} files from {}/{} requested partitions for table {}. " +
+                "Coordinator will fetch the remaining partitions in another request " +
+                "but this impacts metadata performance. Consider compacting files to " +
+                "improve it.",
+            numFilesCollected, resp.table_info.partitions.size(), partIds.size(),
+            full_name_);
+      }
+      return true;
+    }
+    return false;
   }
 
   private double getFileMetadataCacheHitRate() {

@@ -682,3 +682,56 @@ class TestReusePartitionMetadata(CustomClusterTestSuite):
     match = re.search(r"CatalogFetch.Partitions.Misses: (\d+)", ret.runtime_profile)
     assert len(match.groups()) == 1
     assert match.group(1) == str(partition_misses)
+
+
+class TestAllowIncompleteData(CustomClusterTestSuite):
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal --catalog_partial_fetch_max_files=1000")
+  def test_incomplete_partition_list(self):
+    """Test that coordinator can fetch the missing partitions when catalogd decides to
+    truncate the partition list in the response"""
+    res = self.execute_query_expect_success(
+        self.client, "show files in tpcds.store_sales")
+    assert len(res.data) == 1824
+
+    self.assert_catalogd_log_contains(
+        "WARNING", "Returning 1000 files from 1000/1824 requested partitions for table "
+        "tpcds.store_sales. Coordinator will fetch the remaining partitions in another "
+        "request but this impacts metadata performance. Consider compacting files to "
+        "improve it.")
+    self.assert_impalad_log_contains(
+        "INFO", r"Fetched 1000/1824 partitions for TableMetaRef tpcds.store_sales@\d+. "
+        "Sending new requests.")
+    self.assert_impalad_log_contains(
+        "INFO", r"Fetched 1824 partitions for TableMetaRef tpcds.store_sales@\d+")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal --catalog_partial_fetch_max_files=1")
+  def test_too_many_files(self, unique_database):
+    """Test the error reporting the limit is too small"""
+    exception = self.execute_query_expect_failure(
+        self.client, "show files in tpch_parquet.lineitem")
+    err = ("Too many files to collect in table tpch_parquet.lineitem: 3. Current limit "
+           "is 1 configured by startup flag 'catalog_partial_fetch_max_files'. Consider "
+           "compacting files of the table.")
+    assert err in str(exception)
+    self.assert_catalogd_log_contains("ERROR", err)
+
+    # Create a partitioned table with multiple files
+    tbl = unique_database + ".foo"
+    self.execute_query("create table {0} partitioned by (year, month) as "
+                       "select * from functional.alltypestiny".format(tbl))
+    self.execute_query("insert into {0} partition(year, month) select * from "
+                       "functional.alltypestiny".format(tbl))
+    exception = self.execute_query_expect_failure(
+      self.client, "show files in {0}.foo".format(unique_database))
+    err = ("Too many files to collect in table {0} partition year=2009/month=1: 2. "
+           "Current limit is 1 configured by startup flag "
+           "'catalog_partial_fetch_max_files'. Consider compacting files of the table."
+           ).format(tbl)
+    assert err in str(exception)
+    self.assert_catalogd_log_contains("ERROR", err)

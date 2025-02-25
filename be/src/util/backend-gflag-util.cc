@@ -66,6 +66,7 @@ DECLARE_int64(kudu_scanner_thread_estimated_bytes_per_column);
 DECLARE_int64(kudu_scanner_thread_max_estimated_bytes);
 DECLARE_int32(catalog_max_parallel_partial_fetch_rpc);
 DECLARE_int64(catalog_partial_fetch_rpc_queue_timeout_s);
+DECLARE_int32(catalog_partial_fetch_max_files);
 DECLARE_int64(exchg_node_buffer_size_bytes);
 DECLARE_int32(kudu_mutation_buffer_size);
 DECLARE_int32(kudu_error_buffer_size);
@@ -380,6 +381,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
       FLAGS_catalog_max_parallel_partial_fetch_rpc);
   cfg.__set_catalog_partial_fetch_rpc_queue_timeout_s(
       FLAGS_catalog_partial_fetch_rpc_queue_timeout_s);
+  cfg.__set_catalog_partial_fetch_max_files(FLAGS_catalog_partial_fetch_max_files);
   cfg.__set_exchg_node_buffer_size_bytes(
       FLAGS_exchg_node_buffer_size_bytes);
   cfg.__set_kudu_mutation_buffer_size(FLAGS_kudu_mutation_buffer_size);

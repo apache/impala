@@ -139,6 +139,10 @@ public class BackendConfig {
     return backendCfg_.catalog_partial_fetch_rpc_queue_timeout_s;
   }
 
+  public int getCatalogPartialFetchMaxFiles() {
+    return backendCfg_.catalog_partial_fetch_max_files;
+  }
+
   public long getHMSPollingIntervalInSeconds() {
     return backendCfg_.hms_event_polling_interval_s;
   }

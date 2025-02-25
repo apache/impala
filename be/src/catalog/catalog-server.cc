@@ -76,6 +76,12 @@ DEFINE_int64_hidden(catalog_partial_fetch_rpc_queue_timeout_s, LLONG_MAX, "Maxim
     "(in seconds) a partial catalog object fetch RPC spends in the queue waiting "
     "to run. Must be set to a value greater than zero.");
 
+DEFINE_int32(catalog_partial_fetch_max_files, 1000000, "Maximum number of file "
+    "descriptors allowed to return in a single getPartialCatalogObject RPC. Used to "
+    "avoid hitting the JVM array limit when catalogd serializing the thrift response. "
+    "Note that getPartialCatalogObject RPCs are only used in local catalog mode "
+    "coordinators so this is unrelated to the legacy catalog mode.");
+
 DEFINE_int32(catalog_max_lock_skipped_topic_updates, 3, "Maximum number of topic "
     "updates skipped for a table due to lock contention in catalogd after which it must"
     "be added to the topic the update log. This limit only applies to distinct lock "
@@ -379,9 +385,12 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
       status = catalog_server_->catalog()->GetPartialCatalogObject(req, &resp);
     }
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
-    TStatus thrift_status;
-    status.ToThrift(&thrift_status);
-    resp.__set_status(thrift_status);
+    // Don't overwrite the non-OK status returned from catalogd
+    if (!resp.__isset.status || resp.status.status_code == TErrorCode::OK) {
+      TStatus thrift_status;
+      status.ToThrift(&thrift_status);
+      resp.__set_status(thrift_status);
+    }
     VLOG_RPC << "GetPartialCatalogObject(): response=" << ThriftDebugStringNoThrow(resp);
   }
 
