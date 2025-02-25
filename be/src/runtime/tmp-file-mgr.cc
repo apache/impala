@@ -118,10 +118,10 @@ DEFINE_bool(remote_batch_read, false,
     "Set if the system uses batch reading for the remote temporary files. Batch reading"
     "allows reading a block asynchronously when the buffer pool is trying to pin one"
     "page of that block.");
-DEFINE_bool(remote_scratch_cleanup_on_startup, true,
+DEFINE_bool(remote_scratch_cleanup_on_start_stop, true,
     "If enabled, the Impala daemon will clean up the host-level directory within the "
-    "specified remote scratch directory during startup to remove potential leftover "
-    "files. This assumes a single Impala daemon per host. "
+    "specified remote scratch directory during both startup and shutdown to remove "
+    "potential leftover files. This assumes a single Impala daemon per host. "
     "For multiple daemons on a host, set this to false to prevent unintended cleanup.");
 
 using boost::algorithm::is_any_of;
@@ -415,6 +415,19 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
   return Status::OK();
 }
 
+void TmpFileMgr::CleanupAtShutdown() {
+  // Try to clear the host-level remote temporary directory.
+  if (tmp_dirs_remote_ == nullptr) return;
+  hdfsFS hdfs_conn;
+  Status status = tmp_dirs_remote_->GetConnection(this, &hdfs_conn);
+  if (!status.ok()) {
+    LOG(WARNING) << "Unable to get a connection to " << tmp_dirs_remote_->path_
+                 << " for clearing the directory on shutdown";
+    return;
+  }
+  RemoveRemoteDirForHost(tmp_dirs_remote_->path_, hdfs_conn);
+}
+
 Status TmpFileMgr::CreateTmpFileBufferPoolThread(MetricGroup* metrics) {
   DCHECK(metrics != nullptr);
   tmp_dirs_remote_ctrl_.tmp_file_pool_.reset(new TmpFileBufferPool(this));
@@ -459,7 +472,7 @@ static string ConstructRemoteDirPath(const string& base_dir, const string& hostn
 }
 
 void TmpFileMgr::RemoveRemoteDirForHost(const string& dir, hdfsFS hdfs_conn) {
-  if (!FLAGS_remote_scratch_cleanup_on_startup) return;
+  if (!FLAGS_remote_scratch_cleanup_on_start_stop) return;
   DCHECK(hdfs_conn != nullptr);
   const string hostlevel_dir = ConstructRemoteDirPath(
       dir, ExecEnv::GetInstance()->configured_backend_address().hostname);
@@ -836,6 +849,14 @@ Status TmpDirS3::ParsePathTokens(vector<string>& toks) {
   return Status::OK();
 }
 
+Status TmpDirS3::GetConnection(TmpFileMgr* tmp_mgr, hdfsFS* hdfs_conn) {
+  DCHECK(tmp_mgr != nullptr);
+  DCHECK(!path_.empty());
+  DCHECK(hdfs_conn != nullptr);
+  return HdfsFsCache::instance()->GetConnection(
+      path_, hdfs_conn, &(tmp_mgr->hdfs_conns_), tmp_mgr->s3a_options());
+}
+
 Status TmpDirS3::VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
     bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) {
   // For the S3 path, it doesn't need to create the directory for the uploading
@@ -843,8 +864,7 @@ Status TmpDirS3::VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_
   DCHECK(tmp_mgr != nullptr);
   DCHECK(!path_.empty());
   hdfsFS hdfs_conn;
-  RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
-      path_, &hdfs_conn, &(tmp_mgr->hdfs_conns_), tmp_mgr->s3a_options()));
+  RETURN_IF_ERROR(GetConnection(tmp_mgr, &hdfs_conn));
   tmp_mgr->RemoveRemoteDirForHost(path_, hdfs_conn);
   return Status::OK();
 }
@@ -870,12 +890,19 @@ Status TmpDirHdfs::ParsePathTokens(vector<string>& toks) {
   return Status::OK();
 }
 
+Status TmpDirHdfs::GetConnection(TmpFileMgr* tmp_mgr, hdfsFS* hdfs_conn) {
+  DCHECK(tmp_mgr != nullptr);
+  DCHECK(!path_.empty());
+  DCHECK(hdfs_conn != nullptr);
+  return HdfsFsCache::instance()->GetConnection(
+      path_, hdfs_conn, &(tmp_mgr->hdfs_conns_));
+}
+
 Status TmpDirHdfs::VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
     bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) {
   DCHECK(!path_.empty());
   hdfsFS hdfs_conn;
-  RETURN_IF_ERROR(
-      HdfsFsCache::instance()->GetConnection(path_, &hdfs_conn, &(tmp_mgr->hdfs_conns_)));
+  RETURN_IF_ERROR(GetConnection(tmp_mgr, &hdfs_conn));
   if (hdfsExists(hdfs_conn, path_.c_str()) != 0) {
     // If the impala scratch path in hdfs doesn't exist, attempt to create the path to
     // verify it's valid and writable for scratch usage.

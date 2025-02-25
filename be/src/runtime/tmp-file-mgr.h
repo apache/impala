@@ -205,6 +205,9 @@ class TmpFileMgr {
   // Create the TmpFile buffer pool thread for async buffer file reservation.
   Status CreateTmpFileBufferPoolThread(MetricGroup* metrics) WARN_UNUSED_RESULT;
 
+  // Clean up the temporary directory during shutdown if needed.
+  void CleanupAtShutdown();
+
   /// Try to reserve space for the buffer file from local buffer directory.
   /// If quick_return is true, the function won't wait if there is no available space.
   Status ReserveLocalBufferSpace(bool quick_return) WARN_UNUSED_RESULT;

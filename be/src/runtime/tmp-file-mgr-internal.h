@@ -410,6 +410,9 @@ class TmpDir {
   virtual Status VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
       bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) = 0;
 
+  /// Get a connection to the path of the dir. Only for the remote dir.
+  virtual Status GetConnection(TmpFileMgr* tmp_mgr, hdfsFS* conn) = 0;
+
   int64_t bytes_limit() { return bytes_limit_; }
   int priority() { return priority_; }
   const string& path() { return path_; }
@@ -458,6 +461,10 @@ class TmpDirLocal : public TmpDir {
   TmpDirLocal(const std::string& path) : TmpDir(path) {}
   Status VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
       bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) override;
+  Status GetConnection(TmpFileMgr* tmp_mgr, hdfsFS* conn) override {
+    DCHECK(false) << "GetConnection() is not supported for a local temporary dir";
+    return Status("GetConnection() is not supported for a local temporary dir");
+  }
   bool is_local() override { return true; }
 
  private:
@@ -477,6 +484,7 @@ class TmpDirS3 : public TmpDir {
   TmpDirS3(const std::string& path) : TmpDir(path) {}
   Status VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
       bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) override;
+  Status GetConnection(TmpFileMgr* tmp_mgr, hdfsFS* conn) override;
 
  private:
   Status ParsePathTokens(std::vector<string>& tokens) override;
@@ -487,6 +495,7 @@ class TmpDirHdfs : public TmpDir {
   TmpDirHdfs(const std::string& path) : TmpDir(path) {}
   Status VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
       bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) override;
+  Status GetConnection(TmpFileMgr* tmp_mgr, hdfsFS* conn) override;
 
  private:
   Status ParsePathTokens(std::vector<string>& tokens) override;

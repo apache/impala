@@ -3564,6 +3564,9 @@ bool ImpalaServer::CancelQueriesForGracefulShutdown() {
     }
   }
 
+  // Clean up temporary files if needed.
+  ExecEnv::GetInstance()->tmp_file_mgr()->CleanupAtShutdown();
+
   // Drain the completed queries queue to the query log table.
   if (FLAGS_enable_workload_mgmt) {
     ShutdownWorkloadManagement();
