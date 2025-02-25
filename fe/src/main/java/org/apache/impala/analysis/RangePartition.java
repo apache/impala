@@ -174,6 +174,12 @@ public class RangePartition extends StmtNode {
 
   private LiteralExpr analyzeBoundaryValue(Expr value, ColumnDef pkColumn,
       Analyzer analyzer) throws AnalysisException {
+    Type colType = pkColumn.getType();
+    if (!KuduUtil.isSupportedKeyType(colType)) {
+      throw new AnalysisException(String.format("%s type is not allowed to be part of " +
+          "a PRIMARY KEY therefore not allowed for range-partitioning.",
+          colType.toSql()));
+    }
     try {
       value.analyze(analyzer);
     } catch (AnalysisException e) {
@@ -194,8 +200,6 @@ public class RangePartition extends StmtNode {
       throw new AnalysisException(String.format("Range partition values cannot be " +
           "NULL. Range partition: '%s'", toSql()));
     }
-    org.apache.impala.catalog.Type colType = pkColumn.getType();
-    Preconditions.checkState(KuduUtil.isSupportedKeyType(colType));
 
     // Special case string literals in timestamp columns for convenience.
     if (literal.getType().isStringType() && colType.isTimestamp()) {

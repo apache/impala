@@ -709,3 +709,27 @@ select c1, c2, c3 from decimal_partitioned_tbl order by c1 asc
 ---- TYPES
 DECIMAL,DECIMAL,DECIMAL
 ====
+---- QUERY
+# Cannot create a Kudu table with float range partition
+create table create_tbl_float_part (x float) partition by range (x)
+  (partition values < 0)
+stored as kudu
+---- CATCH
+AnalysisException: FLOAT type is not allowed to be part of a PRIMARY KEY therefore not allowed for range-partitioning.
+====
+---- QUERY
+# Cannot create a Kudu table with double range partition
+create table create_tbl_double_part (x double) partition by range (x)
+  (partition values < 0)
+stored as kudu
+---- CATCH
+AnalysisException: DOUBLE type is not allowed to be part of a PRIMARY KEY therefore not allowed for range-partitioning.
+====
+---- QUERY
+# Cannot create a Kudu table with boolean range partition
+create table create_tbl_float_part (x boolean) partition by range (x)
+  (partition value = true)
+stored as kudu
+---- CATCH
+AnalysisException: BOOLEAN type is not allowed to be part of a PRIMARY KEY therefore not allowed for range-partitioning.
+====

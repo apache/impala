@@ -109,7 +109,6 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "stored as kudu", "Specify primary key or non unique primary key for the Kudu " +
         "table, or create partitions with the beginning columns of the table.",
         isExternalPurgeTbl);
-
     AnalyzesOk("create table tab (x int, y string, primary key (x)) partition by " +
         "hash (x) partitions 3, range (x) (partition values < 1, partition " +
         "1 <= values < 10, partition 10 <= values < 20, partition value = 30) " +
@@ -117,6 +116,12 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalyzesOk("create table tab (x int, y int, primary key (x, y)) partition by " +
         "range (x, y) (partition value = (2001, 1), partition value = (2002, 1), " +
         "partition value = (2003, 2)) stored as kudu", isExternalPurgeTbl);
+    // Promote all partition columns as non unique primary key columns if primary keys
+    // are not declared, but partition columns must be supported type.
+    AnalysisError("create table tab (x float) partition by range(x) " +
+        "(partition values < cast(0 as float), partition cast(1.5 as float) <= values) " +
+        "stored as kudu", "FLOAT type is not allowed to be part of a " +
+        "PRIMARY KEY therefore not allowed for range-partitioning.", isExternalPurgeTbl);
     // Non-literal boundary values in range partitions
     AnalyzesOk("create table tab (x int, y int, primary key (x)) partition by " +
         "range (x) (partition values < 1 + 1, partition (1+3) + 2 < values < 10, " +
@@ -283,7 +288,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "partition by range (b) (partition value = 'abc') stored as kudu",
         "Column 'b' in 'RANGE (b) (PARTITION VALUE = 'abc')' is not a key column. " +
         "Only key columns can be used in PARTITION BY.", isExternalPurgeTbl);
-    // No float range partition values
+    // No incompatible range partition values
     AnalysisError("create table tab (a int, b int, c int, d int, primary key (a, b, c))" +
         "partition by hash (a, b, c) partitions 8, " +
         "range (a) (partition value = 1.2, partition value = 2) stored as kudu",
@@ -294,6 +299,19 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "partition by hash (a, b) partitions 8, " +
         "range (a) (partition 0 < values < 1.23, partition 1.23 <= values)" +
         "stored as kudu", isExternalPurgeTbl);
+    // Unsuppported types for range partition
+    AnalysisError("create table tab (a float) partition by range(a) " +
+        "(partition values < 0, partition 1.5 <= values) " +
+        "stored as kudu", "FLOAT type is not allowed to be part of a " +
+        "PRIMARY KEY therefore not allowed for range-partitioning.", isExternalPurgeTbl);
+    AnalysisError("create table tab (a double) partition by range(a) " +
+        "(partition values < 0, partition 1.5 <= values) stored as kudu",
+        "DOUBLE type is not allowed to be part of a PRIMARY KEY therefore not allowed " +
+        "for range-partitioning.", isExternalPurgeTbl);
+    AnalysisError("create table tab (a boolean) partition by range(a) " +
+        "(partition value = true) stored as kudu",
+        "BOOLEAN type is not allowed to be part of a PRIMARY KEY therefore not allowed " +
+        "for range-partitioning.", isExternalPurgeTbl);
     // Non-existing column used in PARTITION BY
     AnalysisError("create table tab (a int, b int, primary key (a, b)) " +
         "partition by range(unknown_column) (partition value = 'abc') stored as kudu",
