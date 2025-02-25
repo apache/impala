@@ -19,21 +19,22 @@ from __future__ import absolute_import, division, print_function
 import pprint
 import pytest
 import shlex
-from subprocess import call
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.test_vector import ImpalaTestDimension
 from tests.util.test_file_parser import QueryTestSectionReader
 
 # The purpose of view compatibility testing is to check whether views created in Hive
 # can be queried in Impala and vice versa. A test typically consists of
 # the following actions specified in different test sections.
 # 1. create a view with a certain definition using Hive and Impala
-# 2. explain a "select *" query on the view created by Hive using Hive and Impala
-# 3. explain a "select *" query on the view created by Impala using Hive and Impala
+# 2. explain and run a "select *" query on the view created by Hive
+#    using Hive and Impala
+# 3. explain and run a "select *" query on the view created by Impala
+#    using Hive and Impala
 # For each of the steps above its corresponding test section specifies our expectations
 # on whether Impala and Hive will succeed or fail.
 #
@@ -44,13 +45,17 @@ from tests.util.test_file_parser import QueryTestSectionReader
 # potentially change in Impala and/or Hive simply testing various SQL statements
 # in Impala and Hive would be insufficient.
 
+HIVE = 'HIVE'
+IMPALA = 'IMPALA'
+VALID_ENGINES = [HIVE, IMPALA]
+
 
 # Missing Coverage: Views created by Hive and Impala being visible and queryable by each
 # other on non hdfs storage.
 @SkipIfFS.hive
 class TestViewCompatibility(ImpalaTestSuite):
-  VALID_SECTION_NAMES = ["CREATE_VIEW", "CREATE_VIEW_RESULTS",\
-                        "QUERY_HIVE_VIEW_RESULTS", "QUERY_IMPALA_VIEW_RESULTS"]
+  VALID_SECTION_NAMES = ["CREATE_VIEW", "CREATE_VIEW_RESULTS",
+                         "QUERY_HIVE_VIEW_RESULTS", "QUERY_IMPALA_VIEW_RESULTS"]
 
   @classmethod
   def get_workload(self):
@@ -68,16 +73,23 @@ class TestViewCompatibility(ImpalaTestSuite):
     # There is no reason to run these tests using all dimensions.
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
+    # Add creator_engine dimension to parallelize test.
+    cls.ImpalaTestMatrix.add_dimension(
+      ImpalaTestDimension('creator_engine', *VALID_ENGINES))
 
-  def test_view_compatibility(self, vector, unique_database):
+  def test_view_compatibility_hive_all(self, vector, unique_database):
     self._run_view_compat_test_case('QueryTest/views-compatibility', vector,
       unique_database)
-    if HIVE_MAJOR_VERSION == 2:
-      self._run_view_compat_test_case('QueryTest/views-compatibility-hive2-only', vector,
-          unique_database)
-    if HIVE_MAJOR_VERSION >= 3:
-      self._run_view_compat_test_case('QueryTest/views-compatibility-hive3-only', vector,
-          unique_database)
+
+  @pytest.mark.skipif(HIVE_MAJOR_VERSION != 2, reason="Test require Hive 2")
+  def test_view_compatibility_hive_2(self, vector, unique_database):
+    self._run_view_compat_test_case('QueryTest/views-compatibility-hive2-only', vector,
+        unique_database)
+
+  @pytest.mark.skipif(HIVE_MAJOR_VERSION < 3, reason="Test require Hive 3+")
+  def test_view_compatibility_hive_3(self, vector, unique_database):
+    self._run_view_compat_test_case('QueryTest/views-compatibility-hive3-only', vector,
+        unique_database)
 
   def _run_view_compat_test_case(self, test_file_name, vector, test_db_name):
     """
@@ -92,76 +104,63 @@ class TestViewCompatibility(ImpalaTestSuite):
     ---- QUERY_IMPALA_VIEW_RESULTS
     whether we expect to be able to query the view created by Impala in Hive/Impala
     """
+    creator_engine = vector.get_value('creator_engine')
+    engine_to_exec = {
+      HIVE: self._exec_in_hive,
+      IMPALA: self._exec_in_impala
+    }
 
-    sections = self.load_query_test_file(self.get_workload(), test_file_name,\
+    sections = self.load_query_test_file(self.get_workload(), test_file_name,
                                          self.VALID_SECTION_NAMES)
 
     for test_section in sections:
       # validate the test
       test_case = ViewCompatTestCase(test_section, test_file_name, test_db_name)
 
-      # create views in Hive and Impala checking against the expected results
-      self._exec_in_hive(test_case.get_create_view_sql('HIVE'),\
-                          test_case.get_create_view_sql('HIVE'),\
-                          test_case.get_create_exp_res())
-      # The table may or may not have been created in Hive. And so, "invalidate metadata"
-      # may throw an exception.
-      try:
-        self.client.execute("invalidate metadata {0}".format(test_case.hive_view_name))
-      except ImpalaBeeswaxException as e:
-        assert "TableNotFoundException" in str(e)
+      # create views in creator_engine checking against the expected results
+      create_query = test_case.get_create_view_sql(creator_engine)
+      engine_to_exec[creator_engine](create_query, create_query,
+                                     test_case.get_create_exp_res())
 
-      self._exec_in_impala(test_case.get_create_view_sql('IMPALA'),\
-                            test_case.get_create_view_sql('IMPALA'),\
-                            test_case.get_create_exp_res())
-
-      # explain a simple query on the view created by Hive in Hive and Impala
-      if test_case.has_query_hive_section():
-        exp_res = test_case.get_query_exp_res('HIVE');
-        if 'HIVE' in exp_res:
-          self._exec_in_hive(test_case.get_query_view_sql('HIVE'),\
-                              test_case.get_create_view_sql('HIVE'), exp_res)
-        if 'IMPALA' in exp_res:
-          self._exec_in_impala(test_case.get_query_view_sql('HIVE'),\
-                                test_case.get_create_view_sql('HIVE'), exp_res)
-
-      # explain a simple query on the view created by Impala in Hive and Impala
-      if test_case.has_query_impala_section():
-        exp_res = test_case.get_query_exp_res('IMPALA');
-        if 'HIVE' in exp_res:
-          self._exec_in_hive(test_case.get_query_view_sql('IMPALA'),\
-                              test_case.get_create_view_sql('IMPALA'), exp_res)
-        if 'IMPALA' in exp_res:
-          self._exec_in_impala(test_case.get_query_view_sql('IMPALA'),\
-                                test_case.get_create_view_sql('IMPALA'), exp_res)
+      # explain and run a simple query on the view created by creator_engine in
+      # reader_engine
+      exp_res = test_case.get_query_exp_res(creator_engine)
+      if exp_res:
+        for reader_engine, exec_func in engine_to_exec.items():
+          if reader_engine in exp_res:
+            if creator_engine == HIVE and reader_engine == IMPALA:
+              # Run invalidate query from Impala so the view that just created by Hive
+              # is queryable by Impala.
+              invalidate_query = "invalidate metadata {0}".format(
+                  test_case.hive_view_name)
+              engine_to_exec[IMPALA](invalidate_query, create_query, None)
+            explain_query = test_case.get_query_view_sql(creator_engine)
+            exec_func(explain_query, create_query, exp_res)
+            if exp_res[reader_engine]:
+              select_query = explain_query.replace('explain ', '')
+              assert select_query != explain_query
+              exec_func(select_query, create_query, exp_res)
 
       # drop the views without checking success or failure
-      self._exec_in_hive(test_case.get_drop_view_sql('HIVE'),\
-                          test_case.get_create_view_sql('HIVE'), None)
-      try:
-        self.client.execute("invalidate metadata {0}".format(test_case.hive_view_name))
-      except ImpalaBeeswaxException as e:
-        assert "TableNotFoundException" in str(e)
-
-      self._exec_in_impala(test_case.get_drop_view_sql('IMPALA'),\
-                            test_case.get_create_view_sql('IMPALA'), None)
+      drop_query = test_case.get_drop_view_sql(creator_engine)
+      engine_to_exec[creator_engine](drop_query, create_query, None)
 
   def _exec_in_hive(self, sql_str, create_view_sql, exp_res):
     try:
       self.run_stmt_in_hive(sql_str)
       success = True
-    except: # consider any exception a failure
+    except Exception:  # consider any exception a failure
       success = False
-    self._cmp_expected(sql_str, create_view_sql, exp_res, "HIVE", success)
+    self._cmp_expected(sql_str, create_view_sql, exp_res, HIVE, success)
 
   def _exec_in_impala(self, sql_str, create_view_sql, exp_res):
     success = True
     try:
       impala_ret = self.execute_query(sql_str)
       success = impala_ret.success
-    except: # consider any exception a failure
+    except Exception:  # consider any exception a failure
       success = False
-    self._cmp_expected(sql_str, create_view_sql, exp_res, "IMPALA", success)
+    self._cmp_expected(sql_str, create_view_sql, exp_res, IMPALA, success)
 
   def _cmp_expected(self, sql_str, create_view_sql, exp_res, engine, success):
     if exp_res is None:
@@ -173,10 +172,10 @@ class TestViewCompatibility(ImpalaTestSuite):
       assert 0, '%s unexpectedly succeeded in executing\n%s\nwhile testing '\
           'a view created as\n%s' % (engine, create_view_sql, sql_str)
 
+
 # Represents one view-compatibility test case. Performs validation of the test sections
 # and provides SQL to execute for each section.
 class ViewCompatTestCase(object):
-  RESULT_KEYS = ["IMPALA", "HIVE"]
 
   def __init__(self, test_section, test_file_name, test_db_name):
     if 'CREATE_VIEW' not in test_section:
@@ -268,15 +267,15 @@ class ViewCompatTestCase(object):
 
     # check that the results section contains at least one entry
     if not (lambda a, b: any(i in b for i in a)):
-      assert 0, 'No valid entry in expected-results section. '\
-      'Expected an IMPALA or HIVE entry.'
+      assert 0, ('No valid entry in expected-results section. '
+                 'Expected an IMPALA or HIVE entry.')
     return exp_res
 
   def get_create_view_sql(self, engine):
-    engine = engine.upper();
-    if engine == "HIVE":
+    engine = engine.upper()
+    if engine == HIVE:
       return self.hive_create_view_sql
-    elif engine == "IMPALA":
+    elif engine == IMPALA:
       return self.impala_create_view_sql
     else:
       assert 0, "Unknown execution engine %s" % (engine)
@@ -285,32 +284,31 @@ class ViewCompatTestCase(object):
     return self.create_exp_res
 
   def get_drop_view_sql(self, engine):
-    engine = engine.upper();
-    if engine == "HIVE":
+    engine = engine.upper()
+    if engine == HIVE:
       return self.drop_hive_view_sql
-    elif engine == "IMPALA":
+    elif engine == IMPALA:
       return self.drop_impala_view_sql
     else:
       assert 0, "Unknown execution engine %s" % (engine)
 
   def get_query_exp_res(self, engine):
-    engine = engine.upper();
-    if engine == "HIVE":
+    engine = engine.upper()
+    if engine == HIVE:
       return self.query_hive_exp_res
-    elif engine == "IMPALA":
+    elif engine == IMPALA:
       return self.query_impala_exp_res
     else:
       assert 0, "Unknown execution engine %s" % (engine)
 
   def get_query_view_sql(self, engine):
-    engine = engine.upper();
-    if engine == "HIVE":
+    engine = engine.upper()
+    if engine == HIVE:
       return self.query_hive_view_sql
-    elif engine == "IMPALA":
+    elif engine == IMPALA:
       return self.query_impala_view_sql
     else:
       assert 0, "Unknown execution engine %s" % (engine)
-    return self.query_hive_view_sql
 
   def has_query_hive_section(self):
     return hasattr(self, 'query_hive_view_sql')

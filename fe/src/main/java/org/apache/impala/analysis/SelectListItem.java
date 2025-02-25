@@ -34,6 +34,10 @@ public class SelectListItem {
   // True if the item shouldn't be included in star expansion
   private final boolean isHidden_;
 
+  // If True, this expr_ must not be rewritten for correctness reason.
+  // Set to True by toColumnLabel() if it returns Hive's auto-generated label.
+  private boolean isSkipExprRewrite_ = false;
+
   public SelectListItem(Expr expr, String alias, boolean isHidden) {
     Preconditions.checkNotNull(expr);
     expr_ = expr;
@@ -65,6 +69,7 @@ public class SelectListItem {
   public String getAlias() { return alias_; }
   public List<String> getRawPath() { return rawPath_; }
   public boolean isHidden() { return isHidden_; }
+  public boolean isSkipExprRewrite() { return isSkipExprRewrite_; }
 
   @Override
   public String toString() {
@@ -122,7 +127,10 @@ public class SelectListItem {
       return Joiner.on(".").join(slotRef.getResolvedPath().getRawPath());
     }
     // Optionally return auto-generated column label.
-    if (useHiveColLabels) return "_c" + selectListPos;
+    if (useHiveColLabels) {
+      isSkipExprRewrite_ = true;
+      return "_c" + selectListPos;
+    }
     // Abbreviate the toSql() for analytic exprs.
     if (expr_ instanceof AnalyticExpr) {
       AnalyticExpr expr = (AnalyticExpr) expr_;

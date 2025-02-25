@@ -97,6 +97,7 @@ public class SelectList {
     List<Subquery> subqueryExprs = new ArrayList<>();
     for (SelectListItem item: items_) {
       if (item.isStar()) continue;
+      if (item.isSkipExprRewrite()) continue;
       item.setExpr(rewriter.rewrite(item.getExpr(), analyzer));
       item.getExpr().collect(Subquery.class, subqueryExprs);
     }

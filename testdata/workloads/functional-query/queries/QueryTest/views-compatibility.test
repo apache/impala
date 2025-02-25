@@ -261,3 +261,30 @@ HIVE=FAILURE
 IMPALA=SUCCESS
 HIVE=FAILURE
 ====
+---- CREATE_VIEW
+# IMPALA-13786: Regression case for SimplifyCastExprRule.
+# The topmost SELECT column does not have explicit alias and will be referred
+# by a Hive auto-generated alias (_c0).
+CREATE VIEW test (`varchar_col`) AS
+SELECT
+  CAST(`alias2` AS VARCHAR(5))
+FROM
+  (
+    SELECT
+      CAST(`alias1` AS VARCHAR(5)) `alias2`
+    FROM
+      (
+        SELECT
+          "varchar val" AS `alias1`
+      ) b
+  ) a
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+---- QUERY_HIVE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+---- QUERY_IMPALA_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+====
