@@ -34,7 +34,7 @@
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "common/object-pool.h"
-#include "exprs/ai-functions.inline.h"
+#include "exprs/ai-functions.h"
 #include "exprs/anyval-util.h"
 #include "exprs/is-null-predicate.h"
 #include "exprs/like-predicate.h"

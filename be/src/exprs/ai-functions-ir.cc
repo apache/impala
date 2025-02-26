@@ -18,9 +18,14 @@
 // The functions in this file are specifically not cross-compiled to IR because there
 // is no signifcant performance benefit to be gained.
 
-#include <boost/algorithm/string/trim.hpp>
+#include <set>
 
-#include "exprs/ai-functions.inline.h"
+#include <boost/algorithm/string/trim.hpp>
+#include <gutil/strings/util.h>
+#include <rapidjson/document.h>
+
+#include "common/compiler-util.h"
+#include "exprs/ai-functions.h"
 
 using namespace impala_udf;
 using boost::algorithm::trim;
@@ -29,28 +34,8 @@ using std::istringstream;
 using std::set;
 using std::string_view;
 
-DEFINE_string(ai_endpoint, "https://api.openai.com/v1/chat/completions",
-    "The default API endpoint for an external AI engine.");
-DEFINE_validator(ai_endpoint, [](const char* name, const string& endpoint) {
-  return (impala::AiFunctions::is_api_endpoint_valid(endpoint) &&
-      impala::AiFunctions::is_api_endpoint_supported(endpoint));
-});
-
-DEFINE_string(ai_model, "gpt-4", "The default AI model used by an external AI engine.");
-
-DEFINE_string(ai_api_key_jceks_secret, "",
-    "The jceks secret key used for extracting the api key from configured keystores. "
-    "'hadoop.security.credential.provider.path' in core-site must be configured to "
-    "include the keystore storing the corresponding secret.");
-
-DEFINE_string(ai_additional_platforms, "",
-    "A comma-separated list of additional platforms allowed for Impala to access via "
-    "the AI api, formatted as 'site1,site2'.");
-
-DEFINE_int32(ai_connection_timeout_s, 10,
-    "(Advanced) The time in seconds for connection timed out when communicating with an "
-    "external AI engine");
-TAG_FLAG(ai_api_key_jceks_secret, sensitive);
+DECLARE_string(ai_endpoint);
+DECLARE_string(ai_additional_platforms);
 
 namespace impala {
 
@@ -266,5 +251,14 @@ StringVal AiFunctions::AiGenerateTextDefault(
   return AiGenerateTextHelper<true>(ctx, NULL_STRINGVAL, prompt, NULL_STRINGVAL,
       NULL_STRINGVAL, NULL_STRINGVAL, NULL_STRINGVAL);
 }
+
+// Explicit template instantiations for AiGenerateTextHelper
+template StringVal AiFunctions::AiGenerateTextHelper<true>(FunctionContext*,
+    const StringVal&, const StringVal&, const StringVal&, const StringVal&,
+    const StringVal&, const StringVal&);
+
+template StringVal AiFunctions::AiGenerateTextHelper<false>(FunctionContext*,
+    const StringVal&, const StringVal&, const StringVal&, const StringVal&,
+    const StringVal&, const StringVal&);
 
 } // namespace impala

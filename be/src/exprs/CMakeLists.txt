@@ -25,9 +25,9 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs")
 set(MURMURHASH_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/murmurhash")
 
 add_library(ExprsIr
-  ai-functions-ir.cc
   agg-fn-evaluator-ir.cc
   aggregate-functions-ir.cc
+  ai-functions-ir.cc
   bit-byte-functions-ir.cc
   cast-functions-ir.cc
   compound-predicates-ir.cc
@@ -58,6 +58,7 @@ add_dependencies(ExprsIr gen-deps)
 add_library(Exprs
   agg-fn.cc
   agg-fn-evaluator.cc
+  ai-functions.cc
   anyval-util.cc
   case-expr.cc
   cast-format-expr.cc

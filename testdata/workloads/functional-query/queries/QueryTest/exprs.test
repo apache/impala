@@ -3390,3 +3390,23 @@ least(cast(19.44 as decimal(4,2)), cast(18.3 as decimal(3,1)));
 ---- TYPES
 DECIMAL,DECIMAL,DECIMAL,DECIMAL
 ====
+---- QUERY
+select r.r_reason_desc, s.sr_return_amt
+FROM tpcds_parquet.store_returns s, tpcds_parquet.reason r
+WHERE s.sr_reason_sk=r.r_reason_sk AND s.sr_return_amt > 10000 AND
+ai_generate_text_default(CONCAT("Categorize the return reason as 'damaged',
+'not needed', 'expensive', 'incorrect order' and 'other': ", r.r_reason_desc))
+NOT IN ('other', 'not needed');
+---- TYPES
+string, INT
+====
+---- QUERY
+select r.r_reason_desc, s.sr_return_amt
+FROM tpcds_parquet.store_returns s, tpcds_parquet.reason r
+WHERE s.sr_reason_sk=r.r_reason_sk AND s.sr_return_amt > 10000 AND
+ai_generate_text("", CONCAT("Categorize the return reason as 'damaged',
+'not needed', 'expensive', 'incorrect order' and 'other': ", r.r_reason_desc),"","","","")
+NOT IN ('other', 'not needed');
+---- TYPES
+string, INT
+====

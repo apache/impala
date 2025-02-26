@@ -40,6 +40,7 @@
 #include "exec/union-node-ir.cc"
 #include "exprs/agg-fn-evaluator-ir.cc"
 #include "exprs/aggregate-functions-ir.cc"
+#include "exprs/ai-functions-ir.cc"
 #include "exprs/bit-byte-functions-ir.cc"
 #include "exprs/cast-functions-ir.cc"
 #include "exprs/compound-predicates-ir.cc"

@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#pragma once
-
 #include <gutil/strings/util.h>
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
@@ -36,10 +34,28 @@
 using namespace rapidjson;
 using namespace impala_udf;
 
-DECLARE_string(ai_endpoint);
-DECLARE_string(ai_model);
-DECLARE_string(ai_api_key_jceks_secret);
-DECLARE_int32(ai_connection_timeout_s);
+DEFINE_string(ai_endpoint, "https://api.openai.com/v1/chat/completions",
+    "The default API endpoint for an external AI engine.");
+DEFINE_validator(ai_endpoint, [](const char* name, const string& endpoint) {
+  return (impala::AiFunctions::is_api_endpoint_valid(endpoint) &&
+      impala::AiFunctions::is_api_endpoint_supported(endpoint));
+});
+
+DEFINE_string(ai_model, "gpt-4", "The default AI model used by an external AI engine.");
+
+DEFINE_string(ai_api_key_jceks_secret, "",
+    "The jceks secret key used for extracting the api key from configured keystores. "
+    "'hadoop.security.credential.provider.path' in core-site must be configured to "
+    "include the keystore storing the corresponding secret.");
+
+DEFINE_string(ai_additional_platforms, "",
+    "A comma-separated list of additional platforms allowed for Impala to access via "
+    "the AI api, formatted as 'site1,site2'.");
+
+DEFINE_int32(ai_connection_timeout_s, 10,
+    "(Advanced) The time in seconds for connection timed out when communicating with an "
+    "external AI engine");
+TAG_FLAG(ai_api_key_jceks_secret, sensitive);
 
 namespace impala {
 
@@ -307,5 +323,36 @@ StringVal AiFunctions::AiGenerateTextInternal(FunctionContext* ctx,
   memcpy(result.ptr, response.data(), response.length());
   return result;
 }
+
+// Template instantiations for getAuthorizationHeader function.
+#define INSTANTIATE_AI_AUTH_HEADER(PLATFORM) \
+    template Status getAuthorizationHeader<AiFunctions::AI_PLATFORM::PLATFORM>( \
+        string&, const std::string_view&, const AiFunctions::AiFunctionsOptions&);
+
+INSTANTIATE_AI_AUTH_HEADER(UNSUPPORTED)
+INSTANTIATE_AI_AUTH_HEADER(OPEN_AI)
+INSTANTIATE_AI_AUTH_HEADER(AZURE_OPEN_AI)
+INSTANTIATE_AI_AUTH_HEADER(GENERAL)
+
+#undef INSTANTIATE_AI_AUTH_HEADER
+
+// Template instantiations for AiGenerateTextInternal function.
+#define INSTANTIATE_AI_GENERATE_TEXT(FASTPATH, PLATFORM) \
+    template StringVal AiFunctions::AiGenerateTextInternal< \
+        FASTPATH, AiFunctions::AI_PLATFORM::PLATFORM>( \
+        FunctionContext*, const std::string_view&, const StringVal&, const StringVal&, \
+        const StringVal&, const StringVal&, const StringVal&, const bool);
+
+#define INSTANTIATE_AI_GENERATE_TEXT_FOR_PLATFORM(PLATFORM) \
+    INSTANTIATE_AI_GENERATE_TEXT(true, PLATFORM) \
+    INSTANTIATE_AI_GENERATE_TEXT(false, PLATFORM)
+
+INSTANTIATE_AI_GENERATE_TEXT_FOR_PLATFORM(UNSUPPORTED)
+INSTANTIATE_AI_GENERATE_TEXT_FOR_PLATFORM(OPEN_AI)
+INSTANTIATE_AI_GENERATE_TEXT_FOR_PLATFORM(AZURE_OPEN_AI)
+INSTANTIATE_AI_GENERATE_TEXT_FOR_PLATFORM(GENERAL)
+
+#undef INSTANTIATE_AI_GENERATE_TEXT
+#undef INSTANTIATE_AI_GENERATE_TEXT_FOR_PLATFORM
 
 } // namespace impala
