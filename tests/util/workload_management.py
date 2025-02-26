@@ -34,9 +34,13 @@ QUERY_TBL_LOG_NAME = "impala_query_log"
 QUERY_TBL_LOG = "{0}.{1}".format(WM_DB, QUERY_TBL_LOG_NAME)
 QUERY_TBL_LIVE_NAME = "impala_query_live"
 QUERY_TBL_LIVE = "{0}.{1}".format(WM_DB, QUERY_TBL_LIVE_NAME)
+
 # Time in seconds the assert_query and assert_csv_col will wait for the query to become
 # available in the relevant workload management table.
 ASSERT_QUERY_TIMEOUT_S = 30
+
+# String parsing format for query start/end time fields in a text query profile.
+QUERY_PROFILE_DT_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
 
 
 def round_to_3(val):
@@ -216,15 +220,17 @@ def assert_query(query_tbl, client, expected_cluster_id="", raw_profile=None,
   # Start Time
   start_time = re.search(r'\n\s+Start Time:\s+(.*?)\n', profile_text)
   assert start_time is not None
-  start_time_obj = datetime.strptime(start_time.group(1)[:-3], "%Y-%m-%d %H:%M:%S.%f")
+  start_time_obj = datetime.strptime(start_time.group(1)[:-3], QUERY_PROFILE_DT_FORMAT)
   start_time_obj_utc = start_time_obj + utc_offset
-  assert column_val(TQueryTableColumn.START_TIME_UTC)[:-3] \
-      == start_time_obj_utc.strftime("%Y-%m-%d %H:%M:%S.%f"), "start time incorrect"
+  expected = start_time_obj_utc.strftime(QUERY_PROFILE_DT_FORMAT)
+  actual = column_val(TQueryTableColumn.START_TIME_UTC)[:-3]
+  assert actual == expected, "start time incorrect, expected '{}' but was '{}'" \
+      .format(expected, actual)
 
   # End Time (not in table, but needed for duration calculation)
   end_time = re.search(r'\n\s+End Time:\s+(.*?)\n', profile_text)
   assert end_time is not None
-  end_time_obj = datetime.strptime(end_time.group(1)[:-3], "%Y-%m-%d %H:%M:%S.%f")
+  end_time_obj = datetime.strptime(end_time.group(1)[:-3], QUERY_PROFILE_DT_FORMAT)
 
   # Query Duration (allow values that are within 1 second)
   value = column_val(TQueryTableColumn.TOTAL_TIME_MS)
