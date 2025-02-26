@@ -135,7 +135,7 @@ const std::array<FieldParser, NumQueryTableColumns> FIELD_PARSERS = {{
     {[](FieldParserContext& ctx) {
       ctx.sql << "'";
       if (ctx.record->session_type == TSessionType::HIVESERVER2) {
-        ctx.sql << ctx.record->hiveserver2_protocol_version;
+        ctx.sql << ctx.record->hiveserver2_protocol_version_formatted();
       }
       ctx.sql << "'";
     }},

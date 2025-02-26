@@ -200,7 +200,7 @@ Status QueryScanner::MaterializeNextTuple(
       case TQueryTableColumn::HIVESERVER2_PROTOCOL_VERSION:
         if (query.session_type == TSessionType::HIVESERVER2) {
           RETURN_IF_ERROR(WriteStringSlot(
-              Substitute("V$0", 1 + query.hiveserver2_protocol_version), pool, slot));
+              query.hiveserver2_protocol_version_formatted(), pool, slot));
         }
         break;
       case TQueryTableColumn::DB_USER:

@@ -144,7 +144,7 @@ def assert_query(query_tbl, client, expected_cluster_id="", raw_profile=None,
   if session_type.group(1) == "HIVESERVER2":
     hs2_ver = re.search(r'\n\s+HiveServer2 Protocol Version:\s+(.*)', profile_text)
     assert hs2_ver is not None
-    assert value == "HIVE_CLI_SERVICE_PROTOCOL_{0}".format(hs2_ver.group(1))
+    assert value == hs2_ver.group(1)
   else:
     assert value == ""
 

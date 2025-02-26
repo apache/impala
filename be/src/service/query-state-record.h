@@ -355,6 +355,11 @@ struct QueryStateExpanded {
   /// Events Timeline Iterator
   EventsTimelineIterator EventsTimeline() const;
 
+  /// Builds a shortened string containing the hiveserver2 protocol version of the Impala
+  /// client (if connected with the HS2 protocol). The returned string will have the
+  /// format 'V' followed by the version number, for example 'V7'.
+  std::string hiveserver2_protocol_version_formatted() const;
+
   // Source tables accessed by this query.
   std::vector<TTableName> tables;
 

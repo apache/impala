@@ -26,9 +26,10 @@
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
-
 #include <gutil/strings/numbers.h>
 #include <gutil/strings/strcat.h>
+#include <gutil/strings/substitute.h>
+
 #include "runtime/coordinator.h"
 #include "scheduling/admission-controller.h"
 #include "scheduling/scheduler.h"
@@ -412,6 +413,10 @@ bool QueryStateExpanded::events_timeline_empty() const {
       base_state->event_sequence.timestamps.size());
   return base_state->event_sequence.labels.empty() ||
       base_state->event_sequence.timestamps.empty();
+}
+
+string QueryStateExpanded::hiveserver2_protocol_version_formatted() const {
+  return strings::Substitute("V$0", 1 + hiveserver2_protocol_version);
 }
 
 bool PerHostPeakMemoryComparator(const pair<TNetworkAddress, PerHostState>& a,
