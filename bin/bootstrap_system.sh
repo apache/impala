@@ -396,52 +396,57 @@ fi
 
 echo ">>> Configuring system"
 
-redhat notindocker sudo service postgresql initdb
-redhat notindocker sudo service postgresql stop
-redhat indocker sudo -u postgres PGDATA=/var/lib/pgsql/data pg_ctl init
-ubuntu sudo service postgresql stop
+function setup_postgresql() {
+  echo ">>> Configuring postgresql. This can fail if postgres is already initialized"
 
-# These configurations expose connectiong to PostgreSQL via md5-hashed
-# passwords over TCP to localhost, and the local socket is trusted
-# widely.
-ubuntu sudo sed -ri 's/local +all +all +peer/local all all trust/g' \
-  /etc/postgresql/*/main/pg_hba.conf
-# Accept remote connections from the hosts in the same subnet.
-ubuntu sudo sed -ri "s/#listen_addresses = 'localhost'/listen_addresses = '0.0.0.0'/g" \
-  /etc/postgresql/*/main/postgresql.conf
-ubuntu sudo sed -ri 's/host +all +all +127.0.0.1\/32/host all all samenet/g' \
-  /etc/postgresql/*/main/pg_hba.conf
-redhat sudo sed -ri 's/local +all +all +(ident|peer)/local all all trust/g' \
-  /var/lib/pgsql/data/pg_hba.conf
-# Accept md5 passwords from localhost
-redhat sudo sed -i -e 's,\(host.*\)ident,\1md5,' /var/lib/pgsql/data/pg_hba.conf
-# Accept remote connections from the hosts in the same subnet.
-redhat sudo sed -ri "s/#listen_addresses = 'localhost'/listen_addresses = '0.0.0.0'/g" \
-  /var/lib/pgsql/data/postgresql.conf
-redhat sudo sed -ri 's/host +all +all +127.0.0.1\/32/host all all samenet/g' \
-  /var/lib/pgsql/data/pg_hba.conf
+  redhat notindocker sudo service postgresql initdb
+  redhat notindocker sudo service postgresql stop
+  redhat indocker sudo -u postgres PGDATA=/var/lib/pgsql/data pg_ctl init
+  ubuntu sudo service postgresql stop
 
-ubuntu sudo service postgresql start
-redhat notindocker sudo service postgresql start
-# Important to redirect pg_ctl to a logfile, lest it keep the stdout
-# file descriptor open, preventing the shell from exiting.
-redhat indocker sudo -u postgres PGDATA=/var/lib/pgsql/data bash -c \
-  "pg_ctl start -w --timeout=120 >> /var/lib/pgsql/pg.log 2>&1"
+  # These configurations expose connectiong to PostgreSQL via md5-hashed
+  # passwords over TCP to localhost, and the local socket is trusted
+  # widely.
+  ubuntu sudo sed -ri 's/local +all +all +peer/local all all trust/g' \
+    /etc/postgresql/*/main/pg_hba.conf
+  # Accept remote connections from the hosts in the same subnet.
+  ubuntu sudo sed -ri "s/#listen_addresses = 'localhost'/listen_addresses = '0.0.0.0'/g" \
+    /etc/postgresql/*/main/postgresql.conf
+  ubuntu sudo sed -ri 's/host +all +all +127.0.0.1\/32/host all all samenet/g' \
+    /etc/postgresql/*/main/pg_hba.conf
+  redhat sudo sed -ri 's/local +all +all +(ident|peer)/local all all trust/g' \
+    /var/lib/pgsql/data/pg_hba.conf
+  # Accept md5 passwords from localhost
+  redhat sudo sed -i -e 's,\(host.*\)ident,\1md5,' /var/lib/pgsql/data/pg_hba.conf
+  # Accept remote connections from the hosts in the same subnet.
+  redhat sudo sed -ri "s/#listen_addresses = 'localhost'/listen_addresses = '0.0.0.0'/g" \
+    /var/lib/pgsql/data/postgresql.conf
+  redhat sudo sed -ri 's/host +all +all +127.0.0.1\/32/host all all samenet/g' \
+    /var/lib/pgsql/data/pg_hba.conf
 
-# Set up postgres for HMS
-if ! [[ 1 = $(sudo -u postgres psql -At -c "SELECT count(*) FROM pg_roles WHERE rolname = 'hiveuser';") ]]
-then
-  sudo -u postgres psql -c "CREATE ROLE hiveuser LOGIN PASSWORD 'password';"
-fi
-sudo -u postgres psql -c "ALTER ROLE hiveuser WITH CREATEDB;"
-# On Ubuntu 18.04 aarch64 version, the sql 'select * from pg_roles' blocked,
-# because output of 'select *' is too long to display in 1 line.
-# So here just change it to 'select count(*)' as a work around.
-if [[ $ARCH_NAME == 'aarch64' ]]; then
-  sudo -u postgres psql -c "SELECT count(*) FROM pg_roles WHERE rolname = 'hiveuser';"
-else
-  sudo -u postgres psql -c "SELECT * FROM pg_roles WHERE rolname = 'hiveuser';"
-fi
+  ubuntu sudo service postgresql start
+  redhat notindocker sudo service postgresql start
+  # Important to redirect pg_ctl to a logfile, lest it keep the stdout
+  # file descriptor open, preventing the shell from exiting.
+  redhat indocker sudo -u postgres PGDATA=/var/lib/pgsql/data bash -c \
+    "pg_ctl start -w --timeout=120 >> /var/lib/pgsql/pg.log 2>&1"
+
+  # Set up postgres for HMS
+  if ! [[ 1 = $(sudo -u postgres psql -At -c "SELECT count(*) FROM pg_roles WHERE rolname = 'hiveuser';") ]]
+  then
+    sudo -u postgres psql -c "CREATE ROLE hiveuser LOGIN PASSWORD 'password';"
+  fi
+  sudo -u postgres psql -c "ALTER ROLE hiveuser WITH CREATEDB;"
+  # On Ubuntu 18.04 aarch64 version, the sql 'select * from pg_roles' blocked,
+  # because output of 'select *' is too long to display in 1 line.
+  # So here just change it to 'select count(*)' as a work around.
+  if [[ $ARCH_NAME == 'aarch64' ]]; then
+    sudo -u postgres psql -c "SELECT count(*) FROM pg_roles WHERE rolname = 'hiveuser';"
+  else
+    sudo -u postgres psql -c "SELECT * FROM pg_roles WHERE rolname = 'hiveuser';"
+  fi
+  echo ">>> Configuring postgresql finished."
+}
 
 # Setup ssh to ssh to localhost
 mkdir -p ~/.ssh
@@ -527,3 +532,6 @@ if [[ "${PREPOPULATE_M2_REPOSITORY:-true}" == true ]] ; then
 else
   echo ">>> Skip populating m2 directory"
 fi
+
+setup_postgresql
+# Be careful about adding code after postgres initialization, as it may fail and exit!
