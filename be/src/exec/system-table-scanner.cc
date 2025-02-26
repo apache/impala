@@ -363,7 +363,7 @@ Status QueryScanner::MaterializeNextTuple(
         }
         break;
       case TQueryTableColumn::SQL:
-        RETURN_IF_ERROR(WriteStringSlot(record.stmt, pool, slot));
+        RETURN_IF_ERROR(WriteStringSlot(query.redacted_sql, pool, slot));
         break;
       case TQueryTableColumn::PLAN:
         RETURN_IF_ERROR(WriteStringSlot(

@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+import os
 import re
 import requests
 
@@ -733,3 +734,9 @@ def assert_csv_col(client, query_tbl, col, query_id, expected_list, db="tpcds"):
         "'{}'\n  actual   (length {}): {}\n  expected (length {}): {}" \
         .format(TQueryTableColumn._VALUES_TO_NAMES[col], query_id, expected, len(actual),
         sorted(actual), len(expected_list), sorted(expected_list))
+
+
+def redaction_rules_file():
+  """Provides the path to a redaction file that redacts the word
+     'supercalifragilisticexpialidocious'."""
+  return "{}/testdata/workload_mgmt/redaction.json".format(os.environ["IMPALA_HOME"])

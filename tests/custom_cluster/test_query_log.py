@@ -34,7 +34,11 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.retry import retry
-from tests.util.workload_management import assert_query, WM_DB, QUERY_TBL_LOG
+from tests.util.workload_management import (
+    assert_query,
+    WM_DB,
+    QUERY_TBL_LOG,
+    redaction_rules_file)
 
 
 class TestQueryLogTableBase(CustomClusterTestSuite):
@@ -409,6 +413,23 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
           res.runtime_profile)
     finally:
       client2.close()
+
+  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+                                                 "--query_log_write_interval_s=1 "
+                                                 "--redaction_rules_file={}"
+                                                 .format(redaction_rules_file()),
+                                    catalogd_args="--enable_workload_mgmt",
+                                    disable_log_buffering=True)
+  def test_redaction(self):
+    """Asserts the query log table redacts the statement."""
+    result = self.client.execute(
+        "select *, 'supercalifragilisticexpialidocious' from functional.alltypes",
+        fetch_profile_after_close=True)
+    assert result.success
+
+    self.cluster.get_first_impalad().service.wait_for_metric_value(
+        "impala-server.completed-queries.written", 1, 60)
+    assert_query(QUERY_TBL_LOG, self.client, raw_profile=result.runtime_profile)
 
 
 class TestQueryLogOtherTable(TestQueryLogTableBase):

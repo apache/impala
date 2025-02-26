@@ -25,7 +25,7 @@ from signal import SIGRTMIN
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import DEFAULT_KRPC_PORT
 from tests.util.retry import retry
-from tests.util.workload_management import assert_query
+from tests.util.workload_management import assert_query, redaction_rules_file
 from time import sleep
 
 
@@ -221,6 +221,20 @@ class TestQueryLive(CustomClusterTestSuite):
   def test_local_catalog(self):
     """Asserts the query live table works with local catalog mode."""
     result = self.client.execute("select * from functional.alltypes",
+        fetch_profile_after_close=True)
+    assert_query('sys.impala_query_live', self.client, 'test_query_live',
+                 result.runtime_profile)
+
+  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+                                                 "--cluster_id=test_query_live "
+                                                 "--redaction_rules_file={}"
+                                                 .format(redaction_rules_file()),
+                                    catalogd_args="--enable_workload_mgmt",
+                                    disable_log_buffering=True)
+  def test_redaction(self):
+    """Asserts the query live table table redacts the statement."""
+    result = self.client.execute(
+        "select *, 'supercalifragilisticexpialidocious' from functional.alltypes",
         fetch_profile_after_close=True)
     assert_query('sys.impala_query_live', self.client, 'test_query_live',
                  result.runtime_profile)

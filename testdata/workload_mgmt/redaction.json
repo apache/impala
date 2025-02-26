@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "description": "Don't show nonnsense",
+      "caseSensitive": false,
+      "search": "supercalifragilisticexpialidocious",
+      "replace": "*poppins*"
+    }
+  ]
+}
