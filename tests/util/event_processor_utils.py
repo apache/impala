@@ -106,10 +106,12 @@ class EventProcessorUtils(object):
     EventProcessorUtils.wait_for_synced_event_id(timeout, error_status_possible,
       current_event_id)
     # Wait until the impalad catalog versions agree with the catalogd's version.
+    # Some tests like test_overlap_min_max_filters have DDLs that take longer than 10s.
+    # The catalog update might be blocked due to that. Use 20s as the timeout here.
     catalogd_version = impala_cluster.catalogd.service.get_catalog_version()
     for impalad in impala_cluster.impalads:
       impalad.service.wait_for_metric_value("catalog.curr-version", catalogd_version,
-        allow_greater=True)
+          timeout=20, allow_greater=True)
 
   @staticmethod
   def get_event_processor_metrics():
