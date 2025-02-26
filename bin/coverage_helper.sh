@@ -77,6 +77,8 @@ if [ ${REPORT_ACTION} -eq 1 ]; then
   cd "${IMPALA_HOME}"
   "${IMPALA_HOME}/bin/impala-gcovr" -v -r "${IMPALA_HOME}/be" \
     --exclude=".*src/benchmarks.*" \
+    --exclude=".*src/gutil.*" \
+    --exclude=".*src/kudu.*" \
     --exclude=".*generated-sources/gen-cpp.*" \
     --exclude=".*src/util/bit-packing.inline.h.*" \
     --html --html-details -o "${REPORT_DIRECTORY}/index.html" \
