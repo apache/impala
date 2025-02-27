@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hive.service.rpc.thrift.*;
+import org.apache.impala.analysis.AnalyzerTest;
 import org.apache.impala.testutil.WebClient;
 import org.apache.impala.testutil.X509CertChain;
 import org.apache.thrift.transport.THttpClient;
@@ -40,6 +41,8 @@ import org.hamcrest.Matcher;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.junit.After;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.hamcrest.core.IsCollectionContaining.hasItem;
 import static org.hamcrest.core.StringContains.containsString;
@@ -49,6 +52,8 @@ import static org.hamcrest.core.StringContains.containsString;
  * JWT authentication is being used.
  */
 public class JwtHttpTest {
+  private final static Logger LOG = LoggerFactory.getLogger(JwtHttpTest.class);
+
   private static final String CA_CERT = "cacert.pem";
   private static final String SERVER_CERT = "server-cert.pem";
   private static final String SERVER_KEY = "server-key.pem";
@@ -612,10 +617,16 @@ public class JwtHttpTest {
 
     // writing logs to disk may take some time, try a few times to search for the
     // expected error in the log
-    for (int i=0; i<10; i++) {
-      logLines = Files.readAllLines(logDir.resolve("impalad.ERROR"));
-      if (m.matches(logLines)) {
-        break;
+    for (int i = 0; i < 10; i++) {
+      final Path log_file_path = logDir.resolve("impalad.ERROR");
+      try {
+        logLines = Files.readAllLines(log_file_path);
+        if (m.matches(logLines)) {
+          break;
+        }
+      } catch (Exception e) {
+        LOG.info("attempt '" + Integer.toString(i) + "' could not read logfile '"
+            + log_file_path.toString() + "'", e);
       }
       Thread.sleep(250);
     }
