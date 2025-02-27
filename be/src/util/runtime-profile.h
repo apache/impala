@@ -944,7 +944,7 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
     std::vector<std::vector<int64_t>> timestamps;
 
     // Builds the JSON for the aggregate event sequence's metrics into the provided 'val'
-    void ToJson(rapidjson::Value*& val, rapidjson::Document* d);
+    void ToJson(rapidjson::Value& event_sequence_json, rapidjson::Document* d);
   };
 
   // Map containing event sequences, with its type in string format as the key

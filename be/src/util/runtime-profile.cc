@@ -2972,10 +2972,10 @@ void AggregatedRuntimeProfile::ToJsonSubclass(
 
     if (es_count > 0) {
       Value event_sequences_json(kArrayType);
-      Value* event_sequence_json;
       for (AggEventSequence& agg_event_sequence : agg_event_sequences) {
+        Value event_sequence_json(kObjectType);
         agg_event_sequence.ToJson(event_sequence_json, d);
-        event_sequences_json.PushBack(*event_sequence_json, allocator);
+        event_sequences_json.PushBack(event_sequence_json, allocator);
       }
       parent->AddMember("event_sequences", event_sequences_json, allocator);
     }
@@ -3001,7 +3001,7 @@ void AggregatedRuntimeProfile::ToJsonSubclass(
   }
 }
 
-void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value*& val,
+void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value& event_sequence_json,
     rapidjson::Document* d) {
   Document::AllocatorType& allocator = d->GetAllocator();
 
@@ -3068,7 +3068,6 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value*& val,
   static vector<size_t> inst_count_list(BUCKET_SIZE);
 
   // Perform aggregation to limit the size and complexity of event sequences JSON
-  Value event_sequence_json(kObjectType);
   Value events_json(kArrayType);
   if (num_instances <= BUCKET_SIZE || BUCKET_SIZE == 0) {
     // Group event timestamps, when number of instances is less than bucket size
@@ -3165,7 +3164,6 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value*& val,
     event_sequence_json.AddMember("unreported_event_instance_idxs",
         missing_event_instance_idxs, allocator);
   }
-  val = &event_sequence_json;
 }
 
 void AggregatedRuntimeProfile::CollectInfoStringIntoJson(const string& info_string_name,
