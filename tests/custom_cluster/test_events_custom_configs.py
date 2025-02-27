@@ -1254,7 +1254,8 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     #    + "not opened and might already be cleaned up")
 
   @CustomClusterTestSuite.with_args(
-      catalogd_args="--hms_event_incremental_refresh_transactional_table=false")
+      catalogd_args="--hms_event_incremental_refresh_transactional_table=false",
+      statestored_args=STATESTORED_ARGS)
   def test_no_hms_event_incremental_refresh_transactional_table(self, unique_database):
     """IMPALA-12835: Test that Impala notices inserts to acid tables when
        hms_event_incremental_refresh_transactional_table is false.
@@ -1268,12 +1269,16 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       self.run_stmt_in_hive(
           "create transactional table {} (i int){}".format(fq_tbl, part_create))
       EventProcessorUtils.wait_for_event_processing(self)
+      # Wait for StatestoreD to propagate the update.
+      wait_single_statestore_heartbeat()
 
       # Load the table in Impala before INSERT
       self.client.execute("refresh " + fq_tbl)
       self.run_stmt_in_hive(
           "insert into {}{} values (1),(2),(3)".format(fq_tbl, part_insert))
       EventProcessorUtils.wait_for_event_processing(self)
+      # Wait for StatestoreD to propagate the update.
+      wait_single_statestore_heartbeat()
 
       results = self.client.execute("select i from " + fq_tbl)
       assert results.data == ["1", "2", "3"]
