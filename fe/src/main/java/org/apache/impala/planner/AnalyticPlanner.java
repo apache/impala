@@ -160,6 +160,23 @@ public class AnalyticPlanner {
   }
 
   /**
+   * Provided for a caller that does not supply a List of TupleIsNullPredicate.
+   */
+  public PlanNode createSingleNodePlan(PlanNode root,
+      List<Expr> groupingExprs, List<Expr> inputPartitionExprs) throws ImpalaException {
+    return createSingleNodePlan(root, groupingExprs, inputPartitionExprs,
+        getTupleIsNullPreds(root));
+  }
+
+  private static List<TupleIsNullPredicate> getTupleIsNullPreds(PlanNode planNode) {
+    if (planNode.getOutputSmap() == null) {
+      return new ArrayList<>();
+    }
+    return TupleIsNullPredicate.getUniqueBoundTupleIsNullPredicates(
+        planNode.getOutputSmap().getRhs(), planNode.getTupleIds());
+  }
+
+  /**
    * Update selectivity of conjuncts in 'substAnalyticConjs' to reflect those that
    * were pushed to a partitioned top-n.
    *
