@@ -21,7 +21,7 @@ from tests.common.file_utils import grep_dir
 from tests.common.skip import SkipIfBuildType, SkipIfDockerizedCluster
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.util.filesystem_utils import IS_HDFS
+from tests.util.filesystem_utils import supports_storage_ids
 from tests.util.parse_util import parse_duration_string_ms
 from datetime import datetime
 from multiprocessing import Process, Queue
@@ -1011,11 +1011,16 @@ class TestWebPage(ImpalaTestSuite):
         "functional_parquet", "iceberg_non_partitioned", "total-file-size-bytes")
     assert '20' == self.__get_table_metric(
         "functional_parquet", "iceberg_non_partitioned", "num-files")
-    assert '13000' == self.__get_table_metric(
-        "functional_parquet", "iceberg_non_partitioned", "memory-estimate-bytes")
-    if IS_HDFS:
+    if supports_storage_ids():
+      # Target FS has block location information.
       assert '20' == self.__get_table_metric(
           "functional_parquet", "iceberg_non_partitioned", "num-blocks")
+      assert '13000' == self.__get_table_metric(
+          "functional_parquet", "iceberg_non_partitioned", "memory-estimate-bytes")
+    else:
+      # Target FS doesn't have block locations, so 'memory-estimate-bytes' differ.
+      assert '10000' == self.__get_table_metric(
+          "functional_parquet", "iceberg_non_partitioned", "memory-estimate-bytes")
 
   def __get_table_metric(self, db_name, tbl_name, metric):
     self.client.execute("refresh %s.%s" % (db_name, tbl_name))

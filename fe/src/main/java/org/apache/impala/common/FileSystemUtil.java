@@ -92,6 +92,8 @@ public class FileSystemUtil {
   /**
    * Set containing all FileSystem scheme that known to supports storage UUIDs in
    * BlockLocation calls.
+   * Keep the list in sync with Python method
+   * tests/util/filesystem_utils.py::supports_storage_ids()
    */
   private static final Set<String> SCHEME_SUPPORT_STORAGE_IDS =
       ImmutableSet.<String>builder()

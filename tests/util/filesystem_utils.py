@@ -95,6 +95,12 @@ def get_fs_uri_scheme():
   return uri_scheme
 
 
+def supports_storage_ids():
+  """Returns True if the target filesystem supports storage UUIDs in BlockLocation
+  calls. Keep in sync with Java method FileSystemUtil.supportsStorageIds()."""
+  return IS_HDFS or IS_OZONE
+
+
 WAREHOUSE = get_fs_path('/test-warehouse')
 FILESYSTEM_NAME = get_fs_name(FILESYSTEM)
 WAREHOUSE_PREFIX = os.getenv("WAREHOUSE_LOCATION_PREFIX")
