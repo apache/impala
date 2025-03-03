@@ -4,7 +4,7 @@ responsible for and how they were created:
   1) wildcardCA.pem & wildcardCA.key:
 
     This is a root certificate and its key which was used to sign wildcard-cert.pem and
-    wildcard-san-cert.pem. (Added as a part of IMPALA-3159)
+    wildcard-san-cert.pem. (Added as a part of IMPALA-3159). The common name is "*"
 
     This was created using the following commands:
 
@@ -18,14 +18,14 @@ responsible for and how they were created:
   2) wildcard-cert.pem & wildcard-cert.key:
 
     This is a wildcard certificate and its corresponding key which has its commonName as
-    "*". This means it should match with any host. (Added as a part of IMPALA-3159)
+    "*.impala.test".  (Added as a part of IMPALA-3159, updated related to IMPALA-13790)
 
     This was created using the following commands:
 
       openssl genrsa -out wildcard-cert.key 2048
 
-      openssl req -new -key wildcard-cert.key -out wildcard-cert.csr
-        (Fill in all the details according to prompts)
+      openssl req -new -key wildcard-cert.key -out wildcard-cert.csr \
+          -subj "/C=US/ST=CA/L=SF/O=Cloudera/CN=*.impala.test"
 
       openssl x509 -req -in wildcard-cert.csr -CA wildcardCA.pem -CAkey wildcardCA.key \
           -CAcreateserial -out wildcard-cert.pem -days 10000 -sha256
@@ -34,8 +34,9 @@ responsible for and how they were created:
   3) wildcard-san-cert.pem & wildcard-san-cert.key:
 
     This is a certificate and its corresponding key which has 2 SANs
-    (subjectAlternativeName). One is "localhost" and the other is a wildcard ("*").
-    (Added as a part of IMPALA-3159)
+    (subjectAlternativeName). One is "alsoBad" and the other is a wildcard
+    ("*.impala.test").
+    (Added as a part of IMPALA-3159, updated related to IMPALA-13790)
 
     This was created using the following commands:
 
@@ -43,12 +44,12 @@ responsible for and how they were created:
 
       openssl req -new -sha256 -key wildcard-san-cert.key \
           -subj "/C=US/ST=CA/L=SF/O=Cloudera/CN=badCN" -reqexts SAN \
-          -config <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=DNS:localhost,DNS:*")) \
+          -config <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=DNS:alsoBad,DNS:*.impala.test")) \
           -out wildcard-san-cert.csr
 
       openssl x509 -req -in wildcard-san-cert.csr -CA wildcardCA.pem \
           -CAkey wildcardCA.key -CAcreateserial \
-          -extfile <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=DNS:localhost,DNS:*")) \
+          -extfile <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=DNS:alsoBad,DNS:*.impala.test")) \
           -extensions SAN -out wildcard-san-cert.pem -days 10000 -sha256
 
 -------------

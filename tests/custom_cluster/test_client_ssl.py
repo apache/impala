@@ -65,21 +65,27 @@ class TestClientSsl(CustomClusterTestSuite):
   # Deprecation warnings should not be seen.
   DEPRECATION_WARNING = "DeprecationWarning"
 
-  SSL_WILDCARD_ARGS = ("--ssl_client_ca_certificate=%s/wildcardCA.pem "
-                      "--ssl_server_certificate=%s/wildcard-cert.pem "
-                      "--ssl_private_key=%s/wildcard-cert.key"
-                      % (CERT_DIR, CERT_DIR, CERT_DIR))
+  SSL_WILDCARD_ARGS = ("--ssl_client_ca_certificate={0}/wildcardCA.pem "
+                       "--ssl_server_certificate={0}/wildcard-cert.pem "
+                       "--ssl_private_key={0}/wildcard-cert.key "
+                       "--hostname={1} "
+                       "--state_store_host={1} "
+                       "--catalog_service_host={1} "
+                       ).format(CERT_DIR, "ip4.impala.test")
 
-  SSL_WILDCARD_SAN_ARGS = ("--ssl_client_ca_certificate=%s/wildcardCA.pem "
-                          "--ssl_server_certificate=%s/wildcard-san-cert.pem "
-                          "--ssl_private_key=%s/wildcard-san-cert.key"
-                          % (CERT_DIR, CERT_DIR, CERT_DIR))
+  SSL_WILDCARD_SAN_ARGS = ("--ssl_client_ca_certificate={0}/wildcardCA.pem "
+                           "--ssl_server_certificate={0}/wildcard-san-cert.pem "
+                           "--ssl_private_key={0}/wildcard-san-cert.key "
+                           "--hostname={1} "
+                           "--state_store_host={1} "
+                           "--catalog_service_host={1} "
+                           ).format(CERT_DIR, "ip4.impala.test")
 
-  SSL_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
-              "--ssl_server_certificate=%s/server-cert.pem "
-              "--ssl_private_key=%s/server-key.pem "
+  SSL_ARGS = ("--ssl_client_ca_certificate={0}/server-cert.pem "
+              "--ssl_server_certificate={0}/server-cert.pem "
+              "--ssl_private_key={0}/server-key.pem "
               "--hostname=localhost " # Required to match hostname in certificate
-              % (CERT_DIR, CERT_DIR, CERT_DIR))
+              ).format(CERT_DIR)
 
   @classmethod
   def setup_class(cls):
@@ -202,21 +208,20 @@ class TestClientSsl(CustomClusterTestSuite):
                                     statestored_args=SSL_WILDCARD_ARGS,
                                     catalogd_args=SSL_WILDCARD_ARGS)
   @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
-  @pytest.mark.xfail(run=True, reason="Inconsistent wildcard support on target platforms")
   def test_wildcard_ssl(self, vector):
     """ Test for IMPALA-3159: Test with a certificate which has a wildcard for the
     CommonName.
     """
-    self._verify_negative_cases(vector)
+    self._verify_negative_cases(vector, host="ip4.impala.test")
 
-    self._validate_positive_cases(vector, "%s/wildcardCA.pem" % CERT_DIR)
+    self._validate_positive_cases(vector, "%s/wildcardCA.pem" % CERT_DIR,
+                                  host="ip4.impala.test")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=SSL_WILDCARD_SAN_ARGS,
                                     statestored_args=SSL_WILDCARD_SAN_ARGS,
                                     catalogd_args=SSL_WILDCARD_SAN_ARGS)
   @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
-  @pytest.mark.xfail(run=True, reason="Inconsistent wildcard support on target platforms")
   def test_wildcard_san_ssl(self, vector):
     """ Test for IMPALA-3159: Test with a certificate which has a wildcard as a SAN. """
 
@@ -229,24 +234,31 @@ class TestClientSsl(CustomClusterTestSuite):
           "cannot retrieve SAN from certificate: "
           "https://bugzilla.redhat.com/show_bug.cgi?id=928390")
 
-    self._verify_negative_cases(vector)
+    self._verify_negative_cases(vector, host="ip4.impala.test")
 
-    self._validate_positive_cases(vector, "%s/wildcardCA.pem" % CERT_DIR)
+    self._validate_positive_cases(vector, "%s/wildcardCA.pem" % CERT_DIR,
+                                  host="ip4.impala.test")
 
-  def _verify_negative_cases(self, vector):
+  def _verify_negative_cases(self, vector, host=""):
     # Expect the shell to not start successfully if we point --ca_cert to an incorrect
     # certificate.
     args = ["--ssl", "-q", "select 1 + 2",
             "--ca_cert=%s/incorrect-commonname-cert.pem" % CERT_DIR]
+    if host:
+      args.extend(["-i", host])
     run_impala_shell_cmd(vector, args, expect_success=False)
 
     # Expect the shell to not start successfully if we don't specify the --ssl option
     args = ["-q", "select 1 + 2"]
+    if host:
+      args.extend(["-i", host])
     run_impala_shell_cmd(vector, args, expect_success=False)
 
-  def _validate_positive_cases(self, vector, ca_cert=""):
+  def _validate_positive_cases(self, vector, ca_cert="", host=None):
     python3_10_version_re = re.compile(r"using Python 3\.1[0-9]")
     shell_options = ["--ssl", "-q", "select 1 + 2"]
+    if host:
+      shell_options.extend(["-i", host])
     result = run_impala_shell_cmd(vector, shell_options)
     for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
       assert msg in result.stderr

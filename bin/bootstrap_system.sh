@@ -480,7 +480,16 @@ ssh localhost whoami
 #    ...
 #  ...ConnectionError: ('Connection aborted.', error(111, 'Connection refused'))
 # Prefer the FQDN first for rpc-mgr-kerberized-test as newer krb5 requires FQDN.
-echo -e "\n127.0.0.1 $(hostname) $(hostname -s)" | sudo tee -a /etc/hosts
+add_if_not_there() {
+   grep -q "$2" $1 || echo "$2" | sudo tee -a $1
+}
+add_if_not_there "/etc/hosts" "127.0.0.1 $(hostname) $(hostname -s)"
+
+# Add hostnames with multiple labels to allow matching wildcard TLS certificates.
+# Create names that map to v4/v6/dual localhost to help ipv6 testing.
+add_if_not_there "/etc/hosts" "127.0.0.1 ip4.impala.test ip46.impala.test"
+add_if_not_there "/etc/hosts" "::1       ip6.impala.test ip46.impala.test"
+
 #
 # In Docker, one can change /etc/hosts as above but not with sed -i. The error message is
 # "sed: cannot rename /etc/sedc3gPj8: Device or resource busy". The following lines are
