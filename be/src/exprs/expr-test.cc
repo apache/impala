@@ -11598,6 +11598,21 @@ TEST_P(ExprTest, AiFunctionsTestAdditionalSites) {
   EXPECT_EQ(
       AiFunctions::GetAiPlatformFromEndpoint("https://AI-API.COM/v1/generate", true),
       AiFunctions::AI_PLATFORM::GENERAL);
+
+  // Test for supported/unsupported endpoints.
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported("https://ai-api.com/v1/generate"), true);
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported("https://another-ai.org/completions"), true);
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported(
+          "https://api.openai.com/v1/chat/completions"), true);
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported(
+          "https://openai.azure.com/openai/deployments/"), true);
+  EXPECT_EQ(
+      AiFunctions::is_api_endpoint_supported("https://random-ai.com/generate"), false);
+
 }
 
 } // namespace impala

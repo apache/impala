@@ -157,6 +157,8 @@ DECLARE_string(debug_actions);
 DECLARE_string(ssl_client_ca_certificate);
 
 DECLARE_string(ai_api_key_jceks_secret);
+DECLARE_string(ai_endpoint);
+DECLARE_string(ai_additional_platforms);
 
 DEFINE_int32(backend_client_connection_num_retries, 3, "Retry backend connections.");
 // When network is unstable, TCP will retry and sending could take longer time.
@@ -534,6 +536,17 @@ Status ExecEnv::Init() {
     RETURN_IF_ERROR(
         frontend_->GetSecretFromKeyStore(FLAGS_ai_api_key_jceks_secret, &api_key));
     AiFunctions::set_api_key(api_key);
+  }
+  // Validate default ai_endpoint.
+  if (FLAGS_ai_endpoint != "" &&
+      !AiFunctions::is_api_endpoint_supported(FLAGS_ai_endpoint)) {
+    string supported_platforms = Substitute("$0, $1",
+        AiFunctions::OPEN_AI_AZURE_ENDPOINT, AiFunctions::OPEN_AI_PUBLIC_ENDPOINT);
+    if (!FLAGS_ai_additional_platforms.empty()) {
+      supported_platforms += ", " + FLAGS_ai_additional_platforms;
+    }
+    return Status(Substitute("Unsupported --ai_endpoint=$0, supported platforms are: $1",
+        FLAGS_ai_endpoint, supported_platforms));
   }
 
   jwt_helper_ = new JWTHelper();

@@ -37,8 +37,7 @@ using namespace impala_udf;
 DEFINE_string(ai_endpoint, "https://api.openai.com/v1/chat/completions",
     "The default API endpoint for an external AI engine.");
 DEFINE_validator(ai_endpoint, [](const char* name, const string& endpoint) {
-  return (impala::AiFunctions::is_api_endpoint_valid(endpoint) &&
-      impala::AiFunctions::is_api_endpoint_supported(endpoint));
+  return impala::AiFunctions::is_api_endpoint_valid(endpoint);
 });
 
 DEFINE_string(ai_model, "gpt-4", "The default AI model used by an external AI engine.");

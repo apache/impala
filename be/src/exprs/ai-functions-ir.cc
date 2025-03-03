@@ -62,8 +62,8 @@ const char* AiFunctions::AZURE_OPEN_AI_REQUEST_AUTH_HEADER =
 // other constants
 static const StringVal NULL_STRINGVAL = StringVal::null();
 static const char* AI_API_ENDPOINT_PREFIX = "https://";
-static const char* OPEN_AI_AZURE_ENDPOINT = "openai.azure.com";
-static const char* OPEN_AI_PUBLIC_ENDPOINT = "api.openai.com";
+const char* AiFunctions::OPEN_AI_AZURE_ENDPOINT = "openai.azure.com";
+const char* AiFunctions::OPEN_AI_PUBLIC_ENDPOINT = "api.openai.com";
 // OPEN AI specific constants
 static const char* OPEN_AI_RESPONSE_FIELD_CHOICES = "choices";
 static const char* OPEN_AI_RESPONSE_FIELD_MESSAGE = "message";

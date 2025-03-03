@@ -39,6 +39,8 @@ class AiFunctions {
   static const char* OPEN_AI_REQUEST_FIELD_CONTENT_TYPE_HEADER;
   static const char* OPEN_AI_REQUEST_AUTH_HEADER;
   static const char* AZURE_OPEN_AI_REQUEST_AUTH_HEADER;
+  static const char* OPEN_AI_AZURE_ENDPOINT;
+  static const char* OPEN_AI_PUBLIC_ENDPOINT;
   enum class AI_PLATFORM {
     /// Unsupported platform
     UNSUPPORTED,
