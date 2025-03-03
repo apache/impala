@@ -1186,10 +1186,13 @@ class ImpalaTestSuite(BaseTestSuite):
     result = self.execute_query_using_client(client, query, vector)
     # Restore client configuration before returning.
     modified_configs = vector.get_exec_option_dict().keys()
+    options_to_restore = dict()
     for name, val in client.get_default_configuration().items():
       lower_name = name.lower()
       if lower_name in modified_configs:
-        client.set_configuration_option(lower_name, val)
+        options_to_restore[lower_name] = val
+    if options_to_restore:
+      client.set_configuration(options_to_restore)
     return result
 
   @execute_wrapper

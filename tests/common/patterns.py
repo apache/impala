@@ -26,6 +26,8 @@ VALID_IMPALA_IDENTIFIER_REGEX = re.compile(r'^[a-zA-Z][a-zA-Z0-9_]{,127}$')
 
 INT64_MASK = (1 << 64) - 1
 
+LOG_FORMAT = "-- %(asctime)s %(levelname)-8s %(threadName)s: %(message)s"
+
 
 def is_valid_impala_identifier(identifier):
   """Return True if identifier is a valid Impala identifier, False otherwise."""

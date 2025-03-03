@@ -35,13 +35,12 @@ from impala_py_lib.helpers import find_all_files, is_core_dump
 import tests.common.base_test_suite
 from tests.common.environ import build_flavor_timeout
 from tests.common.test_result_verifier import QueryTestResult
-from tests.common.patterns import is_valid_impala_identifier
+from tests.common.patterns import LOG_FORMAT, is_valid_impala_identifier
 from tests.common.test_vector import BEESWAX, HS2, HS2_HTTP
 from tests.comparison.db_connection import ImpalaConnection
 from tests.util.filesystem_utils import FILESYSTEM, ISILON_WEBHDFS_PORT, WAREHOUSE
 
 LOG = logging.getLogger('test_configuration')
-LOG_FORMAT = "-- %(asctime)s %(levelname)-8s %(threadName)s: %(message)s"
 VALID_TEST_PROTOCOLS = [BEESWAX, HS2, HS2_HTTP]
 
 DEFAULT_CONN_TIMEOUT = 45
