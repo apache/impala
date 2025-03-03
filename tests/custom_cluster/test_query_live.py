@@ -36,14 +36,6 @@ class TestQueryLive(CustomClusterTestSuite):
     super(TestQueryLive, self).setup_method(method)
     self.wait_for_wm_init_complete()
 
-    # Wait until sys.impala_query_live is available in the coordinator's catalog cache.
-    def table_exists():
-      catalog_objs = self.cluster.get_first_impalad() \
-          .service.read_debug_webpage("catalog?json")
-      return "impala_query_live" in catalog_objs
-
-    assert retry(func=table_exists, max_attempts=5, sleep_time_s=3, backoff=1)
-
   def assert_describe_extended(self):
     describe_ext_result = self.execute_query('describe extended sys.impala_query_live')
     # Alter can add additional event fields. Filter them out.

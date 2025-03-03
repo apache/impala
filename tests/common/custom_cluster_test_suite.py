@@ -37,6 +37,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.util.filesystem_utils import IS_LOCAL
 from tests.util.retry import retry
+from tests.util.workload_management import QUERY_TBL_LOG_NAME, QUERY_TBL_LIVE_NAME
 from time import sleep
 
 LOG = logging.getLogger(__name__)
@@ -410,30 +411,25 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   def wait_for_wm_init_complete(self, timeout_s=60):
     """
     Waits for the catalog to report the workload management initialization process has
-    completed and for the catalog updates to be received by the coordinators. The input
-    timeout_s is used as the timeout for three separate function calls. Thus, the
-    theoretical max amount of time this function could wait is (timeout_s * 3).
+    completed and the workload management tables to be in the local catalog. The input
+    timeout_s is used as the timeout for multiple separate function calls. Thus, the
+    theoretical max amount of time this function could wait is:
+        timeout_s + (timeout_s * num_coordinators).
     """
-    catalog_log = self.assert_log_contains_multiline("catalogd", "INFO", r'Completed '
-        r'workload management initialization.*?A catalog update with \d+ entries is '
-        r'assembled\. Catalog version: (\d+)', timeout_s)
+    self.assert_catalogd_ha_contains("INFO", r'Completed workload management '
+        r'initialization', timeout_s)
 
-    # Assert each coordinator has received a catalog update that was assembled after
-    # workload management completed.
-    for idx, _ in enumerate(self.cluster.get_all_coordinators()):
-      node_name = "impalad"
-      if idx > 0:
-        node_name += "_node" + str(idx)
+    for tbl in (QUERY_TBL_LIVE_NAME, QUERY_TBL_LOG_NAME):
+      for coord in self.cluster.get_all_coordinators():
+        # Wait until table is available in the coordinator's catalog cache.
+        def exists_func():
+          catalog_objs = coord.service.read_debug_webpage("catalog?json")
+          return tbl in catalog_objs
 
-      def assert_func():
-        coord_log = self.assert_log_contains(node_name, "INFO", r'Catalog topic update '
-            r'applied with version: (\d+)', timeout_s=timeout_s, expected_count=-1)
-        return int(coord_log.group(1)) >= int(catalog_log.group(1))
-
-      max_attempts = timeout_s / 3
-      assert retry(func=assert_func, max_attempts=max_attempts, sleep_time_s=3,
-          backoff=1), "Expected a catalog topic update with version '{}' or later, but " \
-          "no such update was found.".format(catalog_log.group(1))
+        max_attempts = timeout_s / 3
+        assert retry(func=exists_func, max_attempts=max_attempts, sleep_time_s=3,
+            backoff=1), "Did not find table '{}' in local catalog of coordinator " \
+            "'{}:{}'.".format(tbl, coord.hostname, coord.get_webserver_port())
 
   @classmethod
   def _stop_impala_cluster(cls):
