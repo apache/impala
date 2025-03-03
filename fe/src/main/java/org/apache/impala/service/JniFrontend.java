@@ -134,8 +134,8 @@ public class JniFrontend {
   private final static TBinaryProtocol.Factory protocolFactory_ =
       new TBinaryProtocol.Factory();
   private final Frontend frontend_;
-  public final static String KEYSTORE_ERROR_MSG = "Failed to get password from" +
-      "keystore, error: invalid key '%s' or password doesn't exist";
+  public final static String KEYSTORE_ERROR_MSG = "Failed to get password from "
+      + "keystore, error: invalid key '%s' or password doesn't exist";
 
   /**
    * Create a new instance of the Jni Frontend.

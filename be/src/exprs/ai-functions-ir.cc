@@ -51,6 +51,8 @@ const string AiFunctions::AI_GENERATE_TXT_MSG_OVERRIDE_FORBIDDEN_ERROR =
     "Invalid override, 'messages' cannot be overriden";
 const string AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR =
     "Invalid override, 'n' must be of integer type and have value 1";
+const string AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX =
+    "AI Generate Text Error: ";
 string AiFunctions::ai_api_key_;
 const char* AiFunctions::OPEN_AI_REQUEST_FIELD_CONTENT_TYPE_HEADER =
     "Content-Type: application/json";

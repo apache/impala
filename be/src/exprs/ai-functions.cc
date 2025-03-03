@@ -58,12 +58,20 @@ TAG_FLAG(ai_api_key_jceks_secret, sensitive);
 
 namespace impala {
 
-#define RETURN_STRINGVAL_IF_ERROR(ctx, stmt)               \
-  do {                                                     \
-    const ::impala::Status& _status = (stmt);              \
-    if (UNLIKELY(!_status.ok())) {                         \
-      return copyErrorMessage(ctx, _status.msg().msg());   \
-    }                                                      \
+// Set an error message in the context, causing the query to fail.
+#define SET_ERROR(ctx, status_str, prefix)          \
+  do {                                              \
+    (ctx)->SetError((prefix + status_str).c_str()); \
+  } while (false)
+
+// Check the status and return an error if it fails.
+#define RETURN_STRINGVAL_IF_ERROR(ctx, stmt)                                    \
+  do {                                                                          \
+    const ::impala::Status& _status = (stmt);                                   \
+    if (UNLIKELY(!_status.ok())) {                                              \
+      SET_ERROR(ctx, _status.msg().msg(), AI_GENERATE_TXT_COMMON_ERROR_PREFIX); \
+      return StringVal::null();                                                 \
+    }                                                                           \
   } while (false)
 
 // Impala Ai Functions Options Constants.
@@ -181,8 +189,11 @@ StringVal AiFunctions::AiGenerateTextInternal(FunctionContext* ctx,
     try {
       ParseImpalaOptions(impala_options, impala_options_document, ai_options);
     } catch (const std::runtime_error& e) {
-      LOG(WARNING) << AI_GENERATE_TXT_JSON_PARSE_ERROR << ": " << e.what();
-      return StringVal(AI_GENERATE_TXT_JSON_PARSE_ERROR.c_str());
+      std::stringstream ss;
+      ss << AI_GENERATE_TXT_JSON_PARSE_ERROR << ": " << e.what();
+      LOG(WARNING) << ss.str();
+      const Status err_status(ss.str());
+      RETURN_STRINGVAL_IF_ERROR(ctx, err_status);
     }
   }
 
@@ -238,6 +249,9 @@ StringVal AiFunctions::AiGenerateTextInternal(FunctionContext* ctx,
     Value message(rapidjson::kObjectType);
     message.AddMember("role", "user", payload_allocator);
     if (prompt.ptr == nullptr || prompt.len == 0) {
+      // Return a string with the invalid prompt error message instead of failing
+      // the query, as the issue may be with the row rather than the configuration
+      // or query. This behavior might be reconsidered later.
       return StringVal(AI_GENERATE_TXT_INVALID_PROMPT_ERROR.c_str());
     }
     message.AddMember("content",
@@ -253,26 +267,32 @@ StringVal AiFunctions::AiGenerateTextInternal(FunctionContext* ctx,
     if (!fastpath && platform_params.ptr != nullptr && platform_params.len != 0) {
       overrides.Parse(reinterpret_cast<char*>(platform_params.ptr), platform_params.len);
       if (overrides.HasParseError()) {
-        LOG(WARNING) << AI_GENERATE_TXT_JSON_PARSE_ERROR << ": error code "
-                     << overrides.GetParseError() << ", offset input "
-                     << overrides.GetErrorOffset();
-        return StringVal(AI_GENERATE_TXT_JSON_PARSE_ERROR.c_str());
+        std::stringstream ss;
+        ss << AI_GENERATE_TXT_JSON_PARSE_ERROR << ": error code "
+           << overrides.GetParseError() << ", offset input "
+           << overrides.GetErrorOffset();
+        LOG(WARNING) << ss.str();
+        const Status err_status(ss.str());
+        RETURN_STRINGVAL_IF_ERROR(ctx, err_status);
       }
       for (auto& m : overrides.GetObject()) {
         if (payload.HasMember(m.name.GetString())) {
           if (m.name == "messages") {
-            LOG(WARNING)
-                << AI_GENERATE_TXT_JSON_PARSE_ERROR
-                << ": 'messages' is constructed from 'prompt', cannot be overridden";
-            return StringVal(AI_GENERATE_TXT_MSG_OVERRIDE_FORBIDDEN_ERROR.c_str());
+            const string error_msg = AI_GENERATE_TXT_MSG_OVERRIDE_FORBIDDEN_ERROR
+                + ": 'messages' is constructed from 'prompt', cannot be overridden";
+            LOG(WARNING) << error_msg;
+            const Status err_status(error_msg);
+            RETURN_STRINGVAL_IF_ERROR(ctx, err_status);
           } else {
             payload[m.name.GetString()] = m.value;
           }
         } else {
           if ((m.name == "n") && !(m.value.IsInt() && m.value.GetInt() == 1)) {
-            LOG(WARNING) << AI_GENERATE_TXT_JSON_PARSE_ERROR
-                         << ": 'n' must be of integer type and have value 1";
-            return StringVal(AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR.c_str());
+            const string error_msg = AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR
+                + ": 'n' must be of integer type and have value 1";
+            LOG(WARNING) << error_msg;
+            const Status err_status(error_msg);
+            RETURN_STRINGVAL_IF_ERROR(ctx, err_status);
           }
           payload.AddMember(m.name, m.value, payload_allocator);
         }
@@ -312,7 +332,10 @@ StringVal AiFunctions::AiGenerateTextInternal(FunctionContext* ctx,
     status = curl.PostToURL(endpoint_str, payload_str, &resp, headers);
   }
   VLOG(2) << "AI Generate Text: \noriginal response: " << resp.ToString();
-  if (UNLIKELY(!status.ok())) return copyErrorMessage(ctx, status.ToString());
+  if (UNLIKELY(!status.ok())) {
+    SET_ERROR(ctx, status.ToString(), AI_GENERATE_TXT_COMMON_ERROR_PREFIX);
+    return StringVal::null();
+  }
   // Parse the JSON response string
   std::string response = AiGenerateTextParseOpenAiResponse(
       std::string_view(reinterpret_cast<char*>(resp.data()), resp.size()));

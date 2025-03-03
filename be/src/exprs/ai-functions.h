@@ -36,6 +36,7 @@ class AiFunctions {
   static const string AI_GENERATE_TXT_INVALID_PROMPT_ERROR;
   static const string AI_GENERATE_TXT_MSG_OVERRIDE_FORBIDDEN_ERROR;
   static const string AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR;
+  static const string AI_GENERATE_TXT_COMMON_ERROR_PREFIX;
   static const char* OPEN_AI_REQUEST_FIELD_CONTENT_TYPE_HEADER;
   static const char* OPEN_AI_REQUEST_AUTH_HEADER;
   static const char* AZURE_OPEN_AI_REQUEST_AUTH_HEADER;

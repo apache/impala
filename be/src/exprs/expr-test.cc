@@ -1259,6 +1259,16 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
         UdfTestHarness::CreateTestContext(return_type, arg_types, state, pool));
   }
 
+  // Helper function to close context then create a new one.
+  void RecreateUdfTestContext(const FunctionContext::TypeDesc& return_type,
+      const std::vector<FunctionContext::TypeDesc>& arg_types, RuntimeState* state,
+      MemPool* pool, FunctionContext** old_ctx) {
+    ASSERT_TRUE(old_ctx != nullptr && *old_ctx != nullptr);
+    UdfTestHarness::CloseContext(*old_ctx);
+    *old_ctx = CreateUdfTestContext(return_type, arg_types, state, pool);
+    ASSERT_TRUE(*old_ctx != nullptr);
+  }
+
   void TestBytes();
 };
 
@@ -11388,14 +11398,26 @@ TEST_P(ExprTest, AiFunctionsTest) {
   EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
       AiFunctions::AI_GENERATE_TXT_INVALID_PROMPT_ERROR);
 
+  size_t json_parse_error_len = AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR.size()
+      + AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX.size();
+  size_t override_forbidden_error_len =
+      AiFunctions::AI_GENERATE_TXT_MSG_OVERRIDE_FORBIDDEN_ERROR.size()
+      + AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX.size();
+  size_t n_override_forbidden_error_len =
+      AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR.size()
+      + AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX.size();
   // Test override/additional params
   // invalid json results in error.
   StringVal invalid_json_params("{\"temperature\": 0.49, \"stop\": [\"*\",::,]}");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, invalid_json_params,
       impala_options, dry_run);
-  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
-      AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
+  EXPECT_TRUE(ctx->has_error());
+  EXPECT_EQ(string(ctx->error_msg(), json_parse_error_len),
+      AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX
+          + AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
+  EXPECT_EQ(result.ptr, nullptr);
+  RecreateUdfTestContext(str_desc, v, nullptr, &pool, &ctx);
   // valid json results in overriding existing params ('model'), and adding new parms
   // like 'temperature' and 'stop'.
   StringVal valid_json_params(
@@ -11415,22 +11437,34 @@ TEST_P(ExprTest, AiFunctionsTest) {
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_msg_override,
       impala_options, dry_run);
-  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
-      AiFunctions::AI_GENERATE_TXT_MSG_OVERRIDE_FORBIDDEN_ERROR);
+  EXPECT_TRUE(ctx->has_error());
+  EXPECT_EQ(string(ctx->error_msg(), override_forbidden_error_len),
+      AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX
+          + AiFunctions::AI_GENERATE_TXT_MSG_OVERRIDE_FORBIDDEN_ERROR);
+  EXPECT_EQ(result.ptr, nullptr);
+  RecreateUdfTestContext(str_desc, v, nullptr, &pool, &ctx);
   // 'n != 1' cannot be overriden as additional params
   StringVal forbidden_n_value("{\"n\": 2}");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_n_value,
       impala_options, dry_run);
-  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
-      AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR);
+  EXPECT_TRUE(ctx->has_error());
+  EXPECT_EQ(string(ctx->error_msg(), n_override_forbidden_error_len),
+      AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX
+          + AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR);
+  EXPECT_EQ(result.ptr, nullptr);
+  RecreateUdfTestContext(str_desc, v, nullptr, &pool, &ctx);
   // non integer value of 'n' cannot be overriden as additional params
   StringVal forbidden_n_type("{\"n\": \"1\"}");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, forbidden_n_type, impala_options,
       dry_run);
-  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
-      AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR);
+  EXPECT_TRUE(ctx->has_error());
+  EXPECT_EQ(string(ctx->error_msg(), n_override_forbidden_error_len),
+      AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX
+          + AiFunctions::AI_GENERATE_TXT_N_OVERRIDE_FORBIDDEN_ERROR);
+  EXPECT_EQ(result.ptr, nullptr);
+  RecreateUdfTestContext(str_desc, v, nullptr, &pool, &ctx);
   // accept 'n=1' override as additional params
   StringVal allowed_n_override("{\"n\": 1}");
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
@@ -11493,8 +11527,12 @@ TEST_P(ExprTest, AiFunctionsTest) {
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, json_params,
       impala_options_mal_formatted, dry_run);
-  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
-      AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
+  EXPECT_TRUE(ctx->has_error());
+  EXPECT_EQ(string(ctx->error_msg(), json_parse_error_len),
+      AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX
+          + AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
+  EXPECT_EQ(result.ptr, nullptr);
+  RecreateUdfTestContext(str_desc, v, nullptr, &pool, &ctx);
 
   // Test Impala options with payload exceeding 5MB.
   string large_string(5 * 1024 * 1024 + 1, 'A');
@@ -11503,8 +11541,12 @@ TEST_P(ExprTest, AiFunctionsTest) {
   result = AiFunctions::AiGenerateTextInternal<false, AiFunctions::AI_PLATFORM::OPEN_AI>(
       ctx, openai_endpoint, prompt, model, jceks_secret, json_params, impala_options_long,
       dry_run);
-  EXPECT_EQ(string(reinterpret_cast<char*>(result.ptr), result.len),
-      AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
+  EXPECT_TRUE(ctx->has_error());
+  EXPECT_EQ(string(ctx->error_msg(), json_parse_error_len),
+      AiFunctions::AI_GENERATE_TXT_COMMON_ERROR_PREFIX
+          + AiFunctions::AI_GENERATE_TXT_JSON_PARSE_ERROR);
+  EXPECT_EQ(result.ptr, nullptr);
+  RecreateUdfTestContext(str_desc, v, nullptr, &pool, &ctx);
 
   // Test PLAIN credential type.
   StringVal plain_token("test_token");

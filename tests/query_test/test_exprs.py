@@ -134,6 +134,12 @@ class TestExprs(ImpalaTestSuite):
       assert "not supported by OpenSSL" in str(e)
       return False
 
+  def test_ai_generate_text_exprs(self, vector):
+    table_format = vector.get_value('table_format')
+    if table_format.file_format != 'parquet':
+      pytest.skip()
+    self.run_test_case('QueryTest/ai_generate_text_exprs', vector)
+
 
 # Tests very deep expression trees and expressions with many children. Impala defines
 # a 'safe' upper bound on the expr depth and the number of expr children in the

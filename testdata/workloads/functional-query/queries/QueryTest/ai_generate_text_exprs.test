@@ -1,0 +1,79 @@
+====
+---- QUERY
+# Incorrect password.
+select ai_generate_text('https://api.openai.com/v1/chat/completions', '', '',
+'wrong_password', '', '');
+---- RESULTS
+---- CATCH
+row_regex:.* AI Generate Text Error:.*Failed to get password from keystore.*
+====
+---- QUERY
+# Missing endpoint.
+select ai_generate_text('', 'prompt', '', '', '', '');
+---- RESULTS
+---- CATCH
+row_regex:.* AI Generate Text Error:.*Network error: curl error.*
+====
+---- QUERY
+# Invalid JSON format in impala options.
+select ai_generate_text('https://api.openai.com/v1/chat/completions', 'prompt',
+'gpt-4', '', '', '{\"wrong_format:\"random_val\"}');
+---- RESULTS
+---- CATCH
+row_regex:.* AI Generate Text Error:.*Invalid Json: Error parsing impala options.*
+====
+---- QUERY
+# Invalid override.
+select ai_generate_text('https://api.openai.com/v1/chat/completions', 'prompt',
+'gpt-4', '', '{\"messages\": [{\"role\":\"system\",\"content\":\"howdy!\"}]}', '');
+---- RESULTS
+---- CATCH
+row_regex:.* AI Generate Text Error:.*Invalid override, 'messages' cannot be
+ overriden.*
+====
+---- QUERY
+# Invalid override.
+select ai_generate_text('https://api.openai.com/v1/chat/completions', 'prompt',
+'gpt-4', '', '{\"n\": 2}', '');
+---- RESULTS
+---- CATCH
+row_regex:.* AI Generate Text Error:.*Invalid override, 'n' must be of integer
+ type and have value 1.*
+====
+---- QUERY
+# Invalid override.
+select ai_generate_text('https://api.openai.com/v1/chat/completions', 'prompt',
+'gpt-4', '', '{\"n\": \"1\"}', '');
+---- RESULTS
+---- CATCH
+row_regex:.* AI Generate Text Error:.*Invalid override, 'n' must be of integer
+ type and have value 1.*
+====
+---- QUERY
+# Invalid JSON format in impala options.
+select ai_generate_text('https://api.openai.com/v1/chat/completions', 'prompt',
+'gpt-4', '', '', '{\"payload\":\"testpayload\", malformatted_key:\"malformatted_content}');
+---- RESULTS
+---- CATCH
+row_regex:.* AI Generate Text Error:.*Invalid Json: Error parsing impala options.*
+====
+---- QUERY
+select r.r_reason_desc, s.sr_return_amt
+FROM tpcds_parquet.store_returns s, tpcds_parquet.reason r
+WHERE s.sr_reason_sk=r.r_reason_sk AND s.sr_return_amt > 10000 AND
+ai_generate_text_default(CONCAT("Categorize the return reason as 'damaged',
+'not needed', 'expensive', 'incorrect order' and 'other': ", r.r_reason_desc))
+NOT IN ('other', 'not needed');
+---- CATCH
+row_regex:.* AI Generate Text Error:.*Network error: curl error.*
+====
+---- QUERY
+select r.r_reason_desc, s.sr_return_amt
+FROM tpcds_parquet.store_returns s, tpcds_parquet.reason r
+WHERE s.sr_reason_sk=r.r_reason_sk AND s.sr_return_amt > 10000 AND
+ai_generate_text("", CONCAT("Categorize the return reason as 'damaged',
+'not needed', 'expensive', 'incorrect order' and 'other': ", r.r_reason_desc),"","","","")
+NOT IN ('other', 'not needed');
+---- CATCH
+row_regex:.* AI Generate Text Error:.*Network error: curl error.*
+====
