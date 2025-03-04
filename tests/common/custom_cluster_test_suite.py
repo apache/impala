@@ -272,6 +272,12 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if TMP_DIR_PLACEHOLDERS in args:
       # Create all requested temporary dirs.
       for name in args[TMP_DIR_PLACEHOLDERS]:
+        if name in cls.TMP_DIRS:
+          LOG.warning("Tmp dir '{0}' referring to '{1}' not been cleanup. It will "
+                      "be erased from TMP_DIRS map, but actual path might stay in "
+                      "filesystem. Custom cluster test before this might have not "
+                      "teardown cleanly.".format(name, cls.TMP_DIRS[name]))
+          del cls.TMP_DIRS[name]
         cls.make_tmp_dir(name)
 
     if args.get(IMPALAD_GRACEFUL_SHUTDOWN, False):
