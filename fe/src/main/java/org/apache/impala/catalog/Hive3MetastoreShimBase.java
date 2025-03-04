@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -257,6 +258,9 @@ public class Hive3MetastoreShimBase {
   public static final EnumSet<TableType> IMPALA_SUPPORTED_TABLE_TYPES = EnumSet
       .of(TableType.EXTERNAL_TABLE, TableType.MANAGED_TABLE, TableType.VIRTUAL_VIEW,
           TableType.MATERIALIZED_VIEW);
+
+  public static final List<String> HIVE_VIEW_TYPE =
+      Collections.singletonList("VIRTUAL_VIEW");
 
   /**
    * mapping between the HMS-3 type the Impala types

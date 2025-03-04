@@ -22,7 +22,6 @@ import re
 from os import getenv
 from time import sleep
 
-
 from impala_thrift_gen.hive_metastore.ttypes import FireEventRequest
 from impala_thrift_gen.hive_metastore.ttypes import FireEventRequestData
 from impala_thrift_gen.hive_metastore.ttypes import InsertEventRequestData
@@ -1617,3 +1616,24 @@ class TestEventSyncFailures(TestEventProcessingCustomConfigsBase):
     # SELECT gets the new row if waiting for enough time
     results = self.execute_query_expect_success(client, query, EVENT_SYNC_QUERY_OPTIONS)
     assert len(results.data) == 1
+
+
+class TestEventSyncWaiting(TestEventProcessingCustomConfigsBase):
+
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="--debug_actions=catalogd_event_processing_delay:SLEEP@200")
+  def test_hms_event_sync_with_commit_compaction(self, vector, unique_database):
+    """Test waiting for COMMIT_COMPACTION_EVENT. There is always a COMMIT_TXN event
+    before it so use a sleep of 200ms to delay processing it."""
+    client = self.default_impala_client(vector.get_value('protocol'))
+    client.set_configuration({"sync_hms_events_wait_time_s": 10})
+    tbl = unique_database + ".foo"
+    self.run_stmt_in_hive("""create transactional table {} partitioned by(p)
+        as select 0 as i, 0 as p""".format(tbl))
+    self.run_stmt_in_hive("insert into {} select 1,0".format(tbl))
+    res = self.execute_query_expect_success(client, "show files in " + tbl)
+    assert len(res.data) == 2
+    self.run_stmt_in_hive(
+        "alter table {} partition(p=0) compact 'minor' and wait".format(tbl))
+    res = self.execute_query_expect_success(client, "show files in " + tbl)
+    assert len(res.data) == 1

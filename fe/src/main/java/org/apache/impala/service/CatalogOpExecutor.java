@@ -2357,7 +2357,7 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Fetches CreateDatabase and CreateTable events of a db if events processing is active.
+   * Fetches DropDatabase and DropTable events of a db if events processing is active.
    * Returns an empty list if not active. Also updates the given 'catalogTimeline'.
    */
   private List<NotificationEvent> getNextMetastoreDropEventsForDbIfEnabled(

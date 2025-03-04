@@ -26,26 +26,37 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.time.LocalDateTime;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient.NotificationFilter;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.NotificationEventRequest;
 import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
+import org.apache.hadoop.hive.metastore.api.TableMeta;
+import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
+import org.apache.impala.analysis.TableRef;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
@@ -54,23 +65,36 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.MetastoreClientInstantiationException;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.IncompleteTable;
+import org.apache.impala.catalog.View;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
+import org.apache.impala.catalog.events.MetastoreEvents.AlterDatabaseEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.CreateDatabaseEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.CreateTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.DropDatabaseEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.DropTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
+import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TEventBatchProgressInfo;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
+import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TStatus;
+import org.apache.impala.thrift.TTable;
+import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TWaitForHmsEventRequest;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.NoOpEventSequence;
 import org.apache.impala.util.ThreadNameAnnotator;
@@ -395,7 +419,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         NotificationEventRequest eventRequest = new NotificationEventRequest();
         eventRequest.setMaxEvents(batchSize);
         eventRequest.setLastEvent(currentEventId);
-        // Need to set table/dbnames in the request according to the filter
+        // Need to set table/db names in the request according to the filter
         MetastoreShim.setNotificationEventRequestWithFilter(eventRequest,
             metaDataFilter);
         NotificationEventResponse notificationEventResponse =
@@ -1488,10 +1512,30 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   }
 
   public static class MetaDataFilter {
+    public static final List<String> DB_EVENT_TYPES = Lists.newArrayList(
+        AlterDatabaseEvent.EVENT_TYPE, CreateDatabaseEvent.EVENT_TYPE,
+        DropDatabaseEvent.EVENT_TYPE);
+    // Event types required to check for a SHOW TABLES statement. ALTER_DATABASE is
+    // required to check changes on the ownership.
+    public static final List<String> TABLE_LIST_EVENT_TYPES = Lists.newArrayList(
+        AlterDatabaseEvent.EVENT_TYPE, CreateDatabaseEvent.EVENT_TYPE,
+        DropDatabaseEvent.EVENT_TYPE, CreateTableEvent.EVENT_TYPE,
+        DropTableEvent.EVENT_TYPE);
+    public static final List<String> TABLE_EXIST_EVENT_TYPES = Lists.newArrayList(
+        CreateTableEvent.EVENT_TYPE, DropTableEvent.EVENT_TYPE);
+    public static final List<String> TABLE_EVENT_TYPES =
+        Stream.of(
+            MetastoreEventType.CREATE_TABLE, MetastoreEventType.DROP_TABLE,
+            MetastoreEventType.ALTER_TABLE, MetastoreEventType.ADD_PARTITION,
+            MetastoreEventType.ALTER_PARTITION, MetastoreEventType.ALTER_PARTITIONS,
+            MetastoreEventType.DROP_PARTITION, MetastoreEventType.INSERT,
+            MetastoreEventType.INSERT_PARTITIONS, MetastoreEventType.RELOAD,
+            MetastoreEventType.COMMIT_COMPACTION_EVENT
+        ).map(MetastoreEventType::toString).collect(Collectors.toList());
     public NotificationFilter filter_;
     public String catName_;
     public String dbName_;
-    public String tableName_;
+    public List<String> tableNames_;
 
     public MetaDataFilter(NotificationFilter notificationFilter) {
       this.filter_ = notificationFilter; // if this null then don't build event filter
@@ -1507,7 +1551,17 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     public MetaDataFilter(NotificationFilter notificationFilter, String catName,
         String databaseName, String tblName) {
       this(notificationFilter, catName, databaseName);
-      this.tableName_ = tblName;
+      if (tblName != null && !tblName.isEmpty()) {
+        this.tableNames_ = Arrays.asList(tblName);
+      }
+    }
+
+    public MetaDataFilter(NotificationFilter notificationFilter, String catName,
+        String databaseName, List<String> tblNames) {
+      this(notificationFilter, catName, databaseName);
+      if (tblNames != null && !tblNames.isEmpty()) {
+        this.tableNames_ = tblNames;
+      }
     }
 
     public void setNotificationFilter(NotificationFilter notificationFilter) {
@@ -1526,12 +1580,18 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       return dbName_;
     }
 
-    public String getTableName() {
-      return tableName_;
+    public List<String> getTableNames() {
+      return tableNames_;
     }
   }
 
-  public TStatus waitForSyncUpToCurrentEvent(long timeoutMs) {
+  /**
+   * Wait until the catalog doesn't have stale metadata that could be used by the query.
+   * The min required event id is calculated based on the pending HMS events on requested
+   * db/table names. We then wait until that event is processed by the EventProcessor.
+   */
+  public TStatus waitForMostRecentMetadata(TWaitForHmsEventRequest req) {
+    long timeoutMs = req.timeout_s * 1000L;
     TStatus res = new TStatus();
     // Only waits when event-processor is in ACTIVE/PAUSED states. PAUSED states happen
     // at startup or when global invalidate is running, so it's ok to wait for.
@@ -1543,12 +1603,21 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       return res;
     }
     long waitForEventId;
+    long latestEventId;
     try {
-      waitForEventId = getCurrentEventId();
+      latestEventId = getCurrentEventId();
     } catch (MetastoreNotificationFetchException e) {
       res.setStatus_code(TErrorCode.GENERAL);
       res.addToError_msgs("Failed to fetch current HMS event id: " + e.getMessage());
       return res;
+    }
+    try {
+      waitForEventId = getMinEventIdToWaitFor(req);
+    } catch (Throwable e) {
+      LOG.warn("Failed to check the min required event id to wait for. Fallback to use " +
+          "the latest event id {}. Query might wait longer than it needs.",
+          latestEventId, e);
+      waitForEventId = latestEventId;
     }
     long lastSyncedEventId = getLastSyncedEventId();
     long startMs = System.currentTimeMillis();
@@ -1582,5 +1651,316 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     LOG.info("Last synced event id ({}) reached {}", lastSyncedEventId, waitForEventId);
     res.setStatus_code(TErrorCode.OK);
     return res;
+  }
+
+  /**
+   * Find the min required event id that should be synced to avoid the query using
+   * stale metadata.
+   */
+  private long getMinEventIdToWaitFor(TWaitForHmsEventRequest req)
+      throws MetastoreNotificationFetchException, TException, CatalogException {
+    if (req.should_expand_views) expandViews(req);
+    // requiredEventId starts from the last synced event id. While checking pending
+    // events of a target, we just fetch events after requiredEventId, since events
+    // before it are decided to be waited for.
+    long requiredEventId = getLastSyncedEventId();
+    if (req.want_db_list) {
+      return getMinRequiredEventIdForDbList(requiredEventId);
+    }
+    if (req.isSetObject_descs()) {
+      // Step 1: Collect db/table names requested by the query.
+      // Group table names by the db name. HMS events on tables in the same db can be
+      // checked by one RPC.
+      Set<String> dbNames = new HashSet<>();
+      Map<String, List<String>> db2Tables = new HashMap<>();
+      for (TCatalogObject catalogObject: req.getObject_descs()) {
+        if (catalogObject.isSetDb()) {
+          dbNames.add(catalogObject.getDb().db_name);
+        } else if (catalogObject.isSetTable()) {
+          TTable table = catalogObject.getTable();
+          if (catalog_.getDb(table.db_name) == null) {
+            // We will check existence of missing dbs. Once the missing db is added,
+            // the underlying tables are also added (as IncompleteTables). So don't
+            // need to check table events. I.e. there are no stale metadata on those
+            // tables.
+            dbNames.add(table.db_name);
+          } else {
+            db2Tables.computeIfAbsent(table.db_name, k -> new ArrayList<>())
+                .add(table.tbl_name);
+          }
+        }
+      }
+      // Step 2: Check DB events
+      requiredEventId = getMinRequiredEventIdForDb(requiredEventId, dbNames,
+          req.want_table_list);
+      // Step 3: Check transactional events if there are transactional tables.
+      // Such events (COMMIT_TXN, ABORT_TXN) don't have the db/table names since they
+      // might modify multiple transactional tables. If there are transactional tables,
+      // wait for all the transactional events.
+      requiredEventId = getMinRequiredTxnEventId(requiredEventId, db2Tables);
+      // Step 4: Check table events
+      requiredEventId = getMinRequiredTableEventId(requiredEventId, db2Tables);
+    }
+    return requiredEventId;
+  }
+
+  private static void doForAllObjectNames(TWaitForHmsEventRequest req,
+      Function<TTableName, Object> tblFn, @Nullable Function<String, Object> dbFn) {
+    for (TCatalogObject catalogObject : req.getObject_descs()) {
+      if (catalogObject.isSetTable()) {
+        TTable table = catalogObject.getTable();
+        tblFn.apply(new TTableName(table.db_name, table.tbl_name));
+      } else if (dbFn != null && catalogObject.isSetDb()) {
+        dbFn.apply(catalogObject.getDb().getDb_name());
+      }
+    }
+  }
+
+  /**
+   * Expand views used by the query so we know what additional tables need to wait for
+   * their metadata to be synced. Throws exceptions if we can't expand any views.
+   */
+  private void expandViews(TWaitForHmsEventRequest req)
+      throws TException, CatalogException {
+    if (!req.isSetObject_descs()) return;
+    // Check all the table names in the request. Expand views and add underlying tables
+    // into the queue if they are new.
+    Queue<TTableName> uncheckedNames = new ArrayDeque<>();
+    doForAllObjectNames(req, uncheckedNames::offer, /*dbFn*/null);
+    Set<TTableName> checkedNames = new HashSet<>();
+    String loadReason = "expand view to check HMS events on underlying tables";
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      while (!uncheckedNames.isEmpty()) {
+        TTableName tblName = uncheckedNames.poll();
+        checkedNames.add(tblName);
+        Db db = catalog_.getDb(tblName.db_name);
+        Table tbl = null;
+        // Case 1: handle loaded table/views.
+        // If 'tbl' is a loaded view, reload it in case the view definition is modified.
+        // Note that loading a view from HMS is cheaper than checking HMS events. So we
+        // always reload it regardless of whether there are pending events on it.
+        if (db != null) {
+          tbl = db.getTable(tblName.table_name);
+          if (tbl instanceof View) {
+            catalog_.reloadTable(tbl, loadReason, getLastSyncedEventId(),
+                /*unused*/true, EventSequence.getUnusedTimeline());
+            expandView((View) tbl, checkedNames, uncheckedNames);
+            continue;
+          }
+          if (tbl instanceof IncompleteTable && tbl.isLoaded()) {
+            throw new CatalogException(String.format("Cannot expand view %s.%s due to " +
+                "failures in metadata loading", tblName.db_name, tblName.table_name),
+                ((IncompleteTable) tbl).getCause());
+          }
+          // Ignore loaded tables.
+          if (tbl != null && tbl.isLoaded()) continue;
+        }
+        // Case 2: handle unloaded/missing tables/views.
+        // Check the metadata in HMS directly. Note that this is cheaper than checking
+        // HMS events. Only trigger metadata loading for views. Unloaded tables will
+        // remain unloaded which helps EventProcessor to skip most of their events.
+        List<TableMeta> metaRes = null;
+        try {
+          metaRes = msClient.getHiveClient().getTableMeta(
+              tblName.db_name, tblName.table_name, MetastoreShim.HIVE_VIEW_TYPE);
+        } catch (UnknownDBException | NoSuchObjectException e) {
+          // Ignore non-existing db/tables
+        }
+        // 'metaRes' could be null since we are just fetching views.
+        if (metaRes != null && !metaRes.isEmpty() && TImpalaTableType.VIEW.equals(
+            MetastoreShim.mapToInternalTableType(metaRes.get(0).getTableType()))) {
+          // View exists in HMS. If it's missing in the cache, invalidate it to bring
+          // it up.
+          if (db == null || tbl == null) {
+            catalog_.invalidateTable(tblName, /*unused*/new Reference<>(),
+                /*unused*/new Reference<>(), EventSequence.getUnusedTimeline());
+          }
+          tbl = catalog_.getOrLoadTable(tblName.db_name, tblName.table_name, loadReason,
+              /*validWriteIdList*/null);
+          if (tbl instanceof View) {
+            expandView((View) tbl, checkedNames, uncheckedNames);
+          } else {
+            // The view could be dropped concurrently or loading its metadata might fail.
+            throw new CatalogException(String.format("Failed to expand view %s.%s",
+                tblName.db_name, tblName.table_name));
+          }
+        }
+      }
+    }
+    // Add new table names we found in view expansion to 'req'.
+    // Remove table names in 'checkedNames' that already exist in 'req' and collect
+    // existing db names.
+    Set<String> existingDbNames = new HashSet<>();
+    doForAllObjectNames(req, checkedNames::remove, existingDbNames::add);
+    // Add new tables and dbs to 'req'.
+    for (TTableName tblName : checkedNames) {
+      TCatalogObject tblDesc = new TCatalogObject(TCatalogObjectType.TABLE, 0);
+      tblDesc.setTable(new TTable(tblName.db_name, tblName.table_name));
+      req.addToObject_descs(tblDesc);
+      if (!existingDbNames.contains(tblName.db_name)) {
+        existingDbNames.add(tblName.db_name);
+        TCatalogObject dbDesc = new TCatalogObject(TCatalogObjectType.DATABASE, 0);
+        dbDesc.setDb(new TDatabase(tblName.db_name));
+        req.addToObject_descs(dbDesc);
+      }
+    }
+  }
+
+  private void expandView(View view, Set<TTableName> checkedNames,
+      Queue<TTableName> uncheckedNames) throws CatalogException {
+    for (TableRef tblRef : view.getQueryStmt().collectTableRefs()) {
+      List<String> strs = tblRef.getPath();
+      // Table names in the view definition should all be fully qualified.
+      // Add a check here in case something wrong happens in Hive.
+      if (strs.size() < 2) {
+        String str = String.join(".", strs);
+        LOG.error("Illegal table name found in view {}: {}. View definition:\n{}",
+            view.getFullName(), str, view.getMetaStoreTable().getViewExpandedText());
+        throw new CatalogException(String.format(
+            "Illegal table name found in view %s: %s", view.getFullName(), str));
+      }
+      TTableName name = new TTableName(strs.get(0), strs.get(1));
+      if (!checkedNames.contains(name)) {
+        uncheckedNames.add(name);
+        LOG.info("Found new table name used by view {}: {}.{}", view.getFullName(),
+            name.db_name, name.table_name);
+      }
+    }
+  }
+
+  /**
+   * Get the min required event id to avoid the query using stale metadata on the
+   * requested dbs.
+   */
+  private long getMinRequiredEventIdForDb(long startEventId, Set<String> dbNames,
+      boolean wantTableList) throws MetastoreNotificationFetchException {
+    long requiredEventId = startEventId;
+    for (String dbName : dbNames) {
+      // For SHOW TABLES, also check the CREATE/DROP table events.
+      List<String> eventTypes = wantTableList ?
+          MetaDataFilter.TABLE_LIST_EVENT_TYPES : MetaDataFilter.DB_EVENT_TYPES;
+      NotificationFilter filter = e -> dbName.equalsIgnoreCase(e.getDbName())
+          && MetastoreShim.isDefaultCatalog(e.getCatName())
+          && eventTypes.contains(e.getEventType());
+      // Use 'requiredEventId' as the startEventId since events before it are decided
+      // to wait for.
+      List<NotificationEvent> dbEvents = getNextMetastoreEventsInBatches(
+          catalog_, /*startEventId*/ requiredEventId, filter,
+          eventTypes.toArray(new String[0]));
+      if (dbEvents.isEmpty()) {
+        LOG.info("No pending events found on db {}", dbName);
+        continue;
+      }
+      NotificationEvent e = dbEvents.get(dbEvents.size() - 1);
+      LOG.info("Found db {} has pending event. EventId:{} EventType:{}",
+          dbName, e.getEventId(), e.getEventType());
+      requiredEventId = Math.max(requiredEventId, e.getEventId());
+    }
+    return requiredEventId;
+  }
+
+  /**
+   * Check if there are any transactional tables loaded in catalog
+   */
+  private boolean hasLoadedTxnTables(Map<String, List<String>> db2Tables) {
+    for (String dbName : db2Tables.keySet()) {
+      Db db = catalog_.getDb(dbName);
+      if (db == null) continue;
+      for (String tableName : db2Tables.get(dbName)) {
+        Table table = db.getTable(tableName);
+        if (table instanceof HdfsTable && AcidUtils.isTransactionalTable(
+            table.getMetaStoreTable().getParameters())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private boolean hasLoadedTables(Map<String, List<String>> db2Tables) {
+    for (String dbName : db2Tables.keySet()) {
+      Db db = catalog_.getDb(dbName);
+      if (db == null) continue;
+      for (String tableName : db2Tables.get(dbName)) {
+        Table table = db.getTable(tableName);
+        if (table != null && !(table instanceof IncompleteTable)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private long getMinRequiredTxnEventId(long startEventId,
+      Map<String, List<String>> db2Tables) throws MetastoreNotificationFetchException {
+    if (!hasLoadedTxnTables(db2Tables)) return startEventId;
+    NotificationFilter filter = e ->
+        MetastoreShim.CommitTxnEvent.EVENT_TYPE.equals(e.getEventType())
+            || MetastoreEvents.AbortTxnEvent.EVENT_TYPE.equals(e.getEventType());
+    List<NotificationEvent> txnEvents = getNextMetastoreEventsInBatches(catalog_,
+        startEventId, filter, MetastoreShim.CommitTxnEvent.EVENT_TYPE,
+        MetastoreEvents.AbortTxnEvent.EVENT_TYPE);
+    if (!txnEvents.isEmpty()) {
+      NotificationEvent e = txnEvents.get(txnEvents.size() - 1);
+      LOG.info("Some of the requested tables are transactional tables. Found {} " +
+          "pending transactional events. The last event is EventId: {} " +
+          "EventType: {}", txnEvents.size(), e.getEventId(), e.getEventType());
+      return e.getEventId();
+    }
+    LOG.info("Some of the requested tables are transactional tables. " +
+        "No pending transactional events found.");
+    return startEventId;
+  }
+
+  private long getMinRequiredTableEventId(long startEventId,
+      Map<String, List<String>> db2Tables) throws MetastoreNotificationFetchException {
+    long requiredEventId = startEventId;
+    // If all requested tables are unloaded, just check CREATE/DROP table events.
+    List<String> eventTypes = hasLoadedTables(db2Tables) ?
+        MetaDataFilter.TABLE_EVENT_TYPES : MetaDataFilter.TABLE_EXIST_EVENT_TYPES;
+    for (String dbName : db2Tables.keySet()) {
+      Set<String> tblNames = new HashSet<>(db2Tables.get(dbName));
+      NotificationFilter filter = e -> dbName.equalsIgnoreCase(e.getDbName())
+          && tblNames.contains(e.getTableName().toLowerCase())
+          && MetastoreShim.isDefaultCatalog(e.getCatName())
+          && eventTypes.contains(e.getEventType());
+      MetaDataFilter metaDataFilter = new MetaDataFilter(filter,
+          MetastoreShim.getDefaultCatalogName(), dbName, db2Tables.get(dbName));
+      List<NotificationEvent> tableEvents = getNextMetastoreEventsWithFilterInBatches(
+          catalog_, requiredEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC,
+          eventTypes.toArray(new String[0]));
+      if (tableEvents.isEmpty()) {
+        LOG.info("No pending events on specified tables under db {}", dbName);
+        continue;
+      }
+      NotificationEvent e = tableEvents.get(tableEvents.size() - 1);
+      requiredEventId = Math.max(requiredEventId, e.getEventId());
+      LOG.info("Found {} pending events on table {} of db {}. The last event is " +
+              "EventId: {} EventType: {} Table: {}",
+          tableEvents.size(), String.join(",", db2Tables.get(dbName)), dbName,
+          e.getEventId(), e.getEventType(), e.getTableName());
+    }
+    return requiredEventId;
+  }
+
+  /**
+   * Get the min required event id to avoid the query using stale db list.
+   */
+  private long getMinRequiredEventIdForDbList(long startEventId)
+      throws MetastoreNotificationFetchException {
+    NotificationFilter filter = e -> MetastoreShim.isDefaultCatalog(e.getCatName())
+        && MetaDataFilter.DB_EVENT_TYPES.contains(e.getEventType());
+    List<NotificationEvent> dbEvents = getNextMetastoreEventsInBatches(
+        catalog_, startEventId, filter,
+        MetaDataFilter.DB_EVENT_TYPES.toArray(new String[0]));
+    if (dbEvents.isEmpty()) {
+      LOG.info("No events need to be synced for db list");
+      return startEventId;
+    }
+    NotificationEvent e = dbEvents.get(dbEvents.size() - 1);
+    LOG.info("Found {} pending events on db list. The last one is EventId: {} " +
+            "EventType: {} db: {}", dbEvents.size(), e.getEventId(), e.getEventType(),
+        e.getDbName());
+    return e.getEventId();
   }
 }

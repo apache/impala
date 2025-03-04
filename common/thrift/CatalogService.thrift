@@ -791,6 +791,9 @@ struct TWaitForHmsEventRequest {
 
   // Descriptors of catalog objects that might be used by the query.
   6: optional list<CatalogObjects.TCatalogObject> object_descs
+
+  // Whether to check tables used by views.
+  7: optional bool should_expand_views = false
 }
 
 struct TWaitForHmsEventResponse {

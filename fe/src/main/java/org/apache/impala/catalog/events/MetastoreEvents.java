@@ -2268,6 +2268,7 @@ public class MetastoreEvents {
    * MetastoreEvent for ALTER_DATABASE event type
    */
   public static class AlterDatabaseEvent extends MetastoreDatabaseEvent {
+    public static final String EVENT_TYPE = "ALTER_DATABASE";
     // metastore database object as parsed from NotificationEvent message
     private final Database alteredDatabase_;
 
@@ -3257,6 +3258,7 @@ public class MetastoreEvents {
    * tables.
    */
   public static class AbortTxnEvent extends MetastoreEvent {
+    public static final String EVENT_TYPE = "ABORT_TXN";
     private final long txnId_;
     private Set<TableWriteId> tableWriteIds_ = Collections.emptySet();
 

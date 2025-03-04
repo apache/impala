@@ -77,6 +77,7 @@ import org.apache.impala.analysis.CommentOnStmt;
 import org.apache.impala.analysis.CopyTestCaseStmt;
 import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
+import org.apache.impala.analysis.CreateTableAsSelectStmt;
 import org.apache.impala.analysis.CreateUdaStmt;
 import org.apache.impala.analysis.CreateUdfStmt;
 import org.apache.impala.analysis.DescribeTableStmt;
@@ -2294,7 +2295,10 @@ public class Frontend {
       dbDesc.setDb(new TDatabase(name));
       req.addToObject_descs(dbDesc);
     }
-    LOG.info("Waiting for HMS events on the dbs: {} and tables: {}",
+    // Only statements that have SELECT need to expand views.
+    req.setShould_expand_views(stmt instanceof QueryStmt
+        || stmt instanceof DmlStatementBase || stmt instanceof CreateTableAsSelectStmt);
+    LOG.info("Waiting for HMS events on dbs: {} and tables: {}",
         String.join(", ", dbNames),
         tableNames.stream().map(TableName::toString).collect(Collectors.joining(", ")));
   }

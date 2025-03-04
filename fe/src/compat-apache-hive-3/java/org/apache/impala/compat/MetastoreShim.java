@@ -622,6 +622,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
    * CDP Hive-3 only function.
    */
   public static class CommitTxnEvent extends MetastoreEvent {
+    public static final String EVENT_TYPE = "COMMIT_TXN";
 
     public CommitTxnEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
         NotificationEvent event) {

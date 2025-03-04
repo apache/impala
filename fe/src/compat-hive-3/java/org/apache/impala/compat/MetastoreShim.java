@@ -830,6 +830,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
    * tables.
    */
   public static class CommitTxnEvent extends MetastoreEvent {
+    public static final String EVENT_TYPE = "COMMIT_TXN";
     private final CommitTxnMessage commitTxnMessage_;
     private final long txnId_;
     private Set<TableWriteId> tableWriteIds_ = Collections.emptySet();
@@ -1105,9 +1106,9 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
           !metaDataFilter.getDbName().isEmpty()) {
         eventRequest.setDbName(metaDataFilter.getDbName());
       }
-      if (metaDataFilter.getTableName() != null &&
-          !metaDataFilter.getTableName().isEmpty()) {
-        eventRequest.setTableNames(Arrays.asList(metaDataFilter.getTableName()));
+      if (metaDataFilter.getTableNames() != null &&
+          !metaDataFilter.getTableNames().isEmpty()) {
+        eventRequest.setTableNames(metaDataFilter.getTableNames());
       }
     }
   }

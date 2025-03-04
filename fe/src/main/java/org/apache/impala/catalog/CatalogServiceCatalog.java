@@ -33,6 +33,7 @@ import static org.apache.impala.thrift.TCatalogObjectType.TABLE;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,6 +42,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -61,21 +63,27 @@ import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.analysis.TableRef;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.FeFsTable.Utils;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
+import org.apache.impala.catalog.events.MetastoreEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLatestEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
+import org.apache.impala.catalog.events.MetastoreNotificationException;
 import org.apache.impala.catalog.events.MetastoreNotificationFetchException;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.events.SelfEventContext;
@@ -4331,11 +4339,13 @@ public class CatalogServiceCatalog extends Catalog {
 
   public TWaitForHmsEventResponse waitForHmsEvent(TWaitForHmsEventRequest req) {
     LOG.info("waitForHmsEvent request: want_minimal_response={}, coordinator={}, " +
-            "timeout_s={}, want_db_list={}, want_table_list={}, objects=[{}]",
+            "timeout_s={}, want_db_list={}, want_table_list={}, objects=[{}], " +
+            "should_expand_views={}",
         req.header.want_minimal_response, req.header.coordinator_hostname, req.timeout_s,
         req.want_db_list, req.want_table_list, !req.isSetObject_descs() ? "" :
             req.object_descs.stream().map(Catalog::toCatalogObjectKey)
-                .collect(Collectors.joining(", ")));
+                .collect(Collectors.joining(", ")),
+        req.should_expand_views);
     TWaitForHmsEventResponse res = new TWaitForHmsEventResponse();
     if (!(metastoreEventProcessor_ instanceof MetastoreEventsProcessor)) {
       res.setStatus(new TStatus(TErrorCode.RPC_GENERAL_ERROR,
@@ -4345,7 +4355,7 @@ public class CatalogServiceCatalog extends Catalog {
     }
     MetastoreEventsProcessor eventsProcessor =
         (MetastoreEventsProcessor) metastoreEventProcessor_;
-    TStatus status = eventsProcessor.waitForSyncUpToCurrentEvent(req.timeout_s * 1000L);
+    TStatus status = eventsProcessor.waitForMostRecentMetadata(req);
     if (status.status_code != TErrorCode.OK) {
       res.setStatus(status);
       LOG.error(String.join("\n", status.error_msgs));

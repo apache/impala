@@ -19,6 +19,7 @@ from subprocess import check_call
 import pytest
 import re
 import time
+import threading
 
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
@@ -309,11 +310,30 @@ class TestEventSyncWaiting(ImpalaTestSuite):
     add_mandatory_exec_option(cls, 'sync_hms_events_wait_time_s', PROCESSING_TIMEOUT_S)
     add_mandatory_exec_option(cls, 'sync_hms_events_strict_mode', True)
 
-  def test_hms_event_sync(self, vector, unique_database):
+  @pytest.mark.execute_serially
+  def test_event_processor_pauses(self, vector, unique_database):
+    client = self.create_impala_client_from_vector(vector)
+    tbl = unique_database + ".foo"
+
+    # Create a table in Hive and submit a query on it when EP is paused.
+    client.execute(":event_processor('pause')")
+    self.run_stmt_in_hive("create table {} as select 1".format(tbl))
+
+    # execute_async() is not really async that it returns after query planning finishes.
+    # So we use execute_query_expect_success here and resume EP in a background thread.
+    def resume_event_processor():
+      time.sleep(2)
+      client = self.create_impala_client_from_vector(vector)
+      client.execute(":event_processor('start')")
+    resume_ep_thread = threading.Thread(target=resume_event_processor)
+    resume_ep_thread.start()
+    res = self.execute_query_expect_success(client, "select * from " + tbl)
+    assert res.data == ['1']
+
+  def test_hms_event_sync_basic(self, vector, unique_database):
     """Verify query option sync_hms_events_wait_time_s should protect the query by
     waiting until Impala sync the HMS changes."""
-    client = self.default_impala_client(vector.get_value('protocol'))
-    client.set_configuration(vector.get_exec_option_dict())
+    client = self.create_impala_client_from_vector(vector)
     tbl_name = unique_database + ".tbl"
     label = "Synced events from Metastore"
     # Test DESCRIBE on new table created in Hive
@@ -414,3 +434,168 @@ class TestEventSyncWaiting(ImpalaTestSuite):
     assert res.data == ["j\tint\t"]
     assert res.log == ''
     self.verify_timeline_item("Query Compilation", label, res.runtime_profile)
+
+  def test_hms_event_sync_multiple_tables(self, vector, unique_database):
+    client = self.create_impala_client_from_vector(vector)
+    for i in range(3):
+      self.execute_query("create table {0}.tbl{1} (i int)".format(unique_database, i))
+    res = self.execute_query_expect_success(client, """
+        select t1.i from {0}.tbl0 t0, {0}.tbl1 t1, {0}.tbl2 t2
+        where t0.i = t1.i and t1.i = t2.i""".format(unique_database))
+    assert len(res.data) == 0
+
+    for i in range(3):
+      self.run_stmt_in_hive("insert into table {0}.tbl{1} select 1".format(
+          unique_database, i))
+    res = self.execute_scalar_expect_success(client, """
+        select t1.i from {0}.tbl0 t0, {0}.tbl1 t1, {0}.tbl2 t2
+        where t0.i = t1.i and t1.i = t2.i""".format(unique_database))
+    assert res == "1"
+
+  def test_hms_event_sync_with_view(self, vector, unique_database):
+    client = self.create_impala_client_from_vector(vector)
+    tbl = unique_database + ".foo"
+    view = unique_database + ".foo_view"
+    count_stmt = "select count(*) from {}".format(view)
+    self.execute_query("create table {}(i int)".format(tbl))
+    self.execute_query("create view {} as select * from {}".format(view, tbl))
+    # Run a query to make the metadata loaded so they can be stale later.
+    res = self.execute_scalar(count_stmt)
+    assert res == '0'
+
+    # Modify the table in Hive and read the view in Impala
+    self.run_stmt_in_hive("insert into {} select 1".format(tbl))
+    res = self.execute_query_expect_success(client, count_stmt)
+    assert res.data[0] == '1'
+
+    # Modify the view in Hive and read it in Impala
+    self.run_stmt_in_hive(
+        "alter view {} as select * from {} where i > 1".format(view, tbl))
+    res = self.execute_query_expect_success(client, count_stmt)
+    assert res.data[0] == '0'
+
+  def test_hms_event_sync_with_view_partitioned(self, vector, unique_database):
+    client = self.create_impala_client_from_vector(vector)
+    tbl = unique_database + ".foo"
+    view = unique_database + ".foo_view"
+    select_stmt = "select * from " + view
+    self.execute_query("create table {}(i int) partitioned by(p int)".format(tbl))
+    self.execute_query("create view {} as select * from {} where p>0".format(view, tbl))
+    res = self.execute_query_expect_success(client, select_stmt)
+    assert len(res.data) == 0
+
+    # Ingest data in Hive and read the view in Impala
+    # Add a new partition that will be filtered out by the view
+    self.run_stmt_in_hive("insert into {} select 0, 0".format(tbl))
+    res = self.execute_query_expect_success(client, select_stmt)
+    assert len(res.data) == 0
+    # Add a new partition that will show up in the view
+    self.run_stmt_in_hive("insert into {} select 1, 1".format(tbl))
+    res = self.execute_scalar_expect_success(client, select_stmt)
+    assert res == '1\t1'
+    # Add a new partition and alter the view to only show it
+    self.run_stmt_in_hive("insert into {} select 2, 2".format(tbl))
+    self.run_stmt_in_hive("alter view {} as select * from {} where p>1".format(view, tbl))
+    res = self.execute_scalar_expect_success(client, select_stmt)
+    assert res == '2\t2'
+
+  def test_hms_event_sync_compute_stats(self, vector, unique_database):
+    client = self.create_impala_client_from_vector(vector)
+    tbl = unique_database + ".foo"
+    self.execute_query("create table {}(i int) partitioned by(p int)".format(tbl))
+    # Add one partition in Hive and compute incremental stats on that partition in Impala
+    self.run_stmt_in_hive("insert into {} select 0,0".format(tbl))
+    res = self.execute_query_expect_success(
+        client, "compute incremental stats {} partition(p=0)".format(tbl))
+    assert res.data == ['Updated 1 partition(s) and 1 column(s).']
+    # Add one partition in Hive and compute incremental stats on that table in Impala
+    self.run_stmt_in_hive("insert into {} select 1,1 union all select 2,2".format(tbl))
+    res = self.execute_query_expect_success(
+      client, "compute incremental stats {}".format(tbl))
+    assert res.data == ['Updated 2 partition(s) and 1 column(s).']
+    # Drop two partitions in Hive and compute stats on that table in Impala. The
+    # incremental stats will be replaced with non-incremental stats so the remaining
+    # partition is updated.
+    self.run_stmt_in_hive("alter table {} drop partition(p<2)".format(tbl))
+    res = self.execute_query_expect_success(
+        client, "compute stats {}".format(tbl))
+    assert res.data == ['Updated 1 partition(s) and 1 column(s).']
+
+  def test_hms_event_sync_ctas(self, vector, unique_database):
+    client = self.create_impala_client_from_vector(vector)
+    tbl = unique_database + ".foo"
+    tmp_tbl = unique_database + ".tmp"
+    self.execute_query("create table {}(i int) partitioned by(p int)".format(tbl))
+    # Add one partition in Hive and use the table in Impala
+    self.run_stmt_in_hive("insert into {} select 0,0".format(tbl))
+    res = self.execute_query_expect_success(
+        client, "create table {} as select * from {}".format(tmp_tbl, tbl))
+    assert res.data == ['Inserted 1 row(s)']
+    # Insert one row into the same partition in Hive and use the table in Impala
+    self.run_stmt_in_hive("insert into {} select 1,0".format(tbl))
+    res = self.execute_query_expect_success(
+        client, "create table {}_2 as select * from {}".format(tmp_tbl, tbl))
+    assert res.data == ['Inserted 2 row(s)']
+    # Truncate the table in Hive and use it in Impala
+    self.run_stmt_in_hive("truncate table {}".format(tbl))
+    res = self.execute_query_expect_success(
+        client, "create table {}_3 as select * from {}".format(tmp_tbl, tbl))
+    assert res.data == ['Inserted 0 row(s)']
+
+    # Create a table in Hive before CTAS of it in Impala
+    self.run_stmt_in_hive("create table {}_4(i int) partitioned by(p int)".format(tbl))
+    exception = self.execute_query_expect_failure(
+        client, "create table {}_4 as select 1,1".format(tbl))
+    assert 'Table already exists: {}_4'.format(tbl) in str(exception)
+
+  def test_hms_event_sync_insert(self, vector, unique_database):
+    client = self.create_impala_client_from_vector(vector)
+    tbl = unique_database + ".foo"
+    tmp_tbl = unique_database + ".tmp"
+    self.execute_query("create table {}(i int) partitioned by(p int)".format(tbl))
+    self.execute_query("create table {}(i int) partitioned by(p int)".format(tmp_tbl))
+    insert_stmt = "insert into {} partition (p) select * from {}".format(tmp_tbl, tbl)
+    # Add one partition in Hive and use the table in INSERT in Impala
+    self.run_stmt_in_hive("insert into {} select 0,0".format(tbl))
+    res = self.execute_query_expect_success(client, insert_stmt)
+    # Result rows are "partition_name: num_rows_inserted" for each modified partitions
+    assert res.data == ['p=0: 1']
+    # Insert one row into the same partition in Hive and use the table in INSERT in Impala
+    self.run_stmt_in_hive("insert into {} select 1,0".format(tbl))
+    res = self.execute_query_expect_success(client, insert_stmt)
+    assert res.data == ['p=0: 2']
+    # Add another new partition in Hive and use the table in INSERT in Impala
+    self.run_stmt_in_hive("insert into {} select 2,2".format(tbl))
+    res = self.execute_query_expect_success(client, insert_stmt)
+    assert res.data == ['p=0: 2', 'p=2: 1']
+    # Drop one partition in Hive and use the table in INSERT in Impala
+    self.run_stmt_in_hive("alter table {} drop partition(p=0)".format(tbl))
+    res = self.execute_query_expect_success(client, insert_stmt)
+    assert res.data == ['p=2: 1']
+    # Truncate the table in Hive and use it in INSERT in Impala
+    self.run_stmt_in_hive("truncate table {}".format(tbl))
+    res = self.execute_query_expect_success(client, insert_stmt)
+    assert len(res.data) == 0
+
+  def test_hms_event_sync_txn(self, vector, unique_database):
+    client = self.create_impala_client_from_vector(vector)
+    tbl = unique_database + ".foo"
+    self.run_stmt_in_hive(
+        "create transactional table {}(i int) partitioned by(p int)".format(tbl))
+    # Load the table in Impala
+    self.execute_query_expect_success(client, "describe " + tbl)
+    # Insert the table in Hive and check it in Impala immediately
+    self.run_stmt_in_hive("insert into {} select 0,0".format(tbl))
+    res = self.execute_query_expect_success(client, "select * from " + tbl)
+    assert res.data == ['0\t0']
+    # Insert the table in Hive again and check number of rows in Impala
+    self.run_stmt_in_hive("insert into {} select 1,0".format(tbl))
+    res = self.execute_query_expect_success(client, "select count(*) from " + tbl)
+    assert res.data == ['2']
+    res = self.execute_query_expect_success(client, "show files in " + tbl)
+    assert len(res.data) == 2
+    # Trigger compaction in Hive
+    self.run_stmt_in_hive(
+        "alter table {} partition(p=0)compact 'minor' and wait".format(tbl))
+    res = self.execute_query_expect_success(client, "show files in " + tbl)
+    assert len(res.data) == 1
