@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2024" />
-<meta name="DC.rights.owner" content="(C) Copyright 2024" />
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Admission Control and Query Queuing" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_resource_management.html" />
@@ -268,7 +268,12 @@ You might also need to increase the value to use Impala with
           <dt class="dt dlterm">Minimum Query Memory Limit and Maximum Query Memory Limit</dt>
 
           <dd class="dd">
-            <p class="p">These two options determine the minimum and maximum per-host
+            <p class="p">These are
+              <code class="ph codeph">impala.admission-control.min-query-mem-limit.*</code>
+              and <code class="ph codeph">impala.admission-control.max-query-mem-limit.*</code>
+              configurations in <span class="ph filepath">llama-site.xml</span> (See
+              <a class="xref" href="impala_admission_config.html#concept_cz4_vxz_jgb">Example of Admission Control Configuration</a>).
+              They determine the minimum and maximum per-host
               memory limit that will be chosen by Impala Admission control for
               queries in this resource pool. If set, Impala Admission Control
               will choose a memory limit between the minimum and maximum values
@@ -336,13 +341,16 @@ If a user tries to submit a query with the
         
           <dt class="dt dlterm"> Clamp MEM_LIMIT Query Option</dt>
 
-          <dd class="dd">If this field is not selected, the <code class="ph codeph">MEM_LIMIT</code>
-            query option will not be bounded by the <strong class="ph b">Maximum Query Memory
-              Limit</strong> and the <strong class="ph b">Minimum Query Memory Limit</strong> values
-            specified for this resource pool. By default, this field is selected
-            in Impala 3.1 and higher. The field is disabled if both <strong class="ph b">Minimum
-              Query Memory Limit</strong> and <strong class="ph b">Maximum Query Memory Limit</strong> are
-            not set.</dd>
+          <dd class="dd">This is
+            <code class="ph codeph">impala.admission-control.clamp-mem-limit-query-option.*</code>
+            configuration in <span class="ph filepath">llama-site.xml</span>.
+            If this configuration is set to <code class="ph codeph">false</code>,
+            the <code class="ph codeph">MEM_LIMIT</code> query option will not be bounded by the
+            <strong class="ph b">Maximum Query Memory Limit</strong> and the <strong class="ph b">Minimum Query Memory Limit</strong>
+            values specified for this resource pool. By default, this configuration is
+            set to <code class="ph codeph">true</code> in Impala 3.1 and higher. This configuration
+            is ignored if both <strong class="ph b">Minimum Query Memory Limit</strong> and
+            <strong class="ph b">Maximum Query Memory Limit</strong> are not set.</dd>
 
         
       </dl>
@@ -403,7 +411,7 @@ If a user tries to submit a query with the
 
     <div class="body conbody">
       <p class="p">Use per-query memory limits to prevent queries from consuming excessive
-        memory resources that impact other queries. We recommends that you set
+        memory resources that impact other queries. We recommend that you set
         the query memory limits whenever possible.</p>
 
       <p class="p">If you set the <strong class="ph b">Max Memory</strong> for a resource pool, Impala attempts
@@ -425,10 +433,63 @@ If a user tries to submit a query with the
 
   </div>
 
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="examples_of_query_rejection_by_admission_control">
+    <h2 class="title topictitle2" id="ariaid-title5">Examples of Query Rejection by Admission Control</h2>
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="admission_yarn">
+    <div class="body conbody">
+      <dl class="dl">
+        
+          <dt class="dt dlterm">The minimum memory to start a query is not satisfied</dt>
 
-    <h2 class="title topictitle2" id="ariaid-title5">How Impala Admission Control Relates to Other Resource Management Tools</h2>
+          <dd class="dd">
+            <p class="p">Impala will attempt to start a query as long as the minimum memory
+              requirement to run that query can be satisfied by all executor nodes.
+              In the event where Admission Control determines that the minimum memory
+              requirement can not be satisfied by existing memory limit configurations
+              (<code class="ph codeph">MEM_LIMIT</code> query option or other memory limit
+              configurations at request pool) or available system memory in one or more
+              executor nodes, it will reject the query and the query will not execute
+              at all. Admission Control will return an error message describing what is
+              happening and recommend which configuration to adjust so that the query
+              can pass Admission Control. Take a look at the last query examples from
+              <a class="xref" href="impala_mem_limit.html">MEM_LIMIT Query Option</a></p>
+
+<pre class="pre codeblock"><code>
+[localhost:21000] &gt; set mem_limit=15mb;
+MEM_LIMIT set to 15mb
+[localhost:21000] &gt; select count(distinct c_name) from customer;
+Query: select count(distinct c_name) from customer
+ERROR:
+Rejected query from pool default-pool: minimum memory reservation is greater than memory available to the query
+for buffer reservations. Memory reservation needed given the current plan: 38.00 MB. Adjust MEM_LIMIT option
+for the query to allow the query memory limit to be at least 70.00 MB. Note that changing the memory limit may
+also change the plan. See 'Per Host Min Memory Reservation' in the query profile for more information about the
+per-node memory requirements.</code></pre>
+            <p class="p">Admission Control rejects this query because <code class="ph codeph">MEM_LIMIT</code>
+              is set too low such that it is insufficient to start the query, which
+              requires 70.00 MB (38.00 MB + 32.00 MB overhead) at minimum for one or more
+              executor nodes. The error message contains recommendations on what
+              configuration to adjust depending on which limitation causes rejection.
+              In this case, Admission Controller recommends raising query option
+              <code class="ph codeph">MEM_LIMIT</code> &gt;= 70mb so that the minimum memory
+              requirement is satisfied to start the query.
+              Users can also inspect 'Per Host Min Memory Reservation' info at the query
+              profile to check which executor node(s) require 38.00 MB minimum memory
+              reservation.</p>
+
+          </dd>
+
+        
+      </dl>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="admission_yarn">
+
+    <h2 class="title topictitle2" id="ariaid-title6">How Impala Admission Control Relates to Other Resource Management Tools</h2>
 
   
 
@@ -478,9 +539,9 @@ If a user tries to submit a query with the
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="admission_architecture">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="admission_architecture">
 
-    <h2 class="title topictitle2" id="ariaid-title6">How Impala Schedules and Enforces Limits on Concurrent Queries</h2>
+    <h2 class="title topictitle2" id="ariaid-title7">How Impala Schedules and Enforces Limits on Concurrent Queries</h2>
 
   
 
@@ -516,9 +577,9 @@ If a user tries to submit a query with the
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="admission_jdbc_odbc">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="admission_jdbc_odbc">
 
-    <h2 class="title topictitle2" id="ariaid-title7">How Admission Control works with Impala Clients (JDBC, ODBC, HiveServer2)</h2>
+    <h2 class="title topictitle2" id="ariaid-title8">How Admission Control works with Impala Clients (JDBC, ODBC, HiveServer2)</h2>
 
   
 
@@ -586,8 +647,8 @@ If a user tries to submit a query with the
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="admission_schema_config">
-    <h2 class="title topictitle2" id="ariaid-title8">SQL and Schema Considerations for Admission Control</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="admission_schema_config">
+    <h2 class="title topictitle2" id="ariaid-title9">SQL and Schema Considerations for Admission Control</h2>
 
     <div class="body conbody">
       <p class="p">
@@ -627,8 +688,8 @@ If a user tries to submit a query with the
 
   </div>
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="admission_guidelines">
-    <h2 class="title topictitle2" id="ariaid-title9">Guidelines for Using Admission Control</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title10" id="admission_guidelines">
+    <h2 class="title topictitle2" id="ariaid-title10">Guidelines for Using Admission Control</h2>
 
     
     <div class="body conbody">

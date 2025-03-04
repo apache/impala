@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Using Impala to Query External JDBC Data Sources" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="impala_jdbc_external_table_support" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Using Impala to Query External JDBC Data Sources</title>
+</head>
+<body id="impala_jdbc_external_table_support">
+
+    <h1 class="title topictitle1" id="impala_jdbc_external_table_support__jdbc_external_table">Using Impala to Query External JDBC Data Sources</h1>
+
+    
+    <div class="body conbody">
+        <p class="p">Apache Impala now supports reading from external JDBC data sources. An external JDBC table represents a table or a view in a remote RDBMS database or another Impala cluster. Using external JDBC tables, you can connect Impala to a database, such as MySQL, PostgreSQL, or another Impala cluster and read the data in the remote tables.</p>
+
+        <div class="section"><h2 class="title sectiontitle">Syntax</h2>
+            
+            <p class="p">To connect to a remote database, you create an external JDBC table with the appropriate table properties, such as the database type, JDBC URL, driver class, driver file location, JDBC username and password, and name of the remote table to be mapped to the Impala external JDBC table.</p>
+
+            <pre class="pre codeblock" id="impala_jdbc_external_table_support__codeblock_klg_tcd_5bc"><code>CREATE EXTERNAL TABLE [IF NOT EXISTS] [db_name.]table_name
+  (<em class="ph i">col_name data_type</em>,
+   ....)
+  STORED BY JDBC
+  TBLPROPERTIES (
+    "database.type"="<em class="ph i">value</em>",
+    "jdbc.url"="<em class="ph i">value</em>",
+    "jdbc.driver"="<em class="ph i">value</em>",
+    "driver.url"="<em class="ph i">value</em>",
+    "dbcp.username"="<em class="ph i">value</em>",
+    "dbcp.password"="<em class="ph i">value</em>",
+    "table"="<em class="ph i">table.name</em>");</code></pre>
+            <p class="p"><strong class="ph b">Examples:</strong></p>
+
+            <div class="p"><strong class="ph b">Creating an external JDBC table to map a table in a remote PostgreSQL
+                    database:</strong><pre class="pre codeblock" id="impala_jdbc_external_table_support__codeblock_f3m_jdd_5bc"><code>CREATE EXTERNAL TABLE student_jdbc (
+    id INT,
+    bool_col BOOLEAN,
+    tinyint_col TINYINT,
+    smallint_col SMALLINT,
+    int_col INT,
+    bigint_col BIGINT,
+    float_col FLOAT,
+    double_col DOUBLE,
+    date_col DATE,
+    string_col STRING,
+    timestamp_col TIMESTAMP)
+STORED BY JDBC
+TBLPROPERTIES (
+    "database.type"="POSTGRES",
+    "jdbc.url"="jdbc:postgresql://<em class="ph i">IP_address</em>:5432/<em class="ph i">database_name</em>",
+    "jdbc.driver"="org.postgresql.Driver",
+    "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+    "dbcp.username"="user",
+    "dbcp.password"="password",
+    "table"="student");
+</code></pre></div>
+
+            <div class="p"><strong class="ph b">Creating an external JDBC table to map a table in another Impala
+                cluster:</strong><pre class="pre codeblock" id="impala_jdbc_external_table_support__codeblock_csx_qdd_5bc"><code>CREATE EXTERNAL TABLE student_jdbc (
+    id INT,
+    bool_col BOOLEAN,
+    tinyint_col TINYINT,
+    smallint_col SMALLINT,
+    int_col INT,
+    bigint_col BIGINT,
+    float_col FLOAT,
+    double_col DOUBLE,
+    date_col DATE,
+    string_col STRING,
+    timestamp_col TIMESTAMP)
+STORED BY JDBC
+TBLPROPERTIES (
+    "database.type"="IMPALA",
+    "jdbc.url"="jdbc:impala://<em class="ph i">IP_address</em>:21050/<em class="ph i">database_name</em>",
+    "jdbc.auth"="AuthMech=3",
+    "jdbc.properties"="MEM_LIMIT=1000000000, MAX_ERRORS = 10000",
+    "jdbc.driver"="com.cloudera.impala.jdbc.Driver",
+    "driver.url"="hdfs://test-warehouse/data-sources/jdbc-drivers/ImpalaJDBC42.jar",
+    "dbcp.username"="user",
+    "dbcp.password.keystore"="jceks://hdfs/test-warehouse/data-sources/test.jceks",
+    "dbcp.password.key"="password-key",
+    "table"="student");</code></pre></div>
+
+        </div>
+
+        <div class="section" id="impala_jdbc_external_table_support__section_mtj_z2d_5bc"><h2 class="title sectiontitle">Table Properties</h2>
+            
+            <p class="p">While creating an external JDBC table, you are required to specify the following
+                table properties:</p>
+
+            <ul class="ul" id="impala_jdbc_external_table_support__ul_q55_hfd_5bc">
+                <li dir="ltr" class="li"><code class="ph codeph">database.type</code>: POSTGRES, MYSQL, or IMPALA</li>
+
+                <li dir="ltr" class="li"><code class="ph codeph">jdbc.url</code>: JDBC connection string with the required
+                    parameters — database type, hostname/IP address, port number, and database name.<p dir="ltr" class="p">Example: “jdbc:impala://10.96.132.138:21050/sample_db”.</p>
+</li>
+
+                <li dir="ltr" class="li"><code class="ph codeph">jdbc.driver</code>: Class name of the JDBC driver</li>
+
+                <li dir="ltr" class="li"><code class="ph codeph">driver.url</code>: URL to download the JAR file package that
+                    is used to access the external database</li>
+
+                <li class="li"><code class="ph codeph">table</code>: Name of the table in the remote database that you want
+                    to map in Impala</li>
+
+            </ul>
+
+            <p class="p">Besides the above required properties, you can also specify optional parameters that
+                allow you to use different authentication methods, allow case sensitive column names
+                in remote tables, or to specify additional database properties:</p>
+
+            <ul class="ul" id="impala_jdbc_external_table_support__ul_mmg_4fd_5bc">
+                <li dir="ltr" class="li"><code class="ph codeph">jdbc.auth</code>: Authentication mechanism of the JDBC
+                    driver</li>
+
+                <li dir="ltr" class="li"><code class="ph codeph">dbcp.username</code>: JDBC username</li>
+
+                <li dir="ltr" class="li"><code class="ph codeph">dbcp.password</code>: JDBC password in clear text.<div class="note note" id="impala_jdbc_external_table_support__note_bqh_tfd_5bc"><span class="notetitle">Note:</span> Storing JDBC passwords in clear text is not
+                        recommended in production environments. The recommended way is to store
+                            the password in a Java keystore file.</div>
+</li>
+
+                <li dir="ltr" class="li"><code class="ph codeph">dbcp.password.key</code>: Key of the Java keystore</li>
+
+                <li dir="ltr" class="li"><code class="ph codeph">dbcp.password.keystore</code>: URI of the keystore
+                    file</li>
+
+                <li dir="ltr" class="li"><code class="ph codeph">jdbc.properties</code>: Additional properties applied to
+                    database engines, like Impala Query options. The properties are specified as
+                    comma-separated "key-value" pairs. </li>
+
+                <li dir="ltr" class="li"><code class="ph codeph">jdbc.fetch.size</code>: Number of rows to fetch in a
+                    batch</li>
+
+                <li class="li"><code class="ph codeph">column.mapping</code>: Mapping of column names between external table
+                    and Impala JDBC table.</li>
+
+            </ul>
+
+        </div>
+
+        <div class="section" id="impala_jdbc_external_table_support__section_bhv_zfd_5bc"><h2 class="title sectiontitle">Supported Data Types</h2>
+            
+            <p class="p">The following column data types are supported for an Impala external JDBC table:</p>
+
+            <ul class="ul" id="impala_jdbc_external_table_support__ul_ky1_cgd_5bc">
+                <li dir="ltr" class="li">Numeric data type: boolean, tinyint, smallint, int, bigint, float,
+                    double</li>
+
+                <li dir="ltr" class="li">Decimal with scale and precision</li>
+
+                <li dir="ltr" class="li">String type: string</li>
+
+                <li dir="ltr" class="li">Date</li>
+
+                <li dir="ltr" class="li">Timestamp</li>
+
+            </ul>
+
+        </div>
+
+        <div class="section" id="impala_jdbc_external_table_support__section_e1g_fgd_5bc"><h2 class="title sectiontitle">Limitations</h2>
+            
+            <p class="p">You must be aware of the following limitations while using Impala external JDBC tables:</p>
+
+            <ul class="ul" id="impala_jdbc_external_table_support__ul_xkf_ggd_5bc">
+                <li dir="ltr" class="li">Following column data types are not supported: char, varchar, binary,
+                  <p class="p">Complex data types - struct, map, array, and nested type</p>
+</li>
+
+                <li dir="ltr" class="li">JDBC tables have to be defined one table at a time</li>
+
+                <li dir="ltr" class="li">Writing to a JDBC table is not supported</li>
+
+                <li dir="ltr" class="li">Only supported binary predicates with operators =, !=, &lt;=, &gt;=,
+                    &lt;, &gt; to be pushed to RDBMS</li>
+
+            </ul>
+
+        </div>
+
+        <div class="section" id="impala_jdbc_external_table_support__secure_jdbc_password"><h2 class="title sectiontitle">Securing the JDBC Password</h2>
+            
+            <p class="p">The <code class="ph codeph">dbcp.password</code> table property stores the JDBC password in clear
+                text. To avoid the risk of a password leak, the <code class="ph codeph">SHOW CREATE TABLE
+                    &lt;table-name&gt;</code> and <code class="ph codeph">DESCRIBE FORMATTED | EXTENDED
+                    &lt;table-name&gt;</code> statements mask the value of the
+                    <code class="ph codeph">dbcp.password</code> table property in their outputs.</p>
+
+            <p class="p">In production environments, it is recommended that you do not store the JDBC password
+                in clear text using the <code class="ph codeph">dbcp.password</code> table property. Instead, you
+                can store the password in a Java Keystore file on HDFS or on cloud storage like
+                Amazon S3 using the following command:</p>
+
+            <div class="p"><strong class="ph b">Creating a Java keystore file on HDFS with the key as "host1.password" and
+                    password as
+                "passwd1":</strong><pre class="pre codeblock" id="impala_jdbc_external_table_support__codeblock_fgg_qgd_5bc"><code>hadoop credential create host1.password -provider jceks://hdfs/user/foo/test.jceks -v passwd1</code></pre></div>
+
+            <div class="p"><strong class="ph b">Creating a Java keystore file on Amazon S3 with the key as "impala" and password
+                    as
+                "passwd2":</strong><pre class="pre codeblock" id="impala_jdbc_external_table_support__codeblock_gll_rgd_5bc"><code>hadoop credential create impala -provider jceks://s3a@dw-impala-test/jceks/demo.jceks -v passwd2</code></pre></div>
+
+            <p class="p">For more information, see the <a class="xref" href="https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/CredentialProviderAPI.html" target="_blank">Apache Hadoop CredentialProvider API
+                Guide</a>.</p>
+
+        </div>
+
+        <div class="section" id="impala_jdbc_external_table_support__section_oxg_m3d_5bc"><h2 class="title sectiontitle">Support for case-sensitive table and column names</h2>
+            
+            <p class="p">The column names of tables in the remote database can be different from the external
+                JDBC table schema. For example, Postgres allows case-sensitive column names,
+                however, Impala saves column names in lowercase. In such situations, you can set the
+                    <code class="ph codeph">column.mapping</code> table property to map column names between
+                Impala external JDBC tables and the remote tables.</p>
+
+            <div class="p"><strong class="ph b">Example:</strong><pre class="pre codeblock" id="impala_jdbc_external_table_support__codeblock_jfs_v3d_5bc"><code>"column.mapping"="id=id, bool_col=Bool_col, tinyint_col=Tinyint_col, 
+smallint_col=Smallint_col, int_col=Int_col, bigint_col=Bigint_col, float_col=Float_col, double_col=Double_col, date_col=date_col, string_col=String_col, timestamp=Timestamp");</code></pre></div>
+
+        </div>
+
+        <div class="section" id="impala_jdbc_external_table_support__section_b2t_1jd_5bc"><h2 class="title sectiontitle">Modifying the external JDBC table</h2>
+            
+            <p class="p">You can use the ALTER TABLE statement to add, drop, or modify columns, or modify the
+                table properties of existing external JDBC tables. The syntax is the same as the
+                other Impala tables.</p>
+
+            <div class="p"><strong class="ph b">To add, drop, or modify
+                columns</strong><pre class="pre codeblock" id="impala_jdbc_external_table_support__codeblock_gcv_fjd_5bc"><code>ALTER TABLE student_jdbc ADD COLUMN IF NOT EXISTS date_col DATE;
+ALTER TABLE student_jdbc DROP COLUMN int_col;
+ALTER TABLE student_jdbc CHANGE COLUMN date_col timestamp_col TIMESTAMP;</code></pre></div>
+
+            <div class="p"><strong class="ph b">To modify table
+                properties</strong><pre class="pre codeblock" id="impala_jdbc_external_table_support__codeblock_er4_jjd_5bc"><code>ALTER TABLE student_jdbc
+SET TBLPROPERTIES ("dbcp.username"="impala", "dbcp.password"="password");</code></pre></div>
+
+        </div>
+
+        <div class="section" id="impala_jdbc_external_table_support__section_yz3_kjd_5bc"><h2 class="title sectiontitle">Querying external JDBC tables</h2>
+            
+            <p class="p">Querying or reading external JDBC tables is the same as querying regular tables in
+                Impala. You can use SELECT statements to query data and can also join the external
+                table with other tables across databases. However, do note that the metadata for the
+                external tables is not persisted in Hive Metastore (HMS). </p>
+
+            <div class="p"><strong class="ph b">Example:</strong><pre class="pre codeblock" id="impala_jdbc_external_table_support__codeblock_yyb_njd_5bc"><code>SELECT * from student_jdbc;</code></pre></div>
+
+        </div>
+
+        <div class="section" id="impala_jdbc_external_table_support__section_nbg_w3d_5bc"><h2 class="title sectiontitle"><strong class="ph b"><strong class="ph b">Query options for external JDBC tables</strong></strong></h2>
+            
+            <p class="p">A new query option, CLEAN_DBCP_DS_CACHE is added to save the DBCP SQL DataSource
+                objects in the cache for a longer period of time. This allows the DBCP connection
+                pools to be reused across multiple queries. When the value is set to false, the DBCP
+                SQL DataSource object is not closed when its reference count is 0. The SQL
+                DataSource object is kept in cache until the object is idle for more than 5
+                minutes.</p>
+
+            <p class="p"><strong class="ph b">Type</strong>: BOOLEAN</p>
+
+            <p class="p"><strong class="ph b">Default</strong>: True (1)</p>
+
+        </div>
+
+    </div>
+
+</body>
+</html>

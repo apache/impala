@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Copy Testcase Statements" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="impala_copy_testcase" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Copy Testcase Statements</title>
+</head>
+<body id="impala_copy_testcase">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Copy Testcase Statements</h1>
+
+  
+  <div class="body conbody">
+    <p class="p">The <code class="ph codeph">COPY TESTCASE</code> statement allows users to export table or view metadata
+      involved in a query, allowing developers to replay the metadata in a local cluster for testing
+      and debugging purposes.</p>
+
+  </div>
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="concept_erz_l3j_wdc">
+    <h2 class="title topictitle2" id="ariaid-title2">Exporting Metadata to a File</h2>
+
+    <div class="body conbody">
+      <div class="p">Use the following syntax to dump
+        metadata:<pre class="pre codeblock" id="concept_erz_l3j_wdc__codeblock_bzf_g3j_wdc"><code>COPY TESTCASE TO &lt;hdfs/s3 dirpath&gt; &lt;query stmt&gt;</code></pre></div>
+
+      <div class="p"><strong class="ph b">Example:</strong><pre class="pre codeblock" id="concept_erz_l3j_wdc__codeblock_e4t_p3j_wdc"><code>COPY TESTCASE TO '/tmp' SELECT * FROM functional_parquet.alltypes;
+</code></pre></div>
+
+      <div class="p"><strong class="ph b">Output:</strong><pre class="pre codeblock" id="concept_erz_l3j_wdc__codeblock_u44_r3j_wdc"><code>
++--------------------------------------------------------------------------------------+
+| Test case data output path                                                           |
++--------------------------------------------------------------------------------------+
+| hdfs://localhost:20500/tmp/impala-testcase-data-f41f7b14-dfc8-408b-ac3b-ef49fc3e0a83 |
++--------------------------------------------------------------------------------------+
+</code></pre></div>
+
+    </div>
+
+  </div>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="concept_d1v_3sp_wdc">
+    <h2 class="title topictitle2" id="ariaid-title3">Loading Metadata into a Target Cluster</h2>
+
+    <div class="body conbody">
+      <div class="p">To load the previously exported metadata, use the following
+        syntax:<pre class="pre codeblock" id="concept_d1v_3sp_wdc__codeblock_hkg_ksp_wdc"><code>COPY TESTCASE FROM &lt;hdfs/s3 testcase file path&gt;</code></pre></div>
+
+      <div class="p"><strong class="ph b">Example:</strong><pre class="pre codeblock" id="concept_d1v_3sp_wdc__codeblock_hrq_lsp_wdc"><code>COPY TESTCASE FROM '/tmp/impala-testcase-data-f41f7b14-dfc8-408b-ac3b-ef49fc3e0a83';</code></pre></div>
+
+      <div class="p"><strong class="ph b">Output:</strong><pre class="pre codeblock" id="concept_d1v_3sp_wdc__codeblock_oqg_nsp_wdc"><code>
++----------------------------------------------------------------------------------------------------------------+
+| summary                                                                                                        |
++----------------------------------------------------------------------------------------------------------------+
+| Testcase generated using Impala version 4.5.0-SNAPSHOT. 1 db(s), 1 table(s) and 0 view(s) imported for query:  |
+|                                                                                                                |
+| SELECT * FROM functional_parquet.alltypes                                                                      |
++----------------------------------------------------------------------------------------------------------------+
+</code></pre></div>
+
+    </div>
+
+  </div>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="concept_tvd_psp_wdc">
+    <h2 class="title topictitle2" id="ariaid-title4">Using the Imported Metadata</h2>
+
+    <div class="body conbody">
+      <div class="p">To use the imported metadata in query planning, enable the planner testcase
+        mode:<pre class="pre codeblock" id="concept_tvd_psp_wdc__codeblock_rzj_rsp_wdc"><code>SET PLANNER_TESTCASE_MODE=true;</code></pre></div>
+
+      <div class="p">You can now interact with the metadata using commands
+        like:<pre class="pre codeblock" id="concept_tvd_psp_wdc__codeblock_g1r_ssp_wdc"><code>SHOW COLUMN STATS functional_parquet.alltypes;</code></pre></div>
+
+    </div>
+
+  </div>
+
+</body>
+</html>

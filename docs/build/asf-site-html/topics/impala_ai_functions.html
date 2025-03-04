@@ -1,0 +1,210 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2025"><meta name="DC.rights.owner" content="(C) Copyright 2025"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_ai_functions"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Advantages and use cases of Impala AI functions</title></head><body id="impala_ai_functions"><header role="banner"><!--
+The DITA Open Toolkit is licensed for use under the the Apache
+Software Foundation License v2.0.
+
+A copy of the Apache Software Foundation License 2.0 is
+available at http://opensource.org/licenses/apache2.0.php
+
+This statement must be included in any copies of DITA Open
+Toolkit code.
+--><div class="header">
+  <p>Apache Impala</p>
+  <hr>
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a><ul><li><a href="../topics/impala_comments.html">Comments</a></li><li><a href="../topics/impala_datatypes.html">Data Types</a></li><li><a href="../topics/impala_literals.html">Literals</a></li><li><a href="../topics/impala_operators.html">SQL Operators</a></li><li><a href="../topics/impala_schema_objects.html">Schema Objects and Object Names</a></li><li><a href="../topics/impala_transactions.html">Transactions</a></li><li><a href="../topics/impala_langref_sql.html">SQL Statements</a></li><li><a href="../topics/impala_functions.html">Built-In Functions</a><ul><li><a href="../topics/impala_math_functions.html">Mathematical Functions</a></li><li><a href="../topics/impala_bit_functions.html">Bit Functions</a></li><li><a href="../topics/impala_conversion_functions.html">Type Conversion Functions</a></li><li><a href="../topics/impala_datetime_functions.html">Date and Time Functions</a></li><li><a href="../topics/impala_conditional_functions.html">Conditional Functions</a></li><li><a href="../topics/impala_string_functions.html">String Functions</a></li><li class="active"><a href="../topics/impala_ai_functions.html">AI Functions</a></li><li><a href="../topics/impala_misc_functions.html">Miscellaneous Functions</a></li><li><a href="../topics/impala_aggregate_functions.html">Aggregate Functions</a></li><li><a href="../topics/impala_analytic_functions.html">Analytic Functions</a></li><li><a href="../topics/impala_geospatial_functions.html">Geospatial Functions</a></li></ul></li><li><a href="../topics/impala_udf.html">User-Defined Functions (UDFs)</a></li><li><a href="../topics/impala_langref_unsupported.html">SQL Differences Between Impala and Hive</a></li><li><a href="../topics/impala_porting.html">Porting SQL</a></li><li><a href="../topics/impala_utf_8.html">UTF-8 Support</a></li></ul></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_jdbc_external_table.html">Using Impala to Query External JDBC Data Sources</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_ozone.html">Ozone Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+  <h1 class="title topictitle1" id="ariaid-title1">Advantages and use cases of Impala AI functions</h1>
+  
+  
+  <div class="body conbody">
+    <p class="p"> You can use Impala's ai_generate_text function to access Large Language Models
+      (LLMs) in SQL queries. This function enables you to input a prompt, retrieve the LLM response,
+      and include it in results. You can create custom UDFs for complex tasks like sentiment
+      analysis and translation.
+    </p>
+    <section class="section" id="impala_ai_functions__section_ufg_4tv_fcc"><h2 class="title sectiontitle">Use LLMs directly in SQL with Impala's <code class="ph codeph">ai_generate_text</code>
+        function&gt;</h2>
+      
+      <p class="p">Impala introduces a built-in AI function called <code class="ph codeph">ai_generate_text</code> that
+        enables direct access to and utilization of Large Language Models (LLMs) in SQL queries.
+        With this function, you can input a prompt, which may include data. The function
+        communicates with a supported LLM endpoint, sends the prompt, retrieves the response, and
+        includes it in the query result.</p>
+      <p class="p">Alternatively, seamlessly integrate LLM intelligence into your Impala workflow by creating
+        custom User Defined Functions (UDFs) on top of <code class="ph codeph">ai_generate_text</code>. This
+        allows you to use concise SQL statements for sending prompts to an LLM and receiving
+        responses. You can define UDFs for complex tasks like sentiment analysis, language
+        translation, and generative contextual analysis.</p>
+    </section>
+    <section class="section" id="impala_ai_functions__ai_advantages"><h2 class="title sectiontitle">Advantages of using AI functions</h2>
+      
+      <div class="p">
+        <ul class="ul" id="impala_ai_functions__ul_cdc_fm4_tbc">
+          <li class="li"><strong class="ph b">Simplified Workflow</strong>: Eliminates the necessity for setting up intricate data
+            pipelines.</li>
+          <li class="li"><strong class="ph b">No ML Expertise Required</strong>: No specialized machine learning skills are
+            needed.</li>
+          <li class="li"><strong class="ph b">Swift Decision-Making</strong>: Enables faster insights on the data, facilitating
+            critical business decisions by using in-database function calls.</li>
+          <li class="li"><strong class="ph b">Integrated Functionality</strong>: Requires no external applications, as it is a
+            built-in feature in Data Warehouse.</li>
+        </ul>
+      </div>
+    </section>
+    <section class="section" id="impala_ai_functions__ai_usecases"><h2 class="title sectiontitle">List of possible use cases</h2>
+      
+      <div class="p">Here are some practical applications of using AI models with the function:<ul class="ul" id="impala_ai_functions__ul_ond_pm4_tbc">
+          <li class="li"><strong class="ph b">Sentiment Analysis</strong>: Use the AI model to examine customer reviews for a product
+            and identify their sentiment as positive, negative, or neutral.</li>
+          <li class="li"><strong class="ph b">Language Translation</strong>: Translate product reviews written in different languages
+            to understand customer feedback from various regions.</li>
+          <li class="li"><strong class="ph b">Generative Contextual Analysis</strong>: Generate detailed reports and insights on
+            various topics based on provided data.</li>
+        </ul></div>
+    </section>
+    <section class="section" id="impala_ai_functions__syntax_ai_function"><h2 class="title sectiontitle">Syntax for AI built-in function arguments</h2>
+      
+      <p class="p">The following example of a built-in AI function demonstrates the use of the OpenAI API as a
+        large language model. Currently, OpenAI's public endpoint and Azure OpenAI endpoints are
+        supported.</p>
+      <dl class="dl" id="impala_ai_functions__dl_w5l_nn4_tbc">
+        
+          <dt class="dt dlterm">AI_GENERATE_TEXT_DEFAULT</dt>
+          <dd class="dd">Syntax:<pre class="pre codeblock" id="impala_ai_functions__codeblock_ibj_qn4_tbc"><code>ai_generate_text_default(prompt)</code></pre></dd>
+        
+        
+          <dt class="dt dlterm">AI_GENERATE_TEXT</dt>
+          <dd class="dd">Syntax:<pre class="pre codeblock" id="impala_ai_functions__codeblock_qdg_zn4_tbc"><code>ai_generate_text(ai_endpoint, prompt, ai_model, ai_api_key_jceks_secret, additional_params)
+          </code></pre></dd>
+        
+      </dl>
+      <p class="p">The <code class="ph codeph">ai_generate_text</code> function uses the values you provide as an argument
+        in the function for <code class="ph codeph">ai_endpoint</code>, <code class="ph codeph">ai_model</code>, and
+          <code class="ph codeph">ai_api_key_jceks_secret</code>. If any of the arguments are left empty or set to
+        NULL, the function uses the default values defined at the instance level. These default
+        values correspond to the flag settings configured in the Impala instance. For example, if
+        the <code class="ph codeph">ai_endpoint</code> argument is NULL or empty, the function will use the value
+        specified by the <code class="ph codeph">ai_endpoint</code> flag as the default.</p>
+      <p dir="ltr" class="p">When using the <code class="ph codeph">ai_generate_text_default</code> function, make sure to
+        set all parameters (<code class="ph codeph">ai_endpoint</code>, <code class="ph codeph">ai_model</code>, and
+        <code class="ph codeph">ai_api_key_jceks_secret</code>) in the coordinator/executor flagfiles with
+        appropriate values.</p>
+    </section>
+    <section class="section" id="impala_ai_functions__key_parameters_ai_function"><h2 class="title sectiontitle">Key parameters for using the AI model</h2>
+      
+      <ul class="ul" id="impala_ai_functions__ul_pfm_2p4_tbc">
+        <li class="li"><strong class="ph b">ai_endpoint</strong>: The endpoint for the model API that is being interfaced with,
+          supports services like OpenAI and Azure OpenAI Service, for example,
+          https://api.openai.com/v1/chat/completions.</li>
+        <li class="li"><strong class="ph b">prompt</strong>: The text you submit to the AI model to generate a response.</li>
+        <li class="li"><strong class="ph b">ai_model</strong>: The specific model name you want to use within the desired API, for
+          example, gpt-3.5-turbo.</li>
+        <li class="li"><strong class="ph b">ai_api_key_jceks_secret</strong>: The key name for the JCEKS secret that contains your API
+          key for the AI API you are using. You need a JCEKS keystore containing the specified JCEKS
+          secret referenced in <code class="ph codeph">ai_api_key_jceks_secret</code>. To do this, set the
+            <code class="ph codeph">hadoop.security.credential.provider.path</code> property in the
+            <code class="ph codeph">core-site</code> configuration for both the executor and coordinator.</li>
+        <li class="li"><strong class="ph b">additional_params</strong>: Additional parameters that the AI API offers that is provided
+          to the built-in function as a JSON object.</li>
+      </ul>
+    </section>
+    <section class="section" id="impala_ai_functions__impala-built-in-ai-function"><h2 class="title sectiontitle">Examples of using the built-in AI function</h2>
+      
+      <div class="p">The following example lists the steps needed to turn a prompt into a custom SQL function
+        using just the built-in function
+        <code class="ph codeph">ai_generate_text_default</code>.<pre class="pre codeblock" id="impala_ai_functions__codeblock_ppy_dr4_tbc"><code>&gt; select ai_generate_text_default('hello');
+  Response:
+  Hello! How can I assist you today?
+        </code></pre></div>
+      <div class="p">In the below example, a query is sent to the Amazon book reviews database for the book
+        titled Artificial Superintelligence. The large language model (LLM) is prompted to classify
+        the sentiment as positive, neutral, or
+        negative.<pre class="pre codeblock" id="impala_ai_functions__codeblock_hyp_4np_tbc"><code>&gt; select customer_id, star_rating, ai_generate_text_default(CONCAT('Classify the following review as positive, neutral, or negative', and only include the uncapitalized category in the response: ', review_body)) AS review_analysis, review_body from amazon_book_reviews where product_title='Artificial Superintelligence' order by customer_id LIMIT 1;
+  Response:
+  +--+------------+------------+----------------+------------------+
+  |  |customer_id |star_rating |review_analysis |review_body       |
+  +--+------------+------------+----------------+------------------+
+  |1 |4343565     | 5          |positive        |What is this book |
+  |  |            |            |                |all about …………    |
+  +--+------------+------------+----------------+------------------+
+        </code></pre></div>
+    </section>
+    <section class="section" id="impala_ai_functions__impala-custom-udf"><h2 class="title sectiontitle">Examples of creating and using custom UDFs along with the built-in AI function</h2>
+      
+      <p class="p">Instead of writing the prompts in a SQL query, you can build a UDF with your intended
+        prompt. Once you build your custom UDF, pass your desired prompt within your custom UDF into
+        the <code class="ph codeph">ai_generate_text_default</code> built-in Impala function.</p>
+      <p class="p">Example: Classify input customer reviews</p>
+      <p class="p">The following UDF uses the Amazon book reviews database as the input and requests the LLM
+        to classify the sentiment.</p>
+      <p class="p">Classify input customer reviews:</p>
+      <pre class="pre codeblock" id="impala_ai_functions__codeblock_h1z_yrp_tbc"><code>
+    IMPALA_UDF_EXPORT
+    StringVal ClassifyReviews(FunctionContext* context, const StringVal&amp; input) {
+      std::string request =
+        std::string("Classify the following review as positive, neutral, or negative")
+        + std::string(" and only include the uncapitalized category in the response: ")
+        + std::string(reinterpret_cast&lt;const char*&gt;(input.ptr), input.len);
+      StringVal prompt(request.c_str());
+      const StringVal endpoint("https://api.openai.com/v1/chat/completions");
+      const StringVal model("gpt-3.5-turbo");
+      const StringVal api_key_jceks_secret("open-ai-key");
+      const StringVal params("{\"temperature\": 0.9, \"model\": \"gpt-4\"}");
+      return context-&gt;Functions()-&gt;ai_generate_text(
+        context, endpoint, prompt, model, api_key_jceks_secret, params);
+    }
+      </code></pre>
+      <p class="p">Now you can define these prompt building UDFs and build them in Impala. Once you have them
+        running, you can query your datasets using them.</p>
+      <p class="p">Creating <code class="ph codeph">analyze_reviews</code> function:</p>
+      <pre class="pre codeblock" id="impala_ai_functions__codeblock_b4l_ctp_tbc"><code>&gt; CREATE FUNCTION analyze_reviews(STRING)
+    RETURNS STRING
+    LOCATION ‘s3a://dw-...............’
+    SYMBOL=’ClassifyReviews’
+      </code></pre>
+      <p class="p">Using SELECT query for Sentiment analysis to classify Amazon book reviews</p>
+      <pre class="pre codeblock" id="impala_ai_functions__codeblock_xdr_jtp_tbc"><code>&gt; SELECT customer_id, star_rating, analyze_reviews(review_body) AS review_analysis, review_body from amazon_book_reviews where product_title='Artificial Superintelligence' order by customer_id;
+  Response:
+  +--+------------+------------+----------------+----------------------+
+  |  |customer_id |star_rating |review_analysis |review_body           |
+  +--+------------+------------+----------------+----------------------+
+  |1 |44254093    | 5          |positive        |What is this book all |
+  |  |            |            |                |about? It is all about|
+  |  |            |            |                |a mind-blowing        |
+  |  |            |            |                |universal law of      |
+  |  |            |            |                |nature. Mind-blow…    |
+  +--+------------+------------+----------------+----------------------+
+  |2 |50050072    | 5          |positive        |The two tightly-      |
+  |  |            |            |                |connected ideas strike|
+  |  |            |            |                |you as amazed. In the |
+  |  |            |            |                |first place, what has |
+  |  |            |            |                |never bef…            |
+  +--+------------+------------+----------------+----------------------+
+  |3 |50050072    | 5          |positive        |The two tightly-      |
+  |  |            |            |                |connected ideas strike|
+  |  |            |            |                |you as amazed. In the |
+  |  |            |            |                |first place, what has |
+  |  |            |            |                |never bef…            |
+  +--+------------+------------+----------------+----------------------+
+  |4 |52932308    | 1          |negative        |This book is seriously|
+  |  |            |            |                |flawed. I could not   |
+  |  |            |            |                |work out if the author|
+  |  |            |            |                |was a mathemetician   |
+  |  |            |            |                |dabbi…                |
+  +--+------------+------------+----------------+----------------------+
+  |5 |52971961    | 1          |negative        |Abdoullaev's          |
+  |  |            |            |                |exploration of        |
+  |  |            |            |                |Al issues appears to  |
+  |  |            |            |                |be very technological |
+  |  |            |            |                |and straightforward…  |
+  +--+------------+------------+----------------+----------------------+
+  |6 |53008416    | 4          |positive        |As Co Founder of      |
+  |  |            |            |                |ArtilectWorld:ultra   |
+  |  |            |            |                |intelligent machine,  |
+  |  |            |            |                |I recommend reading   |
+  |  |            |            |                |this book!            |
+  +--+------------+------------+----------------+----------------------+
+</code></pre>
+    </section>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div></div></nav></article></main></body></html>

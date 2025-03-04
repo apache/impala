@@ -1,0 +1,1296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Geospatial Functions" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="geospatial_functions" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Geospatial Functions</title>
+</head>
+<body id="geospatial_functions">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Geospatial Functions</h1>
+
+  
+
+  
+
+  <div class="body conbody">
+    <p class="p">Impala supports a range of geospatial functions to facilitate spatial data processing and analysis,
+     based on Apache Hive's implementation of ESRI functions.</p>
+
+    <div class="p"> Many functions return results in binary format (<code class="ph codeph">BINARY</code>), these values can typically be
+      interpreted as geometries, and they can be used with Hive functions similarly. It's not recommended
+      to serialize geometries in this format, for compatibility, converting to Well-Known Binary format is recommended.
+      Possible geometries returned as <code class="ph codeph">BINARY</code>:
+      <ul class="ul">
+        <li class="li">POINT</li>
+
+        <li class="li">LINESTRING</li>
+
+        <li class="li">POLYGON</li>
+
+        <li class="li">MULTIPOINT</li>
+
+        <li class="li">MULTILINESTRING</li>
+
+        <li class="li">MULTIPOLYGON</li>
+
+        <li class="li">GEOMETRYCOLLECTION</li>
+
+      </ul>
+
+      Coordinates for geometries may be 2D (x, y), 3D (x, y, z) or 4D (x, y, z, m).
+      Geospatial functionality can be controlled through the startup flag <code class="ph codeph">GEOSPATIAL_LIBRARY</code>.
+      <ul class="ul">
+        <li class="li">By default, the library is set to <code class="ph codeph">HIVE_ESRI</code>, enabling the
+        <a class="xref" href="https://github.com/Esri/spatial-framework-for-hadoop/wiki/UDF-Documentation" target="_blank">Hive ESRI</a>
+        geospatial functions.
+        </li>
+
+        <li class="li">If geospatial functionality is not needed, it can be turned off by setting <code class="ph codeph">GEOSPATIAL_LIBRARY</code> to <code class="ph codeph">NONE</code>.</li>
+
+      </ul>
+
+    </div>
+
+    <div class="p">There are 3 types of ST_* functions:
+    <ul class="ul">
+      <li class="li">
+        Regular functions with one argument list and one return type.
+      </li>
+
+      <li class="li">
+        Generic functions with multiple argument lists and overloads
+      </li>
+
+      <li class="li">
+        Vararg functions with variable-length argument lists. The maximum number of arguments for vararg functions is limited to 14.
+      </li>
+
+    </ul>
+
+    </div>
+
+    <div class="p">The list of supported functions:
+    <ul class="ul">
+      <li class="li"><a class="xref" href="#geospatial_functions__st_area">ST_Area</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_asbinary">ST_AsBinary</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_asgeojson">ST_AsGeoJson</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_asjson">ST_AsJson</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_asshape">ST_AsShape</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_astext">ST_AsText</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_bin">ST_Bin</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_binenvelope_point">ST_BinEnvelope</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_boundary">ST_Boundary</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_buffer">ST_Buffer</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_centroid">ST_Centroid</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_contains">ST_Contains</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_convexhull">ST_ConvexHull</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_coorddim">ST_CoordDim</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_crosses">ST_Crosses</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_difference">ST_Difference</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_dimension">ST_Dimension</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_disjoint">ST_Disjoint</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_distance">ST_Distance</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_endpoint">ST_EndPoint</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_envelope">ST_Envelope</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_envintersects">ST_EnvIntersects</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_equals">ST_Equals</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_exteriorring">ST_ExteriorRing</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_geodesiclengthwgs84">ST_GeodesicLengthWGS84</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_geomcollection_wkt">ST_GeomCollection</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_geometryn">ST_GeometryN</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_geometrytype">ST_GeometryType</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_geomfromgeojson">ST_GeomFromGeoJson</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_geomfromjson">ST_GeomFromJson</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_geomfromshape">ST_GeomFromShape</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_geomfromtext">ST_GeomFromText</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_geomfromwkb">ST_GeomFromWKB</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_interiorringn">ST_InteriorRingN</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_intersection">ST_Intersection</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_intersects">ST_Intersects</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_is3d">ST_Is3D</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_isclosed">ST_IsClosed</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_isempty">ST_IsEmpty</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_ismeasured">ST_IsMeasured</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_isring">ST_IsRing</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_issimple">ST_IsSimple</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_length">ST_Length</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_linefromwkb">ST_LineFromWKB</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_linestring">ST_LineString</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_m">ST_M</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_maxm">ST_MaxM</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_maxx">ST_MaxX</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_maxy">ST_MaxY</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_maxz">ST_MaxZ</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_minm">ST_MinM</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_minx">ST_MinX</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_miny">ST_MinY</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_minz">ST_MinZ</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_mlinefromwkb">ST_MLineFromWKB</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_mpointfromwkb">ST_MPointFromWKB</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_mpolyfromwkb">ST_MPolyFromWKB</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_multilinestring">ST_MultiLineString</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_multipoint">ST_MultiPoint</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_multipolygon">ST_MultiPolygon</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_numgeometries">ST_NumGeometries</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_numinteriorring">ST_NumInteriorRing</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_numpoints">ST_NumPoints</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_overlaps">ST_Overlaps</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_point">ST_Point</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_pointfromwkb">ST_PointFromWKB</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_pointn">ST_PointN</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_pointz">ST_PointZ</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_polyfromwkb">ST_PolyFromWKB</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_polygon">ST_Polygon</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_relate">ST_Relate</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_setsrid">ST_SetSRID</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_srid">ST_SRID</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_startpoint">ST_StartPoint</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_symmetricdiff">ST_SymmetricDiff</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_touches">ST_Touches</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_union">ST_Union</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_within">ST_Within</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_x">ST_X</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_y">ST_Y</a></li>
+
+      <li class="li"><a class="xref" href="#geospatial_functions__st_z">ST_Z</a></li>
+
+    </ul>
+
+    </div>
+
+
+    <dl class="dl">
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_area">ST_Area(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_asbinary">ST_AsBinary(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_asgeojson">ST_AsGeoJson(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> STRING</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_asjson">ST_AsJson(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> STRING</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_asshape">ST_AsShape(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_astext">ST_AsText(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> STRING</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_bin">ST_Bin([BIGINT, DOUBLE] binsize, [BINARY, STRING] point)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BIGINT</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_binenvelope_point">ST_BinEnvelope([BIGINT, DOUBLE] binsize, [BINARY, STRING] point)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_binenvelope_bin_id">ST_BinEnvelope([BIGINT, DOUBLE] binsize, BIGINT bin_id)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_boundary">ST_Boundary(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_buffer">ST_Buffer(BINARY geometry, DOUBLE distance)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_centroid">ST_Centroid(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_contains">ST_Contains([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_convexhull">ST_ConvexHull(BINARY geometry...)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_coorddim">ST_CoordDim(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> INT</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_crosses">ST_Crosses([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_difference">ST_Difference(BINARY geometry1, BINARY geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_dimension">ST_Dimension(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> INT</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_disjoint">ST_Disjoint([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_distance">ST_Distance(BINARY geometry1, BINARY geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_endpoint">ST_EndPoint(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_envelope">ST_Envelope(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_envintersects">ST_EnvIntersects(BINARY geometry1, BINARY geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_equals">ST_Equals([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_exteriorring">ST_ExteriorRing(BINARY polygon)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geodesiclengthwgs84">ST_GeodesicLengthWGS84(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geomcollection_wkt">ST_GeomCollection(STRING wkt)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geomcollection_wkt_wkid">ST_GeomCollection(STRING wkt, INT wkid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geometryn">ST_GeometryN(BINARY geometry, INT n)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geometrytype">ST_GeometryType(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> STRING</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geomfromgeojson">ST_GeomFromGeoJson(STRING geojson_string)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geomfromjson">ST_GeomFromJson(STRING json_string)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geomfromshape">ST_GeomFromShape(BINARY shape)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geomfromshape_srid">ST_GeomFromShape(BINARY shape, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geomfromtext">ST_GeomFromText(STRING wkt)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geomfromtext_srid">ST_GeomFromText(STRING wkt, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geomfromwkb">ST_GeomFromWKB(BINARY wkb)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_geomfromwkb_srid">ST_GeomFromWKB(BINARY wkb, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_interiorringn">ST_InteriorRingN(BINARY polygon, INT n)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_intersection">ST_Intersection([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_intersects">ST_Intersects([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_is3d">ST_Is3D(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_isclosed">ST_IsClosed(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_isempty">ST_IsEmpty(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_ismeasured">ST_IsMeasured(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_isring">ST_IsRing(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_issimple">ST_IsSimple(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_length">ST_Length(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_linefromwkb">ST_LineFromWKB(BINARY wkb)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_linefromwkb_srid">ST_LineFromWKB(BINARY wkb, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_linestring">ST_LineString(DOUBLE point1, DOUBLE point2 [, DOUBLE pointN, DOUBLE pointM]*)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_linestring_wkt">ST_LineString(STRING wkt)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_m">ST_M(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_maxm">ST_MaxM(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_maxx">ST_MaxX(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_maxy">ST_MaxY(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_maxz">ST_MaxZ(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_minm">ST_MinM(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_minx">ST_MinX(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_miny">ST_MinY(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_minz">ST_MinZ(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_mlinefromwkb">ST_MLineFromWKB(BINARY wkb)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_mlinefromwkb_srid">ST_MLineFromWKB(BINARY wkb, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_mpointfromwkb">ST_MPointFromWKB(BINARY wkb)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_mpointfromwkb_srid">ST_MPointFromWKB(BINARY wkb, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_mpolyfromwkb">ST_MPolyFromWKB(BINARY wkb)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_mpolyfromwkb_srid">ST_MPolyFromWKB(BINARY wkb, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+            
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_multilinestring">ST_MultiLineString(STRING wkt)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_multipoint">ST_MultiPoint(DOUBLE x1, DOUBLE y1, [, DOUBLE xn, DOUBLE yn])</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_multipoint_wkt">ST_MultiPoint(STRING wkt)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_multipolygon">ST_MultiPolygon(STRING wkt)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_numgeometries">ST_NumGeometries(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> INT</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_numinteriorring">ST_NumInteriorRing(BINARY polygon)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> INT</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_numpoints">ST_NumPoints(BINARY linestring)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> INT</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_overlaps">ST_Overlaps([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_point">ST_Point(DOUBLE x, DOUBLE y [, DOUBLE z [, DOUBLE m]])</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_pointfromwkb">ST_PointFromWKB(BINARY wkb)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_pointfromwkb_srid">ST_PointFromWKB(BINARY wkb, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_pointn">ST_PointN(BINARY linestring, INT n)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_pointz">ST_PointZ(DOUBLE x, DOUBLE y, DOUBLE z [, DOUBLE m])</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_polyfromwkb">ST_PolyFromWKB(BINARY wkb, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_polyfromwkb_srid">ST_PolyFromWKB(BINARY wkb, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_relate">ST_Relate(BINARY geometry1, BINARY geometry2, STRING pattern)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_polygon">ST_Polygon(DOUBLE x, DOUBLE y, [DOUBLE xn, DOUBLE yn]*)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_polygon_wkt">ST_Polygon(STRING wkt)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_setsrid">ST_SetSRID(BINARY geometry, INT srid)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_srid">ST_SRID(BINARY geometry)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> INT</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_startpoint">ST_StartPoint(BINARY linestring)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_symmetricdiff">ST_SymmetricDiff(BINARY geometry1, BINARY geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_touches">ST_Touches([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_union">ST_Union(BINARY geometry1, BINARY geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BINARY</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_within">ST_Within([BINARY, STRING] geometry1, [BINARY, STRING] geometry2)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> BOOLEAN</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_x">ST_X(BINARY point)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_y">ST_Y(BINARY point)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+
+      
+      
+        <dt class="dt dlterm" id="geospatial_functions__st_z">ST_Z(BINARY point)</dt>
+
+        <dd class="dd">
+          <p class="p"><strong class="ph b">Return type:</strong> DOUBLE</p>
+
+        </dd>
+
+      
+    </dl>
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div>
+</div>
+</div></body>
+</html>

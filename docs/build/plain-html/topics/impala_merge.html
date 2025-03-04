@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="MERGE Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="merge" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>MERGE Statement</title>
+</head>
+<body id="merge">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">MERGE Statement</h1>
+
+  
+  
+
+ <div class="body conbody">
+
+    <p class="p">
+      
+      The <code class="ph codeph">MERGE</code> statement enables conditional updates, deletes, and inserts, based on the result of a join
+      between a target and a source table. This operation is useful for applying data changes from transactional systems to
+      analytic data warehouses by merging data from two tables with similar structures.
+    </p>
+
+
+    <p class="p">
+      The <code class="ph codeph">MERGE</code> statement supports multiple <code class="ph codeph">WHEN</code> clauses, where each clause can specify
+      actions like <code class="ph codeph">UPDATE</code>, <code class="ph codeph">DELETE</code>, or <code class="ph codeph">INSERT</code>. Actions are applied based
+      on the join conditions defined between the source and target tables.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+
+<pre class="pre codeblock"><code>MERGE INTO <em class="ph i">target_table</em> [AS <em class="ph i">target_alias</em>]
+USING <em class="ph i">source_expr</em> [AS <em class="ph i">source_alias</em>]
+ON <em class="ph i">search_condition</em>
+[WHEN MATCHED [AND <em class="ph i">search_condition</em>] THEN
+  UPDATE SET <em class="ph i">column1 = expression1</em>, <em class="ph i">column2 = expression2</em>, ... ]
+[WHEN MATCHED [AND <em class="ph i">search_condition</em>] THEN DELETE]
+[WHEN NOT MATCHED [AND <em class="ph i">search_condition</em>] THEN
+  INSERT (<em class="ph i">column1</em>, <em class="ph i">column2</em>, ...) VALUES (<em class="ph i">expression1</em>, <em class="ph i">expression2</em>, ...)]</code></pre>
+
+    <p class="p">
+      The <code class="ph codeph">WHEN MATCHED</code> clause is executed if a row from the source table matches a row in the target table,
+      based on the <code class="ph codeph">ON</code> condition. Within this clause, you can either <code class="ph codeph">UPDATE</code> specific
+      columns or <code class="ph codeph">DELETE</code> the matched rows. Multiple <code class="ph codeph">WHEN MATCHED</code> clauses can be provided,
+      each with a different condition.
+    </p>
+
+
+    <p class="p">
+      The <code class="ph codeph">WHEN NOT MATCHED</code> clause is executed if a row from the source table has no matching row in the
+      target table. This clause typically inserts new rows into the target table.
+    </p>
+
+
+    <ul class="ul">
+      <li class="li"><code class="ph codeph">UPDATE</code>: Updates specified columns of the target table for matching rows. Both source and target
+      fields can be used in the update expressions.</li>
+
+      <li class="li"><code class="ph codeph">DELETE</code>: Deletes the matching rows from the target table.</li>
+
+      <li class="li"><code class="ph codeph">INSERT</code>: Inserts new rows into the target table when no match is found, using values from the source table.</li>
+
+    </ul>
+
+
+    <p class="p">
+      The <code class="ph codeph">ON</code> clause defines the join condition between the target table and source expression, typically based
+      on primary key or unique identifier columns. The <code class="ph codeph">MERGE</code> operation evaluates the conditions in the order
+      of the <code class="ph codeph">WHEN</code> clauses, executing the first matching action and discarding subsequent clauses.
+    </p>
+
+
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+
+
+<pre class="pre codeblock"><code>MERGE INTO customers AS c
+USING updates AS u
+ON u.customer_id = c.customer_id
+WHEN MATCHED AND c.status != 'inactive' THEN
+  UPDATE SET c.name = u.name, c.email = u.email
+WHEN MATCHED THEN DELETE
+WHEN NOT MATCHED THEN
+  INSERT (customer_id, name, email, status) VALUES (u.customer_id, u.name, u.email, 'active');</code></pre>
+    <p class="p">
+      In this example, the <code class="ph codeph">MERGE</code> operation updates customer information where IDs match and the customer
+      is not inactive, deletes inactive customers, and inserts new customers from the source table if no match is found.
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">MERGE</code> statement is only supported for Iceberg tables.
+    </p>
+
+    <p class="p">
+      For Iceberg tables, this operation generally uses a full outer join with the <code class="ph codeph">STRAIGHT_JOIN</code> hint
+      to combine the target and source datasets.
+    </p>
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

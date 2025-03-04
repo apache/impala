@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2024" />
-<meta name="DC.rights.owner" content="(C) Copyright 2024" />
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Managing Disk Space for Impala Data" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html" />
@@ -221,11 +221,11 @@
         
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="disk_space__table_a4d_myg_3jb" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /></colgroup><thead class="thead" style="text-align:left;">
               <tr class="row">
-                <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d66750e320">
+                <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d68047e320">
                   Config option
                 </th>
 
-                <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d66750e323">
+                <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d68047e323">
                   Description
                 </th>
 
@@ -234,22 +234,22 @@
             </thead>
 <tbody class="tbody">
               <tr class="row">
-                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66750e320 ">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d68047e320 ">
                   <code class="ph codeph">--scratch_dirs=/dir1,/dir2</code>
                 </td>
 
-                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66750e323 ">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d68047e323 ">
                   Use /dir1 and /dir2 as scratch directories with no capacity quota.
                 </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66750e320 ">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d68047e320 ">
                   <code class="ph codeph">--scratch_dirs=/dir1,/dir2:25G</code>
                 </td>
 
-                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66750e323 ">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d68047e323 ">
                   Use /dir1 and /dir2 as scratch directories with no capacity quota on /dir1 and
                   the 25GB quota on /dir2.
                 </td>
@@ -257,11 +257,11 @@
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66750e320 ">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d68047e320 ">
                   <code class="ph codeph">--scratch_dirs=/dir1:5MB,/dir2</code>
                 </td>
 
-                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66750e323 ">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d68047e323 ">
                   Use /dir1 and /dir2 as scratch directories with the capacity quota of 5MB on
                   /dir1 and no quota on /dir2.
                 </td>
@@ -269,11 +269,11 @@
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66750e320 ">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d68047e320 ">
                   <code class="ph codeph">--scratch_dirs=/dir1:-1,/dir2:0</code>
                 </td>
 
-                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d66750e323 ">
+                <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d68047e323 ">
                   Use /dir1 and /dir2 as scratch directories with no capacity quota.
                 </td>
 

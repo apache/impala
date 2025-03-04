@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2024" />
-<meta name="DC.rights.owner" content="(C) Copyright 2024" />
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Impala String Functions" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
@@ -2499,7 +2499,7 @@ select replace('hello world','xyz','abc');
       
 
         <dt class="dt dlterm" id="string_functions__trim">
-          TRIM(STRING a)
+          TRIM(STRING a), TRIM({{LEADING | TRAILING | BOTH} [STRING chars_to_trim] | STRING chars_to_trim} FROM STRING a)
         </dt>
 
 
@@ -2512,6 +2512,35 @@ select replace('hello world','xyz','abc');
             cycle, if input values might still have surrounding spaces. For a more
             general-purpose function that can remove other leading and trailing characters
             besides spaces, see <code class="ph codeph">BTRIM()</code>.
+          </p>
+
+
+          <p class="p">
+            TRIM-FROM syntax is a SQL-standardized wrapper around
+            <code class="ph codeph">LTRIM</code> / <code class="ph codeph">RTRIM</code> / <code class="ph codeph">BTRIM</code>.
+            Depending on the first parameter <code class="ph codeph">LEADING</code> /
+            <code class="ph codeph">TRAILING</code> / <code class="ph codeph">BOTH</code>, wrapper resolves itself to
+            the corresponding underlying function. Default value is <code class="ph codeph">BOTH</code>.
+            If present, the <code class="ph codeph">chars_to_trim</code> parameter is passed forward to
+            the underlying function. Thus, given syntax may come in three different forms:
+          </p>
+
+
+          <p class="p">
+            Syntax #1: <code class="ph codeph">TRIM(&lt;where&gt; FROM &lt;string&gt;)</code> --&gt;
+            <code class="ph codeph">{L|R|B}TRIM(string)</code>;
+          </p>
+
+
+          <p class="p">
+            Syntax #2: <code class="ph codeph">TRIM(&lt;charset&gt; FROM &lt;string&gt;)</code>  --&gt;
+            <code class="ph codeph">BTRIM(string, charset)</code>;
+          </p>
+
+
+          <p class="p">
+            Syntax #3: <code class="ph codeph">TRIM(&lt;where&gt; &lt;charset&gt; FROM &lt;string&gt;)</code>
+            --&gt;<code class="ph codeph">{L|R|B}TRIM(string, charset)</code>.
           </p>
 
 

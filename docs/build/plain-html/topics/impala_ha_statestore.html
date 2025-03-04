@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Configuring StateStore for High Availability" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_ha.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="impala_ha_statestore" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Configuring StateStore for High Availability</title>
+</head>
+<body id="impala_ha_statestore">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Configuring StateStore for High Availability</h1>
+
+  
+  <div class="body conbody">
+    <p class="p">With a pair of StateStore instances in primary/standby mode, the primary StateStore instance
+      will send the cluster's state update and propagate metadata updates. It periodically sends
+      heartbeat to the standby StateStore instance, CatalogD, coordinators and executors. The standby
+      StateStore instance also sends heartbeats to the CatalogD, and coordinators and executors. RPC
+      connections between daemons and StateStore instances are kept alive so that broken connections
+      usually won't result in false failure reports between nodes. The standby StateStore instance
+      takes over the primary role when the service is needed in order to continue to operate when
+      the primary instance goes down.</p>
+
+  </div>
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_ha.html">Configuring Impala for High Availability</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="enabling_statestore_ha">
+    <h2 class="title topictitle2" id="ariaid-title2">Enabling StateStore High Availability</h2>
+
+    <div class="body conbody">
+      <div class="p">To enable StateStore High Availability (HA) in an Impala cluster, follow these steps:<ol class="ol" id="enabling_statestore_ha__ol_k2p_zxm_1cc">
+        <li class="li">Restart two StateStore instances with the following additional
+          flags:<pre class="pre codeblock" id="enabling_statestore_ha__codeblock_tmp_bym_1cc"><code>enable_statestored_ha: true
+state_store_ha_port: RPC port for StateStore HA service (default: 24020)
+state_store_peer_host: Hostname of the peer StateStore instance
+state_store_peer_ha_port: RPC port of high availability service on the peer StateStore instance (default: 24020)
+</code></pre></li>
+
+        <li class="li">Restart all subscribers (including CatalogD, coordinators, and executors) with the
+            following additional
+            flags:<pre class="pre codeblock" id="enabling_statestore_ha__codeblock_zyl_lmh_fcc"><code>state_store_host: Hostname of the first StateStore instance
+state_store_port: RPC port for StateStore registration on the first StateStore instance (default: 24000)
+enable_statestored_ha: true
+state_store_2_host: Hostname of the second StateStore instance
+state_store_2_port: RPC port for StateStore registration on the second StateStore instance (default: 24000)</code></pre></li>
+
+      </ol>
+</div>
+
+    <p class="p">By setting these flags, the Impala cluster is configured to use two StateStore instances for
+      high availability, ensuring high availability and fault tolerance.</p>
+
+    </div>
+
+  </div>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="disabling_statestore_ha">
+    <h2 class="title topictitle2" id="ariaid-title3">Disabling StateStore High Availability</h2>
+
+    <div class="body conbody">
+      <div class="p">To disable StateStore high availability in an Impala cluster, follow these steps:<ol class="ol" id="disabling_statestore_ha__ol_udj_b1n_1cc">
+          <li class="li">Remove one StateStore instance from the Impala cluster.</li>
+
+          <li class="li">Restart the remaining StateStore instance along with the coordinator, executor, and
+            CatalogD nodes, ensuring they are restarted without the
+              <code class="ph codeph">enable_statestored_ha</code> flag.</li>
+
+        </ol>
+</div>
+
+    </div>
+
+  </div>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="statestore_failure_detection">
+    <h2 class="title topictitle2" id="ariaid-title4">StateStore Failure Detection</h2>
+
+    <div class="body conbody">
+      <p class="p">The primary StateStore instance continuously sends heartbeat to its registered clients, and
+        the standby StateStore instance. Each StateStore client registers to both active and standby
+        StateStore instances, and maintains the following information about the StateStore servers:
+        the server IP and port, service role - primary/standby, the last time the heartbeat request
+        was received, or number of missed heartbeats. A missing heartbeat response from the
+        StateStor’s client indicates an unhealthy daemon. There is a flag that defines
+          <code class="ph codeph">MAX_MISSED_HEARTBEAT_REQUEST_NUM </code>as the consecutive number of missed
+        heartbeat requests to indicate losing communication with the StateStore server from the
+        client's point of view so that the client marks the StateStore server as down. Standby
+        StateStore instance collects the connection states between the clients (CatalogD,
+        coordinators and executors) and primary StateStore instance in its heartbeat messages to the
+        clients. If the standby StateStore instance misses <code class="ph codeph">MAX_MISSED_HEARTBEAT_REQUEST_NUM
+        </code>of heartbeat requests from the primary StateStore instance and the majority of
+        clients lose connections with the primary StateStore, it takes over the primary role.</p>
+
+    </div>
+
+  </div>
+
+</body>
+</html>

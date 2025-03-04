@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2024"><meta name="DC.rights.owner" content="(C) Copyright 2024"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_resource_management.html"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="admission_control"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Configuring Admission Control</title></head><body id="admission_control"><header role="banner"><!--
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2025"><meta name="DC.rights.owner" content="(C) Copyright 2025"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_resource_management.html"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.4.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="admission_control"><link rel="stylesheet" type="text/css" href="../css/commonltr.css"><link rel="stylesheet" type="text/css" href="../css/dita-ot-doc.css"><title>Configuring Admission Control</title></head><body id="admission_control"><header role="banner"><!--
 The DITA Open Toolkit is licensed for use under the the Apache
 Software Foundation License v2.0.
 
@@ -12,7 +12,7 @@ Toolkit code.
 --><div class="header">
   <p>Apache Impala</p>
   <hr>
-</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a><ul><li><a href="../topics/impala_admission.html">Admission Control and Query Queuing</a></li><li class="active"><a href="../topics/impala_admission_config.html">Configuring Admission Control</a></li></ul></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_ozone.html">Ozone Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+</div></header><nav role="toc"><ul><li><a href="../topics/impala_intro.html">Introducing Apache Impala</a></li><li><a href="../topics/impala_concepts.html">Concepts and Architecture</a></li><li><a href="../topics/impala_planning.html">Deployment Planning</a></li><li><a href="../topics/impala_install.html">Installing Impala</a></li><li><a href="../topics/impala_config.html">Managing Impala</a></li><li><a href="../topics/impala_upgrading.html">Upgrading Impala</a></li><li><a href="../topics/impala_processes.html">Starting Impala</a></li><li><a href="../topics/impala_tutorial.html">Tutorials</a></li><li><a href="../topics/impala_admin.html">Administration</a></li><li><a href="../topics/impala_security.html">Impala Security</a></li><li><a href="../topics/impala_langref.html">SQL Reference</a></li><li><a href="../topics/impala_performance.html">Performance Tuning</a></li><li><a href="../topics/impala_scalability.html">Scalability Considerations</a></li><li><a href="../topics/impala_resource_management.html">Resource Management</a><ul><li><a href="../topics/impala_admission.html">Admission Control and Query Queuing</a></li><li class="active"><a href="../topics/impala_admission_config.html">Configuring Admission Control</a></li></ul></li><li><a href="../topics/impala_partitioning.html">Partitioning</a></li><li><a href="../topics/impala_file_formats.html">File Formats</a></li><li><a href="../topics/impala_jdbc_external_table.html">Using Impala to Query External JDBC Data Sources</a></li><li><a href="../topics/impala_kudu.html">Using Impala to Query Kudu Tables</a></li><li><a href="../topics/impala_hbase.html">HBase Tables</a></li><li><a href="../topics/impala_iceberg.html">Iceberg Tables</a></li><li><a href="../topics/impala_s3.html">S3 Tables</a></li><li><a href="../topics/impala_adls.html">ADLS Tables</a></li><li><a href="../topics/impala_isilon.html">Isilon Storage</a></li><li><a href="../topics/impala_ozone.html">Ozone Storage</a></li><li><a href="../topics/impala_logging.html">Logging</a></li><li><a href="../topics/impala_client.html">Client Access</a></li><li><a href="../topics/impala_fault_tolerance.html">Fault Tolerance</a></li><li><a href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></li><li><a href="../topics/impala_ports.html">Ports Used by Impala</a></li><li><a href="../topics/impala_reserved_words.html">Impala Reserved Words</a></li><li><a href="../topics/impala_faq.html">Impala Frequently Asked Questions</a></li><li><a href="../topics/impala_release_notes.html">Impala Release Notes</a></li></ul></nav><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Configuring Admission Control</h1>
 
@@ -75,7 +75,7 @@ Toolkit code.
         might set up different resource pools with separate memory limits, and maximum number of
         concurrent and queued queries, for different categories of users within your
         organization. For details about all the Fair Scheduler configuration settings, see the
-        <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache
+        <a class="xref" href="https://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache
         wiki</a>.
       </p>
 
@@ -89,6 +89,15 @@ llama.am.throttling.maximum.queued.reservations.<var class="keyword varname">que
 <span class="ph">impala.admission-control.pool-default-query-options.<var class="keyword varname">queue_name</var>
 impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queue_name</var></span>
 </code></pre>
+
+      <p class="p">
+        The <code class="ph codeph">llama.am.throttling.maximum.placed.reservations.<var class="keyword varname">queue_name</var></code>
+        setting specifies the number of queries that are allowed to run concurrently in this pool.
+      </p>
+      <p class="p">
+        The <code class="ph codeph">llama.am.throttling.maximum.queued.reservations.<var class="keyword varname">queue_name</var></code>
+        setting specifies the number of queries that are allowed to be queued in this pool.
+      </p>
 
       <p class="p">
         The <code class="ph codeph">impala.admission-control.pool-queue-timeout-ms</code> setting specifies
@@ -119,10 +128,10 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
         <p class="p">
           Here are sample <span class="ph filepath">fair-scheduler.xml</span> and
           <span class="ph filepath">llama-site.xml</span> files that define resource pools
-          <code class="ph codeph">root.default</code>, <code class="ph codeph">root.development</code>, and
-          <code class="ph codeph">root.production</code>. These files define resource pools for Impala
-          admission control and are separate from the similar
-          <code class="ph codeph">fair-scheduler.xml</code>that defines resource pools for YARN.
+          <code class="ph codeph">root.default</code>, <code class="ph codeph">root.development</code>,
+          <code class="ph codeph">root.production</code>, and <code class="ph codeph">root.coords</code>.
+          These files define resource pools for Impala admission control and are separate
+          from the similar <code class="ph codeph">fair-scheduler.xml</code>that defines resource pools for YARN.
         </p>
 
         <p class="p">
@@ -148,6 +157,36 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
           to those pools.
         </p>
 
+        <p class="p">
+          The <code class="ph codeph">&lt;onlyCoordinators&gt;</code> element is a boolean that defaults
+          to <code class="ph codeph">false</code>. If this value is set to <code class="ph codeph">true</code>, the
+          named request pool will contain only the coordinators and none of the executors.
+          The main purpose of this setting is to enable running queries against the
+          <code class="ph codeph">sys.impala_query_live</code> table from workload management. Since the
+          data for this table is stored in the memory of the coordinators, the executors
+          do not need to be involved if the query only selects from this table.
+        </p>
+
+        <p class="p">
+          To use an <code class="ph codeph">&lt;onlyCoordinators&gt;</code> request pool, set the
+          <code class="ph codeph">REQUEST_POOL</code> query option to the name of the
+          <code class="ph codeph">&lt;onlyCoordinators&gt;</code> request pool. <strong class="ph b">Caution</strong> even though
+          these request pools do not contain executors, they can still run any query.
+          Thus, while the <code class="ph codeph">REQUEST_POOL</code> query option is set to an only
+          coordinators request pool, queries have the potential to run the coordinators
+          out of resources.
+        </p>
+
+        <p class="p">
+          Caution: care must be taken when naming the <code class="ph codeph">&lt;onlyCoordinators&gt;</code>
+          request pool. If the name has the same prefix as a named executor group set, then
+          queries may be automatically routed to the request pool.  For example, if the
+          coordinator is configured with
+          <code class="ph codeph">--expected_executor_group_sets=prefix1:10</code>, then an only coordinators
+          request pool named <code class="ph codeph">prefix1-onlycoords</code> will potentially have
+          queries routed to it.
+        </p>
+
 <pre class="pre codeblock"><code>&lt;allocations&gt;
 
     &lt;queue name="root"&gt;
@@ -163,6 +202,11 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
         &lt;queue name="production"&gt;
             &lt;maxResources&gt;1000000 mb, 0 vcores&lt;/maxResources&gt;
             &lt;aclSubmitApps&gt; ops,admin&lt;/aclSubmitApps&gt;
+        &lt;/queue&gt;
+        &lt;queue name="coords"&gt;
+            &lt;maxResources&gt;1000000 mb, 0 vcores&lt;/maxResources&gt;
+            &lt;aclSubmitApps&gt;ops,admin&lt;/aclSubmitApps&gt;
+            &lt;onlyCoordinators&gt;true&lt;/onlyCoordinators&gt;
         &lt;/queue&gt;
     &lt;/queue&gt;
     &lt;queuePlacementPolicy&gt;
@@ -223,11 +267,285 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
 
     </article>
 
+  <article class="topic concept nested2" aria-labelledby="ariaid-title4" id="concept_bz4_vxz_jgb__user_quotas">
+
+      <h3 class="title topictitle3" id="ariaid-title4">Configuring User Quotas in the Admission Control Configuration</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          Since <span class="keyword">Impala 4.5</span>, User Quotas can be used to define rules
+          that limit the total count of queries that a user can run concurrently.
+          The rules are based on either usernames or group membership.
+          The username is the short username, and groups are
+          <a class="xref" href="https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/GroupsMapping.html" target="_blank">Hadoop Groups
+          </a>.
+        </p>
+        <p class="p">
+          Queries are counted from when they are queued to when they are released.
+          In a cluster without an Admission Daemon, the count of queries is synchronized
+          across all coordinators through the Statestore.
+          In this configuration over-admission is possible.
+        </p>
+        <p class="p">
+          If a query fails to pass the User Quota rules then the query will be
+          rejected when it is submitted.
+        </p>
+
+        <div class="p">
+          There are three type of rules:
+          <ul class="ul">
+            <li class="li">
+              User Rules (based on a username)
+            </li>
+            <li class="li">
+              Wildcard Rules (which match any username)
+            </li>
+            <li class="li">
+              Group Rules (based on a user’s membership of a group)
+            </li>
+          </ul>
+          The rules can be placed at the Pool level or the Root level:
+          <ul class="ul">
+            <li class="li">
+              A rule at the Pool level is evaluated against the number of queries a user has running in the pool
+            </li>
+            <li class="li">
+              A rule at the Root level is evaluated against the total number of queries a user has running across all pools.
+            </li>
+          </ul>
+        </div>
+
+        <div class="p">
+          The XML tags used for User Quotas are:
+          <ul class="ul">
+            <li class="li">
+              <strong class="ph b">userQueryLimit</strong> - used to define a User Rule
+            </li>
+            <li class="li">
+              <strong class="ph b">groupQueryLimit</strong> - used to define a Group Rule
+            </li>
+            <li class="li">
+              <strong class="ph b">totalCount</strong> - used to define the number of queries that can run
+              concurrently.
+            </li>
+            <li class="li">
+              <strong class="ph b">user</strong> - used to specify a username to define a User Rule,
+              or, by using the wildcard '*', to define a Wildcard Rule.
+            </li>
+            <li class="li">
+              <strong class="ph b">group</strong> - in a Group rule, used to specify a group name that the
+              rule applies to.
+            </li>
+          </ul>
+          Examples are provided below.
+        </div>
+
+        <p class="p">
+          More specific rules override more general rules.
+          A user rule overrides a group rule or wildcard rule.
+          A group rule overrides a wildcard rule.
+          Pool level rules are evaluated first.
+          If Pool level rules pass, then Root level rules are evaluated.
+        </p>
+
+        <p class="p">
+          Note that the examples of User Quota rules below are incomplete xml snippets
+          that would form part of an Admission Control configuration.
+          In particular, they omit the essential <strong class="ph b">aclSubmitApps</strong> tag.
+        </p>
+
+        <section class="section"><h4 class="title sectiontitle">A User Rule</h4>
+          
+          <pre class="pre codeblock"><code>
+&lt;userQueryLimit&gt;
+  &lt;user&gt;alice&lt;/user&gt;
+  &lt;user&gt;bob&lt;/user&gt;
+  &lt;totalCount&gt;3&lt;/totalCount&gt;
+&lt;/userQueryLimit&gt;
+          </code></pre>
+          <p class="p">
+            This rule limits the users ‘alice’ and ‘bob’ to each running 3 queries.
+            This rule could be placed at the Pool level or the Root level.
+          </p>
+        </section>
+
+        <section class="section"><h4 class="title sectiontitle">A Pool Level Wildcard Rule</h4>
+          
+          <pre class="pre codeblock"><code>
+&lt;queue name="root"&gt;
+  &lt;queue name="queueE"&gt;
+    &lt;userQueryLimit&gt;
+      &lt;user&gt;*&lt;/user&gt;
+      &lt;totalCount&gt;2&lt;/totalCount&gt;
+    &lt;/userQueryLimit&gt;
+  &lt;/queue&gt;
+...
+          </code></pre>
+          <p class="p">
+            This is a wildcard rule on pool root.queueE that limits
+            all users to running 2 queries in that pool.
+          </p>
+        </section>
+
+        <section class="section"><h4 class="title sectiontitle">A Root Level User Rule</h4>
+          
+          <pre class="pre codeblock"><code>
+&lt;queue name="root"&gt;
+  &lt;userQueryLimit&gt;
+    &lt;user&gt;userD&lt;/user&gt;
+    &lt;totalCount&gt;2&lt;/totalCount&gt;
+  &lt;/userQueryLimit&gt;
+...
+          </code></pre>
+          <p class="p">
+            This is a Root level user rule that limits userD to 2 queries across all
+            pools.
+          </p>
+        </section>
+
+        <section class="section"><h4 class="title sectiontitle">A Group Rule</h4>
+          
+          <pre class="pre codeblock"><code>
+&lt;queue name="root"&gt;
+  &lt;queue name="queueE"&gt;
+    &lt;groupQueryLimit&gt;
+      &lt;group&gt;group1&lt;/group&gt;
+      &lt;group&gt;group2&lt;/group&gt;
+      &lt;totalCount&gt;2&lt;/totalCount&gt;
+    &lt;/groupQueryLimit&gt;
+...
+          </code></pre>
+          <p class="p">
+            This rule limits any user in groups group1 or group2 to running 2 queries
+            in pool root.queueE. Note this rule could also be placed at the root level.
+          </p>
+        </section>
+
+        <section class="section"><h4 class="title sectiontitle">
+            More Specific Rules Override The Less Specific
+          </h4>
+          
+          <pre class="pre codeblock"><code>
+&lt;queue name="group-set-small"&gt;
+  &lt;!-- A user not matched by any other rule can run 1 query in the small pool --&gt;
+  &lt;userQueryLimit&gt;
+      &lt;user&gt;*&lt;/user&gt;
+      &lt;totalCount&gt;1&lt;/totalCount&gt;
+  &lt;/userQueryLimit&gt;
+  &lt;!-- The user 'alice' can run 4 queries in the small pool --&gt;
+  &lt;userQueryLimit&gt;
+    &lt;user&gt;alice&lt;/user&gt;
+    &lt;totalCount&gt;4&lt;/totalCount&gt;
+  &lt;/userQueryLimit&gt;
+...
+          </code></pre>
+          <p class="p">
+            With this rule, the user ‘alice’ can run 4 queries in "root.group-set-small".
+            The more specific User rule overrides the wildcard rule.
+            A user that is not ‘alice’ would be able to run 1 query, per the wildcard
+            rule.
+          </p>
+        </section>
+
+        <section class="section"><h4 class="title sectiontitle">
+            Another Example of More Specific Rules Overriding Less Specific Rules
+          </h4>
+          
+          <pre class="pre codeblock"><code>
+&lt;queue name="group-set-small"&gt;
+  &lt;!-- A user not matched by any other rule can run 1 query in the small pool --&gt;
+  &lt;userQueryLimit&gt;
+      &lt;user&gt;*&lt;/user&gt;
+      &lt;totalCount&gt;1&lt;/totalCount&gt;
+  &lt;/userQueryLimit&gt;
+  &lt;!-- Members of the group 'it' can run 2 queries in the small pool --&gt;
+  &lt;groupQueryLimit&gt;
+    &lt;group&gt;it&lt;/group&gt;
+    &lt;totalCount&gt;2&lt;/totalCount&gt;
+  &lt;/groupQueryLimit&gt;
+...
+          </code></pre>
+          <p class="p">
+            Assuming the user ‘bob’ is in the ‘it’ group, they can run 2 queries
+            in "root.group-set-small".
+            The more specific Group rule overrides the wildcard rule.
+          </p>
+        </section>
+
+        <section class="section"><h4 class="title sectiontitle">
+            User rules are more specific than group rules.
+          </h4>
+          
+          <pre class="pre codeblock"><code>
+&lt;queue name="group-set-small"&gt;
+  &lt;!-- Members of the group 'it' can run 2 queries in the small pool --&gt;
+  &lt;groupQueryLimit&gt;
+    &lt;group&gt;it&lt;/group&gt;
+    &lt;totalCount&gt;2&lt;/totalCount&gt;
+  &lt;/groupQueryLimit&gt;
+  &lt;!-- The user 'fiona' can run 3 queries in the small pool --&gt;
+  &lt;userQueryLimit&gt;
+    &lt;user&gt;fiona&lt;/user&gt;
+    &lt;totalCount&gt;3&lt;/totalCount&gt;
+  &lt;/userQueryLimit&gt;
+...
+          </code></pre>
+          <p class="p">
+            The user 'fiona' can run 4 queries in "root.group-set-small", despite also
+            matching the 'it' group.
+            The more specific user rule overrides the group rule.
+          </p>
+        </section>
+
+        <section class="section"><h4 class="title sectiontitle">
+            Both pool and root rules must be passed.
+          </h4>
+          
+          <pre class="pre codeblock"><code>
+&lt;queue name="root"&gt;
+  &lt;groupQueryLimit&gt;
+    &lt;group&gt;support&lt;/group&gt;
+    &lt;totalCount&gt;6&lt;/totalCount&gt;
+  &lt;/groupQueryLimit&gt;
+  &lt;queue name="group-set-small"&gt;
+    &lt;groupQueryLimit&gt;
+      &lt;group&gt;dev&lt;/group&gt;
+      &lt;group&gt;support&lt;/group&gt;
+      &lt;totalCount&gt;5&lt;/totalCount&gt;
+    &lt;/groupQueryLimit&gt;
+  &lt;/queue&gt;
+...
+          </code></pre>
+          <p class="p">
+            Members of group 'support' are limited to run 6 queries across all the pools.
+            Members of groups 'dev' and 'support' can run 5 queries
+            in "root.group-set-small".
+            To run, both rules must be passed.
+            The Pool level rule is evaluated first, so that an error mentioning that pool
+            will be seen in the case where both rules would fail.
+          </p>
+          <p class="p">
+            A user may be a member of more than one group, which means that more than one
+            Group Rule may apply to a user at the Pool or Root level.
+            In this case, at each level, the least restrictive rule is applied.
+            For example, if the user is in 2 groups: 'it' and 'support', where
+            group 'it' restricts her to running 2 queries, and group 'support' restricts
+            her to running 5 queries, then the 'support' rule is the least restrictive,
+            so she can run 5 queries in the pool.
+          </p>
+        </section>
+
+      </div>
+
+    </article>
+
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="admission_control__concept_zy4_vxz_jgb">
 
-    <h2 class="title topictitle2" id="ariaid-title4">Configuring Cluster-wide Admission Control</h2>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="admission_control__concept_zy4_vxz_jgb">
+
+    <h2 class="title topictitle2" id="ariaid-title5">Configuring Cluster-wide Admission Control</h2>
 
     
 
@@ -417,7 +735,7 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
               <strong class="ph b">Usage notes:</strong> Admission control only uses a small subset of the settings
               that can go in this file, as described below. For details about all the Fair
               Scheduler configuration settings, see the
-              <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache
+              <a class="xref" href="https://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache
               wiki</a>.
             </p>
           </dd>

@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2024" />
-<meta name="DC.rights.owner" content="(C) Copyright 2024" />
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using Impala with Iceberg Tables" />
 <meta name="prodname" content="Impala" />
@@ -142,32 +142,32 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
           
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="iceberg_create__iceberg_custom_catalogs" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /></colgroup><thead class="thead" style="text-align:left;">
                 <tr class="row">
-                  <th class="entry cellrowborder" style="vertical-align:top;" id="d99604e155">Config Key</th>
+                  <th class="entry cellrowborder" style="vertical-align:top;" id="d104564e155">Config Key</th>
 
-                  <th class="entry cellrowborder" style="vertical-align:top;" id="d99604e158">Description</th>
+                  <th class="entry cellrowborder" style="vertical-align:top;" id="d104564e158">Description</th>
 
                 </tr>
 
               </thead>
 <tbody class="tbody">
                 <tr class="row">
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e155 ">iceberg.catalog.&lt;catalog_name&gt;.type</td>
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e155 ">iceberg.catalog.&lt;catalog_name&gt;.type</td>
 
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e158 ">type of catalog: hive, hadoop, or left unset if using a custom catalog</td>
-
-                </tr>
-
-                <tr class="row">
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e155 ">iceberg.catalog.&lt;catalog_name&gt;.catalog-impl</td>
-
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e158 ">catalog implementation, must not be null if type is empty</td>
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e158 ">type of catalog: hive, hadoop, or left unset if using a custom catalog</td>
 
                 </tr>
 
                 <tr class="row">
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e155 ">iceberg.catalog.&lt;catalog_name&gt;.&lt;key&gt;</td>
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e155 ">iceberg.catalog.&lt;catalog_name&gt;.catalog-impl</td>
 
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e158 ">any config key and value pairs for the catalog</td>
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e158 ">catalog implementation, must not be null if type is empty</td>
+
+                </tr>
+
+                <tr class="row">
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e155 ">iceberg.catalog.&lt;catalog_name&gt;.&lt;key&gt;</td>
+
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e158 ">any config key and value pairs for the catalog</td>
 
                 </tr>
 
@@ -313,130 +313,130 @@ ALTER TABLE ice_v1_to_v2 SET TBLPROPERTIES('format-version'='2');
         
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="iceberg_types__iceberg_types_sql_types" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /></colgroup><thead class="thead" style="text-align:left;">
               <tr class="row">
-                <th class="entry cellrowborder" style="vertical-align:top;" id="d99604e342">Iceberg type</th>
+                <th class="entry cellrowborder" style="vertical-align:top;" id="d104564e342">Iceberg type</th>
 
-                <th class="entry cellrowborder" style="vertical-align:top;" id="d99604e345">SQL type in Impala</th>
+                <th class="entry cellrowborder" style="vertical-align:top;" id="d104564e345">SQL type in Impala</th>
 
               </tr>
 
             </thead>
 <tbody class="tbody">
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">boolean</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">boolean</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">BOOLEAN</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">int</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">INTEGER</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">BOOLEAN</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">long</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">int</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">BIGINT</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">float</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">FLOAT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">INTEGER</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">double</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">long</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">DOUBLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">decimal(P, S)</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">DECIMAL(P, S)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">BIGINT</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">date</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">float</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">DATE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">time</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">Not supported</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">FLOAT</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">timestamp</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">double</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">TIMESTAMP</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">timestamptz</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">Only read support via TIMESTAMP</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">DOUBLE</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">string</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">decimal(P, S)</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">STRING</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">uuid</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">Not supported</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">DECIMAL(P, S)</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">fixed(L)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">date</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">Not supported</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">binary</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">Not supported</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">DATE</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">struct</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">time</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">STRUCT (read only)</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">list</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">ARRAY (read only)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">Not supported</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e342 ">map</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">timestamp</td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;" headers="d99604e345 ">MAP (read only)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">TIMESTAMP</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">timestamptz</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">Only read support via TIMESTAMP</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">string</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">STRING</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">uuid</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">Not supported</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">fixed(L)</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">Not supported</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">binary</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">Not supported</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">struct</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">STRUCT (read only)</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">list</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">ARRAY (read only)</td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e342 ">map</td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;" headers="d104564e345 ">MAP (read only)</td>
 
               </tr>
 
@@ -622,8 +622,50 @@ DELETE FROM ice_t where i = 3;
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title11" id="iceberg_update">
-    <h2 class="title topictitle2" id="ariaid-title11">Updating data int Iceberg tables</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title11" id="iceberg_drop_partition">
+    <h2 class="title topictitle2" id="ariaid-title11">Dropping partitions from Iceberg tables</h2>
+
+    <div class="body conbody">
+      <div class="p">
+        Since <span class="keyword">Impala 4.4</span> Impala is able to run <code class="ph codeph">ALTER TABLE DROP PARTITION</code> statements. E.g.:
+        <pre class="pre codeblock"><code>
+ALTER TABLE ice_t DROP PARTITION (i = 3);
+ALTER TABLE ice_t DROP PARTITION (day(date_col) &lt; '2024-10-01');
+ALTER TABLE ice_t DROP PARTITION (year(timestamp_col) = '2024');
+        </code></pre>
+      </div>
+
+      <p class="p">
+      Any non-identity transforms must be included in the partition selector like <code class="ph codeph">(day(date_col))</code>. Operands for filtering date and
+      timestamp-based columns with transforms must be provided as strings, for example: <code class="ph codeph">(day(date_col) = '2024-10-01')</code>.
+      This is a metadata-only operation, the datafiles targeted by the deleted partitions do not get purged or removed from the filesystem,
+      only a new snapshot is getting created with the remaining partitions.
+      </p>
+
+      <div class="p">
+      Limitations:
+        <ul class="ul">
+          <li class="li">Binary filter predicates must consist of one partition selector and one constant expression;
+          e.g.: <code class="ph codeph">(day(date_col) = '2024-10-01')</code> is allowed, but <code class="ph codeph">(another_date_col = date_col)</code> is not allowed.</li>
+
+          <li class="li">Filtering expressions must target the latest partition spec of the table.</li>
+
+        </ul>
+
+      </div>
+
+      <p class="p">
+        More information about the <code class="ph codeph">ALTER TABLE DROP PARTITION</code> statement can be found at
+        <a class="xref" href="impala_alter_table.html">ALTER TABLE Statement</a>.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="iceberg_update">
+    <h2 class="title topictitle2" id="ariaid-title12">Updating data in Iceberg tables</h2>
 
     <div class="body conbody">
       <div class="p">
@@ -657,7 +699,7 @@ UPDATE ice_t SET ice_t.k = o.k, ice_t.j = o.j, FROM ice_t, other_table o where i
 
           <li class="li">
             Updating partitioning column with non-constant expression via the UPDATE FROM statement is not allowed.
-            The upcoming MERGE statement will not have this limitation.
+            This limitation could be eliminated by using a <code class="ph codeph">MERGE</code> statement.
           </li>
 
         </ul>
@@ -673,8 +715,44 @@ UPDATE ice_t SET ice_t.k = o.k, ice_t.j = o.j, FROM ice_t, other_table o where i
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="iceberg_load">
-    <h2 class="title topictitle2" id="ariaid-title12">Loading data into Iceberg tables</h2>
+    <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="iceberg_merge">
+    <h2 class="title topictitle2" id="ariaid-title13">Merging data into Iceberg tables</h2>
+
+    <div class="body conbody">
+      <div class="p">
+        Impala can execute MERGE statements against Iceberg tables, e.g:
+        <pre class="pre codeblock"><code>
+MERGE INTO ice_t USING source ON ice_t.a = source.id WHEN NOT MATCHED THEN INSERT VALUES(id, source.column1);
+MERGE INTO ice_t USING source ON ice_t.a = source.id WHEN MATCHED THEN DELETE;
+MERGE INTO ice_t USING source ON ice_t.a = source.id WHEN MATCHED THEN UPDATE SET b = source.b;
+MERGE INTO ice_t USING source ON ice_t.a = source.id
+  WHEN MATCHED AND ice_t.a &lt; 100 THEN UPDATE SET b = source.b
+  WHEN MATCHED THEN DELETE
+  WHEN NOT MATCHED THEN INSERT VALUES(id, source.column1);
+        </code></pre>
+      </div>
+
+      <div class="p">
+        The limitations of the <code class="ph codeph">UPDATE</code> statement also apply to the <code class="ph codeph">MERGE</code> statement; in addition,
+        the limitations of the <code class="ph codeph">MERGE</code> statement:
+        <ul class="ul">
+          <li class="li">Subqueries in source statements must be simple queries as internal rewrite is not supported.</li>
+
+        </ul>
+
+      </div>
+
+      <p class="p">
+        More information about the <code class="ph codeph">MERGE</code> statement can be found at <a class="xref" href="impala_merge.html">MERGE Statement</a>.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title14" id="iceberg_load">
+    <h2 class="title topictitle2" id="ariaid-title14">Loading data into Iceberg tables</h2>
 
     <div class="body conbody">
       <div class="p">
@@ -699,8 +777,8 @@ UPDATE ice_t SET ice_t.k = o.k, ice_t.j = o.j, FROM ice_t, other_table o where i
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="iceberg_optimize_table">
-    <h2 class="title topictitle2" id="ariaid-title13">Optimizing (Compacting) Iceberg tables</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title15" id="iceberg_optimize_table">
+    <h2 class="title topictitle2" id="ariaid-title15">Optimizing (Compacting) Iceberg tables</h2>
 
     <div class="body conbody">
       <div class="p">
@@ -709,22 +787,27 @@ UPDATE ice_t SET ice_t.k = o.k, ice_t.j = o.j, FROM ice_t, other_table o where i
         This causes read performance to degrade over time.
         The following statement can be used to compact the table and optimize it for reading.
         <pre class="pre codeblock"><code>
-OPTIMIZE TABLE [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>;
+OPTIMIZE TABLE [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var> [FILE_SIZE_THRESHOLD_MB=<var class="keyword varname">value</var>];
         </code></pre>
       </div>
 
 
       <div class="p">
-        The current implementation of the <code class="ph codeph">OPTIMIZE TABLE</code> statement rewrites
-        the entire table, executing the following tasks:
+        The <code class="ph codeph">OPTIMIZE TABLE</code> statement rewrites the table, executing the
+        following tasks:
         <ul class="ul">
-          <li class="li">compact small files</li>
+          <li class="li">Merges delete files with the corresponding data files.</li>
 
-          <li class="li">merge delete and update deltas</li>
+          <li class="li">Compacts data files that are smaller than the specified file size threshold in megabytes.</li>
 
-          <li class="li">rewrite all files, converting them to the latest table schema</li>
+        </ul>
 
-          <li class="li">rewrite all partitions according to the latest partition spec</li>
+        If no <code class="ph codeph">FILE_SIZE_THRESHOLD_MB</code> was specified, the command compacts
+        ALL files and also
+        <ul class="ul">
+          <li class="li">Converts data files to the latest table schema.</li>
+
+          <li class="li">Rewrites all partitions according to the latest partition spec.</li>
 
         </ul>
 
@@ -736,10 +819,10 @@ OPTIMIZE TABLE [<var class="keyword varname">db_name</var>.]<var class="keyword 
         <ul class="ul">
           <li class="li">The user needs ALL privileges on the table.</li>
 
-          <li class="li">The table can conatin any file formats that Impala can read, but <code class="ph codeph">write.format.default</code>
+          <li class="li">The table can contain any file formats that Impala can read, but <code class="ph codeph">write.format.default</code>
           has to be <code class="ph codeph">parquet</code>.</li>
 
-          <li class="li">The table cannot contain complex types.</li>
+          <li class="li">General write limitations apply, e.g. the table cannot contain complex types.</li>
 
         </ul>
 
@@ -750,12 +833,16 @@ OPTIMIZE TABLE [<var class="keyword varname">db_name</var>.]<var class="keyword 
         When a table is optimized, a new snapshot is created. The old table state is still
         accessible by time travel to previous snapshots, because the rewritten data and
         delete files are not removed physically.
+        Issue the <code class="ph codeph">ALTER TABLE ... EXECUTE expire_snapshots(...)</code> command
+        to remove the old files from the file system.
       </p>
 
       <p class="p">
-        Note that the current implementation of <code class="ph codeph">OPTIMIZE TABLE</code> rewrites
-        the entire table, therefore this operation can take a long time to complete
+        Note that <code class="ph codeph">OPTIMIZE TABLE</code> without a specified <code class="ph codeph">FILE_SIZE_THRESHOLD_MB</code>
+        rewrites the entire table, therefore the operation can take a long time to complete
         depending on the size of the table.
+        It is recommended to specify a file size threshold for recurring table maintenance
+        jobs to save resources.
       </p>
 
     </div>
@@ -763,8 +850,8 @@ OPTIMIZE TABLE [<var class="keyword varname">db_name</var>.]<var class="keyword 
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title14" id="iceberg_time_travel">
-    <h2 class="title topictitle2" id="ariaid-title14">Time travel for Iceberg tables</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title16" id="iceberg_time_travel">
+    <h2 class="title topictitle2" id="ariaid-title16">Time travel for Iceberg tables</h2>
 
     <div class="body conbody">
 
@@ -834,8 +921,8 @@ DESCRIBE HISTORY ice_t BETWEEN '2022-01-04 10:00:00' AND '2022-01-05 10:00:00';
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title15" id="iceberg_execute_rollback">
-    <h2 class="title topictitle2" id="ariaid-title15">Rolling Iceberg tables back to a previous state</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title17" id="iceberg_execute_rollback">
+    <h2 class="title topictitle2" id="ariaid-title17">Rolling Iceberg tables back to a previous state</h2>
 
     <div class="body conbody">
       <p class="p">
@@ -874,8 +961,8 @@ ALTER TABLE ice_tbl EXECUTE ROLLBACK('2022-01-04 10:00:00');
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title16" id="iceberg_expire_snapshots">
-    <h2 class="title topictitle2" id="ariaid-title16">Expiring snapshots</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title18" id="iceberg_expire_snapshots">
+    <h2 class="title topictitle2" id="ariaid-title18">Expiring snapshots</h2>
 
     <div class="body conbody">
       <div class="p">
@@ -892,9 +979,11 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
       <div class="p">
         Expire snapshots:
         <ul class="ul">
-          <li class="li">does not remove old metadata files by default.</li>
+          <li class="li">removes data files that are no longer referenced by non-expired snapshots.</li>
 
           <li class="li">does not remove orphaned data files.</li>
+
+          <li class="li">does not remove old metadata files by default.</li>
 
           <li class="li">respects the minimum number of snapshots to keep:
           <code class="ph codeph">history.expire.min-snapshots-to-keep</code> table property.</li>
@@ -916,8 +1005,8 @@ ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 5 days);
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title17" id="iceberg_metadata_tables">
-    <h2 class="title topictitle2" id="ariaid-title17">Iceberg metadata tables</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title19" id="iceberg_metadata_tables">
+    <h2 class="title topictitle2" id="ariaid-title19">Iceberg metadata tables</h2>
 
     <div class="body conbody">
       <p class="p">
@@ -999,8 +1088,67 @@ ORDER BY made_current_at;
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title18" id="iceberg_table_cloning">
-    <h2 class="title topictitle2" id="ariaid-title18">Cloning Iceberg tables (LIKE clause)</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title20" id="iceberg_puffin_stats">
+    <h2 class="title topictitle2" id="ariaid-title20">Iceberg Puffin statistics</h2>
+
+    <div class="body conbody">
+      <p class="p">
+      Impala supports reading NDV (Number of Distinct Values) statistics from Puffin files.
+      For the Puffin specification, see <a class="xref" href="https://iceberg.apache.org/puffin-spec" target="_blank">the Apache Iceberg Puffin site</a>.
+      </p>
+
+      <p class="p">
+      If there are Puffin stats for multiple snapshots, Impala chooses the most recent
+      one for each column. Note that this means that the stats for different columns may
+      come from different snapshots.
+      </p>
+
+      <p class="p">
+      In case there are both HMS and Puffin stats for a column, the more recent one will
+      be used - for HMS stats we use the 'impala.lastComputeStatsTime' table property, and
+      for Puffin stats we use the snapshot timestamp to determine which one is more
+      recent.
+      </p>
+
+      <p class="p">
+      Reading Puffin stats is disabled by default; set the "--enable_reading_puffin_stats"
+      startup flag to true to enable it.
+      </p>
+
+      <p class="p">
+      Some engines, e.g. Trino, also write the NDV as a property (with key "ndv") in the
+      "statistics" section of the metadata.json file for each blob, in addition to the
+      Puffin file. If such a property is present for a blob, Impala will read the value
+      from the metadata.json file instead of the Puffin file to reduce file I/O.
+      </p>
+
+      <div class="p">
+      Note that it is currently not possible to drop Puffin stats from Impala.
+      For this reason, it is possible to disable reading Puffin stats in two ways:
+      <ul class="ul">
+        <li class="li">Globally, with the aforementioned
+            <code class="ph codeph">enable_reading_puffin_stats</code> startup flag - when it is set
+            to false, Impala will never read Puffin stats.</li>
+
+        <li class="li">For specific tables, by setting the
+            <code class="ph codeph">impala.iceberg_read_puffin_stats</code> table property to
+            "false".</li>
+
+      </ul>
+
+      </div>
+
+      <p class="p">
+      Note that Impala does not yet support writing Puffin statistics files.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title21" id="iceberg_table_cloning">
+    <h2 class="title topictitle2" id="ariaid-title21">Cloning Iceberg tables (LIKE clause)</h2>
 
     <div class="body conbody">
       <div class="p">
@@ -1022,8 +1170,8 @@ ORDER BY made_current_at;
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title19" id="iceberg_table_properties">
-    <h2 class="title topictitle2" id="ariaid-title19">Iceberg table properties</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title22" id="iceberg_table_properties">
+    <h2 class="title topictitle2" id="ariaid-title22">Iceberg table properties</h2>
 
     <div class="body conbody">
       <div class="p">
@@ -1085,8 +1233,8 @@ ORDER BY made_current_at;
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title20" id="iceberg_manifest_caching">
-    <h2 class="title topictitle2" id="ariaid-title20">Iceberg manifest caching</h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title23" id="iceberg_manifest_caching">
+    <h2 class="title topictitle2" id="ariaid-title23">Iceberg manifest caching</h2>
 
     <div class="body conbody">
       <div class="p">

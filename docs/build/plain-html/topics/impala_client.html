@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2024" />
-<meta name="DC.rights.owner" content="(C) Copyright 2024" />
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Impala Client Access" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html" />
@@ -360,6 +360,25 @@
             <p class="p">
               On a single <code class="ph codeph">impalad</code>, cookies are valid across sessions and
               connections.
+            </p>
+
+          </dd>
+
+
+        
+
+        
+
+          <dt class="dt dlterm">
+            --max_hs2_sessions_per_user
+          </dt>
+
+
+          <dd class="dd">
+            Specifies the maximum allowed number of HiveServer2 sessions that can be
+            opened by any single connected user on a coordinator.
+            <p class="p">
+              The default is -1. Setting to -1 or 0 disables this feature.
             </p>
 
           </dd>

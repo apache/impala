@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="AGG_MEM_CORRELATION_FACTOR Query Option (Impala 4.4 or higher only)" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_set.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="agg_mem_correlation_factor" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>AGG_MEM_CORRELATION_FACTOR Query Option (Impala 4.4 or higher only)</title>
+</head>
+<body id="agg_mem_correlation_factor">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">AGG_MEM_CORRELATION_FACTOR Query Option (<span class="keyword">Impala 4.4</span> or higher only)</h1>
+
+  
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      
+      Default correlation factor between two or more grouping columns in aggregation node.
+      When grouping over multiple columns, the query planner will assume this value to reason
+      about how correlated the columns are. A value close to 1.0 means columns are highly
+      correlated, while 0.0 means no correlation. In popular RDBMS, this column correlation
+      can usually be measured by using <code class="ph codeph">CORR</code> function.
+    </p>
+
+    <p class="p">
+      If both <code class="ph codeph">AGG_MEM_CORRELATION_FACTOR</code> and
+      <code class="ph codeph">LARGE_AGG_MEM_THRESHOLD</code> are set larger than 0, the planner will
+      switch memory estimation calculation for aggregation node from using NDV multiplication-based
+      algorithm to correlation-based memory estimation that should yield lower
+      estimate. Setting a high <code class="ph codeph">AGG_MEM_CORRELATION_FACTOR</code> will result in
+      lower memory estimation, but no less than
+      <code class="ph codeph">LARGE_AGG_MEM_THRESHOLD</code>. Setting a low value will result in higher
+      memory estimation, but will not exceed the default NDV multiplication-based
+      estimation.
+    </p>
+
+    <p class="p">
+      Users can set this option value to 0.0 so the planner stays using the default
+      NDV multiplication based-estimation.
+    </p>
+
+
+    <p class="p">
+        <strong class="ph b">Type:</strong> double
+      </p>
+
+
+    <p class="p">
+        <strong class="ph b">Default:</strong>
+      </p>
+
+    <p class="p">
+      <code class="ph codeph">0.5</code>
+    </p>
+
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 4.4</span>
+      </p>
+
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_large_agg_mem_threshold.html">LARGE_AGG_MEM_THRESHOLD Query Option (Impala 4.4 or higher only)</a>
+    </p>
+
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_set.html">SET Statement</a></div>
+</div>
+</div></body>
+</html>

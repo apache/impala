@@ -4,14 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2024" />
-<meta name="DC.rights.owner" content="(C) Copyright 2024" />
+<meta name="copyright" content="(C) Copyright 2025" />
+<meta name="DC.rights.owner" content="(C) Copyright 2025" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="SET Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_abort_on_error.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_allow_erasure_coded_files.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_allow_unsupported_formats.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_agg_mem_correlation_factor.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_appx_count_distinct.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_batch_size.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_broadcast_bytes_limit.html" />
@@ -38,15 +39,17 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_expand_complex_types.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_explain_level.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_fetch_rows_timeout_ms.html" />
-<meta name="DC.Relation" scheme="URI" content="../topics/impala_join_rows_produced_limit.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_hbase_cache_blocks.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_hbase_caching.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_idle_session_timeout.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_join_rows_produced_limit.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_kudu_read_mode.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_large_agg_mem_threshold.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_live_progress.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_live_summary.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_max_errors.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_max_mem_estimate_for_admission.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_max_num_runtime_filters.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_max_result_spooling_mem.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_max_row_size.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_max_scan_range_length.html" />
@@ -337,6 +340,8 @@ SET <var class="keyword varname">query_option</var>=""
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_allow_unsupported_formats.html">ALLOW_UNSUPPORTED_FORMATS Query Option</a></strong><br />
 </li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_agg_mem_correlation_factor.html">AGG_MEM_CORRELATION_FACTOR Query Option (Impala 4.4 or higher only)</a></strong><br />
+</li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_appx_count_distinct.html">APPX_COUNT_DISTINCT Query Option (Impala 2.0 or higher only)</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_batch_size.html">BATCH_SIZE Query Option</a></strong><br />
@@ -389,15 +394,17 @@ SET <var class="keyword varname">query_option</var>=""
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_fetch_rows_timeout_ms.html">FETCH_ROWS_TIMEOUT_MS Query Option</a></strong><br />
 </li>
-<li class="link ulchildlink"><strong><a href="../topics/impala_join_rows_produced_limit.html">JOIN_ROWS_PRODUCED_LIMIT Query Option</a></strong><br />
-</li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_hbase_cache_blocks.html">HBASE_CACHE_BLOCKS Query Option</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_hbase_caching.html">HBASE_CACHING Query Option</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_idle_session_timeout.html">IDLE_SESSION_TIMEOUT Query Option (Impala 2.12 or higher only)</a></strong><br />
 </li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_join_rows_produced_limit.html">JOIN_ROWS_PRODUCED_LIMIT Query Option</a></strong><br />
+</li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_kudu_read_mode.html">KUDU_READ_MODE Query Option (Impala 3.1 or higher only)</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_large_agg_mem_threshold.html">LARGE_AGG_MEM_THRESHOLD Query Option (Impala 4.4 or higher only)</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_live_progress.html">LIVE_PROGRESS Query Option (Impala 2.3 or higher only)</a></strong><br />
 </li>
@@ -406,6 +413,8 @@ SET <var class="keyword varname">query_option</var>=""
 <li class="link ulchildlink"><strong><a href="../topics/impala_max_errors.html">MAX_ERRORS Query Option</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_max_mem_estimate_for_admission.html">MAX_MEM_ESTIMATE_FOR_ADMISSION Query Option</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_max_num_runtime_filters.html">MAX_NUM_RUNTIME_FILTERS Query Option (Impala 2.5 or higher only)</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_max_result_spooling_mem.html">MAX_RESULT_SPOOLING_MEM Query Option</a></strong><br />
 </li>
