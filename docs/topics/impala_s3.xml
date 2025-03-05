@@ -119,10 +119,6 @@ under the License.
         </li>
         <li>Enable <xref href="impala_data_cache.xml#data_cache">data cache for
             remote reads</xref>.</li>
-        <li>Enable <xref
-            href="https://hadoop.apache.org/docs/current/hadoop-aws/tools/hadoop-aws/s3guard.html"
-            format="html" scope="external">S3Guard</xref> in your cluster for
-          data consistency.</li>
         <li>
           <p> Too many files in a table can make metadata load and update slow
             in S3. If too many requests are made to S3, S3 has a back-off
