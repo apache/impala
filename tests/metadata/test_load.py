@@ -20,8 +20,8 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 import time
-from beeswaxd.BeeswaxService import QueryState
 from copy import deepcopy
+from tests.common.impala_connection import FINISHED, RUNNING
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_client_protocol_dimension,
@@ -42,6 +42,7 @@ HIDDEN_FILES = ["{0}/3/.100101.txt".format(STAGING_PATH),
                 "{0}/3/_100101.txt".format(STAGING_PATH)]
 # A path outside WAREHOUSE, which will be a different bucket for Ozone/ofs.
 TMP_STAGING_PATH = get_fs_path('/tmp/test_load_staging')
+
 
 @SkipIfLocal.hdfs_client
 class TestLoadData(ImpalaTestSuite):
@@ -143,7 +144,7 @@ class TestLoadDataExternal(ImpalaTestSuite):
     self.client.execute("create table functional.{0} like functional.alltypesnopart"
         " location '{1}/{0}'".format(TEST_TBL_NOPART_EXT, WAREHOUSE))
 
-  def test_load(self, vector):
+  def test_load(self):
     self.execute_query_expect_success(self.client, "load data inpath '{0}/100101.txt'"
         " into table functional.{1}".format(TMP_STAGING_PATH, TEST_TBL_NOPART_EXT))
     result = self.execute_scalar(
@@ -179,9 +180,6 @@ class TestAsyncLoadData(ImpalaTestSuite):
     enable_async_load_data = vector.get_value('enable_async_load_data_execution')
     protocol = vector.get_value('protocol')
     client = self.create_impala_client(protocol=protocol)
-    is_hs2 = protocol in ['hs2', 'hs2-http']
-    running_state = "RUNNING_STATE" if is_hs2 else QueryState.RUNNING
-    finished_state = "FINISHED_STATE" if is_hs2 else QueryState.FINISHED
 
     # Form a fully qualified table name with '-' in protocol 'hs2-http' dropped as
     # '-' is not allowed in Impala table name even delimited with ``.
@@ -221,13 +219,13 @@ class TestAsyncLoadData(ImpalaTestSuite):
       handle = self.execute_query_async_using_client(client, load_stmt, new_vector)
       exec_end = time.time()
       exec_time = exec_end - exec_start
-      exec_end_state = client.get_state(handle)
+      exec_end_state = client.get_impala_exec_state(handle)
 
       # Wait for the statement to finish with a timeout of 20 seconds
       # (30 seconds without shortcircuit reads)
       wait_time = 20 if IS_HDFS else 30
       wait_start = time.time()
-      self.wait_for_state(handle, finished_state, wait_time, client=client)
+      client.wait_for_impala_state(handle, FINISHED, wait_time)
       wait_end = time.time()
       wait_time = wait_end - wait_start
       self.close_query_using_client(client, handle)
@@ -236,8 +234,8 @@ class TestAsyncLoadData(ImpalaTestSuite):
         #  The compilation of LOAD is processed in the exec step without delay. And the
         #  processing of the LOAD plan is in wait step with delay. The wait time should
         #  definitely take more time than 3 seconds.
-        assert(exec_end_state == running_state)
-        assert(wait_time >= 3)
+        assert (exec_end_state == RUNNING)
+        assert (wait_time >= 3)
       else:
         # In sync mode:
         #  The entire LOAD is processed in the exec step with delay. exec_time should be
@@ -245,8 +243,8 @@ class TestAsyncLoadData(ImpalaTestSuite):
         #  that the exec state returned is still in RUNNING state due to the the wait-for
         #  thread executing ClientRequestState::Wait() does not have time to set the
         #  exec state from RUNNING to FINISH.
-        assert(exec_end_state == running_state or exec_end_state == finished_state)
-        assert(exec_time >= 3)
+        assert (exec_end_state == RUNNING or exec_end_state == FINISHED)
+        assert (exec_time >= 3)
     finally:
       client.close()
 

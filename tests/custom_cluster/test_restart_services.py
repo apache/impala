@@ -34,9 +34,9 @@ from time import sleep
 from impala.error import HiveServer2Error
 from TCLIService import TCLIService
 
-from beeswaxd.BeeswaxService import QueryState
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_connection import ERROR, RUNNING
 from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfFS
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
@@ -115,7 +115,7 @@ class TestRestart(CustomClusterTestSuite):
       node_to_restart = self.cluster.impalads[2]
       node_to_restart.restart()
       # Verify that the query is cancelled due to the failed impalad quickly.
-      self.wait_for_state(handle, QueryState.EXCEPTION, 20, client=client)
+      client.wait_for_impala_state(handle, ERROR, 20)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -440,14 +440,14 @@ class TestRestart(CustomClusterTestSuite):
     try:
       handle = client.execute_async(slow_query)
       # Make sure query starts running.
-      self.wait_for_state(handle, QueryState.RUNNING, 1000)
+      self.client.wait_for_impala_state(handle, RUNNING, 1000)
       profile = client.get_runtime_profile(handle)
       assert "NumBackends: 3" in profile, profile
       # Restart Statestore and wait till the grace period ends + some buffer.
       self.cluster.statestored.restart()
       self.cluster.statestored.service.wait_for_live_subscribers(4)
       sleep(self.CANCELLATION_GRACE_PERIOD_S + 1)
-      assert client.get_state(handle) == QueryState.RUNNING
+      assert client.is_running(handle)
       # Now restart statestore and kill a backend while it is down, and make sure the
       # query fails when it comes back up.
       start_time = time.time()
@@ -469,7 +469,7 @@ class TestRestart(CustomClusterTestSuite):
       catalogd_version = self.cluster.catalogd.service.get_catalog_version()
       impalad.service.wait_for_metric_value("catalog.curr-version", catalogd_version)
       handle = client.execute_async(slow_query)
-      self.wait_for_state(handle, QueryState.RUNNING, 1000)
+      self.client.wait_for_impala_state(handle, RUNNING, 1000)
       profile = client.get_runtime_profile(handle)
       assert "NumBackends: 2" in profile, profile
       start_time = time.time()
@@ -1010,7 +1010,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     # Fix number of scanner threads to make runtime more deterministic.
     handle = self.execute_query_async(query, {'num_scanner_threads': 1})
     self.impalad_test_service.wait_for_query_state(self.client, handle,
-                self.client.QUERY_STATES['RUNNING'], timeout=20)
+                self.client.QUERY_STATES['RUNNING'], timeout=timeout)
     return handle
 
   def __fetch_and_get_num_backends(self, query, handle, delay_s=0, timeout_s=20):

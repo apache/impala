@@ -23,11 +23,11 @@ from os import getenv
 from time import sleep
 
 
-from beeswaxd.BeeswaxService import QueryState
 from hive_metastore.ttypes import FireEventRequest
 from hive_metastore.ttypes import FireEventRequestData
 from hive_metastore.ttypes import InsertEventRequestData
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_connection import ERROR, FINISHED
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_dimensions import add_exec_option_dimension
@@ -655,8 +655,7 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     add_part_stmt = "alter table {} add if not exists partition(p=0)".format(tbl)
     drop_part_stmt = "alter table {} drop if exists partition(p=0)".format(tbl)
     refresh_stmt = "refresh {} partition(p=0)".format(tbl)
-    end_states = [self.client.QUERY_STATES['FINISHED'],
-                  self.client.QUERY_STATES['EXCEPTION']]
+    end_states = [FINISHED, ERROR]
 
     self.execute_query(create_stmt)
     self.execute_query(add_part_stmt)
@@ -665,11 +664,11 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     # Before IMPALA-12855, REFRESH usually fails in 2-3 rounds.
     for i in range(100):
       self.execute_query(drop_part_stmt)
-      refresh_state = self.wait_for_any_state(refresh_handle, end_states, 10)
-      assert refresh_state == self.client.QUERY_STATES['FINISHED'],\
+      refresh_state = self.client.wait_for_any_impala_state(
+        refresh_handle, end_states, 10)
+      assert refresh_state == FINISHED, \
           "REFRESH state: {}. Error log: {}".format(
-              QueryState._VALUES_TO_NAMES[refresh_state],
-              self.client.get_log(refresh_handle))
+            refresh_state, self.client.get_log(refresh_handle))
       self.execute_query(add_part_stmt)
       refresh_handle = self.client.execute_async(refresh_stmt)
 

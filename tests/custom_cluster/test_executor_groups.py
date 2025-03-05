@@ -20,10 +20,10 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_connection import FINISHED, RUNNING
 from tests.common.parametrize import UniqueDatabase
 from tests.common.test_result_verifier import error_msg_startswith
 from tests.util.concurrent_workload import ConcurrentWorkload
-
 import json
 import logging
 import os
@@ -1606,7 +1606,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     Assert existence of expected_group_str in query profile."""
     client.set_configuration(config_options)
     query_handle = client.execute_async(query)
-    self.wait_for_state(query_handle, client.QUERY_STATES['RUNNING'], 30, client=client)
+    client.wait_for_impala_state(query_handle, RUNNING, 30)
     assert expected_group_str in client.get_runtime_profile(query_handle)
 
   @pytest.mark.execute_serially
@@ -1699,7 +1699,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._add_executors("group", healthy_threshold, num_executors=1,
         resource_pool="root.large", extra_args="-mem_limit=2g", expected_num_impalads=6)
 
-    self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
+    self.client.wait_for_impala_state(handle, FINISHED, 60)
     profile = self.client.get_runtime_profile(handle)
     assert "F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4" in profile, profile
     assert ("Scheduler Warning: Cluster membership might changed between planning and "

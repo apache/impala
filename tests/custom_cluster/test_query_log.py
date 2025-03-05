@@ -31,6 +31,7 @@ from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.cluster_config import impalad_admission_ctrl_config_args
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_connection import FINISHED
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.retry import retry
@@ -518,7 +519,7 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     def close_op(client, resp):
       close_operation_req = TCLIService.TCloseOperationReq()
       close_operation_req.operationHandle = resp.operationHandle
-      assert_resp(hs2_client.CloseOperation(close_operation_req))
+      assert_resp(client.CloseOperation(close_operation_req))
 
     try:
       # Open a new HS2 session.
@@ -897,7 +898,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     unix_now = time()
     try:
       client.execute("{0}".format(unix_now))
-    except Exception as _:
+    except Exception:
       pass
 
     # Get the query id from the completed queries table since the call to execute errors
@@ -1178,7 +1179,7 @@ class TestQueryLogQueuedQueries(CustomClusterTestSuite):
               queries.
        """
     resp = self.hs2_client.execute_async("SELECT * FROM functional.alltypes LIMIT 5")
-    self.wait_for_state(resp, 'FINISHED_STATE', 60, client=self.hs2_client)
+    self.hs2_client.wait_for_impala_state(resp, FINISHED, 60)
     self.hs2_client.close_query(resp)
 
     # Start a query that will consume the only available slot since its rows are not
@@ -1212,7 +1213,7 @@ class TestQueryLogQueuedQueries(CustomClusterTestSuite):
         "list of in-flight queries".format(self.insert_query_id)
 
     # Retrieve all rows of the original blocking query to cause it to complete.
-    self.wait_for_state(long_query_resp, 'FINISHED_STATE', 60, client=self.hs2_client)
+    self.hs2_client.wait_for_impala_state(long_query_resp, FINISHED, 60)
     self.hs2_client.close_query(long_query_resp)
 
     # Helper function that checks if a query matches the workload management insert DML

@@ -23,12 +23,12 @@ import pytest
 import re
 import time
 
-from beeswaxd.BeeswaxService import QueryState
 from copy import deepcopy
 from tests.metadata.test_ddl_base import TestDdlBase
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.environ import (HIVE_MAJOR_VERSION)
 from tests.common.file_utils import create_table_from_orc
+from tests.common.impala_connection import FINISHED, INITIALIZED, PENDING, RUNNING
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (
@@ -961,8 +961,7 @@ class TestAsyncDDL(TestDdlBase):
         "'Inserted 7300 row(s)'")
 
   @classmethod
-  def test_get_operation_status_for_client(self, client, unique_database,
-          init_state, pending_state, running_state):
+  def test_get_operation_status_for_client(self, client, unique_database):
     # Setup
     client.execute("drop table if exists {0}.alltypes_clone".format(unique_database))
     client.execute("select count(*) from functional_parquet.alltypes")
@@ -986,15 +985,15 @@ class TestAsyncDDL(TestDdlBase):
     num_times_in_running_state = 0
     while not client.state_is_finished(handle):
 
-      state = client.get_state(handle)
+      state = client.get_impala_exec_state(handle)
 
-      if (state == init_state):
+      if (state == INITIALIZED):
         num_times_in_initialized_state += 1
 
-      if (state == pending_state):
+      if (state == PENDING):
         num_times_in_pending_state += 1
 
-      if (state == running_state):
+      if (state == RUNNING):
         num_times_in_running_state += 1
 
     # The query must reach INITIALIZED_STATE 0 time and PENDING_STATE at least
@@ -1007,18 +1006,8 @@ class TestAsyncDDL(TestDdlBase):
   def test_get_operation_status_for_async_ddl(self, vector, unique_database):
     """Tests that for an asynchronously executed DDL with delay, GetOperationStatus
     must be issued repeatedly. Test client hs2-http, hs2 and beeswax"""
-
-    if vector.get_value('protocol') == 'hs2-http':
-      self.test_get_operation_status_for_client(self.hs2_http_client, unique_database,
-      "INITIALIZED_STATE", "PENDING_STATE", "RUNNING_STATE")
-
-    if vector.get_value('protocol') == 'hs2':
-      self.test_get_operation_status_for_client(self.hs2_client, unique_database,
-      "INITIALIZED_STATE", "PENDING_STATE", "RUNNING_STATE")
-
-    if vector.get_value('protocol') == 'beeswax':
-      self.test_get_operation_status_for_client(self.client, unique_database,
-      QueryState.INITIALIZED, QueryState.COMPILED, QueryState.RUNNING)
+    client = self.default_impala_client(vector.get_value('protocol'))
+    self.test_get_operation_status_for_client(client, unique_database)
 
 
 class TestAsyncDDLTiming(TestDdlBase):
@@ -1038,10 +1027,6 @@ class TestAsyncDDLTiming(TestDdlBase):
   def test_alter_table_recover(self, vector, unique_database):
     enable_async_ddl = vector.get_value('enable_async_ddl_execution')
     client = self.create_impala_client(protocol=vector.get_value('protocol'))
-    is_hs2 = vector.get_value('protocol') in ['hs2', 'hs2-http']
-    pending_state = "PENDING_STATE" if is_hs2 else QueryState.COMPILED
-    running_state = "RUNNING_STATE" if is_hs2 else QueryState.RUNNING
-    finished_state = "FINISHED_STATE" if is_hs2 else QueryState.FINISHED
 
     try:
       # Setup for the alter table case (create table that points to an existing
@@ -1066,15 +1051,15 @@ class TestAsyncDDLTiming(TestDdlBase):
       handle = self.execute_query_async_using_client(client, alter_stmt, new_vector)
       exec_end = time.time()
       exec_time = exec_end - exec_start
-      state = client.get_state(handle)
+      state = client.get_impala_exec_state(handle)
       if enable_async_ddl:
-        assert state == pending_state or state == running_state
+        assert state in [PENDING, RUNNING]
       else:
-        assert state == running_state or state == finished_state
+        assert state in [RUNNING, FINISHED]
 
       # Wait for the statement to finish with a timeout of 20 seconds
       wait_start = time.time()
-      self.wait_for_state(handle, finished_state, 20, client=client)
+      client.wait_for_impala_state(handle, FINISHED, 20)
       wait_end = time.time()
       wait_time = wait_end - wait_start
       self.close_query_using_client(client, handle)
@@ -1096,9 +1081,6 @@ class TestAsyncDDLTiming(TestDdlBase):
   def test_ctas(self, vector, unique_database):
     enable_async_ddl = vector.get_value('enable_async_ddl_execution')
     client = self.create_impala_client(protocol=vector.get_value('protocol'))
-    is_hs2 = vector.get_value('protocol') in ['hs2', 'hs2-http']
-    pending_state = "PENDING_STATE" if is_hs2 else QueryState.COMPILED
-    finished_state = "FINISHED_STATE" if is_hs2 else QueryState.FINISHED
 
     try:
       # The CTAS is going to need the metadata of the source table in the
@@ -1125,7 +1107,7 @@ class TestAsyncDDLTiming(TestDdlBase):
       # The CRS_BEFORE_COORD_STARTS delay postpones the transition from PENDING
       # to RUNNING, so the sync case should be in PENDING state at the end of
       # the execute call. This means that the sync and async cases are the same.
-      assert client.get_state(handle) == pending_state
+      assert client.is_pending(handle)
 
       # Wait for the statement to finish with a timeout of 40 seconds
       # (60 seconds without shortcircuit reads). There are other tests running
@@ -1134,7 +1116,7 @@ class TestAsyncDDLTiming(TestDdlBase):
       # on the statement finishing in a particular amount of time.
       wait_time = 40 if IS_HDFS else 60
       wait_start = time.time()
-      self.wait_for_state(handle, finished_state, wait_time, client=client)
+      client.wait_for_impala_state(handle, FINISHED, wait_time)
       wait_end = time.time()
       wait_time = wait_end - wait_start
       self.close_query_using_client(client, handle)

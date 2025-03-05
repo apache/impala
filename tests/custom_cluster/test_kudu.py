@@ -24,6 +24,7 @@ from kudu.schema import INT32
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_connection import FINISHED
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.skip import SkipIfKudu, SkipIfBuildType, SkipIf
 from tests.common.test_dimensions import BEESWAX, add_mandatory_exec_option
@@ -853,8 +854,8 @@ class TestKuduDmlConflictBase(CustomClusterTestSuite):
     slow_handle = self.execute_query_async(slow_query, slow_sleep)
     try:
       # Wait for both queries to finish.
-      self.wait_for_state(fast_handle, self.client.QUERY_STATES['FINISHED'], timeout)
-      self.wait_for_state(slow_handle, self.client.QUERY_STATES['FINISHED'], timeout)
+      self.client.wait_for_impala_state(fast_handle, FINISHED, timeout)
+      self.client.wait_for_impala_state(slow_handle, FINISHED, timeout)
       self._check_errors(self.client.get_runtime_profile(slow_handle),
           expect_error_on_slow_query, error_message, num_row_erros)
     finally:

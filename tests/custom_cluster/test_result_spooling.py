@@ -20,6 +20,7 @@ import pytest
 import re
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_connection import FINISHED
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -63,7 +64,7 @@ class TestDedicatedCoordinator(CustomClusterTestSuite):
     try:
       # Wait for the query to finish (all rows are spooled). Assert that the executor
       # has been shutdown and its memory has been released.
-      self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], timeout)
+      self.client.wait_for_impala_state(handle, FINISHED, timeout)
       self.assert_eventually(timeout, 0.5,
           lambda: re.search("RowsSent:.*({0})".format(num_rows),
           self.client.get_runtime_profile(handle)))

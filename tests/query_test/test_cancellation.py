@@ -200,14 +200,14 @@ class TestCancellation(ImpalaTestSuite):
     # Wait for the query to start (with a long timeout to account for admission control
     # queuing).
     WAIT_SECONDS = 60 * 30
-    assert any(client.get_state(handle) == 'RUNNING_STATE' or sleep(0.1)
+    assert any(client.is_running(handle) or sleep(0.1)
                for _ in range(10 * WAIT_SECONDS)), 'Query failed to start'
 
     client.cancel(handle)
     # Wait up to 5 seconds for the query to get cancelled
     # TODO(IMPALA-1262): This should be CANCELED_STATE
     # TODO(IMPALA-8411): Remove and assert that the query is cancelled immediately
-    assert any(client.get_state(handle) == 'ERROR_STATE' or sleep(1)
+    assert any(client.is_error(handle) or sleep(1)
                for _ in range(5)), 'Query failed to cancel'
     # Get profile and check for formatting errors
     profile = client.get_runtime_profile(handle, TRuntimeProfileFormat.THRIFT)

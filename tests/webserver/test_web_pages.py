@@ -20,6 +20,7 @@ from tests.common.environ import ImpalaTestClusterFlagsDetector
 from tests.common.file_utils import grep_dir
 from tests.common.skip import SkipIfBuildType, SkipIfDockerizedCluster
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_connection import FINISHED, RUNNING
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.filesystem_utils import supports_storage_ids
 from tests.util.parse_util import parse_duration_string_ms
@@ -146,7 +147,7 @@ class TestWebPage(ImpalaTestSuite):
     query = "select count(*) from functional_parquet.alltypes where bool_col = sleep(100)"
     query_handle = self.client.execute_async(query)
     try:
-      self.wait_for_state(query_handle, self.client.QUERY_STATES['RUNNING'], 1000)
+      self.client.wait_for_impala_state(query_handle, RUNNING, 1000)
       memz_breakdown = self.get_debug_page(self.MEMZ_URL)['detailed']
       finstance_re = re.compile("Fragment [0-9a-f]{16}:[0-9a-f]{16}")
       assert finstance_re.search(memz_breakdown), memz_breakdown
@@ -171,8 +172,8 @@ class TestWebPage(ImpalaTestSuite):
       assert "application/json" == response.headers['Content-Type']
       jmx_json = ""
       try:
-       jmx_json = json.loads(response.text)
-       assert "beans" in jmx_json.keys(), "Ill formatted JSON returned: %s" % jmx_json
+        jmx_json = json.loads(response.text)
+        assert "beans" in jmx_json.keys(), "Ill formatted JSON returned: %s" % jmx_json
       except ValueError:
         assert False, "Invalid JSON returned from /jmx endpoint: %s" % jmx_json
 
@@ -454,8 +455,8 @@ class TestWebPage(ImpalaTestSuite):
 
   def __test_table_metrics(self, db_name, tbl_name, metric):
     self.client.execute("refresh %s.%s" % (db_name, tbl_name))
-    self.get_and_check_status(self.TABLE_METRICS_URL +
-      "?name=%s.%s" % (db_name, tbl_name), metric, ports_to_test=self.CATALOG_TEST_PORT)
+    self.get_and_check_status(self.TABLE_METRICS_URL
+      + "?name=%s.%s" % (db_name, tbl_name), metric, ports_to_test=self.CATALOG_TEST_PORT)
 
   def __test_catalog_tables_loading_time(self, db_name, tbl_name):
     """Test the list of tables with the longest loading time in the catalog page.
@@ -491,7 +492,7 @@ class TestWebPage(ImpalaTestSuite):
       # Find the entry for the db table and verify its file count.
       if re.search(target_metric, trow) is not None:
         # Get the number following <td> in the entry
-        nfiles = re.search('(?<=\<td\>)\d+', trow)
+        nfiles = re.search(r'(?<=\<td\>)\d+', trow)
         assert nfiles.group(0) == numfiles
     response = self.get_and_check_status(self.CATALOG_URL + "?json",
       "high_file_count_tables", ports_to_test=self.CATALOG_TEST_PORT)
@@ -515,7 +516,7 @@ class TestWebPage(ImpalaTestSuite):
     expected_result = "select \"{0}...".format("x " * 121)
     check_if_contains = False
     response_json = self.__run_query_and_get_debug_page(
-      query, self.QUERIES_URL, expected_state=self.client.QUERY_STATES["FINISHED"])
+      query, self.QUERIES_URL, expected_state=FINISHED)
     # Search the json for the expected value.
     # The query can be in in_flight_queries even though it is in FINISHED state.
     for json_part in itertools.chain(
@@ -539,7 +540,7 @@ class TestWebPage(ImpalaTestSuite):
     response_json = ""
     try:
       if expected_state:
-        self.wait_for_state(query_handle, expected_state, 100)
+        self.client.wait_for_impala_state(query_handle, expected_state, 100)
       responses = self.get_and_check_status(
         page_url + "?query_id=%s&json" % query_handle.get_handle().id,
         ports_to_test=[25000])
@@ -556,7 +557,7 @@ class TestWebPage(ImpalaTestSuite):
     queries; nothing for DDL statements"""
     sleep_query = "select sleep(10000) from functional.alltypes limit 1"
     ctas_sleep_query = "create table {0}.foo as {1}".format(unique_database, sleep_query)
-    running_state = self.client.QUERY_STATES['RUNNING']
+    running_state = RUNNING
     backend_state_properties = ['cpu_user_s', 'rpc_latency', 'num_remaining_instances',
                                 'num_instances', 'peak_per_host_mem_consumption',
                                 'time_since_last_heard_from', 'status', 'host',
@@ -587,7 +588,7 @@ class TestWebPage(ImpalaTestSuite):
     nothing for DDL statements"""
     sleep_query = "select sleep(10000) from functional.alltypes limit 1"
     ctas_sleep_query = "create table {0}.foo as {1}".format(unique_database, sleep_query)
-    running_state = self.client.QUERY_STATES['RUNNING']
+    running_state = RUNNING
     instance_stats_properties = ['fragment_name', 'time_since_last_heard_from',
                                  'current_state', 'first_status_update_received',
                                  'instance_id', 'done']
@@ -595,6 +596,7 @@ class TestWebPage(ImpalaTestSuite):
     for query in [sleep_query, ctas_sleep_query]:
       response_json = self.__run_query_and_get_debug_page(query,
                                                           self.QUERY_FINSTANCES_URL,
+                                                          query_options=query_options,
                                                           expected_state=running_state)
 
       assert 'backend_instances' in response_json
@@ -613,7 +615,8 @@ class TestWebPage(ImpalaTestSuite):
         assert not instance_stats['done']
 
     response_json = self.__run_query_and_get_debug_page("describe functional.alltypes",
-                                                         self.QUERY_BACKENDS_URL)
+                                                        self.QUERY_BACKENDS_URL,
+                                                        query_options=query_options)
     assert 'backend_instances' not in response_json
 
   @pytest.mark.xfail(run=False, reason="IMPALA-8059")
@@ -900,7 +903,7 @@ class TestWebPage(ImpalaTestSuite):
     # Matches all 'form' tags that are not followed by including the hidden inputs.
     form_regex = "<form [^{]*?>(?!{{>www/form-hidden-inputs.tmpl}})"
     # Matches XMLHttpRequest.open() in javascript that are not followed with make_url().
-    javascript_regex = "open\(['\"]GET['\"], (?!make_url)"
+    javascript_regex = r"open\(['\"]GET['\"], (?!make_url)"
     # Matches urls in json parameters passed to DataTables.
     datatables_regex = "url: ['\"](?!make_url)"
     # Matches all references of paths that contain '/www/' but are not fully qualified.
@@ -911,7 +914,8 @@ class TestWebPage(ImpalaTestSuite):
     regex = "(%s)|(%s)|(%s)|(%s)|(%s)|(%s)|(%s)" % \
         (href_regex, script_regex, form_regex, javascript_regex, datatables_regex,
          path_regex, link_regex)
-    results = grep_dir(os.path.join(os.environ['IMPALA_HOME'], "www"), regex, ".*\.tmpl")
+    results = grep_dir(os.path.join(os.environ['IMPALA_HOME'], "www"), regex,
+                       r".*\.tmpl")
     assert len(results) == 0, \
         "All links on the webui must include the webserver host: %s" % results
 
@@ -1037,7 +1041,7 @@ class TestWebPage(ImpalaTestSuite):
     """Tests that /queries page shows query progress."""
     query = "select count(*) from functional_parquet.alltypes where bool_col = sleep(100)"
     response_json = self.__run_query_and_get_debug_page(
-      query, self.QUERIES_URL, expected_state=self.client.QUERY_STATES["RUNNING"])
+      query, self.QUERIES_URL, expected_state=RUNNING)
     for json_part in response_json['in_flight_queries']:
       if query in json_part['stmt']:
         assert json_part["query_progress"] == "0 / 4 ( 0%)"
@@ -1174,6 +1178,7 @@ class TestWebPage(ImpalaTestSuite):
         "fs.defaultFS", ports_to_test=self.TEST_PORTS_WITHOUT_SS)
     # check if response size is 2 , for both catalog and impalad webUI
     assert len(responses) == 2
+
 
 class TestWebPageAndCloseSession(ImpalaTestSuite):
   ROOT_URL = "http://localhost:{0}/"

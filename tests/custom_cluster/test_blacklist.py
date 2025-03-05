@@ -22,7 +22,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 import pytest
 import re
 
-from beeswaxd.BeeswaxService import QueryState
+from tests.common.impala_connection import FINISHED, RUNNING
 from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfBuildType
 from tests.common.test_dimensions import add_mandatory_exec_option
 from time import sleep
@@ -53,7 +53,7 @@ class TestBlacklist(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       statestored_args="-statestore_heartbeat_frequency_ms=1000")
-  def test_kill_impalad(self, cursor):
+  def test_kill_impalad(self):
     """Test that verifies that when an impalad is killed, it is properly blacklisted."""
     # Run a query and verify that no impalads are blacklisted yet.
     result = self.execute_query("select count(*) from tpch.lineitem")
@@ -101,7 +101,7 @@ class TestBlacklist(CustomClusterTestSuite):
     assert re.search("NumBackends: 2", result.runtime_profile), result.runtime_profile
 
   @pytest.mark.execute_serially
-  def test_restart_impalad(self, cursor):
+  def test_restart_impalad(self):
     """Test that verifies the behavior when an impalad is killed, blacklisted, and then
     restarted."""
     # Run a query and verify that no impalads are blacklisted yet.
@@ -146,7 +146,7 @@ class TestBlacklist(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1,
       statestored_args="-statestore_heartbeat_frequency_ms=1000")
-  def test_kill_impalad_with_running_queries(self, cursor):
+  def test_kill_impalad_with_running_queries(self):
     """Verifies that when an Impala executor is killed while running a query, that the
     Coordinator blacklists the killed executor."""
 
@@ -158,7 +158,7 @@ class TestBlacklist(CustomClusterTestSuite):
         'debug_action': '0:GETNEXT:DELAY|1:GETNEXT:DELAY'})
 
     # Wait for the query to start running
-    self.wait_for_any_state(handle, [QueryState.RUNNING, QueryState.FINISHED], 10)
+    self.client.wait_for_any_impala_state(handle, [RUNNING, FINISHED], 10)
 
     # Kill one of the Impala executors
     killed_impalad = self.cluster.impalads[2]

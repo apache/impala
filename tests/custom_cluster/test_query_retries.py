@@ -31,6 +31,7 @@ from random import randint
 
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import ERROR, FINISHED, RUNNING
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.errors import Timeout
@@ -88,7 +89,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     return 'functional-query'
 
   @pytest.mark.execute_serially
-  def test_retries_from_cancellation_pool(self, cursor):
+  def test_retries_from_cancellation_pool(self):
     """Tests that queries are retried instead of cancelled if one of the nodes leaves the
     cluster. The retries are triggered by the cancellation pool in the ImpalaServer. The
     cancellation pool listens for updates from the statestore and kills all queries that
@@ -102,7 +103,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     # Launch the query, wait for it to start running, and then kill an impalad.
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true'})
-    self.wait_for_state(handle, self.client.QUERY_STATES['RUNNING'], 60)
+    self.client.wait_for_impala_state(handle, RUNNING, 60)
 
     # Kill a random impalad (but not the one executing the actual query).
     self.__kill_random_impalad()
@@ -145,7 +146,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     # Launch a query, it should be retried.
     handle = self.execute_query_async(self._shuffle_heavy_query,
         query_options={'retry_failed_queries': 'true'})
-    self.wait_for_state(handle, self.client.QUERY_STATES['RUNNING'], 60)
+    self.client.wait_for_impala_state(handle, RUNNING, 60)
 
     # Kill a random impalad.
     killed_impalad = self.__kill_random_impalad()
@@ -211,8 +212,8 @@ class TestQueryRetries(CustomClusterTestSuite):
       handles.append(handle)
 
     # Wait for each query to start running.
-    running_state = self.client.QUERY_STATES['RUNNING']
-    list(map(lambda handle: self.wait_for_state(handle, running_state, 60), handles))
+    list(map(lambda handle: self.client.wait_for_impala_state(handle, RUNNING, 60),
+             handles))
 
     # Kill a random impalad.
     killed_impalad = self.__kill_random_impalad()
@@ -259,7 +260,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     query = self._count_query
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true'})
-    self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
+    self.client.wait_for_impala_state(handle, FINISHED, 60)
 
     # Validate that the query was retried.
     self.__validate_runtime_profiles_from_service(impalad_service, handle)
@@ -320,7 +321,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true',
                        'debug_action': 'AC_BEFORE_ADMISSION:SLEEP@18000'})
-    self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 80)
+    self.client.wait_for_impala_state(handle, FINISHED, 80)
 
     # Validate that the query was retried.
     self.__validate_runtime_profiles_from_service(impalad_service, handle)
@@ -384,7 +385,7 @@ class TestQueryRetries(CustomClusterTestSuite):
         query_options={'retry_failed_queries': 'true',
                        'debug_action': 'AC_BEFORE_ADMISSION:SLEEP@18000'})
     # Wait until the query fails.
-    self.wait_for_state(handle, self.client.QUERY_STATES['EXCEPTION'], 140)
+    self.client.wait_for_impala_state(handle, ERROR, 140)
 
     # Validate the live exec summary.
     retried_query_id = self.__get_retried_query_id_from_summary(handle)
@@ -439,7 +440,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     # Launch a query, it should be retried.
     handle = self.execute_query_async(self._shuffle_heavy_query,
         query_options={'retry_failed_queries': 'true'})
-    self.wait_for_state(handle, self.client.QUERY_STATES['RUNNING'], 60)
+    self.client.wait_for_impala_state(handle, RUNNING, 60)
 
     # Kill one impalad so that a retry is triggered.
     killed_impalad = self.cluster.impalads[1]
@@ -452,7 +453,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.cluster.impalads[2].kill()
 
     # Wait until the query fails.
-    self.wait_for_state(handle, self.client.QUERY_STATES['EXCEPTION'], 60)
+    self.client.wait_for_impala_state(handle, ERROR, 60)
 
     # Validate the live exec summary.
     retried_query_id = self.__get_retried_query_id_from_summary(handle)
@@ -497,7 +498,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     query_options = {'retry_failed_queries': 'true', 'batch_size': '1',
         'spool_query_results': 'false'}
     handle = self.execute_query_async(query, query_options)
-    self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
+    self.client.wait_for_impala_state(handle, FINISHED, 60)
 
     self.client.fetch(query, handle, max_rows=1)
 
@@ -648,11 +649,11 @@ class TestQueryRetries(CustomClusterTestSuite):
   def test_original_query_cancel(self):
     """Test canceling a retryable query with spool_all_results_for_retries=true. Make sure
     Coordinator::Wait() won't block in cancellation."""
-    for state in ['RUNNING', 'FINISHED']:
+    for state in [RUNNING, FINISHED]:
       handle = self.execute_query_async(self._union_query, query_options={
         'retry_failed_queries': 'true', 'spool_query_results': 'true',
         'spool_all_results_for_retries': 'true'})
-      self.wait_for_state(handle, self.client.QUERY_STATES[state], 60)
+      self.client.wait_for_impala_state(handle, state, 60)
 
       # Cancel the query.
       self.client.cancel(handle)
@@ -677,7 +678,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     query_options = {'retry_failed_queries': 'true', 'batch_size': '1',
         'spool_query_results': 'false'}
     handle = self.execute_query_async(query, query_options)
-    self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
+    self.client.wait_for_impala_state(handle, FINISHED, 60)
 
     self.__kill_random_impalad()
     time.sleep(5)
@@ -706,7 +707,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     query = self._count_query
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true'})
-    self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
+    self.client.wait_for_impala_state(handle, FINISHED, 60)
 
     # Validate the live exec summary.
     retried_query_id = self.__get_retried_query_id_from_summary(handle)
@@ -887,7 +888,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     query = self._count_query
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true', 'exec_time_limit_s': '1'})
-    self.wait_for_state(handle, self.client.QUERY_STATES['EXCEPTION'], 60)
+    self.client.wait_for_impala_state(handle, ERROR, 60)
 
     # Validate the live exec summary.
     retried_query_id = self.__get_retried_query_id_from_summary(handle)
@@ -927,7 +928,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     client = self.cluster.get_first_impalad().service.create_beeswax_client()
     client.set_configuration({'retry_failed_queries': 'true'})
     handle = client.execute_async(query)
-    self.wait_for_state(handle, client.QUERY_STATES['FINISHED'], 60, client=client)
+    client.wait_for_impala_state(handle, FINISHED, 60)
 
     # Wait for the idle session timeout to expire the session.
     time.sleep(5)
@@ -957,7 +958,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.hs2_client.set_configuration({'retry_failed_queries': 'true'})
     self.hs2_client.set_configuration_option('impala.resultset.cache.size', '1024')
     handle = self.hs2_client.execute_async(query)
-    self.wait_for_state(handle, 'FINISHED_STATE', 60, client=self.hs2_client)
+    self.hs2_client.wait_for_impala_state(handle, FINISHED, 60)
 
     results = self.hs2_client.fetch(query, handle)
     assert results.success

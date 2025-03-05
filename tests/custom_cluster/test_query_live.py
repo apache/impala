@@ -19,12 +19,11 @@ from __future__ import absolute_import, division, print_function
 
 import re
 
-from beeswaxd.BeeswaxService import QueryState
 from getpass import getuser
 from signal import SIGRTMIN
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import DEFAULT_KRPC_PORT
-from tests.util.retry import retry
+from tests.common.impala_connection import FINISHED, PENDING
 from tests.util.workload_management import assert_query, redaction_rules_file
 from time import sleep
 
@@ -378,7 +377,7 @@ class TestQueryLive(CustomClusterTestSuite):
         'debug_action': 'AC_BEFORE_ADMISSION:SLEEP@3000'})
 
     # Wait for query to compile and assign ranges, then kill impalad during debug delay.
-    self.wait_for_any_state(handle, [QueryState.COMPILED], 3)
+    self.client.wait_for_impala_state(handle, PENDING, 3)
     self.cluster.impalads[1].kill()
 
     result = self.client.fetch(query, handle)
@@ -401,7 +400,7 @@ class TestQueryLive(CustomClusterTestSuite):
         'debug_action': 'CRS_BEFORE_COORD_STARTS:SLEEP@3000'})
 
     # Wait for query to compile.
-    self.wait_for_any_state(handle, [QueryState.COMPILED], 3)
+    self.client.wait_for_impala_state(handle, PENDING, 3)
     # Ensure enough time for scheduling to assign ranges.
     sleep(1)
     # Kill impalad during debug delay.
@@ -426,10 +425,10 @@ class TestQueryLive(CustomClusterTestSuite):
         'debug_action': 'CRS_BEFORE_COORD_STARTS:SLEEP@3000'})
 
     # Wait for query to compile and assign ranges, then gracefully shutdown impalad.
-    self.wait_for_any_state(handle, [QueryState.COMPILED], 3)
+    self.client.wait_for_impala_state(handle, PENDING, 3)
     self.cluster.impalads[1].kill(SIGRTMIN)
 
-    self.wait_for_any_state(handle, [QueryState.FINISHED], 10)
+    self.client.wait_for_impala_state(handle, FINISHED, 10)
     # Allow time for statestore update to propagate. Shutdown grace period is 120s.
     sleep(1)
     # Coordinator in graceful shutdown should not be scheduled in new queries.

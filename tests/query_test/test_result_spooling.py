@@ -23,6 +23,7 @@ import threading
 
 from time import sleep
 from tests.common.errors import Timeout
+from tests.common.impala_connection import FINISHED
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
@@ -82,11 +83,12 @@ class TestResultSpooling(ImpalaTestSuite):
     # Regexes to look for in the runtime profiles.
     # PeakUnpinnedBytes can show up in exec nodes as well, so we only look for the
     # PeakUnpinnedBytes metrics in the PLAN_ROOT_SINK section of the profile.
-    unpinned_bytes_regex = "PLAN_ROOT_SINK[\s\S]*?PeakUnpinnedBytes.*\([1-9][0-9]*\)"
+    unpinned_bytes_regex = r"PLAN_ROOT_SINK[\s\S]*?PeakUnpinnedBytes.*\([1-9][0-9]*\)"
     # The PLAN_ROOT_SINK should have 'Spilled' in the 'ExecOption' info string.
     spilled_exec_option_regex = "ExecOption:.*Spilled"
     # PLAN_ROOT_SINK's reservation limit should be set at MAX_RESULT_SPOOLING_MEM = 32 KB.
-    plan_root_sink_reservation_limit = "PLAN_ROOT_SINK[\s\S]*?ReservationLimit: 32.00 KB"
+    plan_root_sink_reservation_limit = (r"PLAN_ROOT_SINK[\s\S]*?ReservationLimit: "
+                                        r"32.00 KB")
 
     # Fetch the runtime profile every 0.5 seconds until either the timeout is hit, or
     # PeakUnpinnedBytes shows up in the profile.
@@ -145,7 +147,7 @@ class TestResultSpooling(ImpalaTestSuite):
     timeout = 10
     # Regexes to look for in the runtime profile.
     send_wait_time_regex = "RowBatchSendWaitTime: [1-9]"
-    queue_spilled_regex = "PLAN_ROOT_SINK[\s\S]*?ExecOption: Spilled"
+    queue_spilled_regex = r"PLAN_ROOT_SINK[\s\S]*?ExecOption: Spilled"
 
     # Execute the query asynchronously, wait for the queue to fill up, start fetching
     # results, and then validate that RowBatchSendWaitTime shows a non-zero value in the
@@ -154,7 +156,7 @@ class TestResultSpooling(ImpalaTestSuite):
     # is guaranteed to be full.
     handle = self.execute_query_async(query, exec_options)
     try:
-      self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], timeout)
+      self.client.wait_for_impala_state(handle, FINISHED, timeout)
       self.assert_eventually(30, 1, lambda: re.search(queue_spilled_regex,
           self.client.get_runtime_profile(handle)))
       # A fetch request is necessary to unblock the producer thread and trigger an update
@@ -186,7 +188,7 @@ class TestResultSpooling(ImpalaTestSuite):
       thread = threading.Thread(target=lambda:
           self.create_impala_client().fetch(query, handle))
       thread.start()
-      self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 10)
+      self.client.wait_for_impala_state(handle, FINISHED, 10)
       thread.join()
       assert re.search(get_wait_time_regex, self.client.get_runtime_profile(handle))
     finally:
@@ -264,8 +266,8 @@ class TestResultSpoolingFetchSize(ImpalaTestSuite):
     # Result spooling should be independent of file format, so only testing for
     # table_format=parquet/none in order to avoid a test dimension explosion.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'parquet' and
-        v.get_value('table_format').compression_codec == 'none')
+        v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
 
   @classmethod
   def setup_class(cls):
@@ -295,7 +297,7 @@ class TestResultSpoolingFetchSize(ImpalaTestSuite):
       # If 'wait_for_finished' is True, wait for the query to reach the FINISHED state.
       # When it reaches this state all results should be successfully spooled.
       if vector.get_value('wait_for_finished'):
-          self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], timeout)
+        self.client.wait_for_impala_state(handle, FINISHED, timeout)
       rows_fetched = 0
 
       # Call 'fetch' on the query handle enough times to read all rows.
@@ -307,7 +309,7 @@ class TestResultSpoolingFetchSize(ImpalaTestSuite):
         rows_fetched += len(result_data)
         results.extend(result_data)
     finally:
-       self.client.close_query(handle)
+      self.client.close_query(handle)
 
     # Assert that the fetched results match the '_base_data'.
     assert self._num_rows == rows_fetched
@@ -346,8 +348,8 @@ class TestResultSpoolingCancellation(ImpalaTestSuite):
     # Result spooling should be independent of file format, so only testing for
     # table_format=parquet/none in order to avoid a test dimension explosion.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'parquet' and
-        v.get_value('table_format').compression_codec == 'none')
+        v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
 
   def test_cancellation(self, vector):
     vector.get_value('exec_option')['spool_query_results'] = 'true'
@@ -406,8 +408,8 @@ class TestResultSpoolingFailpoints(ImpalaTestSuite):
     # Result spooling should be independent of file format, so only testing for
     # table_format=parquet/none in order to avoid a test dimension explosion.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'parquet' and
-        v.get_value('table_format').compression_codec == 'none')
+        v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
 
   def test_failpoints(self, vector):
     vector.get_value('exec_option')['batch_size'] = 10
@@ -439,8 +441,8 @@ class TestResultSpoolingMaxReservation(ImpalaTestSuite):
     # Result spooling should be independent of file format, so only testing for
     # table_format=parquet/none in order to avoid a test dimension explosion.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'parquet' and
-        v.get_value('table_format').compression_codec == 'none')
+        v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
 
   def test_high_max_row_size(self, vector):
     """Test that when MAX_ROW_SIZE is set, PLAN_ROOT_SINK can adjust its max_reservation
@@ -464,7 +466,8 @@ class TestResultSpoolingMaxReservation(ImpalaTestSuite):
     assert re.search(spilled_exec_option_regex, result.runtime_profile)
 
     # PLAN_ROOT_SINK's reservation limit should be set at 2 * MAX_ROW_SIZE.
-    plan_root_sink_reservation_limit = "PLAN_ROOT_SINK[\s\S]*?ReservationLimit: 32.00 MB"
+    plan_root_sink_reservation_limit = (r"PLAN_ROOT_SINK[\s\S]*?ReservationLimit: "
+                                        r"32.00 MB")
     assert re.search(plan_root_sink_reservation_limit, result.runtime_profile)
 
   def test_high_default_spillable_buffer(self, vector):
@@ -509,7 +512,7 @@ class TestResultSpoolingMaxReservation(ImpalaTestSuite):
 
     # Check that PLAN_ROOT_SINK's reservation limit match the default
     # MAX_RESULT_SPOOLING_MEM.
-    plan_root_sink_reservation_limit = "PLAN_ROOT_SINK[\s\S]*?ReservationLimit: {0}" \
+    plan_root_sink_reservation_limit = r"PLAN_ROOT_SINK[\s\S]*?ReservationLimit: {0}" \
         .format('100.00 MB')
     assert re.search(plan_root_sink_reservation_limit, result.runtime_profile)
 
@@ -526,6 +529,6 @@ class TestResultSpoolingMaxReservation(ImpalaTestSuite):
     assert re.search(spilled_exec_option_regex, result.runtime_profile)
 
     # Check that PLAN_ROOT_SINK's reservation limit match.
-    plan_root_sink_reservation_limit = "PLAN_ROOT_SINK[\s\S]*?ReservationLimit: {0}" \
+    plan_root_sink_reservation_limit = r"PLAN_ROOT_SINK[\s\S]*?ReservationLimit: {0}" \
         .format(expected_limit)
     assert re.search(plan_root_sink_reservation_limit, result.runtime_profile)

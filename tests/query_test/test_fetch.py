@@ -19,6 +19,7 @@ from __future__ import absolute_import, division, print_function
 import re
 
 from time import sleep
+from tests.common.impala_connection import FINISHED
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import extend_exec_option_dimension
 from tests.util.parse_util import parse_duration_string_ms, \
@@ -49,7 +50,7 @@ class TestFetch(ImpalaTestSuite):
     handle = self.execute_query_async(query, vector.get_value('exec_option'))
     try:
       # Wait until the query is 'FINISHED' and results are available for fetching.
-      self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 30)
+      self.client.wait_for_impala_state(handle, FINISHED, 30)
       # Sleep for 2.5 seconds so that the ClientFetchWaitTimer is >= 1s.
       sleep(2.5)
       # Fetch the results so that the fetch related counters are updated.
@@ -93,7 +94,7 @@ class TestFetch(ImpalaTestSuite):
     handle = self.execute_query_async(query, vector.get_value('exec_option'))
     try:
       # Wait until the query is 'FINISHED' and results are available for fetching.
-      self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 30)
+      self.client.wait_for_impala_state(handle, FINISHED, 30)
 
       # This loop will do 6 fetches that contain data and a final fetch with
       # no data. The last fetch is after eos has been set, so it does not count.
@@ -128,7 +129,7 @@ class TestFetch(ImpalaTestSuite):
     handle = self.execute_query_async(query, vector.get_value('exec_option'))
     try:
       # Wait until the query is 'FINISHED' and results are available for fetching.
-      self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 30)
+      self.client.wait_for_impala_state(handle, FINISHED, 30)
 
       # This loop will do 5 fetches for a total of 25 rows. This is incomplete.
       for i in range(5):
@@ -175,15 +176,15 @@ class TestFetchAndSpooling(ImpalaTestSuite):
     """Validate that RowsSent and RowsSentRate are set to valid values in
     the PLAN_ROOT_SINK section of the runtime profile."""
     num_rows = 10
-    if ('spool_query_results' in vector.get_value('exec_option') and
-          vector.get_value('exec_option')['spool_query_results'] == 'false'):
+    if ('spool_query_results' in vector.get_value('exec_option')
+        and vector.get_value('exec_option')['spool_query_results'] == 'false'):
       vector.get_value('exec_option')['debug_action'] = "BPRS_BEFORE_ADD_ROWS:SLEEP@1000"
     else:
       vector.get_value('exec_option')['debug_action'] = "BPRS_BEFORE_ADD_BATCH:SLEEP@1000"
     result = self.execute_query("select id from functional.alltypes limit {0}"
         .format(num_rows), vector.get_value('exec_option'))
     assert "RowsSent: {0} ({0})".format(num_rows) in result.runtime_profile
-    rows_sent_rate = re.search("RowsSentRate: (\d*\.?\d*)", result.runtime_profile)
+    rows_sent_rate = re.search(r"RowsSentRate: (\d*\.?\d*)", result.runtime_profile)
     assert rows_sent_rate
     assert float(rows_sent_rate.group(1)) > 0
 

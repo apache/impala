@@ -22,10 +22,10 @@ import re
 import requests
 import time
 
-from beeswaxd.BeeswaxService import QueryState
 from builtins import round
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
+from tests.common.impala_connection import ERROR
 from tests.util.filesystem_utils import IS_S3, get_fs_path
 from time import sleep
 
@@ -485,8 +485,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
       LOG.info("Catalogd failover took %s seconds to complete" % round(elapsed_s, 1))
 
       # Verify that the query is failed due to the Catalogd HA fail-over.
-      self.wait_for_state(
-          handle, QueryState.EXCEPTION, SYNC_DDL_DELAY_S * 2 + 10, client=client)
+      client.wait_for_impala_state(handle, ERROR, SYNC_DDL_DELAY_S * 2 + 10)
     finally:
       client.close()
 

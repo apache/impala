@@ -20,12 +20,12 @@ import logging
 import pytest
 import time
 
-from beeswaxd.BeeswaxService import QueryState
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
 from tests.common.impala_cluster import (
     DEFAULT_CATALOG_SERVICE_PORT, DEFAULT_STATESTORE_SERVICE_PORT)
+from tests.common.impala_connection import ERROR, RUNNING
 from tests.common.skip import SkipIfBuildType, SkipIfNotHdfsMinicluster
 from time import sleep
 
@@ -749,7 +749,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
       # Run a slow query
       handle = client.execute_async(slow_query)
       # Make sure query starts running.
-      self.wait_for_state(handle, QueryState.RUNNING, 120, client)
+      client.wait_for_impala_state(handle, RUNNING, 120)
       profile = client.get_runtime_profile(handle)
       assert "NumBackends: 3" in profile, profile
       # Kill active statestored
@@ -763,8 +763,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
       # Wait till the grace period ends + some buffer to verify the slow query is still
       # running.
       sleep(self.RECOVERY_GRACE_PERIOD_S + 1)
-      assert client.get_state(handle) == QueryState.RUNNING, \
-          "Query expected to be in running state"
+      assert client.is_running(handle), "Query expected to be in running state"
       # Now kill a backend, and make sure the query fails.
       self.cluster.impalads[2].kill()
       try:
@@ -785,15 +784,14 @@ class TestStatestoredHA(CustomClusterTestSuite):
       # Run a slow query
       handle = client.execute_async(slow_query)
       # Make sure query starts running.
-      self.wait_for_state(handle, QueryState.RUNNING, 120, client)
+      client.wait_for_impala_state(handle, RUNNING, 120)
       profile = client.get_runtime_profile(handle)
       assert "NumBackends: 2" in profile, profile
       # Kill current active statestored
       start_time = time.time()
       statestoreds[1].kill()
       # Wait till the standby statestored becomes active.
-      query_state = client.get_state(handle)
-      assert query_state == QueryState.RUNNING
+      assert client.is_running(handle)
       statestore_service_0.wait_for_metric_value(
           "statestore.active-status", expected_value=True, timeout=120)
       assert (statestore_service_0.get_metric_value("statestore.active-status")), \
@@ -804,7 +802,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
       # query to fail. Combine failover time (SS_PEER_TIMEOUT_S) and recovery grace
       # period (RECOVERY_GRACE_PERIOD_S) to avoid flaky test.
       timeout_s = self.SS_PEER_TIMEOUT_S + self.RECOVERY_GRACE_PERIOD_S * 2
-      self.wait_for_state(handle, QueryState.EXCEPTION, timeout_s, client)
+      client.wait_for_impala_state(handle, ERROR, timeout_s)
       client.close_query(handle)
       elapsed_s = time.time() - start_time
       assert elapsed_s >= self.SS_PEER_TIMEOUT_S + self.RECOVERY_GRACE_PERIOD_S, \

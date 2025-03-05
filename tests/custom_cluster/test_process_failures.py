@@ -19,10 +19,10 @@ from __future__ import absolute_import, division, print_function
 from builtins import range
 import pytest
 
-from beeswaxd.BeeswaxService import QueryState
 from tests.common.custom_cluster_test_suite import (
     DEFAULT_CLUSTER_SIZE,
     CustomClusterTestSuite)
+from tests.common.impala_connection import RUNNING
 from tests.common.test_result_verifier import error_msg_startswith
 
 # The exact query doesn't matter much for these tests, just want a query that touches
@@ -83,7 +83,7 @@ class TestProcessFailures(CustomClusterTestSuite):
 
     # Wait for the queries to start running
     for handle in handles:
-      self.wait_for_state(handle, QueryState.RUNNING, 1000, client=client)
+      client.wait_for_impala_state(handle, RUNNING, 1000)
 
     # Kill the coordinator
     impalad.kill()
