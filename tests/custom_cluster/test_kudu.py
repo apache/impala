@@ -666,7 +666,7 @@ class TestKuduTransaction(TestKuduTransactionBase):
   @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
   def test_kudu_txn_abort_partition_lock(self, cursor, unique_database):
-    self._test_kudu_txn_abort_partial_rows(cursor, unique_database)
+    self._test_kudu_txn_abort_partition_lock(cursor, unique_database)
 
 
 class TestKuduTransactionNoIgnore(TestKuduTransactionBase):
@@ -724,7 +724,7 @@ class TestKuduTransactionNoIgnore(TestKuduTransactionBase):
   @SkipIfBuildType.not_dev_build
   @CustomClusterTestSuite.with_args(impalad_args=_impalad_args)
   def test_kudu_txn_abort_partition_lock(self, cursor, unique_database):
-    self._test_kudu_txn_abort_partial_rows(cursor, unique_database)
+    self._test_kudu_txn_abort_partition_lock(cursor, unique_database)
 
 
 class TestKuduTransactionIgnoreConflict(TestKuduTransactionBase):
