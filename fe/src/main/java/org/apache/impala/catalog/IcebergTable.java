@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
@@ -42,6 +44,7 @@ import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
@@ -55,6 +58,7 @@ import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TIcebergPartitionStats;
 import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TPartialPartitionInfo;
+import org.apache.impala.thrift.TSqlConstraints;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
@@ -553,12 +557,6 @@ public class IcebergTable extends Table implements FeIcebergTable {
           if (!col.getStats().hasNumDistinctValues()
               || snapshot.timestampMillis() >= hmsStatsTimestampMs) {
             col.getStats().setNumDistinctValues(ndv);
-
-            // In local catalog mode, the stats sent from the catalog are those of
-            // 'hdfsTable_', not those of this class.
-            Column hdfsTableCol = hdfsTable_.getColumn(col.getName());
-            Preconditions.checkNotNull(hdfsTableCol);
-            hdfsTableCol.getStats().setNumDistinctValues(ndv);
           }
         }
       }
@@ -711,7 +709,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
       List<TIcebergPartitionSpec> params) {
     List<IcebergPartitionSpec> ret = new ArrayList<>();
     for (TIcebergPartitionSpec param : params) {
-      // Non-partition iceberg table only has one PartitionSpec with an empty
+      // Non-partitioned iceberg table only has one PartitionSpec with an empty
       // PartitionField set and a partition id
       if (param.getPartition_fields() != null) {
         List<IcebergPartitionField> fields = new ArrayList<>();
@@ -760,16 +758,61 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public TGetPartialCatalogObjectResponse getPartialInfo(
       TGetPartialCatalogObjectRequest req) throws CatalogException {
     Preconditions.checkState(isLoaded(), "unloaded table: %s", getFullName());
-    Map<HdfsPartition, TPartialPartitionInfo> missingPartialInfos = new HashMap<>();
-    TGetPartialCatalogObjectResponse resp =
-        getHdfsTable().getPartialInfo(req, missingPartialInfos);
-    if (resp.table_info != null) {
-      // Clear HdfsTable virtual columns and add IcebergTable virtual columns.
-      resp.table_info.unsetVirtual_columns();
-      for (VirtualColumn vCol : getVirtualColumns()) {
-        resp.table_info.addToVirtual_columns(vCol.toThrift());
+    TGetPartialCatalogObjectResponse resp = super.getPartialInfo(req);
+    Preconditions.checkState(resp.table_info != null);
+    boolean wantPartitionInfo = req.table_info_selector.want_partition_files
+        || req.table_info_selector.want_partition_metadata
+        || req.table_info_selector.want_partition_names
+        || req.table_info_selector.want_partition_stats;
+    Preconditions.checkState(!req.table_info_selector.want_hms_partition);
+    Collection<Long> partIds = req.table_info_selector.partition_ids;
+
+    if (partIds != null && partIds.isEmpty()) {
+      resp.table_info.partitions = Lists.newArrayListWithCapacity(0);
+    } else if (wantPartitionInfo || partIds != null) {
+      // Caller specified at least one piece of partition info. If they didn't explicitly
+      // specify the partitions, it means that they want the info for all partitions.
+      // (Iceberg tables are handled as unpartitioned tables, having only 1 partition.)
+      Preconditions.checkState(partIds == null || partIds.size() == 1);
+      long partId = getPartitionMap().keySet().iterator().next();
+      FeFsPartition part = (FeFsPartition) getPartitionMap().get(partId);
+      if (part == null) {
+        LOG.warn(String.format("Missing partition ID: %s, Table: %s", partId,
+            getFullName()));
+        return new TGetPartialCatalogObjectResponse().setLookup_status(
+            CatalogLookupStatus.PARTITION_NOT_FOUND);
       }
+      TPartialPartitionInfo partInfo = part.getDefaultPartialPartitionInfo(req);
+      resp.table_info.partitions = Lists.newArrayList(partInfo);
     }
+
+    // In most of the cases, the prefix map only contains one item for the table location.
+    // Here we always send it since it's small.
+    resp.table_info.setPartition_prefixes(
+        hdfsTable_.partitionLocationCompressor_.getPrefixes());
+
+    if (req.table_info_selector.want_partition_files) {
+      // TODO(todd) we are sending the whole host index even if we returned only
+      // one file -- maybe not so efficient, but the alternative is to do a bunch
+      // of cloning of file descriptors which might increase memory pressure.
+      resp.table_info.setNetwork_addresses(getHostIndex().getList());
+    }
+
+    if (req.table_info_selector.want_table_constraints) {
+      TSqlConstraints sqlConstraints =
+          new TSqlConstraints(getSqlConstraints().getPrimaryKeys(),
+              getSqlConstraints().getForeignKeys());
+      resp.table_info.setSql_constraints(sqlConstraints);
+    }
+    // Publish the isMarkedCached_ marker so coordinators don't need to validate
+    // it again which requires additional HDFS RPCs.
+    resp.table_info.setIs_marked_cached(isMarkedCached());
+
+    // Add IcebergTable virtual columns.
+    for (VirtualColumn vCol : getVirtualColumns()) {
+      resp.table_info.addToVirtual_columns(vCol.toThrift());
+    }
+
     if (req.table_info_selector.want_iceberg_table) {
       resp.table_info.setIceberg_table(Utils.getTIcebergTable(this));
       if (!resp.table_info.isSetNetwork_addresses()) {

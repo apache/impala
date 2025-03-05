@@ -298,6 +298,11 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   }
 
   @Override
+  public boolean isHiveAcid() {
+    return AcidUtils.isTransactionalTable(getMetaStoreTable().getParameters());
+  }
+
+  @Override
   public TResultSet getTableStats() {
     return HdfsTable.getTableStats(this);
   }

@@ -17,6 +17,7 @@
 package org.apache.impala.catalog;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -28,8 +29,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TAccessLevel;
+import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.util.ListMap;
 
@@ -209,4 +212,43 @@ public interface FeFsPartition {
    * Returns new FeFsPartition that has the delete delta descriptors as file descriptors.
    */
   FeFsPartition genDeleteDeltaPartition();
+
+  /**
+   * Creates TPartialPartitionInfo for the default partition (the one and only partition
+   * that unpartitioned tables have).
+   */
+  default TPartialPartitionInfo getDefaultPartialPartitionInfo(
+      TGetPartialCatalogObjectRequest req) {
+
+    TPartialPartitionInfo partInfo = new TPartialPartitionInfo(getId());
+
+    if (req.table_info_selector.want_partition_names) {
+      partInfo.setName(getPartitionName());
+    }
+
+    if (req.table_info_selector.want_partition_metadata) {
+      // We do not need to set partition metadata for unpartitioned tables.
+      partInfo.setHas_incremental_stats(hasIncrementalStats());
+    }
+
+    if (req.table_info_selector.want_partition_files) {
+      partInfo.setLast_compaction_id(-1);
+      partInfo.insert_file_descriptors = new ArrayList<>();
+      partInfo.delete_file_descriptors = new ArrayList<>();
+      partInfo.file_descriptors = new ArrayList<>();
+      if (!getTable().isHiveAcid()) {
+        for (FileDescriptor fd: getFileDescriptors()) {
+          partInfo.file_descriptors.add(fd.toThrift());
+        }
+      }
+    }
+
+    if (req.table_info_selector.want_partition_stats) {
+      partInfo.setPartition_stats(getPartitionStatsCompressed());
+    }
+
+    partInfo.setIs_marked_cached(isMarkedCached());
+
+    return partInfo;
+  }
 }

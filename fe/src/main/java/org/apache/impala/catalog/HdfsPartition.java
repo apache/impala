@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
@@ -58,12 +59,14 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
+import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TPartitionStats;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.ListMap;
 import org.slf4j.Logger;
@@ -592,6 +595,70 @@ public class HdfsPartition extends CatalogObjectImpl
            encodedDeleteFileDescriptors_.size();
   }
 
+  /**
+   * Returns the requested partitions info and the number of files filtered out based on
+   * the ACID writeIdList.
+   * For non-ACID tables this number is always 0. This number being null indicates that
+   * the file descriptors are missing from the Catalog.
+   */
+  public Pair<TPartialPartitionInfo, Integer> getPartialPartitionInfo(
+      TGetPartialCatalogObjectRequest req, ValidWriteIdList reqWriteIdList) {
+
+    TPartialPartitionInfo partInfo =
+        FeFsPartition.super.getDefaultPartialPartitionInfo(req);
+    // Add HdfsPartition specific information to the basic default partition info.
+    if (req.table_info_selector.want_hms_partition) {
+      partInfo.hms_partition = toHmsPartition();
+    }
+    // The special "prototype partition" or the only partition of an unpartitioned table
+    // don't have partition metadata.
+    if (req.table_info_selector.want_partition_metadata
+        && table_.isPartitioned()
+        && id_ != CatalogObjectsConstants.PROTOTYPE_PARTITION_ID) {
+      // Don't need to make a copy here since the HMS parameters shouldn't change during
+      // the invocation of getPartialPartitionInfo().
+      partInfo.hms_parameters = getParameters();
+      partInfo.write_id = writeId_;
+      partInfo.hdfs_storage_descriptor = fileFormatDescriptor_.toThrift();
+      partInfo.location = getLocationAsThrift();
+    }
+    int numFilesFiltered = 0;
+    if (req.table_info_selector.want_partition_files) {
+      partInfo.setLast_compaction_id(getLastCompactionId());
+      if (table_.isHiveAcid()) {
+        try {
+          if (!getInsertFileDescriptors().isEmpty()) {
+            numFilesFiltered += addFilteredFds(getInsertFileDescriptors(),
+                partInfo.insert_file_descriptors, reqWriteIdList);
+            numFilesFiltered += addFilteredFds(getDeleteFileDescriptors(),
+                partInfo.delete_file_descriptors, reqWriteIdList);
+          } else {
+            numFilesFiltered += addFilteredFds(getFileDescriptors(),
+                partInfo.file_descriptors, reqWriteIdList);
+          }
+        } catch (CatalogException ex) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Could not use cached file descriptors of partition {} of table {}"
+                    + " for writeIdList {}", getPartitionName(), getTable().getFullName(),
+                reqWriteIdList, ex);
+          }
+          return new Pair<>(partInfo, null);
+        }
+      }
+    }
+    return new Pair<>(partInfo, numFilesFiltered);
+  }
+
+  private int addFilteredFds(List<FileDescriptor> fds, List<THdfsFileDesc> thriftFds,
+      ValidWriteIdList writeIdList) throws CatalogException {
+    List<FileDescriptor> filteredFds = new ArrayList<>(fds);
+    int numFilesFiltered = AcidUtils.filterFdsForAcidState(filteredFds, writeIdList);
+    for (FileDescriptor fd: filteredFds) {
+      thriftFds.add(fd.toThrift());
+    }
+    return numFilesFiltered;
+  }
+
   public FileMetadataStats getFileMetadataStats() {
     return fileMetadataStats_;
   }
@@ -604,20 +671,6 @@ public class HdfsPartition extends CatalogObjectImpl
 
   public CachedHmsPartitionDescriptor getCachedMsPartitionDescriptor() {
     return cachedMsPartitionDescriptor_;
-  }
-
-  public void setPartitionMetadata(TPartialPartitionInfo tPart) {
-    // The special "prototype partition" or the only partition of an unpartitioned table
-    // don't have partition metadata.
-    if (id_ == CatalogObjectsConstants.PROTOTYPE_PARTITION_ID
-        || !table_.isPartitioned()) {
-      return;
-    }
-    // Don't need to make a copy here since the caller should not modify the parameters.
-    tPart.hms_parameters = getParameters();
-    tPart.write_id = writeId_;
-    tPart.hdfs_storage_descriptor = fileFormatDescriptor_.toThrift();
-    tPart.location = getLocationAsThrift();
   }
 
   /**

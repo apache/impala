@@ -75,7 +75,6 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
-import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -459,6 +458,12 @@ public class HdfsTable extends Table implements FeFsTable {
       }
     }
     return null;
+  }
+
+  @Override
+  public boolean isHiveAcid() {
+    if (validWriteIds_ != null) return true;
+    return AcidUtils.isTransactionalTable(msTable_.getParameters());
   }
 
   /**
@@ -2293,56 +2298,16 @@ public class HdfsTable extends Table implements FeFsTable {
           return new TGetPartialCatalogObjectResponse().setLookup_status(
               CatalogLookupStatus.PARTITION_NOT_FOUND);
         }
-        TPartialPartitionInfo partInfo = new TPartialPartitionInfo(partId);
-
-        if (req.table_info_selector.want_partition_names) {
-          partInfo.setName(part.getPartitionName());
+        Pair<TPartialPartitionInfo, Integer> partInfoStatus =
+            part.getPartialPartitionInfo(req, reqWriteIdList);
+        if (partInfoStatus.second != null) {
+          hits.inc();
+          numFilesFiltered += partInfoStatus.second;
+        } else {
+          misses.inc();
+          missingPartitionInfos.put(part, partInfoStatus.first);
         }
-
-        if (req.table_info_selector.want_partition_metadata) {
-          part.setPartitionMetadata(partInfo);
-          partInfo.setHas_incremental_stats(part.hasIncrementalStats());
-        }
-        if (req.table_info_selector.want_hms_partition) {
-          partInfo.hms_partition = part.toHmsPartition();
-        }
-
-        if (req.table_info_selector.want_partition_files) {
-          partInfo.setLast_compaction_id(part.getLastCompactionId());
-          try {
-            if (!part.getInsertFileDescriptors().isEmpty()) {
-              partInfo.file_descriptors = new ArrayList<>();
-              partInfo.insert_file_descriptors = new ArrayList<>();
-              numFilesFiltered += addFilteredFds(part.getInsertFileDescriptors(),
-                  partInfo.insert_file_descriptors, reqWriteIdList);
-              partInfo.delete_file_descriptors = new ArrayList<>();
-              numFilesFiltered += addFilteredFds(part.getDeleteFileDescriptors(),
-                  partInfo.delete_file_descriptors, reqWriteIdList);
-            } else {
-              partInfo.file_descriptors = new ArrayList<>();
-              numFilesFiltered += addFilteredFds(part.getFileDescriptors(),
-                  partInfo.file_descriptors, reqWriteIdList);
-              partInfo.insert_file_descriptors = new ArrayList<>();
-              partInfo.delete_file_descriptors = new ArrayList<>();
-            }
-            hits.inc();
-          } catch (CatalogException ex) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Could not use cached file descriptors of partition {} of table"
-                      + " {} for writeIdList {}", part.getPartitionName(), getFullName(),
-                  reqWriteIdList, ex);
-            }
-            misses.inc();
-            missingPartitionInfos.put(part, partInfo);
-          }
-        }
-
-        if (req.table_info_selector.want_partition_stats) {
-          partInfo.setPartition_stats(part.getPartitionStatsCompressed());
-        }
-
-        partInfo.setIs_marked_cached(part.isMarkedCached());
-        resp.table_info.partitions.add(partInfo);
+        resp.table_info.partitions.add(partInfoStatus.first);
       }
     }
     // In most of the cases, the prefix map only contains one item for the table location.
@@ -2371,16 +2336,6 @@ public class HdfsTable extends Table implements FeFsTable {
     // it again which requires additional HDFS RPCs.
     resp.table_info.setIs_marked_cached(isMarkedCached_);
     return resp;
-  }
-
-  private int addFilteredFds(List<FileDescriptor> fds, List<THdfsFileDesc> thriftFds,
-      ValidWriteIdList writeIdList) throws CatalogException {
-    List<FileDescriptor> filteredFds = new ArrayList<>(fds);
-    int numFilesFiltered = AcidUtils.filterFdsForAcidState(filteredFds, writeIdList);
-    for (FileDescriptor fd: filteredFds) {
-      thriftFds.add(fd.toThrift());
-    }
-    return numFilesFiltered;
   }
 
   private double getFileMetadataCacheHitRate() {

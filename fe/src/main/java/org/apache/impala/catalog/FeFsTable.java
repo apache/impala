@@ -277,6 +277,13 @@ public interface FeFsTable extends FeTable {
    */
   SqlConstraints getSqlConstraints();
 
+  /**
+   * @return whether it is a Hive ACID table.
+   */
+  default boolean isHiveAcid() {
+    return false;
+  }
+
   default FileSystem getFileSystem() throws CatalogException {
     FileSystem tableFs;
     try {
