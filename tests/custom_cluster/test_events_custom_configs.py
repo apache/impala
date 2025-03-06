@@ -52,9 +52,10 @@ EVENT_SYNC_QUERY_OPTIONS = {
 }
 
 
-def wait_single_statestore_heartbeat():
+def wait_statestore_heartbeat(num_heartbeat=1):
   """Wait for state sync across impalads."""
-  sleep(STATESTORE_RPC_FREQUENCY_MS / 1000.0)
+  assert num_heartbeat > 0
+  sleep(STATESTORE_RPC_FREQUENCY_MS / 1000.0 * num_heartbeat)
 
 
 class TestEventProcessingCustomConfigsBase(CustomClusterTestSuite):
@@ -1266,11 +1267,11 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       part_create = " partitioned by (p int)" if partitioned else ""
       part_insert = " partition (p = 1)" if partitioned else ""
 
-      self.run_stmt_in_hive(
-          "create transactional table {} (i int){}".format(fq_tbl, part_create))
+      create_stmt = "create transactional table {} (i int){}".format(fq_tbl, part_create)
+      self.run_stmt_in_hive(create_stmt)
       EventProcessorUtils.wait_for_event_processing(self)
       # Wait for StatestoreD to propagate the update.
-      wait_single_statestore_heartbeat()
+      wait_statestore_heartbeat(num_heartbeat=4)
 
       # Load the table in Impala before INSERT
       self.client.execute("refresh " + fq_tbl)
@@ -1278,10 +1279,11 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
           "insert into {}{} values (1),(2),(3)".format(fq_tbl, part_insert))
       EventProcessorUtils.wait_for_event_processing(self)
       # Wait for StatestoreD to propagate the update.
-      wait_single_statestore_heartbeat()
+      wait_statestore_heartbeat(num_heartbeat=4)
 
       results = self.client.execute("select i from " + fq_tbl)
-      assert results.data == ["1", "2", "3"]
+      assert results.data == ["1", "2", "3"], (
+        "ACID table is not updated. Create statement: {}").format(create_stmt)
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=5")
   def test_invalidate_better_create_event_id(self, unique_database):
@@ -1369,7 +1371,7 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     EventProcessorUtils.wait_for_event_processing(self)
 
     # Wait for StatestoreD to propagate the update.
-    wait_single_statestore_heartbeat()
+    wait_statestore_heartbeat()
 
     # Validate that relevant log lines are printed in Coordinator.
     # This should be instantaneous after statestore update received, but set explicit
