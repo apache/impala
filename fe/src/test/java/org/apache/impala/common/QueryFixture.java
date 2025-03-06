@@ -76,6 +76,7 @@ public class QueryFixture {
         analysisCtx_ = makeAnalysisContext();
         analysisResult_ = analysisCtx_.analyzeAndAuthorize(stmt_,
             makeTableCache(stmt_), session_.frontend().getAuthzChecker());
+        Preconditions.checkState(analysisResult_.getException() == null);
         Preconditions.checkNotNull(analysisResult_.getStmt());
         return stmt_;
       } catch (AnalysisException e) {

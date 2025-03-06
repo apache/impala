@@ -367,8 +367,10 @@ public class FrontendFixture {
     StmtMetadataLoader mdLoader = new StmtMetadataLoader(
         frontend_, ctx.getQueryCtx().session.database, null, user, null);
     StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
-    return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache,
+    AnalysisResult analysisResult = ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache,
         frontend_.getAuthzChecker());
+    Preconditions.checkState(analysisResult.getException() == null);
+    return analysisResult;
   }
 
   /**

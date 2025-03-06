@@ -52,26 +52,25 @@ public class StmtRewriter {
    * Rewrite the statement of an analysis result in-place. Assumes that BetweenPredicates
    * have already been rewritten.
    */
-  public void rewrite(AnalysisResult analysisResult) throws AnalysisException {
+  public void rewrite(StatementBase stmt) throws AnalysisException {
     // Analyzed stmt that contains a query statement with subqueries to be rewritten.
-    StatementBase stmt = analysisResult.getStmt();
     Preconditions.checkState(stmt.isAnalyzed());
     // Analyzed query statement to be rewritten.
     QueryStmt queryStmt;
     if (stmt instanceof QueryStmt) {
-      queryStmt = (QueryStmt) analysisResult.getStmt();
+      queryStmt = (QueryStmt) stmt;
     } else if (stmt instanceof InsertStmt) {
-      queryStmt = ((InsertStmt) analysisResult.getStmt()).getQueryStmt();
+      queryStmt = ((InsertStmt) stmt).getQueryStmt();
     } else if (stmt instanceof CreateTableAsSelectStmt) {
-      queryStmt = ((CreateTableAsSelectStmt) analysisResult.getStmt()).getQueryStmt();
-    } else if (analysisResult.isUpdateStmt()) {
-      queryStmt = ((UpdateStmt) analysisResult.getStmt()).getQueryStmt();
-    } else if (analysisResult.isDeleteStmt()) {
-      queryStmt = ((DeleteStmt) analysisResult.getStmt()).getQueryStmt();
-    } else if (analysisResult.isMergeStmt()) {
-      queryStmt = ((MergeStmt) analysisResult.getStmt()).getQueryStmt();
-    } else if (analysisResult.isTestCaseStmt()) {
-      queryStmt = ((CopyTestCaseStmt) analysisResult.getStmt()).getQueryStmt();
+      queryStmt = ((CreateTableAsSelectStmt) stmt).getQueryStmt();
+    } else if (stmt instanceof UpdateStmt) {
+      queryStmt = ((UpdateStmt) stmt).getQueryStmt();
+    } else if (stmt instanceof DeleteStmt) {
+      queryStmt = ((DeleteStmt) stmt).getQueryStmt();
+    } else if (stmt instanceof MergeStmt) {
+      queryStmt = ((MergeStmt) stmt).getQueryStmt();
+    } else if (stmt instanceof CopyTestCaseStmt) {
+      queryStmt = ((CopyTestCaseStmt) stmt).getQueryStmt();
     } else {
       throw new AnalysisException("Unsupported statement: " + stmt.toSql());
     }

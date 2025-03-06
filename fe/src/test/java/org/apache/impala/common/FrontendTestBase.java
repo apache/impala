@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 import org.apache.impala.analysis.AnalysisContext;
+import org.apache.impala.analysis.AnalysisContext.AnalysisDriverImpl;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.InsertStmt;
@@ -277,7 +278,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
       StmtMetadataLoader mdLoader =
           new StmtMetadataLoader(frontend_, ctx.getQueryCtx().session.database, null);
       StmtTableCache loadedTables = mdLoader.loadTables(stmt);
-      Analyzer analyzer = ctx.createAnalyzer(loadedTables);
+      Analyzer analyzer = AnalysisDriverImpl.createAnalyzer(ctx, loadedTables);
       stmt.analyze(analyzer);
       return stmt;
     }
@@ -347,7 +348,10 @@ public class FrontendTestBase extends AbstractFrontendTest {
       StmtMetadataLoader mdLoader = new StmtMetadataLoader(
           fe, ctx.getQueryCtx().session.database, null, user, null);
       StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
-      return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache, fe.getAuthzChecker());
+      AnalysisResult analysisResult =
+          ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache, fe.getAuthzChecker());
+      Preconditions.checkState(analysisResult.getException() == null);
+      return analysisResult;
     }
   }
 

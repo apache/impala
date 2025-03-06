@@ -2739,6 +2739,7 @@ public class Frontend {
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory_, timeline);
     AnalysisResult analysisResult = analysisCtx.analyzeAndAuthorize(stmt, stmtTableCache,
         authzChecker_.get(), planCtx.compilationState_.disableAuthorization());
+    Preconditions.checkState(analysisResult.getException() == null);
     if (!planCtx.compilationState_.disableAuthorization()) {
       LOG.info("Analysis and authorization finished.");
       planCtx.compilationState_.setUserHasProfileAccess(

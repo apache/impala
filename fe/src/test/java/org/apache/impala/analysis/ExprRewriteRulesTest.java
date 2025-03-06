@@ -24,6 +24,7 @@ import static org.junit.Assert.fail;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.analysis.AnalysisContext.AnalysisDriverImpl;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.AnalysisSessionFixture;
@@ -93,7 +94,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
       Preconditions.checkState(analyzer_ == null, "Already analyzed");
       stmt_ = parse();
       analysisCtx_ = makeAnalysisContext();
-      analyzer_ = analysisCtx_.createAnalyzer(makeTableCache(stmt_));
+      analyzer_ = AnalysisDriverImpl.createAnalyzer(analysisCtx_, makeTableCache(stmt_));
       stmt_.analyze(analyzer_);
       return stmt_;
     }
