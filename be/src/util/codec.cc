@@ -21,7 +21,6 @@
 #include <utility>
 
 #include <boost/algorithm/string.hpp>
-#include <zstd.h>
 
 #include "common/compiler-util.h"
 #include "common/logging.h"

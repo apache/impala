@@ -116,6 +116,47 @@ TEST(Webserver, PostTest) {
   ASSERT_TRUE(success) << "POST unexpectedly failed";
 }
 
+TEST(Webserver, ContentEncodingHeadersTest) {
+  // This test validates the content-encoding headers for compression
+  MetricGroup metrics("webserver-test");
+  Webserver webserver("", FLAGS_webserver_port, &metrics);
+  ASSERT_OK(webserver.Start());
+  AddDefaultUrlCallbacks(&webserver);
+
+  // The actual compressed content is parsed and validated through
+  // the tests present in tests/webserver/test_web_pages.py::TestWebPage,
+  // where 'requests' API has "Accept-Encoding: gzip" by default for all the tests
+
+  // Raw text without content-encoding is still supported, and is validated from
+  // the pre-existing tests here.
+
+
+  // 1. Validate headers for raw response
+  // Add request headers
+  HttpRequest req_raw;
+
+  stringstream contents;
+  ASSERT_OK(req_raw.Get(&contents));
+
+  // Validate headers
+  string contents_string = contents.str();
+  EXPECT_TRUE(contents_string.find("Content-Encoding") == string::npos);
+  EXPECT_TRUE(contents_string.find("gzip") == string::npos);
+  contents.clear();
+
+  // 2. Validate headers for gzip encoded response
+  // Add request headers
+  HttpRequest req_gzip;
+  req_gzip.headers.emplace("Accept-Encoding", "gzip");
+
+  ASSERT_OK(req_gzip.Get(&contents));
+
+  // Validate headers
+  contents_string = contents.str();
+  EXPECT_TRUE(contents_string.find("Content-Encoding") != string::npos);
+  EXPECT_TRUE(contents_string.find("gzip") != string::npos);
+}
+
 void AssertArgsCallback(bool* success, const Webserver::WebRequest& req,
     Document* document) {
   const auto& args = req.parsed_args;

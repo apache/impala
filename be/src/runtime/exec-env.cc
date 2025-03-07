@@ -446,13 +446,6 @@ Status ExecEnv::Init() {
 
   InitSystemStateInfo();
 
-  if (enable_webserver_) {
-    RETURN_IF_ERROR(metrics_->RegisterHttpHandlers(webserver_.get()));
-  }
-  if (FLAGS_metrics_webserver_port > 0) {
-    RETURN_IF_ERROR(metrics_->RegisterHttpHandlers(metrics_webserver_.get()));
-    RETURN_IF_ERROR(metrics_webserver_->Start());
-  }
   catalogd_client_cache_->InitMetrics(metrics_.get(), "catalog.server");
   catalogd_lightweight_req_client_cache_->InitMetrics(
       metrics_.get(), "catalog.server", "for-lightweight-rpc");
@@ -463,6 +456,14 @@ Status ExecEnv::Init() {
       exec_env_->metrics()->GetOrCreateChildGroup("impala-server"));
 
   InitMemTracker(bytes_limit);
+
+  if (enable_webserver_) {
+    RETURN_IF_ERROR(metrics_->RegisterHttpHandlers(webserver_.get()));
+  }
+  if (FLAGS_metrics_webserver_port > 0) {
+    RETURN_IF_ERROR(metrics_->RegisterHttpHandlers(metrics_webserver_.get()));
+    RETURN_IF_ERROR(metrics_webserver_->Start());
+  }
 
   // Initializes the RPCMgr, ControlServices and DataStreamServices.
   // Initialization needs to happen in the following order due to dependencies:

@@ -25,6 +25,7 @@
 
 #include "common/status.h"
 #include "kudu/util/web_callback_registry.h"
+#include "runtime/mem-tracker.h"
 #include "thirdparty/squeasel/squeasel.h"
 #include "util/ldap-util.h"
 #include "util/metrics-fwd.h"
@@ -184,6 +185,11 @@ class Webserver {
   static int LogMessageCallbackStatic(const struct sq_connection* connection,
       const char* message);
 
+  /// Send the provided response through the squeasel connection
+  void SendResponse(struct sq_connection* connection,
+      const std::string& response_code_line, const std::string& content_type,
+      const std::string& content, const std::vector<std::string>& header_lines);
+
   /// Squeasel callback for HTTP request events. Static so that it can act as a function
   /// pointer, and then call the next method. Returns squeasel success code.
   static sq_callback_result_t BeginRequestCallbackStatic(
@@ -299,6 +305,9 @@ class Webserver {
   /// If true, the OAuth token in Authorization header will be used for authentication.
   /// An incoming connection will be accepted if the OAuth token could be verified.
   bool use_oauth_ = false;
+
+  // Track memory for the comppressed string buffer
+  std::shared_ptr<MemTracker> compressed_buffer_mem_tracker_;
 
   /// Used to validate usernames/passwords If LDAP authentication is in use.
   std::unique_ptr<ImpalaLdap> ldap_;

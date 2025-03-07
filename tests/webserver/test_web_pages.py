@@ -80,6 +80,16 @@ class TestWebPage(ImpalaTestSuite):
     """Tests that the root URL is accessible and loads properly"""
     self.get_and_check_status(self.ROOT_URL)
 
+  def test_content_encoding(self):
+    responses = self.get_and_check_status(self.ROOT_URL, headers={"Accept-Encoding": ""})
+    for response in responses:
+      assert "Content-Encoding" not in response.headers
+    responses = self.get_and_check_status(self.ROOT_URL,
+                                          headers={"Accept-Encoding": "gzip"})
+    for response in responses:
+      assert "Content-Encoding" in response.headers
+      assert response.headers["Content-Encoding"] == "gzip"
+
   def test_get_build_flags(self):
     """Tests that the build flags on the root page contain valid values"""
     for port in self.TEST_PORTS_WITH_SS:

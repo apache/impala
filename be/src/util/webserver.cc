@@ -18,9 +18,7 @@
 #include "util/webserver.h"
 
 #include <signal.h>
-#include <stdio.h>
 #include <fstream>
-#include <map>
 #include <string>
 #include <boost/algorithm/string.hpp>
 #include <boost/bind.hpp>
@@ -32,6 +30,7 @@
 #include <rapidjson/document.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>
+#include <zlib.h>
 
 #include "common/logging.h"
 #include "common/global-flags.h"
@@ -47,21 +46,23 @@
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "runtime/exec-env.h"
+#include "runtime/mem-tracker.h"
 #include "service/impala-server.h"
 #include "thirdparty/mustache/mustache.h"
 #include "util/asan.h"
 #include "util/coding-util.h"
+#include "util/codec.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/jwt-util.h"
 #include "util/mem-info.h"
 #include "util/metrics.h"
-#include "util/openssl-util.h"
 #include "util/os-info.h"
 #include "util/os-util.h"
 #include "util/pretty-printer.h"
 #include "util/process-state-info.h"
+#include "util/scope-exit-trigger.h"
 #include "util/stopwatch.h"
 
 #include "common/names.h"
@@ -239,35 +240,27 @@ string HttpStatusCodeToString(HttpStatusCode code) {
   return "";
 }
 
-void SendResponse(struct sq_connection* connection, const string& response_code_line,
-    const string& content_type, const string& content,
-    const vector<string>& header_lines) {
-  // Buffer the output and send it in a single call to sq_write in order to avoid
-  // triggering an interaction between Nagle's algorithm and TCP delayed acks.
-  std::ostringstream oss;
-  oss << "HTTP/1.1 " << response_code_line << CRLF;
-  for (const auto& h : header_lines) {
-    oss << h << CRLF;
-  }
-  oss << "X-Frame-Options: " << FLAGS_webserver_x_frame_options << CRLF;
-  oss << "X-Content-Type-Options: nosniff" << CRLF;
-  oss << "Cache-Control: no-store" << CRLF;
-  if (!FLAGS_disable_content_security_policy_header) {
-    oss << "Content-Security-Policy: " << CSP_HEADER << CRLF;
-  }
-
-  struct sq_request_info* request_info = sq_get_request_info(connection);
-  if (request_info->is_ssl) {
-    oss << "Strict-Transport-Security: max-age=31536000; includeSubDomains" << CRLF;
-  }
-  oss << "Content-Type: " << content_type << CRLF;
-  oss << "Content-Length: " << content.size() << CRLF;
-  oss << CRLF;
-  oss << content;
-
-  // Make sure to use sq_write for printing the body; sq_printf truncates at 8kb
-  string output = oss.str();
-  sq_write(connection, output.c_str(), output.length());
+Status CompressStringToBuffer(const string& content,
+    vector<uint8_t>& output) {
+  // Declare the compressor
+  scoped_ptr<Codec> compressor;
+  Codec::CodecInfo codec_info(THdfsCompression::GZIP, Z_BEST_SPEED);
+  LOG_AND_RETURN_IF_ERROR(Codec::CreateCompressor(NULL, false, codec_info, &compressor));
+  auto compressor_cleanup = MakeScopeExitTrigger([&compressor]() {
+    compressor->Close();
+  });
+  // Interpret the data in the required form, do not reallocate
+  uint8_t* content_buffer = reinterpret_cast<uint8_t*>(const_cast<char*>(
+      content.data()));
+  // Allocate the necessary space
+  int64_t compressed_length = compressor->MaxOutputLen(content.size(), content_buffer);
+  output.resize(compressed_length);
+  // Transform the space into necessary form
+  uint8_t* compressed_buffer = output.data();
+  LOG_AND_RETURN_IF_ERROR(compressor->ProcessBlock(true, content.size(), content_buffer,
+      &compressed_length, &compressed_buffer));
+  output.resize(compressed_length);
+  return Status::OK();
 }
 
 // Return the address of the remote user from the squeasel request info.
@@ -372,6 +365,9 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
 }
 
 Webserver::~Webserver() {
+  if (compressed_buffer_mem_tracker_.get() != nullptr) {
+    compressed_buffer_mem_tracker_->Close();
+  }
   Stop();
 }
 
@@ -568,6 +564,22 @@ Status Webserver::Start() {
     return Status(error_msg.str());
   }
 
+  // TODO: IMPALA-14179
+  // Track memory usage of other template generated webpages in the future
+
+  // Initialize compressed_buffer_mem_tracker_, if not initialized
+  if (compressed_buffer_mem_tracker_.get() == nullptr) {
+    MemTracker* process_mem_tracker = nullptr;
+    // Except for impala daemon, ExecEnv does not exist for statestore or catalog daemons
+    if (ExecEnv::GetInstance() != nullptr) {
+    // When ExecEnv is present, link to the current process_mem_tracker
+      DCHECK(ExecEnv::GetInstance()->process_mem_tracker() != nullptr);
+      process_mem_tracker =  ExecEnv::GetInstance()->process_mem_tracker();
+    }
+    compressed_buffer_mem_tracker_ = std::make_shared<MemTracker>(-1,
+        "WebserverCompressedBuffer", process_mem_tracker);
+  }
+
   LOG(INFO) << "Webserver started";
   return Status::OK();
 }
@@ -590,6 +602,54 @@ void Webserver::Init() {
   }
   url_ = Substitute(
       "$0://$1:$2", IsSecure() ? "https" : "http", hostname_, http_address_.port);
+}
+
+void Webserver::SendResponse(struct sq_connection* connection,
+    const string& response_code_line, const string& content_type, const string& content,
+    const vector<string>& header_lines) {
+  // Buffer the output and send it in a single call to sq_write in order to avoid
+  // triggering an interaction between Nagle's algorithm and TCP delayed acks.
+  std::ostringstream oss;
+  oss << "HTTP/1.1 " << response_code_line << CRLF;
+  for (const auto& h : header_lines) {
+    oss << h << CRLF;
+  }
+  oss << "X-Frame-Options: " << FLAGS_webserver_x_frame_options << CRLF;
+  oss << "X-Content-Type-Options: nosniff" << CRLF;
+  oss << "Cache-Control: no-store" << CRLF;
+  if (!FLAGS_disable_content_security_policy_header) {
+    oss << "Content-Security-Policy: " << CSP_HEADER << CRLF;
+  }
+
+  struct sq_request_info* request_info = sq_get_request_info(connection);
+  if (request_info->is_ssl) {
+    oss << "Strict-Transport-Security: max-age=31536000; includeSubDomains" << CRLF;
+  }
+  oss << "Content-Type: " << content_type << CRLF;
+  const char * accepted_encodings = sq_get_header(connection, "Accept-Encoding");
+
+  // Include vector's new memory allocations into 'compressed_buffer_mem_tracker_'
+  MemTrackerAllocator<uint8_t> vector_mem_tracker_allocator(
+      compressed_buffer_mem_tracker_);
+  vector<uint8_t> output(0, vector_mem_tracker_allocator);
+
+  // If accepted, support responses with gzip compression
+  if (accepted_encodings != NULL && std::string_view(accepted_encodings).find("gzip")
+      != string::npos && CompressStringToBuffer(content, output).ok()) {
+    oss << "Content-Encoding: gzip" << CRLF;
+    oss << "Content-Length: " << output.size() << CRLF;
+    oss << CRLF;
+    // Interpret the data in the necessary form, do not reallocate
+    oss.write(reinterpret_cast<char*>(output.data()), output.size());
+  } else {
+    oss << "Content-Length: " << content.size() << CRLF;
+    oss << CRLF;
+    oss.write(content.data(), content.size());
+  }
+  string output_str = oss.str();
+
+  // Make sure to use sq_write for writing the output, as sq_printf truncates at 8kb
+  sq_write(connection, output_str.data(), output_str.size());
 }
 
 void Webserver::GetCommonJson(Document* document, const struct sq_connection* connection,
