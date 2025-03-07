@@ -75,13 +75,6 @@ drop stats ice_alltypes;
 STRING
 ====
 ---- QUERY
-alter table ice_alltypes unset tblproperties('impala.lastComputeStatsTime');
----- RESULTS
-'Updated table.'
----- TYPES
-STRING
-====
----- QUERY
 # Table-level stats are not affected by DROP STATS.
 describe formatted ice_alltypes;
 ---- RESULTS: VERIFY_IS_SUBSET
@@ -260,18 +253,12 @@ drop stats ice_alltypes_ht;
 STRING
 ====
 ---- QUERY
-alter table ice_alltypes_ht unset tblproperties('impala.lastComputeStatsTime');
----- RESULTS
-'Updated table.'
----- TYPES
-STRING
-====
----- QUERY
 # Table-level stats are dropped for non-HMS integrated Iceberg tables.
 describe formatted ice_alltypes_ht;
 ---- RESULTS: VERIFY_IS_NOT_IN
 '','numRows             ','2                   '
 row_regex:'','impala.lastComputeStatsTime','\d+\s+'
+row_regex:'','totalSize           ','\d+\s+'
 ---- TYPES
 STRING, STRING, STRING
 ====
