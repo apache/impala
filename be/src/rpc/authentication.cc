@@ -800,7 +800,10 @@ error_description=\"$0 \"", status.GetDetail()));
     return false;
   }
   connection_context->username = username;
-  // TODO: cookies are not added, but are not needed right now
+
+  // Create a cookie to return.
+  connection_context->return_headers.push_back(
+      Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
   return true;
 }
 
@@ -839,8 +842,10 @@ error_description=\"$0 \"", status.GetDetail()));
     return false;
   }
   connection_context->username = username;
-  // TODO: cookies are not added, but are not needed right now
 
+  // Create a cookie to return.
+  connection_context->return_headers.push_back(
+      Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
   return true;
 }
 

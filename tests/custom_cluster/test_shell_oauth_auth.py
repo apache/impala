@@ -75,10 +75,19 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
     self.cluster.get_first_impalad().service.wait_for_metric_value(
         "impala-server.backend-num-queries-executed", 1, timeout=15)
 
-    # Ensure the Impala coordinator is correctly reporting the oauth auth metrics
-    # must be done before the cluster shuts down since it calls to the coordinator
+    cookie_auth_count = self.cluster.get_first_impalad().service.get_metric_value(
+        "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-success")
+
+    # Impala sets a cookie with the expiry time of 1 day.
+    # After the first successful token verification, the authentication
+    # will happen via cookie auth, hence this count will be 1.
+    self.__assert_success_fail_metric(success_count=1)
+
+    # Total cookie auth success should be 1 less than total rpc_count
+    # since after the 1st rpc count, the cookie is set and no more jwt token
+    # verification happens.
     query_rpc_count = self.__get_rpc_count() - before_rpc_count
-    self.__assert_success_fail_metric(success_count=query_rpc_count)
+    assert cookie_auth_count == query_rpc_count - 1, "Incorrect Cookie Auth Count"
 
     # Shut down cluster to ensure logs flush to disk.
     self._stop_impala_cluster()
