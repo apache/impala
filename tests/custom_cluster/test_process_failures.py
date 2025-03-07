@@ -151,7 +151,7 @@ class TestProcessFailures(CustomClusterTestSuite):
     # node, or because a stream sender failed to establish a thrift connection. It is
     # non-deterministic which of those paths will initiate cancellation, but in either
     # case the query status should include the failed (or unreachable) worker.
-    query_id = handle.get_handle().id
+    query_id = client.handle_id(handle)
     error_state = "Failed due to unreachable impalad"
     assert impalad.service.wait_for_query_status(client, query_id, error_state)
     assert error_msg_startswith(client.get_log(handle), error_state, query_id)

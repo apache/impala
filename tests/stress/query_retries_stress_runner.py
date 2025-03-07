@@ -138,10 +138,12 @@ def run_concurrent_workloads(concurrency, coordinator, database, queries):
       # Run each query sequentially.
       for query in shuffled_queries:
         handle = None
+        query_id = None
         try:
           # Don't use client.execute as it eagerly fetches results, which causes retries
           # to be disabled.
           handle = client.execute_async(query)
+          query_id = client.handle_id(handle)
           if not client.wait_for_finished_timeout(handle, 3600):
             raise Exception("Timeout while waiting for query to finish")
           completed_queries_latch.on_query_completion(stream_id)
@@ -149,7 +151,7 @@ def run_concurrent_workloads(concurrency, coordinator, database, queries):
           # Check if the query was retried, and update any relevant counters.
           runtime_profile = client.get_runtime_profile(handle)
           if "Original Query Id" in runtime_profile:
-            LOG.info("Query {0} was retried".format(handle.get_handle().id))
+            LOG.info("Query {0} was retried".format(query_id))
             num_queries_retried += 1
             total_queries_retried_lock.acquire()
             total_queries_retried += 1
@@ -163,9 +165,9 @@ def run_concurrent_workloads(concurrency, coordinator, database, queries):
 
       LOG.info("Finished workload, retried {0} queries".format(num_queries_retried))
     except Exception:
-      if handle and handle.get_handle() and handle.get_handle().id:
-        LOG.exception("Query query_id={0} failed".format(handle.get_handle().id))
-        exception_queue.put((handle.get_handle().id, sys.exc_info()))
+      if query_id:
+        LOG.exception("Query query_id={0} failed".format(query_id))
+        exception_queue.put((query_id, sys.exc_info()))
       else:
         LOG.exception("An unknown query failed")
         exception_queue.put(("unknown", sys.exc_info()))

@@ -397,13 +397,13 @@ class ImpaladService(BaseImpalaService):
         query_state = client.get_state(query_handle)
       except Exception as e:
         LOG.error("Exception while getting state of query {0}\n{1}".format(
-            query_handle.get_handle().id, str(e)))
+            client.handle_id(query_handle), str(e)))
       if query_state == target_state:
         return
       sleep(interval)
     assert target_state == query_state, \
         'Query {0} did not reach query state in time target={1} actual={2}'.format(
-            query_handle.get_handle().id, target_state, query_state)
+            client.handle_id(query_handle), target_state, query_state)
     return
 
   def wait_for_query_status(self, client, query_id, expected_content,

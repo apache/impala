@@ -107,7 +107,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     # Run the query async to avoid fetching results since fetching such a large result was
     # causing the execution to take a very long time.
     handle = client.execute_async("select '{0}'".format(rand_long_str))
-    query_id = handle.get_handle().id
+    query_id = client.handle_id(handle)
     client.wait_for_finished_timeout(handle, 10)
     client.close_query(handle)
 
@@ -142,7 +142,7 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
 
     client.set_configuration_option("MAX_STATEMENT_LENGTH_BYTES", 16780000)
     handle = client.execute_async("select '{0}'".format(rand_long_str))
-    query_id = handle.get_handle().id
+    query_id = client.handle_id(handle)
     client.wait_for_finished_timeout(handle, 10)
     client.close_query(handle)
 

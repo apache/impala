@@ -1462,9 +1462,8 @@ class ImpalaTestSuite(BaseTestSuite):
       raise Timeout(timeout_msg)
     return actual_state
 
-  def wait_for_progress(self, handle, expected_progress, timeout, client=None):
+  def wait_for_progress(self, client, handle, expected_progress, timeout):
     """Waits for the given query handle to reach expected progress rate"""
-    if client is None: client = self.client
     start_time = time.time()
     summary = client.get_exec_summary(handle)
     while time.time() - start_time < timeout and \
@@ -1474,7 +1473,7 @@ class ImpalaTestSuite(BaseTestSuite):
     actual_progress = self.__get_query_progress_rate(summary.progress)
     if actual_progress <= expected_progress:
       timeout_msg = "query '{0}' did not reach the expected progress {1}, current " \
-          "progress {2}".format(self.__get_id_or_query_from_handle(handle),
+          "progress {2}".format(client.handle_id(handle),
           expected_progress, actual_progress)
       raise Timeout(timeout_msg)
     return actual_progress
@@ -1487,7 +1486,8 @@ class ImpalaTestSuite(BaseTestSuite):
   def __get_id_or_query_from_handle(self, handle):
     """Returns a query identifier, for QueryHandlers it returns the query id. However,
     Impyla handle is a HiveServer2Cursor that does not have query id, returns the query
-    string instead."""
+    string instead.
+    DEPRECATED: Use client.handle_id() instead."""
     if isinstance(handle.get_handle(), HiveServer2Cursor):
       return handle.get_handle().query_string
     elif hasattr(handle.get_handle(), 'id'):

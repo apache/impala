@@ -61,6 +61,7 @@ class TestDedicatedCoordinator(CustomClusterTestSuite):
     timeout = 10
 
     handle = self.execute_query_async(query, vector.get_value('exec_option'))
+    query_id = self.client.handle_id(handle)
     try:
       # Wait for the query to finish (all rows are spooled). Assert that the executor
       # has been shutdown and its memory has been released.
@@ -73,7 +74,7 @@ class TestDedicatedCoordinator(CustomClusterTestSuite):
       assert mem_admitted['executor'][0] == 0
       assert mem_admitted['coordinator'] > 0
       assert get_num_completed_backends(self.cluster.impalads[0].service,
-               handle.get_handle().id) == 1
+                                        query_id) == 1
 
       # Fetch all results from the query and assert that the coordinator and the executor
       # have been shutdown and their memory has been released.
@@ -83,6 +84,6 @@ class TestDedicatedCoordinator(CustomClusterTestSuite):
       assert mem_admitted['executor'][0] == 0
       assert mem_admitted['coordinator'] == 0
       assert get_num_completed_backends(self.cluster.impalads[0].service,
-               handle.get_handle().id) == 2
+                                        query_id) == 2
     finally:
       self.client.close_query(handle)

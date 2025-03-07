@@ -542,7 +542,7 @@ class TestWebPage(ImpalaTestSuite):
       if expected_state:
         self.client.wait_for_impala_state(query_handle, expected_state, 100)
       responses = self.get_and_check_status(
-        page_url + "?query_id=%s&json" % query_handle.get_handle().id,
+        page_url + "?query_id=%s&json" % self.client.handle_id(query_handle),
         ports_to_test=[25000])
       assert len(responses) == 1
       response_json = json.loads(responses[0].text)
@@ -1188,7 +1188,8 @@ class TestWebPageAndCloseSession(ImpalaTestSuite):
     # Execute a long running query then cancel it from the WebUI.
     # Check the runtime profile and the INFO logs for the cause message.
     query = "select sleep(10000)"
-    query_id = self.execute_query_async(query).get_handle().id
+    handle = self.execute_query_async(query)
+    query_id = self.client.handle_id(handle)
     cancel_query_url = "{0}cancel_query?query_id={1}".format(self.ROOT_URL.format
       ("25000"), query_id)
     text_profile_url = "{0}query_profile_plain_text?query_id={1}".format(self.ROOT_URL

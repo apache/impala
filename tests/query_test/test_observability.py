@@ -1001,7 +1001,7 @@ class TestObservability(ImpalaTestSuite):
     # This query runs 15s
     query = "select count(*) from functional.alltypes where bool_col = sleep(50)"
     handle = self.execute_query_async(query)
-    query_id = handle.get_handle().id
+    query_id = self.client.handle_id(handle)
 
     cluster = ImpalaCluster.get_e2e_test_cluster()
     impalad = cluster.get_first_impalad()

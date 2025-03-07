@@ -45,7 +45,7 @@ class QueryToKill:
     self.handle = self.client.execute_async(self.sql, user=self.user)
     self.poll_thread = threading.Thread(target=lambda: self.poll())
     self.poll_thread.start()
-    return self.client.get_query_id(self.handle)
+    return self.client.handle_id(self.handle)
 
   def __exit__(self, exc_type, exc_value, traceback):  # noqa: U100
     self.poll_thread.join()
@@ -58,11 +58,11 @@ class QueryToKill:
     assert error_msg_startswith(
         str(self.exc),
         "Invalid or unknown query handle",
-        self.client.get_query_id(self.handle),
+        self.client.handle_id(self.handle),
     ) or error_msg_startswith(
         str(self.exc),
         "Cancelled",
-        self.client.get_query_id(self.handle),
+        self.client.handle_id(self.handle),
     )
     try:
       self.client.fetch(self.sql, self.handle)
@@ -140,7 +140,7 @@ def __run_cancel_query_and_validate_state(client, query, exec_option,
       kill_client.connect()
       if exec_option:
         kill_client.set_configuration(exec_option)
-      assert_kill_ok(kill_client, client.get_query_id(handle))
+      assert_kill_ok(kill_client, client.handle_id(handle))
   else:
     cancel_result = client.cancel(handle)
     assert cancel_result.status_code == 0, \
