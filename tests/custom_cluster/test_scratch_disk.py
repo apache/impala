@@ -91,13 +91,13 @@ class TestScratchDir(CustomClusterTestSuite):
         os.chmod(dir_path, stat.S_IREAD)
     return result
 
-  def setup_method(self, method):
+  def setup_method(self, method):  # noqa: U100
     # Don't call the superclass method to prevent starting Impala before each test. In
     # this file, each test is responsible for doing that because we want to generate
     # the parameter string to start-impala-cluster in each test method.
     pass
 
-  def teardown_method(self, method):
+  def teardown_method(self, method):  # noqa: U100
     self.clear_tmp_dirs()
     self.check_deleted_file_fd()
 
@@ -117,7 +117,7 @@ class TestScratchDir(CustomClusterTestSuite):
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     self.execute_query_expect_success(client, self.spill_query, exec_option)
     assert self.count_nonempty_dirs(normal_dirs) == 1
 
@@ -130,7 +130,7 @@ class TestScratchDir(CustomClusterTestSuite):
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     # Expect spill to disk to fail
     self.execute_query_expect_failure(client, self.spill_query, exec_option)
     # Should be able to execute in-memory query
@@ -159,7 +159,7 @@ class TestScratchDir(CustomClusterTestSuite):
     # disk.
     exec_option['spool_query_results'] = '0'
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     # Expect spill to disk to fail
     self.execute_query_expect_failure(client, self.spill_query, exec_option)
     # Should be able to execute in-memory query
@@ -185,7 +185,7 @@ class TestScratchDir(CustomClusterTestSuite):
     # disk.
     exec_option['spool_query_results'] = '0'
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     # Expect spill to disk to fail
     self.execute_query_expect_failure(client, self.spill_query, exec_option)
     # Should be able to execute in-memory query
@@ -215,7 +215,7 @@ class TestScratchDir(CustomClusterTestSuite):
 
     # Should still be able to spill to the third directory.
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     self.execute_query_expect_success(client, self.spill_query, exec_option)
     # Restore second directory mod for cleanup later.
     for dirpath, dirnames, filenames in os.walk(dirs[1]):
@@ -236,7 +236,7 @@ class TestScratchDir(CustomClusterTestSuite):
                                     expected_count=len(normal_dirs))
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
     verifier = MetricVerifier(impalad.service)
     verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
@@ -266,7 +266,7 @@ class TestScratchDir(CustomClusterTestSuite):
                                     expected_count=len(normal_dirs))
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
     verifier = MetricVerifier(impalad.service)
     verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
@@ -335,7 +335,7 @@ class TestScratchDir(CustomClusterTestSuite):
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
     verifier = MetricVerifier(impalad.service)
     verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
@@ -366,7 +366,7 @@ class TestScratchDir(CustomClusterTestSuite):
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
     verifier = MetricVerifier(impalad.service)
     verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
@@ -400,7 +400,7 @@ class TestScratchDir(CustomClusterTestSuite):
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
     verifier = MetricVerifier(impalad.service)
     verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
@@ -433,7 +433,7 @@ class TestScratchDir(CustomClusterTestSuite):
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
     verifier = MetricVerifier(impalad.service)
     verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
@@ -472,7 +472,7 @@ class TestScratchDir(CustomClusterTestSuite):
     handle_name = 'handle'
     for i in range(num):
         impalad = self.cluster.impalads[i - 1]
-        locals()[client_name + str(i)] = impalad.service.create_beeswax_client()
+        locals()[client_name + str(i)] = impalad.service.create_hs2_client()
 
     for i in range(num):
         client = locals()[client_name + str(i)]
@@ -517,7 +517,7 @@ class TestScratchDir(CustomClusterTestSuite):
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
     verifier = MetricVerifier(impalad.service)
     verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
@@ -546,7 +546,7 @@ class TestScratchDir(CustomClusterTestSuite):
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     self.execute_query_async_using_client(client, self.spill_query_big_table, vector)
     verifier = MetricVerifier(impalad.service)
     verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
@@ -587,7 +587,7 @@ class TestScratchDir(CustomClusterTestSuite):
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     self.execute_query_async_using_client(client, self.spill_query_big_table, vector)
     verifier = MetricVerifier(impalad.service)
     verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)

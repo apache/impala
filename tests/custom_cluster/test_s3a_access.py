@@ -28,10 +28,12 @@ from tests.util.filesystem_utils import WAREHOUSE
 tmp = tempfile.NamedTemporaryFile(delete=False)
 BAD_KEY_FILE = tmp.name
 
+
 @SkipIf.not_s3
 class TestS3AAccess(CustomClusterTestSuite):
 
   cmd_filename = ""
+
   @classmethod
   def setup_class(cls):
     super(TestS3AAccess, cls).setup_class()
@@ -49,7 +51,7 @@ class TestS3AAccess(CustomClusterTestSuite):
 
   def _get_impala_client(self):
     impalad = self.cluster.get_any_impalad()
-    return impalad.service.create_beeswax_client()
+    return impalad.service.create_hs2_client()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

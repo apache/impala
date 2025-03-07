@@ -49,7 +49,7 @@ class TestAIGenerateText(CustomClusterTestSuite):
       '--impalad_args=--ai_additional_platforms="bad.site" '
       '--ai_endpoint="https://bad.site"'])
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     err = self.execute_query_expect_failure(client, self.ai_generate_text_default_query)
     assert re.search(re.escape(self.AI_GENERATE_COMMON_ERR_PREFIX), str(err))
     assert re.search(re.escape(self.AI_CURL_NETWORK_ERR), str(err))
@@ -61,7 +61,7 @@ class TestAIGenerateText(CustomClusterTestSuite):
       '--ai_endpoint="https://api.openai.com/v1/chat/completions" '
       '--ai_api_key_jceks_secret=""'])
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     err = self.execute_query_expect_failure(client, self.ai_generate_text_default_query)
     assert re.search(re.escape(self.AI_GENERATE_COMMON_ERR_PREFIX), str(err))
     assert re.search(re.escape(self.AI_CURL_NETWORK_ERR), str(err))

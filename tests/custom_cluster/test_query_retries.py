@@ -932,7 +932,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     # Kill an impalad, and run a query. The query should be retried.
     self.cluster.impalads[1].kill()
     query = self._count_query
-    client = self.cluster.get_first_impalad().service.create_beeswax_client()
+    client = self.cluster.get_first_impalad().service.create_hs2_client()
     client.set_configuration({'retry_failed_queries': 'true'})
     handle = client.execute_async(query)
     client.wait_for_impala_state(handle, FINISHED, 60)
@@ -950,10 +950,11 @@ class TestQueryRetries(CustomClusterTestSuite):
     try:
       client.fetch(query, handle)
     except Exception as e:
-      assert "Client session expired" in str(e)
+      assert "Invalid or unknown query handle: {}".format(query_id) in str(e)
 
     # Assert that the impalad metrics show one expired session.
-    assert impalad_service.get_metric_value('impala-server.num-sessions-expired') == 1
+    # hs2_client opens new session on each execute_async(), so there should be 2.
+    assert impalad_service.get_metric_value('impala-server.num-sessions-expired') == 2
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -1218,13 +1219,13 @@ class TestQueryRetriesFaultyDisk(CustomClusterTestSuite):
       order by o_orderdate
       """
 
-  def setup_method(self, method):
+  def setup_method(self, method):  # noqa: U100
     # Don't call the superclass method to prevent starting Impala before each test. In
     # this class, each test is responsible for doing that because we want to generate
     # the parameter string to start-impala-cluster in each test method.
     pass
 
-  def teardown_method(self, method):
+  def teardown_method(self, method):  # noqa: U100
     self.clear_tmp_dirs()
 
   def __generate_scratch_dir(self, num):
@@ -1267,7 +1268,7 @@ class TestQueryRetriesFaultyDisk(CustomClusterTestSuite):
         expected_count=1)
 
     coord_impalad = self.cluster.get_first_impalad()
-    client = coord_impalad.service.create_beeswax_client()
+    client = coord_impalad.service.create_hs2_client()
 
     disk_failure_impalad = self.cluster.impalads[1]
     assert disk_failure_impalad.service.krpc_port == FAILED_KRPC_PORT

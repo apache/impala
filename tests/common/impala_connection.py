@@ -849,8 +849,7 @@ class ImpylaHS2Connection(ImpalaConnection):
         return True
       elif impala_state == ERROR:
         try:
-          error_log = self.__do_rpc(
-            lambda: self.imp_service.get_log(operation_handle.log_context))
+          error_log = operation_handle.get_handle().get_log()
           raise impyla_error.OperationalError(error_log, None)
         finally:
           self.close_query(operation_handle)

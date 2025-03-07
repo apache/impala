@@ -33,6 +33,7 @@ from tests.common.environ import IS_REDHAT_DERIVATIVE
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
 from tests.common.test_dimensions import create_client_protocol_dimension
+from tests.common.test_vector import BEESWAX
 from tests.shell.util import run_impala_shell_cmd, run_impala_shell_cmd_no_expect, \
     ImpalaShell, create_impala_shell_executable_dimension
 
@@ -52,6 +53,7 @@ elif _openssl_version_number < REQUIRED_MIN_OPENSSL_VERSION:
 else:
   SKIP_SSL_MSG = None
 CERT_DIR = "%s/be/src/testutil" % os.environ['IMPALA_HOME']
+
 
 class TestClientSsl(CustomClusterTestSuite):
   """Tests for a client using SSL (particularly, the Impala Shell) """
@@ -92,7 +94,6 @@ class TestClientSsl(CustomClusterTestSuite):
     if sys.version_info < REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12:
       pytest.skip("Python version does not support tls 1.2")
     super(TestClientSsl, cls).setup_class()
-
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=SSL_ARGS, statestored_args=SSL_ARGS,
@@ -156,7 +157,7 @@ class TestClientSsl(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_impala_shell_executable_dimension(dev_only=True))
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('protocol') != 'beeswax')
+        v.get_value('protocol') != BEESWAX)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=WEBSERVER_SSL_ARGS,

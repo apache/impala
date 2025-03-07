@@ -20,7 +20,6 @@ import pytest
 
 from threading import Thread
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 
 # This custom cluster test exercises the behavior of the front end thrift
 # server on how a new client connection request is handled, after the maximum
@@ -42,13 +41,8 @@ class TestFrontendConnectionLimit(CustomClusterTestSuite):
     super(TestFrontendConnectionLimit, cls).add_test_dimensions()
 
   def _connect_and_query(self, query, impalad):
-    client = impalad.service.create_beeswax_client()
-    try:
+    with impalad.service.create_hs2_client() as client:
       client.execute(query)
-    except Exception as e:
-      client.close()
-      raise ImpalaBeeswaxException(str(e))
-    client.close()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

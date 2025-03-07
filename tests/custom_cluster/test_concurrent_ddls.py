@@ -25,7 +25,9 @@ from multiprocessing import TimeoutError
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_connection import ERROR, FINISHED
 from tests.util.shell_util import dump_server_stacktraces
+
 
 class TestConcurrentDdls(CustomClusterTestSuite):
   """Test concurrent DDLs with invalidate metadata"""
@@ -216,7 +218,6 @@ class TestConcurrentDdls(CustomClusterTestSuite):
     for i in range(10):
       self.execute_query("invalidate metadata " + tbl)
       # Always keep a concurrent REFRESH statement running
-      refresh_state = self.client.get_state(refresh_handle)
-      if refresh_state == self.client.QUERY_STATES['FINISHED']\
-          or refresh_state == self.client.QUERY_STATES['EXCEPTION']:
+      refresh_state = self.client.get_impala_exec_state(refresh_handle)
+      if refresh_state == FINISHED or ERROR:
         refresh_handle = self.client.execute_async(refresh_stmt)

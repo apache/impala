@@ -52,8 +52,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
 
   def setup_method(self, method):
     super(TestHdfsFdCaching, self).setup_method(method)
-    impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = self.hs2_client
 
     self.client = client
     client.execute("drop database if exists cachefd cascade")
@@ -63,8 +62,8 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     self.create_n_files(1)
 
   def teardown_method(self, method):
-    super(TestHdfsFdCaching, self).teardown_method(method)
     self.client.execute("drop database if exists cachefd cascade")
+    super(TestHdfsFdCaching, self).teardown_method(method)
 
   def run_fd_caching_test(self, vector, caching_expected, cache_capacity,
       eviction_timeout_secs):

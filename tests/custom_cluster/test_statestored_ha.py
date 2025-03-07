@@ -20,12 +20,12 @@ import logging
 import pytest
 import time
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
 from tests.common.impala_cluster import (
     DEFAULT_CATALOG_SERVICE_PORT, DEFAULT_STATESTORE_SERVICE_PORT)
-from tests.common.impala_connection import ERROR, RUNNING
+from tests.common.impala_connection import (
+    ERROR, IMPALA_CONNECTION_EXCEPTION, RUNNING)
 from tests.common.skip import SkipIfBuildType, SkipIfNotHdfsMinicluster
 from time import sleep
 
@@ -744,7 +744,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
     slow_query = \
         "select distinct * from tpch_parquet.lineitem where l_orderkey > sleep(1000)"
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     try:
       # Run a slow query
       handle = client.execute_async(slow_query)
@@ -769,7 +769,7 @@ class TestStatestoredHA(CustomClusterTestSuite):
       try:
         client.wait_for_finished_timeout(handle, 100)
         assert False, "Query expected to fail"
-      except ImpalaBeeswaxException as e:
+      except IMPALA_CONNECTION_EXCEPTION as e:
         assert "Failed due to unreachable impalad" in str(e), str(e)
 
       # Restart original active statestored. Verify that the statestored does not resume

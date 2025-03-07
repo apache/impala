@@ -462,10 +462,10 @@ class TestCatalogdHA(CustomClusterTestSuite):
     assert(not catalogd_service_2.get_metric_value("catalog-server.active-status"))
 
     # Run DDL with SYNC_DDL enabled.
-    client = self.cluster.impalads[0].service.create_beeswax_client()
+    client = self.cluster.impalads[0].service.create_hs2_client()
     assert client is not None
     try:
-      self.execute_query_expect_success(client, "set SYNC_DDL=1")
+      client.set_configuration_option('sync_ddl', 1)
       ddl_query = "CREATE TABLE {database}.failover_sync_ddl (c int)"
       handle = client.execute_async(ddl_query.format(database=unique_database))
 

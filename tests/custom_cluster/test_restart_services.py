@@ -34,9 +34,9 @@ from time import sleep
 from impala.error import HiveServer2Error
 from TCLIService import TCLIService
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.impala_connection import ERROR, RUNNING
+from tests.common.impala_connection import (
+    ERROR, FINISHED, IMPALA_CONNECTION_EXCEPTION, RUNNING)
 from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfFS
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
@@ -80,7 +80,7 @@ class TestRestart(CustomClusterTestSuite):
       self._start_impala_cluster([], num_coordinators=1, cluster_size=3)
       assert len(self.cluster.impalads) == 3
 
-      client = self.cluster.impalads[0].service.create_beeswax_client()
+      client = self.cluster.impalads[0].service.create_hs2_client()
       assert client is not None
 
       for i in range(5):
@@ -107,7 +107,7 @@ class TestRestart(CustomClusterTestSuite):
         pytest.skip()
 
       assert len(self.cluster.impalads) == 3
-      client = self.cluster.impalads[0].service.create_beeswax_client()
+      client = self.cluster.impalads[0].service.create_hs2_client()
       assert client is not None
 
       handle = client.execute_async(
@@ -436,11 +436,11 @@ class TestRestart(CustomClusterTestSuite):
     slow_query = \
       "select distinct * from tpch_parquet.lineitem where l_orderkey > sleep(1000)"
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     try:
       handle = client.execute_async(slow_query)
       # Make sure query starts running.
-      self.client.wait_for_impala_state(handle, RUNNING, 1000)
+      client.wait_for_impala_state(handle, RUNNING, 1000)
       profile = client.get_runtime_profile(handle)
       assert "NumBackends: 3" in profile, profile
       # Restart Statestore and wait till the grace period ends + some buffer.
@@ -457,7 +457,7 @@ class TestRestart(CustomClusterTestSuite):
       try:
         client.wait_for_finished_timeout(handle, 100)
         assert False, "Query expected to fail"
-      except ImpalaBeeswaxException as e:
+      except IMPALA_CONNECTION_EXCEPTION as e:
         assert "Failed due to unreachable impalad" in str(e), str(e)
         assert time.time() - start_time > self.CANCELLATION_GRACE_PERIOD_S + \
                                      self.SUBSCRIBER_TIMEOUT_S, \
@@ -469,7 +469,7 @@ class TestRestart(CustomClusterTestSuite):
       catalogd_version = self.cluster.catalogd.service.get_catalog_version()
       impalad.service.wait_for_metric_value("catalog.curr-version", catalogd_version)
       handle = client.execute_async(slow_query)
-      self.client.wait_for_impala_state(handle, RUNNING, 1000)
+      client.wait_for_impala_state(handle, RUNNING, 1000)
       profile = client.get_runtime_profile(handle)
       assert "NumBackends: 2" in profile, profile
       start_time = time.time()
@@ -480,7 +480,7 @@ class TestRestart(CustomClusterTestSuite):
       try:
         client.wait_for_finished_timeout(handle, 100)
         assert False, "Query expected to fail"
-      except ImpalaBeeswaxException as e:
+      except IMPALA_CONNECTION_EXCEPTION as e:
         assert "Failed due to unreachable impalad" in str(e), str(e)
         assert time.time() - start_time > self.CANCELLATION_GRACE_PERIOD_S + \
                                      self.SUBSCRIBER_TIMEOUT_S, \
@@ -885,7 +885,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     def expect_beeswax_shutdown_error(fn):
       try:
         fn()
-      except ImpalaBeeswaxException as e:
+      except IMPALA_CONNECTION_EXCEPTION as e:
         assert SHUTDOWN_ERROR_PREFIX in str(e)
     expect_beeswax_shutdown_error(lambda: self.client.execute("select 1"))
     expect_beeswax_shutdown_error(lambda: self.client.execute_async("select 1"))
@@ -925,8 +925,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
 
     # Make sure that the beeswax query is still executing, then close it to allow the
     # coordinator to shut down.
-    self.impalad_test_service.wait_for_query_state(self.client, before_shutdown_handle,
-          self.client.QUERY_STATES['FINISHED'], timeout=20)
+    self.client.wait_for_impala_state(before_shutdown_handle, FINISHED, 20)
     self.client.close_query(before_shutdown_handle)
     self.cluster.impalads[0].wait_for_exit()
 
@@ -1009,15 +1008,13 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     'timeout' controls how long we will wait"""
     # Fix number of scanner threads to make runtime more deterministic.
     handle = self.execute_query_async(query, {'num_scanner_threads': 1})
-    self.impalad_test_service.wait_for_query_state(self.client, handle,
-                self.client.QUERY_STATES['RUNNING'], timeout=timeout)
+    self.client.wait_for_impala_state(handle, RUNNING, timeout)
     return handle
 
   def __fetch_and_get_num_backends(self, query, handle, delay_s=0, timeout_s=20):
     """Fetch the results of 'query' from the beeswax handle 'handle', close the
     query and return the number of backends obtained from the profile."""
-    self.impalad_test_service.wait_for_query_state(self.client, handle,
-                self.client.QUERY_STATES['FINISHED'], timeout=timeout_s)
+    self.client.wait_for_impala_state(handle, FINISHED, timeout_s)
     if delay_s > 0:
       LOG.info("sleeping for {0}s".format(delay_s))
       time.sleep(delay_s)

@@ -193,7 +193,7 @@ class ImpalaCluster(object):
     n = 0
     for impalad in self.impalads:
       try:
-        client = impalad.service.create_beeswax_client()
+        client = impalad.service.create_hs2_client()
         result = client.execute("select 1")
         assert result.success
         ++n

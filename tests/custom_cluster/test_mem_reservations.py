@@ -24,6 +24,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import LOG
 from tests.verifiers.metric_verifier import MetricVerifier
 
+
 class TestMemReservations(CustomClusterTestSuite):
   """Tests for memory reservations that require custom cluster arguments."""
 
@@ -34,7 +35,7 @@ class TestMemReservations(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--buffer_pool_limit=2g --memory_maintenance_sleep_time_ms=100")
-  def test_per_backend_min_reservation(self, vector):
+  def test_per_backend_min_reservation(self):
     """Tests that the per-backend minimum reservations are used (IMPALA-4833).
        The test sets the buffer_pool_limit very low (2gb), and then runs a query against
        two different coordinators. The query was created to have different minimum
@@ -82,7 +83,7 @@ class TestMemReservations(CustomClusterTestSuite):
         self.error = None
 
       def run(self):
-        client = self.coordinator.service.create_beeswax_client()
+        client = self.coordinator.service.create_hs2_client()
         try:
           client.set_configuration(CONFIG_MAP)
           for i in range(20):

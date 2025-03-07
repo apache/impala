@@ -61,7 +61,7 @@ class ResourcePoolConfig(object):
     if impala as picked up the change to that metric and is now equal to the
     'target'val'. Times out after 'timeout' seconds"""
     metric_str = self.CONFIG_TO_METRIC_STR_MAPPING[config_str]
-    client = self.impala_service.create_beeswax_client()
+    client = self.impala_service.create_hs2_client()
     client.set_configuration_option('request_pool', pool_name)
     # set mem_limit to something above the proc limit so that the query always gets
     # rejected.

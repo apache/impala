@@ -49,7 +49,7 @@ class TestExchangeEos(CustomClusterTestSuite):
 
     cluster = ImpalaCluster.get_e2e_test_cluster()
     coordinator = cluster.get_first_impalad()
-    client = coordinator.service.create_beeswax_client()
+    client = coordinator.service.create_hs2_client()
 
     vector.get_value('exec_option')['spool_query_results'] = 'true'
     for query in ["select * from tpch.lineitem order by l_orderkey limit 10000",

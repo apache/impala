@@ -82,8 +82,8 @@ class TestLocalCatalogCompactUpdates(CustomClusterTestSuite):
     try:
       impalad1 = self.cluster.impalads[0]
       impalad2 = self.cluster.impalads[1]
-      client1 = impalad1.service.create_beeswax_client()
-      client2 = impalad2.service.create_beeswax_client()
+      client1 = impalad1.service.create_hs2_client()
+      client2 = impalad2.service.create_hs2_client()
 
       view = "%s.my_view" % unique_database
 
@@ -126,7 +126,7 @@ class TestLocalCatalogCompactUpdates(CustomClusterTestSuite):
     """
     try:
       impalad = self.cluster.impalads[0]
-      client = impalad.service.create_beeswax_client()
+      client = impalad.service.create_hs2_client()
 
       view = "%s.my_view" % unique_database
       self.execute_query_expect_success(client, "create view %s as select 1" % view)
@@ -223,8 +223,8 @@ class TestLocalCatalogCompactUpdates(CustomClusterTestSuite):
     try:
       impalad1 = self.cluster.impalads[0]
       impalad2 = self.cluster.impalads[1]
-      client1 = impalad1.service.create_beeswax_client()
-      client2 = impalad2.service.create_beeswax_client()
+      client1 = impalad1.service.create_hs2_client()
+      client2 = impalad2.service.create_hs2_client()
 
       # Create something to make the cache not empty.
       self.execute_query_expect_success(
@@ -265,8 +265,8 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     # Tracks query failures for all other reasons.
     failed_queries = queue.Queue()
     try:
-      client1 = self.cluster.impalads[0].service.create_beeswax_client()
-      client2 = self.cluster.impalads[1].service.create_beeswax_client()
+      client1 = self.cluster.impalads[0].service.create_hs2_client()
+      client2 = self.cluster.impalads[1].service.create_hs2_client()
 
       def stress_thread(client):
         # Loops, picks a random query in each iteration, runs it,
@@ -277,7 +277,7 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
           attempt += 1
           try:
             print('Attempt', attempt, 'client', str(client))
-            ret = self.execute_query_unchecked(client, q)
+            self.execute_query_unchecked(client, q)
           except Exception as e:
             if 'InconsistentMetadataFetchException' in str(e):
               with inconsistent_seen_lock:
@@ -354,8 +354,8 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     try:
       impalad1 = self.cluster.impalads[0]
       impalad2 = self.cluster.impalads[1]
-      client1 = impalad1.service.create_beeswax_client()
-      client2 = impalad2.service.create_beeswax_client()
+      client1 = impalad1.service.create_hs2_client()
+      client2 = impalad2.service.create_hs2_client()
 
       # Create a view in client 1, cache the table list including that view in
       # client 2, and then drop it in client 1. While we've still cached the
@@ -472,7 +472,7 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     self.execute_query(
         "insert into {0}.tbl partition(p) values (0,0)".format(unique_database))
 
-    def read_part(i):
+    def read_part(i):  # noqa: U100
       self.execute_query_expect_success(
           tls.c, "select * from {0}.tbl where p=0".format(unique_database))
 
@@ -485,6 +485,7 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
         pass
       # Refresh to invalidate the partition in local catalog cache
       self.execute_query("refresh {0}.tbl partition(p=0)".format(unique_database))
+
 
 class TestLocalCatalogObservability(CustomClusterTestSuite):
   def get_catalog_cache_metrics(self, impalad):
@@ -518,7 +519,7 @@ class TestLocalCatalogObservability(CustomClusterTestSuite):
       # Make sure /catalog_object endpoint is disabled on web UI.
       assert 'No URI handler for &apos;/catalog_object&apos;' \
         in impalad.service.read_debug_webpage('/catalog_object')
-      client = impalad.service.create_beeswax_client()
+      client = impalad.service.create_hs2_client()
       cache_hit_rate_metric_key = "catalog.cache.hit-rate"
       cache_miss_rate_metric_key = "catalog.cache.miss-rate"
       cache_hit_count_metric_key = "catalog.cache.hit-count"
@@ -594,6 +595,7 @@ class TestLocalCatalogObservability(CustomClusterTestSuite):
         % test_tbl
     self.assert_impalad_log_contains('INFO', log_regex)
 
+
 class TestFullAcid(CustomClusterTestSuite):
   @classmethod
   def get_workload(self):
@@ -616,6 +618,7 @@ class TestFullAcid(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   def test_full_acid_scans(self, vector, unique_database):
     self.run_test_case('QueryTest/full-acid-scans', vector, use_db=unique_database)
+
 
 class TestReusePartitionMetadata(CustomClusterTestSuite):
   @pytest.mark.execute_serially

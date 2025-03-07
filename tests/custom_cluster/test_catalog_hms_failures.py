@@ -21,10 +21,10 @@ import time
 import threading
 
 from subprocess import check_call
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import (
     CustomClusterTestSuite,
     DEFAULT_CLUSTER_SIZE)
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.skip import SkipIf
 from tests.util.event_processor_utils import EventProcessorUtils
 
@@ -74,7 +74,7 @@ class TestHiveMetaStoreFailure(CustomClusterTestSuite):
 
     try:
       self.client.execute("describe %s" % tbl_name)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       print(str(e))
       assert "Failed to load metadata for table: %s. Running 'invalidate metadata %s' "\
           "may resolve this problem." % (tbl_name, tbl_name) in str(e)
@@ -104,7 +104,7 @@ class TestHiveMetaStoreFailure(CustomClusterTestSuite):
     for _ in range(2):
       try:
         self.client.execute("describe {0}".format(table))
-      except ImpalaBeeswaxException as e:
+      except IMPALA_CONNECTION_EXCEPTION as e:
         assert "Failed to load metadata for table: %s. "\
                "Running 'invalidate metadata %s' may resolve this problem." \
                % (table, table) in str(e)
@@ -203,7 +203,7 @@ class TestCatalogHMSFailures(CustomClusterTestSuite):
     again"""
     # Make sure that catalogd is connected to HMS
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     self.reload_metadata(client)
 
     # Kill HMS
@@ -214,7 +214,7 @@ class TestCatalogHMSFailures(CustomClusterTestSuite):
     start = time.time()
     try:
       self.reload_metadata(client)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Connection refused" in str(e)
     else:
       assert False, "Metadata load should have failed"
@@ -237,7 +237,7 @@ class TestCatalogHMSFailures(CustomClusterTestSuite):
     HMS is started a little later"""
     # Make sure that catalogd is connected to HMS
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     self.reload_metadata(client)
 
     # Kill HMS
@@ -279,7 +279,7 @@ class TestCatalogHMSFailures(CustomClusterTestSuite):
     catalogd fails"""
     # Make sure that catalogd is connected to HMS
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     self.reload_metadata(client)
 
     # Kill HMS

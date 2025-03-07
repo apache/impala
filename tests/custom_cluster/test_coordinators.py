@@ -31,6 +31,7 @@ from tests.common.test_result_verifier import error_msg_startswith
 LOG = logging.getLogger('test_coordinators')
 LOG.setLevel(level=logging.DEBUG)
 
+
 class TestCoordinators(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   def test_multiple_coordinators(self):
@@ -49,7 +50,7 @@ class TestCoordinators(CustomClusterTestSuite):
     # Verify that Beeswax and HS2 client connections can't be established at a worker node
     beeswax_client = None
     try:
-      beeswax_client = worker.service.create_beeswax_client()
+      beeswax_client = worker.service.create_hs2_client()
     except Exception as e:
       LOG.info("Caught exception {0}".format(e))
     finally:
@@ -65,8 +66,8 @@ class TestCoordinators(CustomClusterTestSuite):
 
     # Verify that queries can successfully run on coordinator nodes
     try:
-      client1 = coordinator1.service.create_beeswax_client()
-      client2 = coordinator2.service.create_beeswax_client()
+      client1 = coordinator1.service.create_hs2_client()
+      client2 = coordinator2.service.create_hs2_client()
 
       # select queries
       self.execute_query_expect_success(client1, "select 1")
@@ -107,7 +108,7 @@ class TestCoordinators(CustomClusterTestSuite):
       coordinator = self.cluster.impalads[0]
       client = None
       try:
-        client = coordinator.service.create_beeswax_client()
+        client = coordinator.service.create_hs2_client()
         assert client is not None
         query = "select count(*) from functional.alltypesagg"
         result = client.execute(query, fetch_exec_summary=True)
@@ -157,7 +158,7 @@ class TestCoordinators(CustomClusterTestSuite):
 
     coordinator = self.cluster.impalads[0]
     try:
-      client = coordinator.service.create_beeswax_client()
+      client = coordinator.service.create_hs2_client()
 
       # create the database
       self.execute_query_expect_success(client,
@@ -270,7 +271,7 @@ class TestCoordinators(CustomClusterTestSuite):
 
     client = None
     try:
-      client = coordinator.service.create_beeswax_client()
+      client = coordinator.service.create_hs2_client()
       assert client is not None
 
       client.execute("SET EXPLAIN_LEVEL=2")
@@ -332,12 +333,12 @@ class TestCoordinators(CustomClusterTestSuite):
                                     impalad_args="-num_expected_executors=10")
   def test_num_expected_executors_flag(self):
     """Verifies that the '-num_expected_executors' flag is effective."""
-    client = self.cluster.impalads[0].service.create_beeswax_client()
-    client.execute("set explain_level=2")
+    client = self.cluster.impalads[0].service.create_hs2_client()
+    client.set_configuration_option("explain_level", "2")
     ret = client.execute("explain select * from functional.alltypes a inner join "
                          "functional.alltypes b on a.id = b.id;")
     num_hosts = "hosts=10 instances=10"
-    assert num_hosts in str(ret)
+    assert num_hosts in str(ret.tuples())
 
   @SkipIfFS.hbase
   @SkipIf.skip_hbase
@@ -346,7 +347,7 @@ class TestCoordinators(CustomClusterTestSuite):
     """Verifies HBase tables can be scanned by executor only impalads."""
     self._start_impala_cluster([], cluster_size=3, num_coordinators=1,
                          use_exclusive_coordinators=True)
-    client = self.cluster.impalads[0].service.create_beeswax_client()
+    client = self.cluster.impalads[0].service.create_hs2_client()
     query = "select count(*) from functional_hbase.alltypes"
     result = self.execute_query_expect_success(client, query)
     assert result.data == ['7300']

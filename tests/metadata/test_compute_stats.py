@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import, division, print_function
 from builtins import range
+import os
 import pytest
 from hive_metastore.ttypes import (
     ColumnStatistics, ColumnStatisticsDesc, ColumnStatisticsData,
@@ -31,8 +32,6 @@ from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
 from CatalogObjects.ttypes import THdfsCompression
-
-import os
 
 
 IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
@@ -109,7 +108,7 @@ class TestComputeStats(ImpalaTestSuite):
     finally:
       self.cleanup_db("parquet", sync_ddl=0)
 
-  def test_compute_stats_compression_codec(self, vector, unique_database):
+  def test_compute_stats_compression_codec(self, unique_database):
     """IMPALA-8254: Tests that running compute stats with compression_codec set
     should not throw an error."""
     table = "{0}.codec_tbl".format(unique_database)
@@ -122,7 +121,7 @@ class TestComputeStats(ImpalaTestSuite):
         self.execute_query_expect_success(self.client, "drop stats {0}".format(table))
 
   @SkipIfFS.hive
-  def test_compute_stats_impala_2201(self, vector, unique_database):
+  def test_compute_stats_impala_2201(self, unique_database):
     """IMPALA-2201: Tests that the results of compute incremental stats are properly
     persisted when the data was loaded from Hive with hive.stats.autogather=true.
     """
@@ -193,11 +192,11 @@ class TestComputeStats(ImpalaTestSuite):
     # not zero, for all scans.
     for i in range(len(explain_result.data)):
       if ("SCAN HDFS" in explain_result.data[i]):
-         assert(hdfs_physical_properties_template in explain_result.data[i + 1])
-         assert("cardinality=0" not in explain_result.data[i + 2])
+        assert hdfs_physical_properties_template in explain_result.data[i + 1]
+        assert "cardinality=0" not in explain_result.data[i + 2]
 
   @SkipIfFS.hive
-  def test_corrupted_stats_in_partitioned_hive_tables(self, vector, unique_database):
+  def test_corrupted_stats_in_partitioned_hive_tables(self, unique_database):
     """IMPALA-9744: Tests that the partition stats corruption in Hive tables
     (row count=0, partition size>0, persisted when the data was loaded with
     hive.stats.autogather=true) is handled at the table scan level.
@@ -240,7 +239,7 @@ class TestComputeStats(ImpalaTestSuite):
             table_name, 2, 2)
 
   @SkipIfFS.hive
-  def test_corrupted_stats_in_unpartitioned_hive_tables(self, vector, unique_database):
+  def test_corrupted_stats_in_unpartitioned_hive_tables(self, unique_database):
     """IMPALA-9744: Tests that the stats corruption in unpartitioned Hive
     tables (row count=0, partition size>0, persisted when the data was loaded
     with hive.stats.autogather=true) is handled at the table scan level.
@@ -280,13 +279,13 @@ class TestComputeStats(ImpalaTestSuite):
             table_name, 1, 1)
 
   @SkipIfCatalogV2.stats_pulling_disabled()
-  def test_pull_stats_profile(self, vector, unique_database):
+  def test_pull_stats_profile(self, unique_database):
     """Checks that the frontend profile includes metrics when computing
        incremental statistics.
     """
     try:
       impalad = ImpalaCluster.get_e2e_test_cluster().impalads[0]
-      client = impalad.service.create_beeswax_client()
+      client = impalad.service.create_hs2_client()
       create = "create table test like functional.alltypes"
       load = "insert into test partition(year, month) select * from functional.alltypes"
       insert = """insert into test partition(year=2009, month=1) values
@@ -328,6 +327,7 @@ class TestComputeStats(ImpalaTestSuite):
       assert profile.count("StatsFetch.NumPartitionsWithStats: 24") == 1
     finally:
       client.close()
+
 
 # Tests compute stats on HBase tables. This test is separate from TestComputeStats,
 # because we want to use the existing machanism to disable running tests on hbase/none
@@ -391,7 +391,7 @@ class TestIncompatibleColStats(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
-  def test_incompatible_col_stats(self, vector, unique_database):
+  def test_incompatible_col_stats(self, unique_database):
     """Tests Impala is able to use tables when the column stats data is not compatible
     with the column type. Regression test for IMPALA-588."""
 

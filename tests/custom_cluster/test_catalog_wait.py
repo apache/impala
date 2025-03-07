@@ -18,9 +18,9 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 
-from time import sleep
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfBuildType
+
 
 @SkipIfBuildType.not_dev_build
 class TestCatalogWait(CustomClusterTestSuite):
@@ -29,14 +29,9 @@ class TestCatalogWait(CustomClusterTestSuite):
      This test simulates a failed or slow catalog on impalad startup."""
 
   def expect_connection(self, impalad):
-    impalad.service.create_beeswax_client()
     impalad.service.create_hs2_client()
 
   def expect_no_connection(self, impalad):
-    with pytest.raises(Exception) as e:
-      impalad.service.create_beeswax_client()
-      assert 'Could not connect to' in str(e.value)
-
     with pytest.raises(Exception) as e:
       impalad.service.create_hs2_client()
       assert 'Could not connect to' in str(e.value)
@@ -71,8 +66,8 @@ class TestCatalogWait(CustomClusterTestSuite):
     # and does not prematurely register itself as an executor. The former is
     # verified via query fragment metrics and the latter would fail if registered
     # but unable to process fragments.
-    client0 = self.cluster.impalads[0].service.create_beeswax_client()
-    client1 = self.cluster.impalads[1].service.create_beeswax_client()
+    client0 = self.cluster.impalads[0].service.create_hs2_client()
+    client1 = self.cluster.impalads[1].service.create_hs2_client()
 
     self.execute_query_expect_success(client0, "select * from functional.alltypes");
     self.execute_query_expect_success(client1, "select * from functional.alltypes");

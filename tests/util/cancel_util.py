@@ -120,7 +120,7 @@ def __run_cancel_query_and_validate_state(client, query, exec_option,
   thread.start()
 
   sleep(cancel_delay)
-  if client.get_state(handle) == client.QUERY_STATES['EXCEPTION']:
+  if client.is_error(handle):
       # If some error occurred before trying to cancel the query then we put an error
       # message together and fail the test.
       thread.join()

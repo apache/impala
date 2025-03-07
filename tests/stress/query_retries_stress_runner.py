@@ -125,7 +125,7 @@ def run_concurrent_workloads(concurrency, coordinator, database, queries):
     client = None
     try:
       # Create and setup the client.
-      client = coordinator.service.create_beeswax_client()
+      client = coordinator.service.create_hs2_client()
       LOG.info("Running workload: database={0} and coordinator=localhost:{1}, pid={2}"
           .format(database, coordinator.get_webserver_port(), coordinator.get_pid()))
       client.execute("use {0}".format(database))
@@ -347,9 +347,9 @@ When specifying a non-default scale, the job will look for a database of the for
     sys.exit(1)
 
   # Set the correct database.
-  if table_format is 'parquet':
+  if table_format == 'parquet':
     database = workload + scale + '_parquet'
-  elif workload is 'text':
+  elif workload == 'text':
     database = workload + scale
   else:
     parser.print_usage()

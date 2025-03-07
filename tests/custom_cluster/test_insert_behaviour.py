@@ -50,7 +50,7 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
 
   def _get_impala_client(self):
     impalad = self.cluster.get_any_impalad()
-    return impalad.service.create_beeswax_client()
+    return impalad.service.create_hs2_client()
 
   def _create_test_tbl(self):
     client = self._get_impala_client()
@@ -116,7 +116,7 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
   def test_insert_inherit_permission_disabled(self):
     """Check that turning off insert permission inheritance works correctly."""
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     try:
       ls = self.hdfs_client.get_file_dir_status("test-warehouse/%s/p1=1/" % TEST_TBL)
       default_perms = ls['FileStatus']['permission']
@@ -129,7 +129,7 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
         self._check_partition_perms("p1=1/p2=3/", default_perms)
       self._check_partition_perms("p1=1/p2=3/p3=4/", default_perms)
     finally:
-       client.close()
+      client.close()
 
 
 @SkipIfFS.hive

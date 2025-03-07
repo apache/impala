@@ -32,6 +32,7 @@ from datetime import datetime
 from time import sleep, time
 
 from tests.common.impala_connection import create_connection, create_ldap_connection
+from tests.common.test_vector import BEESWAX, HS2, HS2_HTTP
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 
@@ -440,9 +441,10 @@ class ImpaladService(BaseImpalaService):
     return self.is_port_open(self.webserver_port)
 
   def create_beeswax_client(self, use_kerberos=False):
-    """Creates a new beeswax client connection to the impalad"""
+    """Creates a new beeswax client connection to the impalad.
+    DEPRECATED: Use create_hs2_client() instead."""
     client = create_connection('%s:%d' % (self.hostname, self.beeswax_port),
-                               use_kerberos, 'beeswax')
+                               use_kerberos, BEESWAX)
     client.connect()
     return client
 
@@ -468,7 +470,7 @@ class ImpaladService(BaseImpalaService):
 
   def create_hs2_client(self):
     """Creates a new HS2 client connection to the impalad"""
-    client = create_connection('%s:%d' % (self.hostname, self.hs2_port), protocol='hs2')
+    client = create_connection('%s:%d' % (self.hostname, self.hs2_port), protocol=HS2)
     client.connect()
     return client
 
@@ -495,11 +497,11 @@ class ImpaladService(BaseImpalaService):
 
   def create_client(self, protocol):
     """Creates a new client connection for given protocol to this impalad"""
-    port = self.beeswax_port
-    if protocol == 'hs2':
-      port = self.hs2_port
-    elif protocol == 'hs2-http':
+    port = self.hs2_port
+    if protocol == HS2_HTTP:
       port = self.hs2_http_port
+    if protocol == BEESWAX:
+      port = self.beeswax_port
     client = create_connection('%s:%d' % (self.hostname, port), protocol=protocol)
     client.connect()
     return client

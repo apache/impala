@@ -20,7 +20,9 @@ import pytest
 import re
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension
+from tests.common.impala_connection import FINISHED
 from tests.util.parse_util import parse_duration_string_ms
+
 
 class TestRowsAvailability(ImpalaTestSuite):
   """Tests that the 'Rows available' timeline event is marked only after rows are
@@ -59,7 +61,7 @@ class TestRowsAvailability(ImpalaTestSuite):
     return vector.get_value('table_format').file_format == 'text' and\
         vector.get_value('table_format').compression_codec == 'none' and\
         vector.get_value('exec_option')['batch_size'] == 0 and\
-        vector.get_value('exec_option')['disable_codegen'] == False and\
+        vector.get_value('exec_option')['disable_codegen'] is False and\
         vector.get_value('exec_option')['num_nodes'] == 0
 
   @pytest.mark.execute_serially
@@ -70,8 +72,7 @@ class TestRowsAvailability(ImpalaTestSuite):
     query = vector.get_value('query')
     # Execute async to get a handle. Wait until the query has completed.
     handle = self.execute_query_async(query, vector.get_value('exec_option'))
-    self.impalad_test_service.wait_for_query_state(self.client, handle,
-        self.client.QUERY_STATES['FINISHED'], timeout=20)
+    self.client.wait_for_impala_state(handle, FINISHED, 20)
 
     profile = self.client.get_runtime_profile(handle)
     start_time_ms = None

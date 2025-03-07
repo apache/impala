@@ -233,13 +233,13 @@ class TestBlacklistFaultyDisk(CustomClusterTestSuite):
       print("Generated dir " + dir_path)
     return result
 
-  def setup_method(self, method):
+  def setup_method(self, method):  # noqa: U100
     # Don't call the superclass method to prevent starting Impala before each test. In
     # this class, each test is responsible for doing that because we want to generate
     # the parameter string to start-impala-cluster in each test method.
     pass
 
-  def teardown_method(self, method):
+  def teardown_method(self, method):  # noqa: U100
     self.clear_tmp_dirs()
 
   @SkipIfBuildType.not_dev_build
@@ -264,7 +264,7 @@ class TestBlacklistFaultyDisk(CustomClusterTestSuite):
     # First set debug_action for query as empty.
     vector.get_value('exec_option')['debug_action'] = ''
     coord_impalad = self.cluster.get_first_impalad()
-    client = coord_impalad.service.create_beeswax_client()
+    client = coord_impalad.service.create_client_from_vector(vector)
 
     # Expect spill to disk to success with debug_action as empty. Verify all nodes are
     # active.

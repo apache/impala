@@ -22,6 +22,7 @@ import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
+
 class TestCompactCatalogUpdates(CustomClusterTestSuite):
   @classmethod
   def get_workload(cls):
@@ -47,8 +48,8 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
       impalad2 = self.cluster.impalads[1]
       assert impalad2.service.get_metric_value("catalog.curr-version") > 0
 
-      client1 = impalad1.service.create_beeswax_client()
-      client2 = impalad2.service.create_beeswax_client()
+      client1 = impalad1.service.create_hs2_client()
+      client2 = impalad2.service.create_hs2_client()
       query_options = {"sync_ddl" : 1}
       self.execute_query_expect_success(client1, "refresh functional.alltypes",
           query_options)

@@ -24,10 +24,10 @@ import psutil
 import pytest
 import time
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import (
   DEFAULT_CLUSTER_SIZE,
   CustomClusterTestSuite)
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.skip import SkipIfFS
 from tests.shell.util import run_impala_shell_cmd
 
@@ -212,7 +212,7 @@ class TestWebPage(CustomClusterTestSuite):
     statestored_args="--logtostderr=true --redirect_stdout_stderr=false",
     catalogd_args="--logtostderr=true --redirect_stdout_stderr=false"
   )
-  def test_webserver_hide_logs_link(self, vector):
+  def test_webserver_hide_logs_link(self):
     """Validate that there is no /logs link when we use --logtostderr=true """
     ports = ["25000", "25010", "25020"]
     for port in ports:
@@ -375,7 +375,7 @@ class TestWebPage(CustomClusterTestSuite):
       self.execute_query("refresh functional.alltypes", {
         "debug_action": "catalogd_refresh_hdfs_listing_delay:SLEEP@100"
       })
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "RPC recv timed out" in str(e)
     # In impalad side, the query fails by the above error. However, in catalogd side,
     # the RPCs are still running. Check the in-flight operations.

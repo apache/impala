@@ -580,7 +580,7 @@ class TestDdlStatements(TestDdlBase):
     else:
       num_attempts = 60
     for impalad in ImpalaCluster.get_e2e_test_cluster().impalads:
-      client = impalad.service.create_beeswax_client()
+      client = impalad.service.create_client_from_vector(vector)
       try:
         for attempt in itertools.count(1):
           assert attempt <= num_attempts, "ran out of attempts"
@@ -603,21 +603,20 @@ class TestDdlStatements(TestDdlBase):
     impala_cluster = ImpalaCluster.get_e2e_test_cluster()
     impalads = impala_cluster.impalads
     view_name = "%s.test_describe_view" % unique_database
-    query_opts = vector.get_value('exec_option')
-    first_client = impalads[0].service.create_beeswax_client()
+    first_client = impalads[0].service.create_client_from_vector(vector)
     try:
       # Create a view and verify it's visible.
       self.execute_query_expect_success(first_client,
                                         "create view {0} as "
                                         "select * from functional.alltypes"
-                                        .format(view_name), query_opts)
+                                        .format(view_name))
       self._verify_describe_view(vector, view_name, "select * from functional.alltypes")
 
       # Alter the view and verify the alter is visible.
       self.execute_query_expect_success(first_client,
                                         "alter view {0} as "
                                         "select * from functional.alltypesagg"
-                                        .format(view_name), query_opts)
+                                        .format(view_name))
       self._verify_describe_view(vector, view_name,
                                  "select * from functional.alltypesagg")
     finally:

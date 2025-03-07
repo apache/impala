@@ -47,7 +47,7 @@ class TestProcessFailures(CustomClusterTestSuite):
   def test_restart_coordinator(self):
     """Restarts the coordinator between queries."""
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
 
     self.execute_query_expect_success(client, QUERY)
 
@@ -56,7 +56,7 @@ class TestProcessFailures(CustomClusterTestSuite):
     statestored.service.wait_for_live_subscribers(DEFAULT_NUM_SUBSCRIBERS, timeout=60)
 
     # Reconnect
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     impalad.service.wait_for_metric_value('catalog.ready', 1, timeout=60)
     self.execute_query_expect_success(client, QUERY)
 
@@ -67,7 +67,7 @@ class TestProcessFailures(CustomClusterTestSuite):
     """"Tests that when a coordinator running multiple queries is killed, all
     running fragments on executors are cancelled."""
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     assert client is not None
     # A query which is cancelable and takes long time to execute
     query = "select * from tpch.lineitem t1, tpch.lineitem t2, tpch.lineitem t3 " \
@@ -100,7 +100,7 @@ class TestProcessFailures(CustomClusterTestSuite):
   def test_restart_statestore(self):
     """Tests the cluster still functions when the statestore dies."""
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     statestored = self.cluster.statestored
     statestored.kill()
     impalad.service.wait_for_metric_value(
@@ -128,7 +128,7 @@ class TestProcessFailures(CustomClusterTestSuite):
   def test_kill_restart_worker(self):
     """Verifies a worker is able to be killed."""
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     self.execute_query_expect_success(client, QUERY)
 
     # select a different impalad and restart it
@@ -182,7 +182,7 @@ class TestProcessFailures(CustomClusterTestSuite):
   def test_restart_catalogd(self):
     # Choose a random impalad verify a query can run against it.
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     self.execute_query_expect_success(client, QUERY)
 
     # Kill the catalogd.
@@ -208,7 +208,7 @@ class TestProcessFailures(CustomClusterTestSuite):
   def test_restart_all_impalad(self):
     """Restarts all the impalads and runs a query"""
     impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     self.execute_query_expect_success(client, QUERY)
 
     # Kill each impalad and wait for the statestore to register the failures.
@@ -229,7 +229,7 @@ class TestProcessFailures(CustomClusterTestSuite):
     for impalad in self.cluster.impalads:
       impalad.service.wait_for_num_known_live_backends(DEFAULT_CLUSTER_SIZE, timeout=60)
       impalad.service.wait_for_metric_value('catalog.ready', True, timeout=60)
-      client = impalad.service.create_beeswax_client()
+      client = impalad.service.create_hs2_client()
       self.execute_query_expect_success(client, QUERY)
       # Make sure the catalog service is actually back up by executing an operation
       # against it.

@@ -29,7 +29,7 @@ class TestRefreshInvalidPartition(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     catalogd_args="--topic_update_log_gc_frequency=10")
-  def test_refresh_invalid_partition_with_sync_ddl(self, vector, unique_database):
+  def test_refresh_invalid_partition_with_sync_ddl(self, unique_database):
     """
     Regression test for IMPALA-12448. Avoid getting stuck when refreshing a
     non-existent partition with sync_ddl.
@@ -67,8 +67,8 @@ class TestRefreshInvalidPartition(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--statestore_update_frequency_ms=5000")
   def test_refresh_missing_partition(self, unique_database):
-    client1 = self.cluster.impalads[1].service.create_beeswax_client()
-    client2 = self.cluster.impalads[2].service.create_beeswax_client()
+    client1 = self.cluster.impalads[1].service.create_hs2_client()
+    client2 = self.cluster.impalads[2].service.create_hs2_client()
     self.client.execute('create table {}.tbl (i int) partitioned by (p int)'
         .format(unique_database))
     self.execute_query(

@@ -47,7 +47,7 @@ from tests.common.impala_connection import (
 from tests.common.resource_pool_config import ResourcePoolConfig
 from tests.common.skip import SkipIfFS, SkipIfEC, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
-    HS2, BEESWAX,
+    HS2,
     add_mandatory_exec_option,
     create_exec_option_dimension,
     create_single_exec_option_dimension,
@@ -204,13 +204,6 @@ class TestAdmissionControllerBase(CustomClusterTestSuite):
 
 class TestAdmissionControllerRawHS2(TestAdmissionControllerBase, HS2TestSuite):
 
-  @classmethod
-  def default_test_protocol(cls):
-    # HS2TestSuite override self.hs2_client with a raw Impala hs2 thrift client.
-    # This will set self.client = self.beeswax_client.
-    # Do not change this. Multiple test method has been hardcoded under this assumption.
-    return BEESWAX
-
   def __check_pool_rejected(self, client, pool, expected_error_re):
     try:
       client.set_configuration({'request_pool': pool})
@@ -286,7 +279,7 @@ class TestAdmissionControllerRawHS2(TestAdmissionControllerBase, HS2TestSuite):
     to require a specific pool, and validate that the per-pool configurations were
     applied."""
     impalad = self.cluster.impalads[0]
-    client = impalad.service.create_beeswax_client()
+    client = impalad.service.create_hs2_client()
     # Expected default mem limit for queueA, used in several tests below
     queueA_mem_limit = "MEM_LIMIT=%s" % (128 * 1024 * 1024)
     try:
