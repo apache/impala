@@ -110,7 +110,8 @@ class TestCoordinators(CustomClusterTestSuite):
         client = coordinator.service.create_beeswax_client()
         assert client is not None
         query = "select count(*) from functional.alltypesagg"
-        result = self.execute_query_expect_success(client, query)
+        result = client.execute(query, fetch_exec_summary=True)
+        assert result.success
         # Verify that SCAN and AGG are executed on the expected number of
         # executor nodes
         for rows in result.exec_summary:

@@ -37,6 +37,7 @@ from tests.common.test_dimensions import (
 from tests.common.test_result_verifier import (
     QueryTestResult,
     parse_result_rows)
+from tests.common.test_vector import HS2
 from tests.verifiers.metric_verifier import MetricVerifier
 
 
@@ -237,8 +238,8 @@ class TestInsertWideTable(ImpalaTestSuite):
 
     # Don't run on core. This test is very slow (IMPALA-864) and we are unlikely to
     # regress here.
-    if cls.exploration_strategy() == 'core':
-      cls.ImpalaTestMatrix.add_constraint(lambda v: False)
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip("Test only run in exhaustive exploration.")
 
   @SkipIfLocal.parquet_file_size
   def test_insert_wide_table(self, vector, unique_database):
@@ -438,6 +439,10 @@ class TestInsertHdfsWriterLimit(ImpalaTestSuite):
     return 'functional-query'
 
   @classmethod
+  def default_test_protocol(cls):
+    return HS2
+
+  @classmethod
   def add_test_dimensions(cls):
     super(TestInsertHdfsWriterLimit, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -544,7 +549,7 @@ class TestInsertHdfsWriterLimit(ImpalaTestSuite):
     # and running.
     self.impalad_test_service.wait_for_metric_value("cluster-membership.backends.total",
                                                     3)
-    result = self.client.execute(query)
+    result = self.client.execute(query, fetch_exec_summary=True)
     assert 'HDFS WRITER' in result.exec_summary[0]['operator'], result.runtime_profile
     if (max_fs_writers > 0):
       num_writers = int(result.exec_summary[0]['num_instances'])

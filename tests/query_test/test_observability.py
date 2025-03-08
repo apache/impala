@@ -22,7 +22,8 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster
-from tests.util.filesystem_utils import IS_EC, WAREHOUSE
+from tests.common.test_vector import HS2
+from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.parse_util import get_duration_us_from_str
 from time import sleep, time
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
@@ -35,6 +36,10 @@ class TestObservability(ImpalaTestSuite):
   def get_workload(self):
     return 'functional-query'
 
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
+
   def test_merge_exchange_num_rows(self):
     """Regression test for IMPALA-1473 - checks that the exec summary for a merging
     exchange with a limit reports the number of rows returned as equal to the limit,
@@ -42,7 +47,7 @@ class TestObservability(ImpalaTestSuite):
     of rows returned correctly."""
     query = """select tinyint_col, count(*) from functional.alltypes
         group by tinyint_col order by tinyint_col limit 5"""
-    result = self.execute_query(query)
+    result = self.client.execute(query, fetch_exec_summary=True)
     exchange = result.exec_summary[1]
     assert exchange['operator'] == '05:MERGING-EXCHANGE'
     assert exchange['num_rows'] == 5
@@ -61,7 +66,7 @@ class TestObservability(ImpalaTestSuite):
     query = """select distinct a.int_col, a.string_col from functional.alltypes a
         inner join functional.alltypessmall b on (a.id = b.id)
         where a.year = 2009 and b.month = 2"""
-    result = self.execute_query(query)
+    result = self.client.execute(query, fetch_exec_summary=True)
     exchange = result.exec_summary[8]
     assert exchange['operator'] == '04:EXCHANGE'
     assert exchange['num_rows'] == 25
@@ -98,21 +103,21 @@ class TestObservability(ImpalaTestSuite):
     """IMPALA-4499: Checks that the exec summary for scans show the table name."""
     # HDFS table
     query = "select count(*) from functional.alltypestiny"
-    result = self.execute_query(query)
+    result = self.client.execute(query, fetch_exec_summary=True)
     scan_idx = len(result.exec_summary) - 1
     assert result.exec_summary[scan_idx]['operator'] == '00:SCAN HDFS'
     assert result.exec_summary[scan_idx]['detail'] == 'functional.alltypestiny'
 
     # KUDU table
     query = "select count(*) from functional_kudu.alltypestiny"
-    result = self.execute_query(query)
+    result = self.client.execute(query, fetch_exec_summary=True)
     scan_idx = len(result.exec_summary) - 1
     assert result.exec_summary[scan_idx]['operator'] == '00:SCAN KUDU'
     assert result.exec_summary[scan_idx]['detail'] == 'functional_kudu.alltypestiny'
 
     # HBASE table
     query = "select count(*) from functional_hbase.alltypestiny"
-    result = self.execute_query(query)
+    result = self.client.execute(query, fetch_exec_summary=True)
     scan_idx = len(result.exec_summary) - 1
     assert result.exec_summary[scan_idx]['operator'] == '00:SCAN HBASE'
     assert result.exec_summary[scan_idx]['detail'] == 'functional_hbase.alltypestiny'
@@ -121,7 +126,7 @@ class TestObservability(ImpalaTestSuite):
     """IMPALA-1048: Checks that the exec summary contains sinks."""
     # SELECT query.
     query = "select count(*) from functional.alltypes"
-    result = self.execute_query(query)
+    result = self.client.execute(query, fetch_exec_summary=True)
     # Sanity-check the root sink.
     root_sink = result.exec_summary[0]
     assert root_sink['operator'] == 'F01:ROOT'
@@ -147,7 +152,7 @@ class TestObservability(ImpalaTestSuite):
     # INSERT query.
     query = "create table {0}.tmp as select count(*) from functional.alltypes".format(
         unique_database)
-    result = self.execute_query(query)
+    result = self.client.execute(query, fetch_exec_summary=True)
     # Sanity-check the HDFS writer sink.
     assert result.exec_summary[0]['operator'] == 'F01:HDFS WRITER'
     assert result.exec_summary[0]['max_time'] >= 0
@@ -633,7 +638,7 @@ class TestObservability(ImpalaTestSuite):
         "create table %s as select * from functional.alltypestiny" % table_name)
     results = self.execute_query("compute stats %s" % table_name)
     # Search for all query ids (max length 33) in the profile.
-    matches = re.findall("Query \(id=.{,33}\)", results.runtime_profile)
+    matches = re.findall(r"Query \(id=.{,33}\)", results.runtime_profile)
     query_ids = []
     for query_id in matches:
       if query_id not in query_ids:
@@ -673,7 +678,7 @@ class TestObservability(ImpalaTestSuite):
       for key in keys:
         if key in line:
           # Match byte count within parentheses
-          m = re.search("\(([0-9]+)\)", line)
+          m = re.search(r"\(([0-9]+)\)", line)
 
           # If a match was not found, then the value of the key should be 0
           if not m:
@@ -686,8 +691,8 @@ class TestObservability(ImpalaTestSuite):
     # All counters have values
     assert all(counters[key] > 0 for key in keys)
 
-    assert counters["TotalBytesSent"] == (counters["TotalScanBytesSent"] +
-                                          counters["TotalInnerBytesSent"])
+    assert counters["TotalBytesSent"] == (counters["TotalScanBytesSent"]
+                                          + counters["TotalInnerBytesSent"])
 
   def test_query_profile_contains_host_resource_usage(self):
     """Tests that the profile contains a sub-profile with per node resource usage."""
@@ -914,12 +919,12 @@ class TestObservability(ImpalaTestSuite):
     assert "Travel:" in runtime_profile
     assert "HashCollisions:" in runtime_profile
     assert "Resizes:" in runtime_profile
-    nprobes = re.search('Probes:.*\((\d+)\)', runtime_profile)
+    nprobes = re.search(r'Probes:.*\((\d+)\)', runtime_profile)
     # Probes and travel can be 0. The number can be an integer or float with K.
     # The number extracted is the number inside parenthesis, which is always
     # an integer.
     assert nprobes and len(nprobes.groups()) == 1 and int(nprobes.group(1)) >= 0
-    ntravel = re.search('Travel:.*\((\d+)\)', runtime_profile)
+    ntravel = re.search(r'Travel:.*\((\d+)\)', runtime_profile)
     assert ntravel and len(ntravel.groups()) == 1 and int(ntravel.group(1)) >= 0
 
   def test_query_profle_hashtable(self):
@@ -955,7 +960,7 @@ class TestObservability(ImpalaTestSuite):
     assert results.success
 
     "When the skew summary is seen, look for the details"
-    skews_found = 'skew\(s\) found at:.*HASH_JOIN.*HASH_JOIN.*HDFS_SCAN_NODE'
+    skews_found = r'skew\(s\) found at:.*HASH_JOIN.*HASH_JOIN.*HDFS_SCAN_NODE'
     if len(re.findall(skews_found, results.runtime_profile, re.M)) == 1:
 
       "Expect to see skew details twice at the hash join nodes."
@@ -981,20 +986,21 @@ class TestObservability(ImpalaTestSuite):
   @SkipIfNotHdfsMinicluster.plans
   def test_reduced_cardinality_by_filter(self):
     """IMPALA-12702: Check that ExecSummary shows the reduced cardinality estimation."""
-    query_opts = {'compute_processing_cost': True}
     query = """select STRAIGHT_JOIN count(*) from
         (select l_orderkey from tpch_parquet.lineitem) a
         join (select o_orderkey, o_custkey from tpch_parquet.orders) l1
           on a.l_orderkey = l1.o_orderkey
         where l1.o_custkey < 1000"""
-    result = self.execute_query(query, query_opts)
-    scan = result.exec_summary[10]
-    assert '00:SCAN' in scan['operator']
-    assert scan['num_rows'] == 39563
-    assert scan['est_num_rows'] == 575771
-    assert scan['detail'] == 'tpch_parquet.lineitem'
-    runtime_profile = result.runtime_profile
-    assert "cardinality=575.77K(filtered from 6.00M)" in runtime_profile
+    with self.create_impala_client() as client:
+      client.set_configuration_option('compute_processing_cost', 1)
+      result = client.execute(query, fetch_exec_summary=True)
+      scan = result.exec_summary[10]
+      assert '00:SCAN' in scan['operator']
+      assert scan['num_rows'] == 39563
+      assert scan['est_num_rows'] == 575771
+      assert scan['detail'] == 'tpch_parquet.lineitem'
+      runtime_profile = result.runtime_profile
+      assert "cardinality=575.77K(filtered from 6.00M)" in runtime_profile
 
   def test_query_profile_contains_get_inflight_profile_counter(self):
     """Test that counter for getting inflight profiles appears in the profile"""
@@ -1080,4 +1086,4 @@ class TestQueryStates(ImpalaTestSuite):
   def __is_line_in_profile(self, line, profile):
     """Returns true if the given 'line' is in the given 'profile'. A single line of the
     profile must exactly match the given 'line' (excluding whitespaces)."""
-    return re.search("^\s*{0}\s*$".format(line), profile, re.M)
+    return re.search(r"^\s*{0}\s*$".format(line), profile, re.M)

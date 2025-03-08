@@ -21,6 +21,7 @@ import re
 
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import hs2_client_protocol_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.parse_util import parse_duration_string_ms
 from tests.verifiers.metric_verifier import MetricVerifier
@@ -45,7 +46,9 @@ class TestHashJoinTimer(ImpalaTestSuite):
   # Fully hint the queries so that the plan will not change.
 
   # Each test case contain a query, the join type.
-  TEST_CASES = [["select /*+straight_join*/ count(*) from"
+  TEST_CASES = \
+            [
+             ["select /*+straight_join*/ count(*) from"
               " (select distinct * from functional.alltypes where int_col >= sleep(5)) a"
               " join /* +SHUFFLE */ functional.alltypes b on (a.id=b.id)",
               "HASH JOIN"],
@@ -64,7 +67,7 @@ class TestHashJoinTimer(ImpalaTestSuite):
               " (select distinct * from functional.alltypes where int_col >= sleep(5)) b"
               " where a.id>b.id and a.id=99",
               "NESTED LOOP JOIN"]
-             ]
+            ]
   # IMPALA-2973: For non-code-coverage builds, 1000 milliseconds are sufficient, but more
   # time is needed in code-coverage builds.
   HASH_JOIN_UPPER_BOUND_MS = 2000
@@ -83,15 +86,16 @@ class TestHashJoinTimer(ImpalaTestSuite):
     super(TestHashJoinTimer, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('test cases', *cls.TEST_CASES))
+    cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_constraint(lambda v: cls.__is_valid_test_vector(v))
 
   @classmethod
   def __is_valid_test_vector(cls, vector):
-    return vector.get_value('table_format').file_format == 'text' and \
-        vector.get_value('table_format').compression_codec == 'none' and \
-        vector.get_value('exec_option')['batch_size'] == 0 and \
-        vector.get_value('exec_option')['disable_codegen'] == False and \
-        vector.get_value('exec_option')['num_nodes'] == 0
+    return (vector.get_value('table_format').file_format == 'text'
+            and vector.get_value('table_format').compression_codec == 'none'
+            and vector.get_value('exec_option')['batch_size'] == 0
+            and not vector.get_value('exec_option')['disable_codegen']
+            and vector.get_value('exec_option')['num_nodes'] == 0)
 
   @pytest.mark.execute_serially
   def test_hash_join_timer(self, vector):
@@ -109,7 +113,9 @@ class TestHashJoinTimer(ImpalaTestSuite):
       verifier.wait_for_metric("impala-server.num-fragments-in-flight", 0)
 
     # Execute the query. The query summary and profile are stored in 'result'.
-    result = self.execute_query(query, vector.get_value('exec_option'))
+    result = None
+    with self.create_impala_client_from_vector(vector) as client:
+      result = client.execute(query, fetch_exec_summary=True)
 
     # Parse the query summary; The join node is "id=3".
     # In the ExecSummary, search for the join operator's summary and verify the

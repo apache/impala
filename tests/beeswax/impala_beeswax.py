@@ -184,7 +184,8 @@ class ImpalaBeeswaxClient(object):
                             service='impala', transport_type=trans_type, user=self.user,
                             password=self.password, use_ssl=self.use_ssl)
 
-  def execute(self, query_string, user=None, fetch_profile_after_close=False):
+  def execute(self, query_string, user=None, fetch_profile_after_close=False,
+              fetch_exec_summary=False):
     """Re-directs the query to its appropriate handler, returns ImpalaBeeswaxResult"""
     # Take care of leading/trailing whitespaces.
     query_string = query_string.strip()
@@ -200,7 +201,8 @@ class ImpalaBeeswaxClient(object):
         # profile and log will be available so fetch them first.
         runtime_profile = self.get_runtime_profile(handle)
 
-      exec_summary = self.get_exec_summary_and_parse(handle)
+      exec_summary = (self.get_exec_summary_and_parse(handle) if fetch_exec_summary
+                      else None)
       log = self.get_log(handle.log_context)
 
       result = self.fetch_results(query_string, handle)
@@ -218,7 +220,8 @@ class ImpalaBeeswaxClient(object):
       result = self.fetch_results(query_string, handle)
       result.time_taken = time.time() - start
       result.start_time = start_time
-      result.exec_summary = self.get_exec_summary_and_parse(handle)
+      result.exec_summary = (self.get_exec_summary_and_parse(handle) if fetch_exec_summary
+                             else None)
       result.log = self.get_log(handle.log_context)
 
       if not fetch_profile_after_close:
@@ -254,7 +257,7 @@ class ImpalaBeeswaxClient(object):
     return output
 
   def __build_summary_table(self, summary, output):
-    from shell.impala_client import build_exec_summary_table
+    from shell.exec_summary import build_exec_summary_table
     result = list()
     build_exec_summary_table(summary, 0, 0, False, result, is_prettyprint=False,
                              separate_prefix_column=True)
@@ -385,14 +388,14 @@ class ImpalaBeeswaxClient(object):
                                  success=True, data=[])
 
     # Result fetching for insert is different from other queries.
-    exec_result = None
-    if discard_results:
-      return exec_result
     if query_type == 'insert':
       exec_result = self.__fetch_insert_results(query_handle)
     else:
       exec_result = self.__fetch_results(query_handle, max_rows)
     exec_result.query = query_string
+    # Check for discard_results arg only after all rows has been fetched.
+    if discard_results:
+      return None
     return exec_result
 
   def __fetch_results(self, handle, max_rows=-1):

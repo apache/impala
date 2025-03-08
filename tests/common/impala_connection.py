@@ -111,6 +111,21 @@ def format_sql_for_logging(sql_stmt):
             u"\n-- [...]\n").format(len(sql_stmt), truncated_sql)
 
 
+def build_summary_table_from_thrift(thrift_exec_summary):
+  from shell.exec_summary import build_exec_summary_table
+  result = list()
+  build_exec_summary_table(thrift_exec_summary, 0, 0, False, result,
+                           is_prettyprint=False, separate_prefix_column=True)
+  keys = ['prefix', 'operator', 'num_hosts', 'num_instances', 'avg_time', 'max_time',
+          'num_rows', 'est_num_rows', 'peak_mem', 'est_peak_mem', 'detail']
+  output = list()
+  for row in result:
+    assert len(keys) == len(row)
+    summ_map = dict(zip(keys, row))
+    output.append(summ_map)
+  return output
+
+
 def collect_default_query_options(options, name, val, kind):
   if kind == 'REMOVED':
     return
@@ -274,7 +289,9 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
     """Cancels an in-flight operation"""
     pass
 
-  def execute(self, sql_stmt):
+  def execute(self, sql_stmt, user=None, fetch_profile_after_close=False,  # noqa: U100
+              fetch_exec_summary=False,  # noqa: U100
+              profile_format=TRuntimeProfileFormat.STRING):  # noqa: U100
     """Executes a query and fetches the results"""
     pass
 
@@ -288,6 +305,7 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
   @abc.abstractmethod
   def fetch(self, sql_stmt, operation_handle, max_rows=-1, discard_results=False):
     """Fetches query results up to max_rows given a handle and sql statement.
+    Caller must ensure that query has passed PENDING state before calling fetch.
     If max_rows < 0, all rows are fetched. If max_rows > 0 but the number of
     rows returned is less than max_rows, all the rows have been fetched.
     Return None if discard_results is True.
@@ -372,6 +390,17 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
     profile"""
     pass
 
+  @abc.abstractmethod
+  def get_exec_summary(self, operation_handle):  # noqa: U100
+    pass
+
+  def get_exec_summary_table(self, operation_handle):
+    summary_table = list()
+    summary = self.get_exec_summary(operation_handle)
+    if summary:
+        summary_table = build_summary_table_from_thrift(summary)
+    return summary_table
+
 
 # Represents a connection to Impala using the Beeswax API.
 class BeeswaxConnection(ImpalaConnection):
@@ -455,11 +484,15 @@ class BeeswaxConnection(ImpalaConnection):
     self.log_handle(operation_handle, 'closing DML query')
     self.__beeswax_client.close_dml(operation_handle.get_handle())
 
-  def execute(self, sql_stmt, user=None, fetch_profile_after_close=False):
+  def execute(self, sql_stmt, user=None, fetch_profile_after_close=False,
+              fetch_exec_summary=False, profile_format=TRuntimeProfileFormat.STRING):
+    assert profile_format == TRuntimeProfileFormat.STRING, (
+      "Beeswax client only supports getting runtime profile in STRING format.")
     self.log_client(u"executing against {0}\n{1}".format(
       self.__host_port, format_sql_for_logging(sql_stmt)))
     return self.__beeswax_client.execute(sql_stmt, user=user,
-        fetch_profile_after_close=fetch_profile_after_close)
+        fetch_profile_after_close=fetch_profile_after_close,
+        fetch_exec_summary=fetch_exec_summary)
 
   def execute_async(self, sql_stmt, user=None):
     self.log_client(u"executing async {0}\n{1}".format(
@@ -485,7 +518,7 @@ class BeeswaxConnection(ImpalaConnection):
   def get_runtime_profile(self, operation_handle,
                           profile_format=TRuntimeProfileFormat.STRING):
     assert profile_format == TRuntimeProfileFormat.STRING, (
-      "Beeswax client only support getting runtime profile in STRING format.")
+      "Beeswax client only supports getting runtime profile in STRING format.")
     self.log_handle(operation_handle, 'getting runtime profile operation')
     return self.__beeswax_client.get_runtime_profile(operation_handle.get_handle())
 
@@ -690,8 +723,8 @@ class ImpylaHS2Connection(ImpalaConnection):
          format_sql_for_logging(sql_stmt))
     )
 
-  def execute(self, sql_stmt, user=None, profile_format=TRuntimeProfileFormat.STRING,
-      fetch_profile_after_close=False):
+  def execute(self, sql_stmt, user=None, fetch_profile_after_close=False,
+              fetch_exec_summary=False, profile_format=TRuntimeProfileFormat.STRING):
     cursor = self.__cursor
     result = None
     try:
@@ -704,8 +737,8 @@ class ImpylaHS2Connection(ImpalaConnection):
       self.log_handle(handle, "started query in session {0}".format(
         self.__get_session_id(cursor)))
       result = self.__fetch_results_and_profile(
-        handle, profile_format=profile_format,
-        fetch_profile_after_close=fetch_profile_after_close)
+        handle, fetch_profile_after_close=fetch_profile_after_close,
+        fetch_exec_summary=fetch_exec_summary, profile_format=profile_format)
     finally:
       cursor.close_operation()
       if cursor != self.__cursor:
@@ -713,11 +746,12 @@ class ImpylaHS2Connection(ImpalaConnection):
     return result
 
   def __fetch_results_and_profile(
-      self, operation_handle, profile_format=TRuntimeProfileFormat.STRING,
-      fetch_profile_after_close=False):
+      self, operation_handle, fetch_profile_after_close=False,
+      fetch_exec_summary=False, profile_format=TRuntimeProfileFormat.STRING):
     r = None
     try:
-      r = self.__fetch_results(operation_handle, profile_format=profile_format)
+      r = self.__fetch_results(operation_handle, fetch_exec_summary=fetch_exec_summary,
+                               profile_format=profile_format)
     finally:
       if r is None:
         # Try to close the query handle but ignore any exceptions not to replace the
@@ -860,6 +894,7 @@ class ImpylaHS2Connection(ImpalaConnection):
 
   def __fetch_results(self, handle, max_rows=-1,
                       discard_results=False,
+                      fetch_exec_summary=False,
                       profile_format=TRuntimeProfileFormat.STRING):
     """Implementation of result fetching from handle."""
     cursor = handle.get_handle()
@@ -877,20 +912,25 @@ class ImpylaHS2Connection(ImpalaConnection):
       else:
         result_tuples = cursor.fetchmany(max_rows)
 
-    if not self._is_hive and self._collect_profile_and_log:
-      log = self.get_log(handle)
-      profile = self.get_runtime_profile(handle, profile_format=profile_format)
-    else:
-      log = None
-      profile = None
     result = None
-
     if discard_results:
       return result
+
+    log = None
+    profile = None
+    exec_summary = None
+    if not self._is_hive:
+      if fetch_exec_summary:
+        exec_summary = self.get_exec_summary_table(handle)
+      if self._collect_profile_and_log:
+        log = self.get_log(handle)
+        profile = self.get_runtime_profile(handle, profile_format=profile_format)
+
     result = ImpylaHS2ResultSet(success=True, result_tuples=result_tuples,
                                 column_labels=column_labels, column_types=column_types,
                                 query=handle.sql_stmt(), log=log, profile=profile,
-                                query_id=self.get_query_id(handle))
+                                query_id=self.get_query_id(handle),
+                                exec_summary=exec_summary)
     return result
 
 
@@ -898,7 +938,7 @@ class ImpylaHS2ResultSet(object):
   """This emulates the interface of ImpalaBeeswaxResult so that it can be used in
   place of it. TODO: when we deprecate/remove Beeswax, clean this up."""
   def __init__(self, success, result_tuples, column_labels, column_types, query, log,
-      profile, query_id):
+      profile, query_id, exec_summary):
     self.success = success
     self.column_labels = column_labels
     self.column_types = column_types
@@ -913,6 +953,7 @@ class ImpylaHS2ResultSet(object):
     self.data = None
     if result_tuples is not None:
       self.data = [self.__convert_result_row(tuple) for tuple in result_tuples]
+    self.exec_summary = exec_summary
 
   def tuples(self):
     """Return the raw HS2 result set, which is a list of tuples."""
@@ -995,7 +1036,9 @@ class MinimalHS2Connection(ImpalaConnection):
     finally:
       self.__conn.close()
 
-  def execute(self, sql_stmt):  # noqa: U100
+  def execute(self, sql_stmt, user=None, fetch_profile_after_close=False,  # noqa: U100
+              fetch_exec_summary=False,  # noqa: U100
+              profile_format=TRuntimeProfileFormat.STRING):  # noqa: U100
     raise NotImplementedError()
 
   def execute_async(self, sql_stmt):
@@ -1084,4 +1127,7 @@ class MinimalHS2Connection(ImpalaConnection):
     raise NotImplementedError()
 
   def wait_for_admission_control(self, operation_handle, timeout_s=60):  # noqa: U100
+    raise NotImplementedError()
+
+  def get_exec_summary(self, operation_handle):  # noqa: U100
     raise NotImplementedError()
