@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="4.5.0" id="impala_cluster_id_request_queue">
+  <title>Cluster ID for Membership and Request-Queue</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Request Queue"/>
+      <data name="Category" value="Cluster ID for memebership"/>
+      <data name="Category" value="Resource Management"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p rev="4.5.0 IMPALA-13259">Learn how to use a cluster ID in <ph keyref="impala45"/> to separate
+      query scheduling across clusters while sharing a common Catalogd and Statestore.</p>
+  </conbody>
+  <concept id="overview">
+    <title>Overview</title>
+    <conbody>
+      <p rev="4.5.0">Starting with <ph keyref="impala45"/>, you can add a cluster ID to the
+        membership and request-queue topic names. This feature enables sharing a single Catalogd and
+        Statestore service across multiple Impala clusters while ensuring that queries are scheduled
+        only within the same cluster.</p>
+    </conbody>
+    <concept id="ss_topics">
+      <title>How Impala Uses Statestore Topics</title>
+      <conbody>
+        <p>Coordinators subscribe to three statestore topics:<ul id="ul_ff5_knm_p2c">
+            <li><codeph>catalog-update</codeph></li>
+            <li><codeph>impala-membership</codeph></li>
+            <li><codeph>impala-request-queue</codeph></li>
+          </ul></p>
+        <p>The two topics <codeph>impala-membership</codeph> and
+            <codeph>impala-request-queue</codeph> are used for query scheduling. By adding a cluster
+          ID to these topic names, Impala daemons (Impalads) are only visible to each other inside
+          the same cluster. Queries are not scheduled across different clusters. However, all Impala
+          daemons still subscribe to the same <codeph>catalog-update</codeph> topic, allowing them
+          to share the same Catalog service.<note id="note_lxv_4nm_p2c" type="note">If the cluster
+            ID is empty, the original topic names are used.</note></p>
+      </conbody>
+    </concept>
+    <concept rev="4.5.0" id="starting_new_with_existing">
+      <title>Starting a New Cluster with an Existing Catalogd and Statestore</title>
+      <conbody>
+        <p>To start a new cluster using an existing Catalogd and statestore, set the
+            <codeph>--cluster_membership_topic_id=new_cluster_name</codeph> flag in the coordinator,
+          executor, and admission daemon of the new cluster. The other flags can remain the same as
+          in existing clusters.</p>
+      </conbody>
+    </concept>
+  </concept>
+</concept>

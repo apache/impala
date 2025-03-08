@@ -329,6 +329,7 @@ under the License.
   <topicref href="topics/impala_resource_management.xml">
     <topicref href="topics/impala_admission.xml"/>
     <topicref href="topics/impala_admission_config.xml"/>
+    <topicref href="topics/impala_cluster_id_request_queue.xml"/>
   </topicref>
   <topicref href="topics/impala_partitioning.xml"/>
   <topicref href="topics/impala_file_formats.xml">
