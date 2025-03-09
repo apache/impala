@@ -392,8 +392,9 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("base64decode(base64encode('\\047\\001\\132\\060')) = " +
       "'\\047\\001\\132\\060'", rule, "TRUE");
 
-    // Tests correct handling of strings with chars > 127. Should not be folded.
-    RewritesOk("hex(unhex(hex(unhex('D3'))))", rule, null);
+    // Tests correct handling of strings with chars > 127.
+    RewritesOk("concat('á', '你好')", rule, "'á你好'");
+    RewritesOk("hex(unhex(hex(unhex('D3'))))", rule, "'D3'");
     // Tests that non-deterministic functions are not folded.
     RewritesOk("rand()", rule, null);
     RewritesOk("random()", rule, null);

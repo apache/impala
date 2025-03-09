@@ -201,6 +201,13 @@ public class RangePartition extends StmtNode {
           "NULL. Range partition: '%s'", toSql()));
     }
 
+    if (literal instanceof StringLiteral) {
+        if (!((StringLiteral) literal).isValidUtf8()) {
+          throw new AnalysisException(
+            "Invalid String range partition value: " + literal.toSql());
+        }
+    }
+
     // Special case string literals in timestamp columns for convenience.
     if (literal.getType().isStringType() && colType.isTimestamp()) {
       // Add an explicit cast to TIMESTAMP

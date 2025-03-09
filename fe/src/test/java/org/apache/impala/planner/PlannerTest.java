@@ -141,7 +141,13 @@ public class PlannerTest extends PlannerTestBase {
     // Tests that constant folding is applied to all relevant PlanNodes and DataSinks.
     // Note that not all Exprs are printed in the explain plan, so validating those
     // via this test is currently not possible.
-    runPlannerTestFile("constant-folding",
+    TQueryOptions options = defaultQueryOptions();
+    options.setUtf8_mode(false);
+    runPlannerTestFile("constant-folding", options,
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+            PlannerTestOption.INCLUDE_QUERY_WITH_IMPLICIT_CASTS));
+    options.setUtf8_mode(true);
+    runPlannerTestFile("constant-folding-utf8-mode", options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
             PlannerTestOption.INCLUDE_QUERY_WITH_IMPLICIT_CASTS));
   }

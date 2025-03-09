@@ -117,7 +117,8 @@ struct TSlotRef {
 }
 
 struct TStringLiteral {
-  1: required string value;
+  // Use binary instead of string as the value may not be valid utf8.
+  1: required binary value;
 }
 
 // Additional information for aggregate functions.

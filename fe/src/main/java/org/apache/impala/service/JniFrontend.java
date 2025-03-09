@@ -115,6 +115,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.lang.IllegalArgumentException;
+import java.nio.charset.StandardCharsets;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.GregorianCalendar;
@@ -807,11 +808,13 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, secretKey, secretKeyRequest);
     String secret = null;
     try {
-      char[] secretCharArray = CONF.getPassword(secretKey.getValue());
+      String secretKeyStr =
+          StandardCharsets.UTF_8.decode(secretKey.value).toString();
+      char[] secretCharArray = CONF.getPassword(secretKeyStr);
       if (secretCharArray != null) {
         secret = new String(secretCharArray);
       } else {
-        String errMsg = String.format(KEYSTORE_ERROR_MSG, secretKey.getValue());
+        String errMsg = String.format(KEYSTORE_ERROR_MSG, secretKeyStr);
         LOG.error(errMsg);
         throw new InternalException(errMsg);
       }
@@ -830,7 +833,11 @@ public class JniFrontend {
     final TStringLiteral timezone = new TStringLiteral();
     JniUtil.deserializeThrift(protocolFactory_, timezone, timezoneT);
     // TimeZone.getTimeZone defaults to GMT if it doesn't recognize the timezone.
-    Calendar c = new GregorianCalendar(TimeZone.getTimeZone(timezone.getValue()));
+    // Invalid characters are replaced if decoding is not successful. This should lead
+    // to a failed timezone lookup and using default GMT.
+    String timezoneStr =
+        StandardCharsets.UTF_8.decode(timezone.value).toString();
+    Calendar c = new GregorianCalendar(TimeZone.getTimeZone(timezoneStr));
     c.setTimeInMillis(utc_time_millis);
 
     final TCivilTime civilTime = new TCivilTime(

@@ -51,6 +51,7 @@ import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.THdfsCompression;
+import org.apache.impala.util.StringUtils;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.ColumnSchema.Encoding;
@@ -163,6 +164,7 @@ public class KuduUtil {
     TExprNode literal = boundaryVal.getNodes().get(0);
     String colName = col.getName();
     org.apache.kudu.Type type = col.getType();
+    String strLiteral;
     switch (type) {
       case INT8:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
@@ -182,11 +184,13 @@ public class KuduUtil {
         break;
       case VARCHAR:
         checkCorrectType(literal.isSetString_literal(), type, colName, literal);
-        key.addVarchar(pos, literal.getString_literal().getValue());
+        key.addVarchar(pos,
+            StringUtils.fromUtf8Buffer(literal.getString_literal().value, false));
         break;
       case STRING:
         checkCorrectType(literal.isSetString_literal(), type, colName, literal);
-        key.addString(pos, literal.getString_literal().getValue());
+        key.addString(pos,
+            StringUtils.fromUtf8Buffer(literal.getString_literal().value, false));
         break;
       case UNIXTIME_MICROS:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
@@ -244,7 +248,7 @@ public class KuduUtil {
       case VARCHAR:
       case STRING:
         checkCorrectType(literal.isSetString_literal(), type, colName, literal);
-        return literal.getString_literal().getValue();
+        return StringUtils.fromUtf8Buffer(literal.getString_literal().value, false);
       case BOOL:
         checkCorrectType(literal.isSetBool_literal(), type, colName, literal);
         return literal.getBool_literal().isValue();

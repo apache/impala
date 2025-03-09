@@ -383,6 +383,20 @@ stored as kudu
 AnalysisException: Invalid date literal: '111111-33-33'
 ====
 ---- QUERY
+# create table with invalid default STRING value
+create table kudu_invalid_default_string (s string primary key default unhex("aa"))
+stored as kudu
+---- CATCH
+AnalysisException: Invalid String default value: unhex('aa')
+====
+---- QUERY
+# create table with invalid range STRING value
+create table kudu_invalid_range_string (s string primary key)
+partition by range (s) (partition values < unhex("aa")) stored as kudu;
+---- CATCH
+AnalysisException: Invalid String range partition value: 'unhex("AA")'
+====
+---- QUERY
 # create table with DATE primary key partitioned by range
 create table kudu_datepk_range (fdate DATE not null primary key)
 partition by range (fdate)

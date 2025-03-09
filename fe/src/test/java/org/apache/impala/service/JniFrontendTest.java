@@ -23,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
@@ -134,18 +135,20 @@ public class JniFrontendTest {
   @Test
   public void testGetSecretFromKeyStore() throws ImpalaException {
     // valid secret-key returns the correct secret
-    TStringLiteral secretKey = new TStringLiteral("openai-api-key-secret");
+    String keyName = "openai-api-key-secret";
+    TStringLiteral secretKey = new TStringLiteral(StandardCharsets.UTF_8.encode(keyName));
     byte[] secretKeyBytes = JniUtil.serializeToThrift(secretKey);
     String secret = JniFrontend.getSecretFromKeyStore(secretKeyBytes);
     assertEquals(secret, "secret");
     // invalid secret-key returns error
-    secretKey = new TStringLiteral("dummy-secret");
+    keyName = "dummy-secret";
+    secretKey = new TStringLiteral(StandardCharsets.UTF_8.encode(keyName));
     secretKeyBytes = JniUtil.serializeToThrift(secretKey);
     try {
       secret = JniFrontend.getSecretFromKeyStore(secretKeyBytes);
     } catch (InternalException e) {
       assertEquals(e.getMessage(),
-          String.format(JniFrontend.KEYSTORE_ERROR_MSG, secretKey.getValue()));
+          String.format(JniFrontend.KEYSTORE_ERROR_MSG, keyName));
     }
   }
 }

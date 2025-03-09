@@ -167,7 +167,7 @@ BIGINT
 !row_regex:.*TotalKuduScanRoundTrips: 1.*
 ====
 ---- QUERY
-# Check that filters with constant folding and non ascii characters cannot
+# Check that filters with constant folding and non ascii (utf8) characters can
 # be pushed down to kudu (IMPALA-10349).
 select count(*) from binary_tbl
 where binary_col = cast("á" as binary)
@@ -176,10 +176,10 @@ BIGINT
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex:.*TotalKuduScanRoundTrips: 1.*
+row_regex:.*TotalKuduScanRoundTrips: 0.*
 ====
 ---- QUERY
-# Check that filters with constant folding and not valid utf8 characters cannot
+# Check that filters with constant folding and not valid utf8 characters can
 # be pushed down to kudu (IMPALA-10349).
 select count(*) from binary_tbl
 where binary_col = cast(unhex("AA") as binary)
@@ -188,5 +188,5 @@ BIGINT
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex:.*TotalKuduScanRoundTrips: 1.*
+row_regex:.*TotalKuduScanRoundTrips: 0.*
 ====

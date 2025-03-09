@@ -1,0 +1,25 @@
+# Constant folding of utf8-aware functions with utf8_mode=true.
+select string_col from functional.alltypes
+where int_col = length(concat("á", "é"))
+   or string_col = substr("áé", 1, 1)
+---- PLAN
+Analyzed query: SELECT string_col FROM functional.alltypes WHERE int_col =
+CAST(2 AS INT) OR string_col = 'á'
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=132.00MB mem-reservation=4.03MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: string_col
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: int_col = CAST(2 AS INT) OR string_col = 'á'
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=17B cardinality=1.39K
+   in pipelines: 00(GETNEXT)
+====

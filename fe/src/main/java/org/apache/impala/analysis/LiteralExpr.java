@@ -146,8 +146,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
               Long.toString(exprNode.int_literal.value), colType);
           break;
         case STRING_LITERAL:
-          result = LiteralExpr.createFromUnescapedStr(
-              exprNode.string_literal.value, colType);
+          result = new StringLiteral(exprNode.string_literal.getValue(), colType);
           break;
         case BOOL_LITERAL:
           result =  LiteralExpr.createFromUnescapedStr(
@@ -194,7 +193,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   /**
    * Evaluates the given constant expr and returns its result as a LiteralExpr.
    * Assumes expr has been analyzed. Returns constExpr if is it already a LiteralExpr.
-   * Returns null for types that do not have a LiteralExpr subclass, e.g. TIMESTAMP, or
+   * Returns null for types that do not have a LiteralExpr subclass and
    * in cases where the corresponding LiteralExpr is not able to represent the evaluation
    * result, e.g., NaN or infinity. Returns null if the expr evaluation encountered errors
    * or warnings in the BE.
@@ -259,18 +258,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         if (val.isSetBinary_val()) {
           byte[] bytes = new byte[val.binary_val.remaining()];
           val.binary_val.get(bytes);
-          // Converting strings between the BE/FE does not work properly for the
-          // extended ASCII characters above 127. Bail in such cases to avoid
-          // producing incorrect results.
-          for (byte b: bytes) if (b < 0) return null;
-          try {
-            // US-ASCII is 7-bit ASCII.
-            String strVal = new String(bytes, "US-ASCII");
-            // The evaluation result is a raw string that must not be unescaped.
-            result = new StringLiteral(strVal, constExpr.getType(), false);
-          } catch (UnsupportedEncodingException e) {
-            return null;
-          }
+          result = new StringLiteral(bytes, constExpr.getType());
         }
         break;
       case TIMESTAMP:
@@ -312,7 +300,8 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
     if (Expr.IS_NULL_LITERAL.apply(this) && Expr.IS_NULL_LITERAL.apply(other)) return 0;
     if (Expr.IS_NULL_LITERAL.apply(this)) return -1;
     if (Expr.IS_NULL_LITERAL.apply(other)) return 1;
-    if (getClass() != other.getClass()) return -1;
+    // Sublcass implementations do not handle comparison with other Literal types.
+    Preconditions.checkState(getClass() == other.getClass());
     return 0;
   }
 

@@ -761,22 +761,22 @@ PLAN-ROOT SINK
    row-size=36B cardinality=0
 ====
 # BINARY predicate.
-# Non-ASCII strings cannot be pushed down to Kudu (IMPALA-10349)
+# Non-ASCII strings can be pushed down to Kudu (IMPALA-10349)
 select * from functional_kudu.binary_tbl where binary_col=cast("á" as binary);
 ---- PLAN
 PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.binary_tbl]
-   predicates: binary_col = CAST('á' AS BINARY)
+   kudu predicates: binary_col = 'á'
    row-size=36B cardinality=0
 ====
 # BINARY predicate.
-# Not valid utf8 strings cannot be pushed down to Kudu (IMPALA-10349)
+# Not valid utf8 strings can be pushed down to Kudu (IMPALA-10349)
 select * from functional_kudu.binary_tbl where binary_col=cast(unhex("aa") as binary);
 ---- PLAN
 PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.binary_tbl]
-   predicates: binary_col = CAST(unhex('aa') AS BINARY)
+   kudu predicates: binary_col = 'unhex("AA")'
    row-size=36B cardinality=0
 ====

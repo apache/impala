@@ -319,6 +319,15 @@ public class ColumnDef {
       Preconditions.checkNotNull(defaultValLiteral);
       outputDefaultValue_ = defaultValLiteral;
 
+      // Non-utf8 values could be allowed for BINARY literals, but those don't work for
+      // other reason: IMPALA-14173
+      if (outputDefaultValue_ instanceof StringLiteral) {
+        if (!((StringLiteral) outputDefaultValue_).isValidUtf8()) {
+          throw new AnalysisException(
+            "Invalid String default value: " + defaultValue_.toSql());
+        }
+      }
+
       // TODO: Remove when Impala supports a 64-bit TIMESTAMP type.
       if (type_.isTimestamp()) {
         try {

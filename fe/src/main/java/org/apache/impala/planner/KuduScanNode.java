@@ -576,13 +576,16 @@ public class KuduScanNode extends ScanNode {
       case STRING:
       case VARCHAR:
       case CHAR: {
+        StringLiteral strLit = (StringLiteral)literal;
+        if (!strLit.isValidUtf8()) return false;
         kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
-            ((StringLiteral)literal).getUnescapedValue());
+            strLit.getUnescapedValue());
         break;
       }
       case BINARY: {
+        StringLiteral strLit = (StringLiteral)literal;
         kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
-            ((StringLiteral)literal).getUnescapedValue().getBytes());
+            strLit.getBinValue());
         break;
       }
       case TIMESTAMP: {
