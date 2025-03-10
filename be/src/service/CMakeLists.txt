@@ -135,6 +135,7 @@ ADD_DEPENDENCIES(unified-be-test-executable unifiedbetests)
 
 add_library(ServiceTests STATIC
   hs2-util-test.cc
+  impala-http-handler-test.cc
   impala-server-test.cc
   query-options-test.cc
   query-state-record-test.cc
@@ -146,6 +147,7 @@ add_dependencies(ServiceTests gen-deps)
 ADD_BE_TEST(session-expiry-test session-expiry-test.cc) # TODO: this leaks thrift server
 ADD_UNIFIED_BE_LSAN_TEST(hs2-util-test "StitchNullsTest.*:PrintTColumnValueTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(query-options-test QueryOptions.*)
+ADD_UNIFIED_BE_LSAN_TEST(impala-http-handler-test ImpalaHttpHandlerTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(impala-server-test ImpalaServerTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(query-state-record-test QueryStateRecordTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(workload-management-worker-test WorkloadManagementWorkerTest.*)

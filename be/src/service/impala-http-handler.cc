@@ -1146,33 +1146,10 @@ void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
   value->AddMember("children", children, document->GetAllocator());
 }
 
-// Helper method which converts a list of plan fragments into a single JSON document, with
-// the following schema:
-// "plan_nodes": [
-//     {
-//       "label": "12:AGGREGATE",
-//       "label_detail": "FINALIZE",
-//       "output_card": 23456,
-//       "num_instances": 34,
-//       "max_time": "1m23s",
-//       "avg_time": "1.3ms",
-//       "children": [
-//           {
-//             "label": "11:EXCHANGE",
-//             "label_detail": "UNPARTITIONED",
-//             "children": []
-//           }
-//       ]
-//     },
-//     {
-//       "label": "07:AGGREGATE",
-//       "label_detail": "",
-//       "children": [],
-//       "data_stream_target": "11:EXCHANGE"
-//     }
-// ]
-void PlanToJson(const vector<TPlanFragment>& fragments, const TExecSummary& summary,
-    rapidjson::Document* document, Value* value) {
+} // unnamed namespace
+
+void impala::PlanToJson(const vector<TPlanFragment>& fragments,
+    const TExecSummary& summary, rapidjson::Document* document, Value* value) {
   // Build a map from id to label so that we can resolve the targets of data-stream sinks
   // and connect plan fragments.
   map<TPlanNodeId, string> label_map;
@@ -1207,8 +1184,6 @@ void PlanToJson(const vector<TPlanFragment>& fragments, const TExecSummary& summ
     nodes.PushBack(plan_fragment, document->GetAllocator());
   }
   value->AddMember("plan_nodes", nodes, document->GetAllocator());
-}
-
 }
 
 void ImpalaHttpHandler::QueryBackendsHandler(

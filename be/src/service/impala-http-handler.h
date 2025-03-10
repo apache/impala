@@ -31,6 +31,34 @@ namespace impala {
 class AdmissionController;
 class ClusterMembershipMgr;
 
+// Helper method which converts a list of plan fragments into a single JSON document, with
+// the following schema:
+// "plan_nodes": [
+//     {
+//       "label": "12:AGGREGATE",
+//       "label_detail": "FINALIZE",
+//       "output_card": 23456,
+//       "num_instances": 34,
+//       "max_time": "1m23s",
+//       "avg_time": "1.3ms",
+//       "children": [
+//           {
+//             "label": "11:EXCHANGE",
+//             "label_detail": "UNPARTITIONED",
+//             "children": []
+//           }
+//       ]
+//     },
+//     {
+//       "label": "07:AGGREGATE",
+//       "label_detail": "",
+//       "children": [],
+//       "data_stream_target": "11:EXCHANGE"
+//     }
+// ]
+void PlanToJson(const vector<TPlanFragment>& fragments, const TExecSummary& summary,
+    rapidjson::Document* document, rapidjson::Value* value);
+
 /// Handles all webserver callbacks for an ImpalaServer. This class is a friend of
 /// ImpalaServer in order to access the internal state needed to generate the debug
 /// webpages.
