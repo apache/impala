@@ -22,7 +22,8 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/udf")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/udf")
 
-add_library(UdfIr udf-ir.cc)
+set(UDF_IR_SRC_FILES udf-ir.cc)
+add_library(UdfIr ${UDF_IR_SRC_FILES})
 add_dependencies(UdfIr gen-deps)
 
 set(UDF_SRC_FILES
@@ -33,10 +34,13 @@ set(UDF_SRC_FILES
 # Build this library twice. Once to be linked into the main impalad. This version
 # can have dependencies on our other libs. The second version is shipped as part
 # of the UDF sdk, which can't use other libs.
+# Note that '${UDF_IR_SRC_FILES}' is not needed in 'Udf' because it will be linked
+# together with 'UdfIr' as part of the Impala binary, but 'ImpalaUdf' needs it because it
+# is shipped separately.
 add_library(Udf ${UDF_SRC_FILES})
 add_dependencies(Udf gen-deps)
 
-add_library(ImpalaUdf ${UDF_SRC_FILES})
+add_library(ImpalaUdf ${UDF_SRC_FILES} ${UDF_IR_SRC_FILES})
 add_dependencies(ImpalaUdf gen-deps)
 set_target_properties(ImpalaUdf PROPERTIES COMPILE_FLAGS "-DIMPALA_UDF_SDK_BUILD")
 
