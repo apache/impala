@@ -41,14 +41,14 @@ class LineageUtil {
       writer->String("vertexType");
       writer->String("COLUMN");
       writer->String("vertexId");
-      writer->String(vertex.label.c_str());
+      writer->String(vertex.label);
       if (vertex.__isset.metadata) {
         writer->String("metadata");
         writer->StartObject();
         writer->String("tableName");
-        writer->String(vertex.metadata.table_name.c_str());
+        writer->String(vertex.metadata.table_name);
         writer->String("tableType");
-        writer->String(vertex.metadata.table_type.c_str());
+        writer->String(vertex.metadata.table_type);
         writer->String("tableCreateTime");
         writer->Int64(vertex.metadata.table_create_time);
         writer->EndObject();
@@ -78,7 +78,7 @@ class LineageUtil {
       writer->String("edgeType");
       string edge_type =
           (obj.edgetype == TEdgeType::PROJECTION) ? "PROJECTION" : "PREDICATE";
-      writer->String(edge_type.c_str());
+      writer->String(edge_type);
       writer->EndObject();
     }
 
@@ -89,13 +89,13 @@ class LineageUtil {
       rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
       writer.StartObject();
       writer.String("queryText");
-      writer.String(lineage.query_text.c_str());
+      writer.String(lineage.query_text);
       writer.String("queryId");
-      writer.String(PrintId(lineage.query_id).c_str());
+      writer.String(PrintId(lineage.query_id));
       writer.String("hash");
-      writer.String(lineage.hash.c_str());
+      writer.String(lineage.hash);
       writer.String("user");
-      writer.String(lineage.user.c_str());
+      writer.String(lineage.user);
       // write query start time
       writer.String("timestamp");
       writer.Int64(lineage.started);
@@ -120,7 +120,7 @@ class LineageUtil {
       // Write location if it is available.
       if (lineage.__isset.table_location) {
         writer.String("tableLocation");
-        writer.String(lineage.table_location.c_str());
+        writer.String(lineage.table_location);
       }
       writer.EndObject();
       *out = buffer.GetString();

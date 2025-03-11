@@ -160,12 +160,11 @@ static StringVal ToStringVal(FunctionContext* ctx, const JsonUdfValue& values,
 static void SelectByKey(const string& key, JsonUdfValue* queue,
     JsonUdfAllocator* allocator) {
   SizeType old_items = queue->Size();  // RapidJson uses SizeType instead of size_t
-  const char* key_ptr = key.c_str();
   JsonUdfValue item;
   for (SizeType i = 0; i < old_items; ++i) {
     item = (*queue)[i];
-    if (!item.IsObject() || !item.HasMember(key_ptr)) continue;
-    queue->PushBack(item[key_ptr], *allocator);
+    if (!item.IsObject() || !item.HasMember(key)) continue;
+    queue->PushBack(item[key], *allocator);
   }
   queue->Erase(queue->Begin(), queue->Begin() + old_items);
 }

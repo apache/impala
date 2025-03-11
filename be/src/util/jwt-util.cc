@@ -149,7 +149,7 @@ class JWKSetParser {
          member != json_key.MemberEnd(); ++member) {
       string k, v, values[MAX_X5C_CERTIFICATES];
       k = string(member->name.GetString());
-      const Value& json_value = json_key[k.c_str()];
+      const Value& json_value = json_key[k];
       if (NameOfTypeOfJsonValue(json_value) == ARRAY_TYPE) {
         RETURN_IF_ERROR(ReadKeyArrayProperty(k.c_str(), json_key, values,
             /*required*/ false));
@@ -203,7 +203,7 @@ class JWKSetParser {
   template <typename T>
   Status ReadKeyProperty(
       const string& name, const Value& json_key, T* value, bool required = true) {
-    const Value& json_value = json_key[name.c_str()];
+    const Value& json_value = json_key[name];
     if (json_value.IsNull()) {
       if (required) {
         return Status(Substitute("'$0' property is required and cannot be null", name));
@@ -219,7 +219,7 @@ class JWKSetParser {
   template <typename T>
   Status ReadKeyArrayProperty(
       const string& name, const Value& json_key, T* value, bool required = true) {
-    const Value& json_value = json_key[name.c_str()];
+    const Value& json_value = json_key[name];
     if (json_value.IsNull()) {
       if (required) {
         return Status(Substitute("'$0' property is required and cannot be null", name));

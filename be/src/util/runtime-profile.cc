@@ -1303,8 +1303,7 @@ void RuntimeProfileBase::ToJsonCounters(Verbosity verbosity, Value* parent, Docu
 
       Value counter(kObjectType);
       iter->second->ToJson(verbosity, *d, &counter);
-      Value child_counter_json(child_counter.c_str(), child_counter.size(), allocator);
-      counter.AddMember("counter_name", child_counter_json, allocator);
+      counter.AddMember("counter_name", child_counter, allocator);
 
       Value child_counters_json(kArrayType);
       ToJsonCounters(verbosity, &child_counters_json, d, child_counter, counter_map,
@@ -1331,8 +1330,7 @@ void RuntimeProfileBase::ToJsonHelper(
   }
 
   // 1. Name
-  Value name(name_.c_str(), allocator);
-  parent->AddMember("profile_name", name, allocator);
+  parent->AddMember("profile_name", name_, allocator);
 
   // 2. Num_children
   parent->AddMember("num_children", children_.size(), allocator);
@@ -1357,12 +1355,10 @@ void RuntimeProfileBase::ToJsonHelper(
       Value info_strings_json(kArrayType);
       for (const string& key : info_strings_display_order_) {
         Value info_string_json(kObjectType);
-        Value key_json(key.c_str(), allocator);
         auto value_itr = info_strings_.find(key);
         DCHECK(value_itr != info_strings_.end());
-        Value value_json(value_itr->second.c_str(), allocator);
-        info_string_json.AddMember("key", key_json, allocator);
-        info_string_json.AddMember("value", value_json, allocator);
+        info_string_json.AddMember("key", key, allocator);
+        info_string_json.AddMember("value", value_itr->second, allocator);
         info_strings_json.PushBack(info_string_json, allocator);
       }
       parent->AddMember("info_strings", info_strings_json, allocator);
@@ -1443,7 +1439,7 @@ void RuntimeProfile::ToJsonSubclass(
       Value summary_stats_counters_json(kArrayType);
       for (const SummaryStatsCounterMap::value_type& v : summary_stats_map_) {
         Value summary_stats_counter(kObjectType);
-        Value summary_name_json(v.first.c_str(), v.first.size(), allocator);
+        Value summary_name_json(v.first, allocator);
         v.second->ToJson(verbosity, *d, &summary_stats_counter);
         summary_stats_counter.AddMember("counter_name", summary_name_json, allocator);
         summary_stats_counters_json.PushBack(summary_stats_counter, allocator);
@@ -2607,7 +2603,7 @@ void RuntimeProfile::TimeSeriesCounter::ToJson(
   lock_guard<SpinLock> lock(lock_);
   Value counter_json(kObjectType);
 
-  Value counter_name_json(name_.c_str(), name_.size(), document.GetAllocator());
+  Value counter_name_json(name_, document.GetAllocator());
   counter_json.AddMember("counter_name", counter_name_json, document.GetAllocator());
   auto unit_itr = _TUnit_VALUES_TO_NAMES.find(unit_);
   DCHECK(unit_itr != _TUnit_VALUES_TO_NAMES.end());
@@ -2630,7 +2626,7 @@ void RuntimeProfile::TimeSeriesCounter::ToJson(
     if (i + step < num) stream << ",";
   }
 
-  Value samples_data_json(stream.str().c_str(), document.GetAllocator());
+  Value samples_data_json(stream.str(), document.GetAllocator());
   counter_json.AddMember("data", samples_data_json, document.GetAllocator());
   *val = counter_json;
 }
@@ -2647,7 +2643,7 @@ void RuntimeProfile::EventSequence::ToJson(
 
   for (const Event& ev: events_) {
     Value event_json(kObjectType);
-    Value label_json(ev.first.c_str(), ev.first.size(), document.GetAllocator());
+    Value label_json(ev.first, document.GetAllocator());
     event_json.AddMember("label", label_json, document.GetAllocator());
     event_json.AddMember("timestamp", ev.second, document.GetAllocator());
     events_json.PushBack(event_json, document.GetAllocator());
@@ -2944,7 +2940,7 @@ void AggregatedRuntimeProfile::ToJsonSubclass(
         SummaryStatsCounter aggregated_stats(v.second.first);
         AggregateSummaryStats(v.second.second, &aggregated_stats);
         Value summary_stats_counter(kObjectType);
-        Value summary_name_json(v.first.c_str(), v.first.size(), allocator);
+        Value summary_name_json(v.first, allocator);
         aggregated_stats.ToJson(verbosity, *d, &summary_stats_counter);
         summary_stats_counter.AddMember("counter_name", summary_name_json, allocator);
         summary_stats_counters_json.PushBack(summary_stats_counter, allocator);
@@ -3009,7 +3005,7 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value& event_sequence_js
   vector<Value> label_vals(events_count);
   // Index event labels with their associated value
   for (const auto& label_item : labels) {
-    label_vals[label_item.second] = Value(label_item.first.c_str(), allocator);
+    label_vals[label_item.second] = Value(label_item.first, allocator);
     // Note: The value part of 'labels' map is being used to order events initially.
   }
 
@@ -3174,18 +3170,17 @@ void AggregatedRuntimeProfile::CollectInfoStringIntoJson(const string& info_stri
   AggInfoStrings::const_iterator it = agg_info_strings_.find(info_string_name);
   if (it != agg_info_strings_.end()) {
     Value info_string_json(kObjectType);
-    Value info_string_key((info_string_name).c_str(), allocator);
     Value info_values_json(kArrayType);
 
     // Group info string values into "values" field
     map<string, vector<int32_t>> distinct_values = GroupDistinctInfoStrings(
         it->second);
     for (auto& info_value : distinct_values) {
-      info_values_json.PushBack(Value(info_value.first.c_str(), allocator),
+      info_values_json.PushBack(Value(info_value.first, allocator),
           allocator);
     }
 
-    info_string_json.AddMember("key", info_string_key, allocator);
+    info_string_json.AddMember("key", info_string_name, allocator);
     info_string_json.AddMember("values", info_values_json, allocator);
     parent->PushBack(info_string_json, allocator);
   }

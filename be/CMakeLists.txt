@@ -65,6 +65,8 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_ALLOW_DEPRECATED_HEADERS")
 #      built at OS where getrandom(2) is available at OSes where getrandom(2)
 #      isn't supported (e.g., that might happen in containerized deployments).
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_UUID_RANDOM_PROVIDER_FORCE_POSIX")
+# Support using strings directly in rapidjson
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DRAPIDJSON_HAS_STDSTRING=1")
 IF($ENV{IMPALA_LINKER} STREQUAL "mold")
   # Only very recent GCC 12+ has support for -fuse-ld=mold, so we override "ld" by
   # putting Mold's libexec/mold directory (which has a "ld" symlink) on the path.

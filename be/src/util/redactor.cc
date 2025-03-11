@@ -172,7 +172,7 @@ class RulesParser {
   template<typename T>
   bool ReadRuleProperty(const string& name, const Value& rule, T* value,
       bool required = true) {
-    const Value& json_value = rule[name.c_str()];
+    const Value& json_value = rule[name];
     if (json_value.IsNull()) {
       if (required) {
         AddRuleParseError() << name << " property is required and cannot be null";

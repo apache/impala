@@ -896,18 +896,18 @@ void Coordinator::BackendState::InstanceStats::UpdateExecStats(
 
 void Coordinator::BackendState::InstanceStats::ToJson(Value* value, Document* document) {
   Value instance_id_val(
-      PrintId(exec_params_.instance_id()).c_str(), document->GetAllocator());
+      PrintId(exec_params_.instance_id()), document->GetAllocator());
   value->AddMember("instance_id", instance_id_val, document->GetAllocator());
 
   // We send 'done' explicitly so we don't have to infer it by comparison with a string
   // constant in the debug page JS code.
   value->AddMember("done", done_, document->GetAllocator());
 
-  Value state_val(FragmentInstanceState::ExecStateToString(current_state_).c_str(),
+  Value state_val(FragmentInstanceState::ExecStateToString(current_state_),
       document->GetAllocator());
   value->AddMember("current_state", state_val, document->GetAllocator());
 
-  Value fragment_name_val(fragment_->display_name.c_str(), document->GetAllocator());
+  Value fragment_name_val(fragment_->display_name, document->GetAllocator());
   value->AddMember("fragment_name", fragment_name_val, document->GetAllocator());
 
   value->AddMember("first_status_update_received", last_report_time_ms_ > 0,
@@ -987,7 +987,7 @@ void Coordinator::BackendState::ToJson(Value* value, Document* document) {
       document->GetAllocator());
 
   string host = NetworkAddressPBToString(impalad_address());
-  Value val(host.c_str(), document->GetAllocator());
+  Value val(host, document->GetAllocator());
   value->AddMember("host", val, document->GetAllocator());
 
   value->AddMember("rpc_latency", rpc_latency(), document->GetAllocator());
@@ -995,7 +995,7 @@ void Coordinator::BackendState::ToJson(Value* value, Document* document) {
       document->GetAllocator());
 
   string status_str = status_.ok() ? "OK" : status_.GetDetail();
-  Value status_val(status_str.c_str(), document->GetAllocator());
+  Value status_val(status_str, document->GetAllocator());
   value->AddMember("status", status_val, document->GetAllocator());
 
   value->AddMember(
@@ -1018,7 +1018,7 @@ void Coordinator::BackendState::InstanceStatsToJson(Value* value, Document* docu
   // impalad_address is not protected by lock_. The lifetime of the backend state is
   // protected by Coordinator::lock_.
   Value val(
-      NetworkAddressPBToString(impalad_address()).c_str(), document->GetAllocator());
+      NetworkAddressPBToString(impalad_address()), document->GetAllocator());
   value->AddMember("host", val, document->GetAllocator());
 }
 

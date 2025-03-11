@@ -91,7 +91,7 @@ struct JsonObjWrapper {
 
 template<>
 inline void JsonObjWrapper::AddMember(const char* name, const std::string& val) {
-  rapidjson::Value field(val.c_str(), allocator);
+  rapidjson::Value field(val, allocator);
   value.AddMember(rapidjson::StringRef(name), field, allocator);
 }
 

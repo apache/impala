@@ -378,7 +378,7 @@ void Webserver::ErrorHandler(const WebRequest& req, Document* document) {
   ArgumentMap::const_iterator it = req.parsed_args.find(ERROR_KEY);
   if (it == req.parsed_args.end()) return;
 
-  Value error(it->second.c_str(), document->GetAllocator());
+  Value error(it->second, document->GetAllocator());
   document->AddMember("error", error, document->GetAllocator());
 }
 
@@ -602,14 +602,14 @@ void Webserver::GetCommonJson(Document* document, const struct sq_connection* co
     // absolute, which allows Knox to rewrite the links to point to the Knox host while
     // including 'scheme', 'host', and 'port' parameters which tell Knox where do forward
     // the request to.
-    Value url_value(url().c_str(), document->GetAllocator());
+    Value url_value(url(), document->GetAllocator());
     obj.AddMember("host-url", url_value, document->GetAllocator());
 
     // These are used to add hidden form fields when Knox is being used to add the 'host'
     // and related parameters to the form's request.
     Value scheme_value(IsSecure() ? "https" : "http", document->GetAllocator());
     obj.AddMember("scheme", scheme_value, document->GetAllocator());
-    Value hostname_value(hostname_.c_str(), document->GetAllocator());
+    Value hostname_value(hostname_, document->GetAllocator());
     obj.AddMember("hostname", hostname_value, document->GetAllocator());
     Value port_value;
     port_value.SetInt(http_address_.port);
@@ -624,8 +624,8 @@ void Webserver::GetCommonJson(Document* document, const struct sq_connection* co
         Value hdl(kObjectType);
         // Though we set link and title the same value, be careful with RapidJSON's MOVE
         // semantic. We create the values by deep-copy here.
-        Value link(handler.first.c_str(), document->GetAllocator());
-        Value title(handler.first.c_str(), document->GetAllocator());
+        Value link(handler.first, document->GetAllocator());
+        Value title(handler.first, document->GetAllocator());
         hdl.AddMember("link", link, document->GetAllocator());
         hdl.AddMember("title", title, document->GetAllocator());
         lst.PushBack(hdl, document->GetAllocator());

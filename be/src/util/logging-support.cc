@@ -94,7 +94,7 @@ static jmethodID reset_log_levels_method; // GlogAppender.resetLogLevels()
 void AddDocumentMember(const string& message, const char* member,
     Document* document) {
   Value key(member, document->GetAllocator());
-  Value output(message.c_str(), document->GetAllocator());
+  Value output(message, document->GetAllocator());
   document->AddMember(key, output, document->GetAllocator());
 }
 

@@ -838,7 +838,7 @@ void CatalogServer::CatalogUrlCallback(const Webserver::WebRequest& req,
   TGetDbsResult get_dbs_result;
   Status status = catalog_->GetDbs(NULL, &get_dbs_result);
   if (!status.ok()) {
-    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    Value error(status.GetDetail(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
@@ -849,19 +849,19 @@ void CatalogServer::CatalogUrlCallback(const Webserver::WebRequest& req,
     version_value.SetInt(current_catalog_version);
     document->AddMember("version", version_value, document->GetAllocator());
   } else {
-    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    Value error(status.GetDetail(), document->GetAllocator());
     document->AddMember("versionError", error, document->GetAllocator());
   }
   Value databases(kArrayType);
   for (const TDatabase& db: get_dbs_result.dbs) {
     Value database(kObjectType);
-    Value str(db.db_name.c_str(), document->GetAllocator());
+    Value str(db.db_name, document->GetAllocator());
     database.AddMember("name", str, document->GetAllocator());
 
     TGetTablesResult get_table_results;
     Status status = catalog_->GetTableNames(db.db_name, NULL, &get_table_results);
     if (!status.ok()) {
-      Value error(status.GetDetail().c_str(), document->GetAllocator());
+      Value error(status.GetDetail(), document->GetAllocator());
       database.AddMember("error", error, document->GetAllocator());
       continue;
     }
@@ -869,10 +869,10 @@ void CatalogServer::CatalogUrlCallback(const Webserver::WebRequest& req,
     Value table_array(kArrayType);
     for (const string& table: get_table_results.tables) {
       Value table_obj(kObjectType);
-      Value fq_name(Substitute("$0.$1", db.db_name, table).c_str(),
+      Value fq_name(Substitute("$0.$1", db.db_name, table),
           document->GetAllocator());
       table_obj.AddMember("fqtn", fq_name, document->GetAllocator());
-      Value table_name(table.c_str(), document->GetAllocator());
+      Value table_name(table, document->GetAllocator());
       table_obj.AddMember("name", table_name, document->GetAllocator());
       Value has_metrics;
       has_metrics.SetBool(true);
@@ -893,7 +893,7 @@ void CatalogServer::GetCatalogUsage(Document* document) {
   TGetCatalogUsageResponse catalog_usage_result;
   Status status = catalog_->GetCatalogUsage(&catalog_usage_result);
   if (!status.ok()) {
-    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    Value error(status.GetDetail(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
@@ -902,7 +902,7 @@ void CatalogServer::GetCatalogUsage(Document* document) {
   for (const auto & large_table : catalog_usage_result.large_tables) {
     Value tbl_obj(kObjectType);
     Value tbl_name(Substitute("$0.$1", large_table.table_name.db_name,
-        large_table.table_name.table_name).c_str(), document->GetAllocator());
+        large_table.table_name.table_name), document->GetAllocator());
     tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
     DCHECK(large_table.__isset.memory_estimate_bytes);
     tbl_obj.AddMember("mem_estimate", large_table.memory_estimate_bytes,
@@ -922,7 +922,7 @@ void CatalogServer::GetCatalogUsage(Document* document) {
   for (const auto & frequent_table : catalog_usage_result.frequently_accessed_tables) {
     Value tbl_obj(kObjectType);
     Value tbl_name(Substitute("$0.$1", frequent_table.table_name.db_name,
-        frequent_table.table_name.table_name).c_str(), document->GetAllocator());
+        frequent_table.table_name.table_name), document->GetAllocator());
     tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
     Value num_metadata_operations;
     DCHECK(frequent_table.__isset.num_metadata_operations);
@@ -946,7 +946,7 @@ void CatalogServer::GetCatalogUsage(Document* document) {
   for (const auto & high_filecount_tbl : catalog_usage_result.high_file_count_tables) {
     Value tbl_obj(kObjectType);
     Value tbl_name(Substitute("$0.$1", high_filecount_tbl.table_name.db_name,
-        high_filecount_tbl.table_name.table_name).c_str(), document->GetAllocator());
+        high_filecount_tbl.table_name.table_name), document->GetAllocator());
     tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
     Value num_files;
     DCHECK(high_filecount_tbl.__isset.num_files);
@@ -971,7 +971,7 @@ void CatalogServer::GetCatalogUsage(Document* document) {
   for (const auto & longest_table : catalog_usage_result.long_metadata_loading_tables) {
     Value tbl_obj(kObjectType);
     Value tbl_name(Substitute("$0.$1", longest_table.table_name.db_name,
-        longest_table.table_name.table_name).c_str(), document->GetAllocator());
+        longest_table.table_name.table_name), document->GetAllocator());
     tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
     Value median_loading_time;
     Value max_loading_time;
@@ -1024,16 +1024,16 @@ void CatalogServer::EventMetricsUrlCallback(
   TEventProcessorMetricsSummaryResponse event_processor_summary_response;
   Status status = catalog_->GetEventProcessorSummary(&event_processor_summary_response);
   if (!status.ok()) {
-    Value error(status.GetDetail().c_str(), allocator);
+    Value error(status.GetDetail(), allocator);
     document->AddMember("error", error, allocator);
     return;
   }
 
   Value event_processor_summary(
-      event_processor_summary_response.summary.c_str(), allocator);
+      event_processor_summary_response.summary, allocator);
   document->AddMember("event_processor_metrics", event_processor_summary, allocator);
   if (event_processor_summary_response.__isset.error_msg) {
-    Value error_msg(event_processor_summary_response.error_msg.c_str(), allocator);
+    Value error_msg(event_processor_summary_response.error_msg, allocator);
     document->AddMember("event_processor_error_msg", error_msg, allocator);
   }
   const TEventBatchProgressInfo& progress_info =
@@ -1123,7 +1123,7 @@ void CatalogServer::CatalogObjectsUrlCallback(const Webserver::WebRequest& req,
       string json_str;
       if (status.ok()) status = catalog_->GetJsonCatalogObject(request, &json_str);
       if (status.ok()) {
-        Value debug_string(json_str.c_str(), document->GetAllocator());
+        Value debug_string(json_str, document->GetAllocator());
         document->AddMember("json_string", debug_string, document->GetAllocator());
       }
     } else {
@@ -1132,12 +1132,12 @@ void CatalogServer::CatalogObjectsUrlCallback(const Webserver::WebRequest& req,
       if (status.ok()) status = catalog_->GetCatalogObject(request, &result);
       if(status.ok()) {
         Value debug_string(
-            ThriftDebugStringNoThrow(result).c_str(), document->GetAllocator());
+            ThriftDebugStringNoThrow(result), document->GetAllocator());
         document->AddMember("thrift_string", debug_string, document->GetAllocator());
       }
     }
     if (!status.ok()) {
-      Value error(status.GetDetail().c_str(), document->GetAllocator());
+      Value error(status.GetDetail(), document->GetAllocator());
       document->AddMember("error", error, document->GetAllocator());
     }
   } else {
@@ -1152,7 +1152,7 @@ void CatalogServer::OperationUsageUrlCallback(
   TGetOperationUsageResponse operation_usage;
   Status status = catalog_->GetOperationUsage(&operation_usage);
   if (!status.ok()) {
-    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    Value error(status.GetDetail(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
@@ -1166,12 +1166,12 @@ void CatalogServer::GetCatalogOpSummary(const TGetOperationUsageResponse& operat
   Value catalog_op_list(kArrayType);
   for (const auto& catalog_op : operation_usage.catalog_op_counters) {
     Value catalog_op_obj(kObjectType);
-    Value op_name(catalog_op.catalog_op_name.c_str(), document->GetAllocator());
+    Value op_name(catalog_op.catalog_op_name, document->GetAllocator());
     catalog_op_obj.AddMember("catalog_op_name", op_name, document->GetAllocator());
     Value op_counter;
     op_counter.SetInt64(catalog_op.op_counter);
     catalog_op_obj.AddMember("op_counter", op_counter, document->GetAllocator());
-    Value table_name(catalog_op.table_name.c_str(), document->GetAllocator());
+    Value table_name(catalog_op.table_name, document->GetAllocator());
     catalog_op_obj.AddMember("table_name", table_name, document->GetAllocator());
     catalog_op_list.PushBack(catalog_op_obj, document->GetAllocator());
   }
@@ -1185,7 +1185,7 @@ void CatalogServer::GetCatalogOpSummary(const TGetOperationUsageResponse& operat
   Value catalog_op_summary(kArrayType);
   for (const auto& catalog_op : aggregated_operations) {
     Value catalog_op_obj(kObjectType);
-    Value op_name(catalog_op.first.c_str(), document->GetAllocator());
+    Value op_name(catalog_op.first, document->GetAllocator());
     catalog_op_obj.AddMember("catalog_op_name", op_name, document->GetAllocator());
     Value op_counter;
     op_counter.SetInt64(catalog_op.second);
@@ -1199,37 +1199,37 @@ static void CatalogOpListToJson(const vector<TCatalogOpRecord>& catalog_ops,
     Value* catalog_op_list, Document* document) {
   for (const auto& catalog_op : catalog_ops) {
     Value obj(kObjectType);
-    Value op_name(catalog_op.catalog_op_name.c_str(), document->GetAllocator());
+    Value op_name(catalog_op.catalog_op_name, document->GetAllocator());
     obj.AddMember("catalog_op_name", op_name, document->GetAllocator());
 
     Value thread_id;
     thread_id.SetInt64(catalog_op.thread_id);
     obj.AddMember("thread_id", thread_id, document->GetAllocator());
 
-    Value query_id(PrintId(catalog_op.query_id).c_str(), document->GetAllocator());
+    Value query_id(PrintId(catalog_op.query_id), document->GetAllocator());
     obj.AddMember("query_id", query_id, document->GetAllocator());
 
-    Value client_ip(catalog_op.client_ip.c_str(), document->GetAllocator());
+    Value client_ip(catalog_op.client_ip, document->GetAllocator());
     obj.AddMember("client_ip", client_ip, document->GetAllocator());
 
-    Value coordinator(catalog_op.coordinator_hostname.c_str(), document->GetAllocator());
+    Value coordinator(catalog_op.coordinator_hostname, document->GetAllocator());
     obj.AddMember("coordinator", coordinator, document->GetAllocator());
 
-    Value user(catalog_op.user.c_str(), document->GetAllocator());
+    Value user(catalog_op.user, document->GetAllocator());
     obj.AddMember("user", user, document->GetAllocator());
 
-    Value target_name(catalog_op.target_name.c_str(), document->GetAllocator());
+    Value target_name(catalog_op.target_name, document->GetAllocator());
     obj.AddMember("target_name", target_name, document->GetAllocator());
 
     Value start_time(ToStringFromUnixMillis(catalog_op.start_time_ms,
-        TimePrecision::Millisecond).c_str(), document->GetAllocator());
+        TimePrecision::Millisecond), document->GetAllocator());
     obj.AddMember("start_time", start_time, document->GetAllocator());
 
     int64_t end_time_ms;
     if (catalog_op.finish_time_ms > 0) {
       end_time_ms = catalog_op.finish_time_ms;
       Value finish_time(ToStringFromUnixMillis(catalog_op.finish_time_ms,
-          TimePrecision::Millisecond).c_str(), document->GetAllocator());
+          TimePrecision::Millisecond), document->GetAllocator());
       obj.AddMember("finish_time", finish_time, document->GetAllocator());
     } else {
       end_time_ms = UnixMillis();
@@ -1237,13 +1237,13 @@ static void CatalogOpListToJson(const vector<TCatalogOpRecord>& catalog_ops,
 
     int64_t duration_ms = end_time_ms - catalog_op.start_time_ms;
     const string& printed_duration = PrettyPrinter::Print(duration_ms, TUnit::TIME_MS);
-    Value duration(printed_duration.c_str(), document->GetAllocator());
+    Value duration(printed_duration, document->GetAllocator());
     obj.AddMember("duration", duration, document->GetAllocator());
 
-    Value status(catalog_op.status.c_str(), document->GetAllocator());
+    Value status(catalog_op.status, document->GetAllocator());
     obj.AddMember("status", status, document->GetAllocator());
 
-    Value details(catalog_op.details.c_str(), document->GetAllocator());
+    Value details(catalog_op.details, document->GetAllocator());
     obj.AddMember("details", details, document->GetAllocator());
 
     catalog_op_list->PushBack(obj, document->GetAllocator());
@@ -1278,18 +1278,17 @@ void CatalogServer::TableMetricsUrlCallback(const Webserver::WebRequest& req,
     if (pos == string::npos || pos >= full_tbl_name.size() - 1) {
       stringstream error_msg;
       error_msg << "Invalid table name: " << full_tbl_name;
-      Value error(error_msg.str().c_str(), document->GetAllocator());
-      document->AddMember("error", error, document->GetAllocator());
+      document->AddMember("error", error_msg.str(), document->GetAllocator());
       return;
     }
     string metrics;
     Status status = catalog_->GetTableMetrics(
         full_tbl_name.substr(0, pos), full_tbl_name.substr(pos + 1), &metrics);
     if (status.ok()) {
-      Value metrics_str(metrics.c_str(), document->GetAllocator());
+      Value metrics_str(metrics, document->GetAllocator());
       document->AddMember("table_metrics", metrics_str, document->GetAllocator());
     } else {
-      Value error(status.GetDetail().c_str(), document->GetAllocator());
+      Value error(status.GetDetail(), document->GetAllocator());
       document->AddMember("error", error, document->GetAllocator());
     }
   } else {
@@ -1345,7 +1344,7 @@ void CatalogServer::HadoopVarzHandler(const Webserver::WebRequest& req,
   if (!status.ok()) {
     LOG(ERROR) << "Error getting cluster configuration for hadoop-varz: "
                << status.GetDetail();
-    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    Value error(status.GetDetail(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
@@ -1353,8 +1352,8 @@ void CatalogServer::HadoopVarzHandler(const Webserver::WebRequest& req,
   Value configs(kArrayType);
   typedef map<string, string> ConfigMap;
   for (const auto& config: response.configs) {
-    Value key(config.first.c_str(), document->GetAllocator());
-    Value value(config.second.c_str(), document->GetAllocator());
+    Value key(config.first, document->GetAllocator());
+    Value value(config.second, document->GetAllocator());
     Value config_json(kObjectType);
     config_json.AddMember("key", key, document->GetAllocator());
     config_json.AddMember("value", value, document->GetAllocator());

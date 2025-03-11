@@ -45,16 +45,16 @@ namespace impala {
 template <>
 void ToJsonValue<string>(const string& value, const TUnit::type unit,
     Document* document, Value* out_val) {
-  Value val(value.c_str(), document->GetAllocator());
+  Value val(value, document->GetAllocator());
   *out_val = val;
 }
 
 void Metric::AddStandardFields(Document* document, Value* val) {
-  Value name(key_.c_str(), document->GetAllocator());
+  Value name(key_, document->GetAllocator());
   val->AddMember("name", name, document->GetAllocator());
-  Value desc(description_.c_str(), document->GetAllocator());
+  Value desc(description_, document->GetAllocator());
   val->AddMember("description", desc, document->GetAllocator());
-  Value metric_value(ToHumanReadable().c_str(), document->GetAllocator());
+  Value metric_value(ToHumanReadable(), document->GetAllocator());
   val->AddMember("human_readable", metric_value, document->GetAllocator());
 }
 
@@ -67,9 +67,9 @@ void ScalarMetric<T, metric_kind_t>::ToJson(Document* document, Value* val) {
   ToJsonValue(GetValue(), TUnit::NONE, document, &metric_value);
   container.AddMember("value", metric_value, document->GetAllocator());
 
-  Value type_value(PrintValue(kind()).c_str(), document->GetAllocator());
+  Value type_value(PrintValue(kind()), document->GetAllocator());
   container.AddMember("kind", type_value, document->GetAllocator());
-  Value units(PrintValue(unit()).c_str(), document->GetAllocator());
+  Value units(PrintValue(unit()), document->GetAllocator());
   container.AddMember("units", units, document->GetAllocator());
   *val = container;
 }
@@ -78,14 +78,14 @@ template <typename T, TMetricKind::type metric_kind_t>
 void ScalarMetric<T, metric_kind_t>::ToLegacyJson(Document* document) {
   Value val;
   ToJsonValue(GetValue(), TUnit::NONE, document, &val);
-  Value key(key_.c_str(), document->GetAllocator());
+  Value key(key_, document->GetAllocator());
   document->AddMember(key, val, document->GetAllocator());
 }
 
 template <typename T, TMetricKind::type metric_kind_t>
 TMetricKind::type ScalarMetric<T, metric_kind_t>::ToPrometheus(
     string name, stringstream* val, stringstream* metric_kind) {
-  string metric_type = PrintValue(kind()).c_str();
+  string metric_type = PrintValue(kind());
   // prometheus doesn't support 'property', so ignore it
   if (!metric_type.compare("property")) {
     return TMetricKind::PROPERTY;
@@ -240,7 +240,7 @@ void MetricGroup::TemplateCallback(const Webserver::WebRequest& req,
     found_group->ToJson(false, document, &container);
     document->AddMember("metric_group", container, document->GetAllocator());
   } else {
-    Value error(Substitute("Metric group $0 not found", metric_group->second).c_str(),
+    Value error(Substitute("Metric group $0 not found", metric_group->second),
         document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
   }
@@ -270,7 +270,7 @@ void MetricGroup::ToJson(bool include_children, Document* document, Value* out_v
 
   Value container(kObjectType);
   container.AddMember("metrics", metric_list, document->GetAllocator());
-  Value name(name_.c_str(), document->GetAllocator());
+  Value name(name_, document->GetAllocator());
   container.AddMember("name", name, document->GetAllocator());
   if (include_children) {
     Value child_groups(kArrayType);

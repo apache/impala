@@ -71,7 +71,7 @@ static void RepeatedFieldToJson(const google::protobuf::Message& pb,
         arr.PushBack(reflection->GetRepeatedBool(pb, field, i), document->GetAllocator());
         break;
       case google::protobuf::FieldDescriptor::CPPTYPE_ENUM: {
-        Value enum_str(reflection->GetRepeatedEnum(pb, field, i)->name().c_str(),
+        Value enum_str(reflection->GetRepeatedEnum(pb, field, i)->name(),
             document->GetAllocator());
         arr.PushBack(enum_str, document->GetAllocator());
         break;
@@ -79,7 +79,7 @@ static void RepeatedFieldToJson(const google::protobuf::Message& pb,
       case google::protobuf::FieldDescriptor::CPPTYPE_STRING: {
         string str = reflection->GetRepeatedString(pb, field, i);
         Redact(&str, nullptr);
-        Value val_str(str.c_str(), document->GetAllocator());
+        Value val_str(str, document->GetAllocator());
         arr.PushBack(val_str, document->GetAllocator());
         break;
       }
@@ -94,7 +94,7 @@ static void RepeatedFieldToJson(const google::protobuf::Message& pb,
         DCHECK(false) << "Type NYI: " << field->cpp_type() << " " << field->name();
     }
   }
-  Value field_name(field->name().c_str(), document->GetAllocator());
+  Value field_name(field->name(), document->GetAllocator());
   obj->AddMember(field_name, arr, document->GetAllocator());
 }
 
@@ -107,7 +107,7 @@ void ProtobufToJson(const google::protobuf::Message& pb, Document* document, Val
       RepeatedFieldToJson(pb, reflection, field, document, obj);
       continue;
     }
-    Value field_name(field->name().c_str(), document->GetAllocator());
+    Value field_name(field->name(), document->GetAllocator());
     switch (field->cpp_type()) {
       case google::protobuf::FieldDescriptor::CPPTYPE_INT32:
         obj->AddMember(
@@ -139,14 +139,14 @@ void ProtobufToJson(const google::protobuf::Message& pb, Document* document, Val
         break;
       case google::protobuf::FieldDescriptor::CPPTYPE_ENUM: {
         Value enum_str(
-            reflection->GetEnum(pb, field)->name().c_str(), document->GetAllocator());
+            reflection->GetEnum(pb, field)->name(), document->GetAllocator());
         obj->AddMember(field_name, enum_str, document->GetAllocator());
         break;
       }
       case google::protobuf::FieldDescriptor::CPPTYPE_STRING: {
         string str = reflection->GetString(pb, field);
         Redact(&str, nullptr);
-        Value val_str(str.c_str(), document->GetAllocator());
+        Value val_str(str, document->GetAllocator());
         obj->AddMember(field_name, val_str, document->GetAllocator());
         break;
       }
