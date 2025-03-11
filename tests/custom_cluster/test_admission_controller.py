@@ -38,6 +38,7 @@ from tests.common.custom_cluster_test_suite import (
     ADMISSIOND_ARGS,
     IMPALAD_ARGS,
     START_ARGS,
+    WORKLOAD_MGMT_IMPALAD_FLAGS,
     CustomClusterTestSuite)
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
 from tests.common.impala_connection import (
@@ -1901,7 +1902,7 @@ class TestAdmissionController(TestAdmissionControllerBase):
       workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
         fs_allocation_file="fair-scheduler-onlycoords.xml",
         llama_site_file="llama-site-onlycoords.xml"),
-        statestored_args=_STATESTORED_ARGS)
+      statestored_args=_STATESTORED_ARGS)
   def test_coord_only_pool_happy_path(self, vector):
     """Asserts queries set to use an only coordinators request pool run all the fragment
        instances on all coordinators and no executors even if the query includes
@@ -1926,7 +1927,7 @@ class TestAdmissionController(TestAdmissionControllerBase):
       workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
         fs_allocation_file="fair-scheduler-onlycoords.xml",
         llama_site_file="llama-site-onlycoords.xml"),
-        statestored_args=_STATESTORED_ARGS)
+      statestored_args=_STATESTORED_ARGS)
   def test_coord_only_pool_no_executors(self, vector):
     """Asserts queries that only select from the active queries table run even if no
        executors are running."""
@@ -1938,7 +1939,7 @@ class TestAdmissionController(TestAdmissionControllerBase):
       workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
         fs_allocation_file="fair-scheduler-onlycoords.xml",
         llama_site_file="llama-site-onlycoords.xml"),
-        statestored_args=_STATESTORED_ARGS)
+      statestored_args=_STATESTORED_ARGS)
   def test_coord_only_pool_one_quiescing_coord(self, vector):
     """Asserts quiescing coordinators do not run fragment instances for queries that only
        select from the active queries table."""
@@ -1960,7 +1961,7 @@ class TestAdmissionController(TestAdmissionControllerBase):
       workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
         fs_allocation_file="fair-scheduler-onlycoords.xml",
         llama_site_file="llama-site-onlycoords.xml"),
-        statestored_args=_STATESTORED_ARGS)
+      statestored_args=_STATESTORED_ARGS)
   def test_coord_only_pool_one_coord_terminate(self, vector):
     """Asserts a force terminated coordinator is eventually removed from the list of
        active coordinators."""
@@ -2003,7 +2004,7 @@ class TestAdmissionController(TestAdmissionControllerBase):
       workload_mgmt=True, impalad_args=impalad_admission_ctrl_config_args(
         fs_allocation_file="fair-scheduler-onlycoords.xml",
         llama_site_file="llama-site-onlycoords.xml"),
-        statestored_args=_STATESTORED_ARGS)
+      statestored_args=_STATESTORED_ARGS)
   def test_coord_only_pool_add_coord(self, vector):
     self.wait_for_wm_init_complete()
 
@@ -2011,15 +2012,16 @@ class TestAdmissionController(TestAdmissionControllerBase):
     cluster_size = len(self.cluster.impalads)
     self._start_impala_cluster(
         options=[
-            "--impalad_args=s{}".format(impalad_admission_ctrl_config_args(
+            "--impalad_args={0} {1}".format(
+              WORKLOAD_MGMT_IMPALAD_FLAGS,
+              impalad_admission_ctrl_config_args(
                 fs_allocation_file="fair-scheduler-onlycoords.xml",
                 llama_site_file="llama-site-onlycoords.xml"))],
         add_impalads=True,
         cluster_size=6,
         num_coordinators=1,
         use_exclusive_coordinators=True,
-        wait_for_backends=False,
-        workload_mgmt=True)
+        wait_for_backends=False)
 
     self.assert_log_contains("impalad_node" + str(cluster_size), "INFO",
         "join Impala Service pool")
@@ -2035,8 +2037,7 @@ class TestAdmissionController(TestAdmissionControllerBase):
         additional_args="--expected_executor_group_sets=root.group-set-small:1,"
                         "root.group-set-large:2 "
                         "--num_expected_executors=2 --executor_groups=coordinator"),
-        impalad_graceful_shutdown=True,
-        statestored_args=_STATESTORED_ARGS)
+      statestored_args=_STATESTORED_ARGS)
   def test_coord_only_pool_exec_groups(self, vector):
     """Asserts queries using only coordinators request pools can run successfully when
        executor groups are configured."""
@@ -2075,8 +2076,6 @@ class TestAdmissionController(TestAdmissionControllerBase):
         expected_subscribers=expected_subscribers,
         expected_num_impalads=expected_num_impalads)
     self.__run_assert_systables_query(vector)
-    # Refresh cluster to include those two new impalad for graceful shutdown.
-    self.cluster.refresh()
 
 
 class TestAdmissionControllerWithACService(TestAdmissionController):

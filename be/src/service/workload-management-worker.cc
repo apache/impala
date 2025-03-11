@@ -502,6 +502,7 @@ void ImpalaServer::ShutdownWorkloadManagement() {
   // chance to flush the in-memory queue to the completed queries table.
   if (workload_mgmt_state_ == WorkloadManagementState::RUNNING) {
     workload_mgmt_state_ = WorkloadManagementState::SHUTTING_DOWN;
+    LOG(INFO) << "Workload management is shutting down";
     _completed_queries_cv.notify_all();
     _completed_queries_shutdown_cv.wait_for(l,
         chrono::seconds(FLAGS_query_log_shutdown_timeout_s),

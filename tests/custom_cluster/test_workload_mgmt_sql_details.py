@@ -21,11 +21,15 @@ import os
 
 from SystemTables.ttypes import TQueryTableColumn
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from test_query_log import TestQueryLogTableBase
+from tests.common.test_dimensions import hs2_client_protocol_dimension
+from tests.common.wm_test_suite import WorkloadManagementTestSuite
 from tests.util.workload_management import assert_csv_col, QUERY_TBL_LOG
 
 
-class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
+@CustomClusterTestSuite.with_args(
+  cluster_size=1, disable_log_buffering=True, workload_mgmt=True,
+  impalad_args="--query_log_max_queued=1")
+class TestWorkloadManagementSQLDetails(WorkloadManagementTestSuite):
   """Tests that ensure the workload management data describing the details of the sql
      statement values (columns tables_queried, select_columns, where_columns,
      join_columns, aggregate_columns, and orderby_columns) in the completed
@@ -37,12 +41,7 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
   @classmethod
   def add_test_dimensions(cls):
     super(TestWorkloadManagementSQLDetails, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value("protocol") == "beeswax")
-
-  def setup_method(self, method):
-    super(TestWorkloadManagementSQLDetails, self).setup_method(method)
-    self.wait_for_wm_init_complete()
+    cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
 
     # Assert tables queried.
   def _assert_all(self, vector, query, expected_tables_queried, expected_select_cols,
@@ -60,7 +59,7 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
 
     # Wait for the query to be written to the completed queries table.
     self.cluster.get_first_impalad().service.wait_for_metric_value(
-        "impala-server.completed-queries.written", 1, 60)
+        "impala-server.completed-queries.queued", 0, 60)
 
     # Assert tables queried.
     assert_csv_col(client, QUERY_TBL_LOG, TQueryTableColumn.TABLES_QUERIED, res.query_id,
@@ -101,10 +100,6 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
     self._assert_all(vector, query_text, expected_tables_queried, expected_select,
         expected_where, expected_join, expected_aggregate, expected_orderby)
 
-  @CustomClusterTestSuite.with_args(
-      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
   def test_tpcds_1(self, vector):
     """Asserts the values inserted into the workload management table columns match
        what is expected for TPCDS query 1.
@@ -134,10 +129,6 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["customer.c_customer_id"])
 
-  @CustomClusterTestSuite.with_args(
-      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
   def test_tpcds_3(self, vector):
     """Asserts the values inserted into the workload management table columns match
        what is expected for TPCDS query 3.
@@ -165,10 +156,6 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["date_dim.d_year", "store_sales.ss_ext_sales_price", "item.i_brand_id"])
 
-  @CustomClusterTestSuite.with_args(
-      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
   def test_tpcds_51(self, vector):
     """Asserts the values inserted into the workload management table columns match
        what is expected for TPCDS query 51.
@@ -198,10 +185,6 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["web_sales.ws_item_sk", "store_sales.ss_item_sk", "date_dim.d_date"])
 
-  @CustomClusterTestSuite.with_args(
-      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
   def test_tpcds_62(self, vector):
     """Asserts the values inserted into the workload management table columns match
        what is expected for TPCDS query 62.
@@ -232,10 +215,6 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["warehouse.w_warehouse_name", "ship_mode.sm_type", "web_site.web_name"])
 
-  @CustomClusterTestSuite.with_args(
-      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
   def test_tpcds_64(self, vector):
     """Asserts the values inserted into the workload management table columns match
        what is expected for TPCDS query 64.
@@ -303,10 +282,6 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["item.i_product_name", "store.s_store_name", "store_sales.ss_wholesale_cost"])
 
-  @CustomClusterTestSuite.with_args(
-      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
   def test_tpcds_66(self, vector):
     """Asserts the values inserted into the workload management table columns match
        what is expected for TPCDS query 66.
@@ -349,10 +324,6 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         # Expected order by columns.
         ["warehouse.w_warehouse_name"])
 
-  @CustomClusterTestSuite.with_args(
-      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
   def test_tpcds_75(self, vector):
     """Asserts the values inserted into the workload management table columns match
        what is expected for TPCDS query 75.
@@ -404,10 +375,6 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
          "web_returns.wr_return_amt", "web_returns.wr_return_quantity",
          "web_sales.ws_ext_sales_price", "web_sales.ws_quantity"])
 
-  @CustomClusterTestSuite.with_args(
-      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
   def test_sql_having(self, vector):
     """Asserts the values inserted into the workload management table columns match
        what is expected when the sql contains both a group by and a having clause that
@@ -422,10 +389,6 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         ["store_sales.ss_item_sk", "store_sales.ss_quantity"],
         ["store_sales.ss_quantity"])
 
-  @CustomClusterTestSuite.with_args(
-      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
   def test_complex_types(self, vector):
     """Asserts that queries using subtypes of complex type columns only report the column
        name and do not also report the subtype."""
@@ -439,10 +402,6 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         [],
         "functional")
 
-  @CustomClusterTestSuite.with_args(
-      cluster_size=1, impalad_graceful_shutdown=True, disable_log_buffering=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
   def test_arithmetic(self, vector):
     """Asserts that arithmetic operations record the columns used in them."""
     self._assert_all(vector, "select (tinyint_col + smallint_col), sum(float_col) from "
@@ -456,10 +415,17 @@ class TestWorkloadManagementSQLDetails(TestQueryLogTableBase):
         [],
         "functional")
 
+
+class TestWorkloadManagementSQLDetailsCalcite(WorkloadManagementTestSuite):
+  """Variant of TestWorkloadManagementSQLDetails using calcite planner."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestWorkloadManagementSQLDetailsCalcite, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
+
   @CustomClusterTestSuite.with_args(start_args="--use_calcite_planner=true",
-      cluster_size=1, impalad_graceful_shutdown=True,
-      impalad_args="--enable_workload_mgmt --query_log_write_interval_s=1",
-      catalogd_args="--enable_workload_mgmt")
+                                    cluster_size=1, workload_mgmt=True)
   def test_tpcds_8_decimal(self, vector):
     """Runs the tpcds-decimal_v2-q8 query using the calcite planner and asserts the query
        completes successfully. See IMPALA-13505 for details on why this query in

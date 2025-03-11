@@ -33,7 +33,9 @@ from tests.common.cluster_config import impalad_admission_ctrl_config_args
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_connection import FINISHED
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
+from tests.common.test_dimensions import hs2_client_protocol_dimension
 from tests.common.test_vector import ImpalaTestDimension
+from tests.common.wm_test_suite import WorkloadManagementTestSuite
 from tests.util.retry import retry
 from tests.util.workload_management import (
     assert_query,
@@ -42,42 +44,14 @@ from tests.util.workload_management import (
     redaction_rules_file)
 
 
-class TestQueryLogTableBase(CustomClusterTestSuite):
-  """Base class for all query log tests. Sets up the tests to use the Beeswax and HS2
-     client protocols."""
-
-  PROTOCOL_BEESWAX = "beeswax"
-  PROTOCOL_HS2 = "hs2"
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestQueryLogTableBase, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol',
-        cls.PROTOCOL_BEESWAX, cls.PROTOCOL_HS2))
-
-  def setup_method(self, method):
-    super(TestQueryLogTableBase, self).setup_method(method)
-    self.wait_for_wm_init_complete()
-
-  def get_client(self, protocol):
-    """Retrieves the default Impala client for the specified protocol. This client is
-       automatically closed after the test completes."""
-    if protocol == self.PROTOCOL_BEESWAX:
-      return self.client
-    elif protocol == self.PROTOCOL_HS2:
-      return self.hs2_client
-    raise Exception("unknown protocol: {0}".format(protocol))
-
-
-class TestQueryLogTableBeeswax(TestQueryLogTableBase):
+class TestQueryLogTableBasic(WorkloadManagementTestSuite):
   """Tests to assert the query log table is correctly populated when using the Beeswax
      client protocol."""
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestQueryLogTableBeeswax, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('protocol') == 'beeswax')
+    super(TestQueryLogTableBasic, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
 
   @classmethod
   def get_workload(self):
@@ -85,17 +59,12 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
 
   MAX_SQL_PLAN_LEN = 2000
   LOG_DIR_MAX_WRITES = 'max_attempts_exceeded'
-  FLUSH_MAX_RECORDS_CLUSTER_ID = "test_query_log_max_records_" + str(int(time()))
-  FLUSH_MAX_RECORDS_QUERY_COUNT = 30
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_max_select "
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_max_select "
                                                  "--query_log_max_sql_length={0} "
                                                  "--query_log_max_plan_length={0}"
                                                  .format(MAX_SQL_PLAN_LEN),
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_lower_max_sql_plan(self, vector):
     """Asserts that length limits on the sql and plan columns in the completed queries
@@ -128,11 +97,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     assert len(data[1]) == self.MAX_SQL_PLAN_LEN - data[1].count("\n") - 1, \
         "incorrect plan length"
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_max_select",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_max_select",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_sql_plan_too_long(self, vector):
     """Asserts that very long queries have their corresponding plan and sql columns
@@ -164,13 +130,10 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     # Newline characters are not counted by Impala's length function.
     assert len(data[1]) == 16777216 - data[1].count("\n") - 1
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_query_hist_1 "
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_hist_1 "
                                                  "--query_log_size=0 "
                                                  "--query_log_size_in_bytes=0",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_no_query_log(self, vector):
     """Asserts queries are written to the completed queries table when the in-memory
@@ -194,13 +157,10 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     assert len(actual.data) == 1
     assert actual.data[0] == select_sql
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_query_hist_2 "
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_hist_2 "
                                                  "--always_use_data_cache "
                                                  "--data_cache={query_data_cache}:5GB",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     cluster_size=1,
                                     tmp_dir_placeholders=['query_data_cache'],
                                     disable_log_buffering=True)
@@ -240,11 +200,9 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     assert data["BYTES_READ_CACHE_TOTAL"] != "0", "bytes read from cache total was " \
         "zero, test did not assert anything"
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=5",
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=5",
                                     impala_log_dir=("{" + LOG_DIR_MAX_WRITES + "}"),
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     tmp_dir_placeholders=[LOG_DIR_MAX_WRITES],
                                     disable_log_buffering=True)
   def test_max_attempts_exceeded(self, vector):
@@ -290,80 +248,9 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     assert impalad.service.get_metric_value(
       "impala-server.completed-queries.written") == 0
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_max_queued={0} "
-                                                 "--query_log_write_interval_s=9999 "
-                                                 "--cluster_id={1} "
-                                                 "--query_log_expression_limit=5000"
-                                                 .format(FLUSH_MAX_RECORDS_QUERY_COUNT,
-                                                 FLUSH_MAX_RECORDS_CLUSTER_ID),
-                                    catalogd_args="--enable_workload_mgmt",
-                                    default_query_options=[
-                                      ('statement_expression_limit', 1024)],
-                                    impalad_graceful_shutdown=True,
-                                    disable_log_buffering=True)
-  def test_flush_on_queued_count_exceeded(self, vector):
-    """Asserts that queries that have completed are written to the query log table when
-       the maximum number of queued records is reached. Also verifies that writing
-       completed queries is not limited by default statement_expression_limit."""
-
-    impalad = self.cluster.get_first_impalad()
-    client = self.get_client(vector.get_value('protocol'))
-
-    rand_str = "{0}-{1}".format(vector.get_value('protocol'), time())
-
-    test_sql = "select '{0}','{1}'".format(rand_str,
-        self.FLUSH_MAX_RECORDS_CLUSTER_ID)
-    test_sql_assert = "select '{0}', count(*) from {1} where sql='{2}'".format(
-        rand_str, QUERY_TBL_LOG, test_sql.replace("'", r"\'"))
-
-    for _ in range(0, self.FLUSH_MAX_RECORDS_QUERY_COUNT):
-      res = client.execute(test_sql)
-      assert res.success
-
-    # Running this query results in the number of queued completed queries to exceed
-    # the max and thus all completed queries will be written to the query log table.
-    res = client.execute(test_sql_assert)
-    assert res.success
-    assert 1 == len(res.data)
-    assert "0" == res.data[0].split("\t")[1]
-
-    # Wait until the completed queries have all been written out because the max queued
-    # count was exceeded.
-    impalad.service.wait_for_metric_value(
-        "impala-server.completed-queries.max-records-writes", 1, 60)
-    self.cluster.get_first_impalad().service.wait_for_metric_value(
-        "impala-server.completed-queries.written",
-        self.FLUSH_MAX_RECORDS_QUERY_COUNT + 1, 60)
-
-    # Force Impala to process the inserts to the completed queries table.
-    client.execute("refresh " + QUERY_TBL_LOG)
-
-    # This query will remain queued due to the long write interval and max queued
-    # records limit not being reached.
-    res = client.execute(r"select count(*) from {0} where sql like 'select \'{1}\'%'"
-        .format(QUERY_TBL_LOG, rand_str))
-    assert res.success
-    assert 1 == len(res.data)
-    assert str(self.FLUSH_MAX_RECORDS_QUERY_COUNT + 1) == res.data[0]
-    impalad.service.wait_for_metric_value(
-        "impala-server.completed-queries.queued", 2, 60)
-
-    assert impalad.service.get_metric_value(
-        "impala-server.completed-queries.max-records-writes") == 1
-    assert impalad.service.get_metric_value(
-        "impala-server.completed-queries.scheduled-writes") == 0
-    assert impalad.service.get_metric_value("impala-server.completed-queries.written") \
-        == self.FLUSH_MAX_RECORDS_QUERY_COUNT + 1
-    assert impalad.service.get_metric_value(
-        "impala-server.completed-queries.queued") == 2
-
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1",
-                                    cluster_size=3,
+  @CustomClusterTestSuite.with_args(cluster_size=3,
                                     num_exclusive_coordinators=2,
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_dedicated_coordinator_no_mt_dop(self, vector):
     """Asserts the values written to the query log table match the values from the
@@ -386,12 +273,9 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     finally:
       client2.close()
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1",
-                                    cluster_size=3,
+  @CustomClusterTestSuite.with_args(cluster_size=3,
                                     num_exclusive_coordinators=2,
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_dedicated_coordinator_with_mt_dop(self, vector):
     """Asserts the values written to the query log table match the values from the
@@ -416,26 +300,24 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
     finally:
       client2.close()
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--redaction_rules_file={}"
+  @CustomClusterTestSuite.with_args(impalad_args="--redaction_rules_file={}"
                                                  .format(redaction_rules_file()),
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
-  def test_redaction(self):
+  def test_redaction(self, vector):
     """Asserts the query log table redacts the statement."""
-    result = self.client.execute(
+    client = self.get_client(vector.get_value('protocol'))
+    result = client.execute(
         "select *, 'supercalifragilisticexpialidocious' from functional.alltypes",
         fetch_profile_after_close=True)
     assert result.success
 
     self.cluster.get_first_impalad().service.wait_for_metric_value(
         "impala-server.completed-queries.written", 1, 60)
-    assert_query(QUERY_TBL_LOG, self.client, raw_profile=result.runtime_profile)
+    assert_query(QUERY_TBL_LOG, client, raw_profile=result.runtime_profile)
 
 
-class TestQueryLogOtherTable(TestQueryLogTableBase):
+class TestQueryLogOtherTable(WorkloadManagementTestSuite):
   """Tests to assert that query_log_table_name works with non-default value."""
 
   OTHER_TBL = "completed_queries_table_{0}".format(int(time()))
@@ -443,19 +325,15 @@ class TestQueryLogOtherTable(TestQueryLogTableBase):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueryLogOtherTable, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('protocol') == 'beeswax')
+    cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--blacklisted_dbs=information_schema "
+  @CustomClusterTestSuite.with_args(impalad_args="--blacklisted_dbs=information_schema "
                                                  "--query_log_table_name={0}"
                                                  .format(OTHER_TBL),
-                                    catalogd_args="--enable_workload_mgmt "
-                                                  "--blacklisted_dbs=information_schema "
+                                    catalogd_args="--blacklisted_dbs=information_schema "
                                                   "--query_log_table_name={0}"
                                                   .format(OTHER_TBL),
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_renamed_log_table(self, vector):
     """Asserts that the completed queries table can be renamed."""
@@ -479,7 +357,7 @@ class TestQueryLogOtherTable(TestQueryLogTableBase):
       client.execute("drop table {0}.{1} purge".format(WM_DB, self.OTHER_TBL))
 
 
-class TestQueryLogTableHS2(TestQueryLogTableBase):
+class TestQueryLogTableHS2(WorkloadManagementTestSuite):
   """Tests to assert the query log table is correctly populated when using the HS2
      client protocol."""
 
@@ -488,16 +366,12 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueryLogTableHS2, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('protocol') == 'hs2')
+    cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id={}"
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id={}"
                                                  .format(HS2_OPERATIONS_CLUSTER_ID),
-                                    catalogd_args="--enable_workload_mgmt",
                                     cluster_size=2,
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_hs2_metadata_operations(self, vector):
     """Certain HS2 operations appear to Impala as a special kind of query. Specifically,
@@ -620,12 +494,9 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     assert assert_results.success
     assert assert_results.data[0] == "1"
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_query_hist_mult",
-                                    catalogd_args="--enable_workload_mgmt",
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_hist_mult",
                                     cluster_size=2,
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_query_multiple_tables(self, vector):
     """Asserts the values written to the query log table match the values from the
@@ -650,11 +521,8 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     finally:
       client2.close()
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_query_hist_3",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_hist_3",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_insert_select(self, vector, unique_database,
       unique_name):
@@ -684,117 +552,12 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
     finally:
       client2.close()
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=15",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
-                                    disable_log_buffering=True)
-  def test_flush_on_interval(self, vector):
-    """Asserts that queries that have completed are written to the query log table
-       after the specified write interval elapses."""
-
-    client = self.get_client(vector.get_value('protocol'))
-
-    query_count = 10
-
-    for i in range(query_count):
-      res = client.execute("select sleep(1000)")
-      assert res.success
-
-    # Wait for at least one iteration of the workload management processing loop to write
-    # to the completed queries table.
-    self.cluster.get_first_impalad().service.wait_for_metric_value(
-      "impala-server.completed-queries.written", query_count, 20)
-
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=9999 "
-                                                 "--shutdown_grace_period_s=0 "
-                                                 "--shutdown_deadline_s=15 "
-                                                 "--debug_actions="
-                                                 "WM_SHUTDOWN_DELAY:SLEEP@5000",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    disable_log_buffering=True)
-  def test_flush_on_shutdown(self, vector):
-    """Asserts that queries that have completed but are not yet written to the query
-       log table are flushed to the table before the coordinator exits. Graceful shutdown
-       for 2nd coordinator not needed because query_log_write_interval_s is very long."""
-
-    impalad = self.cluster.get_first_impalad()
-    client = self.get_client(vector.get_value('protocol'))
-
-    # Execute sql statements to ensure all get written to the query log table.
-    sql1 = client.execute("select 1")
-    assert sql1.success
-
-    sql2 = client.execute("select 2")
-    assert sql2.success
-
-    sql3 = client.execute("select 3")
-    assert sql3.success
-
-    impalad.service.wait_for_metric_value("impala-server.completed-queries.queued", 3,
-        60)
-
-    impalad.kill_and_wait_for_exit(SIGRTMIN)
-    self.assert_impalad_log_contains("INFO", r'Workload management shutdown successful',
-      timeout_s=60)
-
-    client2 = self.create_client_for_nth_impalad(1, vector.get_value('protocol'))
-
-    try:
-      def assert_func():
-        results = client2.execute("select query_id,sql from {0} where query_id in "
-                                  "('{1}','{2}','{3}')".format(QUERY_TBL_LOG,
-                                  sql1.query_id, sql2.query_id, sql3.query_id))
-
-        return len(results.data) == 3
-
-      assert retry(func=assert_func, max_attempts=5, sleep_time_s=3)
-    finally:
-      client2.close()
-
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=9999 "
-                                                 "--shutdown_grace_period_s=0 "
-                                                 "--query_log_shutdown_timeout_s=3 "
-                                                 "--shutdown_deadline_s=15 "
-                                                 "--debug_actions="
-                                                 "WM_SHUTDOWN_DELAY:SLEEP@10000",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    disable_log_buffering=True)
-  def test_shutdown_flush_timed_out(self, vector):
-    """Asserts that queries that have completed but are not yet written to the query
-       log table are lost if the completed queries queue drain takes too long and that
-       the coordinator logs the estimated number of queries lost."""
-
-    impalad = self.cluster.get_first_impalad()
-    client = self.get_client(vector.get_value('protocol'))
-
-    # Execute sql statements to ensure all get written to the query log table.
-    sql1 = client.execute("select 1")
-    assert sql1.success
-
-    sql2 = client.execute("select 2")
-    assert sql2.success
-
-    sql3 = client.execute("select 3")
-    assert sql3.success
-
-    impalad.service.wait_for_metric_value("impala-server.completed-queries.queued", 3,
-        60)
-
-    impalad.kill_and_wait_for_exit(SIGRTMIN)
-    self.assert_impalad_log_contains("INFO", r"Workload management shutdown timed out. "
-      r"Up to '3' queries may have been lost",
-      timeout_s=60)
-
   @CustomClusterTestSuite.with_args(
-      impalad_args="--enable_workload_mgmt "
-      "--query_log_write_interval_s=3 "
+      impalad_args="--query_log_write_interval_s=3 "
       "--query_log_dml_exec_timeout_s=1 "
       "--debug_actions=INTERNAL_SERVER_AFTER_SUBMIT:SLEEP@2000",
-      catalogd_args="--enable_workload_mgmt",
-      impalad_graceful_shutdown=True, cluster_size=1, disable_log_buffering=True)
+      workload_mgmt=True,
+      cluster_size=1, disable_log_buffering=True)
   def test_exec_timeout(self, vector):
     """Asserts the --query_log_dml_exec_timeout_s startup flag is added to the workload
        management insert DML and the DML will be cancelled when its execution time exceeds
@@ -820,15 +583,17 @@ class TestQueryLogTableHS2(TestQueryLogTableBase):
                                      "limit of 1s000ms".format(self.insert_query_id))
 
 
-class TestQueryLogTableAll(TestQueryLogTableBase):
+class TestQueryLogTableAll(WorkloadManagementTestSuite):
   """Tests to assert the query log table is correctly populated when using all the
      client protocols."""
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_query_hist_2",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestQueryLogTableAll, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
+
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_hist_2",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_ddl(self, vector, unique_database, unique_name):
     """Asserts the values written to the query log table match the values from the
@@ -851,11 +616,8 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     finally:
       client2.close()
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_query_hist_3",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_hist_3",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_dml(self, vector, unique_database, unique_name):
     """Asserts the values written to the query log table match the values from the
@@ -885,11 +647,8 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     finally:
       client2.close()
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_query_hist_2",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_hist_2",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_invalid_query(self, vector):
     """Asserts correct values are written to the completed queries table for a failed
@@ -918,10 +677,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     assert_query(query_tbl=QUERY_TBL_LOG, client=client,
         expected_cluster_id="test_query_hist_2", impalad=impalad, query_id=result.data[0])
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_ignored_sqls_not_written(self, vector):
     """Asserts that expected queries are not written to the query log table."""
@@ -1013,10 +769,7 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
     assert self.cluster.get_first_impalad().service.get_metric_value(
         "impala-server.completed-queries.failure") == 0
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_sql_injection_attempts(self, vector):
     client = self.get_client(vector.get_value('protocol'))
@@ -1089,21 +842,19 @@ class TestQueryLogTableAll(TestQueryLogTableBase):
                                         .format(esc_sql, test_case)
 
 
-class TestQueryLogTableBufferPool(TestQueryLogTableBase):
+class TestQueryLogTableBufferPool(WorkloadManagementTestSuite):
   """Base class for all query log tests that set the buffer pool query option."""
 
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueryLogTableBufferPool, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('buffer_pool_limit',
         None, "14.97MB"))
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_query_hist_1 "
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_hist_1 "
                                                  "--scratch_dirs={scratch_dir}:5G",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     tmp_dir_placeholders=['scratch_dir'],
                                     disable_log_buffering=True)
   def test_select(self, vector):
@@ -1152,16 +903,21 @@ class TestQueryLogTableBufferPool(TestQueryLogTableBase):
           "was zero, test did not assert anything"
 
 
-class TestQueryLogQueuedQueries(CustomClusterTestSuite):
+class TestQueryLogQueuedQueries(WorkloadManagementTestSuite):
   """Simulates a cluster that is under load and has queries that are queueing in
      admission control."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestQueryLogQueuedQueries, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
 
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_config_args(
           fs_allocation_file="fair-scheduler-one-query.xml",
           llama_site_file="llama-site-one-query.xml",
           additional_args="--query_log_write_interval_s=5"),
-      impalad_graceful_shutdown=True, workload_mgmt=True,
+      workload_mgmt=True,
       num_exclusive_coordinators=1, cluster_size=2,
       default_query_options=[('fetch_rows_timeout_ms', '1000')])
   def test_query_queued(self):
@@ -1231,6 +987,183 @@ class TestQueryLogQueuedQueries(CustomClusterTestSuite):
           "completed_queries", is_insert_query_queryid_success)
     assert retry(func=find_completed_insert_query, max_attempts=10, sleep_time_s=1,
                  backoff=1)
+
+
+class TestQueryLogTableFlush(CustomClusterTestSuite):
+  """Tests to assert the query log table flush correctly under some shutdown
+  scenario. They are separated from others because test may stop impalad individually.
+  This test class does not extend from WorkloadManagementTestSuite because it must not
+  wait until workload management is idle to begin graceful shutdown."""
+
+  FLUSH_MAX_RECORDS_CLUSTER_ID = "test_query_log_flush_max_records_" + str(int(time()))
+  FLUSH_MAX_RECORDS_QUERY_COUNT = 30
+
+  def setup_method(self, method):
+    super(TestQueryLogTableFlush, self).setup_method(method)
+    self.wait_for_wm_init_complete()
+
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_max_queued={0} "
+                                                 "--query_log_write_interval_s=9999 "
+                                                 "--cluster_id={1} "
+                                                 "--query_log_expression_limit=5000"
+                                                 .format(FLUSH_MAX_RECORDS_QUERY_COUNT,
+                                                 FLUSH_MAX_RECORDS_CLUSTER_ID),
+                                    default_query_options=[
+                                      ('statement_expression_limit', 1024)],
+                                    workload_mgmt=True,
+                                    disable_log_buffering=True)
+  def test_flush_on_queued_count_exceeded(self):
+    """Asserts that queries that have completed are written to the query log table when
+       the maximum number of queued records is reached. Also verifies that writing
+       completed queries is not limited by default statement_expression_limit."""
+
+    impalad = self.cluster.get_first_impalad()
+    client = impalad.service.create_hs2_client()
+
+    rand_str = "{0}-{1}".format(client.get_test_protocol(), time())
+
+    test_sql = "select '{0}','{1}'".format(rand_str,
+        self.FLUSH_MAX_RECORDS_CLUSTER_ID)
+    test_sql_assert = "select '{0}', count(*) from {1} where sql='{2}'".format(
+        rand_str, QUERY_TBL_LOG, test_sql.replace("'", r"\'"))
+
+    for _ in range(0, self.FLUSH_MAX_RECORDS_QUERY_COUNT):
+      res = client.execute(test_sql)
+      assert res.success
+
+    # Running this query results in the number of queued completed queries to exceed
+    # the max and thus all completed queries will be written to the query log table.
+    res = client.execute(test_sql_assert)
+    assert res.success
+    assert 1 == len(res.data)
+    assert "0" == res.data[0].split("\t")[1]
+
+    # Wait until the completed queries have all been written out because the max queued
+    # count was exceeded.
+    impalad.service.wait_for_metric_value(
+        "impala-server.completed-queries.max-records-writes", 1, 60)
+    self.cluster.get_first_impalad().service.wait_for_metric_value(
+        "impala-server.completed-queries.written",
+        self.FLUSH_MAX_RECORDS_QUERY_COUNT + 1, 60)
+
+    # Force Impala to process the inserts to the completed queries table.
+    client.execute("refresh " + QUERY_TBL_LOG)
+
+    # This query will remain queued due to the long write interval and max queued
+    # records limit not being reached.
+    res = client.execute(r"select count(*) from {0} where sql like 'select \'{1}\'%'"
+        .format(QUERY_TBL_LOG, rand_str))
+    assert res.success
+    assert 1 == len(res.data)
+    assert str(self.FLUSH_MAX_RECORDS_QUERY_COUNT + 1) == res.data[0]
+    impalad.service.wait_for_metric_value(
+        "impala-server.completed-queries.queued", 2, 60)
+
+    assert impalad.service.get_metric_value(
+        "impala-server.completed-queries.max-records-writes") == 1
+    assert impalad.service.get_metric_value(
+        "impala-server.completed-queries.scheduled-writes") == 0
+    assert impalad.service.get_metric_value("impala-server.completed-queries.written") \
+        == self.FLUSH_MAX_RECORDS_QUERY_COUNT + 1
+    assert impalad.service.get_metric_value(
+        "impala-server.completed-queries.queued") == 2
+
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=15",
+                                    workload_mgmt=True,
+                                    disable_log_buffering=True)
+  def test_flush_on_interval(self):
+    """Asserts that queries that have completed are written to the query log table
+       after the specified write interval elapses."""
+
+    impalad = self.cluster.get_first_impalad()
+    client = impalad.service.create_hs2_client()
+
+    query_count = 10
+
+    for i in range(query_count):
+      res = client.execute("select sleep(1000)")
+      assert res.success
+
+    # Wait for at least one iteration of the workload management processing loop to write
+    # to the completed queries table.
+    self.cluster.get_first_impalad().service.wait_for_metric_value(
+      "impala-server.completed-queries.written", query_count, 20)
+
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=9999 "
+                                                 "--shutdown_grace_period_s=0 "
+                                                 "--shutdown_deadline_s=15 "
+                                                 "--debug_actions="
+                                                 "WM_SHUTDOWN_DELAY:SLEEP@5000",
+                                    workload_mgmt=True,
+                                    disable_log_buffering=True)
+  def test_flush_on_shutdown(self):
+    """Asserts that queries that have completed but are not yet written to the query
+       log table are flushed to the table before the coordinator exits. Graceful shutdown
+       for 2nd coordinator not needed because query_log_write_interval_s is very long."""
+
+    impalad = self.cluster.get_first_impalad()
+    client = impalad.service.create_hs2_client()
+
+    # Execute sql statements to ensure all get written to the query log table.
+    sql1 = client.execute("select 1")
+    assert sql1.success
+
+    sql2 = client.execute("select 2")
+    assert sql2.success
+
+    sql3 = client.execute("select 3")
+    assert sql3.success
+
+    impalad.service.wait_for_metric_value("impala-server.completed-queries.queued", 3,
+        60)
+
+    impalad.kill_and_wait_for_exit(SIGRTMIN)
+    self.assert_impalad_log_contains("INFO", r'Workload management shutdown successful',
+      timeout_s=60)
+
+    with self.cluster.impalads[1].service.create_hs2_client() as client2:
+      def assert_func():
+        results = client2.execute("select query_id,sql from {0} where query_id in "
+                                  "('{1}','{2}','{3}')".format(QUERY_TBL_LOG,
+                                  sql1.query_id, sql2.query_id, sql3.query_id))
+
+        return len(results.data) == 3
+
+      assert retry(func=assert_func, max_attempts=5, sleep_time_s=3)
+
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=9999 "
+                                                 "--shutdown_grace_period_s=0 "
+                                                 "--query_log_shutdown_timeout_s=3 "
+                                                 "--shutdown_deadline_s=15 "
+                                                 "--debug_actions="
+                                                 "WM_SHUTDOWN_DELAY:SLEEP@10000",
+                                    workload_mgmt=True,
+                                    disable_log_buffering=True)
+  def test_shutdown_flush_timed_out(self):
+    """Asserts that queries that have completed but are not yet written to the query
+       log table are lost if the completed queries queue drain takes too long and that
+       the coordinator logs the estimated number of queries lost."""
+
+    impalad = self.cluster.get_first_impalad()
+    client = impalad.service.create_hs2_client()
+
+    # Execute sql statements to ensure all get written to the query log table.
+    sql1 = client.execute("select 1")
+    assert sql1.success
+
+    sql2 = client.execute("select 2")
+    assert sql2.success
+
+    sql3 = client.execute("select 3")
+    assert sql3.success
+
+    impalad.service.wait_for_metric_value("impala-server.completed-queries.queued", 3,
+        60)
+
+    impalad.kill_and_wait_for_exit(SIGRTMIN)
+    self.assert_impalad_log_contains("INFO", r"Workload management shutdown timed out. "
+      r"Up to '3' queries may have been lost",
+      timeout_s=60)
 
 
 # Helper function to determine if a query from the debug UI is a workload management

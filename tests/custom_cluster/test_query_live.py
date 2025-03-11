@@ -23,13 +23,20 @@ from getpass import getuser
 from signal import SIGRTMIN
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_cluster import DEFAULT_KRPC_PORT
-from tests.common.impala_connection import FINISHED, PENDING
+from tests.common.impala_connection import ERROR, FINISHED, PENDING
+from tests.common.test_vector import HS2
 from tests.util.workload_management import assert_query, redaction_rules_file
 from time import sleep
 
 
 class TestQueryLive(CustomClusterTestSuite):
-  """Tests to assert the query live table is correctly populated."""
+  """Tests to assert the query live table is correctly populated.
+  This test class does not extend from WorkloadManagementTestSuite due to long
+  --query_log_write_interval_s requirement in most test method."""
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
 
   def setup_method(self, method):
     super(TestQueryLive, self).setup_method(method)
@@ -74,9 +81,9 @@ class TestQueryLive(CustomClusterTestSuite):
         assert False, "did not find host {}".format(host)
     assert len(actual_hosts) == 0, "did not find all expected hosts"
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_query_live_hs2(self):
     """Asserts the query live table shows and allows filtering queries. Uses the hs2
@@ -88,9 +95,9 @@ class TestQueryLive(CustomClusterTestSuite):
     assert_query('sys.impala_query_live', self.hs2_client, 'test_query_live',
                  result1.runtime_profile)
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_query_live(self):
     """Asserts the query live table shows and allows filtering queries. Uses the default
@@ -186,11 +193,11 @@ class TestQueryLive(CustomClusterTestSuite):
     self.execute_query_expect_success(self.client, 'drop table sys.impala_query_live')
 
   # Must come directly after "drop table sys.impala_query_live"
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
                                                  "--cluster_id=test_query_live "
                                                  "--use_local_catalog=true",
-                                    catalogd_args="--enable_workload_mgmt "
-                                                  "--catalog_topic_mode=minimal",
+                                    catalogd_args="--catalog_topic_mode=minimal",
+                                    workload_mgmt=True,
                                     default_query_options=[
                                       ('default_transactional_type', 'insert_only')],
                                     disable_log_buffering=True)
@@ -203,11 +210,11 @@ class TestQueryLive(CustomClusterTestSuite):
                  result.runtime_profile)
     self.assert_describe_extended()
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
                                                  "--cluster_id=test_query_live "
                                                  "--use_local_catalog=true",
-                                    catalogd_args="--enable_workload_mgmt "
-                                                  "--catalog_topic_mode=minimal",
+                                    catalogd_args="--catalog_topic_mode=minimal",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_local_catalog(self):
     """Asserts the query live table works with local catalog mode."""
@@ -216,12 +223,11 @@ class TestQueryLive(CustomClusterTestSuite):
     assert_query('sys.impala_query_live', self.client, 'test_query_live',
                  result.runtime_profile)
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
                                                  "--cluster_id=test_query_live "
                                                  "--redaction_rules_file={}"
                                                  .format(redaction_rules_file()),
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_redaction(self):
     """Asserts the query live table table redacts the statement."""
@@ -231,9 +237,9 @@ class TestQueryLive(CustomClusterTestSuite):
     assert_query('sys.impala_query_live', self.client, 'test_query_live',
                  result.runtime_profile)
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_alter(self):
     """Asserts alter works on query live table."""
@@ -267,9 +273,9 @@ class TestQueryLive(CustomClusterTestSuite):
     select_column2 = self.execute_query('select * from sys.impala_query_live')
     assert len(select_column2.data) > 1
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
+                                    workload_mgmt=True,
                                     cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     disable_log_buffering=True)
@@ -301,17 +307,21 @@ class TestQueryLive(CustomClusterTestSuite):
     client2.close_query(handle2)
     client2.close()
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
+                                    workload_mgmt=True,
                                     cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     disable_log_buffering=True)
   def test_executor_groups(self):
     """Asserts scans are performed only on coordinators with multiple executor groups."""
     # Add a (non-dedicated) coordinator and executor in a different executor group.
-    self._start_impala_cluster(options=['--impalad_args=--executor_groups=extra',
-                                        '--impalad_args=--cluster_id=test_query_live'],
+    self._start_impala_cluster(options=['--impalad_args=--executor_groups=extra '
+                                        '--enable_workload_mgmt '
+                                        '--query_log_write_interval_s=300 '
+                                        '--shutdown_grace_period_s=0 '
+                                        '--shutdown_deadline_s=15 '
+                                        '--cluster_id=test_query_live '],
                                cluster_size=1,
                                add_executors=True,
                                expected_num_impalads=4)
@@ -322,9 +332,9 @@ class TestQueryLive(CustomClusterTestSuite):
     assert len(result.data) == 1
     self.assert_only_coordinators(result.runtime_profile, coords=[0, 1], execs=[2, 3])
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_query_entries_are_unique(self):
     """Asserts queries in the query live table are unique."""
@@ -364,9 +374,9 @@ class TestQueryLive(CustomClusterTestSuite):
     client2.close_query(handle2)
     client2.close()
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
+                                                 "--cluster_id=test_query_live ",
+                                    workload_mgmt=True,
                                     cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     disable_log_buffering=True)
@@ -377,10 +387,13 @@ class TestQueryLive(CustomClusterTestSuite):
     handle = self.execute_query_async(query, query_options={
         'debug_action': 'AC_BEFORE_ADMISSION:SLEEP@3000'})
 
-    # Wait for query to compile and assign ranges, then kill impalad during debug delay.
+    # Wait for query to compile and assign ranges, then kill impalad
+    # in non-graceful manner during debug delay.
     self.client.wait_for_impala_state(handle, PENDING, 3)
     self.cluster.impalads[1].kill()
 
+    # Wait for query to pass admission control before fetching.
+    self.client.wait_for_any_impala_state(handle, [FINISHED, ERROR], 60)
     result = self.client.fetch(query, handle)
     assert len(result.data) == 1
     expected_message = 'is no longer available for system table scan assignment'
@@ -389,9 +402,9 @@ class TestQueryLive(CustomClusterTestSuite):
 
     self.close_query(handle)
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
                                                  "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_shutdown_coordinator(self):
     """Asserts query fails if a coordinator disappears after scheduling. Depends on
@@ -404,19 +417,24 @@ class TestQueryLive(CustomClusterTestSuite):
     self.client.wait_for_impala_state(handle, PENDING, 3)
     # Ensure enough time for scheduling to assign ranges.
     sleep(1)
-    # Kill impalad during debug delay.
+    # Kill impalad in non-graceful manner during debug delay.
     self.cluster.impalads[1].kill()
 
     try:
+      # Wait for query to pass admission control before fetching.
+      self.client.wait_for_any_impala_state(handle, [FINISHED, ERROR], 60)
       self.client.fetch(query, handle)
       assert False, "fetch should fail"
     except Exception as e:
       assert "Network error: Client connection negotiation failed" in str(e)
-    # Beeswax client closes the query on failure.
+    # client closes the query on failure.
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
+                                                 "--cluster_id=test_query_live "
+                                                 # Override flag set by
+                                                 # workload_mgmt arg.
+                                                 "--shutdown_grace_period_s=120",
+                                    workload_mgmt=True,
                                     disable_log_buffering=True)
   def test_graceful_shutdown_coordinator(self):
     """Asserts query succeeds if another coordinator is shutdown gracefully after
@@ -445,11 +463,8 @@ class TestQueryLive(CustomClusterTestSuite):
     assert len(shutdown.data) == 2
     self.assert_impalads(shutdown.runtime_profile, present=[0, 2], absent=[1])
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--query_log_write_interval_s=1 "
-                                                 "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
-                                    impalad_graceful_shutdown=True,
+  @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_live ",
+                                    workload_mgmt=True,
                                     cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     disable_log_buffering=True)
@@ -482,9 +497,9 @@ class TestQueryLive(CustomClusterTestSuite):
     # in scans.
     self.assert_fragment_instances(result.runtime_profile, [3, 2, 2])
 
-  @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
-                                                 "--cluster_id=test_query_live",
-                                    catalogd_args="--enable_workload_mgmt",
+  @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=300 "
+                                                 "--cluster_id=test_query_live ",
+                                    workload_mgmt=True,
                                     cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     disable_log_buffering=True)

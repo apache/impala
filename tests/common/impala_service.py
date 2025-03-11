@@ -116,7 +116,8 @@ class BaseImpalaService(object):
   def wait_for_metric_value(self, metric_name, expected_value, timeout=10, interval=1,
       allow_greater=False):
     start_time = time()
-    while (time() - start_time < timeout):
+    total_wait = 0
+    while (total_wait < timeout):
       LOG.info("Getting metric: %s from %s:%s" %
           (metric_name, self.hostname, self.webserver_port))
       value = None
@@ -127,21 +128,22 @@ class BaseImpalaService(object):
 
       # if allow_greater is True we wait until the metric value becomes >= the expected
       # value.
-      if allow_greater:
-        if value >= expected_value:
-          LOG.info("Metric '%s' has reached desired value: %s" % (metric_name, value))
-          return value
-      elif value == expected_value:
-        LOG.info("Metric '%s' has reached desired value: %s" % (metric_name, value))
+      if (value == expected_value) or (allow_greater and value >= expected_value):
+        LOG.info("Metric '{0}' has reached desired value: {1}. total_wait: {2}s".format(
+          metric_name, value, total_wait))
         return value
       else:
-        LOG.info("Waiting for metric value '%s'%s%s. Current value: %s" %
-            (metric_name, '>=' if allow_greater else '=', expected_value, value))
+        LOG.info("Waiting for metric value '{0}'{1}{2}. Current value: {3}. "
+                 "total_wait: {4}s".format(
+                   metric_name, ('>=' if allow_greater else '='), expected_value, value,
+                   total_wait))
       LOG.info("Sleeping %ds before next retry." % interval)
       sleep(interval)
+      total_wait = time() - start_time
 
     LOG.info("Metric {0} did not reach value {1} in {2}s. Actual value was '{3}'. "
-        "Failing...".format(metric_name, expected_value, timeout, value))
+             "total_wait: {4}s. Failing...".format(
+               metric_name, expected_value, timeout, value, total_wait))
     self.__metric_timeout_assert(metric_name, expected_value, timeout, value)
 
   def __request_minidump(self, pid):

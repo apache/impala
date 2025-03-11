@@ -29,7 +29,7 @@ import time
 import requests
 from getpass import getuser
 from random import choice
-from signal import SIGKILL
+from signal import SIGKILL, SIGRTMIN
 from subprocess import check_call, check_output
 from time import sleep
 
@@ -279,6 +279,14 @@ class ImpalaCluster(object):
     if msg:
       raise RuntimeError(msg)
 
+  def graceful_shutdown_impalads(self):
+    # Refresh cluster in case cluster has changed.
+    self.refresh()
+    for impalad in self.impalads:
+      impalad.kill(SIGRTMIN)
+    for impalad in self.impalads:
+      impalad.wait_for_exit()
+
   def __build_impala_process_lists(self):
     """
     Gets all the running Impala procs (with start arguments) on the machine.
@@ -500,9 +508,9 @@ class Process(object):
       LOG.info("Starting container: {0}".format(self.container_id))
       check_call(["docker", "container", "start", self.container_id])
 
-  def restart(self):
+  def restart(self, signal=SIGKILL):
     """Kills and restarts the process"""
-    self.kill()
+    self.kill(signal=signal)
     self.wait_for_exit()
     self.start()
 
@@ -632,8 +640,8 @@ class ImpaladProcess(BaseImpalaProcess):
     """Waits for client ports to be opened. Assumes that the webservice ports are open."""
     start_time = time.time()
     LOG.info(
-        "Waiting for coordinator client services " +
-        "- hs2 port: %d hs2-http port: %d beeswax port: %d",
+        "Waiting for coordinator client services "
+        + "- hs2 port: %d hs2-http port: %d beeswax port: %d",
         self.service.hs2_port, self.service.hs2_http_port, self.service.beeswax_port)
     while time.time() - start_time < CLUSTER_WAIT_TIMEOUT_IN_SECONDS:
       beeswax_port_is_open = self.service.beeswax_port_is_open()
@@ -752,7 +760,7 @@ def find_user_processes(binaries):
     except KeyError as e:
       if "uid not found" not in str(e):
         raise
-    except psutil.NoSuchProcess as e:
+    except psutil.NoSuchProcess:
       # Ignore the case when a process no longer exists.
       pass
 

@@ -30,7 +30,6 @@ import subprocess
 from glob import glob
 from impala_py_lib.helpers import find_all_files, is_core_dump
 from re import search
-from signal import SIGRTMIN
 from subprocess import check_call
 from tests.common.file_utils import cleanup_tmp_test_dir, make_tmp_test_dir
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -69,11 +68,6 @@ IMPALAD_TIMEOUT_S = 'impalad_timeout_s'
 EXPECT_CORES = 'expect_cores'
 # Additional arg to determine whether we should reset the Ranger policy repository.
 RESET_RANGER = 'reset_ranger'
-# By default, Impalad processes are left running at the end of the test. The next test run
-# terminates the processes when calling the `bin/start-impala-cluster.py`` script. Setting
-# this to `True` causes Impalad processes to be sent the SIGRTMIN signal at the end of the
-# test which runs the Impalad shutdown steps instead of abruptly ending the process.
-IMPALAD_GRACEFUL_SHUTDOWN = 'impalad_graceful_shutdown'
 # Decorator key to support temporary dir creation.
 TMP_DIR_PLACEHOLDERS = 'tmp_dir_placeholders'
 # Indicates if a failure to start is acceptable or not. If set to `True` and the cluster
@@ -94,6 +88,15 @@ ACCEPT_FORMATTING = set([IMPALAD_ARGS, CATALOGD_ARGS, IMPALA_LOG_DIR])
 DEFAULT_STATESTORE_ARGS = ('--statestore_update_frequency_ms=50 '
                            '--statestore_priority_update_frequency_ms=50 '
                            '--statestore_heartbeat_frequency_ms=50')
+
+# Additional flags appended to impalad_args if workload_mgmt=True.
+# IMPALA-13051: Add faster default graceful shutdown options before processing
+# explicit args. Impala doesn't start graceful shutdown until the grace period
+# has passed, and most tests that use graceful shutdown are testing flushing
+# the query log, which doesn't start until after the grace period has passed.
+WORKLOAD_MGMT_IMPALAD_FLAGS = (
+  '--enable_workload_mgmt=true --query_log_write_interval_s=1 '
+  '--shutdown_grace_period_s=0 --shutdown_deadline_s=60 ')
 
 
 class CustomClusterTestSuite(ImpalaTestSuite):
@@ -155,7 +158,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       impala_log_dir=None, hive_conf_dir=None, cluster_size=None,
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
       impalad_timeout_s=None, expect_cores=None, reset_ranger=False,
-      impalad_graceful_shutdown=False, tmp_dir_placeholders=[],
+      tmp_dir_placeholders=[],
       expect_startup_fail=False, disable_log_buffering=False, log_symlinks=False,
       workload_mgmt=False):
     """Records arguments to be passed to a cluster by adding them to the decorated
@@ -191,8 +194,6 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       args[EXPECT_CORES] = expect_cores
     if reset_ranger:
       args[RESET_RANGER] = True
-    if impalad_graceful_shutdown:
-      args[IMPALAD_GRACEFUL_SHUTDOWN] = True
     if tmp_dir_placeholders:
       args[TMP_DIR_PLACEHOLDERS] = tmp_dir_placeholders
     if expect_startup_fail:
@@ -280,18 +281,17 @@ class CustomClusterTestSuite(ImpalaTestSuite):
           del cls.TMP_DIRS[name]
         cls.make_tmp_dir(name)
 
-    if args.get(IMPALAD_GRACEFUL_SHUTDOWN, False):
-      # IMPALA-13051: Add faster default graceful shutdown options before processing
-      # explicit args. Impala doesn't start graceful shutdown until the grace period has
-      # passed, and most tests that use graceful shutdown are testing flushing the query
-      # log, which doesn't start until after the grace period has passed.
-      cluster_args.append(
-          "--impalad=--shutdown_grace_period_s=0 --shutdown_deadline_s=15")
     impala_daemons = [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS, ADMISSIOND_ARGS]
     for arg in (impala_daemons + [JVM_ARGS]):
       val = ''
+      if args.get(WORKLOAD_MGMT, False):
+        if arg == CATALOGD_ARGS:
+          val += '--enable_workload_mgmt=true '
+        if arg == IMPALAD_ARGS:
+          val += WORKLOAD_MGMT_IMPALAD_FLAGS
       if arg in impala_daemons and disable_log_buffering:
         val += '--logbuflevel=-1 '
+      # append this the very last so it can override anything above.
       if arg in args:
         val += (args[arg] if arg not in ACCEPT_FORMATTING
                else args[arg].format(**cls.TMP_DIRS))
@@ -339,10 +339,6 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if IMPALAD_TIMEOUT_S in args:
       kwargs[IMPALAD_TIMEOUT_S] = args[IMPALAD_TIMEOUT_S]
 
-    if args.get(WORKLOAD_MGMT, False):
-      if IMPALAD_ARGS or CATALOGD_ARGS in args:
-        kwargs[WORKLOAD_MGMT] = True
-
     if args.get(EXPECT_CORES, False):
       # Make a note of any core files that already exist
       possible_cores = find_all_files('*core*')
@@ -384,11 +380,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   @classmethod
   def cluster_teardown(cls, name, args):
-    if args.get(IMPALAD_GRACEFUL_SHUTDOWN, False):
-      for impalad in cls.cluster.impalads:
-        impalad.kill(SIGRTMIN)
-      for impalad in cls.cluster.impalads:
-        impalad.wait_for_exit()
+    if args.get(WORKLOAD_MGMT, False):
+      cls.cluster.graceful_shutdown_impalads()
 
     cls.clear_tmp_dirs()
 
@@ -436,6 +429,20 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         assert retry(func=exists_func, max_attempts=max_attempts, sleep_time_s=3,
             backoff=1), "Did not find table '{}' in local catalog of coordinator " \
             "'{}:{}'.".format(tbl, coord.hostname, coord.get_webserver_port())
+
+  def wait_for_wm_idle(self, coordinators=[], timeout_s=370):
+    """Wait until workload management worker in each coordinator becomes idle.
+    The 'timeout_s' is applied on each coordinator wait. Default 'timeout_s' is:
+      query_log_dml_exec_timeout_s * query_log_max_insert_attempts + 10 = 370
+    It is intentionally set high to avoid HMS deadlock in the event of slow insert
+    followed by ungraceful shutdown (IMPALA-13842)."""
+    if not coordinators:
+      # Refresh cluster in case cluster has changed.
+      self.cluster.refresh()
+      coordinators = self.cluster.get_all_coordinators()
+    for coord in coordinators:
+      coord.service.wait_for_metric_value(
+        "impala-server.completed-queries.queued", 0, timeout=timeout_s, interval=1)
 
   @classmethod
   def _stop_impala_cluster(cls):
@@ -532,8 +539,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                             impalad_timeout_s=60,
                             ignore_pid_on_log_rotation=False,
                             wait_for_backends=True,
-                            log_symlinks=False,
-                            workload_mgmt=False):
+                            log_symlinks=False):
     cls.impala_log_dir = impala_log_dir
     # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
     # certain custom startup arguments work and we want to keep them independent of dev
@@ -562,10 +568,6 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if pytest.config.option.use_local_catalog:
       cmd.append("--impalad_args=--use_local_catalog=1")
       cmd.append("--catalogd_args=--catalog_topic_mode=minimal")
-
-    if workload_mgmt:
-      cmd.append("--impalad_args=--enable_workload_mgmt=true")
-      cmd.append("--catalogd_args=--enable_workload_mgmt=true")
 
     default_query_option_kvs = []
     # Put any defaults first, then any arguments after that so they can override defaults.
