@@ -1014,7 +1014,7 @@ Status ParquetSchemaResolver::GenerateFieldIDs() {
         DCHECK(current_child.children.size() == 1);
 
         nodes.push(&current_child.children[0]);
-      } else {
+      } else if (current_child.children.size() > 0) {
         nodes.push(&current_child);
       }
     }

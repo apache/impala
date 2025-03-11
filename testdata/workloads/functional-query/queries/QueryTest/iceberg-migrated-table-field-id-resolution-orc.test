@@ -1,0 +1,51 @@
+====
+---- QUERY
+# Regression test for IMPALA-13853. We should still be able to read ORC file
+# if starting columns match the schema.
+create table mig_add_column_orc(i int) partitioned by (p int) stored as orc;
+====
+---- HIVE_QUERY
+insert into $DATABASE.mig_add_column_orc partition(p=2) values (1);
+====
+---- QUERY
+alter table mig_add_column_orc add column j int;
+alter table mig_add_column_orc convert to iceberg;
+select * from mig_add_column_orc;
+---- RESULTS
+1,NULL,2
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+# Regression test for IMPALA-13853. We should still be able to read ORC file
+# if starting columns match the schema.
+create table mig_drop_column_orc(i int, j int) partitioned by (p int) stored as orc;
+====
+---- HIVE_QUERY
+insert into $DATABASE.mig_drop_column_orc partition(p=2) values (1, 100);
+====
+---- QUERY
+alter table mig_drop_column_orc drop column j;
+alter table mig_drop_column_orc convert to iceberg;
+select * from mig_drop_column_orc;
+---- RESULTS
+1,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Regression test for IMPALA-13853. We should reject ORC files that have mis-matching
+# schema
+create table mig_wrong_type_orc(i int, s string) partitioned by (p int) stored as orc;
+====
+---- HIVE_QUERY
+insert into $DATABASE.mig_wrong_type_orc partition(p=2) values (1, 'IMPALA');
+====
+---- QUERY
+alter table mig_wrong_type_orc drop column s;
+alter table mig_wrong_type_orc add column j int;
+alter table mig_wrong_type_orc convert to iceberg;
+select * from mig_wrong_type_orc;
+---- CATCH
+table column INT is map to column string in ORC file
+====

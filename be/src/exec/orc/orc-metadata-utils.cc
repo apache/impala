@@ -348,7 +348,10 @@ Status OrcSchemaResolver::GenerateFieldIDs() {
 
       // Push children in reverse order to the stack so they are processed in the original
       // order
-      nodes.push(current->getSubtype(size - i - 1));
+      const orc::Type* reverseOrderChild = current->getSubtype(size - i - 1);
+      if (reverseOrderChild->getSubtypeCount() > 0) {
+        nodes.push(reverseOrderChild);
+      }
     }
 
     if (current == root_ && !nodes.empty()) {

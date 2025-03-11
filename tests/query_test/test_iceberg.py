@@ -269,6 +269,9 @@ class TestIcebergTable(IcebergTestSuite):
                                         "iceberg_migrated_complex_test_orc", "orc")
     self.run_test_case('QueryTest/iceberg-migrated-table-field-id-resolution',
                        vector, unique_database)
+    if IS_HDFS:
+      self.run_test_case('QueryTest/iceberg-migrated-table-field-id-resolution-orc',
+          vector, unique_database)
 
   def test_column_case_sensitivity(self, vector, unique_database):
     create_iceberg_table_from_directory(self.client, unique_database,

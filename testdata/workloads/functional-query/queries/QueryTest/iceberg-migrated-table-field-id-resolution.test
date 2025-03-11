@@ -206,3 +206,41 @@ select my_map_4.key, my_map_4.value from iceberg_migrated_complex_test_orc, iceb
 ---- TYPES
 INT, INT
 ====
+---- QUERY
+# Regression test for IMPALA-13853. We should still be able to read Parquet file
+# if starting columns match the schema.
+create table mig_add_column(i int) partitioned by (p int) stored as parquet;
+insert into mig_add_column partition(p) values (1, 2);
+alter table mig_add_column add column j int;
+alter table mig_add_column convert to iceberg;
+select * from mig_add_column;
+---- RESULTS
+1,NULL,2
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+# Regression test for IMPALA-13853. We should still be able to read Parquet file
+# if starting columns match the schema.
+create table mig_drop_column(i int, j int) partitioned by (p int) stored as parquet;
+insert into mig_drop_column partition(p) values (1, 100, 2);
+alter table mig_drop_column drop column j;
+alter table mig_drop_column convert to iceberg;
+select * from mig_drop_column;
+---- RESULTS
+1,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Regression test for IMPALA-13853. We should reject Parquet files that have mis-matching
+# schema
+create table mig_wrong_type(i int, s string) partitioned by (p int) stored as parquet;
+insert into mig_wrong_type partition(p) values (1, 'IMPALA', 2);
+alter table mig_wrong_type drop column s;
+alter table mig_wrong_type add column j int;
+alter table mig_wrong_type convert to iceberg;
+select * from mig_wrong_type;
+---- CATCH
+has an incompatible Parquet schema for column
+====
