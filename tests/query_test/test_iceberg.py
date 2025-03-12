@@ -1697,6 +1697,12 @@ class TestIcebergV2Table(IcebergTestSuite):
     assert hive_output == \
         "2,true,1,11,1.1,2.222,123.321,2022-02-22,impala\n"
 
+  def test_large_scale_deletes(self, vector, unique_database):
+    if vector.get_value('exec_option')['disable_optimized_iceberg_v2_read'] == 1:
+      pytest.skip("Only test the optimized v2 operator")
+    self.run_test_case('QueryTest/iceberg-large-scale-deletes', vector,
+        unique_database)
+
   @SkipIfFS.hive
   def test_delete_hive_read(self, vector, unique_database):
     ice_delete = unique_database + ".ice_delete"

@@ -1,0 +1,25 @@
+====
+---- QUERY
+# Regression test for IMPALA-13854.
+create table range_5_million (i bigint) stored by iceberg
+tblproperties('format-version'='2');
+with v            as (values (0 as x), (1), (2), (3), (4), (5), (6), (7), (8), (9)),
+     v10          as (select 10*x as x from v),
+     v100         as (select 10*x as x from v10),
+     v1000        as (select 10*x as x from v100),
+     v10000       as (select 10*x as x from v1000),
+     v100000      as (select 10*x as x from v10000),
+     v1000000     as (select 10*x as x from v100000),
+     range_i   as (select v1000000.x + v100000.x + v10000.x + v1000.x + v100.x + v10.x + v.x as i
+                   from v1000000, v100000, v10000, v1000, v100, v10, v)
+insert into range_5_million select i from range_i where i < 5000000;
+delete from range_5_million where i > 0;
+====
+---- QUERY
+SET MEM_LIMIT=60m;
+select count(*) from range_5_million;
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====

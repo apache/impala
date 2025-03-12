@@ -169,6 +169,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
       fragment_instance_id_(fragment_instance_id),
       dest_node_id_(dest_node_id),
       is_local_(is_local) {
+    row_batch_capacity_ = CalculateRowBatchCapacity();
     DCHECK(IsResolvedAddress(address_));
   }
 
@@ -378,8 +379,6 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
 
 Status KrpcDataStreamSender::Channel::Init(
     RuntimeState* state, const shared_ptr<CharMemTrackerAllocator>& allocator) {
-  row_batch_capacity_ = CalculateRowBatchCapacity();
-
   // Create a DataStreamService proxy to the destination.
   RETURN_IF_ERROR(DataStreamService::GetProxy(address_, hostname_, &proxy_));
 
