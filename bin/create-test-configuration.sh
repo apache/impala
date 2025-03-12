@@ -132,6 +132,9 @@ rm -f authz-provider.ini
 # Generate hive configs first so that schemaTool can be used to init the metastore schema
 # if needed
 
+# Set IMPALA_JAVA_TOOL_OPTIONS to allow passing it to Tez containers.
+. $IMPALA_HOME/bin/set-impala-java-tool-options.sh
+
 $IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site.xml
 export HIVE_VARIANT=changed_external_dir
 $IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site_ext.xml

@@ -34,6 +34,9 @@ RESTART_SERVICE=1
 
 CLUSTER_BIN=${IMPALA_HOME}/testdata/bin
 
+. $IMPALA_HOME/bin/set-impala-java-tool-options.sh
+export JAVA_TOOL_OPTIONS="$IMPALA_JAVA_TOOL_OPTIONS ${JAVA_TOOL_OPTIONS-}"
+
 if ${CLUSTER_DIR}/admin is_kerberized; then
     # Making a kerberized cluster... set some more environment variables.
     . ${MINIKDC_ENV}

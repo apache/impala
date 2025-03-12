@@ -285,49 +285,11 @@ do
 
     # Add Jamm as javaagent for CatalogdMetaProviderTest.testWeights
     JAMM_JAR=$(compgen -G ${IMPALA_HOME}/fe/target/dependency/jamm-*.jar)
+    PREV_JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS-}"
     export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS-} -javaagent:${JAMM_JAR}"
 
-    if $JAVA -version 2>&1 | grep -q -E ' version "(9|[1-9][0-9])\.'; then
-      # If running with Java 9+, add-opens to JAVA_TOOL_OPTIONS for
-      # CatalogdMetaProviderTest.testWeights with ehcache.sizeof.
-      JAVA_OPTIONS=" --add-opens=java.base/java.io=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.lang.invoke=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.lang.module=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.lang.ref=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.lang=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.net=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.nio.charset=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.nio.file.attribute=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.nio=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.security=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.util.concurrent=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.util.jar=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.util.regex=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.util.zip=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/java.util=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.loader=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.math=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.module=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.perf=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.platform=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.platform.cgroupv1=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/jdk.internal.util.jar=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/sun.net.www.protocol.jar=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=java.base/sun.nio.fs=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.beans=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.linker.support=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.linker=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.support=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=jdk.management.jfr/jdk.management.jfr=ALL-UNNAMED"
-      JAVA_OPTIONS+=" --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED"
-      export JAVA_TOOL_OPTIONS="$JAVA_OPTIONS ${JAVA_TOOL_OPTIONS-}"
-    fi
+    . $IMPALA_HOME/bin/set-impala-java-tool-options.sh
+    export JAVA_TOOL_OPTIONS="$IMPALA_JAVA_TOOL_OPTIONS ${JAVA_TOOL_OPTIONS-}"
 
     MVN_ARGS=""
     if [[ "${TARGET_FILESYSTEM}" == "s3" ]]; then
@@ -356,6 +318,9 @@ do
       start_impala_cluster
     fi
     popd
+
+    # Restore old (likely empty) JAVA_TOOL_OPTIONS to avoid polluting other tests.
+    export JAVA_TOOL_OPTIONS=$PREV_JAVA_TOOL_OPTIONS
   fi
 
   if [[ "$EE_TEST" == true ]]; then

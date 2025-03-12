@@ -272,9 +272,17 @@ if [[ $ARCH_NAME == 'aarch64' ]]; then
           libncurses5-dev libreadline-dev
 fi
 
+ubuntu sudo update-java-alternatives -l || true
+
 # Configure the default Java version to be the version we selected.
-ubuntu sudo update-java-alternatives -s \
+ubuntu sudo update-java-alternatives -v -s \
     java-1.${UBUNTU_JAVA_VERSION}.0-openjdk-${UBUNTU_PACKAGE_ARCH}
+
+# update-java-alternatives may not take effect if there is a Java in PATH
+which java
+java -version
+which javac
+javac -version
 
 redhat sudo yum install -y file gawk gcc gcc-c++ git krb5-devel krb5-server \
         krb5-workstation libevent-devel libffi-devel make openssl-devel cyrus-sasl \

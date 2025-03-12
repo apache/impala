@@ -485,4 +485,18 @@ public class TestUtils {
   public static String getRandomString(int size) {
     return RandomStringUtils.randomAlphanumeric(size);
   }
+
+  public static int getJavaMajorVersion() {
+    String version = System.getProperty("java.version");
+    if(version.startsWith("1.")) {
+        version = version.substring(2, 3);
+    } else {
+        int dot = version.indexOf(".");
+        if (dot != -1) { version = version.substring(0, dot); }
+    }
+    int result = Integer.parseInt(version);
+    // Impala tests shouldn't see java version < 8.
+    Preconditions.checkState(result >= 8);
+    return result;
+  }
 }

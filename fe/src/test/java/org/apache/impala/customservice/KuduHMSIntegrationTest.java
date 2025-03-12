@@ -25,7 +25,10 @@ import org.apache.impala.analysis.AuditingKuduTest;
 import org.apache.impala.analysis.ParserTest;
 import org.apache.impala.analysis.ToSqlTest;
 import org.apache.impala.customservice.CustomServiceRunner;
+import org.apache.impala.testutil.TestUtils;
+
 import org.junit.AfterClass;
+import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
@@ -56,7 +59,11 @@ public class KuduHMSIntegrationTest {
       envp.removeIf(s -> s.startsWith("JAVA_HOME="));
       envp.add("JAVA=" + altJavaHome + "/bin/java");
       envp.add("JAVA_HOME=" + altJavaHome);
+    } else if (TestUtils.getJavaMajorVersion() >= 17) {
+      // Skip loading libjsig (IMPALA-13856).
+      envp.removeIf(s -> s.startsWith("LD_PRELOAD="));
     }
+
     int exitVal = CustomServiceRunner.RestartMiniclusterComponent(
         "kudu", envp.toArray(new String[envp.size()]));
     assertEquals(0, exitVal);

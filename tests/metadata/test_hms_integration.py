@@ -25,6 +25,7 @@
 
 from __future__ import absolute_import, division, print_function
 from builtins import range
+import os
 import pytest
 import random
 import string
@@ -788,10 +789,14 @@ class TestHmsIntegration(ImpalaTestSuite):
         # Modify HMS table metadata again, change the type of column 'y' back to INT.
         self.run_stmt_in_hive('alter table %s change y y int' % table_name)
         # Neither Hive 2 and 3, nor Impala converts STRINGs to INTs implicitly.
+        err_msg = ("{0}org.apache.hadoop.io.Text cannot be "
+                  "cast to {0}org.apache.hadoop.io.IntWritable")
+        # The error message is different in newer Javas than in 17
+        # TODO: find out which version changed it exactly
+        err_msg = err_msg.format(
+            "class " if os.environ.get('IMPALA_JDK_VERSION_NUM') >= 17 else "")
         self.assert_sql_error(
-            self.run_stmt_in_hive, 'select * from %s' % table_name,
-            'org.apache.hadoop.io.Text cannot be '
-            'cast to org.apache.hadoop.io.IntWritable')
+            self.run_stmt_in_hive, 'select * from %s' % table_name, err_msg)
         self.client.execute('invalidate metadata %s' % table_name)
         self.assert_sql_error(
             self.client.execute, 'select * from %s' % table_name,

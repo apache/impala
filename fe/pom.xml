@@ -790,6 +790,8 @@ under the License.
                  * LD_LIBRARY_PATH needs to include the GCC libraries that libfesupport.so
                    was built against.
                  * LD_PRELOAD needs to include libjsig.so for JVM/native signal handling.
+                   TODO(IMPALA-13856): remove libjsig.so if possible as it causes issues
+                                       with Java 17
             -->
             <LD_LIBRARY_PATH>
               ${env.IMPALA_TOOLCHAIN_PACKAGES_HOME}/gcc-${env.IMPALA_GCC_VERSION}/lib64

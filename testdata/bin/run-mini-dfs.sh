@@ -31,6 +31,9 @@ else
   SHOULD_FORMAT=false
 fi
 
+. $IMPALA_HOME/bin/set-impala-java-tool-options.sh
+export JAVA_TOOL_OPTIONS="$IMPALA_JAVA_TOOL_OPTIONS ${JAVA_TOOL_OPTIONS-}"
+
 # Kill and clean data for a clean start.
 $IMPALA_HOME/testdata/bin/kill-mini-dfs.sh
 

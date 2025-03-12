@@ -20,9 +20,10 @@
 from __future__ import absolute_import, division, print_function
 import os
 
-hive_major_version = int(os.environ['IMPALA_HIVE_VERSION'][0])
-kerberize = os.environ.get('IMPALA_KERBERIZE') == 'true'
-variant = os.environ.get('HIVE_VARIANT')
+HIVE_MAJOR_VERSION = int(os.environ['IMPALA_HIVE_VERSION'][0])
+KERBERIZE = os.environ.get('IMPALA_KERBERIZE') == 'true'
+VARIANT = os.environ.get('HIVE_VARIANT')
+IMPALA_JAVA_TOOL_OPTIONS=os.environ.get("IMPALA_JAVA_TOOL_OPTIONS")
 
 CONFIG = {
   'dfs.replication': '3'
@@ -71,24 +72,24 @@ CONFIG.update({
   'hive.metastore.partitions.parameters.exclude.pattern': '""',
 })
 
-if variant == 'changed_external_dir':
+if VARIANT == 'changed_external_dir':
   CONFIG.update({
     'hive.metastore.warehouse.external.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse-external',
   })
-elif variant == 'ranger_auth':
+elif VARIANT == 'ranger_auth':
   CONFIG.update({
     'hive.security.authorization.manager':
         'org.apache.ranger.authorization.hive.authorizer.RangerHiveAuthorizerFactory',
     'hive.metastore.pre.event.listeners':
         'org.apache.hadoop.hive.ql.security.authorization.plugin.metastore.HiveMetaStoreAuthorizer',
   })
-elif variant == 'events_cleanup':
+elif VARIANT == 'events_cleanup':
   # HMS configs needed for regression test for IMPALA-11028
   CONFIG.update({
     'hive.metastore.event.db.listener.timetolive': '60s',
     'hive.metastore.event.db.listener.clean.interval': '10s'
   })
-elif variant == 'housekeeping_on':
+elif VARIANT == 'housekeeping_on':
   # HMS configs needed for regression test for IMPALA-12827
   CONFIG.update({
     'hive.metastore.housekeeping.threads.on': 'true',
@@ -100,7 +101,7 @@ CONFIG.update({
   'hive.cluster.delegation.token.store.zookeeper.connectString': '${INTERNAL_LISTEN_HOST}:2181',
 })
 
-if kerberize:
+if KERBERIZE:
   CONFIG.update({
    'hive.server2.authentication.kerberos.keytab': '${KRB5_KTNAME}',
    'hive.server2.authentication.kerberos.principal': '${MINIKDC_PRINC_HIVE}',
@@ -119,7 +120,7 @@ if kerberize:
   #   hive.metastore.kerberos.principal
 
 # Enable Tez, ACID and proleptic Gregorian calendar DATE types for Hive 3
-if hive_major_version >= 3:
+if HIVE_MAJOR_VERSION >= 3:
   CONFIG.update({
    'hive.execution.engine': 'tez',
    'hive.tez.container.size': '512',
@@ -128,6 +129,9 @@ if hive_major_version >= 3:
    'tez.ignore.lib.uris': 'true',
    'tez.use.cluster.hadoop-libs': 'true',
    'tez.am.tez-ui.webservice.port-range': '32000-32100',
+
+   'tez.task.launch.cluster-default.cmd-opts': IMPALA_JAVA_TOOL_OPTIONS,
+   'tez.am.launch.cluster-default.cmd-opts': IMPALA_JAVA_TOOL_OPTIONS,
 
    # Some of the tests change the columns in a incompatible manner
    # (eg. string to timestamp) this is disallowed by default in Hive-3 which causes
@@ -211,7 +215,7 @@ CONFIG.update({
   'iceberg.catalog.ice_hadoop_cat.warehouse': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse/ice_hadoop_cat',
 })
 
-if variant == 'without_hms_config':
+if VARIANT == 'without_hms_config':
   CONFIG.clear()
 
 # Database and JDO-related configs:
