@@ -221,6 +221,7 @@ class TestQueryLive(CustomClusterTestSuite):
                                                  "--redaction_rules_file={}"
                                                  .format(redaction_rules_file()),
                                     catalogd_args="--enable_workload_mgmt",
+                                    impalad_graceful_shutdown=True,
                                     disable_log_buffering=True)
   def test_redaction(self):
     """Asserts the query live table table redacts the statement."""
