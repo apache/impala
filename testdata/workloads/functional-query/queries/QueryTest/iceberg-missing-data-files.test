@@ -65,7 +65,6 @@ describe formatted missing_files_part
 '','NULL','NULL'
 '# Detailed Table Information','NULL','NULL'
 'OwnerType:          ','USER                ','NULL'
-'Erasure Coding Policy:','NONE                ','NULL'
 'Table Type:         ','EXTERNAL_TABLE      ','NULL'
 'Table Parameters:','NULL','NULL'
 '','EXTERNAL            ','TRUE                '
