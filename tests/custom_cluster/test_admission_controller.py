@@ -2035,11 +2035,13 @@ class TestAdmissionController(TestAdmissionControllerBase):
         additional_args="--expected_executor_group_sets=root.group-set-small:1,"
                         "root.group-set-large:2 "
                         "--num_expected_executors=2 --executor_groups=coordinator"),
+        impalad_graceful_shutdown=True,
         statestored_args=_STATESTORED_ARGS)
   def test_coord_only_pool_exec_groups(self, vector):
     """Asserts queries using only coordinators request pools can run successfully when
        executor groups are configured."""
     self.wait_for_wm_init_complete()
+    executor_flags = '--shutdown_grace_period_s=0 --shutdown_deadline_s=60 '
 
     # Assert queries can be run when no executors are started.
     self.__run_assert_systables_query(vector)
@@ -2053,7 +2055,8 @@ class TestAdmissionController(TestAdmissionControllerBase):
     expected_num_impalads += 1
     self._start_impala_cluster(
         options=[
-            "--impalad_args=--executor_groups=root.group-set-small-group-000:1"],
+            "--impalad_args=--executor_groups=root.group-set-small-group-000:1 "
+            + executor_flags],
         add_executors=True,
         cluster_size=1,
         expected_subscribers=expected_subscribers,
@@ -2065,12 +2068,15 @@ class TestAdmissionController(TestAdmissionControllerBase):
     expected_num_impalads += 2
     self._start_impala_cluster(
         options=[
-            "--impalad_args=--executor_groups=root.group-set-small-group-000:2"],
+            "--impalad_args=--executor_groups=root.group-set-small-group-000:2 "
+            + executor_flags],
         add_executors=True,
         cluster_size=2,
         expected_subscribers=expected_subscribers,
         expected_num_impalads=expected_num_impalads)
     self.__run_assert_systables_query(vector)
+    # Refresh cluster to include those two new impalad for graceful shutdown.
+    self.cluster.refresh()
 
 
 class TestAdmissionControllerWithACService(TestAdmissionController):

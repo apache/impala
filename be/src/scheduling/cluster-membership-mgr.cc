@@ -58,7 +58,10 @@ void RemoveExecutorAndGroup(const BackendDescriptorPB& be_desc,
     const ExecutorGroupDescPB& group,
     ClusterMembershipMgr::ExecutorGroups* executor_groups) {
   auto it = executor_groups->find(group.name());
-  DCHECK(it != executor_groups->end());
+  if (it == executor_groups->end()) {
+    VLOG(1) << "Group \"" << group.name() << "\" is not found";
+    return;
+  }
   DCHECK_EQ(group.name(), it->second.name());
   it->second.RemoveExecutor(be_desc);
   if (it->second.NumExecutors() == 0) {
