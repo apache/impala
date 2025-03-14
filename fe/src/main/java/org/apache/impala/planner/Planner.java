@@ -166,6 +166,7 @@ public class Planner {
       ctx_.getTimeline().markEvent("Runtime filters computed");
 
       checkAndOverrideMinmaxFilterThresholdAndLevel(ctx_.getQueryOptions());
+      reduceCardinalityByRuntimeFilter(rootFragment, ctx_);
     }
 
     rootFragment.verifyTree();
@@ -308,7 +309,8 @@ public class Planner {
    * return a single-node, distributed, or parallel plan depending on the query and
    * configuration.
    */
-  public List<PlanFragment> createPlans() throws ImpalaException {
+  public List<PlanFragment> createPlans(TQueryExecRequest result)
+      throws ImpalaException {
     List<PlanFragment> distrPlan = createPlanFragments();
     Preconditions.checkNotNull(distrPlan);
     if (useParallelPlan(ctx_)) {
@@ -318,11 +320,17 @@ public class Planner {
     } else {
       distrPlan = Collections.singletonList(distrPlan.get(0));
     }
+
+    // Compute the processing cost and adjust fragment parallelism
+    // The TupleCachePlanner uses the processing cost and fragment parallelism, so
+    // this needs to happen first.
+    computeProcessingCost(distrPlan, result, ctx_);
+
     // TupleCachePlanner comes last, because it needs to compute the eligibility of
     // various locations in the PlanNode tree. Runtime filters and other modifications
     // to the tree can change this, so this comes after all those modifications are
     // complete.
-    if (useTupleCache(ctx_)) {
+    if (useTupleCache(ctx_.getQueryOptions())) {
       TupleCachePlanner cachePlanner = new TupleCachePlanner(ctx_);
       distrPlan = cachePlanner.createPlans(distrPlan);
       ctx_.getTimeline().markEvent("Tuple caching plan created");
@@ -345,8 +353,15 @@ public class Planner {
   }
 
   // Return true if ENABLE_TUPLE_CACHE=true
-  public static boolean useTupleCache(PlannerContext planCtx) {
-    return planCtx.getQueryOptions().isEnable_tuple_cache();
+  public static boolean useTupleCache(TQueryOptions queryOptions) {
+    return queryOptions.isEnable_tuple_cache();
+  }
+
+  // Return true if the processing cost has been computed. This is true for
+  // COMPUTE_PROCESSING_COST=true and ENABLE_TUPLE_CACHE=true
+  public static boolean isProcessingCostAvailable(TQueryOptions queryOptions) {
+    return queryOptions.isCompute_processing_cost() ||
+        useTupleCache(queryOptions);
   }
 
   /**
@@ -548,12 +563,11 @@ public class Planner {
    * computation.
    */
   public static void reduceCardinalityByRuntimeFilter(
-      List<PlanFragment> planRoots, PlannerContext planCtx) {
+      PlanFragment rootFragment, PlannerContext planCtx) {
     double reductionScale = planCtx.getRootAnalyzer()
                                 .getQueryOptions()
                                 .getRuntime_filter_cardinality_reduction_scale();
     if (reductionScale <= 0) return;
-    PlanFragment rootFragment = planRoots.get(0);
     Stack<PlanNode> nodeStack = new Stack<>();
     rootFragment.getPlanRoot().reduceCardinalityByRuntimeFilter(
         nodeStack, reductionScale);
@@ -572,7 +586,7 @@ public class Planner {
     List<PlanFragment> postOrderFragments = new ArrayList<>();
     boolean testCostCalculation = queryOptions.isEnable_replan()
         && (RuntimeEnv.INSTANCE.isTestEnv() || queryOptions.isTest_replan());
-    if (queryOptions.isCompute_processing_cost() || testCostCalculation) {
+    if (isProcessingCostAvailable(queryOptions) || testCostCalculation) {
       postOrderFragments = rootFragment.getNodesPostOrder();
       for (PlanFragment fragment : postOrderFragments) {
         fragment.computeCostingSegment(queryOptions);

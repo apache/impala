@@ -744,14 +744,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    */
   public String getFragmentHeaderString(String firstLinePrefix, String detailPrefix,
       TQueryOptions queryOptions, TExplainLevel explainLevel) {
-    boolean isComputeCost = queryOptions.isCompute_processing_cost();
+    boolean adjustsInstanceCount = queryOptions.isCompute_processing_cost();
     boolean useMTFragment = Planner.useMTFragment(queryOptions);
     StringBuilder builder = new StringBuilder();
     builder.append(String.format("%s%s:PLAN FRAGMENT [%s]", firstLinePrefix,
         fragmentId_.toString(), dataPartition_.getExplainString()));
     builder.append(PrintUtils.printNumHosts(" ", getNumNodes()));
     builder.append(PrintUtils.printNumInstances(" ", getNumInstances()));
-    if (isComputeCost && originalInstanceCount_ != getNumInstances()) {
+    if (adjustsInstanceCount && originalInstanceCount_ != getNumInstances()) {
       builder.append(" (adjusted from " + originalInstanceCount_ + ")");
     }
     builder.append("\n");
@@ -807,7 +807,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       builder.append(perInstanceExplainString);
       builder.append("\n");
     }
-    if (isComputeCost && rootSegment_ != null
+    if (Planner.isProcessingCostAvailable(queryOptions) && rootSegment_ != null
         && explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       // Print processing cost.
       builder.append(detailPrefix);

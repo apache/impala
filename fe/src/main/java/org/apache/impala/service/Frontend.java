@@ -2031,16 +2031,14 @@ public class Frontend {
    */
   private TQueryExecRequest createExecRequest(
       Planner planner, PlanCtx planCtx) throws ImpalaException {
+    TQueryExecRequest result = new TQueryExecRequest();
     TQueryCtx queryCtx = planner.getQueryCtx();
-    List<PlanFragment> planRoots = planner.createPlans();
+    List<PlanFragment> planRoots = planner.createPlans(result);
     if (planCtx.planCaptureRequested()) {
       planCtx.plan_ = planRoots;
     }
 
     // Compute resource requirements of the final plans.
-    TQueryExecRequest result = new TQueryExecRequest();
-    Planner.reduceCardinalityByRuntimeFilter(planRoots, planner.getPlannerCtx());
-    Planner.computeProcessingCost(planRoots, result, planner.getPlannerCtx());
     Planner.computeResourceReqs(planRoots, queryCtx, result,
         planner.getPlannerCtx(), planner.getAnalysisResult().isQueryStmt());
 

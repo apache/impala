@@ -388,7 +388,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       expBuilder.append(nodeResourceProfile_.getExplainString());
       expBuilder.append("\n");
 
-      if (queryOptions.isCompute_processing_cost() && processingCost_.isValid()
+      if (Planner.isProcessingCostAvailable(queryOptions) && processingCost_.isValid()
           && detailLevel.ordinal() >= TExplainLevel.VERBOSE.ordinal()) {
         // Print processing cost.
         expBuilder.append(processingCost_.getExplainString(detailPrefix, false));
@@ -421,7 +421,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       } else {
         expBuilder.append(PrintUtils.printEstCardinality(cardinality_));
       }
-      if (queryOptions.isCompute_processing_cost()) {
+      if (Planner.isProcessingCostAvailable(queryOptions)) {
         // Show processing cost total.
         expBuilder.append(" cost=");
         if (processingCost_.isValid()) {
@@ -1412,6 +1412,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       // Leaf node, add query options hash.
       tupleCacheInfo_.hashThrift("Query options hash", queryOptsHash);
     }
+    tupleCacheInfo_.calculateCostInformation(this);
     tupleCacheInfo_.finalizeHash();
     LOG.trace("Hash for {}:", this);
     for (HashTraceElement elem : tupleCacheInfo_.getHashTraces()) {

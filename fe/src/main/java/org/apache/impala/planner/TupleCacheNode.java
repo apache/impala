@@ -45,32 +45,37 @@ public class TupleCacheNode extends PlanNode {
   protected boolean displayCorrectnessCheckingInfo_;
   protected boolean skipCorrectnessVerification_;
   protected final List<Integer> inputScanNodeIds_ = new ArrayList<Integer>();
+  protected final TupleCacheInfo childTupleCacheInfo_;
 
   public TupleCacheNode(PlanNodeId id, PlanNode child,
       boolean displayCorrectnessCheckingInfo) {
     super(id, "TUPLE CACHE");
     addChild(child);
     cardinality_ = child.getCardinality();
+    if (child.getFilteredCardinality() != cardinality_) {
+      setFilteredCardinality(child.getFilteredCardinality());
+    }
     limit_ = child.limit_;
 
-    TupleCacheInfo childCacheInfo = child.getTupleCacheInfo();
-    Preconditions.checkState(childCacheInfo.isEligible());
-    compileTimeKey_ = childCacheInfo.getHashString();
+    childTupleCacheInfo_ = child.getTupleCacheInfo();
+    Preconditions.checkState(childTupleCacheInfo_.isEligible());
+    compileTimeKey_ = childTupleCacheInfo_.getHashString();
     // If there is variability due to a streaming agg, skip the correctness verification
     // for this location.
-    skipCorrectnessVerification_ = childCacheInfo.getStreamingAggVariability();
+    skipCorrectnessVerification_ = childTupleCacheInfo_.getStreamingAggVariability();
     displayCorrectnessCheckingInfo_ = displayCorrectnessCheckingInfo;
-    for (HdfsScanNode scanNode : childCacheInfo.getInputScanNodes()) {
+    for (HdfsScanNode scanNode : childTupleCacheInfo_.getInputScanNodes()) {
       // Inputs into the tuple cache need to use deterministic scan range assignment
       scanNode.setDeterministicScanRangeAssignment(true);
       inputScanNodeIds_.add(scanNode.getId().asInt());
     }
+    computeTupleIds();
   }
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {
     super.init(analyzer);
-    computeTupleIds();
+    Preconditions.checkState(conjuncts_.isEmpty());
   }
 
   @Override
@@ -128,6 +133,7 @@ public class TupleCacheNode extends PlanNode {
         inputScanNodeIds_.stream().map(Object::toString).collect(Collectors.toList());
     output.append(detailPrefix + "input scan node ids: " +
         String.join(",", input_scan_node_ids_strs) + "\n");
+    output.append(childTupleCacheInfo_.getCostExplainString(detailPrefix));
     return output.toString();
   }
 
