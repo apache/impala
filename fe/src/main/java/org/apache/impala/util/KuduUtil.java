@@ -390,7 +390,7 @@ public class KuduUtil {
   }
 
   public static boolean isSupportedKeyType(org.apache.impala.catalog.Type type) {
-    return type.isIntegerType() || type.isStringType() || type.isTimestamp()
+    return type.isFixedPointType() || type.isStringType() || type.isTimestamp()
         || type.isDate();
   }
 

@@ -665,3 +665,45 @@ select id, int_col, auto_incrementing_id from non_unique_key_create_tbl15 order 
 ---- TYPES
 INT,INT,BIGINT
 ====
+---- QUERY
+# Create Kudu table with decimal primary key and range partitions.
+create table decimal_partitioned_tbl
+  (c1 decimal(10,4) primary key, c2 decimal(15,5), c3 decimal(1,1))
+partition by range (c1) (partition values <= 0.2000, partition 0.2000 < values <= 0.7575,
+  partition 0.7575 < values)
+stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+show range partitions decimal_partitioned_tbl
+---- RESULTS
+'VALUES < 0.2001'
+'0.2001 <= VALUES < 0.7576'
+'VALUES >= 0.7576'
+---- TYPES
+STRING
+====
+---- QUERY
+insert into decimal_partitioned_tbl
+  select c1, c2, c3 from functional.decimal_tiny order by c1 asc limit 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 10
+NumRowErrors: 0
+====
+---- QUERY
+select c1, c2, c3 from decimal_partitioned_tbl order by c1 asc
+---- RESULTS
+0.0000,100.00000,0.0
+0.1111,101.22222,0.1
+0.2222,102.44444,0.2
+0.3333,103.66666,0.3
+0.4444,104.88888,0.4
+0.5555,106.11110,0.5
+0.6666,107.33332,0.6
+0.7777,108.55554,0.7
+0.8888,109.77776,0.8
+0.9999,110.99998,0.9
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL
+====

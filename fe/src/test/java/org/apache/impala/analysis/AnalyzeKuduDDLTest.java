@@ -247,6 +247,10 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "(partition value = 1, partition value = 'abc', partition 3 <= values) " +
         "stored as kudu", "Range partition value 'abc' (type: STRING) is not type " +
         "compatible with partitioning column 'a' (type: INT).", isExternalPurgeTbl);
+    AnalysisError("create table tab (a int primary key) partition by range (a) " +
+        "(partition value = 1.2, partition value = 2) stored as kudu",
+        "Range partition value 1.2 (type: DECIMAL(2,1)) is not type compatible with " +
+        "partitioning column 'a' (type: INT).", isExternalPurgeTbl);
     AnalysisError("create table tab (a tinyint primary key) partition by range (a) " +
         "(partition value = 128) stored as kudu", "Range partition value 128 " +
         "(type: SMALLINT) is not type compatible with partitioning column 'a' " +
@@ -263,9 +267,16 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "(partition value = 9223372036854775808) stored as kudu", "Range partition " +
         "value 9223372036854775808 (type: DECIMAL(19,0)) is not type compatible with " +
         "partitioning column 'a' (type: BIGINT)", isExternalPurgeTbl);
+    AnalysisError("create table tab (a decimal(18,2) primary key)" +
+        "partition by range (a) (partition value = 0.1234) stored as kudu",
+        "Range partition value 0.1234 (type: DECIMAL(4,4)) is not type compatible with " +
+        "partitioning column 'a' (type: DECIMAL(18,2))", isExternalPurgeTbl);
     // Test implicit casting/folding of partition values.
     AnalyzesOk("create table tab (a int primary key) partition by range (a) " +
         "(partition value = false, partition value = true) stored as kudu",
+        isExternalPurgeTbl);
+    AnalyzesOk("create table tab (a decimal(18,2) primary key) partition by range (a) " +
+        "(partition value = 0, partition 0 < values <= 0.1) stored as kudu",
         isExternalPurgeTbl);
     // Non-key column used in PARTITION BY
     AnalysisError("create table tab (a int, b string, c bigint, primary key (a)) " +
@@ -278,6 +289,11 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "range (a) (partition value = 1.2, partition value = 2) stored as kudu",
         "Range partition value 1.2 (type: DECIMAL(2,1)) is not type compatible with " +
         "partitioning column 'a' (type: INT).", isExternalPurgeTbl);
+    // Decimal range partition values
+    AnalyzesOk("create table tab (a decimal(8,2), b int, c int, primary key (a, b))" +
+        "partition by hash (a, b) partitions 8, " +
+        "range (a) (partition 0 < values < 1.23, partition 1.23 <= values)" +
+        "stored as kudu", isExternalPurgeTbl);
     // Non-existing column used in PARTITION BY
     AnalysisError("create table tab (a int, b int, primary key (a, b)) " +
         "partition by range(unknown_column) (partition value = 'abc') stored as kudu",
