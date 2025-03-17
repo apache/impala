@@ -126,7 +126,8 @@ static void ParseImpalaOptions(const StringVal& options, Document& document,
   if (document.Parse(reinterpret_cast<const char*>(options.ptr), options.len)
           .HasParseError()) {
     std::stringstream ss;
-    ss << "Error parsing impala options: " << reinterpret_cast<const char*>(options.ptr)
+    ss << "Error parsing impala options: "
+       << string(reinterpret_cast<const char*>(options.ptr), options.len)
        << ", error code: " << document.GetParseError() << ", offset input "
        << document.GetErrorOffset();
     throw std::runtime_error(ss.str());
