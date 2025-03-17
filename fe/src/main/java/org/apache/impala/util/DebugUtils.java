@@ -104,6 +104,10 @@ public class DebugUtils {
   // test failure for IMPALA-13126.
   public static final String MOCK_WRITE_LOCK_FAILURE = "mock_write_lock_failure";
 
+  // debug action lable inside CatalogServiceCatalog.reset() Db loop section that hold
+  // the write lock.
+  public static final String RESET_METADATA_LOOP_LOCKED = "reset_metadata_loop_locked";
+
   /**
    * Returns true if the label of action is set in the debugActions
    */

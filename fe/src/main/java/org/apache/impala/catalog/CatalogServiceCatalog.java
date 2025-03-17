@@ -28,7 +28,6 @@ import static org.apache.impala.service.CatalogOpExecutor.FETCHED_HMS_TABLE;
 import static org.apache.impala.service.CatalogOpExecutor.FETCHED_LATEST_HMS_EVENT_ID;
 import static org.apache.impala.service.CatalogOpExecutor.GOT_TABLE_READ_LOCK;
 import static org.apache.impala.service.CatalogOpExecutor.GOT_TABLE_WRITE_LOCK;
-import static org.apache.impala.thrift.TCatalogObjectType.DATABASE;
 import static org.apache.impala.thrift.TCatalogObjectType.HDFS_PARTITION;
 import static org.apache.impala.thrift.TCatalogObjectType.TABLE;
 
@@ -132,7 +131,6 @@ import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TSetEventProcessorStatusResponse;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TSystemTableName;
-import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableType;
@@ -2327,6 +2325,9 @@ public class CatalogServiceCatalog extends Catalog {
             newDbCache.put(dbName, invalidatedDb.first);
             tblsToBackgroundLoad.addAll(invalidatedDb.second);
           }
+
+          DebugUtils.executeDebugAction(BackendConfig.INSTANCE.debugActions(),
+              DebugUtils.RESET_METADATA_LOOP_LOCKED);
         }
       }
       dbCache_.set(newDbCache);
@@ -3573,10 +3574,8 @@ public class CatalogServiceCatalog extends Catalog {
         // changed from active to standby, or from standby to active. Inactive catalogd
         // does not receive catalog topic updates from the statestore. To avoid waiting
         // indefinitely, throw exception if its service id has been changed.
-        if (!Strings.isNullOrEmpty(BackendConfig.INSTANCE.debugActions())) {
-          DebugUtils.executeDebugAction(
-              BackendConfig.INSTANCE.debugActions(), DebugUtils.WAIT_SYNC_DDL_VER_DELAY);
-        }
+        DebugUtils.executeDebugAction(
+            BackendConfig.INSTANCE.debugActions(), DebugUtils.WAIT_SYNC_DDL_VER_DELAY);
         if (!serviceId.equals(JniCatalog.getServiceId())) {
           String errorMsg = "Couldn't retrieve the catalog topic update for the " +
               "SYNC_DDL operation since HA role of this catalog instance has been " +

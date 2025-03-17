@@ -510,9 +510,13 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
 CatalogServer::CatalogServer(MetricGroup* metrics)
   : protocol_version_(CatalogServiceVersion::V2),
     thrift_iface_(new CatalogServiceThriftIf(this)),
-    thrift_serializer_(FLAGS_compact_catalog_topic), metrics_(metrics),
-    is_active_(!FLAGS_enable_catalogd_ha), is_ha_determined_(!FLAGS_enable_catalogd_ha),
-    topic_updates_ready_(false), last_sent_catalog_version_(0L),
+    thrift_serializer_(FLAGS_compact_catalog_topic),
+    metrics_(metrics),
+    is_active_(!FLAGS_enable_catalogd_ha),
+    is_ha_determined_(!FLAGS_enable_catalogd_ha),
+    topic_updates_ready_(false),
+    last_sent_catalog_version_(0L),
+    triggered_first_reset_(false),
     catalog_objects_max_version_(0L) {
   topic_processing_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
       CATALOG_SERVER_TOPIC_PROCESSING_TIMES);
@@ -552,7 +556,6 @@ Status CatalogServer::Start() {
   TNetworkAddress server_address = MakeNetworkAddress(FLAGS_hostname,
       FLAGS_catalog_service_port);
 
-  // This will trigger a full Catalog metadata load.
   catalog_.reset(new Catalog());
 #ifndef NDEBUG
   if (FLAGS_stress_catalog_startup_delay_ms > 0) {
@@ -562,6 +565,8 @@ Status CatalogServer::Start() {
   RETURN_IF_ERROR(Thread::Create("catalog-server", "catalog-update-gathering-thread",
       &CatalogServer::GatherCatalogUpdatesThread, this,
       &catalog_update_gathering_thread_));
+  RETURN_IF_ERROR(Thread::Create("catalog-server", "catalog-first-reset-metadata-thread",
+      &CatalogServer::TriggerResetMetadata, this, &catalog_first_reset_metadata_thread_));
   RETURN_IF_ERROR(Thread::Create("catalog-server", "catalog-metrics-refresh-thread",
       &CatalogServer::RefreshMetrics, this, &catalog_metrics_refresh_thread_));
 
@@ -596,7 +601,7 @@ Status CatalogServer::Start() {
   if (FLAGS_force_catalogd_active && !IsActive()) {
     // If both catalogd are started with 'force_catalogd_active' as true in short time,
     // the second election overwrite the first election. The one which registering with
-    // statstore first will be inactive.
+    // statestore first will be inactive.
     LOG(WARNING) << "Could not start CatalogD as active instance";
   }
 
@@ -714,17 +719,7 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
       // Clear pending topic updates.
       pending_topic_updates_.clear();
       if (FLAGS_catalogd_ha_reset_metadata_on_failover) {
-        // Reset all metadata when the catalogd becomes active.
-        TResetMetadataRequest req;
-        TResetMetadataResponse resp;
-        req.__set_header(TCatalogServiceRequestHeader());
-        req.header.__set_want_minimal_response(false);
-        req.__set_is_refresh(false);
-        req.__set_sync_ddl(false);
-        Status status = catalog_->ResetMetadata(req, &resp);
-        if (!status.ok()) {
-          LOG(ERROR) << "Failed to reset metadata triggered by catalogd failover.";
-        }
+        triggered_first_reset_ = false;
       } else {
         // Refresh DataSource objects when the catalogd becomes active.
         Status status = catalog_->RefreshDataSources();
@@ -755,19 +750,64 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
   is_ha_determined_ = true;
 }
 
+[[noreturn]] void CatalogServer::TriggerResetMetadata() {
+  while (true) {
+    bool must_reset = false;
+    {
+      unique_lock<mutex> unique_lock(catalog_lock_);
+      while (!must_reset) {
+        catalog_update_cv_.NotifyOne();
+        catalog_update_cv_.Wait(unique_lock);
+        must_reset = is_active_ && !triggered_first_reset_;
+      }
+    }
+
+    // Run ResetMetadata without holding 'catalog_lock_' so that it does not block
+    // gathering thread from starting. Note that gathering thread will still compete
+    // for CatalogServiceCatalog.versionLock_.writeLock() in JVM.
+    VLOG(1) << "Triggering first catalog invalidation.";
+    TResetMetadataRequest req;
+    TResetMetadataResponse resp;
+    req.__set_header(TCatalogServiceRequestHeader());
+    req.header.__set_want_minimal_response(true); // not using response. minimal is OK.
+    req.__set_is_refresh(false);
+    req.__set_sync_ddl(false);
+    Status status = catalog_->ResetMetadata(req, &resp);
+    if (!status.ok()) {
+      LOG(ERROR) << "Catalog server failed to run first catalog invalidation. "
+                 << "Please run 'invalidate metadata' manually.";
+    }
+    {
+      // Mark to true, regardless of status.
+      unique_lock<mutex> unique_lock(catalog_lock_);
+      triggered_first_reset_ = true;
+      catalog_update_cv_.NotifyOne();
+    }
+  }
+}
+
 bool CatalogServer::IsActive() {
   lock_guard<mutex> l(catalog_lock_);
   return is_active_;
 }
 
 [[noreturn]] void CatalogServer::GatherCatalogUpdatesThread() {
+  // catalog_topic_mode=minimal does not require initial reset to happen ahead of catalog
+  // update gathering because coordinator will request metadata on-demand.
+  bool require_initial_reset = FLAGS_catalog_topic_mode != "minimal";
   while (true) {
     unique_lock<mutex> unique_lock(catalog_lock_);
     // Protect against spurious wake-ups by checking the value of topic_updates_ready_.
     // It is only safe to continue on and update the shared pending_topic_updates_
     // when topic_updates_ready_ is false, otherwise we may be in the middle of
     // processing a heartbeat.
-    while (topic_updates_ready_) {
+    // If require_initial_reset is True, this thread need to let TriggerResetMetadata
+    // thread to proceed first.
+    while (topic_updates_ready_ || (require_initial_reset && !triggered_first_reset_)) {
+      if (!triggered_first_reset_) {
+        // Wake up TriggerResetMetadata thread.
+        catalog_update_cv_.NotifyOne();
+      }
       catalog_update_cv_.Wait(unique_lock);
     }
 
@@ -785,6 +825,8 @@ bool CatalogServer::IsActive() {
     } else if (current_catalog_version != last_sent_catalog_version_) {
       // If there has been a change since the last time the catalog was queried,
       // call into the Catalog to find out what has changed.
+      VLOG(2) << "Catalog version changed from " << last_sent_catalog_version_ << " to "
+              << current_catalog_version << ". Gathering catalog delta.";
       TGetCatalogDeltaResponse resp;
       status = catalog_->GetCatalogDelta(this, last_sent_catalog_version_, &resp);
       if (!status.ok()) {
@@ -796,6 +838,7 @@ bool CatalogServer::IsActive() {
 
     topic_processing_time_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     topic_updates_ready_ = true;
+    if (!triggered_first_reset_) catalog_update_cv_.NotifyOne();
   }
 }
 

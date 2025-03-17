@@ -210,6 +210,9 @@ class CatalogServer {
   IntGauge* num_hms_clients_idle_metric_;
   IntGauge* num_hms_clients_in_use_metric_;
 
+  /// Thread that polls and execute first reset metadata operation.
+  std::unique_ptr<Thread> catalog_first_reset_metadata_thread_;
+
   /// Thread that polls the catalog for any updates.
   std::unique_ptr<Thread> catalog_update_gathering_thread_;
 
@@ -253,8 +256,13 @@ class CatalogServer {
   /// Set in UpdateCatalogTopicCallback() and protected by the catalog_lock_.
   int64_t last_sent_catalog_version_;
 
+  /// Mark if the first metadata reset has been triggered.
+  /// Protected by the catalog_lock_.
+  bool triggered_first_reset_;
+
   /// The max catalog version in pending_topic_updates_. Set by the
   /// catalog_update_gathering_thread_ and protected by catalog_lock_.
+  /// Value -1 means catalog_update_gathering_thread_ has not set it.
   int64_t catalog_objects_max_version_;
 
   /// Called during each Statestore heartbeat and is responsible for updating the current
@@ -391,6 +399,10 @@ class CatalogServer {
   /// value) pairs, one for each Hadoop configuration value.
   void HadoopVarzHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
+
+  /// Thread method to issue first ResetMetadata request when this CatalogD becomes
+  /// active.
+  [[noreturn]] void TriggerResetMetadata();
 
   /// Indicates if the catalog has finished initialization. If last_sent_catalog_version_
   /// is greater than 0, returns `true`, otherwise returns `false`.

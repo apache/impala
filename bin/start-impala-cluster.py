@@ -205,6 +205,9 @@ parser.add_option("--use_calcite_planner", default="False", type="choice",
                   choices=["true", "True", "false", "False"],
                   help="If true, use the Calcite planner for query optimization "
                   "instead of the Impala planner")
+parser.add_option("--wait_num_table", default=1, type="int",
+                  help="If starting cluster, wait until coordinator's catalog.num-tables "
+                  "reach this value or more.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -1253,7 +1256,9 @@ if __name__ == "__main__":
       # https://issues.apache.org/jira/browse/IMPALA-13755
       expected_num_ready_impalads = options.cluster_size
       expected_cluster_size = options.cluster_size
-    impala_cluster.wait_until_ready(expected_cluster_size, expected_num_ready_impalads)
+    LOG.info("wait_num_table={}".format(options.wait_num_table))
+    impala_cluster.wait_until_ready(expected_cluster_size, expected_num_ready_impalads,
+                                    wait_num_table=options.wait_num_table)
   except Exception as e:
     LOG.exception("Error starting cluster")
     sys.exit(1)

@@ -204,7 +204,8 @@ class ImpalaCluster(object):
         client.close()
     return n
 
-  def wait_until_ready(self, expected_num_impalads=1, expected_num_ready_impalads=None):
+  def wait_until_ready(self, expected_num_impalads=1, expected_num_ready_impalads=None,
+                       wait_num_table=-1):
     """Waits for this 'cluster' to be ready to submit queries.
 
       A cluster is deemed "ready" if:
@@ -219,6 +220,7 @@ class ImpalaCluster(object):
       This information is retrieved by querying the statestore debug webpage
       and each individual impalad's metrics webpage.
     """
+    start_time = time.time()
     self.wait_for_num_impalads(expected_num_impalads)
 
     # TODO: fix this for coordinator-only nodes as well.
@@ -242,9 +244,16 @@ class ImpalaCluster(object):
 
     # Wait for coordinators to start.
     for impalad in self.impalads:
-      if impalad._get_arg_value("is_coordinator", default="true") != "true": continue
-      if impalad._get_arg_value("stress_catalog_init_delay_ms", default=0) != 0: continue
-      impalad.wait_for_coordinator_services(sleep_interval, check_processes_still_running)
+      # lookup /varz page. webserver should up already.
+      flags = impalad.service.get_flag_current_values()
+      if flags['is_coordinator'] != 'true':
+        continue
+      if flags['stress_catalog_init_delay_ms'] != '0':
+        continue
+      if flags['use_local_catalog'] != 'false':
+        wait_num_table = -1
+      impalad.wait_for_coordinator_services(sleep_interval, check_processes_still_running,
+                                            wait_num_table=wait_num_table)
       # Decrease sleep_interval after first coordinator ready as the others are also
       # likely to be (nearly) ready.
       sleep_interval = 0.2
@@ -257,6 +266,7 @@ class ImpalaCluster(object):
       impalad.service.wait_for_num_known_live_backends(expected_num_ready_impalads,
           timeout=CLUSTER_WAIT_TIMEOUT_IN_SECONDS, interval=sleep_interval,
           early_abort_fn=check_processes_still_running)
+    LOG.info("Total wait: {:.2f}s".format(time.time() - start_time))
 
   def wait_for_num_impalads(self, num_impalads, retries=10):
     """Checks that at least 'num_impalads' impalad processes are running, along with
@@ -553,7 +563,7 @@ class BaseImpalaProcess(Process):
     """Return the port for the webserver of this process."""
     return int(self._get_port('webserver_port', self._get_default_webserver_port()))
 
-  def set_jvm_log_level(self, class_name, level="info"):
+  def set_jvm_log_level(self, class_name, level="info"):  # noqa: U100
     """Helper method to set JVM log level for certain class name.
     Some daemon might not have JVM in it."""
     raise NotImplementedError()
@@ -638,7 +648,8 @@ class ImpaladProcess(BaseImpalaProcess):
       early_abort_fn()
       sleep(sleep_interval)
 
-  def wait_for_coordinator_services(self, sleep_interval, early_abort_fn):
+  def wait_for_coordinator_services(self, sleep_interval, early_abort_fn,
+                                    wait_num_table=-1):
     """Waits for client ports to be opened. Assumes that the webservice ports are open."""
     start_time = time.time()
     LOG.info(
@@ -649,17 +660,20 @@ class ImpaladProcess(BaseImpalaProcess):
       beeswax_port_is_open = self.service.beeswax_port_is_open()
       hs2_port_is_open = self.service.hs2_port_is_open()
       hs2_http_port_is_open = self.service.hs2_http_port_is_open()
-      if beeswax_port_is_open and hs2_port_is_open and hs2_http_port_is_open:
-        return
-      early_abort_fn()
-      # The coordinator is likely to wait for the catalog update. Fetch the number
-      # of catalog objects.
+      # Fetch the number of catalog objects.
       num_dbs, num_tbls = self.service.get_metric_values(
           ["catalog.num-databases", "catalog.num-tables"])
+      if (beeswax_port_is_open and hs2_port_is_open and hs2_http_port_is_open
+          and num_tbls >= wait_num_table):
+        return
+      early_abort_fn()
+      # The coordinator is likely to wait for the catalog update.
       LOG.info(("Client services not ready. Waiting for catalog cache: "
-          "({num_dbs} DBs / {num_tbls} tables). Trying again ...").format(
+          "({num_dbs} DBs / {num_tbls} tables / wait_num_table={wait_num_table}). "
+          "Trying again ...").format(
               num_dbs=num_dbs,
-              num_tbls=num_tbls))
+              num_tbls=num_tbls,
+              wait_num_table=wait_num_table))
       sleep(sleep_interval)
 
     raise RuntimeError(

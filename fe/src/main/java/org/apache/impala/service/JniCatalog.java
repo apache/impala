@@ -102,7 +102,6 @@ import org.apache.impala.util.NoOpEventSequence;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TUniqueIdUtil;
 import org.apache.impala.util.ThreadNameAnnotator;
-import org.apache.impala.util.TUniqueIdUtil;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -189,11 +188,7 @@ public class JniCatalog {
     catalog_.setCatalogMetastoreServer(catalogMetastoreServer_);
     catalogMetastoreServer_.start();
 
-    try {
-      catalog_.reset(NoOpEventSequence.INSTANCE);
-    } catch (CatalogException e) {
-      LOG.error("Error initializing Catalog. Please run 'invalidate metadata'", e);
-    }
+    // catalog-server.cc is responsible to call catalog_.reset() for the first time.
   }
 
   /**

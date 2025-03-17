@@ -153,7 +153,7 @@ class TestProcessFailures(CustomClusterTestSuite):
     # case the query status should include the failed (or unreachable) worker.
     query_id = client.handle_id(handle)
     error_state = "Failed due to unreachable impalad"
-    assert impalad.service.wait_for_query_status(client, query_id, error_state)
+    assert impalad.service.wait_for_query_status(query_id, error_state)
     assert error_msg_startswith(client.get_log(handle), error_state, query_id)
 
     # Assert that the query status on the query profile web page contains the expected

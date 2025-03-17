@@ -79,9 +79,10 @@ class BaseImpalaService(object):
   def read_debug_webpage(self, page_name, timeout=10, interval=1):
     return self.open_debug_webpage(page_name, timeout=timeout, interval=interval).text
 
-  def get_debug_webpage_json(self, page_name):
+  def get_debug_webpage_json(self, page_name, timeout=10, interval=1):
     """Returns the json for the given Impala debug webpage, eg. '/queries'"""
-    return json.loads(self.read_debug_webpage(page_name + "?json"))
+    return json.loads(self.read_debug_webpage(
+        page_name + "?json", timeout=timeout, interval=interval))
 
   def dump_debug_webpage_json(self, page_name, filename):
     """Dumps the json for a given Impalad debug webpage to the specified file.
@@ -101,18 +102,26 @@ class BaseImpalaService(object):
     if default_values is None:
       default_values = [None for m in metric_names]
     assert len(metric_names) == len(default_values)
-    metrics = json.loads(self.read_debug_webpage('jsonmetrics?json'))
+    metrics = self.get_debug_webpage_json('jsonmetrics')
     return [metrics.get(metric_name, default_value)
             for metric_name, default_value in zip(metric_names, default_values)]
 
   def get_flag_current_value(self, flag):
     """Returns the value of the the given flag name from the Impala /varz debug webpage.
     If the flag does not exist it returns None."""
-    varz = json.loads(self.read_debug_webpage("varz?json"))
+    varz = self.get_debug_webpage_json("varz")
     for var in varz.get("flags"):
       if var["name"] == flag:
         return var["current"]
     return None
+
+  def get_flag_current_values(self):
+    """Returns the value of all flags from the Impala /varz debug webpage."""
+    flags = dict()
+    varz = self.get_debug_webpage_json("varz")
+    for var in varz.get("flags"):
+      flags[var['name']] = var['current']
+    return flags
 
   def wait_for_metric_value(self, metric_name, expected_value, timeout=10, interval=1,
       allow_greater=False):
@@ -262,14 +271,15 @@ class ImpaladService(BaseImpalaService):
 
   def get_num_known_live_executors(self, timeout=30, interval=1,
       include_shutting_down=True):
-    return self.get_num_known_live_backends(include_shutting_down=include_shutting_down,
+    return self.get_num_known_live_backends(timeout=timeout, interval=interval,
+                                            include_shutting_down=include_shutting_down,
                                             only_executors=True)
 
   def get_num_known_live_backends(self, timeout=30, interval=1,
       include_shutting_down=True, only_coordinators=False, only_executors=False):
     LOG.debug("Getting num_known_live_backends from %s:%s" %
         (self.hostname, self.webserver_port))
-    result = json.loads(self.read_debug_webpage('backends?json', timeout, interval))
+    result = self.get_debug_webpage_json('backends', timeout, interval)
     count = 0
     for backend in result['backends']:
       if backend['is_quiescing'] and not include_shutting_down:
@@ -286,15 +296,15 @@ class ImpaladService(BaseImpalaService):
     group's executors."""
     LOG.debug("Getting executor groups from %s:%s" %
         (self.hostname, self.webserver_port))
-    result = json.loads(self.read_debug_webpage('backends?json', timeout, interval))
+    result = self.get_debug_webpage_json('backends', timeout, interval)
     groups = defaultdict(list)
     for backend in result['backends']:
       groups[backend['executor_groups']].append(backend['krpc_address'])
     return groups
 
-  def get_queries_json(self):
+  def get_queries_json(self, timeout=30, interval=1):
     """Return the full JSON from the /queries page."""
-    return json.loads(self.read_debug_webpage('queries?json', timeout=30, interval=1))
+    return self.get_debug_webpage_json('queries', timeout=timeout, interval=interval)
 
   def get_query_locations(self):
     # Returns a dictionary of the format <host_address, num_of_queries_running_there>
@@ -305,17 +315,17 @@ class ImpaladService(BaseImpalaService):
 
   def get_in_flight_queries(self, timeout=30, interval=1):
     """Returns the number of in flight queries."""
-    return self.get_queries_json()['in_flight_queries']
+    return self.get_queries_json(timeout=timeout, interval=interval)['in_flight_queries']
 
   def get_completed_queries(self, timeout=30, interval=1):
     """Returns the number of completed queries."""
-    result = json.loads(self.read_debug_webpage('queries?json', timeout, interval))
+    result = self.get_debug_webpage_json('queries', timeout, interval)
     return result['completed_queries']
 
   def _get_pool_counter(self, pool_name, counter_name, timeout=30, interval=1):
     """Returns the value of the field 'counter_name' in pool 'pool_name' or 0 if the pool
     doesn't exist."""
-    result = json.loads(self.read_debug_webpage('admission?json', timeout, interval))
+    result = self.get_debug_webpage_json('admission', timeout, interval)
     pools = result['resource_pools']
     for pool in pools:
       if pool['pool_name'] == pool_name:
@@ -341,7 +351,8 @@ class ImpaladService(BaseImpalaService):
     LOG.info("Getting num_in_flight_queries from %s:%s" %
         (self.hostname, self.webserver_port))
     result = self.read_debug_webpage('inflight_query_ids?raw', timeout, interval)
-    return None if result is None else len([l for l in result.split('\n') if l])
+    return None if result is None else len(
+        [line for line in result.split('\n') if line])
 
   def wait_for_num_in_flight_queries(self, expected_val, timeout=10):
     """Waits for the number of in-flight queries to reach a certain value"""
@@ -381,7 +392,8 @@ class ImpaladService(BaseImpalaService):
     """Fetches the raw contents of the query's runtime profile webpage.
     Fails an assertion if Impala's webserver is unavailable or the query's
     profile page doesn't exist."""
-    return self.read_debug_webpage("query_profile?query_id=%s&raw" % (query_id))
+    return self.read_debug_webpage(
+        "query_profile?query_id=%s&raw" % (query_id), timeout=timeout, interval=interval)
 
   def get_query_status(self, query_id):
     """Gets the 'Query Status' section of the query's runtime profile."""
@@ -409,8 +421,7 @@ class ImpaladService(BaseImpalaService):
             client.handle_id(query_handle), target_state, query_state)
     return
 
-  def wait_for_query_status(self, client, query_id, expected_content,
-                               timeout=30, interval=1):
+  def wait_for_query_status(self, query_id, expected_content, timeout=30, interval=1):
     """Polls for the query's status in the query profile web page to contain the
     specified content. Returns False if the timeout was reached before a successful
     match, True otherwise."""

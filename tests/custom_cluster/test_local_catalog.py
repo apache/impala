@@ -146,12 +146,25 @@ class TestLocalCatalogCompactUpdates(CustomClusterTestSuite):
       # catalog pushes a new topic update.
       self.cluster.catalogd.start()
       NUM_ATTEMPTS = 30
+      database_found = False
+      view_not_found = False
       for attempt in range(NUM_ATTEMPTS):
         try:
-          self.assert_impalad_log_contains('WARNING', 'Detected catalog service restart')
-          err = self.execute_query_expect_failure(client, "select * from %s" % view)
-          assert "Could not resolve table reference" in str(err)
-          break
+          if not view_not_found:
+            self.assert_impalad_log_contains(
+              'WARNING', 'Detected catalog service restart')
+            err = self.execute_query_expect_failure(
+              client, "select * from {}".format(view))
+            assert "Could not resolve table reference" in str(err)
+            view_not_found = True
+          if not database_found:
+            # This part is only needed to ensure unique_database cleanup is successful.
+            self.execute_query_unchecked(
+              client, "show tables in {}".format(unique_database))
+            database_found = True
+          if view_not_found and database_found:
+            # All assertions passed.
+            break
         except Exception as e:
           assert attempt < NUM_ATTEMPTS - 1, str(e)
         time.sleep(1)
