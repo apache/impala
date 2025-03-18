@@ -2068,7 +2068,7 @@ class TestAdmissionController(TestAdmissionControllerBase):
     expected_num_impalads += 2
     self._start_impala_cluster(
         options=[
-            "--impalad_args=--executor_groups=root.group-set-small-group-000:2 "
+            "--impalad_args=--executor_groups=root.group-set-large-group-000:2 "
             + executor_flags],
         add_executors=True,
         cluster_size=2,
