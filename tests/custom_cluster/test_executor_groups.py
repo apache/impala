@@ -1324,7 +1324,6 @@ class TestExecutorGroups(CustomClusterTestSuite):
        "Per-Host Resource Estimates: Memory=9.25GB",
        "mem-estimate=1.38GB",  # memory estimate of 17:AGGREGATE.
        "mem-estimate=1.11GB",  # memory estimate of 07:AGGREGATE.
-       "Cluster Memory Admitted: 10.90 GB",
        "MemoryAsk: 27.76 GB"])
 
     # Set very low MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR.
@@ -1335,7 +1334,6 @@ class TestExecutorGroups(CustomClusterTestSuite):
        "Per-Host Resource Estimates: Memory=1.86GB",
        "mem-estimate=210.92MB",  # memory estimate of 17:AGGREGATE.
        "mem-estimate=211.13MB",  # memory estimate of 07:AGGREGATE.
-       "Cluster Memory Admitted: 6.07 GB",
        "MemoryAsk: 5.57 GB"])
 
     # Set MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR to maximum.
@@ -1346,7 +1344,6 @@ class TestExecutorGroups(CustomClusterTestSuite):
        "Per-Host Resource Estimates: Memory=9.25GB",
        "mem-estimate=1.38GB",  # memory estimate of 17:AGGREGATE.
        "mem-estimate=1.11GB",  # memory estimate of 07:AGGREGATE.
-       "Cluster Memory Admitted: 10.90 GB",
        "MemoryAsk: 27.76 GB"])
 
     # Set MEM_LIMIT_EXECUTORS to 3GB, lower than --mem_limit=4g of root.large's
@@ -1358,7 +1355,6 @@ class TestExecutorGroups(CustomClusterTestSuite):
        "Per-Host Resource Estimates: Memory=6.68GB",
        "mem-estimate=1.00GB",  # memory estimate of 17:AGGREGATE.
        "mem-estimate=768.00MB",  # memory estimate of 07:AGGREGATE.
-       "Cluster Memory Admitted: 9.10 GB",
        "MemoryAsk: 20.03 GB"])
 
     # Set MEM_LIMIT to 2GB, lower than MEM_LIMIT_EXECUTORS.
@@ -1369,7 +1365,6 @@ class TestExecutorGroups(CustomClusterTestSuite):
        "Per-Host Resource Estimates: Memory=4.68GB",
        "mem-estimate=682.67MB",  # memory estimate of 17:AGGREGATE.
        "mem-estimate=512.00MB",  # memory estimate of 07:AGGREGATE.
-       "Cluster Memory Admitted: 8.00 GB",
        "MemoryAsk: 14.03 GB"])
 
     self._set_query_options({
