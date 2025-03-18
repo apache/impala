@@ -23,10 +23,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
+
+import javax.annotation.Nullable;
 
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
@@ -90,11 +90,8 @@ public abstract class Catalog implements AutoCloseable {
   // Sentry Service, if configured.
   protected AuthorizationPolicy authPolicy_ = new AuthorizationPolicy();
 
-  // Thread safe cache of database metadata. Uses an AtomicReference so reset()
-  // operations can atomically swap dbCache_ references.
-  // TODO: Update this to use a CatalogObjectCache?
-  protected AtomicReference<Map<String, Db>> dbCache_ =
-      new AtomicReference<>(new ConcurrentHashMap<String, Db>());
+  // Thread safe cache of database metadata.
+  protected CatalogObjectCache<Db> dbCache_ = new CatalogObjectCache<>();
 
   // Cache of data sources.
   protected final CatalogObjectCache<DataSource> dataSources_;
@@ -150,9 +147,7 @@ public abstract class Catalog implements AutoCloseable {
    * Adds a new database to the catalog, replacing any existing database with the same
    * name.
    */
-  public void addDb(Db db) {
-    dbCache_.get().put(db.getName().toLowerCase(), db);
-  }
+  public void addDb(Db db) { dbCache_.add(db); }
 
   /**
    * Gets the Db object from the Catalog using a case-insensitive lookup on the name.
@@ -161,7 +156,7 @@ public abstract class Catalog implements AutoCloseable {
   public Db getDb(String dbName) {
     Preconditions.checkArgument(dbName != null && !dbName.isEmpty(),
         "Null or empty database name given as argument to Catalog.getDb");
-    return dbCache_.get().get(dbName.toLowerCase());
+    return dbCache_.get(dbName.toLowerCase());
   }
 
   /**
@@ -169,15 +164,17 @@ public abstract class Catalog implements AutoCloseable {
    * if not database was removed as part of this operation. Used by DROP DATABASE
    * statements.
    */
-  public Db removeDb(String dbName) {
-    return dbCache_.get().remove(dbName.toLowerCase());
+  public @Nullable Db removeDb(String dbName) {
+    Db removedDb = dbCache_.remove(dbName.toLowerCase());
+    if (removedDb != null) { removedDb.markRemoved(); }
+    return removedDb;
   }
 
   /**
    * Returns all databases that match 'matcher'.
    */
   public List<Db> getDbs(PatternMatcher matcher) {
-    return filterCatalogObjectsByPattern(dbCache_.get().values(), matcher);
+    return filterCatalogObjectsByPattern(dbCache_.getValues(), matcher);
   }
 
   /**

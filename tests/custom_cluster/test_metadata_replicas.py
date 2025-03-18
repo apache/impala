@@ -40,6 +40,8 @@ class TestMetadataReplicas(CustomClusterTestSuite):
     self.__validate_metadata()
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      statestored_args="--statestore_update_frequency_ms=1000")
   def test_catalog_restart(self, testid_checksum):
     """ IMPALA-6948: reproduces the issue by deleting a table from Hive while the catalogd
         is down. When catalogd is restarted, if the regression is present, the deleted

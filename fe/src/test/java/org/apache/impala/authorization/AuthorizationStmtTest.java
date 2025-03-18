@@ -33,8 +33,8 @@ import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTableName;
+import org.junit.After;
 import org.junit.AfterClass;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -74,6 +74,14 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
   @AfterClass
   public static void cleanUp() {
     RuntimeEnv.INSTANCE.reset();
+  }
+
+  @After
+  public void closeAuthzCatalog() {
+    // This is to prevent HMS connection leak between tests (see IMPALA-8073).
+    // Class constructor will be called and create a new instance of authzCatalog_
+    // for each test.
+    authzCatalog_.close();
   }
 
   @Parameters

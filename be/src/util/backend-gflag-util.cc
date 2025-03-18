@@ -143,6 +143,8 @@ DECLARE_int32(num_table_event_executors_per_db_event_executor);
 DECLARE_int32(min_event_processor_idle_ms);
 DECLARE_int32(max_outstanding_events_on_executors);
 DECLARE_bool(consolidate_grant_revoke_requests);
+DECLARE_int32(reset_metadata_lock_duration_ms);
+DECLARE_int32(catalog_reset_max_threads);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -544,6 +546,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
       FLAGS_max_outstanding_events_on_executors);
   cfg.__set_consolidate_grant_revoke_requests(FLAGS_consolidate_grant_revoke_requests);
   cfg.__set_iceberg_catalog_num_threads(FLAGS_iceberg_catalog_num_threads);
+  cfg.__set_reset_metadata_lock_duration_ms(FLAGS_reset_metadata_lock_duration_ms);
+  cfg.__set_catalog_reset_max_threads(FLAGS_catalog_reset_max_threads);
   return Status::OK();
 }
 

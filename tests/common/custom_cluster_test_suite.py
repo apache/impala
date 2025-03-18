@@ -35,9 +35,8 @@ from tests.common.file_utils import cleanup_tmp_test_dir, make_tmp_test_dir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.util.filesystem_utils import IS_LOCAL
-from tests.util.retry import retry
 from tests.util.workload_management import QUERY_TBL_LOG_NAME, QUERY_TBL_LIVE_NAME
-from time import sleep
+from time import sleep, time
 
 LOG = logging.getLogger(__name__)
 
@@ -415,28 +414,33 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if not self.SHARED_CLUSTER_ARGS:
       self.cluster_teardown(method.__name__, method.__dict__)
 
-  def wait_for_wm_init_complete(self, timeout_s=60):
+  def wait_for_wm_init_complete(self, timeout_s=180):
     """
     Waits for the catalog to report the workload management initialization process has
-    completed and the workload management tables to be in the local catalog. The input
-    timeout_s is used as the timeout for multiple separate function calls. Thus, the
-    theoretical max amount of time this function could wait is:
-        timeout_s + (timeout_s * num_coordinators).
+    completed and the workload management tables to be in the local catalog of
+    all coordinators.
     """
+    end_time = time() + timeout_s
     self.assert_catalogd_ha_contains("INFO", r'Completed workload management '
-        r'initialization', timeout_s)
+        r'initialization', timeout_s=(end_time - time()))
 
-    for tbl in (QUERY_TBL_LIVE_NAME, QUERY_TBL_LOG_NAME):
-      for coord in self.cluster.get_all_coordinators():
-        # Wait until table is available in the coordinator's catalog cache.
-        def exists_func():
-          catalog_objs = coord.service.read_debug_webpage("catalog?json")
-          return tbl in catalog_objs
-
-        max_attempts = timeout_s / 3
-        assert retry(func=exists_func, max_attempts=max_attempts, sleep_time_s=3,
-            backoff=1), "Did not find table '{}' in local catalog of coordinator " \
-            "'{}:{}'.".format(tbl, coord.hostname, coord.get_webserver_port())
+    # Wait until table is available in the coordinator's catalog cache.
+    for coord in self.cluster.get_all_coordinators():
+      success = False
+      wm_tables = list()
+      while (not success and time() < end_time):
+        wm_tables = [QUERY_TBL_LIVE_NAME, QUERY_TBL_LOG_NAME]
+        catalog_objs = coord.service.read_debug_webpage(
+            "catalog?json", timeout=(end_time - time()))
+        for tbl in list(wm_tables):
+          if tbl in catalog_objs:
+            wm_tables.remove(tbl)
+        success = (len(wm_tables) == 0)
+        if not success:
+          sleep(0.5)
+      assert success, (
+          "Did not find table '{}' in local catalog of coordinator '{}:{}'.").format(
+              str(wm_tables), coord.hostname, coord.get_webserver_port())
 
   def wait_for_wm_idle(self, coordinators=[], timeout_s=370):
     """Wait until workload management worker in each coordinator becomes idle.

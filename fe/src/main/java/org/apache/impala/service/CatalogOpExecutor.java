@@ -7277,7 +7277,7 @@ public class CatalogOpExecutor {
     } else {
       // Invalidate the entire catalog if no table name is provided.
       Preconditions.checkArgument(!req.isIs_refresh());
-      resp.getResult().setVersion(catalog_.reset(catalogTimeline));
+      resp.getResult().setVersion(catalog_.reset(catalogTimeline, req.isSync_ddl()));
       resp.getResult().setIs_invalidate(true);
     }
     catalogTimeline.markEvent("Finished resetMetadata request");

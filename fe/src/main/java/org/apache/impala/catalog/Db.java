@@ -129,6 +129,10 @@ public class Db extends CatalogObjectImpl implements FeDb {
   // by reading this flag and without acquiring read lock on db object
   private volatile long lastSyncedEventId_ = -1;
 
+  // Flag used by CatalogServiceCatalog to mark if this Db is already removed or not.
+  // Should only be used by CatalogServiceCatalog.
+  private volatile boolean isRemoved_ = false;
+
   public Db(String name, org.apache.hadoop.hive.metastore.api.Database msDb) {
     setMetastoreDb(name, msDb);
     tableCache_ = new CatalogObjectCache<>();
@@ -157,6 +161,10 @@ public class Db extends CatalogObjectImpl implements FeDb {
     lastSyncedEventId_ = eventId;
 
   }
+
+  protected boolean isRemoved() { return isRemoved_; }
+
+  protected void markRemoved() { isRemoved_ = true; }
 
   public void setIsSystemDb(boolean b) { isSystemDb_ = b; }
 

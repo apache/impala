@@ -169,34 +169,34 @@ class TestWorkloadManagementInitWait(TestWorkloadManagementInitBase):
         r"upgraded", expected_count=0)
 
   @CustomClusterTestSuite.with_args(
-      cluster_size=10, disable_log_buffering=True,
+      cluster_size=3, disable_log_buffering=True,
       log_symlinks=True, workload_mgmt=True,
       impalad_args="--workload_mgmt_schema_version=1.0.0",
       catalogd_args="--workload_mgmt_schema_version=1.0.0 "
                     "--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL))
   def test_create_on_version_1_0_0(self, vector):
     """Asserts that workload management tables are properly created on version 1.0.0 using
-       a 10 node cluster when no tables exist."""
+       a 3 node cluster when no tables exist."""
     self.check_schema("1.0.0", vector, multiple_impalad=True)
 
   @CustomClusterTestSuite.with_args(
-      cluster_size=10, disable_log_buffering=True,
+      cluster_size=3, disable_log_buffering=True,
       log_symlinks=True, workload_mgmt=True,
       impalad_args="--workload_mgmt_schema_version=1.1.0",
       catalogd_args="--workload_mgmt_schema_version=1.1.0 "
                     "--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL))
   def test_create_on_version_1_1_0(self, vector):
     """Asserts that workload management tables are properly created on version 1.1.0 using
-       a 10 node cluster when no tables exist."""
+       a 3 node cluster when no tables exist."""
     self.check_schema("1.1.0", vector, multiple_impalad=True)
 
   @CustomClusterTestSuite.with_args(
-      cluster_size=10, disable_log_buffering=True,
+      cluster_size=3, disable_log_buffering=True,
       log_symlinks=True, workload_mgmt=True,
       catalogd_args="--workload_mgmt_drop_tables={}".format(QUERY_TBL_ALL))
   def test_create_on_version_1_2_0(self, vector):
     """Asserts that workload management tables are properly created on the latest version
-       using a 10 node cluster when no tables exist."""
+       using a 3 node cluster when no tables exist."""
     self.check_schema("1.2.0", vector, multiple_impalad=True)
 
   @CustomClusterTestSuite.with_args(

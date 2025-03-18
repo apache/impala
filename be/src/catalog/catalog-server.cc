@@ -45,6 +45,13 @@ using namespace apache::thrift;
 using namespace rapidjson;
 using namespace strings;
 
+// Validator function asserting the value of a flag is greater than 0.
+static const auto gt_0 = [](const char* name, int32_t val) {
+  if (val > 0) return true;
+  LOG(ERROR) << "Invalid value for --" << name << ": must be greater than 0";
+  return false;
+};
+
 DEFINE_int32(catalog_service_port, 26000, "port where the CatalogService is running");
 DEFINE_string(catalog_topic_mode, "full",
     "The type of data that the catalog service will publish into the Catalog "
@@ -219,6 +226,7 @@ DEFINE_string(default_skipped_hms_event_types,
     "HMS event types that are not used by Impala. They are skipped by default in "
     "fetching HMS event batches. Only in few places they will be fetched, e.g. fetching "
     "the latest event time in HMS.");
+
 DEFINE_string(common_hms_event_types, "ADD_PARTITION,ALTER_PARTITION,DROP_PARTITION,"
     "ADD_PARTITION,ALTER_PARTITION,DROP_PARTITION,CREATE_TABLE,ALTER_TABLE,DROP_TABLE,"
     "CREATE_DATABASE,ALTER_DATABASE,DROP_DATABASE,INSERT,OPEN_TXN,COMMIT_TXN,ABORT_TXN,"
@@ -270,6 +278,18 @@ DEFINE_int32(max_outstanding_events_on_executors, 1000,
     "event executors. It is a backpressure mechanism to throttle event fetching when "
     "the outstanding events exceeds the threshold. This configuration is applicable when "
     "enable_hierarchical_event_processing is enabled.");
+
+DEFINE_int32(reset_metadata_lock_duration_ms, 100,
+    "Duration in ms where CatalogD will hold version lock before temporarily releasing "
+    "it during reset/invalidate metadata operation. Setting low duration will increase "
+    "CatalogD availability during long invalidate metadata operation, while setting "
+    "high number will result in less catalog update per invalidate metadata operation.");
+DEFINE_validator(reset_metadata_lock_duration_ms, gt_0);
+
+DEFINE_int32(catalog_reset_max_threads, 10,
+    "Maximum number of threads for fetching metadata from Metastore in parallel during "
+    "catalog reset.");
+DEFINE_validator(catalog_reset_max_threads, gt_0);
 
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);

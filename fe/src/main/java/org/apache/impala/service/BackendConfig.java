@@ -581,4 +581,12 @@ public class BackendConfig {
   public int icebergCatalogNumThreads() {
     return backendCfg_.iceberg_catalog_num_threads;
   }
+
+  public int getResetMetadataLockDurationMs() {
+    return backendCfg_.reset_metadata_lock_duration_ms;
+  }
+
+  public int getCatalogResetMaxThreads() {
+    return backendCfg_.catalog_reset_max_threads;
+  }
 }

@@ -341,4 +341,8 @@ struct TBackendGflags {
   154: required bool consolidate_grant_revoke_requests
 
   155: required i32 iceberg_catalog_num_threads
+
+  156: required i32 reset_metadata_lock_duration_ms
+
+  157: required i32 catalog_reset_max_threads
 }

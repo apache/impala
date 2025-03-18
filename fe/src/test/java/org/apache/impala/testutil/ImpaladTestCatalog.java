@@ -18,6 +18,7 @@
 package org.apache.impala.testutil;
 
 import com.google.common.base.Preconditions;
+
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
@@ -26,7 +27,6 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.HdfsCachePool;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
@@ -40,6 +40,8 @@ import org.apache.impala.util.PatternMatcher;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import javax.annotation.Nullable;
 
 /**
  * Mock catalog used for running FE tests that allows lazy-loading of tables without a
@@ -84,7 +86,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
   }
 
   @Override
-  public Db removeDb(String dbName) {
+  public @Nullable Db removeDb(String dbName) {
     return srcCatalog_.removeDb(dbName);
   }
 

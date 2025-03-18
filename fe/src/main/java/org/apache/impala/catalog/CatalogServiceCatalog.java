@@ -33,19 +33,22 @@ import static org.apache.impala.thrift.TCatalogObjectType.TABLE;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +58,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
+
 import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -65,25 +69,21 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
-import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.TableName;
-import org.apache.impala.analysis.TableRef;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.catalog.CatalogResetManager.PrefetchedDatabaseObjects;
 import org.apache.impala.catalog.FeFsTable.Utils;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
-import org.apache.impala.catalog.events.MetastoreEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLatestEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
-import org.apache.impala.catalog.events.MetastoreNotificationException;
 import org.apache.impala.catalog.events.MetastoreNotificationFetchException;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.events.SelfEventContext;
@@ -169,7 +169,6 @@ import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -289,6 +288,9 @@ public class CatalogServiceCatalog extends Catalog {
   //   atomically (potentially in a different database).
   private final ReentrantReadWriteLock versionLock_ = new ReentrantReadWriteLock(true);
 
+  // Executor service for fetching catalog objects from Metastore in the background.
+  private final CatalogResetManager resetManager_ = new CatalogResetManager(this);
+
   // Last assigned catalog version. Starts at INITIAL_CATALOG_VERSION and is incremented
   // with each update to the Catalog. Continued across the lifetime of the object.
   // Protected by versionLock_.
@@ -384,6 +386,9 @@ public class CatalogServiceCatalog extends Catalog {
   private int numTables_ = 0;
   private int numFunctions_ = 0;
 
+  // True if initial reset() has been triggered internally.
+  private boolean triggeredInitialReset_ = false;
+
   private final List<String> impalaSysTables;
 
   /**
@@ -462,6 +467,60 @@ public class CatalogServiceCatalog extends Catalog {
     LOG.info("Common HMS event types: " + commonHmsEventTypes_);
   }
 
+  /**
+   * If initial reset has just begin, wait until it is completed.
+   * @param dbName if supplied, wait can return early if the db is found in the cache.
+   */
+  private void waitInitialResetCompletion(@Nullable String dbName) {
+    boolean isWaiting = false;
+    while (!triggeredInitialReset_) {
+      if (dbName != null && dbCache_.contains(dbName)) {
+        // If the db is found in the cache, we can return early.
+        break;
+      }
+
+      versionLock_.writeLock().lock();
+      try {
+        if (!resetManager_.isActive()) {
+          // Catalog is not currently resetting, so we can stop wait.
+          // This can happen if the catalog is in passive state.
+          LOG.info("Catalog is not initialized yet. Skip waiting{}...",
+              (dbName != null ? " for db " + dbName : ""));
+          break;
+        } else {
+          // Wait for the initial reset to complete.
+          if (!isWaiting) {
+            LOG.info("Waiting for initial reset to complete{}...",
+                (dbName != null ? " for db " + dbName : ""));
+            isWaiting = true;
+          }
+          if (dbName != null) {
+            resetManager_.waitOngoingMetadataFetch(dbName);
+          } else {
+            resetManager_.waitFullMetadataFetch();
+          }
+        }
+      } finally {
+        versionLock_.writeLock().unlock();
+      }
+    }
+    if (isWaiting) {
+      LOG.info("Initial reset completed{}.", (dbName != null ? " for db " + dbName : ""));
+    }
+  }
+
+  @Override
+  public Db getDb(String dbName) {
+    waitInitialResetCompletion(dbName);
+    return super.getDb(dbName);
+  }
+
+  @Override
+  public List<Db> getDbs(PatternMatcher matcher) {
+    waitInitialResetCompletion(null);
+    return super.getDbs(matcher);
+  }
+
   public void startEventsProcessor() {
     Preconditions.checkNotNull(metastoreEventProcessor_,
         "Start events processor called before initializing it");
@@ -486,11 +545,16 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public boolean isBlacklistedDb(String dbName) {
     Preconditions.checkNotNull(dbName);
-    if (BackendConfig.INSTANCE.enableWorkloadMgmt() && dbName.equalsIgnoreCase(Db.SYS)) {
+    return isBlacklistedDbInternal(dbName.toLowerCase());
+  }
+
+  protected boolean isBlacklistedDbInternal(String loweredDbName) {
+    if (BackendConfig.INSTANCE.enableWorkloadMgmt()
+        && loweredDbName.equalsIgnoreCase(Db.SYS)) {
       // Override 'sys' for Impala system tables.
       return false;
     }
-    return blacklistedDbs_.contains(dbName.toLowerCase());
+    return blacklistedDbs_.contains(loweredDbName);
   }
 
   /**
@@ -631,6 +695,7 @@ public class CatalogServiceCatalog extends Catalog {
         versionLock_.writeLock().lock();
         Lock lock = useWriteLock ? tbl.writeLock() : tbl.readLock();
         try {
+          resetManager_.waitOngoingMetadataFetch(tbl.getDb().getName());
           //Note that we don't use the timeout directly here since the timeout
           //since we don't want to unnecessarily hold the versionLock if the table
           //cannot be acquired. Holding version lock can potentially blocks other
@@ -667,15 +732,17 @@ public class CatalogServiceCatalog extends Catalog {
         "Attempting to lock database " + db.getName())) {
       long begin = System.currentTimeMillis();
       long end;
+      String lowerCaseDbName = db.getName().toLowerCase();
       do {
         versionLock_.writeLock().lock();
-        if (db.getLock().tryLock()) {
-          long duration = System.currentTimeMillis() - begin;
-          if (duration > LOCK_ACQUIRING_DURATION_WARN_MS) {
-            LOG.warn("Lock for db {} was acquired in {} msec",
-                db.getName(), duration);
+        if (!resetManager_.isPendingFetch(lowerCaseDbName)) {
+          if (db.getLock().tryLock()) {
+            long duration = System.currentTimeMillis() - begin;
+            if (duration > LOCK_ACQUIRING_DURATION_WARN_MS) {
+              LOG.warn("Lock for db {} was acquired in {} msec", db.getName(), duration);
+            }
+            return true;
           }
-          return true;
         }
         versionLock_.writeLock().unlock();
         try {
@@ -1056,7 +1123,9 @@ public class CatalogServiceCatalog extends Catalog {
     } finally {
       versionLock_.readLock().unlock();
     }
-    for (Db db: getAllDbs()) {
+    InvalidateAwareDbSnapshot snapshot = new InvalidateAwareDbSnapshot(getAllDbs());
+    for (Db db : snapshot) {
+      if (db.isRemoved()) continue;
       ctx.numDbs++;
       addDatabaseToCatalogDelta(db, ctx);
     }
@@ -1372,12 +1441,64 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * A helper class to iterate list of Db.
+   * iterator() method will return an iterator that will wait for ongoing
+   * reset() if needed. Caller of iterator must still check for Db.isRemoved()
+   * status and act accordingly. Especially if there is a significant gap between
+   * hasNext() and next().
+   */
+  public class InvalidateAwareDbSnapshot implements Iterable<Db> {
+    private final List<Db> dbList_;
+
+    public InvalidateAwareDbSnapshot(List<Db> snapshot) {
+      dbList_ = new ArrayList<>(snapshot);
+      dbList_.sort(Comparator.comparing(Db::getName));
+    }
+
+    private class InvalidateAwareDbSnapshotIterator implements Iterator<Db> {
+      private int idx_ = 0;
+      public InvalidateAwareDbSnapshotIterator() {}
+
+      @Override
+      public boolean hasNext() {
+        while (idx_ < dbList_.size()) {
+          versionLock_.writeLock().lock();
+          try {
+            if (resetManager_.isActive()) {
+              // reset() is happening. Wait until invalidation passed the next Db.
+              resetManager_.waitOngoingMetadataFetch(dbList_.get(idx_).getName());
+            }
+          } finally { versionLock_.writeLock().unlock(); }
+
+          if (dbList_.get(idx_).isRemoved()) {
+            ++idx_;
+          } else {
+            break;
+          }
+        }
+        return idx_ < dbList_.size();
+      }
+
+      @Override
+      public Db next() {
+        return dbList_.get(idx_++);
+      }
+    }
+
+    @Override
+    public Iterator<Db> iterator() {
+      return new InvalidateAwareDbSnapshotIterator();
+    }
+  }
+
+  /**
    * Get a snapshot view of all the databases in the catalog.
+   * Reader must check isRemoved() value and act accordingly.
    */
   List<Db> getAllDbs() {
     versionLock_.readLock().lock();
     try {
-      return ImmutableList.copyOf(dbCache_.get().values());
+      return ImmutableList.copyOf(dbCache_.getValues());
     } finally {
       versionLock_.readLock().unlock();
     }
@@ -1558,6 +1679,7 @@ public class CatalogServiceCatalog extends Catalog {
     Preconditions.checkNotNull(msDb.getName());
     versionLock_.writeLock().lock();
     try {
+      resetManager_.waitOngoingMetadataFetch(msDb.getName());
       Db db = getDb(msDb.getName());
       if (db == null) {
         throw new DatabaseNotFoundException("Database " + msDb.getName() + " not found");
@@ -1968,51 +2090,59 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Extracts Impala functions stored in metastore db parameters and adds them to
-   * the catalog cache.
+   * Extracts Impala functions stored in metastore db parameters.
    */
-  private void loadFunctionsFromDbParams(Db db,
+  protected List<Function> extractNativeImpalaFunctions(
       org.apache.hadoop.hive.metastore.api.Database msDb) {
-    if (msDb == null || msDb.getParameters() == null) return;
-    LOG.info("Loading native functions for database: " + db.getName());
-    List<Function> funcs = FunctionUtils.deserializeNativeFunctionsFromDbParams(
-        msDb.getParameters());
-    for (Function f : funcs) {
-      db.addFunction(f, false);
-      f.setCatalogVersion(incrementAndGetCatalogVersion());
-    }
-    LOG.info("Loaded {} native functions for database: {}", funcs.size(), db.getName());
+    if (msDb == null || msDb.getParameters() == null) return Collections.emptyList();
+    return FunctionUtils.deserializeNativeFunctionsFromDbParams(msDb.getParameters());
   }
 
   /**
-   * Loads Java functions into the catalog. For each function in "functions",
-   * we extract all Impala compatible evaluate() signatures and load them
-   * as separate functions in the catalog.
+   * Extract Java functions.
+   * For each function in "functions", we extract all Impala compatible evaluate()
+   * signatures.
    */
-  private void loadJavaFunctions(Db db,
+  protected List<Function> extractJavaFunctions(
       List<org.apache.hadoop.hive.metastore.api.Function> functions) {
     Preconditions.checkNotNull(functions);
     if (BackendConfig.INSTANCE.disableCatalogDataOpsDebugOnly()) {
       LOG.info("Skip loading Java functions: catalog data ops disabled.");
-      return;
+      return Collections.emptyList();
     }
-    LOG.info("Loading Java functions for database: " + db.getName());
-    int numFuncs = 0;
+    List<Function> javaFunctions = new ArrayList<>();
     for (org.apache.hadoop.hive.metastore.api.Function function: functions) {
       try {
         HiveJavaFunctionFactoryImpl factory =
             new HiveJavaFunctionFactoryImpl(localLibraryPath_);
         HiveJavaFunction javaFunction = factory.create(function);
-        for (Function fn: javaFunction.extract()) {
-          db.addFunction(fn);
-          fn.setCatalogVersion(incrementAndGetCatalogVersion());
-          ++numFuncs;
-        }
+        javaFunctions.addAll(javaFunction.extract());
       } catch (Exception | LinkageError e) {
         LOG.error("Skipping function load: " + function.getFunctionName(), e);
       }
     }
-    LOG.info("Loaded {} Java functions for database: {}", numFuncs, db.getName());
+    return javaFunctions;
+  }
+
+  /**
+   * Adds native and java functions to db.
+   */
+  private void loadFunctions(
+      Db db, List<Function> nativeFuncs, List<Function> javaFuncs) {
+    long startTime = System.currentTimeMillis();
+    for (Function f : nativeFuncs) {
+      db.addFunction(f, false);
+      f.setCatalogVersion(incrementAndGetCatalogVersion());
+    }
+    for (Function fn : javaFuncs) {
+      db.addFunction(fn);
+      fn.setCatalogVersion(incrementAndGetCatalogVersion());
+    }
+    long duration = System.currentTimeMillis() - startTime;
+    if (!nativeFuncs.isEmpty() || !javaFuncs.isEmpty()) {
+      LOG.info("Loaded {} native {} and {} java functions for database {} in {} ms.",
+          nativeFuncs.size(), javaFuncs.size(), db.getName(), duration);
+    }
   }
 
   /**
@@ -2035,10 +2165,9 @@ public class CatalogServiceCatalog extends Catalog {
       org.apache.hadoop.hive.metastore.api.Database msDb =
           msClient.getHiveClient().getDatabase(dbName);
       tmpDb = new Db(dbName, msDb);
-      // Load native UDFs into the temporary db.
-      loadFunctionsFromDbParams(tmpDb, msDb);
-      // Load Java UDFs from HMS into the temporary db.
-      loadJavaFunctions(tmpDb, javaFns);
+      // Load native and java UDFs into the temporary db.
+      loadFunctions(
+          tmpDb, extractNativeImpalaFunctions(msDb), extractJavaFunctions(javaFns));
 
       Db db = getDb(dbName);
       if (db == null) {
@@ -2119,8 +2248,8 @@ public class CatalogServiceCatalog extends Catalog {
    * @param tblName Nullable table name. If it's null, all tables of the required database
    *               will be fetched. If it's not null, the list will contain only one item.
    */
-  private List<TableMeta> getTableMetaFromHive(MetaStoreClient msClient, String dbName,
-      @Nullable String tblName) throws TException {
+  protected static List<TableMeta> getTableMetaFromHive(MetaStoreClient msClient,
+      String dbName, @Nullable String tblName) throws TException {
     // Load the exact TableMeta list if pull_table_types_and_comments is set to true.
     if (BackendConfig.INSTANCE.pullTableTypesAndComments()) {
       return msClient.getHiveClient().getTableMeta(dbName, tblName, /*tableTypes*/ null);
@@ -2141,25 +2270,15 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Invalidates the database 'db'. This method can have potential race
-   * conditions with external changes to the Hive metastore and hence any
-   * conflicting changes to the objects can manifest in the form of exceptions
-   * from the HMS calls which are appropriately handled. Returns the invalidated
-   * 'Db' object along with list of tables to be loaded by the TableLoadingMgr.
-   * Returns null if the method encounters an exception during invalidation.
+   * Invalidates the database 'db'.
+   * Returns the invalidated 'Db' object along with list of tables to be loaded by
+   * the TableLoadingMgr. Returns null if the method encounters an exception during
+   * invalidation.
    */
-  private Pair<Db, List<TTableName>> invalidateDb(
-      MetaStoreClient msClient, String dbName, Db existingDb,
-      EventSequence catalogTimeline) {
+  private Pair<Db, List<TTableName>> invalidateDb(String dbName, Db existingDb,
+      PrefetchedDatabaseObjects prefetchedObjects, EventSequence catalogTimeline) {
     try {
-      List<org.apache.hadoop.hive.metastore.api.Function> javaFns =
-          new ArrayList<>();
-      for (String javaFn: msClient.getHiveClient().getFunctions(dbName, "*")) {
-        javaFns.add(msClient.getHiveClient().getFunction(dbName, javaFn));
-      }
-      org.apache.hadoop.hive.metastore.api.Database msDb =
-          msClient.getHiveClient().getDatabase(dbName);
-      Db newDb = new Db(dbName, msDb);
+      Db newDb = new Db(dbName, prefetchedObjects.getMsDb());
       // existingDb is usually null when the Catalog loads for the first time.
       // In that case we needn't restore any transient functions.
       if (existingDb != null) {
@@ -2170,17 +2289,15 @@ public class CatalogServiceCatalog extends Catalog {
           fn.setCatalogVersion(incrementAndGetCatalogVersion());
         }
       }
-      // Reload native UDFs.
-      loadFunctionsFromDbParams(newDb, msDb);
-      // Reload Java UDFs from HMS.
-      loadJavaFunctions(newDb, javaFns);
-      newDb.setCatalogVersion(incrementAndGetCatalogVersion());
-      catalogTimeline.markEvent("Loaded functions of " + dbName);
 
-      LOG.info("Loading table list for database: {}", dbName);
+      // Reload native and Java UDFs.
+      loadFunctions(newDb, prefetchedObjects.getNativeFunctions(),
+          prefetchedObjects.getJavaFunctions());
+      newDb.setCatalogVersion(incrementAndGetCatalogVersion());
+
       int numTables = 0;
       List<TTableName> tblsToBackgroundLoad = new ArrayList<>();
-      for (TableMeta tblMeta: getTableMetaFromHive(msClient, dbName, /*tblName*/null)) {
+      for (TableMeta tblMeta : prefetchedObjects.getTableMetas()) {
         String tableName = tblMeta.getTableName().toLowerCase();
         if (isBlacklistedTable(dbName, tableName)) {
           LOG.info("skip blacklisted table: " + dbName + "." + tableName);
@@ -2197,10 +2314,14 @@ public class CatalogServiceCatalog extends Catalog {
           tblsToBackgroundLoad.add(new TTableName(dbName, tableName));
         }
       }
-      catalogTimeline.markEvent(String.format(
-          "Loaded %d table names of database %s", numTables, dbName));
-      LOG.info("Loaded table list for database: {}. Number of tables: {}",
-          dbName, numTables);
+      int numFunctions = prefetchedObjects.getNativeFunctions().size()
+          + prefetchedObjects.getJavaFunctions().size();
+      catalogTimeline.markEvent(
+          String.format("Loaded %d table names and %d functions of database %s",
+              numTables, numFunctions, dbName));
+      LOG.info("Loaded table list ({}) and functions ({}) for database: {}. "
+              + "Fetch duration: {} ms.",
+          numTables, numFunctions, dbName, prefetchedObjects.getDurationMs());
 
       if (existingDb != null) {
         // Identify any removed functions and add them to the delta log.
@@ -2248,15 +2369,22 @@ public class CatalogServiceCatalog extends Catalog {
     }
   }
 
+  public long reset(EventSequence catalogTimeline) throws CatalogException {
+    return reset(catalogTimeline, false);
+  }
+
   /**
    * Resets this catalog instance by clearing all cached table and database metadata.
    * Returns the current catalog version before reset has taken any effect. The
    * requesting impalad will use that version to determine when the
    * effects of reset have been applied to its local catalog cache.
    */
-  public long reset(EventSequence catalogTimeline) throws CatalogException {
+  public long reset(EventSequence catalogTimeline, boolean isSyncDdl)
+      throws CatalogException {
     long startVersion = getCatalogVersion();
     LOG.info("Invalidating all metadata. Version: " + startVersion);
+    Stopwatch resetTimer = Stopwatch.createStarted();
+    Stopwatch unlockedTimer = Stopwatch.createStarted();
     // First update the policy metadata.
     refreshAuthorization(true);
 
@@ -2293,71 +2421,33 @@ public class CatalogServiceCatalog extends Catalog {
       LOG.error("Couldn't identify the default FS. Cache Pool reader will be disabled.");
     }
     versionLock_.writeLock().lock();
-    catalogTimeline.markEvent(GOT_CATALOG_VERSION_WRITE_LOCK);
-    // In case of an empty new catalog, the version should still change to reflect the
-    // reset operation itself and to unblock impalads by making the catalog version >
-    // INITIAL_CATALOG_VERSION. See Frontend.waitForCatalog()
-    if (catalogVersion_ < Catalog.CATALOG_VERSION_AFTER_FIRST_RESET) {
-      catalogVersion_ = Catalog.CATALOG_VERSION_AFTER_FIRST_RESET;
-      LOG.info("First reset initiated. Version: " + catalogVersion_);
-    } else {
-      ++catalogVersion_;
-    }
-
-    // Update data source, db and table metadata
     try {
-      // Refresh DataSource objects from HMS and assign new versions.
+      resetManager_.waitFullMetadataFetch();
+      unlockedTimer.stop();
+      catalogTimeline.markEvent(GOT_CATALOG_VERSION_WRITE_LOCK);
+      // In case of an empty new catalog, the version should still change to reflect the
+      // reset operation itself and to unblock impalads by making the catalog version >
+      // INITIAL_CATALOG_VERSION. See Frontend.waitForCatalog()
+      if (catalogVersion_ < Catalog.CATALOG_VERSION_AFTER_FIRST_RESET) {
+        catalogVersion_ = Catalog.CATALOG_VERSION_AFTER_FIRST_RESET;
+        LOG.info("First reset initiated. Version: " + catalogVersion_);
+      } else {
+        ++catalogVersion_;
+      }
+
+      // Update data source, db and table metadata.
+      // First, refresh DataSource objects from HMS and assign new versions.
       refreshDataSources();
 
-      // Not all Java UDFs are persisted to the metastore. The ones which aren't
-      // should be restored once the catalog has been invalidated.
-      Map<String, Db> oldDbCache = dbCache_.get();
-
-      // Build a new DB cache, populate it, and replace the existing cache in one
-      // step.
-      Map<String, Db> newDbCache = new ConcurrentHashMap<String, Db>();
-      List<TTableName> tblsToBackgroundLoad = new ArrayList<>();
+      // Next, rebuild the dbCache_ in-place.
+      List<String> allHmsDbs;
       try (MetaStoreClient msClient = getMetaStoreClient(catalogTimeline)) {
-        List<String> allDbs = msClient.getHiveClient().getAllDatabases();
+        allHmsDbs = msClient.getHiveClient().getAllDatabases();
         catalogTimeline.markEvent("Got database list");
-        int numComplete = 0;
-        for (String dbName: allDbs) {
-          if (isBlacklistedDb(dbName)) {
-            LOG.info("skip blacklisted db: " + dbName);
-            continue;
-          }
-          String annotation = String.format("invalidating metadata - %s/%s dbs complete",
-              numComplete++, allDbs.size());
-          try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
-            dbName = dbName.toLowerCase();
-            Db oldDb = oldDbCache.get(dbName);
-            Pair<Db, List<TTableName>> invalidatedDb = invalidateDb(msClient,
-                dbName, oldDb, catalogTimeline);
-            if (invalidatedDb == null) continue;
-            newDbCache.put(dbName, invalidatedDb.first);
-            tblsToBackgroundLoad.addAll(invalidatedDb.second);
-          }
-
-          DebugUtils.executeDebugAction(BackendConfig.INSTANCE.debugActions(),
-              DebugUtils.RESET_METADATA_LOOP_LOCKED);
-        }
       }
-      dbCache_.set(newDbCache);
+      rebuildDbCache(allHmsDbs, unlockedTimer, catalogTimeline, isSyncDdl);
+
       catalogTimeline.markEvent("Updated catalog cache");
-
-      // Identify any deleted databases and add them to the delta log.
-      Set<String> oldDbNames = oldDbCache.keySet();
-      Set<String> newDbNames = newDbCache.keySet();
-      oldDbNames.removeAll(newDbNames);
-      for (String dbName: oldDbNames) {
-        Db removedDb = oldDbCache.get(dbName);
-        updateDeleteLog(removedDb);
-      }
-
-      // Submit tables for background loading.
-      for (TTableName tblName: tblsToBackgroundLoad) {
-        tableLoadingMgr_.backgroundLoad(tblName);
-      }
     } catch (Exception e) {
       LOG.error("Error initializing Catalog", e);
       throw new CatalogException("Error initializing Catalog. Catalog may be empty.", e);
@@ -2366,6 +2456,10 @@ public class CatalogServiceCatalog extends Catalog {
       // acquires the version lock before us so the lastResetStartVersion_ is already
       // bumped. Don't need to update it in this case.
       if (lastResetStartVersion_ < startVersion) lastResetStartVersion_ = startVersion;
+      resetManager_.stop();
+      resetManager_.signalAllWaiters();
+      triggeredInitialReset_ = true; // set to true, regardless of success status.
+      unlockedTimer.start();
       versionLock_.writeLock().unlock();
       // clear all txn to write ids mapping so that there is no memory leak for previous
       // events
@@ -2373,8 +2467,118 @@ public class CatalogServiceCatalog extends Catalog {
       // restart the event processing for id just before the reset
       metastoreEventProcessor_.start(currentEventId);
     }
-    LOG.info("Invalidated all metadata.");
+    unlockedTimer.stop();
+    resetTimer.stop();
+    LOG.info("Invalidated all metadata in {} ms ({} ms outside version write lock).",
+        resetTimer.elapsed(TimeUnit.MILLISECONDS),
+        unlockedTimer.elapsed(TimeUnit.MILLISECONDS));
     return startVersion;
+  }
+
+  /**
+   * Build a new dbCache_ in-place.
+   * If isSyncDdl is False, do it in stages and unlock writeLock in between stages.
+   * Entering and exiting this method should hold versionLock_.writeLock().
+   */
+  private void rebuildDbCache(List<String> allHmsDbs, Stopwatch unlockedTimer,
+      EventSequence catalogTimeline, boolean isSyncDdl) {
+    Preconditions.checkState(versionLock_.writeLock().isHeldByCurrentThread());
+
+    // Not all Java UDFs are persisted to the metastore. The ones which aren't
+    // should be restored once the catalog has been invalidated.
+    List<String> oldDbNamesList = new ArrayList<>(dbCache_.keySet());
+    Collections.sort(oldDbNamesList);
+    Queue<String> oldDbNames = new LinkedList<>(oldDbNamesList);
+
+    // Fetch the list of databases, functions, and tables from HMS.
+    resetManager_.beginFetch(allHmsDbs);
+
+    Set<String> newDbNames = new HashSet<>();
+    long allDbsCount = allHmsDbs.size();
+    int numComplete = 0;
+    long lockDurationMs = BackendConfig.INSTANCE.getResetMetadataLockDurationMs();
+    long nextUnlock = System.currentTimeMillis() + lockDurationMs;
+
+    while (resetManager_.isActive()) {
+      Pair<String, Future<PrefetchedDatabaseObjects>> resettingDbPair =
+          resetManager_.peekFetchingDb();
+      String dbName = resettingDbPair.first;
+      String annotation =
+          String.format("invalidating metadata - %s/%s dbs complete. Current db: %s",
+              numComplete++, allDbsCount, dbName);
+      try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
+        // Poll oldDbNames up to current dbName.
+        while (!oldDbNames.isEmpty() && oldDbNames.peek().compareTo(dbName) < 0) {
+          String oldDbName = oldDbNames.poll();
+          if (!newDbNames.contains(oldDbName)) {
+            LOG.info("Removing database: " + oldDbName);
+            removeDbLocked(oldDbName);
+          }
+        }
+
+        // Invalidate dbName.
+        Pair<Db, List<TTableName>> invalidatedDb = null;
+        try {
+          // Getting Future<DatabaseHmsObjects> result can have potential race
+          // conditions with external changes to the Hive metastore and hence any
+          // conflicting changes to the objects can manifest in the form of exceptions
+          // from the HMS calls which are appropriately handled by leaving invalidatedDb
+          // null.
+          PrefetchedDatabaseObjects hmsObjects = resettingDbPair.second.get();
+          Db oldDb = dbCache_.get(dbName);
+          invalidatedDb = invalidateDb(dbName, oldDb, hmsObjects, catalogTimeline);
+        } catch (Exception e) {
+          LOG.warn("Error fetching HMS objects for database " + dbName, e);
+        }
+        if (invalidatedDb != null) {
+          dbCache_.add(invalidatedDb.first);
+          // Submit tables for background loading.
+          for (TTableName tblName : invalidatedDb.second) {
+            tableLoadingMgr_.backgroundLoad(tblName);
+          }
+        }
+        newDbNames.add(dbName);
+        resetManager_.pollFetchingDb();
+
+        DebugUtils.executeDebugAction(
+            BackendConfig.INSTANCE.debugActions(), DebugUtils.RESET_METADATA_LOOP_LOCKED);
+      }
+
+      // Everytime lockDurationMs passed, temporarily unlock versionLock_.writeLock()
+      // to allow other operation to progress. DO NOT unlock if dbResetMonitor_ is
+      // not active.
+      if (!isSyncDdl && resetManager_.isActive()
+          && System.currentTimeMillis() >= nextUnlock) {
+        annotation =
+            String.format("invalidating metadata - %s/%s dbs complete - temporary unlock",
+                numComplete++, allDbsCount);
+        try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
+          // Temporary release writeLock() and lock it again.
+          // Increase catalogVersion_ after relocking.
+          resetManager_.signalAllWaiters();
+          unlockedTimer.start();
+          versionLock_.writeLock().unlock();
+
+          DebugUtils.executeDebugAction(BackendConfig.INSTANCE.debugActions(),
+              DebugUtils.RESET_METADATA_LOOP_UNLOCKED);
+
+          versionLock_.writeLock().lock();
+          unlockedTimer.stop();
+          nextUnlock = System.currentTimeMillis() + lockDurationMs;
+          ++catalogVersion_;
+        }
+      }
+    }
+
+    // Poll the remaining oldDbNames.
+    while (!oldDbNames.isEmpty()) {
+      String oldDbName = oldDbNames.poll();
+      if (!newDbNames.contains(oldDbName)) {
+        LOG.info("Removing database: " + oldDbName);
+        removeDbLocked(oldDbName);
+      }
+    }
+    Preconditions.checkState(versionLock_.writeLock().isHeldByCurrentThread());
   }
 
   public Db addDb(String dbName, org.apache.hadoop.hive.metastore.api.Database msDb) {
@@ -2390,6 +2594,7 @@ public class CatalogServiceCatalog extends Catalog {
     Db newDb = new Db(dbName, msDb);
     versionLock_.writeLock().lock();
     try {
+      resetManager_.waitOngoingMetadataFetch(dbName);
       newDb.setCatalogVersion(incrementAndGetCatalogVersion());
       newDb.setCreateEventId(eventId);
       addDb(newDb);
@@ -2405,15 +2610,20 @@ public class CatalogServiceCatalog extends Catalog {
    * Used by DROP DATABASE statements.
    */
   @Override
-  public Db removeDb(String dbName) {
+  public @Nullable Db removeDb(String dbName) {
     versionLock_.writeLock().lock();
     try {
-      Db removedDb = super.removeDb(dbName);
-      if (removedDb != null) updateDeleteLog(removedDb);
-      return removedDb;
+      resetManager_.waitOngoingMetadataFetch(dbName);
+      return removeDbLocked(dbName);
     } finally {
       versionLock_.writeLock().unlock();
     }
+  }
+
+  private @Nullable Db removeDbLocked(String dbName) {
+    Db removedDb = super.removeDb(dbName);
+    if (removedDb != null) updateDeleteLog(removedDb);
+    return removedDb;
   }
 
   /**
@@ -2450,6 +2660,7 @@ public class CatalogServiceCatalog extends Catalog {
       String tblComment, long createEventId) {
     versionLock_.writeLock().lock();
     try {
+      resetManager_.waitOngoingMetadataFetch(dbName);
       // IMPALA-9211: get db object after holding the writeLock in case of getting stale
       // db object due to concurrent INVALIDATE METADATA
       Db db = getDb(dbName);
@@ -2477,17 +2688,18 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public Table addTable(Db db, Table table) {
     versionLock_.writeLock().lock();
+    Preconditions.checkNotNull(db);
     try {
-      Preconditions.checkNotNull(db).addTable(Preconditions.checkNotNull(table));
+      resetManager_.waitOngoingMetadataFetch(db.getName());
+      db.addTable(Preconditions.checkNotNull(table));
     } finally {
       versionLock_.writeLock().unlock();
     }
     return table;
   }
 
-  public Table getOrLoadTable(String dbName, String tblName, String reason,
-      ValidWriteIdList validWriteIdList)
-      throws CatalogException {
+  public @Nullable Table getOrLoadTable(String dbName, String tblName, String reason,
+      ValidWriteIdList validWriteIdList) throws CatalogException {
     return getOrLoadTable(dbName, tblName, reason, validWriteIdList,
         TABLE_ID_UNAVAILABLE, NoOpEventSequence.INSTANCE);
   }
@@ -2501,7 +2713,7 @@ public class CatalogServiceCatalog extends Catalog {
    * and the current cached value will be returned. This may mean that a missing table
    * (not yet loaded table) will be returned.
    */
-  public Table getOrLoadTable(String dbName, String tblName, String reason,
+  public @Nullable Table getOrLoadTable(String dbName, String tblName, String reason,
       ValidWriteIdList validWriteIdList, long tableId, EventSequence catalogTimeline)
       throws CatalogException {
     TTableName tableName = new TTableName(dbName.toLowerCase(), tblName.toLowerCase());
@@ -2619,10 +2831,11 @@ public class CatalogServiceCatalog extends Catalog {
    * for transactional tables, we still replace the existing table if the updatedTbl has
    * more recent writeIdList than the existing table.
    */
-  private Table replaceTableIfUnchanged(Table updatedTbl, long expectedCatalogVersion,
-      long tableId) throws DatabaseNotFoundException {
+  private @Nullable Table replaceTableIfUnchanged(Table updatedTbl,
+      long expectedCatalogVersion, long tableId) throws DatabaseNotFoundException {
     versionLock_.writeLock().lock();
     try {
+      resetManager_.waitOngoingMetadataFetch(updatedTbl.getDb().getName());
       Db db = getDb(updatedTbl.getDb().getName());
       if (db == null) {
         throw new DatabaseNotFoundException(
@@ -2690,10 +2903,11 @@ public class CatalogServiceCatalog extends Catalog {
    * Returns the removed Table, or null if the table or db does not exist.
    */
   public Table removeTable(String dbName, String tblName) {
-    Db parentDb = getDb(dbName);
-    if (parentDb == null) return null;
     versionLock_.writeLock().lock();
     try {
+      resetManager_.waitOngoingMetadataFetch(dbName);
+      Db parentDb = getDb(dbName);
+      if (parentDb == null) return null;
       Table removedTable = parentDb.removeTable(tblName);
       if (removedTable != null && !removedTable.isStoredInImpaladCatalogCache()) {
         CatalogMonitor.INSTANCE.getCatalogTableMetrics().removeTable(removedTable);
@@ -2717,6 +2931,7 @@ public class CatalogServiceCatalog extends Catalog {
   public Function removeFunction(Function desc) {
     versionLock_.writeLock().lock();
     try {
+      resetManager_.waitOngoingMetadataFetch(desc.dbName());
       Function removedFn = super.removeFunction(desc);
       if (removedFn != null) {
         removedFn.setCatalogVersion(incrementAndGetCatalogVersion());
@@ -2734,10 +2949,11 @@ public class CatalogServiceCatalog extends Catalog {
    */
   @Override
   public boolean addFunction(Function fn) {
-    Db db = getDb(fn.getFunctionName().getDb());
-    if (db == null) return false;
     versionLock_.writeLock().lock();
     try {
+      resetManager_.waitOngoingMetadataFetch(fn.dbName());
+      Db db = getDb(fn.getFunctionName().getDb());
+      if (db == null) return false;
       if (db.addFunction(fn)) {
         fn.setCatalogVersion(incrementAndGetCatalogVersion());
         return true;
@@ -2799,6 +3015,9 @@ public class CatalogServiceCatalog extends Catalog {
     if (db == null) return Pair.create(null, null);
     versionLock_.writeLock().lock();
     try {
+      List<String> dbNames =
+          ImmutableList.of(oldTableName.getDb_name(), newTableName.getDb_name());
+      resetManager_.waitOngoingMetadataFetch(dbNames);
       Table oldTable =
           removeTable(oldTableName.getDb_name(), oldTableName.getTable_name());
       if (oldTable == null) return Pair.create(null, null);
@@ -3115,6 +3334,7 @@ public class CatalogServiceCatalog extends Catalog {
     Table incompleteTable;
     versionLock_.writeLock().lock();
     try {
+      resetManager_.waitOngoingMetadataFetch(dbName);
       Db db = getDb(dbName);
       if (db == null) return null;
       Table existingTbl = db.getTable(tblName);
@@ -4230,7 +4450,14 @@ public class CatalogServiceCatalog extends Catalog {
     TCatalogInfoSelector sel = Preconditions.checkNotNull(req.catalog_info_selector,
         "no catalog_info_selector in request");
     if (sel.want_db_names) {
-      resp.catalog_info.db_names = ImmutableList.copyOf(dbCache_.get().keySet());
+      // dbCache_ might not be fully populated yet.
+      // Report content of dbResetMonitor_ as well, if it is not empty.
+      versionLock_.writeLock().lock();
+      try {
+        Set<String> dbNames = new HashSet<>(dbCache_.keySet());
+        dbNames.addAll(resetManager_.allFetcingDbList());
+        resp.catalog_info.db_names = ImmutableList.copyOf(dbNames);
+      } finally { versionLock_.writeLock().unlock(); }
     }
     // TODO(todd) implement data sources and other global information.
     return resp;

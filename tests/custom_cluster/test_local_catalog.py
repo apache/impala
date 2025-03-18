@@ -201,7 +201,7 @@ class TestLocalCatalogCompactUpdates(CustomClusterTestSuite):
     # Update all partitions. We should receive invalidations for partition id=0,1,2.
     self.execute_query("insert into my_part partition(p) values (0,0),(1,1),(2,2)")
 
-    log_regex = "Invalidated objects in cache: \[partition %s.my_part:p=\d \(id=%%d\)\]"\
+    log_regex = r"Invalidated objects in cache: \[partition %s.my_part:p=\d \(id=%%d\)\]"\
                 % unique_database
     self.assert_impalad_log_contains('INFO', log_regex % 0)
     self.assert_impalad_log_contains('INFO', log_regex % 1)
@@ -225,7 +225,7 @@ class TestLocalCatalogCompactUpdates(CustomClusterTestSuite):
     # Update the table. So we should receive an invalidation on partition id = 9.
     self.execute_query("insert into my_tbl select 0")
     self.assert_impalad_log_contains(
-        'INFO', "Invalidated objects in cache: \[partition %s.my_tbl: \(id=9\)\]"
+        'INFO', r"Invalidated objects in cache: \[partition %s.my_tbl: \(id=9\)\]"
                 % unique_database)
 
   @pytest.mark.execute_serially
@@ -448,13 +448,14 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     tls = ThreadLocalClient()
 
     def do_table(i):
-      for q in [
+      queries = [
         "create table {db}.t{i} (i int)",
         "describe {db}.t{i}",
         "drop table {db}.t{i}",
         "create database {db}_{i}",
         "show tables in {db}_{i}",
-        "drop database {db}_{i}"]:
+        "drop database {db}_{i}"]
+      for q in queries:
         self.execute_query_expect_success(tls.c, q.format(
             db=unique_database, i=i))
 

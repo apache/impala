@@ -47,6 +47,9 @@ LOG = logging.getLogger(__name__)
 
 
 class TestRestart(CustomClusterTestSuite):
+
+  UPDATE_FREQUENCY_S = 4
+
   @pytest.mark.execute_serially
   def test_restart_statestore(self, cursor):
     """ Regression test of IMPALA-6973. After the statestore restarts, the metadata should
@@ -171,8 +174,10 @@ class TestRestart(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    statestored_args="--statestore_update_frequency_ms=5000 "
-                     "--statestore_heartbeat_frequency_ms=10000")
+      statestored_args=(
+          "--statestore_heartbeat_frequency_ms=10000 "
+          "--statestore_update_frequency_ms={frequency_ms}").format(
+              frequency_ms=(UPDATE_FREQUENCY_S * 1000)))
   def test_restart_catalogd(self, unique_database):
     tbl_name = unique_database + ".join_aa"
     self.execute_query_expect_success(
@@ -339,7 +344,8 @@ class TestRestart(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    statestored_args="--statestore_update_frequency_ms=5000")
+      statestored_args="--statestore_update_frequency_ms={frequency_ms}".format(
+          frequency_ms=(UPDATE_FREQUENCY_S * 1000)))
   def test_restart_catalogd_sync_ddl(self, unique_database):
     tbl_name = unique_database + ".join_aa"
     self.execute_query_expect_success(
@@ -363,24 +369,34 @@ class TestRestart(CustomClusterTestSuite):
         "alter table {} add columns (name string)".format(tbl_name), query_options)
     self.execute_query_expect_success(self.client, "select name from {}".format(tbl_name))
 
-  UPDATE_FREQUENCY_S = 10
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     statestored_args="--statestore_update_frequency_ms={frequency_ms}"
     .format(frequency_ms=(UPDATE_FREQUENCY_S * 1000)))
-  def test_restart_catalogd_twice(self, unique_database):
+  def test_restart_legacy_catalogd_twice(self, unique_database):
+    self.run_restart_catalogd_twice(unique_database)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal",
+    statestored_args="--statestore_update_frequency_ms={frequency_ms}"
+    .format(frequency_ms=(UPDATE_FREQUENCY_S * 1000)))
+  def test_restart_local_catalogd_twice(self, unique_database):
+    self.run_restart_catalogd_twice(unique_database)
+
+  def run_restart_catalogd_twice(self, unique_database):
     tbl_name = unique_database + ".join_aa"
+
     self.cluster.catalogd.restart()
-    query = "create table {}(id int)".format(tbl_name)
-    query_handle = []
 
     def execute_query_async():
-      query_handle.append(self.execute_query(query))
+      query = "create table {}(id int)".format(tbl_name)
+      self.execute_query(query)
 
     thread = threading.Thread(target=execute_query_async)
     thread.start()
-    sleep(self.UPDATE_FREQUENCY_S - 5)
+    sleep(self.UPDATE_FREQUENCY_S // 2)
     self.cluster.catalogd.restart()
     thread.join()
     self.execute_query_expect_success(self.client,
@@ -391,7 +407,8 @@ class TestRestart(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
       catalogd_args="--catalog_topic_mode=minimal",
-      statestored_args="--statestore_update_frequency_ms=5000")
+      statestored_args="--statestore_update_frequency_ms={frequency_ms}".format(
+          frequency_ms=(UPDATE_FREQUENCY_S * 1000)))
   def test_restart_catalogd_with_local_catalog(self, unique_database):
     tbl_name = unique_database + ".join_aa"
     self.execute_query_expect_success(

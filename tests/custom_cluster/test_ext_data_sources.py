@@ -72,7 +72,9 @@ class TestExtDataSources(CustomClusterTestSuite):
 
   @SkipIfApacheHive.data_connector_not_supported
   @pytest.mark.execute_serially
-  def test_restart_catalogd(self, vector, unique_database):
+  @CustomClusterTestSuite.with_args(
+      statestored_args="--statestore_update_frequency_ms=1000")
+  def test_restart_catalogd(self):
     """Restart Catalog server after creating a data source. Verify that the data source
     object is persistent across restarting of Catalog server."""
     DROP_DATA_SOURCE_QUERY = "DROP DATA SOURCE IF EXISTS test_restart_persistent"

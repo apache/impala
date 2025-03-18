@@ -84,6 +84,16 @@ class TestConcurrentDdls(CustomClusterTestSuite):
   def test_local_catalog_ddls_with_invalidate_metadata_sync_ddl(self, unique_database):
     self._run_ddls_with_invalidation(unique_database, sync_ddl=True)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal "
+                  "--reset_metadata_lock_duration_ms=50 "
+                  "--debug_actions=reset_metadata_loop_unlocked:SLEEP@50")
+  def test_local_catalog_ddls_with_invalidate_metadata_unlock_gap(self, unique_database):
+    """Test with 50ms write unlock gap."""
+    self._run_ddls_with_invalidation(unique_database, sync_ddl=False)
+
   def _run_ddls_with_invalidation(self, db, sync_ddl=False):
     """Test INVALIDATE METADATA with concurrent DDLs to see if any queries hang"""
     test_self = self
@@ -136,8 +146,8 @@ class TestConcurrentDdls(CustomClusterTestSuite):
         while True:
           try:
             handle = tls.client.execute_async(query)
-            is_finished = tls.client.wait_for_finished_timeout(handle, timeout=60)
-            assert is_finished, "Query timeout(60s): " + query
+            is_finished = tls.client.wait_for_finished_timeout(handle, timeout=120)
+            assert is_finished, "Query timeout(120s): " + query
             tls.client.close_query(handle)
             # Success, next case.
             break

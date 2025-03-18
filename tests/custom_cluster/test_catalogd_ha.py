@@ -37,6 +37,12 @@ DEFAULT_CATALOG_SERVICE_PORT = 26000
 SLOW_BUILD_SYNC_DDL_DELAY_S = 20
 SYNC_DDL_DELAY_S = build_flavor_timeout(
     10, slow_build_timeout=SLOW_BUILD_SYNC_DDL_DELAY_S)
+SS_AUTO_FAILOVER_FREQ_MS = 500
+SS_AUTO_FAILOVER_ARGS = (
+  "--use_subscriber_id_as_catalogd_priority=true "
+  "--statestore_heartbeat_frequency_ms={0} "
+  "--active_catalogd_designation_monitoring_interval_ms={0} ").format(
+  SS_AUTO_FAILOVER_FREQ_MS)
 # s3 can behave as a slow build.
 if IS_S3:
   SYNC_DDL_DELAY_S = SLOW_BUILD_SYNC_DDL_DELAY_S
@@ -177,9 +183,9 @@ class TestCatalogdHA(CustomClusterTestSuite):
     statestore_service = self.cluster.statestored.service
 
     # Assert that cluster is set up with configs needed to run this test.
-    assert 1000 >= int(statestore_service.get_flag_current_value(
+    assert SS_AUTO_FAILOVER_FREQ_MS >= int(statestore_service.get_flag_current_value(
         'active_catalogd_designation_monitoring_interval_ms'))
-    assert 1000 >= int(statestore_service.get_flag_current_value(
+    assert SS_AUTO_FAILOVER_FREQ_MS >= int(statestore_service.get_flag_current_value(
         'statestore_heartbeat_frequency_ms'))
 
     start_count_clear_topic_entries = statestore_service.get_metric_value(
@@ -234,9 +240,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
     self.__verify_impalad_active_catalogd_port(2, catalogd_service_2)
 
   @CustomClusterTestSuite.with_args(
-    statestored_args="--use_subscriber_id_as_catalogd_priority=true "
-                     "--statestore_heartbeat_frequency_ms=1000 "
-                     "--active_catalogd_designation_monitoring_interval_ms=1000",
+    statestored_args=SS_AUTO_FAILOVER_ARGS,
     catalogd_args="--catalogd_ha_reset_metadata_on_failover=false",
     start_args="--enable_catalogd_ha")
   def test_catalogd_auto_failover(self, unique_database):
@@ -252,10 +256,9 @@ class TestCatalogdHA(CustomClusterTestSuite):
     assert failed_update_catalogd_rpc_num == 0
 
   @CustomClusterTestSuite.with_args(
-    statestored_args="--use_subscriber_id_as_catalogd_priority=true "
-                     "--statestore_heartbeat_frequency_ms=1000 "
-                     "--active_catalogd_designation_monitoring_interval_ms=1000 "
-                     "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:FAIL@1.0",
+    statestored_args=(
+        SS_AUTO_FAILOVER_ARGS
+        + "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:FAIL@1.0"),
     catalogd_args="--catalogd_ha_reset_metadata_on_failover=false",
     start_args="--enable_catalogd_ha")
   def test_catalogd_auto_failover_with_failed_rpc(self, unique_database):
@@ -271,18 +274,33 @@ class TestCatalogdHA(CustomClusterTestSuite):
     assert failed_update_catalogd_rpc_num == successful_update_catalogd_rpc_num
 
   @CustomClusterTestSuite.with_args(
-    statestored_args="--use_subscriber_id_as_catalogd_priority=true "
-                     "--statestore_heartbeat_frequency_ms=1000 "
-                     "--active_catalogd_designation_monitoring_interval_ms=1000 "
-                     "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:SLEEP@3000",
+    statestored_args=(
+        SS_AUTO_FAILOVER_ARGS
+        + "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:SLEEP@3000"),
     # minicluster has 68 Db when this test is written. So total sleep is ~3.4s.
-    catalogd_args="--debug_actions=reset_metadata_loop_locked:SLEEP@50",
+    catalogd_args="--reset_metadata_lock_duration_ms=100 "
+                  "--debug_actions=reset_metadata_loop_locked:SLEEP@50",
     start_args="--enable_catalogd_ha")
-  @UniqueDatabase.parametrize(name_prefix='aa_test_catalogd_auto_failover_slow')
-  def test_catalogd_auto_failover_slow(self, unique_database):
+  @UniqueDatabase.parametrize(name_prefix='aaa_test_catalogd_auto_failover_slow_first_db')
+  def test_catalogd_auto_failover_slow_first_db(self, unique_database):
     """Tests for Catalog Service auto fail over with both slow metadata reset and slow
-    statestore update. Set 'aa_' as unique_database prefix to make the database among
+    statestore update. Set 'aaa_' as unique_database prefix to make the database among
     the earliest in reset metadata order."""
+    self.__test_catalogd_auto_failover(unique_database)
+
+  @CustomClusterTestSuite.with_args(
+    statestored_args=(
+        SS_AUTO_FAILOVER_ARGS
+        + "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:SLEEP@3000"),
+    # minicluster has 68 Db when this test is written. So total sleep is ~3.4s.
+    catalogd_args="--reset_metadata_lock_duration_ms=100 "
+                  "--debug_actions=reset_metadata_loop_locked:SLEEP@50",
+    start_args="--enable_catalogd_ha")
+  @UniqueDatabase.parametrize(name_prefix='zzz_test_catalogd_auto_failover_slow_last_db')
+  def test_catalogd_auto_failover_slow_last_db(self, unique_database):
+    """Tests for Catalog Service auto fail over with both slow metadata reset and slow
+    statestore update. Set 'zzz_' as unique_database prefix to make the database among
+    the latest in reset metadata order."""
     self.__test_catalogd_auto_failover(unique_database)
 
   def __test_catalogd_manual_failover(self, unique_database):
