@@ -47,6 +47,12 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
   # storing common arguments as members and substituting table name and HDFS warehouse
   # path to the query string.
   class TestHelper:
+    class TimeState:
+      CHANGED = "Changed"
+      UNCHANGED = "Unchanged"
+      SET = "Set"
+      UNSET = "Unset"
+
     def __init__(self, test_suite, db_name, tbl_name):
       self.test_suite = test_suite
       self.db_name = db_name
@@ -58,21 +64,21 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
       changed by running the query.
       The following strings are substituted in the query: "%(TBL)s" and "%(WAREHOUSE)s"
       """
-      self.run_test(query, False, False)
+      self.run_test(query, self.TimeState.UNCHANGED, self.TimeState.UNCHANGED)
 
     def expect_ddl_time_change(self, query):
       """Running the query should increase transient_lastDdlTime but
       not impala.lastComputeStatsTime.
       The following strings are substituted in the query: "%(TBL)s" and "%(WAREHOUSE)s"
       """
-      self.run_test(query, True, False)
+      self.run_test(query, self.TimeState.CHANGED, self.TimeState.UNCHANGED)
 
     def expect_stat_time_change(self, query):
       """Running the query should increase impala.lastComputeStatsTime but
       not transient_lastDdlTime.
       The following strings are substituted in the query: "%(TBL)s" and "%(WAREHOUSE)s"
       """
-      self.run_test(query, False, True)
+      self.run_test(query, self.TimeState.UNCHANGED, self.TimeState.CHANGED)
 
     def expect_ddl_time_change_on_rename(self, new_tbl_name):
       """
@@ -80,9 +86,23 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
       the new table than it was on the old table.
       """
       query = "alter table %(TBL)s rename to {}".format(self.db_name + "." + new_tbl_name)
-      self.run_test(query, True, False, new_tbl_name)
+      self.run_test(query, self.TimeState.CHANGED, self.TimeState.UNCHANGED, new_tbl_name)
 
-    def run_test(self, query, expect_changed_ddl_time, expect_changed_stats_time,
+    def expect_stat_time_set(self, query):
+      """Running the query should not change transient_lastDdlTime while
+      impala.lastComputeStatsTime should be set.
+      The following strings are substituted in the query: "%(TBL)s" and "%(WAREHOUSE)s"
+      """
+      self.run_test(query, self.TimeState.UNCHANGED, self.TimeState.SET)
+
+    def expect_stat_time_unset(self, query):
+      """Running the query should not change transient_lastDdlTime while
+      impala.lastComputeStatsTime should be unset.
+      The following strings are substituted in the query: "%(TBL)s" and "%(WAREHOUSE)s"
+      """
+      self.run_test(query, self.TimeState.UNCHANGED, self.TimeState.UNSET)
+
+    def run_test(self, query, expected_ddl_time_state, expected_stats_time_state,
         new_tbl_name=None):
       """
       Runs the query and compares the last ddl/compute stats time before and after
@@ -109,17 +129,19 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
       (afterDdlTime, afterStatsTime) = self._get_ddl_and_stats_time(
           self.db_name, self.tbl_name)
 
-      if expect_changed_ddl_time:
-        # check that the new ddlTime is strictly greater than the old one.
-        assert int(afterDdlTime) > int(beforeDdlTime)
-      else:
-        assert int(afterDdlTime) == int(beforeDdlTime)
+      self.check_time_state(expected_ddl_time_state, afterDdlTime, beforeDdlTime)
+      self.check_time_state(expected_stats_time_state, afterStatsTime, beforeStatsTime)
 
-      if expect_changed_stats_time:
-        # check that the new statsTime is strictly greater than the old one.
-        assert int(afterStatsTime) > int(beforeStatsTime)
-      else:
-        assert int(afterStatsTime) == int(beforeStatsTime)
+    def check_time_state(self, expected_state, after_time, before_time):
+      if expected_state == self.TimeState.CHANGED:
+        # Check that the new time is strictly greater than the old one.
+        assert int(after_time) > int(before_time)
+      elif expected_state == self.TimeState.UNCHANGED:
+        assert int(after_time) == int(before_time)
+      elif expected_state == self.TimeState.SET:
+        assert after_time != ""
+      elif expected_state == self.TimeState.UNSET:
+        assert after_time == ""
 
     def _update_name(self, new_tbl_name):
       """"
@@ -138,8 +160,8 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
 
       table = self.test_suite.hive_client.get_table(db_name, tbl_name)
       assert table is not None
-      ddlTime = table.parameters[HIVE_LAST_DDL_TIME_PARAM_KEY]
-      statsTime = table.parameters[LAST_COMPUTE_STATS_TIME_KEY]
+      ddlTime = table.parameters.get(HIVE_LAST_DDL_TIME_PARAM_KEY, "")
+      statsTime = table.parameters.get(LAST_COMPUTE_STATS_TIME_KEY, "")
       return (ddlTime, statsTime)
 
   def _create_table(self, fq_tbl_name, is_kudu):
@@ -177,11 +199,11 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     self.run_common_test_cases(h)
 
     # prepare for incremental statistics tests
-    self.execute_query("drop stats %s" % h.fq_tbl_name)
+    h.expect_stat_time_unset("drop stats %(TBL)s")
     self.execute_query("alter table %s add partition (j=1, s='2012')" % h.fq_tbl_name)
 
     # compute incremental statistics
-    h.expect_stat_time_change("compute incremental stats %(TBL)s")
+    h.expect_stat_time_set("compute incremental stats %(TBL)s")
     h.expect_stat_time_change("compute incremental stats %(TBL)s "
                               "partition (j=1, s='2012')")
 
@@ -257,7 +279,8 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     h.expect_stat_time_change("compute stats %(TBL)s (i)")
 
     # drop statistics
-    h.expect_no_time_change("drop stats %(TBL)s")
+    h.expect_stat_time_unset("drop stats %(TBL)s")
+    self.execute_query("compute stats  %s" % h.fq_tbl_name)
 
     # invalidate metadata and reload table
     self.execute_query("invalidate metadata %s" % h.fq_tbl_name)
