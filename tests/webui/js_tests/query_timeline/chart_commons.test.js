@@ -18,7 +18,7 @@
 import {describe, test, expect} from '@jest/globals';
 import {exportedForTest, generateTimesamples, clearTimeseriesValues,
     mapTimeseriesCounters, aggregateProfileTimeseries} from
-    '../../query_timeline/chart_commons.js';
+    'scripts/query_timeline/chart_commons.js';
 
 describe("Test mapTimeseriesCounters", () => {
   // Test whether the method correctly searches and maps indexes of counters based

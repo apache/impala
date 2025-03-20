@@ -26,7 +26,7 @@ describe("Test Compression Library", () => {
     const exampleJSONProfileText = readFileSync("../../../testdata/impala-profiles/"
         + "impala_profile_log_tpcds_compute_stats_extended.expected.pretty.json",
         {encoding : "utf-8"});
-    import("../../../pako.min.js").then((pako) => {
+    import("pako.min.js").then((pako) => {
       pako = pako.default;
       expect(pako.inflate(pako.deflate(exampleJSONProfileText, {level : 3}), {to : "string"}))
           .toBe(exampleJSONProfileText);

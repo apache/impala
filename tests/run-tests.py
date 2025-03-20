@@ -48,7 +48,7 @@ VALID_TEST_DIRS = ['failure', 'query_test', 'stress', 'unittests', 'aux_query_te
 TEST_HELPER_DIRS = ['aux_parquet_data_load', 'comparison', 'benchmark',
                      'custom_cluster', 'util', 'experiments', 'verifiers', 'common',
                      'performance', 'beeswax', 'aux_custom_cluster_tests',
-                     'authorization', 'test-hive-udfs', '__pycache__']
+                     'authorization', 'test-hive-udfs', '__pycache__', 'webui']
 
 TEST_DIR = os.path.join(os.environ['IMPALA_HOME'], 'tests')
 RESULT_DIR = os.path.join(os.environ['IMPALA_EE_TEST_LOGS_DIR'], 'results')

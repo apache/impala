@@ -352,7 +352,7 @@ do
   fi
 
   if [[ "$JS_TEST" == true ]]; then
-    if ! "${IMPALA_HOME}/tests/run-js-tests.sh"; then
+    if ! "${IMPALA_HOME}/tests/webui/run-js-tests.sh"; then
       TEST_RET_CODE=1
     fi
   fi

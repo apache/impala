@@ -21,52 +21,52 @@ set -euo pipefail
 . "$IMPALA_HOME/bin/report_build_error.sh"
 setup_report_build_error
 
-: ${IMPALA_JS_TEST_LOGS_DIR:="${IMPALA_LOGS_DIR}/js_tests"}
-
-NODEJS_VERSION=v16.20.2
-# ARCH_NAME is set in bin/impala-config.sh
+: ${ARCH_NAME:=$(uname -p)}
 if [[ $ARCH_NAME == aarch64 ]]; then
   NODEJS_DISTRO=linux-arm64
 elif [[ $ARCH_NAME == x86_64 ]]; then
   NODEJS_DISTRO=linux-x64
 else
   echo "This script supports Intel x86_64 or ARM aarch64 CPU architectures only." >&2
-  echo "Current CPU type is reported as $ARCH_NAME" >&2
+  echo "Current CPU type is reported as '$ARCH_NAME'" >&2
   # report the installation failure as a JUnit symptom
   "${IMPALA_HOME}"/bin/generate_junitxml.py --phase JS_TEST \
-      -- step "node.js installation" \
+      --step "node.js installation" \
       --error "Unknown CPU architecture $ARCH_NAME encountered."
   exit 1
 fi
 
-NODEJS_LIB_PATH="${IMPALA_TOOLCHAIN}/node-${NODEJS_VERSION}"
-export IMPALA_NODEJS="${NODEJS_LIB_PATH}/bin/node"
-NPM="${NODEJS_LIB_PATH}/bin/npm"
-JS_TESTS_DIR="${IMPALA_HOME}/www/scripts/tests"
+: ${IMPALA_TOOLCHAIN_HOST:=native-toolchain.s3.amazonaws.com}
+: ${IMPALA_NODEJS_VERSION:=v16.20.2}
+: ${IMPALA_TOOLCHAIN:="$IMPALA_HOME/toolchain"}
 
-export IMPALA_JS_TEST_LOGS_DIR;
+IMPALA_NODEJS_LIB="${IMPALA_TOOLCHAIN}/node-${IMPALA_NODEJS_VERSION}"
+CACHED_NODEJS_PATH="${HOME}/.cache/impala_nodejs"
 
 # Install nodejs locally, if not installed
-if [ -r "$IMPALA_NODEJS" ]; then
-  echo "NodeJS ${NODEJS_VERSION} installation found";
-else
-  echo "Fetching NodeJS ${NODEJS_VERSION}-${NODEJS_DISTRO} binaries ...";
-  NODE_URL_PREFIX="https://${IMPALA_TOOLCHAIN_HOST}/mirror/nodejs"
-  NODE_URL_SUFFIX="node-${NODEJS_VERSION}-${NODEJS_DISTRO}.tar.xz"
-  curl "${NODE_URL_PREFIX}/${NODE_URL_SUFFIX}" -O
+if [ ! -r "${IMPALA_NODEJS_LIB}/bin/node" ]; then
+  echo "Fetching NodeJS ${IMPALA_NODEJS_VERSION}-${NODEJS_DISTRO} binaries ..."
 
-  tar -xJf node-${NODEJS_VERSION}-${NODEJS_DISTRO}.tar.xz
+  NODE_URL_SUFFIX="node-${IMPALA_NODEJS_VERSION}-${NODEJS_DISTRO}.tar.xz"
+  CACHED_NODEJS_TARBALL="${CACHED_NODEJS_PATH}/${NODE_URL_SUFFIX}"
 
-  mkdir -p "${NODEJS_LIB_PATH}"
+  if [ ! -r "${CACHED_NODEJS_TARBALL}" ]; then
+    NODE_URL_PREFIX="https://${IMPALA_TOOLCHAIN_HOST}/mirror/nodejs"
 
-  mv node-${NODEJS_VERSION}-${NODEJS_DISTRO}/* -t "${NODEJS_LIB_PATH}";
+    mkdir -p "$CACHED_NODEJS_PATH"
 
-  rm -rf node-${NODEJS_VERSION}-${NODEJS_DISTRO}.tar.xz \
-      node-${NODEJS_VERSION}-${NODEJS_DISTRO}/
+    curl "${NODE_URL_PREFIX}/${NODE_URL_SUFFIX}" -o "${CACHED_NODEJS_TARBALL}"
+  fi
+
+  tar -xJf "${CACHED_NODEJS_TARBALL}" -C ./
+
+  mkdir -p "${IMPALA_NODEJS_LIB}"
+
+  mv node-${IMPALA_NODEJS_VERSION}-${NODEJS_DISTRO}/* -t "${IMPALA_NODEJS_LIB}"
+
+  rm -rf node-${IMPALA_NODEJS_VERSION}-${NODEJS_DISTRO}.tar.xz \
+      node-${IMPALA_NODEJS_VERSION}-${NODEJS_DISTRO}/
 fi;
 
-# Install packages in package.json
-"$IMPALA_NODEJS" "$NPM" --prefix "${JS_TESTS_DIR}" install
-
-# Run all JEST testing suites (by default *.test.js)
-"$IMPALA_NODEJS" "$NPM" --prefix "${JS_TESTS_DIR}" test
+echo "NodeJS installation found in :"
+echo "${IMPALA_NODEJS_LIB}/bin"

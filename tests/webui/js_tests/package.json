@@ -1,11 +1,11 @@
 {
-  "name": "Impala WebUI JS Tests",
+  "name": "impala-webui-js-tests",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "test": "JEST_JUNIT_OUTPUT_DIR=\"${IMPALA_JS_TEST_LOGS_DIR}\" \"${IMPALA_NODEJS}\" --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
-  "devDependencies": {
+  "dependencies": {
     "jest": "^29.6.4",
     "jest-environment-jsdom": "^29.6.4",
     "jest-junit": "^16.0.0"

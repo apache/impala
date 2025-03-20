@@ -16,7 +16,7 @@
 // under the License.
 
 import {describe, test, expect} from '@jest/globals';
-import {exportedForTest} from "../../query_timeline/fragment_diagram.js";
+import {exportedForTest} from "scripts/query_timeline/fragment_diagram.js";
 
 describe("Test getSvg*", () => {
   // Test whether getSvg* methods correctly set attributes and return expected elements

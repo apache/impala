@@ -411,6 +411,43 @@ def get_planner_tests_comments():
   return comments
 
 
+def get_eslint_comments(base_revision, revision):
+  """Get comments based on JS code analysis and styling rules for
+  all scripts present in the git commit 'revision'."""
+  filenames = check_output(["git", "diff", "{0}..{1}".format(base_revision, revision),
+      "--name-only", "--", "*.js"], universal_newlines=True)
+  filenames = filenames.strip().splitlines()
+  comments = {}
+  if (len(filenames) > 0):
+    node_env = {}
+    if (os.environ.get("IMPALA_SCRIPTS_HOME")):
+      node_env["IMPALA_HOME"] = os.environ.get("IMPALA_SCRIPTS_HOME")
+    else:
+      node_env["IMPALA_HOME"] = os.environ.get("IMPALA_HOME")
+    node_env["HOME"] = os.environ.get("HOME")
+
+    NODEJS_SETUP = os.path.join(node_env["IMPALA_HOME"], "bin/nodejs/setup_nodejs.sh")
+    NODEJS_BIN = check_output([NODEJS_SETUP], env=node_env).decode("utf-8")
+    NODEJS_BIN = NODEJS_BIN.splitlines()[-1]
+    NODE = os.path.join(NODEJS_BIN, "node")
+    NPM = os.path.join(NODEJS_BIN, "npm")
+    LINTING_TESTS_HOME = os.path.join(node_env["IMPALA_HOME"], "tests/webui/linting")
+    check_output([NODE, NPM, "--prefix", LINTING_TESTS_HOME, "install"])
+    filenames = [os.path.join(node_env["IMPALA_HOME"], filename) for filename in
+        filenames]
+    try:
+      node_env["IMPALA_NODEJS"] = NODE
+      node_env["REVIEW_JS_FILES"] = ' '.join(filenames)
+      LINTING_BIN = os.path.join(LINTING_TESTS_HOME, "node_modules/.bin/eslint")
+      LINTING_FORMATTER = os.path.join(LINTING_TESTS_HOME,
+                                       "eslint/eslint_custom_output_formatter.js")
+      LINTING_CONFIG = os.path.join(LINTING_TESTS_HOME, "eslint.config.js")
+      check_output([NODE, LINTING_BIN, "--config", LINTING_CONFIG, *filenames, "-f",
+                    LINTING_FORMATTER], env=node_env).decode("utf-8")
+    except Exception as e:
+      comments = json.loads(e.output)
+  return comments
+
 def post_review_to_gerrit(review_input):
   """Post a review to the gerrit patchset. 'review_input' is a ReviewInput JSON object
   containing the review comments. The gerrit change and patchset are picked up from
@@ -452,9 +489,9 @@ if __name__ == "__main__":
   base_revision = args.base_revision if args.base_revision else "{0}^".format(revision)
   comments = get_flake8_comments(base_revision, revision)
   merge_comments(comments, get_misc_comments(base_revision, revision, args.dryrun))
-  merge_comments(
-    comments, get_catalog_compatibility_comments(base_revision, revision))
+  merge_comments(comments, get_catalog_compatibility_comments(base_revision, revision))
   merge_comments(comments, get_planner_tests_comments())
+  merge_comments(comments, get_eslint_comments(base_revision, revision))
   review_input = {"comments": comments}
   if len(comments) > 0:
     review_input["message"] = (

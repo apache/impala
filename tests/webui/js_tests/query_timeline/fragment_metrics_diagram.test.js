@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import {exportedForTest} from "../../query_timeline/fragment_metrics_diagram.js";
+import {exportedForTest} from "scripts/query_timeline/fragment_metrics_diagram.js";
 
 describe("Test initializeFragmentMetrics", () => {
   // Test whether aggregate arrays and time sample arrays are correctly allocated

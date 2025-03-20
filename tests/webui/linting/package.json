@@ -1,0 +1,7 @@
+{
+  "name": "impala-webui-scripts",
+  "dependencies": {
+    "eslint": "8.57.1",
+    "globals": "13.24.0"
+  }
+}

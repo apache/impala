@@ -16,7 +16,7 @@
 // under the License.
 
 import {describe, test, expect} from '@jest/globals';
-import {exportedForTest} from "../../query_timeline/host_utilization_diagram.js";
+import {exportedForTest} from "scripts/query_timeline/host_utilization_diagram.js";
 
 describe("Test initializeUtilizationMetrics", () => {
   // Test whether aggregate arrays and time sample arrays are correctly allocated

@@ -1,5 +1,4 @@
 {
-  "name": "Impala WebUI - Query Timeline",
-  "version": "1.0.0",
+  "name": "query_timeline",
   "type": "module"
 }
