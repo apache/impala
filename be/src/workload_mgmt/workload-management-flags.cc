@@ -92,7 +92,7 @@ DEFINE_int32(query_log_dml_exec_timeout_s, 120, "Value of the EXEC_TIME_LIMIT_S 
     "query option on the query log table insert dmls.");
 DEFINE_validator(query_log_dml_exec_timeout_s, gt_eq_0);
 
-DEFINE_int32(query_log_max_queued, 5000, "Maximum number of records that can be queued "
+DEFINE_int32(query_log_max_queued, 3000, "Maximum number of records that can be queued "
     "before they are written to the impala query log table. This flag operates "
     "independently of the 'query_log_write_interval_s' flag. If the number of queued "
     "records reaches this value, the records will be written to the query log table no "
@@ -185,3 +185,16 @@ DEFINE_string_hidden(workload_mgmt_drop_tables, "", "Specifies which workload ma
     "tables to drop at startup. Value must be a comma-separated list of table names only "
     "(without the database name) used in workload managment. This flag will fix "
     "situations where the tables have become corrupt and are preventing daemon startup.");
+
+DEFINE_int32_hidden(query_log_expression_limit, -1, "Determines the value of the "
+    "statement_expression_limit query option in the workload management completed "
+    "queries insert DML. A negative value leaves this query option unset.");
+DEFINE_validator(query_log_expression_limit, [](const char* name, const int32_t val) {
+  if (val >= 0 && (val < 1024 || val > 999999)) {
+    LOG(ERROR) << "Invalid value for --" << name << ": must be at least 1,024 and less "
+        "than 1,000,000";
+    return false;
+  }
+
+  return true;
+});

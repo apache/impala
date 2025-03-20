@@ -76,6 +76,7 @@ DECLARE_string(cluster_id);
 DECLARE_string(query_log_request_pool);
 DECLARE_int32(query_log_write_timeout_s);
 DECLARE_string(workload_mgmt_user);
+DECLARE_int32(query_log_expression_limit);
 
 namespace impala {
 namespace workloadmgmt {
@@ -775,10 +776,12 @@ void ImpalaServer::WorkloadManagementWorker(const Version& target_schema_version
     // Set max_statement_length_bytes based on actual query, and at least the minimum.
     opts[TImpalaQueryOptions::MAX_STATEMENT_LENGTH_BYTES] =
         std::to_string(max<size_t>(MIN_MAX_STATEMENT_LENGTH_BYTES, final_sql_len));
-    // Set statement_expression_limit based on actual query, and at least the minimum.
-    opts[TImpalaQueryOptions::STATEMENT_EXPRESSION_LIMIT] =
-        std::to_string(max<size_t>(MIN_STATEMENT_EXPRESSION_LIMIT,
-            queries_to_insert.size() * _TQueryTableColumn_VALUES_TO_NAMES.size()));
+    // Set statement_expression_limit based on the startup flag. The flag validation
+    // ensures this value is numeric and falls within an acceptable range.
+    if (FLAGS_query_log_expression_limit >= 0) {
+      opts[TImpalaQueryOptions::STATEMENT_EXPRESSION_LIMIT] =
+          std::to_string(FLAGS_query_log_expression_limit);
+    }
     opts[TImpalaQueryOptions::MAX_ROW_SIZE] = std::to_string(max_row_size);
 
     // Execute the insert dml.

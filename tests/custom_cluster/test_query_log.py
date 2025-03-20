@@ -293,7 +293,8 @@ class TestQueryLogTableBeeswax(TestQueryLogTableBase):
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt "
                                                  "--query_log_max_queued={0} "
                                                  "--query_log_write_interval_s=9999 "
-                                                 "--cluster_id={1}"
+                                                 "--cluster_id={1} "
+                                                 "--query_log_expression_limit=5000"
                                                  .format(FLUSH_MAX_RECORDS_QUERY_COUNT,
                                                  FLUSH_MAX_RECORDS_CLUSTER_ID),
                                     catalogd_args="--enable_workload_mgmt",
