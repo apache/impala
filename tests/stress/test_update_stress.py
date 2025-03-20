@@ -25,6 +25,7 @@ from subprocess import check_output
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
+from tests.common.skip import SkipIfFS
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.stress.stress_util import run_tasks, Task
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX, IS_HDFS
@@ -352,6 +353,7 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
     assert len(data_files_in_tbl) == len(data_files_on_fs_rows)
     assert set(data_files_on_fs) == set(data_files_in_tbl)
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_iceberg_impala_deletes_and_hive_updates(self, unique_database):
@@ -380,6 +382,7 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
     result = self.client.execute("select count(*) from {}".format(tbl_name))
     assert result.data == ['0']
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_iceberg_impala_updates_and_hive_deletes(self, unique_database):
