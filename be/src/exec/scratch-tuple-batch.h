@@ -25,7 +25,8 @@
 
 namespace impala {
 
-/// Helper struct that represents a micro batch within 'ScratchTupleBatch'.
+/// Helper struct that represents a ['start', 'end'] range of rows that needs to be
+/// scanned within a 'ScratchTupleBatch'.
 struct ScratchMicroBatch {
   int start;
   int end;

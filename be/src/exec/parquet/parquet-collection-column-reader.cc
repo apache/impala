@@ -25,11 +25,16 @@ bool CollectionColumnReader::NextLevels() {
   DCHECK(!children_.empty());
   DCHECK_LE(rep_level_, new_collection_rep_level());
   for (int c = 0; c < children_.size(); ++c) {
+    if (children_[c]->IsComplexReader()
+        && static_cast<ComplexColumnReader*>(children_[c])->next_levels_consumed()) {
+      continue;
+    }
     do {
       // TODO: verify somewhere that all column readers are at end
       if (!children_[c]->NextLevels()) return false;
     } while (children_[c]->rep_level() > new_collection_rep_level());
   }
+  next_levels_consumed_ = true;
   UpdateDerivedState();
   return true;
 }
@@ -41,10 +46,12 @@ bool CollectionColumnReader::ReadValue(MemPool* pool, Tuple* tuple) {
       << "Caller should have called NextLevels() until we are ready to read a value";
 
   if (tuple_offset_ == -1) {
+    SetDescendantsNextLevelsConsumed(false);
     return CollectionColumnReader::NextLevels();
   } else if (def_level_ >= max_def_level()) {
     return ReadSlot(tuple->GetCollectionSlot(tuple_offset_), pool);
   } else {
+    SetDescendantsNextLevelsConsumed(false);
     // Collections add an extra def level, so it is possible to distinguish between
     // NULL and empty collections. See hdfs-parquet-scanner.h for more detailed
     // explanation.
@@ -74,6 +81,7 @@ bool CollectionColumnReader::ReadValueBatch(MemPool* pool, int max_values,
   while (val_count < max_values && !RowGroupAtEnd() && continue_execution) {
     Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem + val_count * tuple_size);
     if (def_level_ < def_level_of_immediate_repeated_ancestor()) {
+      SetDescendantsNextLevelsConsumed(false);
       // A containing repeated field is empty or NULL
       continue_execution = NextLevels();
       continue;
@@ -164,10 +172,12 @@ void CollectionColumnReader::UpdateDerivedState() {
 
 bool CollectionColumnReader::SkipRows(int64_t num_rows, int64_t skip_row_id) {
   DCHECK(!children_.empty());
+  // Prevent NextLevels() from being called more than once in the recursion when
+  // e.g., a child is also a CollectionColumnReader.
+  next_levels_consumed_ = false;
   for (int c = 0; c < children_.size(); ++c) {
     if (!children_[c]->SkipRows(num_rows, skip_row_id)) return false;
   }
-  UpdateDerivedState();
-  return true;
+  return CollectionColumnReader::NextLevels();
 }
 } // namespace impala

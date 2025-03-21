@@ -23,8 +23,13 @@ bool StructColumnReader::NextLevels() {
   DCHECK(!children_.empty());
   bool result = true;
   for (ParquetColumnReader* child_reader : children_) {
+    if (child_reader->IsComplexReader()
+        && static_cast<ComplexColumnReader*>(child_reader)->next_levels_consumed()) {
+      continue;
+    }
     result &= child_reader->NextLevels();
   }
+  next_levels_consumed_ = true;
   def_level_ = children_[0]->def_level();
   rep_level_ = children_[0]->rep_level();
   if (rep_level_ <= max_rep_level() - 1) pos_current_value_ = 0;
@@ -46,6 +51,7 @@ bool StructColumnReader::ReadValue(MemPool* pool, Tuple* tuple, bool* read_row) 
     }
     *read_row = true;
   } else {
+    SetDescendantsNextLevelsConsumed(false);
     if (!HasNullCollectionAncestor<IN_COLLECTION>()) {
       SetNullSlot(tuple);
       *read_row = true;

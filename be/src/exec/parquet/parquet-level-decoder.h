@@ -115,6 +115,10 @@ class ParquetLevelDecoder {
   int CacheSize() const { return num_cached_levels_; }
   int CacheRemaining() const { return num_cached_levels_ - cached_level_idx_; }
   int CacheCurrIdx() const { return cached_level_idx_; }
+  void CachePrev() {
+    DCHECK_GE(cached_level_idx_, 1);
+    --cached_level_idx_;
+  }
 
  private:
   /// Initializes members associated with the level cache. Allocates memory for

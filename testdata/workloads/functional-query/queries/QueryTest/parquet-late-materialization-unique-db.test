@@ -12,4 +12,31 @@ select i, j from late_mat where j = 0;
 0,0
 ---- TYPES
 INT, INT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 3
+====
+---- QUERY
+# Test NumTopLevelValuesSkipped counter when there is more than one page in the
+# column.
+# Table `decimals_1_10` contains 60 rows, in which 8 rows are selected by the
+# query and 44 + 8 == 52 rows are skipped.
+set PARQUET_LATE_MATERIALIZATION_THRESHOLD=1;
+set parquet_read_page_index = false;
+select count(d_10) from decimals_1_10 where d_1 = 1;
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, NumPagesSkippedByLateMaterialization): 44
+aggregation(SUM, NumTopLevelValuesSkipped): 8
+====
+---- QUERY
+# Test if PARQUET_LATE_MATERIALIZATION_THRESHOLD is always 1 if there is any
+# collection that can be skipped.
+set parquet_read_page_index = false;
+select count(unnest(arr)) from nested_decimals n where d_38 = 1;
+---- RESULTS
+4
+---- RUNTIME_PROFILE
+aggregation(SUM, NumPagesSkippedByLateMaterialization): 0
+aggregation(SUM, NumTopLevelValuesSkipped): 17
 ====

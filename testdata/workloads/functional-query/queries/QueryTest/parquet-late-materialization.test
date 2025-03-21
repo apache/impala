@@ -38,8 +38,41 @@ row_regex:.* RF00.\[min_max\] -. .\.l_orderkey.*
 aggregation(SUM, NumPagesSkippedByLateMaterialization)> 0
 ====
 ---- QUERY
-# Test that late materialization on nested columns is disabled.
-select * from tpch_nested_parquet.customer where c_mktsegment = 'COMEDY';
+# Test late materialization for query with one zipping unnest.
+select unnest(arr1)
+from functional_parquet.complextypes_arrays
+where id = 2;
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumPagesSkippedByLateMaterialization): 0
+aggregation(SUM, NumTopLevelValuesSkipped): 10
+====
+---- QUERY
+# Test late materialization for query with multiple zipping unnests.
+select unnest(arr1), unnest(arr2)
+from functional_parquet.complextypes_arrays
+where id = 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 20
+====
+---- QUERY
+# Test if late materialization for collections works with page filtering.
+# In table tpch_nested_parquet.customer, min(c_phone) is '10-100-106-1617'.
+select count(o_orderkey) > 0
+from tpch_nested_parquet.customer c left outer join c.c_orders
+where c_phone < '10-100-106-16170'
+---- RESULTS
+true
+---- RUNTIME_PROFILE
+aggregation(SUM, NumDictFilteredRowGroups): 0
+aggregation(SUM, NumPagesSkippedByLateMaterialization)> 0
+aggregation(SUM, NumTopLevelValuesSkipped)> 0
+====
+---- QUERY
+# Test if PARQUET_LATE_MATERIALIZATION_THRESHOLD is always 1 if there is any
+# collection that can be skipped.
+set parquet_read_page_index = false;
+set expand_complex_types = true;
+select int_array_array
+from functional_parquet.complextypestbl where id % 2 = 0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumTopLevelValuesSkipped): 4
 ====

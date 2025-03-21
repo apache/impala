@@ -189,7 +189,7 @@ class ParquetColumnReader {
   /// Skips the number of encoded values specified by 'num_rows', without materializing or
   /// decoding them across pages. If page filtering is enabled, then it directly skips to
   /// row after 'skip_row_id' and ignores 'num_rows'.
-  /// It invokes 'SkipToLevelRows' for all 'children_'.
+  ///
   /// Returns true on success, false otherwise.
   virtual bool SkipRows(int64_t num_rows, int64_t skip_row_id) = 0;
 
@@ -249,6 +249,13 @@ class ParquetColumnReader {
   /// int16_t is large enough to hold the valid levels 0-255 and negative sentinel values
   /// ParquetLevel::INVALID_LEVEL and ParquetLevel::ROW_GROUP_END. The maximum values are
   /// cached here because they are accessed in inner loops.
+  ///
+  /// See ParquetSchemaResolver::CreateSchemaTree() for how max_def_level_ and
+  /// max_rep_level_ are computed.
+  ///
+  /// Some usages:
+  /// - def_level_ >= max_def_level() means the current value is defined, i.e. not NULL.
+  /// - rep_level_ == 0 means the current value is at the beginning of a top-level row.
   int16_t rep_level_;
   const int16_t max_rep_level_;
   int16_t def_level_;
@@ -591,6 +598,17 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// is more than the rows left in current row group. It can happen even with corrupt
   /// parquet file where number of values might differ from metadata.
   virtual bool SkipRows(int64_t num_rows, int64_t skip_row_id) override {
+    // Undo NextLevels() if it is called before calling this method.
+    if (levels_readahead_) {
+      DCHECK_NE(def_level_, ParquetLevel::INVALID_LEVEL);
+      DCHECK_NE(rep_level_, ParquetLevel::INVALID_LEVEL);
+      rep_levels_.CachePrev();
+      def_levels_.CachePrev();
+      rep_level_ = ParquetLevel::INVALID_LEVEL;
+      def_level_ = ParquetLevel::INVALID_LEVEL;
+      ++num_buffered_values_;
+      levels_readahead_ = false;
+    }
     if (max_rep_level() > 0) {
       return SkipRowsInternal<true>(num_rows, skip_row_id);
     } else {
@@ -693,6 +711,10 @@ class BaseScalarColumnReader : public ParquetColumnReader {
 
   Status LogCorruptNumValuesInMetadataError();
   Status HandleTooEarlyEos();
+
+  /// Non-thread-safe version of
+  /// HdfsParquetScanner::num_top_level_values_skipped_counter_.
+  int64_t num_top_level_values_skipped_counter_ = 0;
 };
 
 // Inline to allow inlining into collection and scalar column reader.

@@ -539,6 +539,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// rows that survived filtering.
   RuntimeProfile::Counter* num_pages_skipped_by_late_materialization_counter_;
 
+  /// Sum of the numbers of top-level values skipped for all columns.
+  /// It only counts the values that are not skipped as a page.
+  RuntimeProfile::Counter* num_top_level_values_skipped_counter_;
+
   /// Number of row groups skipped due to dictionary filter. This is an aggregated counter
   /// that includes the number of filtered row groups as a result of evaluating conjuncts
   /// and runtime bloom filters on the dictionary entries.

@@ -155,6 +155,8 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   num_pages_skipped_by_late_materialization_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumPagesSkippedByLateMaterialization",
           TUnit::UNIT);
+  num_top_level_values_skipped_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumTopLevelValuesSkipped", TUnit::UNIT);
   num_dict_filtered_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumDictFilteredRowGroups", TUnit::UNIT);
   parquet_compressed_page_size_counter_ = ADD_SUMMARY_STATS_COUNTER(
@@ -257,13 +259,16 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   }
   DivideFilterAndNonFilterColumnReaders(column_readers_, &filter_readers_,
       &non_filter_readers_);
+  // Set the late materialization threshold to 1 if
+  // - late materialization is enabled, and
+  // - there is any collection that can be skipped.
+  if (late_materialization_threshold_ >= 0
+      && std::find_if(non_filter_readers_.begin(), non_filter_readers_.end(),
+             [](ParquetColumnReader* reader) { return reader->IsCollectionReader(); })
+          != non_filter_readers_.end()) {
+    late_materialization_threshold_ = 1;
+  }
   return Status::OK();
-}
-
-// Currently, Collection Readers and scalar readers upon collection values
-// are not supported for late materialization.
-static bool DoesNotSupportLateMaterialization(ParquetColumnReader* column_reader) {
-  return column_reader->IsCollectionReader() || column_reader->max_rep_level() > 0;
 }
 
 void HdfsParquetScanner::DivideFilterAndNonFilterColumnReaders(
@@ -274,9 +279,10 @@ void HdfsParquetScanner::DivideFilterAndNonFilterColumnReaders(
   non_filter_readers->clear();
   for (auto column_reader : column_readers) {
     auto slot_desc = column_reader->slot_desc();
-    if (DoesNotSupportLateMaterialization(column_reader) || (slot_desc != nullptr &&
-        std::find(conjunct_slot_ids_.begin(), conjunct_slot_ids_.end(), slot_desc->id())
-            != conjunct_slot_ids_.end())) {
+    if (slot_desc != nullptr
+        && std::find(
+               conjunct_slot_ids_.begin(), conjunct_slot_ids_.end(), slot_desc->id())
+            != conjunct_slot_ids_.end()) {
       filter_readers->push_back(column_reader);
     } else {
       non_filter_readers->push_back(column_reader);
@@ -2513,10 +2519,9 @@ Status HdfsParquetScanner::SkipRowsForColumns(
       // among columns.
       if (UNLIKELY(!col_reader->SkipRows(*num_rows_to_skip, *skip_to_row))) {
         return Status(Substitute(
-            "Parquet file might be corrupted: Error in skipping $0 values to row $1 "
-            "in column $2 of file $3.",
+            "Error in skipping $0 values to row $1 in column $2 of file $3. Detail: $4",
             *num_rows_to_skip, *skip_to_row, col_reader->schema_element().name,
-            filename()));
+            filename(), parse_status_.GetDetail()));
       }
     }
     *num_rows_to_skip = 0;
@@ -2544,13 +2549,14 @@ Status HdfsParquetScanner::FillScratchMicroBatches(
         if (micro_batches[0].start > 0) {
           if (UNLIKELY(!col_reader->SkipRows(micro_batches[0].start, -1))) {
             return Status(ErrorMsg(TErrorCode::PARQUET_ROWS_SKIPPING,
-                col_reader->schema_element().name, filename()));
+                col_reader->schema_element().name, filename(),
+                parse_status_.GetDetail()));
           }
         }
       } else {
         if (UNLIKELY(!col_reader->SkipRows(micro_batches[r].start - last - 1, -1))) {
           return Status(ErrorMsg(TErrorCode::PARQUET_ROWS_SKIPPING,
-              col_reader->schema_element().name, filename()));
+              col_reader->schema_element().name, filename(), parse_status_.GetDetail()));
         }
       }
       // Ensure that the length of the micro_batch is less than
@@ -2587,7 +2593,7 @@ Status HdfsParquetScanner::FillScratchMicroBatches(
     if (UNLIKELY(last < max_num_tuples - 1)) {
       if (UNLIKELY(!col_reader->SkipRows(max_num_tuples - 1 - last, -1))) {
         return Status(ErrorMsg(TErrorCode::PARQUET_ROWS_SKIPPING,
-            col_reader->schema_element().name, filename()));
+            col_reader->schema_element().name, filename(), parse_status_.GetDetail()));
       }
     }
   }

@@ -1077,6 +1077,12 @@ void BaseScalarColumnReader::Close(RowBatch* row_batch) {
   col_chunk_reader_.Close(row_batch == nullptr ? nullptr : row_batch->tuple_data_pool());
   DictDecoderBase* dict_decoder = GetDictionaryDecoder();
   if (dict_decoder != nullptr) dict_decoder->Close();
+  if (num_top_level_values_skipped_counter_ > 0) {
+    // This can happen when the reader gets closed before finishing the current page.
+    COUNTER_ADD(parent_->num_top_level_values_skipped_counter_,
+        num_top_level_values_skipped_counter_);
+    num_top_level_values_skipped_counter_ = 0;
+  }
 }
 
 Status BaseScalarColumnReader::InitDictionary() {
@@ -1233,7 +1239,6 @@ template <bool ADVANCE_REP_LEVEL>
 bool BaseScalarColumnReader::NextLevels() {
   if (!ADVANCE_REP_LEVEL) DCHECK_EQ(max_rep_level(), 0) << slot_desc()->DebugString();
 
-  levels_readahead_ = true;
   if (UNLIKELY(num_buffered_values_ == 0)) {
     if (!NextPage()) return parent_->parse_status_.ok();
   }
@@ -1279,8 +1284,11 @@ bool BaseScalarColumnReader::NextLevels() {
     ++current_row_;
   }
 
+  levels_readahead_ = true;
   return parent_->parse_status_.ok();
 }
+
+template bool BaseScalarColumnReader::NextLevels<true>();
 
 void BaseScalarColumnReader::ResetPageFiltering() {
   offset_index_.page_locations.clear();
@@ -1307,7 +1315,7 @@ Status BaseScalarColumnReader::StartPageFiltering() {
     int64_t remaining = 0;
     if (!SkipTopLevelRows(skip_rows, &remaining)) {
       return Status(ErrorMsg(TErrorCode::PARQUET_ROWS_SKIPPING,
-          schema_element().name, filename()));
+          schema_element().name, filename(), parent_->parse_status_.GetDetail()));
     }
     DCHECK_EQ(remaining, 0);
     DCHECK_EQ(current_row_, range_start - 1);
@@ -1334,8 +1342,11 @@ bool BaseScalarColumnReader::SkipTopLevelRows(int64_t num_rows, int64_t* remaini
     current_row_ += rows_skipped;
     num_buffered_values_ -= rows_skipped;
     *remaining = num_rows - rows_skipped;
+    // Increase the counter before returning when we successfully skip the rows.
+    num_top_level_values_skipped_counter_ += rows_skipped;
     return SkipEncodedValuesInPage(rows_skipped);
   }
+  int64_t num_rows_to_skip = num_rows;
   int64_t num_values_to_skip = 0;
   if (max_rep_level() == 0) {
     // No nesting, but field is not required.
@@ -1391,6 +1402,9 @@ bool BaseScalarColumnReader::SkipTopLevelRows(int64_t num_rows, int64_t* remaini
     }
     *remaining = num_rows;
   }
+  DCHECK_LT(*remaining, num_rows_to_skip);
+  // Increase the counter before returning when we successfully skip the rows.
+  num_top_level_values_skipped_counter_ += (num_rows_to_skip - *remaining);
   return SkipEncodedValuesInPage(num_values_to_skip);
 }
 
@@ -1520,6 +1534,11 @@ Status BaseScalarColumnReader::HandleTooEarlyEos() {
 
 bool BaseScalarColumnReader::NextPage() {
   parent_->assemble_rows_timer_.Stop();
+  if (num_top_level_values_skipped_counter_ > 0) {
+    COUNTER_ADD(parent_->num_top_level_values_skipped_counter_,
+        num_top_level_values_skipped_counter_);
+    num_top_level_values_skipped_counter_ = 0;
+  }
   parent_->parse_status_ = ReadDataPage();
   if (UNLIKELY(!parent_->parse_status_.ok())) return false;
   if (num_buffered_values_ == 0) {
@@ -1644,6 +1663,9 @@ bool BaseScalarColumnReader::SkipRowsInternal(int64_t num_rows, int64_t skip_row
       // Keep advancing to next page header if rows to be skipped are more than number
       // of values in the page. Note we will just be reading headers and skipping
       // pages without decompressing them as we advance.
+      // In this case, the current column is not in any collection. Therefore the number
+      // of rows in the page is equal to the number of values.
+      DCHECK_EQ(max_rep_level(), 0);
       while (num_rows > num_buffered_values_) {
         COUNTER_ADD(parent_->num_pages_skipped_by_late_materialization_counter_, 1);
         num_rows -= num_buffered_values_;

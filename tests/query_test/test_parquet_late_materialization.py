@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import, division, print_function
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.file_utils import create_table_from_parquet
 
 
 class TestParquetLateMaterialization(ImpalaTestSuite):
@@ -34,5 +35,7 @@ class TestParquetLateMaterialization(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet-late-materialization', vector)
 
   def test_parquet_late_materialization_unique_db(self, vector, unique_database):
+    create_table_from_parquet(self.client, unique_database, 'decimals_1_10')
+    create_table_from_parquet(self.client, unique_database, 'nested_decimals')
     self.run_test_case('QueryTest/parquet-late-materialization-unique-db', vector,
         unique_database)

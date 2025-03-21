@@ -56,6 +56,8 @@ public:
     pos_current_value_ = ParquetLevel::INVALID_POS;
   }
 
+  bool next_levels_consumed() const { return next_levels_consumed_; }
+
 protected:
   ComplexColumnReader(HdfsParquetScanner* parent, const SchemaNode& node,
       const SlotDescriptor* slot_desc)
@@ -68,5 +70,18 @@ protected:
   /// complex item tuples, or there is a single child reader that does not materialize
   /// any slot and is only used by this reader to read def and rep levels.
   std::vector<ParquetColumnReader*> children_;
+
+  /// True if the next definition level and repetition level have been consumed by
+  /// NextLevels(). If true, NextLevels() should not be called on this reader again.
+  bool next_levels_consumed_ = false;
+
+  void SetDescendantsNextLevelsConsumed(bool value) {
+    next_levels_consumed_ = value;
+    for (auto child : children_) {
+      if (child->IsComplexReader()) {
+        static_cast<ComplexColumnReader*>(child)->SetDescendantsNextLevelsConsumed(value);
+      }
+    }
+  }
 };
 } // namespace impala

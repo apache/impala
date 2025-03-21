@@ -20,7 +20,6 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.complextypes_arrays]
    HDFS partitions=1/1 files=1 size=1.06KB
-   predicates: !empty(functional_parquet.complextypes_arrays.arr1)
    predicates on arr1: UNNEST(arr1) < 5, arr1.item < 5
    row-size=16B cardinality=1.35K
 ====
@@ -46,7 +45,6 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.complextypes_arrays a]
    HDFS partitions=1/1 files=1 size=1.06KB
-   predicates: !empty(a.arr1)
    predicates on a.arr1: arr1.item < 5
    row-size=16B cardinality=1.35K
 ====
@@ -72,7 +70,6 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.complextypes_arrays]
    HDFS partitions=1/1 files=1 size=1.06KB
-   predicates: !empty(arr1)
     predicates on functional_parquet.complextypes_arrays.arr1: UNNEST(functional_parquet.complextypes_arrays.arr1) < 5, functional_parquet.complextypes_arrays.arr1.item < 5
    row-size=16B cardinality=1.35K
 ====
@@ -98,7 +95,6 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.complextypes_arrays]
    HDFS partitions=1/1 files=1 size=1.06KB
-   predicates: !empty(arr1)
    predicates on functional_parquet.complextypes_arrays.arr1: functional_parquet.complextypes_arrays.arr1.item < 5
    row-size=16B cardinality=1.35K
 ====
@@ -315,7 +311,6 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.complextypes_arrays]
    HDFS partitions=1/1 files=1 size=1.06KB
-   predicates: !empty(functional_parquet.complextypes_arrays.arr1)
    row-size=16B cardinality=1.35K
 ====
 select id, unnest(arr1), row_number() over (order by id, unnest(arr1))
@@ -347,7 +342,6 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.complextypes_arrays]
    HDFS partitions=1/1 files=1 size=1.06KB
-   predicates: !empty(functional_parquet.complextypes_arrays.arr1)
    row-size=16B cardinality=1.35K
 ====
 select id, item1, item2, row_number() over (order by id, item1, item2)

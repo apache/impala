@@ -811,9 +811,8 @@ public class SelectStmt extends QueryStmt {
         // Do not generate a predicate if the parent tuple is outer joined.
         if (analyzer_.isOuterJoined(ref.getResolvedPath().getRootDesc().getId()))
           continue;
-        // Don't push down the "is not empty" predicate for zipping unnests if there are
-        // multiple zipping unnests in the FROM clause.
-        if (tblRef.isZippingUnnest() && analyzer_.getNumZippingUnnests() > 1) {
+        // Don't push down the "is not empty" predicate for zipping unnests.
+        if (tblRef.isZippingUnnest()) {
           continue;
         }
         IsNotEmptyPredicate isNotEmptyPred =
