@@ -358,7 +358,7 @@ public class Analyzer {
 
   public static void ensureTableNotTransactional(FeTable table, String operationStr)
       throws AnalysisException {
-    if (AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
+    if (AcidUtils.isTransactionalTable(table)) {
       throw new AnalysisException(String.format(TRANSACTIONAL_TABLE_NOT_SUPPORTED,
           operationStr, table.getFullName()));
     }

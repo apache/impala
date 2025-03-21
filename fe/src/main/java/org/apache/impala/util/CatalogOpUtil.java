@@ -20,11 +20,14 @@ package org.apache.impala.util;
 import org.apache.impala.analysis.ColumnName;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TCommentOnParams;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.impala.analysis.TableName.thriftToString;
 
 public class CatalogOpUtil {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogOpUtil.class);
@@ -39,25 +42,26 @@ public class CatalogOpUtil {
         case ALTER_DATABASE:
           target = req.getAlter_db_params().getDb();
           break;
-        case ALTER_TABLE:
-          target = TableName.thriftToString(req.getAlter_table_params().getTable_name());
+        case ALTER_TABLE: {
+          TAlterTableParams params = req.getAlter_table_params();
+          target = thriftToString(params.getTable_name()) + " " + params.getAlter_type();
           break;
+        }
         case ALTER_VIEW:
-          target = TableName.thriftToString(req.getAlter_view_params().getView_name());
+          target = thriftToString(req.getAlter_view_params().getView_name());
           break;
         case CREATE_DATABASE:
           target = req.getCreate_db_params().getDb();
           break;
         case CREATE_TABLE_AS_SELECT:
         case CREATE_TABLE:
-          target = TableName.thriftToString(req.getCreate_table_params().getTable_name());
+          target = thriftToString(req.getCreate_table_params().getTable_name());
           break;
         case CREATE_TABLE_LIKE:
-          target = TableName.thriftToString(
-              req.getCreate_table_like_params().getTable_name());
+          target = thriftToString(req.getCreate_table_like_params().getTable_name());
           break;
         case CREATE_VIEW:
-          target = TableName.thriftToString(req.getCreate_view_params().getView_name());
+          target = thriftToString(req.getCreate_view_params().getView_name());
           break;
         case CREATE_FUNCTION:
           target = FunctionName.thriftToString(
@@ -68,7 +72,7 @@ public class CatalogOpUtil {
           if (params.isSetDb()) {
             target = "DB " + params.getDb();
           } else if (params.isSetTable_name()) {
-            target = "TABLE " + TableName.thriftToString(params.getTable_name());
+            target = "TABLE " + thriftToString(params.getTable_name());
           } else if (params.isSetColumn_name()) {
             target = "COLUMN " + ColumnName.thriftToString(params.getColumn_name());
           } else {
@@ -77,18 +81,18 @@ public class CatalogOpUtil {
           break;
         }
         case DROP_STATS:
-          target = TableName.thriftToString(req.getDrop_stats_params().getTable_name());
+          target = thriftToString(req.getDrop_stats_params().getTable_name());
           break;
         case DROP_DATABASE:
           target = req.getDrop_db_params().getDb();
           break;
         case DROP_TABLE:
         case DROP_VIEW:
-          target = TableName.thriftToString(
+          target = thriftToString(
               req.getDrop_table_or_view_params().getTable_name());
           break;
         case TRUNCATE_TABLE:
-          target = TableName.thriftToString(req.getTruncate_params().getTable_name());
+          target = thriftToString(req.getTruncate_params().getTable_name());
           break;
         case DROP_FUNCTION:
           target = FunctionName.thriftToString(req.getDrop_fn_params().fn_name);

@@ -90,8 +90,7 @@ public class ConvertTableToIcebergStmt extends StatementBase {
           table.getClass().getSimpleName());
     }
 
-    if (table.getMetaStoreTable().getParameters() != null &&
-        AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
+    if (AcidUtils.isTransactionalTable(table)) {
       throw new AnalysisException(
           "CONVERT TO ICEBERG is not supported for transactional tables");
     }

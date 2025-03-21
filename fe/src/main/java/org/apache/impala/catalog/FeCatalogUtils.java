@@ -246,7 +246,7 @@ public abstract class FeCatalogUtils {
     Preconditions.checkArgument(
         hmsPartitionValues.size() == table.getNumClusteringCols(),
         "Cannot parse partition values '%s' for table %s: " +
-        "expected %d values but got %d",
+        "expected %s values but got %s",
         hmsPartitionValues, table.getFullName(),
         table.getNumClusteringCols(), hmsPartitionValues.size());
     List<LiteralExpr> keyValues = new ArrayList<>();

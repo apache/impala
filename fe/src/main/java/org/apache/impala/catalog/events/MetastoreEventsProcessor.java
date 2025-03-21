@@ -458,7 +458,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       // For ACID tables, events may include commit_txn and abort_txn which doesn't have
       // db_name and table_name. So it makes sense to fetch all the events and filter
       // them in catalogD.
-      if (AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters())) {
+      if (AcidUtils.isTransactionalTable(tbl)) {
         metaDataFilter = new MetaDataFilter(getTableNotificationEventFilter(tbl));
       } else {
         metaDataFilter = new MetaDataFilter(getTableNotificationEventFilter(tbl),

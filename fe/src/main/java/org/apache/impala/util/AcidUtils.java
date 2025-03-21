@@ -43,6 +43,7 @@ import org.apache.hadoop.hive.common.ValidWriteIdList.RangeResponse;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.FileMetadataLoader.LoadStats;
 import org.apache.impala.catalog.HdfsPartition;
@@ -126,6 +127,11 @@ public class AcidUtils {
     String transactionalProp = props.get(TABLE_TRANSACTIONAL_PROPERTIES);
     return transactionalProp != null && INSERTONLY_TRANSACTIONAL_PROPERTY.
         equalsIgnoreCase(transactionalProp);
+  }
+
+  public static boolean isTransactionalTable(FeTable table) {
+    Map<String, String> parameters = table.getMetaStoreTable().getParameters();
+    return parameters != null && isTransactionalTable(parameters);
   }
 
   public static boolean isTransactionalTable(Map<String, String> props) {
@@ -705,7 +711,7 @@ public class AcidUtils {
       long tableId) {
     Preconditions.checkState(tbl != null && tbl.getMetaStoreTable() != null);
     // if tbl is not a transactional, there is nothing to compare against and we return 0
-    if (!isTransactionalTable(tbl.getMetaStoreTable().getParameters())) return 0;
+    if (!isTransactionalTable(tbl)) return 0;
     Preconditions.checkNotNull(tbl.getValidWriteIds());
     // if the provided table id does not match with what CatalogService has we return
     // -1 indicating that cached table is stale.

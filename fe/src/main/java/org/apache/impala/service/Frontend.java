@@ -2806,8 +2806,7 @@ public class Frontend {
           (analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt())) {
         InsertStmt insertStmt = analysisResult.getInsertStmt();
         FeTable targetTable = insertStmt.getTargetTable();
-        if (AcidUtils.isTransactionalTable(
-            targetTable.getMetaStoreTable().getParameters())) {
+        if (AcidUtils.isTransactionalTable(targetTable)) {
 
           if (planCtx.compilationState_.getWriteId() == -1) {
             // 1st time compilation. Open a transaction and save the writeId.
@@ -3367,8 +3366,7 @@ public class Frontend {
       throws TransactionException {
     Preconditions.checkState(queryCtx.isSetTransaction_id());
     Preconditions.checkState(table instanceof FeFsTable);
-    Preconditions.checkState(
-        AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters()));
+    Preconditions.checkState(AcidUtils.isTransactionalTable(table));
     try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
       IMetaStoreClient hmsClient = client.getHiveClient();
       long txnId = queryCtx.getTransaction_id();
@@ -3392,13 +3390,12 @@ public class Frontend {
       FeTable targetTable, boolean isOverwrite, String staticPartitionTarget,
       TQueryOptions queryOptions)
       throws TransactionException {
-    Preconditions.checkState(
-        AcidUtils.isTransactionalTable(targetTable.getMetaStoreTable().getParameters()));
+    Preconditions.checkState(AcidUtils.isTransactionalTable(targetTable));
     List<LockComponent> lockComponents = new ArrayList<>(tables.size());
     List<FeTable> lockTables = new ArrayList<>(tables);
     if (!lockTables.contains(targetTable)) lockTables.add(targetTable);
     for (FeTable table : lockTables) {
-      if (!AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
+      if (!AcidUtils.isTransactionalTable(table)) {
         continue;
       }
       LockComponent lockComponent = new LockComponent();

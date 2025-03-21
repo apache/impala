@@ -946,8 +946,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
           try {
             catalogOpExecutor_.addCommittedWriteIdsAndReloadPartitionsIfExist(
                 getEventId(), entry.getKey().getDb(), entry.getKey().getTbl(),
-                writeIdsForTable, partsForTable, "Processing event id: " +
-                            getEventId() + ", event type: " + getEventType());
+                writeIdsForTable, partsForTable, "COMMIT_TXN event " + getEventId());
           } catch (TableNotLoadedException e) {
             debugLog("Ignoring reloading since table {} is not loaded",
                 entry.getKey());
@@ -957,7 +956,8 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
           }
         } else {
           catalog_.reloadTableIfExists(entry.getKey().getDb(), entry.getKey().getTbl(),
-              "CommitTxnEvent", getEventId(), /*isSkipFileMetadataReload*/false);
+              "COMMIT_TXN event " + getEventId(), getEventId(),
+              /*isSkipFileMetadataReload*/false);
         }
       }
     }

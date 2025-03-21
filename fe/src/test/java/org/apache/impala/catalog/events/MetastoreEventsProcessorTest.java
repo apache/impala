@@ -3957,7 +3957,7 @@ public class MetastoreEventsProcessorTest {
     // Process commit compaction event should skip the event because
     // DISABLE_EVENT_HMS_SYNC is set to true
     event = filteredEvents.get(filteredEvents.size() - 1);
-    assertEquals(MetastoreEventType.COMMIT_COMPACTION, event.getEventType());
+    assertEquals(MetastoreEventType.COMMIT_COMPACTION_EVENT, event.getEventType());
     long skipCount = eventsProcessor_.getMetrics()
                          .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
                          .getCount();

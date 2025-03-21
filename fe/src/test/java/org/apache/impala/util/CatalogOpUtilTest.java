@@ -27,6 +27,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TAlterDbType;
 import org.apache.impala.thrift.TAlterTableParams;
+import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TColumnName;
 import org.apache.impala.thrift.TCommentOnParams;
@@ -139,8 +140,9 @@ public class CatalogOpUtilTest {
     req.setDdl_type(TDdlType.ALTER_TABLE);
     TAlterTableParams alterTableParams = new TAlterTableParams();
     alterTableParams.setTable_name(tblName);
+    alterTableParams.setAlter_type(TAlterTableType.RECOVER_PARTITIONS);
     req.setAlter_table_params(alterTableParams);
-    assertEquals("ALTER_TABLE db1.tbl1 issued by unknown user",
+    assertEquals("ALTER_TABLE db1.tbl1 RECOVER_PARTITIONS issued by unknown user",
         CatalogOpUtil.getShortDescForExecDdl(req));
 
     req.setDdl_type(TDdlType.CREATE_VIEW);

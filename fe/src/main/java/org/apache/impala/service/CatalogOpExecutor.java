@@ -2717,8 +2717,7 @@ public class CatalogOpExecutor {
         params.getTable_name().getTable_name(), "Load for DROP STATS", catalogTimeline);
     Preconditions.checkNotNull(table);
     // There is no transactional HMS API to drop stats at the moment (HIVE-22104).
-    Preconditions.checkState(!AcidUtils.isTransactionalTable(
-        table.getMetaStoreTable().getParameters()));
+    Preconditions.checkState(!AcidUtils.isTransactionalTable(table));
 
     tryWriteLock(table, "dropping stats", catalogTimeline);
     InProgressTableModification modification = null;
@@ -3128,7 +3127,7 @@ public class CatalogOpExecutor {
     Table tbl = catalog_.getTableIfCachedNoThrow(tableName.getDb(), tableName.getTbl());
     long lockId = -1;
     if (tbl != null && !(tbl instanceof IncompleteTable) &&
-        AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters())) {
+        AcidUtils.isTransactionalTable(tbl)) {
       HeartbeatContext ctx = new HeartbeatContext(
           String.format("Drop table/view %s.%s", tableName.getDb(), tableName.getTbl()),
           System.nanoTime());
@@ -3381,7 +3380,7 @@ public class CatalogOpExecutor {
     try {
       long newCatalogVersion = 0;
       try {
-        if (AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
+        if (AcidUtils.isTransactionalTable(table)) {
           newCatalogVersion = truncateTransactionalTable(params, table, lockMaxWaitTime,
               catalogTimeline);
         } else if (table instanceof FeIcebergTable) {
@@ -5429,7 +5428,7 @@ public class CatalogOpExecutor {
       Table tbl, List<Partition> partitions, Map<String, Long> partitionToEventId,
       boolean ifNotExists, EventSequence catalogTimeline, String debugAction)
       throws ImpalaException {
-    if (!AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters())) {
+    if (!AcidUtils.isTransactionalTable(tbl)) {
       if (DebugUtils.hasDebugAction(debugAction, DebugUtils.ENABLE_EVENT_PROCESSOR)) {
         catalog_.startEventsProcessor();
       }
@@ -6374,6 +6373,7 @@ public class CatalogOpExecutor {
     Map<String, Long> partitionToEventId = Maps.newHashMap();
     String annotation = String.format("Recovering %d partitions for %s",
         hmsPartitions.size(), tbl.getFullName());
+    LOG.info(annotation);
     if (DebugUtils.hasDebugAction(debugAction, DebugUtils.ENABLE_EVENT_PROCESSOR)) {
       catalog_.startEventsProcessor();
     }
@@ -7095,9 +7095,7 @@ public class CatalogOpExecutor {
                   CatalogObject.ThriftObjectType.FULL;
           if (isTableLoadedInCatalog) {
             if (req.isSetPartition_spec()) {
-              boolean isTransactional = AcidUtils.isTransactionalTable(
-                  tbl.getMetaStoreTable().getParameters());
-              Preconditions.checkArgument(!isTransactional);
+              Preconditions.checkArgument(!AcidUtils.isTransactionalTable(tbl));
               Reference<Boolean> wasPartitionRefreshed = new Reference<>(false);
               // TODO if the partition was not really refreshed because the partSpec
               // was wrong, do we still need to send back the table?
@@ -7667,8 +7665,7 @@ public class CatalogOpExecutor {
     long writeId = tblTxn == null ? -1: tblTxn.writeId;
     // If the table is transaction table we should generate a transactional
     // insert event type. This would show up in HMS as an ACID_WRITE event.
-    boolean isTransactional = AcidUtils.isTransactionalTable(table.getMetaStoreTable()
-        .getParameters());
+    boolean isTransactional = AcidUtils.isTransactionalTable(table);
     if (isTransactional) {
       Preconditions.checkState(txnId > 0, "Invalid transaction id %s for table %s",
           txnId, table.getFullName());
@@ -7792,8 +7789,7 @@ public class CatalogOpExecutor {
     InsertEventRequestData insertEventRequestData = new InsertEventRequestData(
         Lists.newArrayListWithCapacity(
             newFiles.size()));
-    boolean isTransactional = AcidUtils
-        .isTransactionalTable(tbl.getMetaStoreTable().getParameters());
+    boolean isTransactional = AcidUtils.isTransactionalTable(tbl);
     // in case of unpartitioned table, partVals will be empty
     boolean isPartitioned = !partVals.isEmpty();
     if (isPartitioned) {

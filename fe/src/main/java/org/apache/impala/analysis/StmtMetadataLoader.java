@@ -286,7 +286,7 @@ public class StmtMetadataLoader {
         boolean hasAcidTbls = false;
         for (FeTable iTbl : loadedOrFailedTbls_.values()) {
           if (iTbl instanceof FeIncompleteTable) continue;
-          if (AcidUtils.isTransactionalTable(iTbl.getMetaStoreTable().getParameters())) {
+          if (AcidUtils.isTransactionalTable(iTbl)) {
             validIdsBuf.append("\n");
             validIdsBuf.append("           ");
             validIdsBuf.append(iTbl.getValidWriteIds().writeToString());

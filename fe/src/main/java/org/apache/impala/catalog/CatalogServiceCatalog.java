@@ -631,8 +631,15 @@ public class CatalogServiceCatalog extends Catalog {
           if (lock.tryLock(0, TimeUnit.SECONDS)) {
             long duration = System.currentTimeMillis() - begin;
             if (duration > LOCK_ACQUIRING_DURATION_WARN_MS) {
-              LOG.warn("{} lock for table {} was acquired in {} msec",
-                  useWriteLock ? "Write" : "Read", tbl.getFullName(), duration);
+              // Get the caller stacktrace and convert it into string.
+              StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+              // Skip the first method which is always java.lang.Thread.getStackTrace().
+              String st = Arrays.stream(stack).skip(1)
+                  .map(StackTraceElement::toString)
+                  .collect(Collectors.joining("\n\tat "));
+              LOG.warn("{} lock for table {} was acquired in {} msec. " +
+                      "Caller stacktrace: {}",
+                  useWriteLock ? "Write" : "Read", tbl.getFullName(), duration, st);
             }
             return true;
           }
@@ -2509,9 +2516,7 @@ public class CatalogServiceCatalog extends Catalog {
       // In the external front end use case it is possible that an external table might
       // have validWriteIdList, so we can simply ignore this value if table is external
       if (isLoaded
-          && (validWriteIdList == null
-                 || (!AcidUtils.isTransactionalTable(
-                        tbl.getMetaStoreTable().getParameters())))) {
+          && (validWriteIdList == null || (!AcidUtils.isTransactionalTable(tbl)))) {
         incrementCatalogDCacheHitMetric(reason);
         LOG.trace("returning already loaded table {}", tbl.getFullName());
         return tbl;
@@ -2530,10 +2535,9 @@ public class CatalogServiceCatalog extends Catalog {
         // calls for the same table. If there are concurrent calls, it is possible we
         // refresh a partition for multiple times but that doesn't break the table's
         // consistency because we refresh the file metadata based on the same writeIdList
-        Preconditions.checkState(
-            AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters()),
-            "Compaction id check cannot be done for non-transactional table "
-                + tbl.getFullName());
+        Preconditions.checkState(AcidUtils.isTransactionalTable(tbl),
+            "Compaction id check cannot be done for non-transactional table %s",
+            tbl.getFullName());
         readLock(tbl, catalogTimeline);
         try {
           partsToBeRefreshed =
@@ -2623,17 +2627,31 @@ public class CatalogServiceCatalog extends Catalog {
       // method to not update the table when the updatedTbl has a higher ValidWriteIdList
       // if we just rely on catalog version comparison which would break the logic to
       // reload on stale ValidWriteIdList logic.
-      if (existingTbl == null
-          || (existingTbl.getCatalogVersion() != expectedCatalogVersion
-                 && (!(existingTbl instanceof HdfsTable)
-                        || AcidUtils.compare((HdfsTable) existingTbl,
-                               updatedTbl.getValidWriteIds(), tableId)
-                            >= 0))) {
-        LOG.trace("returning existing table {} with last synced id: ",
-            existingTbl.getFullName(), existingTbl.getLastSyncedEventId());
-        return existingTbl;
+      if (existingTbl == null) {
+        LOG.info("Not updating table {} since it has been removed",
+            updatedTbl.getFullName());
+        return null;
       }
-
+      long currentVersion = existingTbl.getCatalogVersion();
+      if (!(existingTbl instanceof HdfsTable)
+          || !AcidUtils.isTransactionalTable(existingTbl)) {
+        if (currentVersion != expectedCatalogVersion) {
+          LOG.info("Not updating table {} since it has been modified. Current catalog " +
+                  "version: {}. Expected catalog version: {}",
+              existingTbl.getFullName(), currentVersion, expectedCatalogVersion);
+          return existingTbl;
+        }
+      } else if (currentVersion != expectedCatalogVersion) {
+        int cmp = AcidUtils.compare(
+            (HdfsTable) existingTbl, updatedTbl.getValidWriteIds(), tableId);
+        if (cmp >= 0) {
+          LOG.info("Not updating table {} (transactional). Current catalog version: {}." +
+                  " Expected catalog version: {}. Acid compare: {}. Last synced id: {}",
+              existingTbl.getFullName(), currentVersion, expectedCatalogVersion, cmp,
+              existingTbl.getLastSyncedEventId());
+          return existingTbl;
+        }
+      }
 
       if (existingTbl instanceof HdfsTable) {
         // Add the old instance to the deleteLog_ so we can send isDeleted updates for

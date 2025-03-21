@@ -119,6 +119,8 @@ public class MetastoreEvents {
   }
 
   public enum MetastoreEventType {
+    // It's intended that some eventTypes have a suffix of "_EVENT". This is consistent
+    // with Hive so the type matching can use string equal checks.
     CREATE_TABLE("CREATE_TABLE"),
     DROP_TABLE("DROP_TABLE"),
     ALTER_TABLE("ALTER_TABLE"),
@@ -135,7 +137,7 @@ public class MetastoreEvents {
     ALLOC_WRITE_ID_EVENT("ALLOC_WRITE_ID_EVENT"),
     COMMIT_TXN("COMMIT_TXN"),
     ABORT_TXN("ABORT_TXN"),
-    COMMIT_COMPACTION("COMMIT_COMPACTION_EVENT"),
+    COMMIT_COMPACTION_EVENT("COMMIT_COMPACTION_EVENT"),
     OTHER("OTHER");
 
     private final String eventType_;
@@ -229,7 +231,7 @@ public class MetastoreEvents {
           return new ReloadEvent(catalogOpExecutor_, metrics, event);
         case INSERT:
           return new InsertEvent(catalogOpExecutor_, metrics, event);
-        case COMMIT_COMPACTION:
+        case COMMIT_COMPACTION_EVENT:
           return new CommitCompactionEvent(catalogOpExecutor_, metrics, event);
         default:
           // ignore all the unknown events by creating a IgnoredEvent
@@ -580,10 +582,12 @@ public class MetastoreEvents {
   public static abstract class MetastoreEvent {
 
     // String.format compatible string to prepend event id and type
-    private static final String STR_FORMAT_EVENT_ID_TYPE = "EventId: %d EventType: %s ";
+    private static final String STR_FORMAT_EVENT_ID_TYPE =
+        "EventId: %d EventType: %s Target: %s. ";
 
     // logger format compatible string to prepend to a log formatted message
-    private static final String LOG_FORMAT_EVENT_ID_TYPE = "EventId: {} EventType: {} ";
+    private static final String LOG_FORMAT_EVENT_ID_TYPE =
+        "EventId: {} EventType: {} Target: {}. ";
 
     protected static final String CLUSTER_WIDE_TARGET = "CLUSTER_WIDE";
 
@@ -660,6 +664,10 @@ public class MetastoreEvents {
       if (dbName_ == null && tblName_ == null) return CLUSTER_WIDE_TARGET;
       if (tblName_ == null) return dbName_;
       return dbName_ + "." + tblName_;
+    }
+
+    public String getEventDesc() {
+      return eventType_ + " event " + eventId_;
     }
 
     /**
@@ -802,10 +810,17 @@ public class MetastoreEvents {
      * Helper method to generate the format args after prepending the event id and type
      */
     private Object[] getLogFormatArgs(Object[] args) {
-      Object[] formatArgs = new Object[args.length + 2];
+      Object[] formatArgs = new Object[args.length + 3];
       formatArgs[0] = getEventId();
       formatArgs[1] = getEventType();
-      int i = 2;
+      String target = getTargetName();
+      // AlterPartitionEvent is on a single partition so we can also log the partition
+      // name. Add/DropPartitionEvent might have multiple partitions so ignore them here.
+      if (this instanceof AlterPartitionEvent) {
+        target += ":" + ((AlterPartitionEvent) this).getPartName();
+      }
+      formatArgs[2] = target;
+      int i = 3;
       for (Object arg : args) {
         formatArgs[i] = arg;
         i++;
@@ -1069,11 +1084,10 @@ public class MetastoreEvents {
      * Helper function to initiate a table reload on Catalog. Re-throws the exception if
      * the catalog operation throws.
      */
-    protected boolean reloadTableFromCatalog(String operation, boolean isTransactional)
+    protected boolean reloadTableFromCatalog(boolean isTransactional)
         throws CatalogException {
       try {
-        if (!catalog_.reloadTableIfExists(dbName_, tblName_,
-            "Processing " + operation + " event from HMS", getEventId(),
+        if (!catalog_.reloadTableIfExists(dbName_, tblName_, getEventDesc(), getEventId(),
             skipFileMetadataReload_)) {
           debugLog("Automatic refresh on table {} failed as the table "
                   + "either does not exist anymore or is not in loaded state.",
@@ -1669,7 +1683,7 @@ public class MetastoreEvents {
         // forcing file metadata reload so that new files (due to insert) are reflected
         // HdfsPartition
         reloadPartitions(Arrays.asList(insertPartition_),
-            FileMetadataLoadOpts.FORCE_LOAD, "INSERT event", false);
+            FileMetadataLoadOpts.FORCE_LOAD, getEventDesc(), false);
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
                 + "partition on table {} partition {} failed. Event processing cannot "
@@ -1686,7 +1700,7 @@ public class MetastoreEvents {
       // For non-partitioned tables, refresh the whole table.
       Preconditions.checkState(insertPartition_ == null);
       try {
-        boolean notSkipped = reloadTableFromCatalog("INSERT event", false);
+        boolean notSkipped = reloadTableFromCatalog(false);
         if (!notSkipped) {
           metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
         }
@@ -1845,7 +1859,7 @@ public class MetastoreEvents {
         // refresh, eg. this could be due to as simple as adding a new parameter or a
         // full blown adding or changing column type
         // rename is already handled above
-        boolean notSkipped = reloadTableFromCatalog("ALTER_TABLE", false);
+        boolean notSkipped = reloadTableFromCatalog(false);
         if (!notSkipped) {
           metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
         }
@@ -2514,7 +2528,7 @@ public class MetastoreEvents {
             BackendConfig.INSTANCE.getHMSEventIncrementalRefreshTransactionalTable();
         if ((AcidUtils.isTransactionalTable(msTbl_.getParameters()) && !isSelfEvent() &&
             !incrementalRefresh) || MetaStoreUtils.isMaterializedViewTable(msTbl_)) {
-           boolean notSkipped = reloadTableFromCatalog("ADD_PARTITION", true);
+           boolean notSkipped = reloadTableFromCatalog(true);
            if (!notSkipped) {
              metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
            }
@@ -2564,6 +2578,7 @@ public class MetastoreEvents {
     private final String serviceIdFromEvent_;
     // true if this alter event was due to a truncate operation in metastore
     private final boolean isTruncateOp_;
+    private final String partName_;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -2590,11 +2605,15 @@ public class MetastoreEvents {
                 MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
         serviceIdFromEvent_ = MetastoreEvents.getStringProperty(
             parameters, MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
+        partName_ = HdfsTable.constructPartitionName(getTPartitionSpecFromHmsPartition(
+            msTbl_, partitionAfter_));
       } catch (Exception e) {
         throw new MetastoreNotificationException(
             debugString("Unable to parse the alter partition message"), e);
       }
     }
+
+    public String getPartName() { return partName_; }
 
     @Override
     protected MetastoreEventType getBatchEventType() {
@@ -2673,8 +2692,6 @@ public class MetastoreEvents {
       } else {
         // Refresh the partition that was altered.
         Preconditions.checkNotNull(partitionAfter_);
-        List<TPartitionKeyValue> tPartSpec = getTPartitionSpecFromHmsPartition(msTbl_,
-            partitionAfter_);
         try {
           // load file metadata only if storage descriptor of partitionAfter_ differs
           // from sd of HdfsPartition. If the alter_partition event type is of truncate
@@ -2683,13 +2700,11 @@ public class MetastoreEvents {
               isTruncateOp_ ? FileMetadataLoadOpts.FORCE_LOAD :
                   FileMetadataLoadOpts.LOAD_IF_SD_CHANGED;
           reloadPartitions(Arrays.asList(partitionAfter_), fileMetadataLoadOpts,
-              "ALTER_PARTITION event", false);
+              getEventDesc(), false);
         } catch (CatalogException e) {
           throw new MetastoreNotificationNeedsInvalidateException(
-              debugString("Refresh partition on table {} partition {} failed. Event " +
-                  "processing cannot continue. Issue an invalidate command to reset " +
-                  "the event processor state.", getFullyQualifiedTblName(),
-                  HdfsTable.constructPartitionName(tPartSpec)), e);
+              debugString("Refresh partition on table {} partition {} failed.",
+                  getFullyQualifiedTblName(), partName_), e);
         }
       }
     }
@@ -2726,9 +2741,9 @@ public class MetastoreEvents {
           BackendConfig.INSTANCE.getHMSEventIncrementalRefreshTransactionalTable();
       if (incrementalRefresh) {
         reloadPartitionsFromEvent(Collections.singletonList(partitionAfter_),
-            "ALTER_PARTITION EVENT FOR TRANSACTIONAL TABLE");
+            getEventDesc() + " FOR TRANSACTIONAL TABLE");
       } else {
-        boolean notSkipped = reloadTableFromCatalog("ALTER_PARTITION", true);
+        boolean notSkipped = reloadTableFromCatalog(true);
         if (!notSkipped) {
           metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
         }
@@ -2785,6 +2800,15 @@ public class MetastoreEvents {
     public long getEventTime() {
       Preconditions.checkState(!batchedEvents_.isEmpty());
       return batchedEvents_.get(batchedEvents_.size() - 1).getEventTime();
+    }
+
+    @Override
+    public String getEventDesc() {
+      if (batchedEvents_.isEmpty()) return "empty event batch";
+      int batch = batchedEvents_.size();
+      // E.g. ALTER_PARTITIONS 4 events from 76697 to 76703
+      return String.format("%s %d events from %d to %d", getEventType(), batch,
+          batchedEvents_.get(0).getEventId(), batchedEvents_.get(batch - 1).getEventId());
     }
 
     /**
@@ -2844,7 +2868,7 @@ public class MetastoreEvents {
 
       // Reload the whole table if it's a transactional table.
       if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
-        boolean notSkipped = reloadTableFromCatalog(getEventType().toString(), true);
+        boolean notSkipped = reloadTableFromCatalog(true);
         if (!notSkipped) {
           metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
               .inc(eventsToProcess.size() + partitionEventsToForceReload.size());
@@ -2859,21 +2883,20 @@ public class MetastoreEvents {
           if (baseEvent_ instanceof InsertEvent) {
             // for insert event, always reload file metadata so that new files
             // are reflected in HdfsPartition
-            reloadPartitions(partitions, FileMetadataLoadOpts.FORCE_LOAD,
-                getEventType().toString() + " event", true);
+            reloadPartitions(partitions, FileMetadataLoadOpts.FORCE_LOAD, getEventDesc(),
+                true);
           } else {
             if (!partitionEventsToForceReload.isEmpty()) {
               // force reload truncated partitions
               reloadPartitions(partitionEventsToForceReload,
-                  FileMetadataLoadOpts.FORCE_LOAD, getEventType().toString()
-                  + " event", true);
+                  FileMetadataLoadOpts.FORCE_LOAD, getEventDesc() + " FOR TRUNCATE",
+                  true);
             }
             if (!partitions.isEmpty()) {
               // alter partition event. Reload file metadata of only those partitions
               // for which sd has changed
               reloadPartitions(partitions,
-                  FileMetadataLoadOpts.LOAD_IF_SD_CHANGED, getEventType().toString()
-                  + " event", true);
+                  FileMetadataLoadOpts.LOAD_IF_SD_CHANGED, getEventDesc(), true);
             }
           }
         } catch (CatalogException e) {
@@ -2973,7 +2996,7 @@ public class MetastoreEvents {
             BackendConfig.INSTANCE.getHMSEventIncrementalRefreshTransactionalTable();
         if ((AcidUtils.isTransactionalTable(msTbl_.getParameters()) &&
             !incrementalRefresh) || MetaStoreUtils.isMaterializedViewTable(msTbl_)) {
-          boolean notSkipped = reloadTableFromCatalog("DROP_PARTITION", true);
+          boolean notSkipped = reloadTableFromCatalog(true);
           if (!notSkipped) {
             metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
           }
@@ -3169,7 +3192,7 @@ public class MetastoreEvents {
         // forcing file metadata reload so that new files (due to refresh) are reflected
         // HdfsPartition
         reloadPartitions(Arrays.asList(reloadPartition_),
-            FileMetadataLoadOpts.FORCE_LOAD, "RELOAD event", false);
+            FileMetadataLoadOpts.FORCE_LOAD, getEventDesc(), false);
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
             + "partition on table {} partition {} failed. Event processing cannot "
@@ -3187,7 +3210,7 @@ public class MetastoreEvents {
       Preconditions.checkState(reloadPartition_ == null);
       try {
         // we always treat the table as non-transactional so all the files are reloaded
-        boolean notSkipped = reloadTableFromCatalog("RELOAD event", false);
+        boolean notSkipped = reloadTableFromCatalog(false);
         if (!notSkipped) {
           metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
         }
@@ -3316,8 +3339,8 @@ public class MetastoreEvents {
   }
 
   /**
-   * Metastore event handler for COMMIT_COMPACTION events. Handles
-   * COMMIT_COMPACTION event for transactional tables.
+   * Metastore event handler for COMMIT_COMPACTION_EVENT events. Handles
+   * COMMIT_COMPACTION_EVENT event for transactional tables.
    */
   public static class CommitCompactionEvent extends MetastoreTableEvent {
     private String partitionName_;
@@ -3326,7 +3349,7 @@ public class MetastoreEvents {
         NotificationEvent event) throws MetastoreNotificationException {
       super(catalogOpExecutor, metrics, event);
       Preconditions.checkState(
-          getEventType().equals(MetastoreEventType.COMMIT_COMPACTION));
+          getEventType().equals(MetastoreEventType.COMMIT_COMPACTION_EVENT));
       Preconditions.checkNotNull(event.getMessage());
       try {
         partitionName_ =
@@ -3340,13 +3363,13 @@ public class MetastoreEvents {
     protected void processTableEvent() throws MetastoreNotificationException {
       try {
         if (partitionName_ == null) {
-          boolean notSkipped = reloadTableFromCatalog("Commit Compaction event", true);
+          boolean notSkipped = reloadTableFromCatalog(true);
           if (!notSkipped) {
             metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
           }
         } else {
           reloadPartitionsFromNames(Arrays.asList(partitionName_),
-                  "Commit compaction event", FileMetadataLoadOpts.FORCE_LOAD);
+              getEventDesc(), FileMetadataLoadOpts.FORCE_LOAD);
         }
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
