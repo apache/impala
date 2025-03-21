@@ -574,13 +574,31 @@ class TestQueryLogTableHS2(WorkloadManagementTestSuite):
           "in_flight_queries", _is_insert_query)
       return self.insert_query_id
 
-    assert retry(func=wait_for_insert_query, max_attempts=10, sleep_time_s=1, backoff=1)
+    assert \
+        retry(func=wait_for_insert_query, max_attempts=10, sleep_time_s=1, backoff=1), \
+        "did not find completed queries insert dml in the debug web ui"
     self.assert_impalad_log_contains("INFO", "Expiring query {} due to execution time "
                                      "limit of 1s.".format(self.insert_query_id))
-    self.assert_impalad_log_contains("INFO", "failed to write completed queries table=\""
-                                     "{}\"".format(QUERY_TBL_LOG))
-    self.assert_impalad_log_contains("INFO", "Query {} expired due to execution time "
-                                     "limit of 1s000ms".format(self.insert_query_id))
+
+    # When a workload management insert DML fails, a warning message is logged that
+    # contains information about the DML. These two assertions ensure the message is
+    # logged and important fields are correct.
+    res = self.assert_impalad_log_contains(
+        level="WARNING",
+        line_regex=r'failed to write completed queries table="{}" record_count=(\d+) '
+                   r'bytes=\S+\s\S+ gather_time=\S+ exec_time=\S+ query_id="{}" '
+                   r'msg="(.*?)"'.format(QUERY_TBL_LOG, self.insert_query_id),
+        expected_count=-1)
+    assert res.group(1) == "1", "Invalid record count in the query failed log line"
+    assert res.group(2) == "Query {0} expired due to execution time limit of 1s000ms" \
+                           .format(self.insert_query_id), \
+                           "Found expected query failed log line but the msg parameter " \
+                           "was incorrect"
+
+    self.assert_impalad_log_contains(level="INFO",
+                                     line_regex="Query {} expired due to execution time "
+                                     "limit of 1s000ms".format(self.insert_query_id),
+                                     expected_count=2)
 
 
 class TestQueryLogTableAll(WorkloadManagementTestSuite):
@@ -952,7 +970,9 @@ class TestQueryLogQueuedQueries(WorkloadManagementTestSuite):
           "in_flight_queries", _is_insert_query)
       return self.insert_query_id
 
-    assert retry(func=wait_for_insert_query, max_attempts=10, sleep_time_s=1, backoff=1)
+    assert \
+        retry(func=wait_for_insert_query, max_attempts=10, sleep_time_s=1, backoff=1), \
+        "did not find completed queries insert dml in the debug web ui"
 
     # Wait 2 seconds to ensure the insert into DML is not killed by the fetch rows
     # timeout (set to 1 second in this test's annotations).
@@ -1088,6 +1108,22 @@ class TestQueryLogTableFlush(CustomClusterTestSuite):
     # to the completed queries table.
     self.cluster.get_first_impalad().service.wait_for_metric_value(
       "impala-server.completed-queries.written", query_count, 20)
+
+    # Helper function that waits for the workload management insert DML to start.
+    def wait_for_insert_query():
+      self.insert_query_id = _find_query_in_ui(self.cluster.get_first_impalad().service,
+          "completed_queries", _is_insert_query)
+      return self.insert_query_id
+
+    # Wait for the workload management insert dml to be in the debug ui's completed
+    # queries section so that it's query id can be retrieved.
+    assert \
+        retry(func=wait_for_insert_query, max_attempts=10, sleep_time_s=1, backoff=1), \
+        "did not find completed queries insert dml in the debug web ui"
+    self.assert_impalad_log_contains("INFO", r"wrote completed queries "
+                                     r"table=\"{}\" record_count=\d+ bytes=\S+\s\S+ "
+                                     r"gather_time=\S+ exec_time=\S+ query_id=\"{}\""
+                                     .format(QUERY_TBL_LOG, self.insert_query_id))
 
   @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=9999 "
                                                  "--shutdown_grace_period_s=0 "

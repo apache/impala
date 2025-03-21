@@ -23,6 +23,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -791,29 +792,24 @@ void ImpalaServer::WorkloadManagementWorker(const Version& target_schema_version
 
     uint64_t exec_time = timer.ElapsedTime();
     ImpaladMetrics::COMPLETED_QUERIES_WRITE_DURATIONS->Update(gather_time + exec_time);
+
+    stringstream log_msg_props;
+    log_msg_props
+        << " table=\"" << log_table_name << "\""
+        << " record_count=" << queries_to_insert.size()
+        << " bytes=" << PrettyPrinter::PrintBytes(sql.size())
+        << " gather_time=" << PrettyPrinter::Print(gather_time, TUnit::TIME_NS)
+        << " exec_time=" << PrettyPrinter::Print(exec_time, TUnit::TIME_NS)
+        << " query_id=\"" << PrintId(tmp_query_id) << "\"";
+
     if (ret_status.ok()) {
-      LOG(INFO) << "wrote completed queries table=\"" << log_table_name
-                << "\" record_count="
-                << queries_to_insert.size()
-                << " bytes="
-                << PrettyPrinter::PrintBytes(sql.size())
-                << " gather_time="
-                << PrettyPrinter::Print(gather_time, TUnit::TIME_NS)
-                << " exec_time="
-                << PrettyPrinter::Print(exec_time, TUnit::TIME_NS);
+      LOG(INFO) << "wrote completed queries" << log_msg_props.rdbuf();
       ImpaladMetrics::COMPLETED_QUERIES_QUEUED->Increment(queries_to_insert.size() * -1);
       DCHECK(ImpaladMetrics::COMPLETED_QUERIES_QUEUED->GetValue() >= 0);
       ImpaladMetrics::COMPLETED_QUERIES_WRITTEN->Increment(queries_to_insert.size());
     } else {
-      LOG(WARNING) << "failed to write completed queries table=\"" << log_table_name
-                   << "\" record_count="
-                   << queries_to_insert.size()
-                   << " bytes="
-                   << PrettyPrinter::PrintBytes(sql.size())
-                   << " gather_time="
-                   << PrettyPrinter::Print(gather_time, TUnit::TIME_NS)
-                   << " exec_time="
-                   << PrettyPrinter::Print(exec_time, TUnit::TIME_NS);
+      log_msg_props << " msg=\"" << ret_status.msg().msg() << "\"";
+      LOG(WARNING) << "failed to write completed queries" << log_msg_props.rdbuf();
       LOG(WARNING) << ret_status.GetDetail();
       ImpaladMetrics::COMPLETED_QUERIES_FAIL->Increment(queries_to_insert.size());
       {
