@@ -127,7 +127,13 @@ Status IcebergDeleteBuilder::CalculateDataFiles() {
       q.pop();
       if (current->tnode_->node_id == join_node_id_) {
         fragment_it = it;
-        delete_scan_node = current->children_[0];
+        // Tuple caching can place a TupleCacheNode above the scan node. Look past
+        // a TupleCacheNode to get to the scan node.
+        delete_scan_node = PlanNode::LookPastTupleCache(current->children_[0]);
+        DCHECK_EQ(delete_scan_node->tnode_->node_type, TPlanNodeType::HDFS_SCAN_NODE)
+          << "Failed to calculate delete files: "
+          << Substitute("Unexpected type for plan node $0: $1",
+                 delete_scan_node->tnode_->node_id, delete_scan_node->tnode_->node_type);
         found = true;
         while (!q.empty()) q.pop();
         break;

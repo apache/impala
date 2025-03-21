@@ -320,6 +320,15 @@ public class TupleCacheTest extends PlannerTestBase {
   }
 
   @Test
+  public void testIceberg() {
+    // Sanity test that we can plan a basic scenario querying from an Iceberg table
+    // that has different types of deletes
+    verifyIdenticalCacheKeys(
+        "select * from functional_parquet.iceberg_v2_delete_both_eq_and_pos",
+        "select * from functional_parquet.iceberg_v2_delete_both_eq_and_pos");
+  }
+
+  @Test
   public void testDeterministicScheduling() {
     // Verify that the HdfsScanNode that feeds into a TupleCacheNode uses deterministic
     // scan range scheduling. When there are more ways for locations to be cache

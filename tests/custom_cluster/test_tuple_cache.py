@@ -24,6 +24,7 @@ import re
 import string
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfDockerizedCluster, SkipIf
 from tests.common.test_dimensions import (
     add_exec_option_dimension, add_mandatory_exec_option)
 from tests.util.parse_util import (
@@ -761,6 +762,25 @@ class TestTupleCacheFullCluster(TestTupleCacheBase):
     assert len(before_result_set) + 1 == len(after_insert_result_set)
     different_rows = before_result_set.symmetric_difference(after_insert_result_set)
     assert len(different_rows) == 1
+
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
+  def test_iceberg_deletes(self, vector):  # noqa: U100
+    """
+    Test basic Iceberg v2 deletes, which relies on the directed mode and looking
+    past TupleCacheNodes to find the scan nodes.
+    """
+
+    # This query tests both equality deletes and positional deletes.
+    query = "select * from functional_parquet.iceberg_v2_delete_both_eq_and_pos " + \
+        "order by i"
+    result1 = self.execute_query(query)
+    result2 = self.execute_query(query)
+    assert result1.success and result2.success
+
+    assert result1.data == result2.data
+    assert result1.data[0].split("\t") == ["2", "str2_updated", "2023-12-13"]
+    assert result1.data[1].split("\t") == ["3", "str3", "2023-12-23"]
 
 
 @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS, cluster_size=1)

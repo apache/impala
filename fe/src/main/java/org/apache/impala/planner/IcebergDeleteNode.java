@@ -192,7 +192,11 @@ public class IcebergDeleteNode extends JoinNode {
     // which have delete files and roaring bitmaps that store the positions. Roaring
     // bitmaps store bitmaps in a compressed format, so 2 bytes per position is a
     // conservative estimate (actual mem usage is expected to be lower).
-    int numberOfDataFilesWithDelete = ((IcebergScanNode) getChild(0))
+    PlanNode lhsNode = getChild(0);
+    // Tuple caching can place a TupleCacheNode above the scan, so look past a
+    // TupleCacheNode if it is present
+    if (lhsNode instanceof TupleCacheNode) lhsNode = lhsNode.getChild(0);
+    int numberOfDataFilesWithDelete = ((IcebergScanNode) lhsNode)
         .getFileDescriptorsWithLimit(null, false, -1).size();
     double avgFilePathLen = getChild(1).getAvgRowSize();
     long filePathsSize = (long) Math.ceil(numberOfDataFilesWithDelete * avgFilePathLen);

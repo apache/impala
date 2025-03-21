@@ -102,18 +102,22 @@ Status FragmentState::PutFilesToHostsMappingToSinkConfig() {
   DCHECK_EQ(fragment_.output_sink.stream_sink.output_partition.type,
       TPartitionType::DIRECTED);
 
+  // Tuple caching can place a TupleCacheNode above the scan, so look past a
+  // TupleCacheNode to reach the original scan
+  PlanNode* pnode = PlanNode::LookPastTupleCache(plan_tree_);
+
   const QueryState::NodeToFileSchedulings* node_to_file_schedulings =
       query_state_->node_to_file_schedulings();
   QueryState::NodeToFileSchedulings::const_iterator node_to_file_schedulings_it =
-      node_to_file_schedulings->find(plan_tree_->tnode_->node_id);
+      node_to_file_schedulings->find(pnode->tnode_->node_id);
   if (node_to_file_schedulings_it == node_to_file_schedulings->end()) {
     return Status(Substitute("Failed to find file to hosts mapping for plan node: "
-        "$0", plan_tree_->tnode_->node_id));
+        "$0", pnode->tnode_->node_id));
   }
 
-  DCHECK_EQ(plan_tree_->tnode_->node_type, TPlanNodeType::HDFS_SCAN_NODE);
+  DCHECK_EQ(pnode->tnode_->node_type, TPlanNodeType::HDFS_SCAN_NODE);
   TupleDescriptor* tuple_desc =
-      desc_tbl().GetTupleDescriptor(plan_tree_->tnode_->hdfs_scan_node.tuple_id);
+      desc_tbl().GetTupleDescriptor(pnode->tnode_->hdfs_scan_node.tuple_id);
   DCHECK(tuple_desc != nullptr);
   DCHECK(tuple_desc->table_desc() != nullptr);
   const HdfsTableDescriptor* hdfs_table_desc =

@@ -119,6 +119,17 @@ class PlanNode {
 
   std::vector<PlanNode*> children_;
 
+  /// Helper function to skip past a TupleCacheNode if present. If the provided PlanNode
+  /// is a TupleCacheNode, it returns the child. Otherwise, it returns the provided
+  /// PlanNode.
+  static PlanNode* LookPastTupleCache(PlanNode* pnode) {
+    if (pnode->tnode_->node_type == TPlanNodeType::TUPLE_CACHE_NODE) {
+      pnode = pnode->children_[0];
+    }
+    DCHECK(pnode != nullptr);
+    return pnode;
+  }
+
   /// Pointer to the containing SubplanPlanNode or NULL if not inside a subplan.
   /// Set by the containing SubplanPlanNode::Init() before Init() is called on
   /// 'this' node. Not owned.
