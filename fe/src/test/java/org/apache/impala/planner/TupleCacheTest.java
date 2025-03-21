@@ -66,6 +66,11 @@ public class TupleCacheTest extends PlannerTestBase {
     // Different filter
     verifyDifferentCacheKeys("select id from functional.alltypes where id = 1",
         "select id from functional.alltypes where id = 2");
+
+    // Sanity check for complex types
+    verifyIdenticalCacheKeys(
+        "select nested_struct from functional_parquet.complextypestbl",
+        "select nested_struct from functional_parquet.complextypestbl");
   }
 
   @Test

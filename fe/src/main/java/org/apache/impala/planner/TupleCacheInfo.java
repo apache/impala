@@ -344,15 +344,17 @@ public class TupleCacheInfo {
         // Assign a translated slot id and it to the map
         slotTranslationMap_.put(slotDesc.getId(), translatedSlotIdGenerator_.getNextId());
 
+        // Slots can have nested tuples, so this can recurse. The depth is limited.
+        // The parent can reference tuple ids from children, so this needs to recurse
+        // to the children first.
+        TupleDescriptor nestedTupleDesc = slotDesc.getItemTupleDesc();
+        if (nestedTupleDesc != null) {
+          registerTupleHelper(nestedTupleDesc.getId(), incorporateIntoHash);
+        }
         if (incorporateIntoHash) {
            // Incorporate the SlotDescriptor into the hash
           TSlotDescriptor thriftSlotDesc = slotDesc.toThrift(serialCtx);
           hashThrift(thriftSlotDesc);
-        }
-        // Slots can have nested tuples, so this can recurse. The depth is limited.
-        TupleDescriptor nestedTupleDesc = slotDesc.getItemTupleDesc();
-        if (nestedTupleDesc != null) {
-          registerTupleHelper(nestedTupleDesc.getId(), incorporateIntoHash);
         }
       }
     }
