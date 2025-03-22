@@ -64,9 +64,11 @@ TupleFileWriter::~TupleFileWriter() {
     DCHECK(!kudu::Env::Default()->FileExists(TempPath()));
   }
   // MemTracker expects an explicit close. Consumers need to be released first.
+  // Since the TupleFileWriter can be freed before query execution ends, this must
+  // unregister the MemTracker from its parent before it is freed.
   out_batch_.reset();
   allocator_.reset();
-  if (tracker_) tracker_->Close();
+  if (tracker_) tracker_->CloseAndUnregisterFromParent();
 }
 
 Status TupleFileWriter::Open(RuntimeState* state) {

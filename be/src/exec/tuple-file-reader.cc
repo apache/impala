@@ -42,8 +42,10 @@ TupleFileReader::TupleFileReader(
         ADD_COUNTER(profile, "TupleCacheBytesRead", TUnit::BYTES) : nullptr) {}
 
 TupleFileReader::~TupleFileReader() {
-  // MemTracker expects an explicit close.
-  tracker_->Close();
+  // MemTracker expects an explicit close. Since the TupleFileReader can be freed
+  // before query execution ends, this must unregister the MemTracker from its parent
+  // before it is freed.
+  tracker_->CloseAndUnregisterFromParent();
 }
 
 Status TupleFileReader::Open(RuntimeState *state) {
