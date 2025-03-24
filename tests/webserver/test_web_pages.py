@@ -24,6 +24,7 @@ from tests.common.impala_connection import FINISHED, RUNNING
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.filesystem_utils import supports_storage_ids
 from tests.util.parse_util import parse_duration_string_ms
+from tests.common.test_vector import HS2
 from datetime import datetime
 from multiprocessing import Process, Queue
 from prometheus_client.parser import text_string_to_metric_families
@@ -515,7 +516,7 @@ class TestWebPage(ImpalaTestSuite):
     # chars + "..."
     expected_result = "select \"{0}...".format("x " * 121)
     check_if_contains = False
-    response_json = self.__run_query_and_get_debug_page(
+    (_, response_json) = self.__run_query_and_get_debug_page(
       query, self.QUERIES_URL, expected_state=FINISHED)
     # Search the json for the expected value.
     # The query can be in in_flight_queries even though it is in FINISHED state.
@@ -534,22 +535,21 @@ class TestWebPage(ImpalaTestSuite):
     cancels the query. Optionally takes in an expected_state parameter, if specified the
     method waits for the query to reach the expected state before getting its debug
     information."""
-    if query_options:
-      self.client.set_configuration(query_options)
-    query_handle = self.client.execute_async(query)
-    response_json = ""
-    try:
+    with self.create_impala_client(protocol=HS2) as client:
+      if query_options:
+        client.set_configuration(query_options)
+      query_handle = client.execute_async(query)
       if expected_state:
-        self.client.wait_for_impala_state(query_handle, expected_state, 100)
+        client.wait_for_impala_state(query_handle, expected_state, 100)
+      query_id = client.handle_id(query_handle)
       responses = self.get_and_check_status(
-        page_url + "?query_id=%s&json" % self.client.handle_id(query_handle),
-        ports_to_test=[25000])
+        "{0}?query_id={1}&json".format(page_url, query_id),
+        ports_to_test=self.IMPALAD_TEST_PORT)
       assert len(responses) == 1
       response_json = json.loads(responses[0].text)
-    finally:
-      self.client.cancel(query_handle)
-      self.client.close_query(query_handle)
-    return response_json
+      client.cancel(query_handle)
+      client.close_query(query_handle)
+      return (query_id, response_json)
 
   @pytest.mark.xfail(run=False, reason="IMPALA-8059")
   def test_backend_states(self, unique_database):
@@ -564,9 +564,8 @@ class TestWebPage(ImpalaTestSuite):
                                 'cpu_sys_s', 'done', 'bytes_read']
 
     for query in [sleep_query, ctas_sleep_query]:
-      response_json = self.__run_query_and_get_debug_page(query,
-                                                          self.QUERY_BACKENDS_URL,
-                                                          expected_state=running_state)
+      (_, response_json) = self.__run_query_and_get_debug_page(
+          query, self.QUERY_BACKENDS_URL, expected_state=running_state)
 
       assert 'backend_states' in response_json
       backend_states = response_json['backend_states']
@@ -578,8 +577,8 @@ class TestWebPage(ImpalaTestSuite):
         assert backend_state['status'] == 'OK'
         assert not backend_state['done']
 
-    response_json = self.__run_query_and_get_debug_page("describe functional.alltypes",
-                                                        self.QUERY_BACKENDS_URL)
+    (_, response_json) = self.__run_query_and_get_debug_page(
+        "describe functional.alltypes", self.QUERY_BACKENDS_URL)
     assert 'backend_states' not in response_json
 
   @pytest.mark.xfail(run=False, reason="IMPALA-8059")
@@ -594,10 +593,9 @@ class TestWebPage(ImpalaTestSuite):
                                  'instance_id', 'done']
 
     for query in [sleep_query, ctas_sleep_query]:
-      response_json = self.__run_query_and_get_debug_page(query,
-                                                          self.QUERY_FINSTANCES_URL,
-                                                          query_options=query_options,
-                                                          expected_state=running_state)
+      (_, response_json) = self.__run_query_and_get_debug_page(
+          query, self.QUERY_FINSTANCES_URL, query_options=query_options,
+          expected_state=running_state)
 
       assert 'backend_instances' in response_json
       backend_instances = response_json['backend_instances']
@@ -614,9 +612,9 @@ class TestWebPage(ImpalaTestSuite):
             assert instance_stats_property in instance_stats
         assert not instance_stats['done']
 
-    response_json = self.__run_query_and_get_debug_page("describe functional.alltypes",
-                                                        self.QUERY_BACKENDS_URL,
-                                                        query_options=query_options)
+    (_, response_json) = self.__run_query_and_get_debug_page(
+        "describe functional.alltypes", self.QUERY_BACKENDS_URL,
+        query_options=query_options)
     assert 'backend_instances' not in response_json
 
   @pytest.mark.xfail(run=False, reason="IMPALA-8059")
@@ -1040,11 +1038,18 @@ class TestWebPage(ImpalaTestSuite):
   def test_query_progress(self):
     """Tests that /queries page shows query progress."""
     query = "select count(*) from functional_parquet.alltypes where bool_col = sleep(100)"
-    response_json = self.__run_query_and_get_debug_page(
-      query, self.QUERIES_URL, expected_state=RUNNING)
+    (query_id, response_json) = self.__run_query_and_get_debug_page(
+        query, self.QUERIES_URL, expected_state=RUNNING)
+    found = False
     for json_part in response_json['in_flight_queries']:
-      if query in json_part['stmt']:
+      if query_id in json_part['query_id']:
+        found = True
+        assert json_part["state"] == "RUNNING"
+        assert json_part["waiting"] is False
+        assert json_part["executing"] is True
         assert json_part["query_progress"] == "0 / 4 ( 0%)"
+    assert found, "Query {} not found in response_json\n{}".format(
+        query_id, json.dumps(response_json, sort_keys=True, indent=4))
 
   def try_until(self, desc, run, check, timeout=10, interval=0.1):
     start_time = time()
