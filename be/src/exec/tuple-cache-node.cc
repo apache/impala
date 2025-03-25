@@ -218,7 +218,7 @@ Status TupleCacheNode::VerifyAndMoveDebugCache(RuntimeState* state) {
   if (verify_status.ok() && !passed) {
     // Slow path to compare all rows in an order-insensitive way if the files are not the
     // same.
-    verify_status = TupleTextFileUtil::VerifyRows(ref_file_path, dump_file_path);
+    verify_status = TupleTextFileUtil::VerifyRows(dump_file_path, ref_file_path);
     passed = verify_status.ok();
   }
 

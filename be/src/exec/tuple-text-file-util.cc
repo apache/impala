@@ -128,6 +128,19 @@ Status TupleTextFileUtil::VerifyRows(
   return VerifyRowCount(cache);
 }
 
+static Status ValidateAndOpenFile(const string& path, TupleTextFileReader& reader) {
+  if (!reader.Open().ok()) {
+    return Status(TErrorCode::TUPLE_CACHE_INCONSISTENCY,
+        Substitute("Failed to open file '$0'", path + DEBUG_TUPLE_CACHE_BAD_POSTFIX));
+  }
+
+  if (reader.GetFileSize() == TUPLE_TEXT_FILE_SIZE_ERROR) {
+    return Status(TErrorCode::TUPLE_CACHE_INCONSISTENCY,
+        Substitute("Size of file '$0' is invalid", path + DEBUG_TUPLE_CACHE_BAD_POSTFIX));
+  }
+  return Status::OK();
+}
+
 static Status CacheFileCmp(
     const std::string& path_a, const std::string& path_b, bool* passed) {
   DCHECK(passed != nullptr);
@@ -137,25 +150,20 @@ static Status CacheFileCmp(
   TupleTextFileReader reader_a(path_a);
   TupleTextFileReader reader_b(path_b);
 
-  // Open both files.
-  if (!reader_a.Open().ok()) {
-    return Status(TErrorCode::TUPLE_CACHE_INCONSISTENCY,
-        Substitute("Failed to open file '$0'", path_a + DEBUG_TUPLE_CACHE_BAD_POSTFIX));
-  }
-  if (!reader_b.Open().ok()) {
-    return Status(TErrorCode::TUPLE_CACHE_INCONSISTENCY,
-        Substitute("Failed to open file '$0'", path_b + DEBUG_TUPLE_CACHE_BAD_POSTFIX));
-  }
+  // Validate and open files
+  RETURN_IF_ERROR(ValidateAndOpenFile(path_a, reader_a));
+  RETURN_IF_ERROR(ValidateAndOpenFile(path_b, reader_b));
 
   // Compare file sizes.
-  int file1_length = reader_a.GetFileSize();
-  int file2_length = reader_b.GetFileSize();
-  if (file1_length != file2_length || file1_length == TUPLE_TEXT_FILE_SIZE_ERROR) {
-    return Status(TErrorCode::TUPLE_CACHE_INCONSISTENCY,
-        Substitute("Size of file '$0' (size: $1) and '$2' (size: $3) are different",
-            path_a + DEBUG_TUPLE_CACHE_BAD_POSTFIX, file1_length,
-            path_b + DEBUG_TUPLE_CACHE_BAD_POSTFIX, file2_length));
-  }
+  // Files are supposed to be written in tuple-text-file-writer.cc, and are plain
+  // text with '\n' as row delimiters and no padding, so a size mismatch likely
+  // indicates content differences.
+  // If the sizes are different, we leave "passed" as false to let the caller to proceed
+  // with a slower check. This may provide a clearer error message and prevent false
+  // mismatches when identical rows appear in a different order, which may result in
+  // different sizes.
+  if (reader_a.GetFileSize() != reader_b.GetFileSize()) return Status::OK();
+
   // Reset readers to the beginning of the files.
   reader_a.Rewind();
   reader_b.Rewind();

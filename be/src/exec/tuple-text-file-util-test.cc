@@ -69,8 +69,7 @@ TEST_F(TupleTextFileUtilTest, VerifyDebugDumpCache_DifferentFiles) {
 
   bool passed = false;
   Status status = TupleTextFileUtil::VerifyDebugDumpCache(file1, file2, &passed);
-  EXPECT_FALSE(status.ok());
-  EXPECT_EQ(status.code(), TErrorCode::TUPLE_CACHE_INCONSISTENCY);
+  EXPECT_TRUE(status.ok());
   EXPECT_FALSE(passed);
 }
 
