@@ -413,7 +413,9 @@ public class FunctionCallExpr extends Expr {
             "coordinator", "current_database", "current_session", "current_user",
             "effective_user", "logged_in_user", "pid", "user", "version",
             // Sampling aggregate functions
-            "appx_median",
+            "appx_median", "histogram", "sample",
+            // Order sensitive aggregate functions
+            "group_concat",
             // AI Functions
             "ai_generate_text", "ai_generate_text_default");
     return functionNameInBuiltinSet(fnName_, knownNondeterministicFns);

@@ -183,9 +183,16 @@ public class TupleCacheTest extends PlannerTestBase {
         "from (select * from functional.alltypesagg where id % 100 = day order by id " +
         "limit 99999) a group by day";
     verifyNIdenticalCacheKeys(groupConcatGroupAgg, groupConcatGroupAgg, 1);
-    // Only scan is cached, appx_median disables caching on aggregate.
-    String appxMedianAgg = "select appx_median(tinyint_col) from functional.alltypesagg";
-    verifyNIdenticalCacheKeys(appxMedianAgg, appxMedianAgg, 1);
+
+    // Only scan is cached, variable aggregate disable caching above that.
+    for (String aggFn : Arrays.asList("appx_median", "histogram", "sample")) {
+      String variableAggQuery =
+          String.format("select %s(tinyint_col) from functional.alltypesagg", aggFn);
+      verifyNIdenticalCacheKeys(variableAggQuery, variableAggQuery, 1);
+    }
+    String groupConcatOnlyScan =
+      "select group_concat(string_col) from functional.alltypes";
+    verifyNIdenticalCacheKeys(groupConcatOnlyScan, groupConcatOnlyScan, 1);
   }
 
   @Test
