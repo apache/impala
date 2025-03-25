@@ -358,8 +358,8 @@ constexpr unsigned NUM_QUERY_OPTIONS =
       TQueryOptionLevel::ADVANCED)                                                       \
   TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(long_polling_time_ms, LONG_POLLING_TIME_MS,            \
       TQueryOptionLevel::REGULAR)                                                        \
-  QUERY_OPT_FN(enable_tuple_cache_verification, ENABLE_TUPLE_CACHE_VERIFICATION,         \
-      TQueryOptionLevel::ADVANCED)                                                       \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(enable_tuple_cache_verification,                       \
+      ENABLE_TUPLE_CACHE_VERIFICATION, TQueryOptionLevel::ADVANCED)                      \
   QUERY_OPT_FN(enable_tuple_analysis_in_aggregate,                                       \
       ENABLE_TUPLE_ANALYSIS_IN_AGGREGATE, TQueryOptionLevel::ADVANCED)                   \
   QUERY_OPT_FN(estimate_duplicate_in_preagg,                                             \
