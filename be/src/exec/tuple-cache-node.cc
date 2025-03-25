@@ -228,6 +228,14 @@ Status TupleCacheNode::VerifyAndMoveDebugCache(RuntimeState* state) {
   return verify_status;
 }
 
+// Helper function to generate the unique id based on fragment instance id and node id.
+static string GenerateFragmentNodeId(
+    const RuntimeState* state, const TupleCacheNode* node) {
+  DCHECK(state != nullptr);
+  DCHECK(node != nullptr);
+  return Substitute("$0_$1", PrintId(state->fragment_instance_id()), node->id());
+}
+
 Status TupleCacheNode::GetNext(
     RuntimeState* state, RowBatch* output_row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile()->total_time_counter());
@@ -297,7 +305,7 @@ Status TupleCacheNode::GetNext(
             // option when removing metadata. Keeping this consistent ensures proper
             // handling.
             tuple_cache_mgr->StoreMetadataForTupleCache(
-                combined_key_, PrintId(state->fragment_instance_id()));
+                combined_key_, GenerateFragmentNodeId(state, this));
           }
           tuple_cache_mgr->CompleteWrite(move(handle_), bytes_written);
         } else {
@@ -384,13 +392,13 @@ void TupleCacheNode::Close(RuntimeState* state) {
 string TupleCacheNode::GetDebugDumpPath(const RuntimeState* state,
     const string& org_fragment_id, string* sub_dir_full_path) const {
   // The name of the subdirectory is hash key.
-  // For non-reference files, the file name is the fragment instance id.
-  // For reference files, the name includes the current fragment instance id, the original
-  // fragment id, and a "ref" suffix.
-  string file_name = PrintId(state->fragment_instance_id());
+  // For non-reference files, the file name is the fragment instance node id.
+  // For reference files, the name includes the current fragment instance node id, the
+  // original fragment node id, and a "ref" suffix.
+  string file_name = GenerateFragmentNodeId(state, this);
   if (!org_fragment_id.empty()) {
     // Adds the original fragment id of the cache to the path for debugging purpose.
-    file_name += "_" + org_fragment_id + "_ref";
+    file_name = Substitute("$0_$1_ref", file_name, org_fragment_id);
   }
   return ExecEnv::GetInstance()->tuple_cache_mgr()->GetDebugDumpPath(
       combined_key_, file_name, sub_dir_full_path);
