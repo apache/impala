@@ -1940,7 +1940,7 @@ class TestAdmissionController(TestAdmissionControllerBase):
         fs_allocation_file="fair-scheduler-onlycoords.xml",
         llama_site_file="llama-site-onlycoords.xml"),
       statestored_args=_STATESTORED_ARGS)
-  def test_coord_only_pool_one_quiescing_coord(self, vector):
+  def test_coord_only_pool_one_coord_quiescing(self, vector):
     """Asserts quiescing coordinators do not run fragment instances for queries that only
        select from the active queries table."""
     self.wait_for_wm_init_complete()
@@ -1955,6 +1955,8 @@ class TestAdmissionController(TestAdmissionControllerBase):
     self.__run_assert_systables_query(
         vector=vector,
         expected_coords=[all_coords[0], all_coords[2]])
+    # Wait until quiescing coordinator exit.
+    coord_to_quiesce.wait_for_exit()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(num_exclusive_coordinators=3, cluster_size=5,
@@ -1998,6 +2000,8 @@ class TestAdmissionController(TestAdmissionControllerBase):
 
     assert done_waiting
     self.__assert_systables_query(result.runtime_profile, [all_coords[0], all_coords[1]])
+    # Ensure that coord_to_term has truly exit.
+    coord_to_term.wait_for_exit()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(num_exclusive_coordinators=3, cluster_size=5,
