@@ -132,8 +132,6 @@ create table ignore_column_case (Id int, NAME string, vAlf float, vali bigint,
 ====
 ---- QUERY
 insert into ignore_column_case values (1, 'Martin', 1.0, 10);
----- RESULTS
-: 1
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
@@ -168,6 +166,8 @@ X, I1, I2, I3, I4, VALS, VALF, VALD, VALB, VALDEC4, VALDEC8, VALDEC16, VALDATE, 
 1,NULL,NULL,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
 INT,TINYINT,SMALLINT,INT,BIGINT,STRING,FLOAT,DOUBLE,BOOLEAN,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
+---- HS2_TYPES
+INT,TINYINT,SMALLINT,INT,BIGINT,STRING,FLOAT,DOUBLE,BOOLEAN,DECIMAL,DECIMAL,DECIMAL,DATE,VARCHAR
 ====
 ---- QUERY
 # Overlapping ranges are rejected by the Kudu client
@@ -452,6 +452,8 @@ VALVC
 'z'
 ---- TYPES
 STRING
+---- HS2_TYPES
+VARCHAR
 ====
 ---- QUERY
 # Creates as select table with varchar columns and primary key
@@ -469,6 +471,8 @@ select * from ctas_varchar;
 'c'
 ---- TYPES
 STRING
+---- HS2_TYPES
+VARCHAR
 ====
 ---- QUERY
 # Create with keyword 'stored by'
@@ -493,8 +497,6 @@ stored as kudu
 ====
 ---- QUERY
 insert into non_unique_key_create_tbl1 values (1,'Martin'), (2,'Smith');
----- RESULTS
-: 2
 ---- RUNTIME_PROFILE
 NumModifiedRows: 2
 NumRowErrors: 0
