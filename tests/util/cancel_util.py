@@ -18,8 +18,7 @@
 from __future__ import absolute_import, division, print_function
 import threading
 from time import sleep
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.impala_connection import create_connection
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION, create_connection
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_result_verifier import error_msg_startswith
 
@@ -154,7 +153,7 @@ def __run_cancel_query_and_validate_state(client, query, exec_option,
   if not use_kill_query_statement:
     try:
       client.close_query(handle)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       close_error = e
 
   # Before accessing fetch_results_error we need to join the fetch thread
@@ -202,5 +201,5 @@ def __fetch_results(query, handle):
   try:
     new_client = ImpalaTestSuite.create_impala_client()
     new_client.fetch(query, handle)
-  except ImpalaBeeswaxException as e:
+  except IMPALA_CONNECTION_EXCEPTION as e:
     threading.current_thread().fetch_results_error = e

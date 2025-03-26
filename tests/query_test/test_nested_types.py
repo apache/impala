@@ -19,7 +19,7 @@ from __future__ import absolute_import, division, print_function
 import os
 from copy import deepcopy
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
@@ -963,7 +963,7 @@ class TestMaxNestingDepth(ImpalaTestSuite):
     try:
       self.client.execute("explain select 1 from %s.above_max_depth" % unique_database)
       assert False, "Expected table loading to fail."
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Type exceeds the maximum nesting depth" in str(e)
 
 

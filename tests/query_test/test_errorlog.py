@@ -19,12 +19,13 @@
 # two types of failures - cancellation of the query and a failure test hook.
 #
 from __future__ import absolute_import, division, print_function
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
 from time import sleep
+
 
 # Test injecting error logs in prepare phase and status::OK(). This tests one of race
 # conditions in error reporting (IMPALA-3385).
@@ -67,5 +68,5 @@ class TestErrorLogs(ImpalaTestSuite):
       assert cancel_result.status_code == 0,\
           'Unexpected status code from cancel request: %s' % cancel_result
     # As long as impala did not crash we are good.
-    except ImpalaBeeswaxException:
+    except IMPALA_CONNECTION_EXCEPTION:
       return

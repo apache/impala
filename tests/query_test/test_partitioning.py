@@ -18,10 +18,11 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
+
 
 # Tests to validate HDFS partitioning.
 class TestPartitioning(ImpalaTestSuite):
@@ -47,7 +48,7 @@ class TestPartitioning(ImpalaTestSuite):
   # Missing Coverage: Impala deals with boolean partitions created by Hive on a non-hdfs
   # filesystem.
   @SkipIfFS.hive
-  def test_boolean_partitions(self, vector, unique_database):
+  def test_boolean_partitions(self, unique_database):
     # This test takes about a minute to complete due to the Hive commands that are
     # executed. To cut down on runtime, limit the test to exhaustive exploration
     # strategy.
@@ -86,7 +87,7 @@ class TestPartitioning(ImpalaTestSuite):
     # INSERT into a boolean column is disabled in Impala due to this Hive bug.
     try:
       self.execute_query("insert into %s partition(bool_col=true) select 1" % full_name)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert 'AnalysisException: INSERT into table with BOOLEAN partition column (%s) '\
           'is not supported: %s' % ('b', full_name) in str(e)
 

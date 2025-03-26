@@ -23,9 +23,9 @@ import threading
 from multiprocessing.pool import ThreadPool
 from multiprocessing import TimeoutError
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.impala_connection import ERROR, FINISHED
+from tests.common.impala_connection import (
+    ERROR, FINISHED, IMPALA_CONNECTION_EXCEPTION)
 from tests.util.shell_util import dump_server_stacktraces
 
 
@@ -125,7 +125,7 @@ class TestConcurrentDdls(CustomClusterTestSuite):
           is_finished = tls.client.wait_for_finished_timeout(handle, timeout=60)
           assert is_finished, "Query timeout(60s): " + query
           tls.client.close_query(handle)
-        except ImpalaBeeswaxException as e:
+        except IMPALA_CONNECTION_EXCEPTION as e:
           # Could raise exception when running with INVALIDATE METADATA
           assert TestConcurrentDdls.is_acceptable_error(str(e), sync_ddl), str(e)
       self.execute_query_expect_success(tls.client, "invalidate metadata")

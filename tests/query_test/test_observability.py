@@ -18,8 +18,8 @@
 from __future__ import absolute_import, division, print_function
 from collections import defaultdict
 from datetime import datetime
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster
 from tests.common.test_vector import HS2
@@ -1076,7 +1076,7 @@ class TestQueryStates(ImpalaTestSuite):
     try:
       self.client.fetch(query, handle)
       assert False
-    except ImpalaBeeswaxException:
+    except IMPALA_CONNECTION_EXCEPTION:
       pass
 
     profile = self.client.get_runtime_profile(handle)

@@ -16,7 +16,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 
 
@@ -86,7 +86,7 @@ class TestBeeswax(ImpalaTestSuite):
     try:
       fn()
       assert False, "Expected invalid handle"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Query id" in str(e) and "not found" in str(e), str(e)
 
   def _assert_profile_access_denied(self, fn):
@@ -95,5 +95,5 @@ class TestBeeswax(ImpalaTestSuite):
     try:
       fn()
       assert False, "Expected invalid handle"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "is not authorized to access the runtime profile" in str(e), str(e)

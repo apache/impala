@@ -25,10 +25,10 @@ import time
 
 from copy import deepcopy
 from tests.metadata.test_ddl_base import TestDdlBase
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.environ import (HIVE_MAJOR_VERSION)
 from tests.common.file_utils import create_table_from_orc
-from tests.common.impala_connection import FINISHED, INITIALIZED, PENDING, RUNNING
+from tests.common.impala_connection import (
+    FINISHED, INITIALIZED, IMPALA_CONNECTION_EXCEPTION, PENDING, RUNNING)
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (
@@ -588,7 +588,7 @@ class TestDdlStatements(TestDdlBase):
             result = self.execute_query_expect_success(
                 client, "describe formatted %s" % view_name)
             exp_line = [line for line in result.data if 'View Expanded' in line][0]
-          except ImpalaBeeswaxException as e:
+          except IMPALA_CONNECTION_EXCEPTION as e:
             # In non-SYNC_DDL tests, it's OK to get a "missing view" type error
             # until the metadata propagates.
             exp_line = "Exception: %s" % e

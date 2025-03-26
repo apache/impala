@@ -17,8 +17,8 @@
 
 from __future__ import absolute_import, division, print_function
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_result_verifier import error_msg_startswith
 
@@ -34,21 +34,21 @@ class TestSysDb(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
 
   @CustomClusterTestSuite.with_args()
-  def test_query_log_table_create_sys_db_blocked(self, vector):
+  def test_query_log_table_create_sys_db_blocked(self):
     """Asserts that the sys db cannot be created."""
 
     try:
       self.client.execute("create database {0}".format(self.SYS_DB_NAME))
       assert False, "database '{0}' should have failed to create but was created" \
           .format(self.SYS_DB_NAME)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Invalid db name: {0}. It has been blacklisted using --blacklisted_dbs" \
           .format(self.SYS_DB_NAME) in str(e), "database '{0}' failed to create but " \
           "for the wrong reason".format(self.SYS_DB_NAME)
 
   @CustomClusterTestSuite.with_args(impalad_args="--enable_workload_mgmt",
                                     catalogd_args="--enable_workload_mgmt")
-  def test_query_log_table_create_table_sys_db_blocked(self, vector):
+  def test_query_log_table_create_table_sys_db_blocked(self):
     """Asserts that no other tables can be created in the sys db."""
 
     table_name = "{0}.should_not_create".format(self.SYS_DB_NAME)
@@ -57,7 +57,7 @@ class TestSysDb(CustomClusterTestSuite):
       self.client.execute("create table {0} (id STRING)".format(table_name))
       assert False, "table '{0}' should have failed to create but was created" \
           .format(table_name)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       expected_error = "IllegalStateException: Can't create blacklisted table: {0}" \
           .format(table_name)
       assert error_msg_startswith(str(e), expected_error), \

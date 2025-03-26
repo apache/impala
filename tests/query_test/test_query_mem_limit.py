@@ -23,13 +23,13 @@ import re
 import sys
 from copy import copy
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfEC
 from tests.common.test_dimensions import (
     ImpalaTestDimension,
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
+
 
 class TestQueryMemLimit(ImpalaTestSuite):
   """Test class to do functional validation of per query memory limits.
@@ -113,7 +113,7 @@ class TestQueryMemLimit(ImpalaTestSuite):
     try:
       self.execute_query(query, exec_options, table_format=table_format)
       assert should_succeed, "Query was expected to fail"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert not should_succeed, "Query should not have failed: %s" % e
 
 

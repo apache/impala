@@ -30,8 +30,8 @@ import time
 from random import randint
 
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.impala_connection import ERROR, FINISHED, RUNNING
+from tests.common.impala_connection import (
+    ERROR, FINISHED, IMPALA_CONNECTION_EXCEPTION, RUNNING)
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.errors import Timeout
@@ -407,7 +407,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     try:
       self.client.fetch(self._shuffle_heavy_query, handle)
       assert False
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Admission for query exceeded timeout 60000ms in pool default-pool." \
           in str(e)
       assert "Queued reason: Waiting for executors to start. Only DDL queries and " \
@@ -472,7 +472,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     try:
       self.client.fetch(self._shuffle_heavy_query, handle)
       assert False
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Max retry limit was hit. Query was retried 1 time(s)." in str(e)
 
     # Assert that the killed impalad shows up in the list of blacklisted executors from
@@ -643,7 +643,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     try:
       self.client.fetch(query, handle)
       assert False, "fetch should fail"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Failed due to unreachable impalad" in str(e)
       assert "Skipping retry of query_id=%s because the client has already " \
              "fetched some rows" % self.client.handle_id(handle) in str(e)

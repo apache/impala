@@ -24,7 +24,7 @@ import decimal
 import math
 import random
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
   add_mandatory_exec_option,
@@ -224,7 +224,7 @@ class TestDecimalFuzz(ImpalaTestSuite):
 
     try:
       result = self.execute_scalar(query, query_options)
-    except ImpalaBeeswaxException:
+    except IMPALA_CONNECTION_EXCEPTION:
       result = None
     if result is not None:
       result = decimal.Decimal(result)
@@ -301,7 +301,7 @@ class TestDecimalFuzz(ImpalaTestSuite):
     try:
       result = self.execute_scalar(query, query_options)
       assert int(result) == expected_result
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       if "You need to wrap the arguments in a CAST" not in str(e):
         # Sometimes the decimal inputs are incompatible with each other, so it's ok
         # to ignore this error.

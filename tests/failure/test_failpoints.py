@@ -24,8 +24,8 @@ import pytest
 import re
 from time import sleep
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_dimensions import create_exec_option_dimension
@@ -186,7 +186,7 @@ class TestFailpoints(ImpalaTestSuite):
       try:
         self.execute_query(query,
             query_options={'debug_action': debug_action})
-      except ImpalaBeeswaxException as e:
+      except IMPALA_CONNECTION_EXCEPTION as e:
         assert 'Debug Action: FIS_FAIL_THREAD_CREATION:FAIL@0.5' \
             in str(e), str(e)
         break
@@ -195,7 +195,7 @@ class TestFailpoints(ImpalaTestSuite):
     try:
       self.execute_query(query, vector.get_value('exec_option'))
       assert 'Expected Failure'
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       LOG.debug(e)
       # IMPALA-5197: None of the debug actions should trigger corrupted file message
       assert 'Corrupt Parquet file' not in str(e)

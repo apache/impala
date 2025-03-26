@@ -18,10 +18,11 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 import time
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.verifiers.metric_verifier import MetricVerifier
+
 
 # TODO: Debug actions leak into other tests in the same suite (if not explicitly
 # unset). Ensure they get unset between tests.
@@ -30,6 +31,7 @@ class TestFragmentLifecycleWithDebugActions(ImpalaTestSuite):
   fragments"""
 
   IN_FLIGHT_FRAGMENTS = "impala-server.num-fragments-in-flight"
+
   @classmethod
   def get_workload(self):
     return 'functional'
@@ -43,7 +45,7 @@ class TestFragmentLifecycleWithDebugActions(ImpalaTestSuite):
     try:
       self.client.execute("SELECT COUNT(*) FROM functional.alltypes")
       assert "Query should have thrown an error"
-    except ImpalaBeeswaxException:
+    except IMPALA_CONNECTION_EXCEPTION:
       pass
 
     for v in verifiers:
@@ -63,7 +65,7 @@ class TestFragmentLifecycleWithDebugActions(ImpalaTestSuite):
       self.client.execute("SELECT COUNT(*) FROM functional.alltypes a JOIN [SHUFFLE] \
         functional.alltypes b on a.id = b.id")
       assert "Query should have thrown an error"
-    except ImpalaBeeswaxException:
+    except IMPALA_CONNECTION_EXCEPTION:
       pass
 
     for v in verifiers:
@@ -73,6 +75,7 @@ class TestFragmentLifecycleWithDebugActions(ImpalaTestSuite):
       #
       # TODO: Fix when we have cancellable RPCs.
       v.wait_for_metric(self.IN_FLIGHT_FRAGMENTS, 0, timeout=125)
+
 
 class TestFragmentLifecycle(ImpalaTestSuite):
   def test_finst_cancel_when_query_complete(self):
@@ -94,4 +97,5 @@ class TestFragmentLifecycle(ImpalaTestSuite):
 
     # Query typically completes in < 2s, but if cross join is fully evaluated, will take >
     # 10 minutes. Pick 2 minutes as a reasonable midpoint to avoid false negatives.
-    assert end - now < 120, "Query took too long to complete: " + duration + "s"
+    duration = end - now
+    assert duration < 120, "Query took too long to complete: " + duration + "s"

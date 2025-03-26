@@ -35,7 +35,7 @@ from avro.datafile import DataFileReader
 from avro.io import DatumReader
 import json
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.iceberg_test_suite import IcebergTestSuite
 from tests.common.skip import SkipIf, SkipIfFS, SkipIfDockerizedCluster
 from tests.common.test_dimensions import add_exec_option_dimension
@@ -144,7 +144,7 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-truncate', vector, use_db=unique_database)
 
   @SkipIf.not_dfs
-  def test_drop_incomplete_table(self, vector, unique_database):
+  def test_drop_incomplete_table(self, unique_database):
     """Test DROP TABLE when the underlying directory is deleted. In that case table
     loading fails, but we should be still able to drop the table from Impala."""
     tbl_name = unique_database + ".synchronized_iceberg_tbl"
@@ -226,7 +226,7 @@ class TestIcebergTable(IcebergTestSuite):
     try:
       self.client.wait_for_finished_timeout(handle, 30)
       assert False
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Found conflicting files" in str(e)
 
     # Test INSERT INTO during INSERT OVERWRITE, the exception closes the query handle.
@@ -236,7 +236,7 @@ class TestIcebergTable(IcebergTestSuite):
     try:
       self.client.wait_for_finished_timeout(handle, 30)
       assert False
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Found conflicting files" in str(e)
 
   def test_ctas(self, vector, unique_database):
@@ -440,7 +440,7 @@ class TestIcebergTable(IcebergTestSuite):
     try:
       self.rollback_to_ts(client, tbl_name, ts)
       assert False, "Query should have failed"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       result = re.search(r".*no valid snapshot older than: (\d+)", str(e))
       time_str = result.group(1)
       snapshot_ts = int(time_str)
@@ -565,7 +565,6 @@ class TestIcebergTable(IcebergTestSuite):
         "explain select * from {0} for system_version as of {1}".format(
           tbl_name, snapshot_id))
       assert "   Iceberg snapshot id: {0}".format(snapshot_id) in data.data
-
 
     def impala_now():
       now_data = impalad_client.execute("select now()")
@@ -748,7 +747,7 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-time-travel', vector, use_db=unique_database)
 
   @SkipIf.not_dfs
-  def test_strings_utf8(self, vector, unique_database):
+  def test_strings_utf8(self, unique_database):
     # Create table
     table_name = "ice_str_utf8"
     qualified_table_name = "%s.%s" % (unique_database, table_name)
@@ -860,7 +859,7 @@ class TestIcebergTable(IcebergTestSuite):
     return current_partition_spec
 
   @SkipIf.not_dfs
-  def test_partition_spec_update_v1(self, vector, unique_database):
+  def test_partition_spec_update_v1(self, unique_database):
     # Create table
     table_name = "ice_part"
     qualified_table_name = "%s.%s" % (unique_database, table_name)
@@ -903,7 +902,7 @@ class TestIcebergTable(IcebergTestSuite):
     assert old_truncate_s['transform'] == 'void'
 
   @SkipIf.not_dfs
-  def test_partition_spec_update_v2(self, vector, unique_database):
+  def test_partition_spec_update_v2(self, unique_database):
     # Create table
     table_name = "ice_part"
     qualified_table_name = "%s.%s" % (unique_database, table_name)
@@ -959,11 +958,11 @@ class TestIcebergTable(IcebergTestSuite):
     assert truncate_s['field-id'] == 1004
 
   @SkipIf.not_dfs
-  def test_writing_metrics_to_metadata_v1(self, vector, unique_database):
+  def test_writing_metrics_to_metadata_v1(self, unique_database):
     self._test_writing_metrics_to_metadata_impl(unique_database, 'ice_stats_v1', '1')
 
   @SkipIf.not_dfs
-  def test_writing_metrics_to_metadata_v2(self, vector, unique_database):
+  def test_writing_metrics_to_metadata_v2(self, unique_database):
     self._test_writing_metrics_to_metadata_impl(unique_database, 'ice_stats_v2', '2')
 
   def _test_writing_metrics_to_metadata_impl(self, unique_database, table_name, version):
@@ -1111,7 +1110,7 @@ class TestIcebergTable(IcebergTestSuite):
         use_db=unique_database)
 
   @pytest.mark.execute_serially
-  def test_table_load_time_for_many_files(self, vector, unique_database):
+  def test_table_load_time_for_many_files(self, unique_database):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
     tbl_name = unique_database + ".iceberg_many_files"
@@ -1129,7 +1128,7 @@ class TestIcebergTable(IcebergTestSuite):
       time_limit = 20
     assert elapsed_time < time_limit
 
-  def test_consistent_scheduling(self, vector, unique_database):
+  def test_consistent_scheduling(self, unique_database):
     """IMPALA-10914: This test verifies that Impala schedules scan ranges consistently for
     Iceberg tables."""
     def collect_split_stats(profile):
@@ -1152,7 +1151,7 @@ class TestIcebergTable(IcebergTestSuite):
         split_stats = collect_split_stats(profile)
         assert ref_split_stats == split_stats
 
-  def test_scheduling_partitioned_tables(self, vector, unique_database):
+  def test_scheduling_partitioned_tables(self, unique_database):
     """IMPALA-12765: Balance consecutive partitions better for Iceberg tables"""
     # We are setting the replica_preference query option in this test, so let's create a
     # local impala client.
@@ -1369,7 +1368,7 @@ class TestIcebergTable(IcebergTestSuite):
     assert parquet_column_name_type_list == iceberg_column_name_type_list
 
   @SkipIfFS.hive
-  def test_hive_external_forbidden(self, vector, unique_database):
+  def test_hive_external_forbidden(self, unique_database):
     tbl_name = unique_database + ".hive_ext"
     error_msg = ("cannot be loaded because it is an EXTERNAL table in the HiveCatalog "
         "that points to another table. Query the original table instead.")
@@ -1475,7 +1474,7 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-drop-partition', vector,
       use_db=unique_database)
 
-  def test_rollback_after_drop_partition(self, vector, unique_database):
+  def test_rollback_after_drop_partition(self, unique_database):
     table_name = "iceberg_drop_partition_rollback"
     qualified_table_name = "{}.{}".format(unique_database, table_name)
     create_table_stmt = """CREATE TABLE {}(identity_int int, unpartitioned_int int)
@@ -1704,7 +1703,7 @@ class TestIcebergV2Table(IcebergTestSuite):
         unique_database)
 
   @SkipIfFS.hive
-  def test_delete_hive_read(self, vector, unique_database):
+  def test_delete_hive_read(self, unique_database):
     ice_delete = unique_database + ".ice_delete"
     self.execute_query("""CREATE TABLE {} (i int, s string)
         STORED BY ICEBERG

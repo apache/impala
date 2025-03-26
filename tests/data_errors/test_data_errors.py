@@ -23,7 +23,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import pytest
 import subprocess
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_dimensions import create_exec_option_dimension
@@ -40,7 +40,6 @@ class TestDataErrors(ImpalaTestSuite):
     super(TestDataErrors, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension(batch_sizes=cls.BATCH_SIZES))
-
 
   @classmethod
   def get_workload(self):
@@ -65,7 +64,7 @@ class TestHdfsFileOpenFailErrors(ImpalaTestSuite):
     assert not self.filesystem_client.exists(absolute_location)
     try:
       self.client.execute(select_stmt)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Failed to open HDFS file" in str(e)
     self.client.execute(drop_stmt)
 
@@ -86,13 +85,13 @@ class TestHdfsUnknownErrors(ImpalaTestSuite):
       output, error = subprocess.Popen(
           ['hdfs', 'dfsadmin', '-safemode', 'get'],
               stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-      assert error is "", "Couldn't get status of Safe mode. Error: %s" % (error)
+      assert error == "", "Couldn't get status of Safe mode. Error: %s" % (error)
       assert "Safe mode is OFF" in output
       # Turn safe mode on.
       output, error = subprocess.Popen(
           ['hdfs', 'dfsadmin', '-safemode', 'enter'],
               stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-      assert error is "", "Couldn't turn Safe mode ON. Error: %s" % (error)
+      assert error == "", "Couldn't turn Safe mode ON. Error: %s" % (error)
       assert "Safe mode is ON" in output
 
       # We shouldn't be able to write to HDFS when it's in safe mode.
@@ -107,7 +106,7 @@ class TestHdfsUnknownErrors(ImpalaTestSuite):
       output, error = subprocess.Popen(
           ['hdfs', 'dfsadmin', '-safemode', 'leave'],
               stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-      assert error is "", "Couldn't turn Safe mode OFF. Error: %s" % (error)
+      assert error == "", "Couldn't turn Safe mode OFF. Error: %s" % (error)
       assert "Safe mode is OFF" in output
 
 

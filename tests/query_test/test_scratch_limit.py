@@ -11,10 +11,11 @@
 # limitations under the License.
 
 from __future__ import absolute_import, division, print_function
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+
 
 class TestScratchLimit(ImpalaTestSuite):
   """
@@ -87,7 +88,7 @@ class TestScratchLimit(ImpalaTestSuite):
     try:
       self.execute_query(self.spilling_sort_query, exec_option)
       assert False, "Query was expected to fail"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert expected_error % scratch_limit_in_bytes in str(e)
 
   def test_with_zero_scratch_limit(self, vector):

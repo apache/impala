@@ -16,7 +16,7 @@ import pytest
 import requests
 import time
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.skip import SkipIfLocal, SkipIfFS
@@ -217,7 +217,7 @@ class TestRecursiveListing(ImpalaTestSuite):
       try:
         self.client.fetch(refresh_stmt, handle)
         assert not refresh_should_fail, "REFRESH should fail"
-      except ImpalaBeeswaxException as e:
+      except IMPALA_CONNECTION_EXCEPTION as e:
         assert refresh_should_fail, "unexpected exception " + str(e)
     finally:
       requests.get(self.reset_log_level_url)

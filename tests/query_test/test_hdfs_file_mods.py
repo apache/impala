@@ -19,8 +19,7 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.common.test_vector import ImpalaTestDimension
@@ -29,6 +28,7 @@ from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 
 # Modifications to test
 MODIFICATION_TYPES=["delete_files", "delete_directory", "move_file", "append"]
+
 
 @SkipIfLocal.hdfs_client
 class TestHdfsFileMods(ImpalaTestSuite):
@@ -53,7 +53,7 @@ class TestHdfsFileMods(ImpalaTestSuite):
   def get_workload(cls):
     return 'functional-query'
 
-  def setup_ext_table(self, vector, unique_database, new_table_location):
+  def setup_ext_table(self, unique_database, new_table_location):
     # Use HDFS commands to clone the table's files at the hdfs level
     old_table_location = "{0}/test-warehouse/tinytable".format(FILESYSTEM_PREFIX)
     call(["hdfs", "dfs", "-mkdir", new_table_location])
@@ -71,7 +71,7 @@ class TestHdfsFileMods(ImpalaTestSuite):
 
     new_table_location = "{0}/test-warehouse/{1}".format(FILESYSTEM_PREFIX,\
         unique_database)
-    self.setup_ext_table(vector, unique_database, new_table_location)
+    self.setup_ext_table(unique_database, new_table_location)
 
     # Query the table. If file handle caching is enabled, this will fill the cache.
     count_query = "select count(*) from {0}.t1".format(unique_database)
@@ -99,12 +99,12 @@ class TestHdfsFileMods(ImpalaTestSuite):
            new_table_location + "/data.csv"])
       call(["rm", local_tmp_location])
     else:
-      assert(false)
+      assert False
 
     # The query might fail, but nothing should crash.
     try:
       self.execute_query(count_query)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION:
       pass
 
     # Invalidate metadata

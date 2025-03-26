@@ -18,9 +18,10 @@
 # Validates limit on scan nodes
 
 from __future__ import absolute_import, division, print_function
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension
+
 
 class TestLimit(ImpalaTestSuite):
   LIMIT_VALUES = [1, 2, 3, 4, 5, 10, 100, 5000]
@@ -77,7 +78,7 @@ class TestLimitBase(ImpalaTestSuite):
       assert should_succeed, 'Query was expected to fail'
       assert len(result.data) == expected_rows,\
           'Wrong number of rows returned %d' % len(result.data)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert not should_succeed, 'Query was not expected to fail: %s' % e
       if (expected_error not in str(e)):
         print(str(e))

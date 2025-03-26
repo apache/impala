@@ -18,9 +18,9 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 import time
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIf, SkipIfBuildType
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
+from tests.common.skip import SkipIfBuildType
 
 # The BE krpc port of the impalad these tests simulate rpc errors at.
 KRPC_PORT = 27002
@@ -40,6 +40,7 @@ def _get_fail_action(rpc, error=None, port=KRPC_PORT, p=0.1):
   if error is not None:
     action += "@" + error
   return _get_rpc_debug_action(rpc, action, port=port)
+
 
 @SkipIfBuildType.not_dev_build
 class TestRPCException(CustomClusterTestSuite):
@@ -93,7 +94,7 @@ class TestRPCException(CustomClusterTestSuite):
       try:
         result = self.client.execute(self.TEST_QUERY)
         assert result.data == self.EXPECTED_RESULT, "Query returned unexpected results."
-      except ImpalaBeeswaxException as e:
+      except IMPALA_CONNECTION_EXCEPTION as e:
         if exception_string is None:
           raise e
         assert exception_string in str(e), "Query failed with unexpected exception."
@@ -149,7 +150,7 @@ class TestRPCException(CustomClusterTestSuite):
     try:
       self.client.execute(self.TEST_QUERY)
       assert False, "query was expected to fail"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Debug Action: QUERY_STATE_INIT:FAIL" in str(e)
 
     # If we successfully cancelled all Exec() rpcs and returned to the client as soon as
@@ -178,7 +179,7 @@ class TestRPCException(CustomClusterTestSuite):
     try:
       self.client.execute(self.TEST_QUERY)
       assert False, "query was expected to fail"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Debug Action: CONSTRUCT_QUERY_STATE_REPORT:FAIL" in str(e)
 
     # If we successfully cancelled all Exec() rpcs and returned to the client as soon as

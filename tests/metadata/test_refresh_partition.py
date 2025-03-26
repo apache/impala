@@ -14,7 +14,7 @@
 from __future__ import absolute_import, division, print_function
 from subprocess import check_call
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
@@ -42,7 +42,7 @@ class TestRefreshPartition(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
-  def test_refresh_invalid_partition(self, vector, unique_database):
+  def test_refresh_invalid_partition(self, unique_database):
     """
     Trying to refresh a partition that does not exist does not modify anything
     either in impala or hive.
@@ -59,7 +59,7 @@ class TestRefreshPartition(ImpalaTestSuite):
     assert [('333', '5309')] == self.get_impala_partition_info(table_name, 'y', 'z')
     assert ['y=333/z=5309'] == self.hive_partition_names(table_name)
 
-  def test_remove_data_and_refresh(self, vector, unique_database):
+  def test_remove_data_and_refresh(self, unique_database):
     """
     Data removed through hive is visible in impala after refresh of partition.
     """
@@ -83,14 +83,14 @@ class TestRefreshPartition(ImpalaTestSuite):
     # produce an error, it should be the expected error.
     try:
       self.client.execute("select * from %s" % table_name)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert expected_error in str(e)
 
     self.client.execute('refresh %s partition (y=333, z=5309)' % table_name)
     result = self.client.execute("select count(*) from %s" % table_name)
     assert result.data == [str('0')]
 
-  def test_add_delete_data_to_hdfs_and_refresh(self, vector, unique_database):
+  def test_add_delete_data_to_hdfs_and_refresh(self, unique_database):
     """
     Data added/deleted directly in HDFS is visible in impala after refresh of
     partition.
@@ -126,7 +126,7 @@ class TestRefreshPartition(ImpalaTestSuite):
     result = self.client.execute("select count(*) from %s" % table_name)
     assert result.data == [str(0)]
 
-  def test_confirm_individual_refresh(self, vector, unique_database):
+  def test_confirm_individual_refresh(self, unique_database):
     """
     Data added directly to HDFS is only visible for the partition refreshed
     """

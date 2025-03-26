@@ -21,10 +21,10 @@ from builtins import range
 import pytest
 from copy import copy
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_dimensions import (create_avro_snappy_dimension,
     create_parquet_dimension)
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (
   SkipIfNotHdfsMinicluster,
@@ -122,7 +122,7 @@ class TestLowMemoryLimits(ImpalaTestSuite):
     exec_options['default_spillable_buffer_size'] = "256k"
     try:
       self.run_test_case(tpch_query, new_vector)
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       if not expects_error: raise
       found_expected_error = False
       for error_msg in MEM_LIMIT_ERROR_MSGS:

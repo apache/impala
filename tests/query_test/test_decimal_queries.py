@@ -18,15 +18,14 @@
 # Targeted tests for decimal type.
 
 from __future__ import absolute_import, division, print_function
-from copy import copy
 import pytest
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
     create_client_protocol_dimension, hs2_parquet_constraint)
-from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import IS_S3
+
 
 class TestDecimalQueries(ImpalaTestSuite):
   @classmethod
@@ -58,6 +57,7 @@ class TestDecimalQueries(ImpalaTestSuite):
   def test_queries(self, vector):
     self.run_test_case('QueryTest/decimal', vector)
 
+
 # Tests involving DECIMAL typed expressions. The results depend on whether DECIMAL
 # version 1 or version 2 are enabled, so the .test file itself toggles the DECIMAL_V2
 # query option.
@@ -74,6 +74,7 @@ class TestDecimalExprs(ImpalaTestSuite):
 
   def test_exprs(self, vector):
     self.run_test_case('QueryTest/decimal-exprs', vector)
+
 
 # TODO: when we have a good way to produce Avro decimal data (e.g. upgrade Hive), we can
 # run Avro through the same tests as above instead of using avro_decimal_tbl.
@@ -173,7 +174,7 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
       try:
         self.execute_query_using_client(self.client, query_1, vector)
         assert False, "Query was expected to fail"
-      except ImpalaBeeswaxException as e:
+      except IMPALA_CONNECTION_EXCEPTION as e:
         assert "Decimal expression overflowed" in str(e)
 
       result = self.execute_query_expect_success(self.client,
@@ -188,7 +189,7 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
     try:
       self.execute_query_using_client(self.client, query_1, vector)
       assert False, "Query was expected to fail"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Decimal expression overflowed" in str(e)
 
     result = self.execute_query_expect_success(self.client,
@@ -216,7 +217,7 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
     try:
       self.execute_query_using_client(self.client, query_2, vector)
       assert False, "Query was expected to fail"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert "Decimal expression overflowed" in str(e)
 
     result = self.execute_query_expect_success(self.client,

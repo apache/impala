@@ -18,11 +18,12 @@
 from __future__ import absolute_import, division, print_function
 from subprocess import check_call
 
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
+
 
 class TestRewrittenFile(ImpalaTestSuite):
   """Tests that we gracefully handle when a file in HDFS is rewritten outside of Impala
@@ -69,7 +70,7 @@ class TestRewrittenFile(ImpalaTestSuite):
     try:
       result = self.client.execute("select * from %s.%s" % (db_name, table_name))
       assert False, "Query was expected to fail"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert expected_error in str(e)
 
     # Refresh the table and make sure we get results
@@ -78,7 +79,7 @@ class TestRewrittenFile(ImpalaTestSuite):
     assert result.data == [str(expected_new_count)]
 
   @SkipIfFS.read_past_eof
-  def test_new_file_shorter(self, vector, unique_database):
+  def test_new_file_shorter(self, unique_database):
     """Rewrites an existing file with a new shorter file."""
     # Full error is something like:
     #   Metadata for file '...' appears stale. Try running "refresh
@@ -91,7 +92,7 @@ class TestRewrittenFile(ImpalaTestSuite):
     self.__overwrite_file_and_query(unique_database, table_name,
       self.LONG_FILE, self.SHORT_FILE, 'appears stale.', self.SHORT_FILE_NUM_ROWS)
 
-  def test_new_file_longer(self, vector, unique_database):
+  def test_new_file_longer(self, unique_database):
     """Rewrites an existing file with a new longer file."""
     # Full error is something like:
     # "File '..' has an invalid Parquet version number: ff4C
@@ -103,7 +104,7 @@ class TestRewrittenFile(ImpalaTestSuite):
       self.SHORT_FILE, self.LONG_FILE, 'invalid Parquet version number',
       self.LONG_FILE_NUM_ROWS)
 
-  def test_delete_file(self, vector, unique_database):
+  def test_delete_file(self, unique_database):
     """Deletes an existing file without refreshing metadata."""
     table_name = "delete_file"
     table_location = self.__get_test_table_location(unique_database)
@@ -120,7 +121,7 @@ class TestRewrittenFile(ImpalaTestSuite):
     try:
       result = self.client.execute("select * from %s.%s" % (unique_database, table_name))
       assert False, "Query was expected to fail"
-    except ImpalaBeeswaxException as e:
+    except IMPALA_CONNECTION_EXCEPTION as e:
       assert 'No such file or directory' in str(e)
 
     # Refresh the table and make sure we get results
