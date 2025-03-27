@@ -335,12 +335,6 @@ DEFINE_int64(shutdown_query_cancel_period_s, 60,
     "period exceeds 20% of the total shutdown deadline, it will be capped at 20% of the "
     "total shutdown duration.");
 
-#ifndef NDEBUG
-  DEFINE_int64(stress_metadata_loading_pause_injection_ms, 0, "Simulates metadata loading"
-      "for a given query by injecting a sleep equivalent to this configuration in "
-      "milliseconds. Only used for testing.");
-#endif
-
 DEFINE_int64(accepted_client_cnxn_timeout, 300000,
     "(Advanced) The amount of time in milliseconds an accepted connection will wait in "
     "the post-accept, pre-setup connection queue before it is timed out and the "
@@ -1351,13 +1345,7 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
     RETURN_IF_ERROR(RegisterQuery(query_ctx.query_id, session_state, query_handle));
     *registered_query = true;
 
-#ifndef NDEBUG
-    // Inject a sleep to simulate metadata loading pauses for tables. This
-    // is only used for testing.
-    if (FLAGS_stress_metadata_loading_pause_injection_ms > 0) {
-      SleepForMs(FLAGS_stress_metadata_loading_pause_injection_ms);
-    }
-#endif
+    DebugActionNoFail((*query_handle)->query_options(), "EXECUTE_INTERNAL_REGISTERED");
 
     size_t statement_length = query_ctx.client_request.stmt.length();
     int32_t max_statement_length =

@@ -18,18 +18,21 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 import time
+
 from threading import Thread
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_cluster import ImpalaCluster
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfBuildType
 
+
 @SkipIfBuildType.not_dev_build
-class TestQueryConcurrency(CustomClusterTestSuite):
+class TestQueryConcurrency(ImpalaTestSuite):
   """Tests if multiple queries are registered on the coordinator when
   submitted in parallel along with clients trying to access the web UI.
   The intention here is to check that the web server call paths don't hold
   global locks that can conflict with other requests and prevent the impalad
   from servicing them. It is done by simulating a metadata loading pause
-  using the configuration key --metadata_loading_pause_injection_ms that
+  using the debug action 'EXECUTE_INTERNAL_REGISTERED' that
   makes the frontend hold the ClientRequestState::lock_ for longer duration."""
 
   TEST_QUERY = "select count(*) from tpch.supplier"
@@ -38,12 +41,6 @@ class TestQueryConcurrency(CustomClusterTestSuite):
   @classmethod
   def get_workload(self):
     return 'functional-query'
-
-  @classmethod
-  def setup_class(cls):
-    if cls.exploration_strategy() != 'exhaustive':
-      pytest.skip('Runs only in exhaustive mode.')
-    super(TestQueryConcurrency, cls).setup_class()
 
   def poll_query_page(self, impalad, query_id):
     """Polls the debug plan page of a given query id in a loop till the timeout
@@ -68,24 +65,30 @@ class TestQueryConcurrency(CustomClusterTestSuite):
     assert False, "Registered query count doesn't match: " + str(count)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--stress_metadata_loading_pause_injection_ms=100000")
-  def test_query_concurrency(self, vector):
-    impalad = self.cluster.get_any_impalad()
-    client1 = impalad.service.create_beeswax_client()
-    client2 = impalad.service.create_beeswax_client()
-    q1 = Thread(target = client1.execute_async, args = (self.TEST_QUERY,))
-    q2 = Thread(target = client2.execute_async, args = (self.TEST_QUERY,))
+  def test_query_concurrency(self):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('Runs only in exhaustive mode.')
+    impalad = ImpalaCluster.get_e2e_test_cluster().get_any_impalad()
+    # Inject 1 minute sleep right after "Query submitted" timeline shows up
+    # and ClientRequestState::lock_ is being held.
+    opts = {'debug_action': 'EXECUTE_INTERNAL_REGISTERED:SLEEP@60000'}
+    client1 = impalad.service.create_hs2_client()
+    client2 = impalad.service.create_hs2_client()
+    q1 = Thread(target=self.execute_query_expect_success,
+                args=(client1, self.TEST_QUERY, opts,))
+    q2 = Thread(target=self.execute_query_expect_success,
+                args=(client2, self.TEST_QUERY, opts,))
     q1.start()
     inflight_query_ids = self.check_registered_queries(impalad, 1)
-    Thread(target = self.poll_query_page,\
-        args = (impalad, inflight_query_ids[0]['query_id'],)).start()
+    poll_thread = Thread(target=self.poll_query_page,
+                         args=(impalad, inflight_query_ids[0]['query_id'],))
+    poll_thread.start()
     time.sleep(2)
     q2.start()
     inflight_query_ids = self.check_registered_queries(impalad, 2)
-    result = impalad.service.read_debug_webpage("query_profile_encoded?query_id="\
-        + inflight_query_ids[1]['query_id'])
+    result = impalad.service.read_debug_webpage(
+        "query_profile_encoded?query_id={}".format(inflight_query_ids[1]['query_id']))
     assert result.startswith("Could not obtain runtime profile")
-    client1.close()
-    client2.close()
+    poll_thread.join()
     q1.join()
     q2.join()
