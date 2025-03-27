@@ -70,6 +70,7 @@ under the License.
     </topicref>
     <topicref href="topics/impala_proxy.xml"/>
     <topicref href="topics/impala_disk_space.xml"/>
+    <topicref href="topics/impala_workload_mgmt.xml"/>
     <topicref audience="integrated" href="topics/impala_auditing.xml"/>
     <topicref audience="integrated" href="topics/impala_lineage.xml"/>
   </topicref>

@@ -55,6 +55,10 @@ using kudu::Version;
 namespace impala {
 namespace workloadmgmt {
 
+// -----------------------------------------------------------------------------
+// IMPORTANT: Any changes to this map must be reflected in the documentation in
+//            impala_workload_mgmt.xml
+// -----------------------------------------------------------------------------
 const std::map<TQueryTableColumn::type, FieldDefinition> FIELD_DEFINITIONS = {
     // Schema Version 1.0.0 Columns
     {TQueryTableColumn::CLUSTER_ID,

@@ -1,0 +1,948 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="workload_mgmt">
+
+  <title>Impala Workload Management</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>Workload Management</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Workload Management"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Impala Workload Management provides visibility into running and completed queries,
+      which can be accessed through any SQL client.
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="wm_how_it_works">
+
+    <title>How It Works</title>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="How It Works"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+      <p>
+        As queries progress through their lifecycle, telemetry is collected and tracked by
+        the coordinator responsible for executing each query. Workload Management
+        maintains this telemetry using a dedicated in-memory data structure. Retrieving the
+        telemetry for all queries currently running and recently completed is achieved
+        by querying the <codeph>sys.impala_query_live</codeph> table. This table is not a
+        traditional table since it is not backed by files on disk but by in-memory data
+        structures on each coordinator.
+      </p>
+
+      <p>
+        At regular intervals, based on the <codeph>query_log_write_interval_s</codeph>
+        or <codeph>query_log_max_queued</codeph> startup flags, the Workload Management
+        processing loop wakes up to move telemetry for completed queries to the Apache
+        Iceberg table <codeph>sys.impala_query_log</codeph>. This table is backed by
+        persistent storage. The Workload Management processing loop runs one final time as
+        the last step of a graceful shutdown.
+      </p>
+
+      <p>
+        Because the telemetry move is accomplished by an <codeph>INSERT</codeph> DML statement,
+        at least one active Impala executor must be available in the cluster.
+      </p>
+
+      <p>
+        If an error occurs while the telemetry move <codeph>INSERT</codeph> DML is executing,
+        the telemetry is re-queued in the coordinator's in-memory structure to be retried
+        during the next processing cycle. Each query's telemetry is attempted up to three
+        times before it is dropped.
+      </p>
+
+    </conbody>
+  </concept>
+
+  <concept id="wm_table_structure">
+
+    <title>Table Structure</title>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Table Schema"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+
+      <p>
+        Both <codeph>sys.impala_query_live</codeph> and <codeph>sys.impala_query_log</codeph>
+        share the same schema. The columns in these tables capture detailed metadata about
+        each query, including session information, query options, performance metrics,
+        admission status, memory usage, and more.
+      </p>
+
+      <p>
+        The following table describes the columns available in these tables:
+      </p>
+
+      <table>
+        <tgroup cols="3" rowsep="1" colsep="1">
+          <colspec colname="1" colwidth = "6*" />
+          <colspec colname="1" colwidth = "3*" />
+          <colspec colname="1" colwidth = "20*" />
+          <colspec colname="1" colwidth = "10*" />
+          <thead>
+            <row>
+              <entry>Column Name</entry>
+              <entry>Type</entry>
+              <entry>Description</entry>
+              <entry>Sample Value</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>cluster_id</entry>
+              <entry>String</entry>
+              <entry>
+                Value of the <codeph>cluster_id</codeph> coordinator startup flag.
+              </entry>
+              <entry><codeph>cluster-123</codeph></entry>
+            </row>
+            <row>
+              <entry>query_id</entry>
+              <entry>String</entry>
+              <entry>
+                Impala assigned query identifier.
+              </entry>
+              <entry><codeph>214d08bef0831e7a:3c65392400000000</codeph></entry>
+            </row>
+            <row>
+             <entry>session_id</entry>
+             <entry>String</entry>
+             <entry>
+              Impala assigned session identifier.
+             </entry>
+             <entry><codeph>ea4f661af43993d8:587839553a41adb8</codeph></entry>
+           </row>
+           <row>
+             <entry>session_type</entry>
+             <entry>String</entry>
+             <entry>
+              Type of the client session.
+             </entry>
+             <entry><codeph>HIVESERVER2</codeph></entry>
+           </row>
+           <row>
+             <entry>hiveserver2_protocol_version</entry>
+             <entry>String</entry>
+             <entry>
+              HiveServer2 protocol version used by the client.
+             </entry>
+             <entry><codeph>V6</codeph></entry>
+           </row>
+           <row>
+             <entry>db_user</entry>
+             <entry>String</entry>
+             <entry>
+              Effective cluster user.
+             </entry>
+             <entry><codeph>csso_name</codeph></entry>
+           </row>
+           <row>
+             <entry>db_user_connection</entry>
+             <entry>String</entry>
+             <entry>
+              Username from the authenticated client.
+             </entry>
+             <entry><codeph>csso_name</codeph></entry>
+           </row>
+           <row>
+             <entry>db_name</entry>
+             <entry>String</entry>
+             <entry>
+              Database queried.
+             </entry>
+             <entry><codeph>default</codeph></entry>
+           </row>
+           <row>
+             <entry>impala_coordinator</entry>
+             <entry>String</entry>
+             <entry>
+              Host and port of the coordinator for the query.
+             </entry>
+             <entry><codeph>coord-22899:27000</codeph></entry>
+           </row>
+           <row>
+             <entry>query_status</entry>
+             <entry>String</entry>
+             <entry>
+              Final status of the query.
+             </entry>
+             <entry><codeph>OK</codeph></entry>
+           </row>
+           <row>
+             <entry>query_state</entry>
+             <entry>String</entry>
+             <entry>
+              Final state of the query.
+             </entry>
+             <entry><codeph>FINISHED</codeph></entry>
+           </row>
+           <row>
+             <entry>impala_query_end_state</entry>
+             <entry>String</entry>
+             <entry>
+              Final Impala specific state of the query.
+             </entry>
+             <entry><codeph>FINISHED</codeph></entry>
+           </row>
+           <row>
+             <entry>query_type</entry>
+             <entry>String</entry>
+             <entry>
+              Type of the query (e.g. <codeph>QUERY</codeph>, <codeph>DDL</codeph>).
+             </entry>
+             <entry><codeph>QUERY</codeph></entry>
+           </row>
+           <row>
+             <entry>network_address</entry>
+             <entry>String</entry>
+             <entry>
+              Client IP and port.
+             </entry>
+             <entry><codeph>127.0.0.1:40120</codeph></entry>
+           </row>
+           <row>
+             <entry>start_time_utc</entry>
+             <entry>Timestamp</entry>
+             <entry>
+               Time the query started (UTC).
+             </entry>
+             <entry><codeph>2025-03-28 17:13:46.414316000</codeph></entry>
+           </row>
+           <row>
+             <entry>total_time_ms</entry>
+             <entry>Decimal(18,3)</entry>
+             <entry>
+               Total time between start and end, in milliseconds.
+             </entry>
+             <entry><codeph>136.121</codeph></entry>
+           </row>
+           <row>
+             <entry>query_opts_config</entry>
+             <entry>String</entry>
+             <entry>
+              Query options as comma-separated key-value pairs.
+             </entry>
+             <entry><codeph>TIMEZONE=America/Los_Angeles,QUERY_TIMEOUT_S=600,MT_DOP=12</codeph></entry>
+           </row>
+           <row>
+             <entry>resource_pool</entry>
+             <entry>String</entry>
+             <entry>
+              Name of the resource pool used.
+             </entry>
+             <entry><codeph>default-pool</codeph></entry>
+           </row>
+           <row>
+             <entry>per_host_mem_estimate</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Per-host memory estimate, in bytes.
+             </entry>
+             <entry><codeph>5</codeph></entry>
+           </row>
+           <row>
+             <entry>dedicated_coord_mem_estimate</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Coordinator memory estimate, in bytes.
+             </entry>
+             <entry><codeph>4</codeph></entry>
+           </row>
+           <row>
+             <entry>per_host_fragment_instances</entry>
+             <entry>String</entry>
+             <entry>
+              Comma-separated host and fragment instance count.
+             </entry>
+             <entry><codeph>myhost-1:27000=1,myhost-2:27001=2</codeph></entry>
+           </row>
+           <row>
+             <entry>backends_count</entry>
+             <entry>Integer</entry>
+             <entry>
+               Count of the number of backends used by the query.
+             </entry>
+             <entry><codeph>2</codeph></entry>
+           </row>
+           <row>
+             <entry>admission_result</entry>
+             <entry>String</entry>
+             <entry>
+              Admission control result. Not applicable to <codeph>DDLs</codeph>.
+             </entry>
+             <entry><codeph>Admitted immediately</codeph></entry>
+           </row>
+           <row>
+             <entry>cluster_memory_admitted</entry>
+             <entry>Integer</entry>
+             <entry>
+               Admitted cluster memory in bytes.
+             </entry>
+             <entry><codeph>4</codeph></entry>
+           </row>
+           <row>
+             <entry>executor_group</entry>
+             <entry>String</entry>
+             <entry>
+              Executor group name.
+             </entry>
+             <entry><codeph>executor_group</codeph></entry>
+           </row>
+           <row>
+             <entry>executor_groups</entry>
+             <entry>String</entry>
+             <entry>
+              All considered executor groups (including rejected ones).
+             </entry>
+             <entry><codeph>executor_group1,executor_group2</codeph></entry>
+           </row>
+           <row>
+             <entry>exec_summary</entry>
+             <entry>String</entry>
+             <entry>
+              Full executor summary text.
+             </entry>
+             <entry></entry>
+           </row>
+           <row>
+             <entry>num_rows_fetched</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Number of rows fetched.
+             </entry>
+             <entry><codeph>6001215</codeph></entry>
+           </row>
+           <row>
+             <entry>row_materialization_rows_per_sec</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Rows materialized per second.
+             </entry>
+             <entry><codeph>3780</codeph></entry>
+           </row>
+           <row>
+             <entry>row_materialization_time_ms</entry>
+             <entry>Decimal(18,3)</entry>
+             <entry>
+               Time spent materializing rows, in milliseconds.
+             </entry>
+             <entry><codeph>1.58</codeph></entry>
+           </row>
+           <row>
+             <entry>compressed_bytes_spilled</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Bytes spilled to scratch disk.
+             </entry>
+             <entry><codeph>241515</codeph></entry>
+           </row>
+           <row>
+             <entry>event_planning_finished</entry>
+             <entry>Decimal(18,3)</entry>
+             <entry>
+               Timeline event (milliseconds since the query was received).
+             </entry>
+             <entry><codeph>27.253</codeph></entry>
+           </row>
+           <row>
+             <entry>event_submit_for_admission</entry>
+             <entry>Decimal(18,3)</entry>
+             <entry>
+               Timeline event (milliseconds since the query was received).
+             </entry>
+             <entry><codeph>30.204</codeph></entry>
+           </row>
+           <row>
+             <entry>event_completed_admission</entry>
+             <entry>Decimal(18,3)</entry>
+             <entry>
+               Timeline event (milliseconds since the query was received).
+             </entry>
+             <entry><codeph>30.986</codeph></entry>
+           </row>
+           <row>
+             <entry>event_all_backends_started</entry>
+             <entry>Decimal(18,3)</entry>
+             <entry>
+               Timeline event (milliseconds since the query was received).
+             </entry>
+             <entry><codeph>31.969</codeph></entry>
+           </row>
+           <row>
+             <entry>event_rows_available</entry>
+             <entry>Decimal(18,3)</entry>
+             <entry>
+               Timeline event (milliseconds since the query was received).
+             </entry>
+             <entry><codeph>31.969</codeph></entry>
+           </row>
+           <row>
+             <entry>event_first_row_fetched</entry>
+             <entry>Decimal(18,3)</entry>
+             <entry>
+               Timeline event (milliseconds since the query was received).
+             </entry>
+             <entry><codeph>135.175</codeph></entry>
+           </row>
+           <row>
+             <entry>event_last_row_fetched</entry>
+             <entry>Decimal(18,3)</entry>
+             <entry>
+               Timeline event (milliseconds since the query was received).
+             </entry>
+             <entry><codeph>135.181</codeph></entry>
+           </row>
+           <row>
+             <entry>event_unregister_query</entry>
+             <entry>Decimal(18,3)</entry>
+             <entry>
+               Timeline event (milliseconds since the query was received).
+             </entry>
+             <entry><codeph>141.435</codeph></entry>
+           </row>
+           <row>
+             <entry>read_io_wait_total_ms</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Total read I/O wait time, in milliseconds.
+             </entry>
+             <entry><codeph>15.091</codeph></entry>
+           </row>
+           <row>
+             <entry>read_io_wait_mean_ms</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Average read I/O wait time of all executors, in milliseconds.
+             </entry>
+             <entry><codeph>35.515</codeph></entry>
+           </row>
+           <row>
+             <entry>bytes_read_cache_total</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Total bytes read from data cache.
+             </entry>
+             <entry><codeph>45823</codeph></entry>
+           </row>
+           <row>
+             <entry>bytes_read_total</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Total bytes read.
+             </entry>
+             <entry><codeph>745227</codeph></entry>
+           </row>
+           <row>
+             <entry>pernode_peak_mem_min</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Min peak memory usage across nodes.
+             </entry>
+             <entry><codeph>5552846</codeph></entry>
+           </row>
+           <row>
+             <entry>pernode_peak_mem_max</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Max peak memory usage across nodes.
+             </entry>
+             <entry><codeph>5552846</codeph></entry>
+           </row>
+           <row>
+             <entry>pernode_peak_mem_mean</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Mean peak memory usage across nodes.
+             </entry>
+             <entry><codeph>5552846</codeph></entry>
+           </row>
+           <row>
+             <entry>sql</entry>
+             <entry>String</entry>
+             <entry>
+              User-provided SQL, redacted by Impala.
+             </entry>
+             <entry><codeph>SELECT a.col1, a.col2 from db.tbl a</codeph></entry>
+           </row>
+           <row>
+             <entry>plan</entry>
+             <entry>String</entry>
+             <entry>
+              Full query plan text.
+             </entry>
+             <entry></entry>
+           </row>
+           <row>
+             <entry>tables_queried</entry>
+             <entry>String</entry>
+             <entry>
+              Comma-separated string containing all the tables queried in the SQL
+               statement. Aliased tables are resolved to their actual table names.
+             </entry>
+             <entry><codeph>db.tbl</codeph></entry>
+           </row>
+           <row>
+             <entry>select_columns</entry>
+             <entry>String</entry>
+             <entry>
+              Comma-separated fully qualified table names.
+             </entry>
+             <entry><codeph>db.tbl.col1,db.tbl.col2</codeph></entry>
+           </row>
+           <row>
+             <entry>where_columns</entry>
+             <entry>String</entry>
+             <entry>
+              Comma-separated list of fully qualified column names from the
+               SQL where clause. Aliased columns are resolved to their actual column names.
+             </entry>
+             <entry><codeph>db.tbl.col1,db.tbl.col2</codeph></entry>
+           </row>
+           <row>
+             <entry>join_columns</entry>
+             <entry>String</entry>
+             <entry>
+              Comma-separated list of fully qualified column names from the
+               SQL <codeph>JOIN</codeph> clauses. Aliased columns are resolved to their
+               actual column names.
+             </entry>
+             <entry><codeph>db.tbl.col1,db.tbl.col2</codeph></entry>
+           </row>
+           <row>
+             <entry>aggregate_columns</entry>
+             <entry>String</entry>
+             <entry>
+              Comma-separated list of fully qualified column names from the
+               SQL <codeph>GROUP BY</codeph> and <codeph>HAVING</codeph> clauses. Aliased
+               columns are resolved to their actual column names.
+             </entry>
+             <entry><codeph>db.tbl.col1,db.tbl.col2</codeph></entry>
+           </row>
+           <row>
+             <entry>orderby_columns</entry>
+             <entry>String</entry>
+             <entry>
+              Comma-separated list of fully qualified column names from the
+               SQL <codeph>ORDER BY</codeph> clause. Aliased columns are resolved to their
+               actual column names.
+             </entry>
+             <entry><codeph>db.tbl.col1,db.tbl.col2</codeph></entry>
+           </row>
+           <row>
+             <entry>coordinator_slots</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Number of coordinator query slots used.
+             </entry>
+             <entry><codeph>1</codeph></entry>
+           </row>
+           <row>
+             <entry>executor_slots</entry>
+             <entry>Bigint</entry>
+             <entry>
+               Number of executor query slots used by a single executor.
+             </entry>
+             <entry><codeph>1</codeph></entry>
+           </row>
+          </tbody>
+        </tgroup>
+      </table>
+
+    </conbody>
+  </concept>
+
+  <concept id="wm_setup">
+
+    <title>Setup</title>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Data Setup"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+
+      <p>
+        Workload Management is configured by startup flags. The only required flag is
+        <codeph>--enable_workload_management=true</codeph>, which must be set on all
+        coordinator and catalogd processes. Other coordinator flags provide flexibility to
+        tailor Workload Management to specific needs. The table below lists the common
+        flags that may need to be modified.
+      </p>
+
+      <table>
+        <tgroup cols="3" rowsep="1" colsep="1">
+          <colspec colname="1" colwidth = "10*" />
+          <colspec colname="1" colwidth = "5*" />
+          <colspec colname="1" colwidth = "5*" />
+          <colspec colname="1" colwidth = "34*" />
+          <thead>
+            <row>
+              <entry>Flag Name</entry>
+              <entry>Type</entry>
+              <entry>Default</entry>
+              <entry>Description</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>enable_workload_management</entry>
+              <entry>Boolean</entry>
+              <entry>false</entry>
+              <entry>Enables Workload Management when set to <codeph>true</codeph></entry>
+            </row>
+            <row>
+              <entry>cluster_id</entry>
+              <entry>String</entry>
+              <entry>(empty)</entry>
+              <entry>
+                Identifies the current cluster. This value is written to
+                the <codeph>cluster_id</codeph> column in the Workload Management table.
+              </entry>
+            </row>
+            <row>
+              <entry>query_log_write_interval_s</entry>
+              <entry>Integer</entry>
+              <entry>300</entry>
+              <entry>
+                Number of seconds to wait before batching and inserting completed queries
+                into the query history table. Helps reduce small file creation by batching
+                multiple records into a single insert.
+              </entry>
+            </row>
+            <row>
+              <entry>query_log_max_queued</entry>
+              <entry>Integer</entry>
+              <entry>3000</entry>
+              <entry>
+                Maximum number of completed queries that can be queued before
+                being written to the query history table. This limit is independent of
+                <codeph>query_log_write_interval_s</codeph>. If the queue reaches this size,
+                the batch is flushed immediately. A value of <codeph>0</codeph> disables this limit.
+              </entry>
+            </row>
+            <row>
+              <entry>query_log_max_sql_length</entry>
+              <entry>Integer</entry>
+              <entry>16777216</entry>
+              <entry>
+                Maximum length of a SQL statement to be recorded in the
+                <codeph>sys.impala_query_log</codeph> table. Longer statements are truncated.
+                Escaped characters count toward this limit.
+              </entry>
+            </row>
+            <row>
+              <entry>query_log_max_plan_length</entry>
+              <entry>Integer</entry>
+              <entry>16777216</entry>
+              <entry>
+                Maximum length of a query plan to be recorded in the query
+                log. Plans longer than this value are truncated. Escaped characters count
+                toward the limit.
+              </entry>
+            </row>
+            <row>
+              <entry>query_log_request_pool</entry>
+              <entry>String</entry>
+              <entry>(empty)</entry>
+              <entry>
+                Specifies the resource pool used by queries that insert into
+                the <codeph>sys.impala_query_log</codeph> table. If unset, no pool is applied.
+              </entry>
+            </row>
+            <row>
+              <entry>query_log_dml_exec_timeout_s</entry>
+              <entry>Integer</entry>
+              <entry>120</entry>
+              <entry>
+                Sets the <codeph>EXEC_TIME_LIMIT_S</codeph> query option
+                for the DML that inserts records into the <codeph>sys.impala_query_log</codeph>
+                table.
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+
+    </conbody>
+  </concept>
+
+  <concept id="wm_observability">
+
+    <title>Observing</title>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Observing"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+
+      <p>
+        The following metrics are available to help monitor and understand the behavior of
+        the Workload Management processing loop in Impala.
+      </p>
+
+      <ul>
+        <li>
+          <codeph>impala-server.completed-queries.failure</codeph> - 	The number of
+          completed queries that failed to be written to the
+          <codeph>sys.impala_query_log</codeph> table. If the same query fails to be
+          written multiple times, each attempt increments this counter.
+        </li>
+        <li>
+          <codeph>impala-server.completed-queries.max-records-writes</codeph> - The number
+          of times completed queries were written to the <codeph>sys.impala_query_log</codeph>
+          table because the maximum records queued threshold was reached (set by the
+          <codeph>query_log_max_queued</codeph> startup flag).
+        </li>
+        <li>
+          <codeph>impala-server.completed-queries.queued</codeph> - The number of completed
+          queries that are currently queued and waiting to be written to the
+          <codeph>sys.impala_query_log</codeph> table. Matches the count of rows in
+          <codeph>sys.impala_query_live</codeph>.
+        </li>
+        <li>
+          <codeph>impala-server.completed-queries.scheduled-writes</codeph> - The number of
+          times completed queries were written to the <codeph>sys.impala_query_log</codeph>
+          table during the regularly scheduled interval.
+        </li>
+        <li>
+          <codeph>impala-server.completed-queries.write-durations</codeph> - A histogram
+          representing the time spent writing completed queries to the
+          <codeph>sys.impala_query_log</codeph> table.
+        </li>
+        <li>
+          <codeph>impala-server.completed-queries.written</codeph> - The number of
+          completed queries that were successfully written to the
+          <codeph>sys.impala_query_log</codeph> table.
+        </li>
+      </ul>
+
+      <p>
+        The following log entries help track Workload Management processing activity.
+      </p>
+
+      <table>
+        <tgroup cols="3" rowsep="1" colsep="1">
+          <colspec colname="1" colwidth = "5*" />
+          <colspec colname="1" colwidth = "3*" />
+          <colspec colname="1" colwidth = "20*" />
+          <colspec colname="1" colwidth = "20*" />
+          <thead>
+            <row>
+              <entry>Daemon</entry>
+              <entry>Level</entry>
+              <entry>Description</entry>
+              <entry>Partial Log Text</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>CatalogD</entry>
+              <entry><codeph>INFO</codeph></entry>
+              <entry>
+                Workload Management initialization has started, including create or upgrade of
+                <codeph>sys.impala_query_live</codeph> and <codeph>sys.impala_query_log</codeph>
+                tables.
+              </entry>
+              <entry>
+                <codeph>Starting workload management initialization</codeph>
+              </entry>
+            </row>
+            <row>
+              <entry>CatalogD</entry>
+              <entry><codeph>INFO</codeph></entry>
+              <entry>
+                Workload Management initialization completed successfully.
+              </entry>
+              <entry>
+                <codeph>Completed workload management initialization</codeph>
+              </entry>
+            </row>
+            <row>
+              <entry>Coordinator</entry>
+              <entry><codeph>INFO</codeph></entry>
+              <entry>
+                Shutdown of Workload Management has begun. Pending queries will be written
+                to <codeph>sys.impala_query_log</codeph> if possible.
+              </entry>
+              <entry>
+                <codeph>Workload management is shutting down</codeph>
+              </entry>
+            </row>
+            <row>
+              <entry>Coordinator</entry>
+              <entry><codeph>INFO</codeph></entry>
+              <entry>
+                Workload Management shutdown completed. All pending queries written to
+                <codeph>sys.impala_query_log</codeph>.
+              </entry>
+              <entry>
+                <codeph>Workload management shutdown successful</codeph>
+              </entry>
+            </row>
+            <row>
+              <entry>Coordinator</entry>
+              <entry><codeph>INFO</codeph></entry>
+              <entry>
+                Shutdown timed out before all queries were written to
+                <codeph>sys.impala_query_log</codeph>. The number of lost queries is logged.
+              </entry>
+              <entry>
+                <codeph>
+                  Workload management shutdown timed out. Up to '5' queries may have been lost
+                </codeph>
+              </entry>
+            </row>
+            <row>
+              <entry>Coordinator</entry>
+              <entry><codeph>ERROR</codeph></entry>
+              <entry>
+                The insert DML for moving completed queries to <codeph>sys.impala_query_log</codeph>
+                exceeded the maximum allowed SQL length. Lower the value of the
+                <codeph>query_log_max_queued</codeph> startup flag.
+              </entry>
+              <entry>
+                <codeph>
+                  Completed queries table insert sql statement of length '9999999999' was
+                  longer than the maximum of '2147483647', skipping
+                </codeph>
+              </entry>
+            </row>
+            <row>
+              <entry>Coordinator</entry>
+              <entry><codeph>INFO</codeph></entry>
+              <entry>
+                Successfully inserted completed queries into
+                <codeph>sys.impala_query_log</codeph>. Log includes execution stats.
+              </entry>
+              <entry>
+                <codeph>
+                  wrote completed queries table="sys.impala_query_log" record_count=1
+                  bytes="1.11 KB" gather_time="258.382us" exec_time="1s163ms"
+                  query_id="9e4a49a89079233f:c72589eb00000000"
+                </codeph>
+              </entry>
+            </row>
+            <row>
+              <entry>Coordinator</entry>
+              <entry><codeph>WARNING</codeph></entry>
+              <entry>
+                Failed to run the insert DML for moving completed queries telemetry to
+                <codeph>sys.impala_query_log</codeph>. Error details are in a subsequent log
+                message on the same coordinator. Ids of all completed queries who's telemetry
+                failed to be moved are logged in subsequent log messages at <codeph>ERROR</codeph>
+                level.
+              </entry>
+              <entry>
+                <codeph>
+                  failed to write completed queries table="sys.impala_query_log" record_count=5
+                  bytes="1.11 KB" gather_time="258.382us" exec_time="1s163ms"
+                  query_id="9e4a49a89079233f:c72589eb00000000"
+                </codeph>
+              </entry>
+            </row>
+            <row>
+              <entry>Coordinator</entry>
+              <entry><codeph>ERROR</codeph></entry>
+              <entry>
+                Indicates the telemetry for a single query failed to be moved to the
+                <codeph>sys.impala_query_log</codeph> table after three attempts. The telemetry
+                will be dropped and will no longer be available in either table.
+              </entry>
+              <entry>
+                <codeph>
+                  could not write completed query table="sys.impala_query_log"
+                  query_id="69477a18fdaadfd7:068f25bb00000000"
+                </codeph>
+              </entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+
+    </conbody>
+  </concept>
+
+  <concept id="wm_maintenance">
+
+    <title>Table Maintenance</title>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Maintenance"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+
+      <ul>
+        <li>
+          <codeph>sys.impala_query_live</codeph> - No maintenance is required. This
+          table resides entirely in memory.
+        </li>
+
+        <li>
+          <codeph>sys.impala_query_log</codeph> -- As an Iceberg table, it requires periodic
+          maintenance such as computing statistics and expiring old snapshots. Because
+          workloads vary, maintenance is not automated and must be performed manually.
+          <ul>
+            <li>
+              <codeph>OPTIMIZE TABLE sys.impala_query_log (FILE_SIZE_THRESHOLD_MB=128)</codeph>
+            </li>
+            <li>
+              <codeph>ALTER TABLE ice_tbl EXECUTE expire_snapshots(now() - interval 7 days);</codeph>
+            </li>
+          </ul>
+        </li>
+      </ul>
+
+    </conbody>
+  </concept>
+
+</concept>

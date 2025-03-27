@@ -10682,6 +10682,7 @@ under the License.
   <keydef href="topics/impala_timeouts.xml" keys="timeouts"/>
   <keydef href="topics/impala_proxy.xml" keys="proxy"/>
   <keydef href="topics/impala_disk_space.xml" keys="disk_space"/>
+  <keydef href="topics/impala_workload_mgmt.xml" keys="workload_mgmt"/>
   <keydef href="topics/impala_auditing.xml" keys="auditing"/>
   <keydef href="topics/impala_lineage.xml" keys="lineage"/>
   <keydef href="topics/impala_security.xml" keys="security"/>
