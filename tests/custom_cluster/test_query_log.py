@@ -585,8 +585,8 @@ class TestQueryLogTableHS2(WorkloadManagementTestSuite):
     # logged and important fields are correct.
     res = self.assert_impalad_log_contains(
         level="WARNING",
-        line_regex=r'failed to write completed queries table="{}" record_count=(\d+) '
-                   r'bytes=\S+\s\S+ gather_time=\S+ exec_time=\S+ query_id="{}" '
+        line_regex=r'failed to write completed queries table="{}" record_count="(\d+)" '
+                   r'bytes="\S+\s\S+" gather_time="\S+" exec_time="\S+" query_id="{}" '
                    r'msg="(.*?)"'.format(QUERY_TBL_LOG, self.insert_query_id),
         expected_count=-1)
     assert res.group(1) == "1", "Invalid record count in the query failed log line"
@@ -1120,9 +1120,9 @@ class TestQueryLogTableFlush(CustomClusterTestSuite):
     assert \
         retry(func=wait_for_insert_query, max_attempts=10, sleep_time_s=1, backoff=1), \
         "did not find completed queries insert dml in the debug web ui"
-    self.assert_impalad_log_contains("INFO", r"wrote completed queries "
-                                     r"table=\"{}\" record_count=\d+ bytes=\S+\s\S+ "
-                                     r"gather_time=\S+ exec_time=\S+ query_id=\"{}\""
+    self.assert_impalad_log_contains("INFO", r'wrote completed queries '
+                                     r'table="{}" record_count="\d+" bytes="\S+\s?\S*" '
+                                     r'gather_time="\S+" exec_time="\S+" query_id="{}"'
                                      .format(QUERY_TBL_LOG, self.insert_query_id))
 
   @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=9999 "
