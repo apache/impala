@@ -223,7 +223,8 @@ ubuntu apt-get --yes install ccache curl file gawk g++ gcc apt-utils git libffi-
         python3-dev python3-setuptools python3-venv postgresql \
         ssh wget vim-common psmisc lsof net-tools language-pack-en libxml2-dev \
         libxslt-dev openjdk-${UBUNTU_JAVA_VERSION}-jdk \
-        openjdk-${UBUNTU_JAVA_VERSION}-source openjdk-${UBUNTU_JAVA_VERSION}-dbg
+        openjdk-${UBUNTU_JAVA_VERSION}-source openjdk-${UBUNTU_JAVA_VERSION}-dbg \
+        xsltproc
 
 # Required by Kudu in the minicluster. Older Kudu versions depend on libtinfo5,
 # versions that can be compiled for Ubuntu 24.04 depend on libtinfo6.

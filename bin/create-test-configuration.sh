@@ -305,6 +305,14 @@ sed -i '/<intercept-url pattern="\/\*\*"/i \
     <intercept-url pattern="/service/public/v2/api/roles/names/*" access="permitAll"/>' \
 "${RANGER_SERVER_CONF_DIR}/security-applicationContext.xml"
 
+# Look for the patterns specified in transform.xsl and comment out the matched nodes in
+# security-applicationContext.xml so that Impala's Ranger plug-in is still able to make
+# REST API calls to the Ranger service in the non-Kerberized environment after
+# RANGER-4445.
+xsltproc "${IMPALA_HOME}/testdata/cluster/ranger/setup/transform.xsl" \
+"${RANGER_SERVER_CONF_DIR}/security-applicationContext.xml" > tmp.xml &&
+mv tmp.xml "${RANGER_SERVER_CONF_DIR}/security-applicationContext.xml"
+
 if [[ -f "${POSTGRES_JDBC_DRIVER}" ]]; then
   cp -f "${POSTGRES_JDBC_DRIVER}" "${RANGER_SERVER_LIB_DIR}"
 else
