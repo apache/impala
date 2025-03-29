@@ -147,9 +147,11 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 # dynamic partition insert inherits table properties
 insert into cached_tbl_part partition(j) values(3, 3), (4, 4);
----- RESULTS
-j=3: 1
-j=4: 1
+---- RUNTIME_PROFILE
+Partition: j=3
+Partition: j=4
+NumModifiedRows: 1
+aggregation(SUM, RowsInserted): 2
 ====
 ---- QUERY
 # Modify partition cache replication

@@ -66,6 +66,8 @@ select * from functional.chars_tiny;
 ---- TYPES
 # varchar shows up as string, just as it does in the chars.test file
 char,char,string
+---- HS2_TYPES
+char,char,varchar
 ---- RUNTIME_PROFILE
 row_regex: .*PlannerType: CalcitePlanner.*
 ====

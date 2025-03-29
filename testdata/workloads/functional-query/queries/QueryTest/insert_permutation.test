@@ -63,8 +63,9 @@ INT,STRING,INT
 truncate insert_permutation_test.perm_part;
 # Permute the partition columns
 insert into perm_part(p1, string_col, int_col1, p2) values(10,'str',1, 'hello')
----- RESULTS
-p1=10/p2=hello: 1
+---- RUNTIME_PROFILE
+Partition: p1=10/p2=hello
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part
@@ -77,8 +78,9 @@ INT,STRING,INT,STRING
 truncate insert_permutation_test.perm_part;
 # Same thing - permute the partition columns, but invert their order relative to Hive
 insert into perm_part(p2, string_col, int_col1, p1) values('hello','str',1, 10)
----- RESULTS
-p1=10/p2=hello: 1
+---- RUNTIME_PROFILE
+Partition: p1=10/p2=hello
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part
@@ -91,8 +93,9 @@ INT,STRING,INT,STRING
 truncate insert_permutation_test.perm_part;
 # Check NULL if only partition keys are mentioned
 insert into perm_part(p2, p1) values('hello', 10)
----- RESULTS
-p1=10/p2=hello: 1
+---- RUNTIME_PROFILE
+Partition: p1=10/p2=hello
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part
@@ -105,8 +108,9 @@ INT,STRING,INT,STRING
 truncate insert_permutation_test.perm_part;
 # Check NULL if only partition keys are mentioned, one static
 insert into perm_part(p2) PARTITION(p1=10) values('hello')
----- RESULTS
-p1=10/p2=hello: 1
+---- RUNTIME_PROFILE
+Partition: p1=10/p2=hello
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part
@@ -120,8 +124,9 @@ truncate insert_permutation_test.perm_part;
 # Check dynamic keys mentioned in the PARTITION column are still looked for at the end of
 # the select-list
 insert into perm_part(int_col1, string_col) PARTITION(p1=10, p2) values(1,'perm_col','part_col')
----- RESULTS
-p1=10/p2=part_col: 1
+---- RUNTIME_PROFILE
+Partition: p1=10/p2=part_col
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part
@@ -134,8 +139,9 @@ INT,STRING,INT,STRING
 truncate insert_permutation_test.perm_part;
 # Check behaviour of empty permutation clause with no query statement
 insert into perm_part() PARTITION(p1=10, p2='foo')
----- RESULTS
-p1=10/p2=foo: 1
+---- RUNTIME_PROFILE
+Partition: p1=10/p2=foo
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part
@@ -148,8 +154,9 @@ INT,STRING,INT,STRING
 truncate insert_permutation_test.perm_part;
 # Check behaviour of empty permutation clause
 insert into perm_part() PARTITION(p1, p2='foo') values(5)
----- RESULTS
-p1=5/p2=foo: 1
+---- RUNTIME_PROFILE
+Partition: p1=5/p2=foo
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part
@@ -176,8 +183,9 @@ INT,STRING,INT
 # Test inserting NULLs due to an incomplete column mapping into a Parquet table.
 # Regression test against IMPALA-671.
 insert into parquet_part() partition(p1, p2='foo') values(2)
----- RESULTS
-p1=2/p2=foo: 1
+---- RUNTIME_PROFILE
+Partition: p1=2/p2=foo
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from parquet_part
@@ -233,8 +241,9 @@ INT,STRING,INT
 truncate insert_permutation_test.perm_part;
 # Permute the partition columns
 insert into perm_part(p1, string_col, int_col1, p2) select 10,'str',1, 'hello'
----- RESULTS
-p1=10/p2=hello: 1
+---- RUNTIME_PROFILE
+Partition: p1=10/p2=hello
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part
@@ -247,9 +256,9 @@ INT,STRING,INT,STRING
 truncate insert_permutation_test.perm_part;
 # Same thing - permute the partition columns, but invert their order relative to Hive
 insert into perm_part(p2, string_col, int_col1, p1) select 'hello','str',1, 10
-
----- RESULTS
-p1=10/p2=hello: 1
+---- RUNTIME_PROFILE
+Partition: p1=10/p2=hello
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part
@@ -262,8 +271,9 @@ INT,STRING,INT,STRING
 truncate insert_permutation_test.perm_part;
 # Check NULL if only partition keys are mentioned
 insert into perm_part(p2, p1) select 'hello', 10
----- RESULTS
-p1=10/p2=hello: 1
+---- RUNTIME_PROFILE
+Partition: p1=10/p2=hello
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part
@@ -276,8 +286,9 @@ INT,STRING,INT,STRING
 truncate insert_permutation_test.perm_part;
 # Check NULL if only partition keys are mentioned, one static
 insert into perm_part(p2) PARTITION(p1=10) select 'hello'
----- RESULTS
-p1=10/p2=hello: 1
+---- RUNTIME_PROFILE
+Partition: p1=10/p2=hello
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from perm_part

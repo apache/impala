@@ -47,8 +47,9 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=4
----- RESULTS
-year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__: 25
+---- RUNTIME_PROFILE
+Partition: year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__
+NumModifiedRows: 25
 ====
 ---- QUERY
 # Verify contents of alltypesinsert.
@@ -75,8 +76,9 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=4
----- RESULTS
-year=__HIVE_DEFAULT_PARTITION__/month=10: 25
+---- RUNTIME_PROFILE
+Partition: year=__HIVE_DEFAULT_PARTITION__/month=10
+NumModifiedRows: 25
 ====
 ---- QUERY
 # Verify contents of alltypesinsert.
@@ -95,8 +97,9 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=4
----- RESULTS
-year=2008/month=__HIVE_DEFAULT_PARTITION__: 25
+---- RUNTIME_PROFILE
+Partition: year=2008/month=__HIVE_DEFAULT_PARTITION__
+NumModifiedRows: 25
 ====
 ---- QUERY
 # Verify contents of alltypesinsert.
@@ -115,11 +118,16 @@ float_col, double_col, date_string_col, string_col, timestamp_col,
 cast(if(bool_col, NULL, 2007) as int) as year, cast(if(tinyint_col % 3 = 0, NULL, 6) as int) as month
 from functional.alltypessmall
 where year=2009 and month=4
----- RESULTS: VERIFY_IS_EQUAL_SORTED
-year=2007/month=6: 8
-year=2007/month=__HIVE_DEFAULT_PARTITION__: 5
-year=__HIVE_DEFAULT_PARTITION__/month=6: 7
-year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__: 5
+---- RUNTIME_PROFILE
+Partition: year=2007/month=6
+NumModifiedRows: 8
+Partition: year=2007/month=__HIVE_DEFAULT_PARTITION__
+NumModifiedRows: 5
+Partition: year=__HIVE_DEFAULT_PARTITION__/month=6
+NumModifiedRows: 7
+Partition: year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__
+NumModifiedRows: 5
+aggregation(SUM, RowsInserted): 25
 ====
 ---- QUERY
 # Verify contents of each new partition in alltypesinsert.

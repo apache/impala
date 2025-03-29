@@ -33,6 +33,8 @@ alter table mixed partition (part = 2) set fileformat avro;
 select * from mixed;
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, char, string, int
+---- HS2_TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, char, varchar, int
 ---- RESULTS
 1,false,2,3,4,5,6,7,'1985-07-15','c2','my va',1
 ====
@@ -42,6 +44,8 @@ invalidate metadata mixed;
 select * from mixed;
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, char, string, int
+---- HS2_TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, char, varchar, int
 ---- RESULTS
 1,false,2,3,4,5,6,7,'1985-07-15','c2','my va',1
 ====
@@ -62,5 +66,7 @@ Unresolvable types for column 'tinyint_col': declared column type: TINYINT, tabl
 select * from mixed where part = 1;
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, char, string, int
+---- HS2_TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, char, varchar, int
 ---- RESULTS
 1,false,2,3,4,5,6,7,'1985-07-15','c2','my va',1

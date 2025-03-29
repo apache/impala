@@ -150,6 +150,8 @@ limit 20;
 ' Tiresias above the stealthily p'
 ---- TYPES
 STRING
+---- HS2_TYPES
+VARCHAR
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
 row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
@@ -189,6 +191,8 @@ limit 20;
 ' Tiresias above the stealthily p'
 ---- TYPES
 STRING
+---- HS2_TYPES
+VARCHAR
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
 row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)

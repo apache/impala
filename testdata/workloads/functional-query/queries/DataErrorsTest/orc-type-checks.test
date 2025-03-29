@@ -68,6 +68,8 @@ Type mismatch: table column TIMESTAMP is map to column date in ORC file
 select * from safetypes order by id
 ---- TYPES
 bigint,boolean,smallint,int,bigint,bigint,double,double,char,string,timestamp,int,int
+---- HS2_TYPES
+bigint,boolean,smallint,int,bigint,bigint,double,double,char,varchar,timestamp,int,int
 ---- RESULTS
 0,true,0,0,0,0,0,0,'01/','0',2009-01-01 00:00:00,2009,1
 1,false,1,1,1,10,1.100000023841858,10.1,'01/','1',2009-01-01 00:01:00,2009,1
