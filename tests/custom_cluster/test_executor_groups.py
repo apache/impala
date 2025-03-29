@@ -678,11 +678,11 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Predicates to assert that a certain join type was picked.
     def assert_broadcast_join():
       ret = self.execute_query_expect_success(self.client, QUERY)
-      assert ":EXCHANGE [BROADCAST]" in str(ret)
+      assert ":EXCHANGE [BROADCAST]" in str(ret.data)
 
     def assert_hash_join():
       ret = self.execute_query_expect_success(self.client, QUERY)
-      assert ":EXCHANGE [HASH(b.id)]" in str(ret)
+      assert ":EXCHANGE [HASH(b.id)]" in str(ret.data)
 
     # Without any executors we default to a hash join.
     assert_hash_join()
@@ -721,7 +721,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Predicate to assert that the planner decided on a hash join.
     def assert_hash_join():
       ret = self.execute_query_expect_success(self.client, QUERY)
-      assert ":EXCHANGE [HASH(b.id)]" in str(ret)
+      assert ":EXCHANGE [HASH(b.id)]" in str(ret.data)
 
     # Without any executors we default to a hash join.
     assert_hash_join()

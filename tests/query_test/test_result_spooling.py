@@ -19,7 +19,6 @@ from __future__ import absolute_import, division, print_function
 import pytest
 import re
 import time
-import threading
 
 from time import sleep
 from tests.common.errors import Timeout
@@ -177,15 +176,13 @@ class TestResultSpooling(ImpalaTestSuite):
     # Regex to look for in the runtime profile.
     get_wait_time_regex = "RowBatchGetWaitTime: [1-9]"
 
-    # Execute the query, start a thread to fetch results, wait for the query to finish,
+    # Execute the query asynchronously, fetch results, wait for the query to finish,
     # and then validate that RowBatchGetWaitTime shows a non-zero value in the profile.
     handle = self.execute_query_async(query, vector.get_value('exec_option'))
     try:
-      thread = threading.Thread(target=lambda:
-          self.create_impala_client().fetch(query, handle))
-      thread.start()
+      self.client.wait_for_admission_control(handle, 60)
+      self.client.fetch(query, handle)
       self.client.wait_for_impala_state(handle, FINISHED, 10)
-      thread.join()
       assert re.search(get_wait_time_regex, self.client.get_runtime_profile(handle))
     finally:
       self.client.close_query(handle)

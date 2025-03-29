@@ -18,10 +18,10 @@
 from __future__ import absolute_import, division, print_function
 from tests.common.environ import ImpalaTestClusterFlagsDetector
 from tests.common.file_utils import grep_dir
-from tests.common.skip import SkipIfBuildType, SkipIfDockerizedCluster
+from tests.common.skip import SkipIfBuildType
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.impala_connection import FINISHED, RUNNING
-from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.impala_connection import FINISHED, RUNNING, MinimalHS2Connection
+from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT, ImpalaTestSuite
 from tests.util.filesystem_utils import supports_storage_ids
 from tests.util.parse_util import parse_duration_string_ms
 from tests.common.test_vector import HS2
@@ -1082,16 +1082,20 @@ class TestWebPage(ImpalaTestSuite):
   def test_query_cancel_created(self):
     """Tests that if we cancel a query in the CREATED state, it still finishes and we can
     cancel it."""
+    # Use MinimalHS2Connection because it has simpler concurrency than hs2_client.
+    with MinimalHS2Connection(IMPALAD_HS2_HOST_PORT) as client:
+      delay_created_action = "impalad_load_tables_delay:SLEEP@1000"
+      client.set_configuration(dict(debug_action=delay_created_action))
+      self._run_test_query_cancel_created(client)
+
+  def _run_test_query_cancel_created(self, client):
     query = "select count(*) from functional_parquet.alltypes"
-    delay_created_action = "impalad_load_tables_delay:SLEEP@1000"
 
     response_json = self.try_until("test baseline", self.get_queries,
         lambda resp: resp['num_in_flight_queries'] == 0)
-
     # Start the query completely async. The server doesn't return a response until
     # the query has exited the CREATED state, so we need to get the query ID another way.
-    self.client.set_configuration(dict(debug_action=delay_created_action))
-    proc = Process(target=lambda cli, q: cli.execute_async(q), args=(self.client, query))
+    proc = Process(target=lambda cli, q: cli.execute_async(q), args=(client, query))
     proc.start()
 
     response_json = self.try_until("query creation", self.get_queries,
@@ -1133,9 +1137,15 @@ class TestWebPage(ImpalaTestSuite):
   def test_query_cancel_exception(self):
     """Tests that if we cancel a query in the CREATED state and it has an exception, we
     can cancel it."""
+    # Use MinimalHS2Connection because it has simpler concurrency than hs2_client.
+    with MinimalHS2Connection(IMPALAD_HS2_HOST_PORT) as client:
+      delay_created_action = "impalad_load_tables_delay:SLEEP@1000"
+      client.set_configuration(dict(debug_action=delay_created_action))
+      self._test_query_cancel_exception(client)
+
+  def _test_query_cancel_exception(self, client):
     # Trigger UDF ERROR: Cannot divide decimal by zero
     query = "select *, 1.0/0 from functional_parquet.alltypes limit 10"
-    delay_created_action = "impalad_load_tables_delay:SLEEP@1000"
 
     response_json = self.try_until("test baseline", self.get_queries,
         lambda resp: resp['num_in_flight_queries'] == 0)
@@ -1145,9 +1155,8 @@ class TestWebPage(ImpalaTestSuite):
 
     # Start the query completely async. The server doesn't return a response until
     # the query has exited the CREATED state, so we need to get the query ID another way.
-    self.client.set_configuration(dict(debug_action=delay_created_action))
     queue = Queue()
-    proc = Process(target=run, args=(queue, self.client, query))
+    proc = Process(target=run, args=(queue, client, query))
     proc.start()
 
     response_json = self.try_until("query creation", self.get_queries,
@@ -1168,7 +1177,7 @@ class TestWebPage(ImpalaTestSuite):
     proc.join()
     assert query_handle
     try:
-      self.client.fetch(query, query_handle)
+      client.fetch(query, query_handle)
     except Exception as e:
       re.match("UDF ERROR: Cannot divide decimal by zero", str(e))
 
@@ -1194,35 +1203,3 @@ class TestWebPage(ImpalaTestSuite):
         "fs.defaultFS", ports_to_test=self.TEST_PORTS_WITHOUT_SS)
     # check if response size is 2 , for both catalog and impalad webUI
     assert len(responses) == 2
-
-
-class TestWebPageAndCloseSession(ImpalaTestSuite):
-  ROOT_URL = "http://localhost:{0}/"
-
-  @SkipIfDockerizedCluster.daemon_logs_not_exposed
-  def test_display_src_socket_in_query_cause(self):
-    # Execute a long running query then cancel it from the WebUI.
-    # Check the runtime profile and the INFO logs for the cause message.
-    query = "select sleep(10000)"
-    handle = self.execute_query_async(query)
-    query_id = self.client.handle_id(handle)
-    cancel_query_url = "{0}cancel_query?query_id={1}".format(self.ROOT_URL.format
-      ("25000"), query_id)
-    text_profile_url = "{0}query_profile_plain_text?query_id={1}".format(self.ROOT_URL
-      .format("25000"), query_id)
-    requests.get(cancel_query_url)
-    response = requests.get(text_profile_url)
-    cancel_status = "Cancelled from Impala&apos;s debug web interface by user: " \
-                    "&apos;anonymous&apos; at"
-    assert cancel_status in response.text
-    self.assert_impalad_log_contains("INFO", "Cancelled from Impala\'s debug web "
-      "interface by user: 'anonymous' at", expected_count=-1)
-    # Session closing from the WebUI does not produce the cause message in the profile,
-    # so we will skip checking the runtime profile.
-    results = self.execute_query("select current_session()")
-    session_id = results.data[0]
-    close_session_url = "{0}close_session?session_id={1}".format(self.ROOT_URL.format
-      ("25000"), session_id)
-    requests.get(close_session_url)
-    self.assert_impalad_log_contains("INFO", "Session closed from Impala\'s debug "
-      "web interface by user: 'anonymous' at", expected_count=-1)

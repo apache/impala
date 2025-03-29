@@ -123,10 +123,12 @@ class TestLowMemoryLimits(ImpalaTestSuite):
     try:
       self.run_test_case(tpch_query, new_vector)
     except IMPALA_CONNECTION_EXCEPTION as e:
-      if not expects_error: raise
+      if not expects_error:
+        assert False, "Not expecting error, but got {}".format(str(e))
       found_expected_error = False
       for error_msg in MEM_LIMIT_ERROR_MSGS:
-        if error_msg in str(e): found_expected_error = True
+        if error_msg in str(e):
+          found_expected_error = True
       assert found_expected_error, str(e)
 
 

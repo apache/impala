@@ -43,20 +43,22 @@ FAILPOINT_ACTION_MAP = {'FAIL': 'FAIL', 'CANCEL': 'WAIT',
 MT_DOP_VALUES = [0, 4]
 
 # Queries should cover all exec nodes.
+# {db} will be replaced by target database for specific table_format in test vector.
 QUERIES = [
-  "select * from alltypes",
-  "select count(*) from alltypessmall",
-  "select count(int_col) from alltypessmall group by id",
-  "select 1 from alltypessmall a join alltypessmall b on a.id = b.id",
-  "select 1 from alltypessmall a join alltypessmall b on a.id != b.id",
-  "select 1 from alltypessmall order by id",
-  "select 1 from alltypessmall order by id limit 100",
-  "select * from alltypessmall union all select * from alltypessmall",
-  "select row_number() over (partition by int_col order by id) from alltypessmall",
-  "select c from (select id c from alltypessmall order by id limit 10) v where c = 1",
+  "select * from {db}.alltypes",
+  "select count(*) from {db}.alltypessmall",
+  "select count(int_col) from {db}.alltypessmall group by id",
+  "select 1 from {db}.alltypessmall a join {db}.alltypessmall b on a.id = b.id",
+  "select 1 from {db}.alltypessmall a join {db}.alltypessmall b on a.id != b.id",
+  "select 1 from {db}.alltypessmall order by id",
+  "select 1 from {db}.alltypessmall order by id limit 100",
+  "select * from {db}.alltypessmall union all select * from {db}.alltypessmall",
+  "select row_number() over (partition by int_col order by id) from {db}.alltypessmall",
+  """select c from (select id c from {db}.alltypessmall order by id limit 10) v
+     where c = 1""",
   """SELECT STRAIGHT_JOIN *
-           FROM alltypes t1
-                  JOIN /*+broadcast*/ alltypesagg t2 ON t1.id = t2.id
+           FROM {db}.alltypes t1
+                  JOIN /*+broadcast*/ {db}.alltypesagg t2 ON t1.id = t2.id
            WHERE t2.int_col < 1000"""
 ]
 
@@ -93,11 +95,8 @@ class TestFailpoints(ImpalaTestSuite):
   # killer on machines with 30GB RAM. This makes the test run in 4 minutes instead of 1-2.
   @pytest.mark.execute_serially
   def test_failpoints(self, vector):
-    with self.change_database(self.client, vector.get_table_format()):
-      self.__run_failpoints(vector)
-
-  def __run_failpoints(self, vector):
-    query = vector.get_value('query')
+    db_name = ImpalaTestSuite.get_db_name_from_format(vector.get_table_format())
+    query = vector.get_value('query').format(db=db_name)
     action = vector.get_value('action')
     location = vector.get_value('location')
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
@@ -201,7 +200,9 @@ class TestFailpoints(ImpalaTestSuite):
     handle = self.execute_query_async(query, vector.get_value('exec_option'))
     LOG.info('Sleeping')
     sleep(3)
-    cancel_result = self.client.cancel(handle)
-    self.client.close_query(handle)
-    assert cancel_result.status_code == 0,\
-        'Unexpected status code from cancel request: %s' % cancel_result
+    try:
+      self.client.cancel(handle)
+    except IMPALA_CONNECTION_EXCEPTION as e:
+      assert False, 'Unexpected exception from cancel request: {}'.format(str(e))
+    finally:
+      self.client.close_query(handle)

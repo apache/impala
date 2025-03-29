@@ -410,7 +410,7 @@ class TestHS2FaultInjection(CustomClusterTestSuite):
     self.custom_hs2_http_client.wait_to_finish(query_handle)
     self.transport.enable_fault(502, "Injected Fault", 0.50)
     warning_log = self.custom_hs2_http_client.get_warning_log(query_handle)
-    assert warning_log == 'WARNINGS: JOIN hint not recognized: foo'
+    assert 'WARNINGS: JOIN hint not recognized: foo' in warning_log
     self.close_query(query_handle)
     output = capsys.readouterr()[1].splitlines()
     assert output[1][TS_LEN:] == self.__expect_msg_retry("GetLog")

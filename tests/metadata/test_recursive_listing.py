@@ -16,7 +16,7 @@ import pytest
 import requests
 import time
 
-from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
+from tests.common.impala_connection import ERROR, FINISHED
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.skip import SkipIfLocal, SkipIfFS
@@ -41,8 +41,8 @@ class TestRecursiveListing(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format == 'text' and
-         v.get_value('table_format').compression_codec == 'none'))
+        (v.get_value('table_format').file_format == 'text'
+         and v.get_value('table_format').compression_codec == 'none'))
 
   def _show_files(self, table):
     files = self.client.execute("show files in {0}".format(table))
@@ -65,7 +65,7 @@ class TestRecursiveListing(ImpalaTestSuite):
 
     # Create the table
     self.execute_query_expect_success(self.client,
-        ("create table {tbl} (a string) {partclause} " +
+        ("create table {tbl} (a string) {partclause} "
          "stored as textfile location '{loc}'").format(
             tbl=fq_tbl_name,
             partclause=(partitioned and "partitioned by (p int)" or ""),
@@ -119,7 +119,7 @@ class TestRecursiveListing(ImpalaTestSuite):
     assert len(self._get_rows(fq_tbl_name)) == 3
 
     # Test that disabling recursive listings makes the nested files disappear.
-    self.execute_query_expect_success(self.client, ("alter table {0} set tblproperties(" +
+    self.execute_query_expect_success(self.client, ("alter table {0} set tblproperties("
         "'impala.disable.recursive.listing'='true')").format(fq_tbl_name))
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 1
@@ -130,7 +130,7 @@ class TestRecursiveListing(ImpalaTestSuite):
     assert len(self._show_files(fq_tbl_name)) == 1
     assert len(self._get_rows(fq_tbl_name)) == 1
     # Re-enable.
-    self.execute_query_expect_success(self.client, ("alter table {0} set tblproperties(" +
+    self.execute_query_expect_success(self.client, ("alter table {0} set tblproperties("
         "'impala.disable.recursive.listing'='false')").format(fq_tbl_name))
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 3
@@ -210,10 +210,7 @@ class TestRecursiveListing(ImpalaTestSuite):
       LOG.info("removing staging dir " + large_dir)
       self.filesystem_client.delete_file_dir(large_dir, recursive=True)
       LOG.info("removed staging dir " + large_dir)
-      try:
-        self.client.fetch(refresh_stmt, handle)
-        assert not refresh_should_fail, "REFRESH should fail"
-      except IMPALA_CONNECTION_EXCEPTION as e:
-        assert refresh_should_fail, "unexpected exception " + str(e)
+      expected_state = ERROR if refresh_should_fail else FINISHED
+      self.client.wait_for_impala_state(handle, expected_state, 10)
     finally:
       requests.get(self.reset_log_level_url)

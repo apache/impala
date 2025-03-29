@@ -641,23 +641,24 @@ class TestEventSyncWaiting(ImpalaTestSuite):
     self.run_stmt_in_hive("insert into {} select 0,0".format(tbl))
     res = self.execute_query_expect_success(client, insert_stmt)
     # Result rows are "partition_name: num_rows_inserted" for each modified partitions
-    assert res.data == ['p=0: 1']
+    assert 'Partition: p=0\nNumModifiedRows: 1\n' in res.runtime_profile
     # Insert one row into the same partition in Hive and use the table in INSERT in Impala
     self.run_stmt_in_hive("insert into {} select 1,0".format(tbl))
     res = self.execute_query_expect_success(client, insert_stmt)
-    assert res.data == ['p=0: 2']
+    assert 'Partition: p=0\nNumModifiedRows: 2\n' in res.runtime_profile
     # Add another new partition in Hive and use the table in INSERT in Impala
     self.run_stmt_in_hive("insert into {} select 2,2".format(tbl))
     res = self.execute_query_expect_success(client, insert_stmt)
-    assert res.data == ['p=0: 2', 'p=2: 1']
+    assert 'Partition: p=0\nNumModifiedRows: 2\n' in res.runtime_profile
+    assert 'Partition: p=2\nNumModifiedRows: 1\n' in res.runtime_profile
     # Drop one partition in Hive and use the table in INSERT in Impala
     self.run_stmt_in_hive("alter table {} drop partition(p=0)".format(tbl))
     res = self.execute_query_expect_success(client, insert_stmt)
-    assert res.data == ['p=2: 1']
+    assert 'Partition: p=2\nNumModifiedRows: 1\n' in res.runtime_profile
     # Truncate the table in Hive and use it in INSERT in Impala
     self.run_stmt_in_hive("truncate table {}".format(tbl))
     res = self.execute_query_expect_success(client, insert_stmt)
-    assert len(res.data) == 0
+    assert 'NumModifiedRows:' not in res.runtime_profile
 
   def test_txn(self, vector, unique_database):
     client = self.create_impala_client_from_vector(vector)

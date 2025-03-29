@@ -19,9 +19,10 @@
 from __future__ import absolute_import, division, print_function
 import logging
 
-from tests.common.test_vector import BEESWAX, ImpalaTestMatrix
+from tests.common.test_vector import HS2, ImpalaTestMatrix
 
 LOG = logging.getLogger('base_test_suite')
+
 
 # Base class for tests.
 class BaseTestSuite(object):
@@ -40,4 +41,4 @@ class BaseTestSuite(object):
   @classmethod
   def default_test_protocol(cls):
     """See documentation in ImpalaTestSuite.default_test_protocol()."""
-    return BEESWAX
+    return HS2

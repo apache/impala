@@ -46,6 +46,7 @@ from tests.common.skip import (
     SkipIfNotHdfsMinicluster,
 )
 from tests.common.test_dimensions import add_mandatory_exec_option
+from tests.common.test_vector import BEESWAX
 
 # The BE krpc port of the impalad to simulate rpc or disk errors in tests.
 FAILED_KRPC_PORT = 27001
@@ -68,6 +69,11 @@ def _get_disk_fail_action(port):
 # randomly killing one impalad won't necessarily trigger a retry of the query.
 @SkipIfEC.parquet_file_size
 class TestQueryRetries(CustomClusterTestSuite):
+
+  @classmethod
+  def default_test_protocol(cls):
+    # Retry mechanism is slightly different between beeswax vs hs2 protocol.
+    return BEESWAX
 
   # A query that shuffles a lot of data. Useful when testing query retries since it
   # ensures that a query fails during a TransmitData RPC. The RPC failure will cause the

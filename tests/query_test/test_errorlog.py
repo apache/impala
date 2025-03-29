@@ -59,10 +59,13 @@ class TestErrorLogs(ImpalaTestSuite):
       # large enough to further guarantee at least one cleared error maps to be sent to
       # coordinator.
       sleep(30)
-      cancel_result = self.client.cancel(handle)
-      self.client.close_query(handle)
-      assert cancel_result.status_code == 0,\
-          'Unexpected status code from cancel request: %s' % cancel_result
+      try:
+        self.client.cancel(handle)
+      except IMPALA_CONNECTION_EXCEPTION as ex:
+        assert False, 'Unexpected exception from cancel request: {}'.format(
+            str(ex))
+      finally:
+        self.client.close_query(handle)
     # As long as impala did not crash we are good.
     except IMPALA_CONNECTION_EXCEPTION:
       return

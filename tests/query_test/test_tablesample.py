@@ -51,19 +51,21 @@ class TestTableSample(ImpalaTestSuite):
   def __run_tablesample(self, vector):
     repeatable = vector.get_value('repeatable')
     filtered = vector.get_value('filtered')
+    db_name = ImpalaTestSuite.get_db_name_from_format(vector.get_table_format())
 
     where_clause = ""
     if filtered:
       where_clause = "where month between 1 and 6"
 
-    result = self.client.execute("select count(*) from alltypes %s" % where_clause)
+    result = self.client.execute("select count(*) from {}.alltypes {}".format(
+        db_name, where_clause))
     baseline_count = int(result.data[0])
     prev_count = None
     for perc in [5, 20, 50, 100]:
       rep_sql = ""
       if repeatable: rep_sql = " repeatable(1)"
-      sql_stmt = "select count(*) from alltypes tablesample system(%s)%s %s" \
-                 % (perc, rep_sql, where_clause)
+      sql_stmt = "select count(*) from {}.alltypes tablesample system({}){} {}".format(
+          db_name, perc, rep_sql, where_clause)
       handle = self.client.execute_async(sql_stmt)
       # IMPALA-6352: flaky test, possibly due to a hung thread. Wait for 500 sec before
       # failing and logging the backtraces of all impalads.

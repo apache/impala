@@ -808,7 +808,7 @@ class TestDdlStatements(TestDdlBase):
     # paths, converts them to integers, and checks that wehave all the ones we
     # expect.
     PARTITION_RE = re.compile("p=([0-9]+)")
-    assert list(map(int, PARTITION_RE.findall(str(partitions)))) == \
+    assert list(map(int, PARTITION_RE.findall(str(partitions.data)))) == \
         list(range(MAX_PARTITION_UPDATES_PER_RPC + 2))
 
   def test_create_alter_tbl_properties(self, unique_database):

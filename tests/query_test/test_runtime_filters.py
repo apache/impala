@@ -112,16 +112,14 @@ class TestRuntimeFilters(ImpalaTestSuite):
     get woken up and exit promptly when the query is cancelled."""
     # Make sure the cluster is quiesced before we start this test
     self._verify_no_fragments_running()
-    with self.change_database(self.client, vector.get_value('table_format')):
-      self.__run_wait_time_cancellation(vector)
-
-  def __run_wait_time_cancellation(self, vector):
     # Set up a query where a scan (plan node 0, scanning alltypes) will wait
     # indefinitely for a filter to arrive. The filter arrival is delayed
     # by adding a wait to the scan of alltypestime (plan node 0).
+    db_name = ImpalaTestSuite.get_db_name_from_format(vector.get_table_format())
     QUERY = """select straight_join *
-               from alltypes t1
-                    join /*+shuffle*/ alltypestiny t2 on t1.id = t2.id"""
+               from {db}.alltypes t1
+                    join /*+shuffle*/ {db}.alltypestiny t2
+                    on t1.id = t2.id""".format(db=db_name)
     self.client.set_configuration(vector.get_exec_option_dict())
     self.client.set_configuration_option("DEBUG_ACTION", "1:OPEN:WAIT")
     self.client.set_configuration_option("RUNTIME_FILTER_WAIT_TIME_MS", "10000000")

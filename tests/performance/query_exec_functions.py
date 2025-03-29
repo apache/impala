@@ -21,7 +21,7 @@ import logging
 import re
 from datetime import datetime
 from impala.dbapi import connect
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient, ImpalaBeeswaxResult
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
 from sys import maxsize
 from tests.performance.query import HiveQueryResult, ImpalaQueryResult
 from tests.util.shell_util import exec_process
@@ -33,6 +33,7 @@ DEFAULT_HS2_PORT = 21050
 DEFAULT_HIVE_HS2_PORT = 10000
 
 LOG = logging.getLogger('query_exec_functions')
+
 
 def get_hs2_hive_cursor(hiveserver, user=None, use_kerberos=False,
                         database=None, execOptions=None):
@@ -51,6 +52,7 @@ def get_hs2_hive_cursor(hiveserver, user=None, use_kerberos=False,
   except Exception as e:
     LOG.error("Error Connecting: {0}".format(str(e)))
   return cursor
+
 
 def execute_using_hive_hs2(query, query_config):
   exec_result = HiveQueryResult(query, query_config=query_config)
@@ -80,6 +82,7 @@ def execute_using_hive_hs2(query, query_config):
     if plugin_runner: plugin_runner.run_plugins_post(scope="Query")
   return exec_result
 
+
 def get_hs2_impala_cursor(impalad, use_kerberos=False, database=None):
   """Get a cursor to an impalad
 
@@ -106,6 +109,7 @@ def get_hs2_impala_cursor(impalad, use_kerberos=False, database=None):
   except Exception as e:
     LOG.error("Error connecting: {0}".format(str(e)))
   return cursor
+
 
 def execute_using_impala_hs2(query, query_config):
   """Executes a sql query against Impala using the hs2 interface.
@@ -140,6 +144,7 @@ def execute_using_impala_hs2(query, query_config):
     if plugin_runner: plugin_runner.run_plugins_post(scope="Query")
     return exec_result
 
+
 def establish_beeswax_connection(query_config):
   """Establish a connection to the user specified impalad.
 
@@ -148,7 +153,10 @@ def establish_beeswax_connection(query_config):
 
   Returns:
     ImpalaBeeswaxClient is the connection suceeds, None otherwise.
+
+  DEPRECATED: use hs2 instead of beeswax.
   """
+  LOG.warning('beeswax protocol is deprecated.')
   use_kerberos = query_config.use_kerberos
   user = query_config.user
   password = query_config.password
@@ -170,6 +178,7 @@ def establish_beeswax_connection(query_config):
     LOG.error("Error connecting: {0}".format(str(e)))
   return client
 
+
 def execute_using_impala_beeswax(query, query_config):
   """Executes a query using beeswax.
 
@@ -181,6 +190,8 @@ def execute_using_impala_beeswax(query, query_config):
 
   Returns:
     ImpalaQueryResult
+
+  DEPRECATED: use hs2 instead of beeswax.
   """
 
   # Create a client object to talk to impalad
@@ -204,6 +215,7 @@ def execute_using_impala_beeswax(query, query_config):
     if plugin_runner: plugin_runner.run_plugins_post(context=context, scope="Query")
     return construct_exec_result(result, exec_result)
 
+
 def build_context(query, query_config):
   """Build context based on query config for plugin_runner.
 
@@ -220,6 +232,7 @@ def build_context(query, query_config):
   context = vars(query_config)
   context['query'] = query
   return context
+
 
 def construct_exec_result(result, exec_result):
   """ Transform an ImpalaBeeswaxResult object to a ImpalaQueryResult object.
@@ -241,22 +254,24 @@ def construct_exec_result(result, exec_result):
     setattr(exec_result, attr, getattr(result, attr))
   return exec_result
 
+
 def execute_using_jdbc(query, query_config):
   """Executes a query using JDBC"""
   query_string = query.query_str + ';'
   if query.db:
     query_string = 'use %s; %s' % (query.db, query_string)
   cmd = query_config.jdbc_client_cmd + " -q \"%s\"" % query_string
-  return run_query_capture_results(cmd, query, exit_on_error=False)
+  return run_query_capture_results(cmd, query)
 
-def parse_jdbc_query_results(stdout, stderr, query):
+
+def parse_jdbc_query_results(stdout, query):
   """
   Parse query execution results for the Impala JDBC client
 
   Parses the query execution details (avg time, stddev) from the output of the Impala
   JDBC test client.
   """
-  jdbc_result_regex = 'row\(s\) in (\d*).(\d*)s'
+  jdbc_result_regex = r'row\(s\) in (\d*).(\d*)s'
   time_taken = 0.0
   for line in stdout.split('\n'):
     match = re.search(jdbc_result_regex, line)
@@ -265,6 +280,7 @@ def parse_jdbc_query_results(stdout, stderr, query):
       break
   result_data = re.findall(r'\[START\]----\n(.*?)\n----\[END\]', stdout, re.DOTALL)[0]
   return create_exec_result(time_taken, result_data, query)
+
 
 def create_exec_result(time_taken, result_data, query):
   exec_result = HiveQueryResult(query)
@@ -275,7 +291,8 @@ def create_exec_result(time_taken, result_data, query):
   exec_result.success = True
   return exec_result
 
-def run_query_capture_results(cmd, query, exit_on_error):
+
+def run_query_capture_results(cmd, query):
   """
   Runs the given query command and returns the execution result.
 
@@ -300,7 +317,7 @@ def run_query_capture_results(cmd, query, exit_on_error):
     exec_result.query_error = msg
     return exec_result
   # The command completed
-  exec_result = parse_jdbc_query_results(stdout, stderr, query)
+  exec_result = parse_jdbc_query_results(stdout, query)
   exec_result.query = query
   exec_result.start_time = start_time
   return exec_result

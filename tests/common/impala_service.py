@@ -272,7 +272,8 @@ class ImpaladService(BaseImpalaService):
 
   def get_num_known_live_executors(self, timeout=30, interval=1,
       include_shutting_down=True):
-    return self.get_num_known_live_backends(timeout=timeout, interval=interval,
+    return self.get_num_known_live_backends(timeout=timeout,
+                                            interval=interval,
                                             include_shutting_down=include_shutting_down,
                                             only_executors=True)
 
@@ -305,7 +306,8 @@ class ImpaladService(BaseImpalaService):
 
   def get_queries_json(self, timeout=30, interval=1):
     """Return the full JSON from the /queries page."""
-    return self.get_debug_webpage_json('queries', timeout=timeout, interval=interval)
+    return json.loads(
+        self.read_debug_webpage('queries?json', timeout=timeout, interval=interval))
 
   def get_query_locations(self):
     # Returns a dictionary of the format <host_address, num_of_queries_running_there>
@@ -396,9 +398,9 @@ class ImpaladService(BaseImpalaService):
     return self.read_debug_webpage(
         "query_profile?query_id=%s&raw" % (query_id), timeout=timeout, interval=interval)
 
-  def get_query_status(self, query_id):
+  def get_query_status(self, query_id, timeout=10, interval=1):
     """Gets the 'Query Status' section of the query's runtime profile."""
-    page = self.read_query_profile_page(query_id)
+    page = self.read_query_profile_page(query_id, timeout=timeout, interval=interval)
     status_line =\
         next((x for x in page.split('\n') if re.search('Query Status:', x)), None)
     return status_line.split('Query Status:')[1].strip()
@@ -430,10 +432,11 @@ class ImpaladService(BaseImpalaService):
     query_status = ""
     while (time() - start_time < timeout):
       try:
-        query_status = self.get_query_status(query_id)
+        query_status = self.get_query_status(
+            query_id, timeout=timeout, interval=interval)
         if query_status is None:
-          assert False, "Could not find 'Query Status' section in profile of "\
-              "query with id %s:\n%s" % (query_id)
+          raise Exception("Could not find 'Query Status' section in profile of "
+                          "query with id {}".format(query_id))
       except Exception:
         pass
       if expected_content in query_status:
@@ -455,6 +458,7 @@ class ImpaladService(BaseImpalaService):
   def create_beeswax_client(self, use_kerberos=False):
     """Creates a new beeswax client connection to the impalad.
     DEPRECATED: Use create_hs2_client() instead."""
+    LOG.warning('beeswax protocol is deprecated.')
     client = create_connection('%s:%d' % (self.hostname, self.beeswax_port),
                                use_kerberos, BEESWAX)
     client.connect()
@@ -514,6 +518,7 @@ class ImpaladService(BaseImpalaService):
     if protocol == HS2_HTTP:
       port = self.hs2_http_port
     if protocol == BEESWAX:
+      LOG.warning('beeswax protocol is deprecated.')
       port = self.beeswax_port
     client = create_connection('%s:%d' % (self.hostname, port), protocol=protocol)
     client.connect()

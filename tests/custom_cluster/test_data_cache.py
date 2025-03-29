@@ -23,6 +23,7 @@ import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIf, SkipIfNotHdfsMinicluster
+from tests.common.test_vector import HS2
 
 
 @SkipIf.is_buggy_el6_kernel
@@ -216,7 +217,8 @@ class TestDataCache(CustomClusterTestSuite):
     QUERY = "select * from tpch_parquet.lineitem"
     # Execute a query, record the total bytes and the number of entries of cache before
     # cache dump.
-    self.execute_query(QUERY)
+    with self.create_impala_client(protocol=HS2) as client1:
+      client1.execute(QUERY)
     assert self.get_data_cache_metric('hit-bytes') == 0
     assert self.get_data_cache_metric('hit-count') == 0
     total_bytes = self.get_data_cache_metric('total-bytes')
@@ -242,8 +244,8 @@ class TestDataCache(CustomClusterTestSuite):
       assert self.get_data_cache_metric('num-entries') == num_entries
 
     # Reconnect to the service and execute the query, expecting some cache hits.
-    self.client.connect()
-    self.execute_query(QUERY)
+    with self.create_impala_client(protocol=HS2) as client2:
+      client2.execute(QUERY)
     assert self.get_data_cache_metric('hit-bytes') > 0
     assert self.get_data_cache_metric('hit-count') > 0
     if test_reduce_size:
@@ -285,21 +287,22 @@ class TestDataCache(CustomClusterTestSuite):
     QUERY = "select * from tpch_parquet.lineitem"
     # Execute the query asynchronously, wait a short while, and do gracefully shutdown
     # immediately to test the race between cache writes and setting cache read-only.
-    handle = self.execute_query_async(QUERY)
-    sleep(1)
-    impalad = self.cluster.impalads[0]
-    impalad.kill(SIGRTMIN)
-    self.client.fetch(QUERY, handle)
-    self.client.close_query(handle)
-    impalad.wait_for_exit()
-    impalad.start()
-    impalad.service.wait_for_num_known_live_backends(1)
+    with self.create_impala_client(protocol=HS2) as client1:
+      handle = client1.execute_async(QUERY)
+      sleep(1)
+      impalad = self.cluster.impalads[0]
+      impalad.kill(SIGRTMIN)
+      client1.fetch(QUERY, handle)
+      client1.close_query(handle)
+      impalad.wait_for_exit()
+      impalad.start()
+      impalad.service.wait_for_num_known_live_backends(1)
 
     # We hope that in this case, the cache is still properly dumped and loaded,
     # and then the same query is executed to expect some cache hits.
     self.assert_impalad_log_contains('INFO', 'Partition 0 load successfully.')
-    self.client.connect()
-    self.execute_query(QUERY)
+    with self.create_impala_client(protocol=HS2) as client2:
+      client2.execute(QUERY)
     assert self.get_data_cache_metric('hit-bytes') > 0
     assert self.get_data_cache_metric('hit-count') > 0
 

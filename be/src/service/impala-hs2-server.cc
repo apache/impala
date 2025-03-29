@@ -1169,7 +1169,9 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   }
 
   // Report analysis errors
-  ss << join(query_handle->GetAnalysisWarnings(), "\n");
+  for (const string& warning : query_handle->GetAnalysisWarnings()) {
+    ss << warning << "\n";
+  }
   // Report queuing reason if the admission controller queued the query.
   const string* admission_result = query_handle->summary_profile()->GetInfoString(
       AdmissionController::PROFILE_INFO_KEY_ADMISSION_RESULT);

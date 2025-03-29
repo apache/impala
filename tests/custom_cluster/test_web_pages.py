@@ -28,7 +28,7 @@ from tests.common.custom_cluster_test_suite import (
   DEFAULT_CLUSTER_SIZE,
   CustomClusterTestSuite)
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
-from tests.common.skip import SkipIfFS
+from tests.common.skip import SkipIfFS, SkipIfDockerizedCluster
 from tests.shell.util import run_impala_shell_cmd
 
 SMALL_QUERY_LOG_SIZE_IN_BYTES = 40 * 1024
@@ -192,11 +192,8 @@ class TestWebPage(CustomClusterTestSuite):
     shell_messages = ["Query submitted at: ", "(Coordinator: ",
         "Query state can be monitored at: "]
     query_shell_arg = '--query=select * from functional.alltypes'
-    # hs2
+    # protocol is set inside vector
     results = run_impala_shell_cmd(vector, [query_shell_arg])
-    self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
-    # beeswax
-    results = run_impala_shell_cmd(vector, ['--protocol=beeswax', query_shell_arg])
     self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
     # Even though webserver url is not exposed, it is still accessible.
     page = requests.get('http://localhost:25000')
@@ -542,3 +539,36 @@ class TestWebPage(CustomClusterTestSuite):
     self._test_catalog_tables_stats_after_describe("functional.alltypes", 24)
     self._test_catalog_tables_stats_after_describe(
         "functional_parquet.iceberg_lineitem_sixblocks", 4)
+
+
+class TestWebPageAndCloseSession(CustomClusterTestSuite):
+  ROOT_URL = "http://localhost:{0}/"
+
+  @SkipIfDockerizedCluster.daemon_logs_not_exposed
+  @CustomClusterTestSuite.with_args(disable_log_buffering=True)
+  def test_display_src_socket_in_query_cause(self):
+    # Execute a long running query then cancel it from the WebUI.
+    # Check the runtime profile and the INFO logs for the cause message.
+    query = "select sleep(10000)"
+    handle = self.execute_query_async(query)
+    query_id = self.client.handle_id(handle)
+    cancel_query_url = "{0}cancel_query?query_id={1}".format(self.ROOT_URL.format
+      ("25000"), query_id)
+    text_profile_url = "{0}query_profile_plain_text?query_id={1}".format(self.ROOT_URL
+      .format("25000"), query_id)
+    requests.get(cancel_query_url)
+    response = requests.get(text_profile_url)
+    cancel_status = "Cancelled from Impala&apos;s debug web interface by user: " \
+                    "&apos;anonymous&apos; at"
+    assert cancel_status in response.text
+    self.assert_impalad_log_contains("INFO", "Cancelled from Impala\'s debug web "
+      "interface by user: 'anonymous' at", expected_count=-1, timeout_s=30)
+    # Session closing from the WebUI does not produce the cause message in the profile,
+    # so we will skip checking the runtime profile.
+    results = self.execute_query("select current_session()")
+    session_id = results.data[0]
+    close_session_url = "{0}close_session?session_id={1}".format(self.ROOT_URL.format
+      ("25000"), session_id)
+    requests.get(close_session_url)
+    self.assert_impalad_log_contains("INFO", "Session closed from Impala\'s debug "
+      "web interface by user: 'anonymous' at", expected_count=-1, timeout_s=30)

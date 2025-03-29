@@ -50,7 +50,7 @@ class TestCoordinators(CustomClusterTestSuite):
     # Verify that Beeswax and HS2 client connections can't be established at a worker node
     beeswax_client = None
     try:
-      beeswax_client = worker.service.create_hs2_client()
+      beeswax_client = worker.service.create_beeswax_client()
     except Exception as e:
       LOG.info("Caught exception {0}".format(e))
     finally:

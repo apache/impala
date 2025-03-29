@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_vector import BEESWAX
 
 
 class TestBeeswax(ImpalaTestSuite):
@@ -27,13 +28,13 @@ class TestBeeswax(ImpalaTestSuite):
     and different users."""
     USER1 = "user1"
     USER2 = "user2"
-    client1 = self.client
+    client1 = self.create_impala_client(protocol=BEESWAX)
     different_user_client = None
     unset_user_client = None
     try:
-      same_user_client = self.create_impala_client(protocol='beeswax')
-      different_user_client = self.create_impala_client(protocol='beeswax')
-      unset_user_client = self.create_impala_client(protocol='beeswax')
+      same_user_client = self.create_impala_client(protocol=BEESWAX)
+      different_user_client = self.create_impala_client(protocol=BEESWAX)
+      unset_user_client = self.create_impala_client(protocol=BEESWAX)
 
       # Unauthenticated Beewax only sets user once the query is run.
       result = client1.execute("select effective_user()", user=USER1)

@@ -307,7 +307,8 @@ class TestInsertPartKey(ImpalaTestSuite):
                 "%2F%3A%3D%3F%5C%7B%5B%5D%23%5E"
     res = self.execute_query(
         "insert into {} partition(p='{}') values (0)".format(tbl, special_characters))
-    assert res.data[0] == part_dir + ": 1"
+    assert part_dir in res.runtime_profile
+    assert 'NumModifiedRows: 1\n' in res.runtime_profile
     res = self.client.execute("select p from {}".format(tbl))
     assert res.data[0] == part_value
     res = self.execute_query("show partitions " + tbl)
@@ -341,7 +342,8 @@ class TestInsertPartKey(ImpalaTestSuite):
                      "\\u001F\\\"\\u007F\'%*\\/:=?\\\\{[]#^"
     res = self.execute_query(
         "insert into {} values (0, '{}')".format(tbl, special_characters))
-    assert res.data[0] == part_dir + ": 1"
+    assert part_dir in res.runtime_profile
+    assert 'NumModifiedRows: 1\n' in res.runtime_profile
     res = self.client.execute("select p from {}".format(tbl))
     assert res.data[0] == part_value
     res = self.execute_query("show partitions " + tbl)

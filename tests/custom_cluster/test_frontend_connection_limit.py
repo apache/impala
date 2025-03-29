@@ -44,7 +44,7 @@ class TestFrontendConnectionLimit(CustomClusterTestSuite):
 
   def _connect_and_query(self, query, impalad):
     with impalad.service.create_hs2_client() as client:
-      client.execute(query)
+      self.execute_query_expect_success(client, query)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

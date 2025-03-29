@@ -901,7 +901,8 @@ class ImpalaTestSuite(BaseTestSuite):
         assert result.success, "Query failed: {0}".format(result.data)
 
         # Decode the results read back if the data is stored with a specific encoding.
-        if encoding: result.data = [row.decode(encoding) for row in result.data]
+        if encoding and result.data:
+            result.data = [row.decode(encoding) for row in result.data]
         # Replace $NAMENODE in the expected results with the actual namenode URI.
         if 'RESULTS' in test_section:
           # Combining 'RESULTS' with 'DML_RESULTS" is currently unsupported because
