@@ -2346,8 +2346,15 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     if (unionStmt.hasUnionDistinctOps()) {
       result = createUnionPlan(
           analyzer, unionStmt, unionStmt.getUnionDistinctOperands(), null);
+
+      MultiAggregateInfo unionDistinctAggInfo = unionStmt.getDistinctAggInfo();
+
+      // Make sure MultiAggregateInfo does not remove conjuncts that are unassigned at
+      // this point as redundant.
+      unionDistinctAggInfo.setConjunctsToKeep(analyzer.getUnassignedConjuncts(result));
+
       result = new AggregationNode(
-          ctx_.getNextNodeId(), result, unionStmt.getDistinctAggInfo(), AggPhase.FIRST);
+          ctx_.getNextNodeId(), result, unionDistinctAggInfo, AggPhase.FIRST);
       result.init(analyzer);
     }
     // create ALL tree

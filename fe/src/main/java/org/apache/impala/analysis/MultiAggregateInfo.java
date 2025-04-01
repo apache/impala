@@ -133,6 +133,11 @@ public class MultiAggregateInfo {
   // Result of substituting 'groupingExprs_' with the output smap of the AggregationNode.
   private List<Expr> substGroupingExprs_;
 
+  // These conjuncts are kept even if they would otherwise be removed as redundant. This
+  // can be used for example when a conjunct cannot be pushed into all operands of a UNION
+  // node below the AggregationNode, so it needs to be evaluated by the AggregationNode.
+  private List<Expr> conjunctsToKeep_;
+
   // Results of analyze():
 
   // Aggregation classes and their AggregateInfos. If there is a class with non-distinct
@@ -218,6 +223,10 @@ public class MultiAggregateInfo {
     AggregateInfo distinctAggInfo =
         AggregateInfo.create(groupingExprs, null, tupleDesc, analyzer);
     return new MultiAggregateInfo(distinctAggInfo);
+  }
+
+  public void setConjunctsToKeep(List<Expr> conjuncts) {
+    conjunctsToKeep_ = conjuncts;
   }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
@@ -1024,7 +1033,22 @@ public class MultiAggregateInfo {
     if (markAssigned) analyzer.markConjunctsAssigned(unassignedConjuncts);
     result.addAll(bindingPredicates);
     result.addAll(unassignedConjuncts);
+
+    // Select those conjuncts in 'result' that we need to keep.
+    List<Expr> origConjunctsToKeep = new ArrayList<>();
+    if (conjunctsToKeep_ != null) {
+      for (Expr conj : result) {
+        if (conjunctsToKeep_.contains(conj)) {
+          origConjunctsToKeep.add(conj);
+        }
+      }
+    }
+
     analyzer.createEquivConjuncts(tid, result, groupBySids);
+
+    // Add back conjuncts that we need to keep but may have been removed.
+    if (origConjunctsToKeep != null) result.addAll(origConjunctsToKeep);
+
     Expr.removeDuplicates(result);
     return result;
   }

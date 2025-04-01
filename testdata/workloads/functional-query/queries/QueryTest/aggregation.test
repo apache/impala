@@ -2911,3 +2911,48 @@ select s_store_sk, regr_count(s_number_employees, s_floor_space) over (partition
 ---- TYPES
 int,bigint
 ====
+---- QUERY
+# Regression test for IMPALA-13873: the conjunct 'b = min_b' in the aggregation node
+# should not be discarded.
+WITH u1 AS (select 10 a, 10 b),
+t AS (select a, b, min(b) over (partition by a) min_b from u1 UNION select 10, 10, 20)
+select t.* from t where t.b = t.min_b;
+---- RESULTS
+10,10,10
+---- TYPES
+TINYINT,TINYINT,TINYINT
+====
+---- QUERY
+# Regression test for IMPALA-13873: the conjunct 'b = min_b' in the aggregation node
+# should not be discarded.
+# Querying from tables, not inline expressions.
+WITH t AS (
+  select d2 a, d3 b, min(d3) over (partition by d2) min_b from functional.decimal_tbl
+  UNION
+  select smallint_col, int_col, bigint_col from functional.alltypestiny
+)
+select t.* from t where t.b = t.min_b;
+---- RESULTS
+2222,1.2345678900,1.2345678900
+0,0.0000000000,0.0000000000
+333,123.4567890000,123.4567890000
+111,12.3456789000,12.3456789000
+---- TYPES
+decimal,decimal,decimal
+====
+---- QUERY
+# Regression test for IMPALA-13873: the conjunct 'b = min_b' in the aggregation node
+# should not be discarded.
+# The predicate cannot be pushed down to any UNION operand.
+WITH u1 AS (select tinyint_col, id from functional.alltypestiny),
+t AS (
+  select tinyint_col, id, min(id) over (partition by tinyint_col) min_id from u1
+  UNION
+  select tinyint_col, id, id+100 as min_id from u1)
+select t.* from t where t.id = t.min_id;
+---- RESULTS
+1,1,1
+0,0,0
+---- TYPES
+tinyint,int,bigint
+====

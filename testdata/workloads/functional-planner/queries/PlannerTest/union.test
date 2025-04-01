@@ -4634,3 +4634,128 @@ Per-Host Resources: mem-estimate=80.00MB mem-reservation=128.00KB thread-reserva
    tuple-ids=0 row-size=4B cardinality=11.00K
    in pipelines: 00(GETNEXT)
 ====
+# Regression test for IMPALA-13873: the conjunct 'b = min_b' in the aggregation node
+# should not be discarded.
+WITH u1 AS (select 10 a, 10 b),
+t AS (select a, b, min(b) over (partition by a) min_b from u1 UNION select 10, 10, 20)
+select t.* from t where t.b = t.min_b;
+---- QUERYOPTIONS
+explain_level=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=20.00MB mem-reservation=11.94MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: a, b, min_b
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+04:AGGREGATE [FINALIZE]
+|  group by: a, b, min_b
+|  having: b = min_b
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=2 row-size=3B cardinality=1
+|  in pipelines: 04(GETNEXT), 02(OPEN)
+|
+00:UNION
+|  constant-operands=1
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=3B cardinality=2
+|  in pipelines: 02(GETNEXT)
+|
+03:ANALYTIC
+|  functions: min(b)
+|  partition by: a
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5,4 row-size=3B cardinality=1
+|  in pipelines: 02(GETNEXT)
+|
+02:SORT
+|  order by: a ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=2B cardinality=1
+|  in pipelines: 02(GETNEXT)
+|
+01:UNION
+   constant-operands=1
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=2B cardinality=1
+   in pipelines: <none>
+====
+# Regression test for IMPALA-13873: the conjunct 'b = min_b' in the aggregation node
+# should not be discarded.
+# Querying from tables, not inline expressions.
+WITH t AS (
+  select d2 a, d3 b, min(d3) over (partition by d2) min_b from functional.decimal_tbl
+  UNION
+  select smallint_col, int_col, bigint_col from functional.alltypestiny
+)
+select t.* from t where t.b = t.min_b;
+---- QUERYOPTIONS
+explain_level=1
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  group by: a, b, min_b
+|  having: b = min_b
+|  row-size=40B cardinality=1
+|
+00:UNION
+|  row-size=40B cardinality=4
+|
+|--04:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: functional.alltypestiny.int_col = functional.alltypestiny.bigint_col
+|     row-size=14B cardinality=1
+|
+03:ANALYTIC
+|  functions: min(d3)
+|  partition by: d2
+|  row-size=40B cardinality=3
+|
+02:SORT
+|  order by: d2 ASC NULLS LAST
+|  row-size=24B cardinality=3
+|
+01:SCAN HDFS [functional.decimal_tbl]
+   HDFS partitions=1/1 files=1 size=195B
+   row-size=24B cardinality=3
+====
+# Regression test for IMPALA-13873: the conjunct 'b = min_b' in the aggregation node
+# should not be discarded.
+# The predicate cannot be pushed down to any UNION operand.
+WITH u1 AS (select tinyint_col, id from functional.alltypestiny),
+t AS (
+  select tinyint_col, id, min(id) over (partition by tinyint_col) min_id from u1
+  UNION
+  select tinyint_col, id, id+100 as min_id from u1)
+select t.* from t where t.id = t.min_id;
+---- QUERYOPTIONS
+explain_level=1
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  group by: tinyint_col, id, min_id
+|  having: id = min_id
+|  row-size=13B cardinality=2
+|
+00:UNION
+|  row-size=13B cardinality=16
+|
+|--04:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=5B cardinality=8
+|
+03:ANALYTIC
+|  functions: min(id)
+|  partition by: tinyint_col
+|  row-size=9B cardinality=8
+|
+02:SORT
+|  order by: tinyint_col ASC NULLS LAST
+|  row-size=5B cardinality=8
+|
+01:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=5B cardinality=8
+====
