@@ -1325,12 +1325,14 @@ Status HdfsParquetTableWriter::Init() {
 
   // Default to snappy compressed
   THdfsCompression::type codec = THdfsCompression::SNAPPY;
-  // Compression level only supported for zstd.
-  int clevel = ZSTD_CLEVEL_DEFAULT;
+  // Compression level only supported for zstd and zlib.
+  std::optional<int> clevel;
   const TQueryOptions& query_options = state_->query_options();
   if (query_options.__isset.compression_codec) {
     codec = query_options.compression_codec.codec;
-    clevel = query_options.compression_codec.compression_level;
+    if (query_options.compression_codec.__isset.compression_level) {
+      clevel = query_options.compression_codec.compression_level;
+    }
   } else if (table_desc_->IsIcebergTable()) {
     TCompressionCodec compression_codec = table_desc_->IcebergParquetCompressionCodec();
     codec = compression_codec.codec;
@@ -1362,8 +1364,8 @@ Status HdfsParquetTableWriter::Init() {
   codec = ConvertParquetToImpalaCodec(parquet_codec);
 
   VLOG_FILE << "Using compression codec: " << codec;
-  if (codec == THdfsCompression::ZSTD) {
-    VLOG_FILE << "Using compression level: " << clevel;
+  if (clevel.has_value()) {
+    VLOG_FILE << "Using compression level: " << clevel.value();
   }
 
   if (query_options.__isset.parquet_page_row_count_limit) {

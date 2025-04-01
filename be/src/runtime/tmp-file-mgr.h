@@ -324,7 +324,7 @@ class TmpFileMgr {
   bool compression_enabled() const {
     return compression_codec_ != THdfsCompression::NONE;
   }
-  int compression_level() const { return compression_level_; }
+  std::optional<int> compression_level() const { return compression_level_; }
   bool punch_holes() const { return punch_holes_; }
 
   /// The minimum size of hole that we will try to punch in a scratch file.
@@ -364,9 +364,9 @@ class TmpFileMgr {
   /// compression is used.
   THdfsCompression::type compression_codec_ = THdfsCompression::NONE;
 
-  /// The compression level, which is used for certain compression codecs like ZSTD
-  /// and ignored otherwise. -1 means not set/invalid.
-  int compression_level_ = -1;
+  /// The compression level used for certain compression codecs(i.e. ZSTD, ZLIB, BZIP2)
+  /// and ignored otherwise.
+  std::optional<int> compression_level_;
 
   /// Whether hole punching is enabled.
   bool punch_holes_ = false;

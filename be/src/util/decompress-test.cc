@@ -64,11 +64,12 @@ class DecompressorTest : public ::testing::Test {
     mem_pool_.FreeAll();
   }
 
-  void RunTest(THdfsCompression::type format, int clevel = 0) {
+  void RunTest(THdfsCompression::type format, std::optional<int> clevel = std::nullopt) {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
 
-    Codec::CodecInfo codec_info(format, clevel);
+    Codec::CodecInfo codec_info = Codec::CodecInfo(format, clevel);
+
     EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, codec_info, &compressor));
     EXPECT_OK(Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor));
 
@@ -102,7 +103,8 @@ class DecompressorTest : public ::testing::Test {
     decompressor->Close();
   }
 
-  void RunTestStreaming(THdfsCompression::type format, int compression_level = 0) {
+  void RunTestStreaming(THdfsCompression::type format,
+      std::optional<int> compression_level = std::nullopt) {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
     Codec::CodecInfo codec_info(format, compression_level);
@@ -409,6 +411,9 @@ TEST_F(DecompressorTest, Gzip) {
   RunTest(THdfsCompression::GZIP);
   RunTestStreaming(THdfsCompression::GZIP);
   RunTestMultiStreamDecompressing(THdfsCompression::GZIP);
+
+  RunTest(THdfsCompression::GZIP, Z_BEST_SPEED);
+  RunTestStreaming(THdfsCompression::GZIP, Z_BEST_COMPRESSION);
 }
 
 TEST_F(DecompressorTest, Deflate) {
@@ -421,6 +426,9 @@ TEST_F(DecompressorTest, Bzip) {
   RunTest(THdfsCompression::BZIP2);
   RunTestStreaming(THdfsCompression::BZIP2);
   RunTestMultiStreamDecompressing(THdfsCompression::BZIP2);
+
+  RunTest(THdfsCompression::BZIP2, BZ_MIN_COMPRESSION_LEVEL);
+  RunTestStreaming(THdfsCompression::BZIP2, BZ_MAX_COMPRESSION_LEVEL);
 }
 
 TEST_F(DecompressorTest, SnappyBlocked) {
@@ -496,10 +504,18 @@ TEST_F(DecompressorTest, ZSTD) {
   RunTest(THdfsCompression::ZSTD, ZSTD_CLEVEL_DEFAULT);
   mt19937 rng;
   RandTestUtil::SeedRng("ZSTD_COMPRESSION_LEVEL_SEED", &rng);
-  // zstd supports compression levels from 1 up to ZSTD_maxCLevel()
-  const int clevel = uniform_int_distribution<int>(1, ZSTD_maxCLevel())(rng);
-  RunTest(THdfsCompression::ZSTD, clevel);
-  RunTestStreaming(THdfsCompression::ZSTD, clevel);
+
+  // Test negative compression level
+  const int clevel_n =
+      uniform_int_distribution<int>(ZSTD_minCLevel(), -1)(rng);
+  RunTest(THdfsCompression::ZSTD, clevel_n);
+  RunTestStreaming(THdfsCompression::ZSTD, clevel_n);
+
+  // Test positive compression level
+  const int clevel_p =
+      uniform_int_distribution<int>(0, ZSTD_maxCLevel())(rng);
+  RunTest(THdfsCompression::ZSTD, clevel_p);
+  RunTestStreaming(THdfsCompression::ZSTD, clevel_p);
 }
 
 TEST_F(DecompressorTest, ZSTDHuge) {

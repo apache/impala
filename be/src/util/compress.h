@@ -27,6 +27,9 @@
 #include "common/status.h"
 #include "util/codec.h"
 
+#define BZ_MIN_COMPRESSION_LEVEL 1
+#define BZ_MAX_COMPRESSION_LEVEL 9
+
 namespace impala {
 
 class MemPool;
@@ -44,7 +47,8 @@ class GzipCompressor : public Codec {
     GZIP,
   };
 
-  GzipCompressor(Format format, MemPool* mem_pool = nullptr, bool reuse_buffer = false);
+  GzipCompressor(Format format, MemPool* mem_pool = nullptr, bool reuse_buffer = false,
+      std::optional<int> compression_level = std::nullopt);
   virtual ~GzipCompressor();
 
   virtual Status Init() override WARN_UNUSED_RESULT;
@@ -56,11 +60,15 @@ class GzipCompressor : public Codec {
 
   virtual std::string file_extension() const override { return "gz"; }
 
+  static Status ValidateCompressionLevel(int compression_level);
+
  private:
   Format format_;
 
   /// Structure used to communicate with the library.
   z_stream stream_;
+
+  int compression_level_;
 
   /// These are magic numbers from zlib.h.  Not clear why they are not defined there.
   const static int WINDOW_BITS = 15;    // Maximum window size
@@ -76,15 +84,22 @@ class GzipCompressor : public Codec {
 
 class BzipCompressor : public Codec {
  public:
-  BzipCompressor(MemPool* mem_pool, bool reuse_buffer);
+  BzipCompressor(MemPool* mem_pool, bool reuse_buffer,
+      std::optional<int> compression_level = std::nullopt);
   virtual ~BzipCompressor() { }
 
+  virtual Status Init() override WARN_UNUSED_RESULT;
   virtual int64_t MaxOutputLen(
       int64_t input_len, const uint8_t* input = nullptr) override;
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length,
       uint8_t** output) override WARN_UNUSED_RESULT;
   virtual std::string file_extension() const override { return "bz2"; }
+
+  static Status ValidateCompressionLevel(int compression_level);
+
+ private:
+  int compression_level_;
 };
 
 class SnappyBlockCompressor : public Codec {
@@ -138,8 +153,10 @@ class Lz4Compressor : public Codec {
 class ZstandardCompressor : public Codec {
  public:
   ZstandardCompressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false,
-      int clevel = ZSTD_CLEVEL_DEFAULT);
+      std::optional<int> compression_level = std::nullopt);
   virtual ~ZstandardCompressor();
+
+  virtual Status Init() override WARN_UNUSED_RESULT;
 
   virtual int64_t MaxOutputLen(
       int64_t input_len, const uint8_t* input = nullptr) override;
@@ -148,8 +165,10 @@ class ZstandardCompressor : public Codec {
       uint8_t** output) override WARN_UNUSED_RESULT;
   virtual std::string file_extension() const override { return "zst"; }
 
+  static Status ValidateCompressionLevel(int compression_level);
+
  private:
-  int clevel_;
+  int compression_level_;
   ZSTD_CCtx* stream_ = nullptr;
 };
 

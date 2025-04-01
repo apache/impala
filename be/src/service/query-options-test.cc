@@ -18,6 +18,7 @@
 #include "service/query-options.h"
 
 #include <zstd.h>
+#include <zlib.h>
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
 
@@ -620,16 +621,21 @@ TEST(QueryOptions, CompressionCodec) {
       DEFLATE, BZIP2, SNAPPY, SNAPPY_BLOCKED, LZO, LZ4, ZLIB, ZSTD, BROTLI, LZ4_BLOCKED));
   // Test valid values for compression_codec.
   for (auto& codec : codecs) {
-    EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("$0",codec), &options,
+    EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("$0", codec), &options,
         nullptr).ok());
-    // Test that compression level is only supported for ZSTD.
-    if (codec != THdfsCompression::ZSTD) {
-      EXPECT_FALSE(SetQueryOption("compression_codec", Substitute("$0:1",codec),
+    // Test with compression levels for supported codecs i.e. ZLIB and ZSTD
+    switch(codec) {
+      case THdfsCompression::ZSTD:
+      case THdfsCompression::GZIP:
+      case THdfsCompression::ZLIB:
+      case THdfsCompression::BZIP2:
+      case THdfsCompression::DEFLATE:
+        EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("$0:1", codec),
         &options, nullptr).ok());
-    }
-    else {
-      EXPECT_TRUE(SetQueryOption("compression_codec",
-          Substitute("zstd:$0",ZSTD_CLEVEL_DEFAULT), &options, nullptr).ok());
+        break;
+      default:
+        EXPECT_FALSE(SetQueryOption("compression_codec", Substitute("$0:1", codec),
+          &options, nullptr).ok());
     }
   }
 
@@ -642,18 +648,58 @@ TEST(QueryOptions, CompressionCodec) {
   EXPECT_FALSE(SetQueryOption("compression_codec", ":", &options, nullptr).ok());
   EXPECT_FALSE(SetQueryOption("compression_codec", ":1", &options, nullptr).ok());
 
-  // Test compression levels for ZSTD.
-  const int zstd_min_clevel = 1;
+
+  // Test compression levels for ZSTD
+  // Test minimum negative compression level
+  EXPECT_TRUE(SetQueryOption("compression_codec",
+      Substitute("ZSTD:$0", ZSTD_minCLevel()), &options, nullptr).ok());
+
+  // ZSTD_minCLevel() could be very low (i.e. -ZSTD_TARGETLENGTH_MAX)
+  // The values could begin from -11000 or even less
+  // Unnecessary to begin the test range from such low values
+  const int zstd_min_clevel = -10;
   const int zstd_max_clevel = ZSTD_maxCLevel();
   for (int i = zstd_min_clevel; i <= zstd_max_clevel; i++)
   {
-    EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("ZSTD:$0",i), &options,
+    EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("ZSTD:$0", i), &options,
+      nullptr).ok());
+  }
+  EXPECT_TRUE(SetQueryOption("compression_codec",
+    Substitute("ZSTD:$0", ZSTD_minCLevel()), &options, nullptr).ok());
+  EXPECT_FALSE(SetQueryOption("compression_codec",
+    Substitute("ZSTD:$0", ZSTD_minCLevel() - 1), &options, nullptr).ok());
+  EXPECT_FALSE(SetQueryOption("compression_codec",
+    Substitute("ZSTD:$0", zstd_max_clevel + 1), &options, nullptr).ok());
+
+
+  // Test compression levels for ZLIB
+  const int gzip_min_clevel = Z_BEST_SPEED;
+  const int gzip_max_clevel = Z_BEST_COMPRESSION;
+  for (int i = gzip_min_clevel; i <= gzip_max_clevel; i++)
+  {
+    EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("GZIP:$0", i), &options,
       nullptr).ok());
   }
   EXPECT_FALSE(SetQueryOption("compression_codec",
-    Substitute("ZSTD:$0", zstd_min_clevel - 1), &options, nullptr).ok());
+    Substitute("GZIP:$0", gzip_min_clevel - 1), &options, nullptr).ok());
   EXPECT_FALSE(SetQueryOption("compression_codec",
-    Substitute("ZSTD:$0", zstd_max_clevel + 1), &options, nullptr).ok());
+    Substitute("GZIP:$0", gzip_max_clevel + 1), &options, nullptr).ok());
+
+
+  // Test compression levels for BZIP2
+  // Note: BZIP2 is not supported by parquet
+
+  const int bzip_min_clevel = 1;
+  const int bzip_max_clevel = 9;
+  for (int i = bzip_min_clevel; i <= bzip_max_clevel; i++)
+  {
+    EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("BZIP2:$0", i), &options,
+      nullptr).ok());
+  }
+  EXPECT_FALSE(SetQueryOption("compression_codec",
+    Substitute("BZIP2:$0", bzip_min_clevel - 1), &options, nullptr).ok());
+  EXPECT_FALSE(SetQueryOption("compression_codec",
+    Substitute("BZIP2:$0", bzip_max_clevel + 1), &options, nullptr).ok());
 #undef CASE
 #undef ENTRIES
 #undef ENTRY

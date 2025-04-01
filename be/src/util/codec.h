@@ -61,12 +61,14 @@ class Codec {
 
   struct CodecInfo {
    public:
-    CodecInfo(THdfsCompression::type format, int compression_level = 0)
+    CodecInfo(THdfsCompression::type format,
+        std::optional<int> compression_level = std::nullopt)
       : format_(format), compression_level_(compression_level) {}
 
     THdfsCompression::type format_;
-    // Currently only ZSTD uses compression level.
-    int compression_level_;
+
+    // Currently GZIP, ZSTD and BZIP2 use compression levels.
+    std::optional<int> compression_level_;
   };
 
   /// Create a decompressor.
@@ -98,15 +100,15 @@ class Codec {
       const CodecInfo& codec_info,
       boost::scoped_ptr<Codec>* compressor) WARN_UNUSED_RESULT;
 
-  /// Alternate factory method: takes a codec string and populates a scoped pointer.
-  static Status CreateCompressor(MemPool* mem_pool, bool reuse, const std::string& codec,
-      boost::scoped_ptr<Codec>* compressor) WARN_UNUSED_RESULT;
-
   /// Return the name of a compression algorithm.
   static std::string GetCodecName(THdfsCompression::type);
   /// Returns the java class name for the given compression type
   static Status GetHadoopCodecClassName(
       THdfsCompression::type, std::string* out_name) WARN_UNUSED_RESULT;
+
+  /// Validate compression levels and return status objects with approprate messages
+  static Status ValidateCompressionLevel(THdfsCompression::type,
+      int compression_level);
 
   virtual ~Codec();
 

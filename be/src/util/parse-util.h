@@ -70,7 +70,8 @@ class ParseUtil {
       bool* is_percent, int64_t relative_reference);
 
   static Status ParseCompressionCodec(
-      const std::string& compression_codec, THdfsCompression::type* type, int* level);
+      const std::string& compression_codec, THdfsCompression::type* type,
+      std::optional<int>* level);
 };
 
 std::string GetThriftEnumValues(const std::map<int, const char*>& enum_values_to_names);

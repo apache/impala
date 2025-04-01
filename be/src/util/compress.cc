@@ -41,10 +41,14 @@
 using boost::crc_32_type;
 using namespace impala;
 using namespace strings;
+GzipCompressor::GzipCompressor(Format format, MemPool* mem_pool, bool reuse_buffer,
+    std::optional<int> compression_level) : Codec(mem_pool, reuse_buffer),
+    format_(format), compression_level_(compression_level.value_or(6)) {
+  // Within ZLIB, Z_DEFAULT_COMPRESSION(-1) is mapped to a value of 6
 
-GzipCompressor::GzipCompressor(Format format, MemPool* mem_pool, bool reuse_buffer)
-  : Codec(mem_pool, reuse_buffer),
-    format_(format) {
+  // To limit compression levels in range [Z_BEST_SPEED, Z_BEST_COMPRESSION]
+  // Default compression level is set to 6
+
   bzero(&stream_, sizeof(stream_));
 }
 
@@ -61,7 +65,10 @@ Status GzipCompressor::Init() {
   } else if (format_ == GZIP) {
     window_bits += GZIP_CODEC;
   }
-  if ((ret = deflateInit2(&stream_, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+  Status clevel_status = ValidateCompressionLevel(compression_level_);
+  if (!clevel_status.ok()) { return clevel_status; }
+
+  if ((ret = deflateInit2(&stream_, compression_level_, Z_DEFLATED,
                           window_bits, 9, Z_DEFAULT_STRATEGY )) != Z_OK) {
     return Status("zlib deflateInit failed: " +  string(stream_.msg));
   }
@@ -140,8 +147,23 @@ Status GzipCompressor::ProcessBlock(bool output_preallocated,
   return Status::OK();
 }
 
-BzipCompressor::BzipCompressor(MemPool* mem_pool, bool reuse_buffer)
-  : Codec(mem_pool, reuse_buffer) {
+Status GzipCompressor::ValidateCompressionLevel(int compression_level) {
+  if (compression_level >= Z_BEST_SPEED && compression_level <= Z_BEST_COMPRESSION) {
+    return Status::OK();
+  } else {
+    return Status(Substitute("GZIP compression levels should be in range - [$0, $1]."
+      " Current compression level - $2.", Z_BEST_SPEED, Z_BEST_COMPRESSION,
+      compression_level));
+  }
+}
+
+BzipCompressor::BzipCompressor(MemPool* mem_pool, bool reuse_buffer,
+    std::optional<int> compression_level)
+  : Codec(mem_pool, reuse_buffer), compression_level_(compression_level.value_or(5)) {
+}
+
+Status BzipCompressor::Init() {
+  return ValidateCompressionLevel(compression_level_);
 }
 
 int64_t BzipCompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
@@ -174,10 +196,12 @@ Status BzipCompressor::ProcessBlock(bool output_preallocated, int64_t input_leng
       buffer_length_ = buffer_length_ * 2;
       out_buffer_ = temp_memory_pool_->Allocate(buffer_length_);
     }
+    // In BZ2 library, the compression level is directly mapped to blockSize100k
     outlen = static_cast<unsigned int>(buffer_length_);
     if ((ret = BZ2_bzBuffToBuffCompress(reinterpret_cast<char*>(out_buffer_), &outlen,
         const_cast<char*>(reinterpret_cast<const char*>(input)),
-        static_cast<unsigned int>(input_length), 5, 2, 0)) == BZ_OUTBUFF_FULL) {
+        static_cast<unsigned int>(input_length), compression_level_, 2, 0))
+        == BZ_OUTBUFF_FULL) {
       if (output_preallocated) {
         return Status("Too small buffer passed to BzipCompressor");
       }
@@ -195,6 +219,17 @@ Status BzipCompressor::ProcessBlock(bool output_preallocated, int64_t input_leng
   *output_length = outlen;
   memory_pool_->AcquireData(temp_memory_pool_.get(), false);
   return Status::OK();
+}
+
+Status BzipCompressor::ValidateCompressionLevel(int compression_level) {
+  if (compression_level >= BZ_MIN_COMPRESSION_LEVEL &&
+      compression_level <= BZ_MAX_COMPRESSION_LEVEL) {
+    return Status::OK();
+  } else {
+    return Status(Substitute("BZIP2 compression levels should be in range - [$0, $1]."
+      " Current compression level - $2", BZ_MIN_COMPRESSION_LEVEL,
+      BZ_MAX_COMPRESSION_LEVEL, compression_level));
+  }
 }
 
 // Currently this is only use for testing of the decompressor.
@@ -327,8 +362,14 @@ Status Lz4Compressor::ProcessBlock(bool output_preallocated, int64_t input_lengt
   return Status::OK();
 }
 
-ZstandardCompressor::ZstandardCompressor(MemPool* mem_pool, bool reuse_buffer, int clevel)
-  : Codec(mem_pool, reuse_buffer), clevel_(clevel) {}
+ZstandardCompressor::ZstandardCompressor(MemPool* mem_pool, bool reuse_buffer,
+    std::optional<int> compression_level) : Codec(mem_pool, reuse_buffer),
+    compression_level_(compression_level.value_or(ZSTD_defaultCLevel())) {
+}
+
+Status ZstandardCompressor::Init() {
+  return ValidateCompressionLevel(compression_level_);
+}
 
 ZstandardCompressor::~ZstandardCompressor() {
   if (stream_ != nullptr) {
@@ -352,12 +393,22 @@ Status ZstandardCompressor::ProcessBlock(bool output_preallocated, int64_t input
     }
   }
   *output_length = ZSTD_compressCCtx(stream_, *output, *output_length, input,
-      input_length, clevel_);
+      input_length, compression_level_);
   if (ZSTD_isError(*output_length)) {
     return Status(TErrorCode::ZSTD_ERROR, "ZSTD_compress",
         ZSTD_getErrorString(ZSTD_getErrorCode(*output_length)));
   }
   return Status::OK();
+}
+
+Status ZstandardCompressor::ValidateCompressionLevel(int compression_level) {
+  if (compression_level >= ZSTD_minCLevel() && compression_level <= ZSTD_maxCLevel()) {
+    return Status::OK();
+  } else {
+    return Status(Substitute("ZSTD compression levels should be in range - [$0, $1]."
+      " Current compression level - $2", ZSTD_minCLevel(), ZSTD_maxCLevel(),
+      compression_level));
+  }
 }
 
 Lz4BlockCompressor::Lz4BlockCompressor(MemPool* mem_pool, bool reuse_buffer)

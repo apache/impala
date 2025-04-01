@@ -81,19 +81,6 @@ Status Codec::GetHadoopCodecClassName(THdfsCompression::type type, string* out_n
 
 Codec::~Codec() {}
 
-Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const string& codec,
-    scoped_ptr<Codec>* compressor) {
-  CodecMap::const_iterator type = CODEC_MAP.find(codec);
-  if (type == CODEC_MAP.end()) {
-    return Status(Substitute("$0$1", UNKNOWN_CODEC_ERROR, codec));
-  }
-
-  CodecInfo codec_info(
-      type->second, (type->second == THdfsCompression::ZSTD) ? ZSTD_CLEVEL_DEFAULT : 0);
-  RETURN_IF_ERROR(CreateCompressor(mem_pool, reuse, codec_info, compressor));
-  return Status::OK();
-}
-
 Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const CodecInfo& codec_info,
     scoped_ptr<Codec>* compressor) {
   THdfsCompression::type format = codec_info.format_;
@@ -102,16 +89,21 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const CodecInfo& c
       compressor->reset(nullptr);
       return Status::OK();
     case THdfsCompression::GZIP:
-      compressor->reset(new GzipCompressor(GzipCompressor::GZIP, mem_pool, reuse));
+      compressor->reset(new GzipCompressor(GzipCompressor::GZIP, mem_pool, reuse,
+          codec_info.compression_level_));
       break;
     case THdfsCompression::DEFAULT:
-      compressor->reset(new GzipCompressor(GzipCompressor::ZLIB, mem_pool, reuse));
+    case THdfsCompression::ZLIB:
+      compressor->reset(new GzipCompressor(GzipCompressor::ZLIB, mem_pool, reuse,
+          codec_info.compression_level_));
       break;
     case THdfsCompression::DEFLATE:
-      compressor->reset(new GzipCompressor(GzipCompressor::DEFLATE, mem_pool, reuse));
+      compressor->reset(new GzipCompressor(GzipCompressor::DEFLATE, mem_pool, reuse,
+          codec_info.compression_level_));
       break;
     case THdfsCompression::BZIP2:
-      compressor->reset(new BzipCompressor(mem_pool, reuse));
+      compressor->reset(new BzipCompressor(mem_pool, reuse,
+          codec_info.compression_level_));
       break;
     case THdfsCompression::SNAPPY_BLOCKED:
       compressor->reset(new SnappyBlockCompressor(mem_pool, reuse));
@@ -136,6 +128,25 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const CodecInfo& c
   }
 
   return (*compressor)->Init();
+}
+
+Status Codec::ValidateCompressionLevel(THdfsCompression::type format,
+    int compression_level) {
+  switch(format) {
+    case THdfsCompression::GZIP:
+    case THdfsCompression::ZLIB:
+    case THdfsCompression::DEFLATE:
+      return GzipCompressor::ValidateCompressionLevel(compression_level);
+    case THdfsCompression::ZSTD:
+      return ZstandardCompressor::ValidateCompressionLevel(compression_level);
+    case THdfsCompression::BZIP2:
+      return BzipCompressor::ValidateCompressionLevel(compression_level);
+    default:
+      // Note: BZIP2 compression levels are supported for disk-spill
+      // Parquet or ORC does not support BZIP compression
+      return Status("Compression level only supported for ZSTD, ZLIB(GZIP, DEFLATE)"
+          " and BZIP2. Note: BZIP2 is not supported by Parquet(i.e. to write tables)");
+  }
 }
 
 Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse, const string& codec,

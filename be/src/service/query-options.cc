@@ -94,11 +94,11 @@ static const string& PrintQueryOptionValue(const string& option) {
 }
 
 static string PrintQueryOptionValue(const impala::TCompressionCodec& compression_codec) {
-  if (compression_codec.codec != THdfsCompression::ZSTD) {
-    return Substitute("$0", PrintValue(compression_codec.codec));
-  } else {
+  if (compression_codec.__isset.compression_level) {
     return Substitute("$0:$1", PrintValue(compression_codec.codec),
         compression_codec.compression_level);
+  } else {
+    return Substitute("$0", PrintValue(compression_codec.codec));
   }
 }
 
@@ -327,13 +327,13 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
       };
       case TImpalaQueryOptions::COMPRESSION_CODEC: {
         THdfsCompression::type enum_type;
-        int compression_level;
+        std::optional<int> compression_level;
         RETURN_IF_ERROR(
             ParseUtil::ParseCompressionCodec(value, &enum_type, &compression_level));
         TCompressionCodec compression_codec;
         compression_codec.__set_codec(enum_type);
-        if (enum_type == THdfsCompression::ZSTD) {
-          compression_codec.__set_compression_level(compression_level);
+        if (compression_level.has_value()) {
+          compression_codec.__set_compression_level(compression_level.value());
         }
         query_options->__set_compression_codec(compression_codec);
         break;
@@ -1489,7 +1489,7 @@ static void HashQueryOptionValue(const string& option, HashState& hash) {
 static void HashQueryOptionValue(
     const TCompressionCodec& compression_codec, HashState& hash) {
   HashQueryOptionValue(compression_codec.codec, hash);
-  if (compression_codec.codec == THdfsCompression::ZSTD) {
+  if (compression_codec.__isset.compression_level) {
     HashQueryOptionValue(compression_codec.compression_level, hash);
   }
 }

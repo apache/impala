@@ -19,11 +19,11 @@
 
 #include <sstream>
 
-#include <zstd.h>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
+#include "util/codec.h"
 #include "util/mem-info.h"
 #include "util/string-parser.h"
 
@@ -115,9 +115,10 @@ int64_t ParseUtil::ParseMemSpec(const string& mem_spec_str, bool* is_percent,
 }
 
 Status ParseUtil::ParseCompressionCodec(
-    const string& compression_codec, THdfsCompression::type* type, int* level) {
+    const string& compression_codec, THdfsCompression::type* type,
+    std::optional<int>* level) {
   // Acceptable values are:
-  // - zstd:compression_level
+  // - zstd, gzip :compression_level
   // - codec
   vector<string> tokens;
   split(tokens, compression_codec, is_any_of(":"), token_compress_on);
@@ -125,29 +126,30 @@ Status ParseUtil::ParseCompressionCodec(
 
   string& codec_name = tokens[0];
   trim(codec_name);
-  int compression_level = ZSTD_CLEVEL_DEFAULT;
   THdfsCompression::type enum_type;
   RETURN_IF_ERROR(GetThriftEnum(
       codec_name, "compression codec", _THdfsCompression_VALUES_TO_NAMES, &enum_type));
 
+  *type = enum_type;
+
   if (tokens.size() == 2) {
-    if (enum_type != THdfsCompression::ZSTD) {
-      return Status("Compression level only supported for ZSTD");
-    }
     StringParser::ParseResult status;
     string& clevel = tokens[1];
     trim(clevel);
-    compression_level = StringParser::StringToInt<int>(
+    int compression_level = StringParser::StringToInt<int>(
         clevel.c_str(), static_cast<int>(clevel.size()), &status);
-    if (status != StringParser::PARSE_SUCCESS || compression_level < 1
-        || compression_level > ZSTD_maxCLevel()) {
-      return Status(Substitute("Invalid ZSTD compression level '$0'."
-                               " Valid values are in [1,$1]",
-          clevel, ZSTD_maxCLevel()));
+
+    if (status == StringParser::PARSE_SUCCESS) {
+      Status res = Codec::ValidateCompressionLevel(enum_type, compression_level);
+      if (res.ok()) {
+        level->emplace(compression_level);
+      }
+      return res;
+    } else {
+      return Status(Substitute("Invalid compression level value - $0"
+          ", should be an integer", clevel));
     }
   }
-  *type = enum_type;
-  *level = compression_level;
   return Status::OK();
 }
 

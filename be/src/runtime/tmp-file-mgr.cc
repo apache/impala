@@ -21,7 +21,6 @@
 #include <mutex>
 #include <linux/falloc.h>
 
-#include <zstd.h> // for ZSTD_CLEVEL_DEFAULT
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
