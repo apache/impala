@@ -529,10 +529,6 @@ class TestWorkloadManagementInitNoWait(TestWorkloadManagementInitBase):
   def setup_method(self, method):
     super(TestWorkloadManagementInitNoWait, self).setup_method(method)
 
-  def teardown_method(self, method):
-    self.wait_for_wm_idle()
-    super(TestWorkloadManagementInitNoWait, self).teardown_method(method)
-
   @CustomClusterTestSuite.with_args(
       cluster_size=1, log_symlinks=True,
       impalad_args="--query_log_write_interval_s=3",
@@ -562,6 +558,7 @@ class TestWorkloadManagementInitNoWait(TestWorkloadManagementInitBase):
     res = self.client.execute("select * from functional.alltypes")
     assert res.success
     impalad.wait_for_metric_value("impala-server.completed-queries.written", 1, 15)
+    self.wait_for_wm_idle()
 
   @CustomClusterTestSuite.with_args(
       cluster_size=1, expect_startup_fail=True,
@@ -617,6 +614,7 @@ class TestWorkloadManagementInitNoWait(TestWorkloadManagementInitBase):
     # Assert the standby catalog skipped workload management initialization.
     self.assert_catalogd_log_contains("INFO", r"workload management initialization",
         expected_count=0, node_index=1)
+    self.wait_for_wm_idle()
 
 
 class TestWorkloadManagementCatalogHA(TestWorkloadManagementInitBase):
