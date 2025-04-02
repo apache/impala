@@ -24,6 +24,7 @@ import pytest
 import subprocess
 
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
+from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_dimensions import create_exec_option_dimension
@@ -152,6 +153,32 @@ class TestHdfsRcFileScanNodeErrors(TestHdfsScanNodeErrors):
   def test_hdfs_rcfile_scan_node_errors(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 0
     self.run_test_case('DataErrorsTest/hdfs-rcfile-scan-node-errors', vector)
+
+
+class TestBinaryTypeInText(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestBinaryTypeInText, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'text')
+
+  def test_invalid_binary_type(self, vector, unique_database):
+    """Test scanning text files with invalid BINARY data."""
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    tbl_name = "invalid_binary"
+    create_sql = """create table {}.{} (id BIGINT, bindata BINARY, date_str STRING)
+        ROW FORMAT DELIMITED FIELDS TERMINATED BY '\u0001'
+        WITH SERDEPROPERTIES ('field.delim'='\u0001', 'line.delim'='\n',
+                              'serialization.format'='\u0001')
+        STORED AS textfile""".format(
+        unique_database, tbl_name)
+    create_table_and_copy_files(self.client, create_sql, unique_database, tbl_name,
+        ["/testdata/data/invalid_binary_data.txt"])
+    self.run_test_case('QueryTest/invalid-binary-type', vector, unique_database)
 
 
 @SkipIfFS.qualified_path

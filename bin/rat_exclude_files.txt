@@ -156,6 +156,7 @@ testdata/data/decimal-tiny.txt
 testdata/data/decimal_tbl.txt
 testdata/data/decimal_rtf_tiny_tbl.txt
 testdata/data/decimal_rtf_tbl.txt
+testdata/data/invalid_binary_data.txt
 testdata/data/overflow.txt
 testdata/data/text-comma-backslash-newline.txt
 testdata/data/text-dollar-hash-pipe.txt

@@ -1,0 +1,53 @@
+====
+---- QUERY
+SELECT * FROM invalid_binary;
+---- ERRORS
+Error converting column: 1 to BINARY
+Error converting column: 1 to BINARY
+Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+---- RESULTS
+39,'NULL','2016-10-31 20:46:09.871'
+40,'NULL','2016-10-31 20:46:10.137'
+---- TYPES
+BIGINT,BINARY,STRING
+====
+---- QUERY
+SELECT bindata FROM invalid_binary;
+---- ERRORS
+Error converting column: 1 to BINARY
+Error converting column: 1 to BINARY
+Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+---- RESULTS
+'NULL'
+'NULL'
+---- TYPES
+BINARY
+====
+---- QUERY
+SELECT id, bindata FROM invalid_binary;
+---- ERRORS
+Error converting column: 1 to BINARY
+Error converting column: 1 to BINARY
+Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+---- RESULTS
+39,'NULL'
+40,'NULL'
+---- TYPES
+BIGINT,BINARY
+====
+---- QUERY
+SELECT bindata, date_str FROM invalid_binary;
+---- ERRORS
+Error converting column: 1 to BINARY
+Error converting column: 1 to BINARY
+Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+---- RESULTS
+'NULL','2016-10-31 20:46:09.871'
+'NULL','2016-10-31 20:46:10.137'
+---- TYPES
+BINARY,STRING
+====

@@ -71,7 +71,10 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
         base64_decode = true;
         reuse_data = false;
         int64_t out_len;
-        if (!Base64DecodeBufLen(data, len, &out_len)) return false;
+        if (!Base64DecodeBufLen(data, len, &out_len)) {
+          parse_result = StringParser::PARSE_FAILURE;
+          break;
+        }
         buffer_len = out_len;
       }
 
@@ -92,10 +95,16 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
         str.ptr = type.IsVarLenStringType() ?
             reinterpret_cast<char*>(pool->TryAllocateUnaligned(buffer_len)) :
             reinterpret_cast<char*>(slot);
-        if (UNLIKELY(str.ptr == nullptr)) return false;
+        if (UNLIKELY(str.ptr == nullptr)) {
+          parse_result = StringParser::PARSE_FAILURE;
+          break;
+        }
         if (base64_decode) {
           unsigned out_len;
-          if(!Base64Decode(data, len, buffer_len, str.ptr, &out_len)) return false;
+          if(!Base64Decode(data, len, buffer_len, str.ptr, &out_len)) {
+            parse_result = StringParser::PARSE_FAILURE;
+            break;
+          }
           DCHECK_LE(out_len, buffer_len);
           str.len = out_len;
         } else if (need_escape) {
