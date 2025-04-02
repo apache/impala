@@ -230,16 +230,19 @@ class ImpalaTestSuite(BaseTestSuite):
     return pytest.config.option.default_test_protocol
 
   @staticmethod
-  def create_hive_client(port):
+  def create_hive_client(port=None):
     """
-    Creates a HMS client to a external running metastore service at the provided port
+    Creates a HMS client to a external running metastore service.
     """
+    metastore_host, metastore_port = pytest.config.option.metastore_server.split(':')
+    if port is not None:
+      metastore_port = port
     trans_type = 'buffered'
     if pytest.config.option.use_kerberos:
       trans_type = 'kerberos'
     hive_transport = create_transport(
-      host=pytest.config.option.metastore_server.split(':')[0],
-      port=port,
+      host=metastore_host,
+      port=metastore_port,
       service=pytest.config.option.hive_service_name,
       transport_type=trans_type)
     protocol = TBinaryProtocol.TBinaryProtocol(hive_transport)
@@ -252,28 +255,29 @@ class ImpalaTestSuite(BaseTestSuite):
     """Setup section that runs before each test suite"""
     cls.client = None
     cls.beeswax_client = None
-    cls.hive_client = None
     cls.hs2_client = None
     cls.hs2_http_client = None
-    # Create a Hive Metastore Client (used for executing some test SETUP steps
-    metastore_host, metastore_port = pytest.config.option.metastore_server.split(':')
-    trans_type = 'buffered'
-    if pytest.config.option.use_kerberos:
-      trans_type = 'kerberos'
-    cls.hive_transport = create_transport(
-        host=metastore_host,
-        port=metastore_port,
-        service=pytest.config.option.hive_service_name,
-        transport_type=trans_type)
-    protocol = TBinaryProtocol.TBinaryProtocol(cls.hive_transport)
-    cls.hive_client = ThriftHiveMetastore.Client(protocol)
-    cls.hive_transport.open()
-
-    cls.create_impala_clients()
+    cls.hive_client = None
+    cls.hive_transport = None
 
     # Default query options are populated on demand.
     cls.default_query_options = {}
     cls.impalad_test_service = cls.create_impala_service()
+
+    # Override the shell history path so that commands run by any tests
+    # don't write any history into the developer's file.
+    os.environ['IMPALA_HISTFILE'] = '/dev/null'
+
+    if not cls.need_default_clients():
+      # Class setup is done.
+      return
+
+    # Default clients are requested.
+    # Create a Hive Metastore Client (used for executing some test SETUP steps
+    cls.hive_client, cls.hive_transport = ImpalaTestSuite.create_hive_client()
+
+    # Create default impala clients.
+    cls.create_impala_clients()
 
     # There are multiple clients for interacting with the underlying storage service.
     #
@@ -333,10 +337,6 @@ class ImpalaTestSuite(BaseTestSuite):
     elif IS_OZONE:
       cls.filesystem_client = HadoopFsCommandLineClient("Ozone")
 
-    # Override the shell history path so that commands run by any tests
-    # don't write any history into the developer's file.
-    os.environ['IMPALA_HISTFILE'] = '/dev/null'
-
   @classmethod
   def teardown_class(cls):
     """Setup section that runs after each test suite"""
@@ -345,15 +345,25 @@ class ImpalaTestSuite(BaseTestSuite):
       cls.hive_transport.close()
     cls.close_impala_clients()
 
-  def setup_method(self, test_method):
+  def setup_method(self, test_method):  # noqa: U100
     """Setup for all test method."""
     self._reset_impala_clients()
 
-  def teardown_method(self, test_method):
+  def teardown_method(self, test_method):  # noqa: U100
     """Teardown for all test method.
     Currently, it is only here as a placeholder for future use and complement
     setup_method() declaration."""
     pass
+
+  @classmethod
+  def need_default_clients(cls):
+    """This method controls whether test class need to create default clients
+    (impala, hive, hms, and filesystem).
+    If this is overridden to return False, Test method must create its own clients
+    and none of helper method that relies on default client like run_test_case()
+    or execute_query() will work.
+    """
+    return True
 
   @classmethod
   def create_impala_client(cls, host_port=None, protocol=None, is_hive=False):

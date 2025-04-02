@@ -40,6 +40,12 @@ class TestFrontendConnectionLimit(CustomClusterTestSuite):
   def add_test_dimensions(cls):
     super(TestFrontendConnectionLimit, cls).add_test_dimensions()
 
+  @classmethod
+  def need_default_clients(cls):
+    """Must not create default clients because it will interfere with test methods.
+    """
+    return False
+
   def _connect_and_query(self, query, impalad):
     with impalad.service.create_hs2_client() as client:
       client.execute(query)
