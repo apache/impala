@@ -298,7 +298,7 @@ Status IcebergDeleteBuilder::ProcessBuildBatch(RuntimeState* state,
     file_path = build_row->GetTuple(0)->GetStringSlot(file_path_offset_);
     pos = *build_row->GetTuple(0)->GetBigIntSlot(pos_offset_);
 
-    if (*file_path == prev_file_path) {
+    if (file_path->Ptr() == prev_file_path.Ptr() || *file_path == prev_file_path) {
       pos_buffer.push_back(pos);
     } else {
       RETURN_IF_ERROR(AddToDeletedRows(prev_file_path, pos_buffer));
