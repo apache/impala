@@ -130,9 +130,6 @@ public abstract class VirtualTable implements FeTable {
   public List<String> getColumnNames() { return Column.toColumnNames(colsByPos_); }
 
   @Override
-  public SqlConstraints getSqlConstraints() { return null; }
-
-  @Override
   public int getNumClusteringCols() { return numClusteringCols_; }
 
   @Override

@@ -472,7 +472,7 @@ struct THdfsTable {
   // String to indicate a NULL column value in text files
   5: required string nullColumnValue
 
-  // Set to the table's Avro schema if this is an Avro table
+  // Set to the table's Avro schema if this table contains Avro files
   6: optional string avroSchema
 
   // Map from partition id to partition metadata.
@@ -721,7 +721,7 @@ struct TTable {
   // Determines the table type - either HDFS, HBASE, or VIEW.
   9: optional TTableType table_type
 
-  // Set iff this is an HDFS table
+  // Set iff this is an HDFS table or Iceberg table
   10: optional THdfsTable hdfs_table
 
   // Set iff this is an Hbase table
@@ -741,7 +741,7 @@ struct TTable {
   // Time used for storage loading in nanoseconds.
   16: optional i64 storage_metadata_load_time_ns
 
-  // Set if this a iceberg table
+  // Set if this is an Iceberg table
   17: optional TIcebergTable iceberg_table
 
   // Comment of the table/view. Set only for FeIncompleteTable where msTable doesn't

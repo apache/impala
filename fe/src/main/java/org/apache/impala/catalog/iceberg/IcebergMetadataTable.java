@@ -129,10 +129,6 @@ public class IcebergMetadataTable extends VirtualTable {
     return desc;
   }
 
-  private List<TColumnDescriptor> getTColumnDescriptors() {
-    return FeCatalogUtils.getTColumnDescriptors(this);
-  }
-
   /**
    * Returns true if the table ref is referring to a valid metadata table.
    */

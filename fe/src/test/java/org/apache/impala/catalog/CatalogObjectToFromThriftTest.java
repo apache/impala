@@ -99,8 +99,7 @@ public class CatalogObjectToFromThriftTest {
       HdfsTable newHdfsTable = (HdfsTable) newTable;
       Assert.assertEquals(newHdfsTable.getPartitions().size(), 24);
       Assert.assertEquals(newHdfsTable.getPartitionIds().size(), 24);
-      Collection<? extends FeFsPartition> parts =
-          FeCatalogUtils.loadAllPartitions(newHdfsTable);
+      Collection<? extends FeFsPartition> parts = newHdfsTable.loadAllPartitions();
       for (FeFsPartition hdfsPart: parts) {
         Assert.assertEquals(hdfsPart.getFileDescriptors().size(), 1);
         Assert.assertTrue(
@@ -230,9 +229,8 @@ public class CatalogObjectToFromThriftTest {
     // Get any partition with valid HMS parameters to create a
     // dummy partition.
     long id = Iterables.getFirst(hdfsTable.getPartitionIds(), -1L);
-    HdfsPartition part = (HdfsPartition) FeCatalogUtils.loadPartition(
-        hdfsTable, id);
-    Assert.assertNotNull(part);;
+    HdfsPartition part = (HdfsPartition) hdfsTable.loadPartition(id);
+    Assert.assertNotNull(part);
     // Create a dummy partition with an invalid decimal type.
     try {
       new HdfsPartition.Builder(hdfsTable)

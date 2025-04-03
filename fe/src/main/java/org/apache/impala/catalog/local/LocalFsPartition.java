@@ -239,16 +239,6 @@ public class LocalFsPartition implements FeFsPartition {
   }
 
   @Override
-  public String getConjunctSql() {
-    return FeCatalogUtils.getConjunctSqlForPartition(this);
-  }
-
-  @Override
-  public List<String> getPartitionValuesAsStrings(boolean mapNullsToHiveKey) {
-    return FeCatalogUtils.getPartitionValuesAsStrings(this, mapNullsToHiveKey);
-  }
-
-  @Override
   public List<LiteralExpr> getPartitionValues() {
     return spec_.getPartitionValues();
   }

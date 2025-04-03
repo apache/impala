@@ -18,6 +18,7 @@ package org.apache.impala.catalog;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 import java.io.IOException;
@@ -44,6 +45,7 @@ import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.PrintUtils;
+import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -52,13 +54,11 @@ import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TAccessLevelUtil;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.thrift.TException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Frontend interface for interacting with a filesystem-backed table.
@@ -231,13 +231,6 @@ public interface FeFsTable extends FeTable {
   public String getFirstLocationWithoutWriteAccess();
 
   /**
-   * @return statistics on this table as a tabular result set. Used for the
-   * SHOW TABLE STATS statement. The schema of the returned TResultSet is set
-   * inside this method.
-   */
-  public TResultSet getTableStats();
-
-  /**
    * @return all partitions of this table
    */
   Collection<? extends PrunablePartition> getPartitions();
@@ -266,6 +259,20 @@ public interface FeFsTable extends FeTable {
   Set<Long> getNullPartitionIds(int colIdx);
 
   /**
+   * Convenience method to load exactly one partition from a table.
+   */
+  default FeFsPartition loadPartition(long partitionId) {
+    Collection<? extends FeFsPartition> partCol = loadPartitions(
+        Collections.singleton(partitionId));
+    if (partCol.size() != 1) {
+      throw new AssertionError(String.format(
+          "expected exactly one result fetching partition ID %s from table %s " +
+              "(got %s)", partitionId, getFullName(), partCol.size()));
+    }
+    return Iterables.getOnlyElement(partCol);
+  }
+
+  /**
    * Returns the full partition objects for the given partition IDs, which must
    * have been obtained by prior calls to the above methods.
    * @throws IllegalArgumentException if any partition ID does not exist
@@ -273,9 +280,11 @@ public interface FeFsTable extends FeTable {
   List<? extends FeFsPartition> loadPartitions(Collection<Long> ids);
 
   /**
-   * @return: SQL Constraints Information.
+   * Load all partitions from the table.
    */
-  SqlConstraints getSqlConstraints();
+  default Collection<? extends FeFsPartition> loadAllPartitions() {
+    return loadPartitions(getPartitionIds());
+  }
 
   /**
    * @return whether it is a Hive ACID table.
@@ -442,12 +451,133 @@ public interface FeFsTable extends FeTable {
   }
 
   /**
+   * @return statistics on this table as a tabular result set. Used for the
+   * SHOW TABLE STATS statement. The schema of the returned TResultSet is set
+   * inside this method.
+   */
+  default TResultSet getTableStats() {
+    TResultSet result = new TResultSet();
+    TResultSetMetadata resultSchema = new TResultSetMetadata();
+    result.setSchema(resultSchema);
+
+    for (int i = 0; i < getNumClusteringCols(); ++i) {
+      // Add the partition-key values as strings for simplicity.
+      Column partCol = getColumns().get(i);
+      TColumn colDesc = new TColumn(partCol.getName(), Type.STRING.toThrift());
+      resultSchema.addToColumns(colDesc);
+    }
+
+    boolean statsExtrap = Utils.isStatsExtrapolationEnabled(this);
+
+    resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
+    if (statsExtrap) {
+      resultSchema.addToColumns(new TColumn("Extrap #Rows", Type.BIGINT.toThrift()));
+    }
+    resultSchema.addToColumns(new TColumn("#Files", Type.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Bytes Cached", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Cache Replication", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Format", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Incremental stats", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Location", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("EC Policy", Type.STRING.toThrift()));
+
+    // Pretty print partitions and their stats.
+    List<FeFsPartition> orderedPartitions = new ArrayList<>(loadAllPartitions());
+    orderedPartitions.sort(HdfsPartition.KV_COMPARATOR);
+
+    long totalCachedBytes = 0L;
+    long totalBytes = 0L;
+    long totalNumFiles = 0L;
+    for (FeFsPartition p: orderedPartitions) {
+      long numFiles = p.getNumFileDescriptors();
+      long size = p.getSize();
+      totalNumFiles += numFiles;
+      totalBytes += size;
+
+      TResultRowBuilder rowBuilder = new TResultRowBuilder();
+
+      // Add the partition-key values (as strings for simplicity).
+      for (LiteralExpr expr: p.getPartitionValues()) {
+        rowBuilder.add(expr.getStringValue());
+      }
+
+      // Add rows, extrapolated rows, files, bytes, cache stats, and file format.
+      rowBuilder.add(p.getNumRows());
+      // Compute and report the extrapolated row count because the set of files could
+      // have changed since we last computed stats for this partition. We also follow
+      // this policy during scan-cardinality estimation.
+      if (statsExtrap) {
+        rowBuilder.add(Utils.getExtrapolatedNumRows(this, size));
+      }
+
+      rowBuilder.add(numFiles).addBytes(size);
+      if (!p.isMarkedCached()) {
+        // Helps to differentiate partitions that have 0B cached versus partitions
+        // that are not marked as cached.
+        rowBuilder.add("NOT CACHED");
+        rowBuilder.add("NOT CACHED");
+      } else {
+        // Calculate the number the number of bytes that are cached.
+        long cachedBytes = 0L;
+        for (FileDescriptor fd: p.getFileDescriptors()) {
+          int numBlocks = fd.getNumFileBlocks();
+          for (int i = 0; i < numBlocks; ++i) {
+            FbFileBlock block = fd.getFbFileBlock(i);
+            if (FileBlock.hasCachedReplica(block)) {
+              cachedBytes += FileBlock.getLength(block);
+            }
+          }
+        }
+        totalCachedBytes += cachedBytes;
+        rowBuilder.addBytes(cachedBytes);
+
+        // Extract cache replication factor from the parameters of the table
+        // if the table is not partitioned or directly from the partition.
+        Short rep = HdfsCachingUtil.getCachedCacheReplication(
+            getNumClusteringCols() == 0 ?
+                p.getTable().getMetaStoreTable().getParameters() :
+                p.getParameters());
+        rowBuilder.add(rep.toString());
+      }
+      rowBuilder.add(p.getFileFormat().toString());
+      rowBuilder.add(String.valueOf(p.hasIncrementalStats()));
+      rowBuilder.add(p.getLocation());
+      rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(p.getLocationPath()));
+      result.addToRows(rowBuilder.get());
+    }
+
+    // For partitioned tables add a summary row at the bottom.
+    if (getNumClusteringCols() > 0) {
+      TResultRowBuilder rowBuilder = new TResultRowBuilder();
+      int numEmptyCells = getNumClusteringCols() - 1;
+      rowBuilder.add("Total");
+      for (int i = 0; i < numEmptyCells; ++i) {
+        rowBuilder.add("");
+      }
+
+      // Total rows, extrapolated rows, files, bytes, cache stats.
+      // Leave format empty.
+      rowBuilder.add(getNumRows());
+      // Compute and report the extrapolated row count because the set of files could
+      // have changed since we last computed stats for this partition. We also follow
+      // this policy during scan-cardinality estimation.
+      if (statsExtrap) {
+        rowBuilder.add(Utils.getExtrapolatedNumRows(this, getTotalHdfsBytes()));
+      }
+      rowBuilder.add(totalNumFiles)
+          .addBytes(totalBytes)
+          .addBytes(totalCachedBytes).add("").add("").add("").add("").add("");
+      result.addToRows(rowBuilder.get());
+    }
+    return result;
+  }
+
+  /**
    * Utility functions for operating on FeFsTable. When we move fully to Java 8,
    * these can become default methods of the interface.
    */
   abstract class Utils {
-
-    private final static Logger LOG = LoggerFactory.getLogger(Utils.class);
 
     // Table property key for skip.header.line.count
     public static final String TBL_PROP_SKIP_HEADER_LINE_COUNT = "skip.header.line.count";
@@ -528,7 +658,7 @@ public interface FeFsTable extends FeTable {
 
       List<? extends FeFsPartition> orderedPartitions;
       if (partitionSet == null) {
-        orderedPartitions = Lists.newArrayList(FeCatalogUtils.loadAllPartitions(table));
+        orderedPartitions = Lists.newArrayList(table.loadAllPartitions());
       } else {
         // Get a list of HdfsPartition objects for the given partition set.
         orderedPartitions = getPartitionsFromPartitionSet(table, partitionSet);
@@ -738,8 +868,7 @@ public interface FeFsTable extends FeTable {
       }
 
       if (existingTargetPartition != null) {
-        FeFsPartition partition = FeCatalogUtils.loadPartition(table,
-            existingTargetPartition.getId());
+        FeFsPartition partition = table.loadPartition(existingTargetPartition.getId());
         String location = partition.getLocation();
         if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
           throw new AnalysisException(noWriteAccessErrorMsg + location);

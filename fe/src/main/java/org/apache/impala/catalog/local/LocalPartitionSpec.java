@@ -70,7 +70,7 @@ class LocalPartitionSpec implements PrunablePartition {
     }
   }
 
-  LocalPartitionSpec(LocalFsTable table, long id) {
+  LocalPartitionSpec(long id) {
     // Unpartitioned tables have a single partition with empty name.
     Preconditions.checkArgument(id == CatalogObjectsConstants.PROTOTYPE_PARTITION_ID ||
         id == UNPARTITIONED_ID);

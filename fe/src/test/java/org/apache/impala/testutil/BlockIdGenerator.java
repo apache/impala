@@ -29,7 +29,6 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 
 import org.apache.impala.catalog.Catalog;
-import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeTable;
@@ -73,8 +72,7 @@ public class BlockIdGenerator {
 
             // Write the output as <tablename>: <blockid1> <blockid2> <etc>
             writer.write(tableName + ":");
-            Collection<? extends FeFsPartition> parts =
-                FeCatalogUtils.loadAllPartitions(hdfsTable);
+            Collection<? extends FeFsPartition> parts = hdfsTable.loadAllPartitions();
             for (FeFsPartition partition : parts) {
               List<FileDescriptor> fileDescriptors = partition.getFileDescriptors();
               for (FileDescriptor fd : fileDescriptors) {

@@ -35,7 +35,6 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
-import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.local.CatalogdMetaProvider;
 import org.apache.impala.catalog.local.LocalCatalog;
@@ -49,7 +48,6 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObject;
-import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.TGetCatalogMetricsResult;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TTable;
@@ -146,15 +144,6 @@ public abstract class FeCatalogUtils {
     }
   }
 
-  // TODO(todd): move to a default method in FeTable in Java8
-  public static List<TColumnDescriptor> getTColumnDescriptors(FeTable table) {
-    List<TColumnDescriptor> colDescs = new ArrayList<>();
-    for (Column col: table.getColumns()) {
-      colDescs.add(col.toDescriptor());
-    }
-    return colDescs;
-  }
-
   /**
    * Given the list of column stats returned from the metastore, inject those
    * stats into matching columns in 'table'.
@@ -213,32 +202,6 @@ public abstract class FeCatalogUtils {
   }
 
   /**
-   * Convenience method to load exactly one partition from a table.
-   *
-   * TODO(todd): upon moving to Java8 this could be a default method
-   * in FeFsTable.
-   */
-  public static FeFsPartition loadPartition(FeFsTable table,
-      long partitionId) {
-    Collection<? extends FeFsPartition> partCol = table.loadPartitions(
-        Collections.singleton(partitionId));
-    if (partCol.size() != 1) {
-      throw new AssertionError(String.format(
-          "expected exactly one result fetching partition ID %s from table %s " +
-          "(got %s)", partitionId, table.getFullName(), partCol.size()));
-    }
-    return Iterables.getOnlyElement(partCol);
-  }
-
-  /**
-   * Load all partitions from the given table.
-   */
-  public static Collection<? extends FeFsPartition> loadAllPartitions(
-      FeFsTable table) {
-    return table.loadPartitions(table.getPartitionIds());
-  }
-
-  /**
    * Parse the partition key values out of their stringified format used by HMS.
    */
   public static List<LiteralExpr> parsePartitionKeyValues(FeFsTable table,
@@ -282,22 +245,7 @@ public abstract class FeCatalogUtils {
    */
   public static String getPartitionName(FeFsPartition partition) {
     return getPartitionName(partition.getTable(),
-        getPartitionValuesAsStrings(partition, true));
-  }
-
-  // TODO: this could be a default method in FeFsPartition in Java 8.
-  public static List<String> getPartitionValuesAsStrings(
-      FeFsPartition partition, boolean mapNullsToHiveKey) {
-    List<String> ret = new ArrayList<>();
-    for (LiteralExpr partValue: partition.getPartitionValues()) {
-      if (mapNullsToHiveKey) {
-        ret.add(PartitionKeyValue.getPartitionKeyValueString(
-                partValue, partition.getTable().getNullPartitionKeyValue()));
-      } else {
-        ret.add(partValue.getStringValue());
-      }
-    }
-    return ret;
+        partition.getPartitionValuesAsStrings(true));
   }
 
   public static String getPartitionName(HdfsPartition.Builder partBuilder) {
@@ -327,26 +275,6 @@ public abstract class FeCatalogUtils {
              l, MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE))
         .collect(Collectors.toList());
     return FileUtils.makePartName(partitionKeys, partitionValues);
-  }
-
-  // TODO: this could be a default method in FeFsPartition in Java 8.
-  public static String getConjunctSqlForPartition(FeFsPartition part) {
-    List<String> partColSql = new ArrayList<>();
-    for (Column partCol: part.getTable().getClusteringColumns()) {
-      partColSql.add(ToSqlUtils.getIdentSql(partCol.getName()));
-    }
-
-    List<String> conjuncts = new ArrayList<>();
-    for (int i = 0; i < partColSql.size(); ++i) {
-      LiteralExpr partVal = part.getPartitionValues().get(i);
-      String partValSql = partVal.toSql();
-      if (Expr.IS_NULL_LITERAL.apply(partVal) || partValSql.isEmpty()) {
-        conjuncts.add(partColSql.get(i) + " IS NULL");
-      } else {
-        conjuncts.add(partColSql.get(i) + "=" + partValSql);
-      }
-    }
-    return "(" + Joiner.on(" AND " ).join(conjuncts) + ")";
   }
 
   /**

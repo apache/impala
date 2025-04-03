@@ -43,7 +43,6 @@ import org.apache.impala.catalog.IcebergStructField;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.SideloadTableStats;
-import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.SystemTable;
@@ -276,11 +275,6 @@ abstract class LocalTable implements FeTable {
   @Override
   public List<Column> getColumns() {
     return cols_ == null ? Collections.emptyList() : cols_.colsByPos_;
-  }
-
-  @Override
-  public SqlConstraints getSqlConstraints() {
-    return new SqlConstraints(new ArrayList<>(), new ArrayList<>());
   }
 
   @Override

@@ -32,7 +32,6 @@ import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalog;
-import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
@@ -235,7 +234,7 @@ public class LocalCatalog implements FeCatalog {
     PrunablePartition partition = FeFsTable.Utils.getPartitionFromThriftPartitionSpec(
         (FeFsTable)table, partitionSpec);
     if (partition == null) throwPartitionNotFound(partitionSpec);
-    return FeCatalogUtils.loadPartition((FeFsTable)table, partition.getId());
+    return ((FeFsTable)table).loadPartition(partition.getId());
   }
 
   @Override

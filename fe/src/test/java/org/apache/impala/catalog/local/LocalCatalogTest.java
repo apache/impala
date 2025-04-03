@@ -249,8 +249,7 @@ public class LocalCatalogTest {
     int dayCol = t.getColumn("day").getPosition();
     Set<Long> ids = t.getNullPartitionIds(dayCol);
     assertEquals(1,  ids.size());
-    FeFsPartition partition = FeCatalogUtils.loadPartition(
-        t, Iterables.getOnlyElement(ids));
+    FeFsPartition partition = t.loadPartition(Iterables.getOnlyElement(ids));
     assertTrue(Expr.IS_NULL_VALUE.apply(partition.getPartitionValue(dayCol)));
   }
 
@@ -258,7 +257,7 @@ public class LocalCatalogTest {
   public void testLoadFileDescriptors() throws Exception {
     FeFsTable t = (FeFsTable) catalog_.getTable("functional",  "alltypes");
     int totalFds = 0;
-    for (FeFsPartition p: FeCatalogUtils.loadAllPartitions(t)) {
+    for (FeFsPartition p: t.loadAllPartitions()) {
       List<FileDescriptor> fds = p.getFileDescriptors();
       totalFds += fds.size();
       for (FileDescriptor fd : fds) {
@@ -313,7 +312,7 @@ public class LocalCatalogTest {
   public void testLoadFileDescriptorsUnpartitioned() throws Exception {
     FeFsTable t = (FeFsTable) catalog_.getTable("tpch",  "region");
     int totalFds = 0;
-    for (FeFsPartition p: FeCatalogUtils.loadAllPartitions(t)) {
+    for (FeFsPartition p: t.loadAllPartitions()) {
       List<FileDescriptor> fds = p.getFileDescriptors();
       totalFds += fds.size();
       for (FileDescriptor fd : fds) {

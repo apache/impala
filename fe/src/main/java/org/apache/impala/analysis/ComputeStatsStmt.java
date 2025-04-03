@@ -45,7 +45,6 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FrontendProfile;
@@ -464,8 +463,7 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
       // error if the estimate is greater than --inc_stats_size_limit_bytes in bytes
       if (isIncremental_) {
         long numOfAllIncStatsPartitions = 0;
-        Collection<? extends FeFsPartition> allPartitions =
-            FeCatalogUtils.loadAllPartitions(hdfsTable);
+        Collection<? extends FeFsPartition> allPartitions = hdfsTable.loadAllPartitions();
 
         if (partitionSet_ == null) {
           numOfAllIncStatsPartitions = allPartitions.size();
@@ -540,8 +538,7 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
         }
 
         // Get incremental statistics from all relevant partitions.
-        Collection<? extends FeFsPartition> allPartitions =
-            FeCatalogUtils.loadAllPartitions(hdfsTable);
+        Collection<? extends FeFsPartition> allPartitions = hdfsTable.loadAllPartitions();
         Map<Long, TPartitionStats> partitionStats =
             getOrFetchPartitionStats(analyzer, hdfsTable, allPartitions,
                 /* excludedPartitions= */ Collections.<Long>emptySet());
@@ -578,8 +575,7 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
           targetPartitions.add(p.getId());
         }
         // Get incremental statistics for partitions that are not recomputed.
-        Collection<? extends FeFsPartition> allPartitions =
-            FeCatalogUtils.loadAllPartitions(hdfsTable);
+        Collection<? extends FeFsPartition> allPartitions = hdfsTable.loadAllPartitions();
         Map<Long, TPartitionStats> partitionStats = getOrFetchPartitionStats(
             analyzer, hdfsTable, allPartitions, targetPartitions);
         validPartStats_.addAll(partitionStats.values());
@@ -832,8 +828,7 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
     long minSampleBytes = analyzer.getQueryOptions().compute_stats_min_sample_size;
     long samplePerc = sampleParams_.getPercentBytes();
     // TODO(todd): can we avoid loading all the partitions for this?
-    Collection<? extends FeFsPartition> partitions =
-        FeCatalogUtils.loadAllPartitions(hdfsTable);
+    Collection<? extends FeFsPartition> partitions = hdfsTable.loadAllPartitions();
     Map<Long, List<FileDescriptor>> sample = FeFsTable.Utils.getFilesSample(
         hdfsTable, partitions, samplePerc, minSampleBytes, sampleSeed);
     long sampleFileBytes = 0;
@@ -982,7 +977,7 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
       affectedPartitions = partitionSet_.getPartitions();
     } else {
       FeFsTable hdfsTable = (FeFsTable)table_;
-      affectedPartitions = FeCatalogUtils.loadAllPartitions(hdfsTable);
+      affectedPartitions = hdfsTable.loadAllPartitions();
     }
     for (FeFsPartition partition: affectedPartitions) {
       if (partition.getFileFormat() != HdfsFileFormat.PARQUET
@@ -1007,14 +1002,13 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
     Set<Long> partitionIds = hdfsTable.getPartitionIds();
     if (partitionIds.size() > 0) {
       for (Long partitionId : partitionIds) {
-        FeFsPartition partition = FeCatalogUtils.loadPartition(hdfsTable, partitionId);
+        FeFsPartition partition = hdfsTable.loadPartition(partitionId);
         if (partition.getFileFormat().isParquetBased()) {
           return true;
         }
       }
     } else {
-      Collection<? extends FeFsPartition> allPartitions =
-          FeCatalogUtils.loadAllPartitions(hdfsTable);
+      Collection<? extends FeFsPartition> allPartitions = hdfsTable.loadAllPartitions();
       for (FeFsPartition partition : allPartitions) {
         if (partition.getFileFormat().isParquetBased()) {
           return true;

@@ -18,7 +18,6 @@
 package org.apache.impala.catalog.local;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,7 +27,6 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
@@ -43,8 +41,6 @@ import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -210,7 +206,7 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
       Set<Long> referencedPartitions) {
     // TODO(todd): the old implementation passes kuduTableName_ instead of name below.
     TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.KUDU_TABLE,
-        FeCatalogUtils.getTColumnDescriptors(this),
+        getTColumnDescriptors(),
         getNumClusteringCols(),
         name_, db_.getName());
     desc.setKuduTable(toTKuduTable());

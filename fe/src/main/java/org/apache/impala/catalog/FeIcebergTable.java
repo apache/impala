@@ -295,11 +295,6 @@ public interface FeIcebergTable extends FeFsTable {
   }
 
   @Override
-  default SqlConstraints getSqlConstraints() {
-    return getFeFsTable().getSqlConstraints();
-  }
-
-  @Override
   default ListMap<TNetworkAddress> getHostIndex() {
     return getFeFsTable().getHostIndex();
   }

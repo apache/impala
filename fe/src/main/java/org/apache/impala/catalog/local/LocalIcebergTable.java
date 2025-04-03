@@ -125,7 +125,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
       LocalFsTable fsTable) throws Exception {
     db.getCatalog().getMetaProvider().loadTableColumnStatistics(ref,
         getHmsColumnNames(msTable));
-    FeCatalogUtils.loadAllPartitions(fsTable);
+    fsTable.loadAllPartitions();
   }
 
   private static List<String> getHmsColumnNames(Table msTable) {
@@ -251,7 +251,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   public TTableDescriptor toThriftDescriptor(int tableId,
       Set<Long> referencedPartitions) {
     TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.ICEBERG_TABLE,
-        FeCatalogUtils.getTColumnDescriptors(this),
+        getTColumnDescriptors(),
         getNumClusteringCols(),
         name_, db_.getName());
     desc.setIcebergTable(Utils.getTIcebergTable(this, ThriftObjectType.DESCRIPTOR_ONLY));
@@ -265,7 +265,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     Map<Long, THdfsPartition> idToPartition = new HashMap<>();
     // LocalFsTable transformed from iceberg table only has one partition
     Collection<? extends FeFsPartition> partitions =
-        FeCatalogUtils.loadAllPartitions(localFsTable_);
+        localFsTable_.loadAllPartitions();
     Preconditions.checkState(partitions.size() == 1);
     FeFsPartition partition = (FeFsPartition) partitions.toArray()[0];
     idToPartition.put(partition.getId(),

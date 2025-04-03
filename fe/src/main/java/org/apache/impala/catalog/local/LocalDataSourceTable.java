@@ -23,7 +23,6 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.catalog.DataSourceTable;
-import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.catalog.TableLoadingException;
@@ -173,7 +172,7 @@ public class LocalDataSourceTable extends LocalTable implements FeDataSourceTabl
   public TTableDescriptor toThriftDescriptor(
       int tableId, Set<Long> referencedPartitions) {
     TTableDescriptor tableDesc = new TTableDescriptor(tableId,
-        TTableType.DATA_SOURCE_TABLE, FeCatalogUtils.getTColumnDescriptors(this),
+        TTableType.DATA_SOURCE_TABLE, getTColumnDescriptors(),
         getNumClusteringCols(), getName(), getDb().getName());
     tableDesc.setDataSourceTable(getDataSourceTable());
     return tableDesc;

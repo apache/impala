@@ -29,7 +29,6 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.TableRef;
-import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -171,8 +170,7 @@ public class IcebergScanNode extends HdfsScanNode {
    * unpartitioned hdfs table
    */
   private static List<? extends FeFsPartition> getIcebergPartition(FeFsTable feFsTable) {
-    Collection<? extends FeFsPartition> partitions =
-        FeCatalogUtils.loadAllPartitions(feFsTable);
+    Collection<? extends FeFsPartition> partitions = feFsTable.loadAllPartitions();
     return new ArrayList<>(partitions);
   }
 

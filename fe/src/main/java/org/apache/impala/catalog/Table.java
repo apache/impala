@@ -50,7 +50,6 @@ import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
-import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.TImpalaTableType;
@@ -130,10 +129,6 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   // map from lowercase column name to Column object.
   protected final Map<String, Column> colsByName_ = new HashMap<>();
-
-  // List of SQL constraints associated with the table.
-  private final SqlConstraints sqlConstraints_ = new SqlConstraints(new ArrayList<>(),
-      new ArrayList<>());
 
   // Type of this table (array of struct) that mirrors the columns. Useful for analysis.
   protected final ArrayType type_ = new ArrayType(new StructType());
@@ -891,17 +886,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   public List<VirtualColumn> getVirtualColumns() { return virtualCols_; }
 
   @Override // FeTable
-  public SqlConstraints getSqlConstraints()  { return sqlConstraints_; }
-
-  @Override // FeTable
   public List<String> getColumnNames() { return Column.toColumnNames(colsByPos_); }
-
-  /**
-   * Returns a list of thrift column descriptors ordered by position.
-   */
-  public List<TColumnDescriptor> getTColumnDescriptors() {
-    return FeCatalogUtils.getTColumnDescriptors(this);
-  }
 
   /**
    * Subclasses should override this if they provide a storage handler class. Currently

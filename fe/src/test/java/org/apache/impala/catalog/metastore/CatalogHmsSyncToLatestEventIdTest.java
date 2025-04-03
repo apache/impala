@@ -45,7 +45,6 @@ import org.junit.AfterClass;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -53,10 +52,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.compat.MetastoreShim;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -278,7 +275,7 @@ public class CatalogHmsSyncToLatestEventIdTest extends AbstractCatalogMetastoreT
             // assert that  partition with new location from cached table
             // exists
             FeFsPartition modifiedPartition = null;
-            for (FeFsPartition part : FeCatalogUtils.loadAllPartitions(tbl)) {
+            for (FeFsPartition part : tbl.loadAllPartitions()) {
                 if (part.getLocation().equals(newLocation)) {
                     modifiedPartition = part;
                     break;
@@ -343,8 +340,7 @@ public class CatalogHmsSyncToLatestEventIdTest extends AbstractCatalogMetastoreT
             assertTrue(destCatalogTbl.getPartitions().size() == 2);
 
             // assert that part with val 1 does not exist in src table
-            for (FeFsPartition srcPartition :
-                FeCatalogUtils.loadAllPartitions(srcCatalogTbl)) {
+            for (FeFsPartition srcPartition : srcCatalogTbl.loadAllPartitions()) {
                 List<String> partVals =
                     srcPartition.getPartitionValuesAsStrings(false);
                 assertFalse(partVals.equals(Arrays.asList("1")));
@@ -635,7 +631,7 @@ public class CatalogHmsSyncToLatestEventIdTest extends AbstractCatalogMetastoreT
             // assert that  partition with new location from cached table
             // exists
             FeFsPartition modifiedPartition = null;
-            for (FeFsPartition part : FeCatalogUtils.loadAllPartitions(tbl)) {
+            for (FeFsPartition part : tbl.loadAllPartitions()) {
                 if (part.getLocation().equals(newLocation)) {
                     modifiedPartition = part;
                     break;

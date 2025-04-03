@@ -26,7 +26,6 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
@@ -69,7 +68,7 @@ public class LocalHbaseTable extends LocalTable implements FeHBaseTable {
       Set<Long> referencedPartitions) {
     TTableDescriptor tableDescriptor =
         new TTableDescriptor(tableId, TTableType.HBASE_TABLE,
-            FeCatalogUtils.getTColumnDescriptors(this), 1, getHBaseTableName(),
+            getTColumnDescriptors(), 1, getHBaseTableName(),
             db_.getName());
     tableDescriptor.setHbaseTable(Util.getTHBaseTable(this));
     return tableDescriptor;

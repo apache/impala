@@ -512,8 +512,7 @@ public class CatalogTest {
   public static void checkAllTypesPartitioning(FeFsTable table) {
     assertEquals(24, table.getPartitionIds().size());
     assertEquals(24, table.getPartitions().size());
-    Collection<? extends FeFsPartition> partitions =
-        FeCatalogUtils.loadAllPartitions(table);
+    Collection<? extends FeFsPartition> partitions = table.loadAllPartitions();
 
     // check that partition keys cover the date range 1/1/2009-12/31/2010
     // and that we have one file per partition.

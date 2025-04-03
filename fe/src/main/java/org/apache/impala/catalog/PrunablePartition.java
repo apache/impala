@@ -32,13 +32,15 @@ import org.apache.impala.planner.HdfsPartitionPruner;
  */
 public interface PrunablePartition {
   /**
-   * Returns the identifier of this partition, suitable for later passing
-   * to {@link FeFsTable#loadPartitions(java.util.Collection)}
+   * Returns the identifier of this partition which identifies it within its parent table.
+   * Suitable for later passing to
+   * {@link FeFsTable#loadPartitions(java.util.Collection)}
    */
   public long getId();
 
   /**
-   * Returns the values associated with this partition
+   * Returns the values associated with this partition.
+   * @return an immutable list of partition key expressions
    */
   List<LiteralExpr> getPartitionValues();
 }

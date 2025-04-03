@@ -2056,8 +2056,7 @@ public class CatalogOpExecutor {
     Preconditions.checkState(params.isSetPartition_stats());
     List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
     // TODO(todd) only load the partitions that were modified in 'params'.
-    Collection<? extends FeFsPartition> parts =
-        FeCatalogUtils.loadAllPartitions(table);
+    Collection<? extends FeFsPartition> parts = table.loadAllPartitions();
     for (FeFsPartition fePartition: parts) {
       // TODO(todd): avoid downcast to implementation class
       HdfsPartition partition = (HdfsPartition)fePartition;
@@ -2856,8 +2855,7 @@ public class CatalogOpExecutor {
 
     // List of partitions that were modified as part of this operation.
     List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
-    Collection<? extends FeFsPartition> parts =
-        FeCatalogUtils.loadAllPartitions(hdfsTable);
+    Collection<? extends FeFsPartition> parts = hdfsTable.loadAllPartitions();
     for (FeFsPartition fePart: parts) {
       // TODO(todd): avoid downcast
       HdfsPartition part = (HdfsPartition) fePart;
@@ -3325,8 +3323,7 @@ public class CatalogOpExecutor {
       }
     }
     if (table.getNumClusteringCols() > 0) {
-      Collection<? extends FeFsPartition> parts =
-          FeCatalogUtils.loadAllPartitions(hdfsTable);
+      Collection<? extends FeFsPartition> parts = hdfsTable.loadAllPartitions();
       boolean hasTasks = false;
       for (FeFsPartition part: parts) {
         if (part.isMarkedCached()) {
@@ -3471,8 +3468,7 @@ public class CatalogOpExecutor {
           LOG.trace("Time elapsed to truncate table {} using HMS API: {} msec",
               hdfsTable.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
         } else {
-          Collection<? extends FeFsPartition> parts =
-              FeCatalogUtils.loadAllPartitions(hdfsTable);
+          Collection<? extends FeFsPartition> parts = hdfsTable.loadAllPartitions();
           createEmptyBaseDirectories(parts, tblTxn.writeId);
           LOG.trace("Time elapsed after creating empty base directories for table {}: {} "
                   + "msec", table.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
@@ -3609,8 +3605,7 @@ public class CatalogOpExecutor {
       if (!isTableBeingReplicated) {
         // when table is replicated we let the HMS API handle the file deletion logic
         // otherwise we delete the files.
-        Collection<? extends FeFsPartition> parts = FeCatalogUtils
-            .loadAllPartitions(hdfsTable);
+        Collection<? extends FeFsPartition> parts = hdfsTable.loadAllPartitions();
         for (FeFsPartition part : parts) {
           FileSystemUtil.deleteAllVisibleFiles(new Path(part.getLocation()));
         }
@@ -6189,8 +6184,7 @@ public class CatalogOpExecutor {
       if (tbl.getNumClusteringCols() > 0) {
         // If this is a partitioned table, submit cache directives for all uncached
         // partitions.
-        Collection<? extends FeFsPartition> parts =
-            FeCatalogUtils.loadAllPartitions(hdfsTable);
+        Collection<? extends FeFsPartition> parts = hdfsTable.loadAllPartitions();
         // List of partitions that were modified as part of this operation.
         List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
         for (FeFsPartition fePartition: parts) {
@@ -6244,8 +6238,7 @@ public class CatalogOpExecutor {
       if (cacheDirId != null) HdfsCachingUtil.removeTblCacheDirective(msTbl);
       // Uncache all table partitions.
       if (tbl.getNumClusteringCols() > 0) {
-        Collection<? extends FeFsPartition> parts =
-            FeCatalogUtils.loadAllPartitions(hdfsTable);
+        Collection<? extends FeFsPartition> parts = hdfsTable.loadAllPartitions();
         // List of partitions that were modified as part of this operation.
         List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
         for (FeFsPartition fePartition: parts) {
@@ -7336,8 +7329,7 @@ public class CatalogOpExecutor {
                   .build());
         }
       }
-      Collection<? extends FeFsPartition> parts =
-          FeCatalogUtils.loadAllPartitions((FeFsTable)table);
+      Collection<? extends FeFsPartition> parts = ((FeFsTable)table).loadAllPartitions();
       List<FeFsPartition> affectedExistingPartitions = new ArrayList<>();
       List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitionsStatsUnset =
           Lists.newArrayList();

@@ -16,6 +16,7 @@
 // under the License.
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
@@ -129,7 +131,9 @@ public interface FeTable {
   /**
    * @return SQL constraints for the table.
    */
-  SqlConstraints getSqlConstraints();
+  default SqlConstraints getSqlConstraints() {
+    return new SqlConstraints(new ArrayList<>(), new ArrayList<>());
+  }
 
   /**
    * @return an unmodifiable list of all partition columns.
@@ -221,4 +225,15 @@ public interface FeTable {
    * @return the timestamp when the table is last loaded or reloaded in catalogd.
    */
   long getLastLoadedTimeMs();
+
+  /**
+   * Returns a list of thrift column descriptors ordered by position.
+   */
+  default List<TColumnDescriptor> getTColumnDescriptors() {
+    List<TColumnDescriptor> colDescs = new ArrayList<>();
+    for (Column col: getColumns()) {
+      colDescs.add(col.toDescriptor());
+    }
+    return colDescs;
+  }
 }

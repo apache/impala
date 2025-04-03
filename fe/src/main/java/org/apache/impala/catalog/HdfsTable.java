@@ -63,7 +63,6 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.compat.MetastoreShim;
-import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.hive.common.MutableValidReaderWriteIdList;
 import org.apache.impala.hive.common.MutableValidWriteIdList;
 import org.apache.impala.service.BackendConfig;
@@ -72,7 +71,6 @@ import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
-import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
@@ -81,8 +79,6 @@ import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TPartitionKeyValue;
-import org.apache.impala.thrift.TResultSet;
-import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TSqlConstraints;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TTable;
@@ -100,7 +96,6 @@ import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.NoOpEventSequence;
 import org.apache.impala.util.TAccessLevelUtil;
-import org.apache.impala.util.TResultRowBuilder;
 import org.apache.impala.util.ThreadNameAnnotator;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -385,24 +380,29 @@ public class HdfsTable extends Table implements FeFsTable {
   public boolean isMarkedCached() { return isMarkedCached_; }
 
   @Override // FeFsTable
-  public Collection<? extends PrunablePartition> getPartitions() {
+  public Collection<? extends FeFsPartition> getPartitions() {
     return partitionMap_.values();
   }
 
   @Override // FeFsTable
-  public Map<Long, ? extends PrunablePartition> getPartitionMap() {
+  public Map<Long, ? extends FeFsPartition> getPartitionMap() {
     return partitionMap_;
+  }
+
+  @Override
+  public FeFsPartition loadPartition(long id) {
+    HdfsPartition partition = partitionMap_.get(id);
+    if (partition == null) {
+      throw new IllegalArgumentException("no such partition id " + id);
+    }
+    return partition;
   }
 
   @Override // FeFsTable
   public List<FeFsPartition> loadPartitions(Collection<Long> ids) {
     List<FeFsPartition> partitions = Lists.newArrayListWithCapacity(ids.size());
     for (Long id : ids) {
-      HdfsPartition partition = partitionMap_.get(id);
-      if (partition == null) {
-        throw new IllegalArgumentException("no such partition id " + id);
-      }
-      partitions.add(partition);
+      partitions.add(loadPartition(id));
     }
     return partitions;
   }
@@ -2440,7 +2440,7 @@ public class HdfsTable extends Table implements FeFsTable {
   @Override // FeFsTable
   public ListMap<TNetworkAddress> getHostIndex() { return hostIndex_; }
 
-  @Override
+  @Override // FeTable
   public SqlConstraints getSqlConstraints() {
     return sqlConstraints_;
   }
@@ -2635,138 +2635,11 @@ public class HdfsTable extends Table implements FeFsTable {
     return new Pair<>(value, expr);
   }
 
-  @Override // FeFsTable
-  public TResultSet getTableStats() {
-    return getTableStats(this);
-  }
-
   @Override
   public FileSystemUtil.FsType getFsType() {
     Preconditions.checkNotNull(getHdfsBaseDirPath().toUri().getScheme(),
         "Cannot get scheme from path " + getHdfsBaseDirPath());
     return FileSystemUtil.FsType.getFsType(getHdfsBaseDirPath().toUri().getScheme());
-  }
-
-  // TODO(todd): move to FeCatalogUtils. Upon moving to Java 8, could be
-  // a default method of FeFsTable.
-  public static TResultSet getTableStats(FeFsTable table) {
-    TResultSet result = new TResultSet();
-    TResultSetMetadata resultSchema = new TResultSetMetadata();
-    result.setSchema(resultSchema);
-
-    for (int i = 0; i < table.getNumClusteringCols(); ++i) {
-      // Add the partition-key values as strings for simplicity.
-      Column partCol = table.getColumns().get(i);
-      TColumn colDesc = new TColumn(partCol.getName(), Type.STRING.toThrift());
-      resultSchema.addToColumns(colDesc);
-    }
-
-    boolean statsExtrap = Utils.isStatsExtrapolationEnabled(table);
-
-    resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
-    if (statsExtrap) {
-      resultSchema.addToColumns(new TColumn("Extrap #Rows", Type.BIGINT.toThrift()));
-    }
-    resultSchema.addToColumns(new TColumn("#Files", Type.BIGINT.toThrift()));
-    resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Bytes Cached", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Cache Replication", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Format", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Incremental stats", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Location", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("EC Policy", Type.STRING.toThrift()));
-
-    // Pretty print partitions and their stats.
-    List<FeFsPartition> orderedPartitions = new ArrayList<>(
-        FeCatalogUtils.loadAllPartitions(table));
-    Collections.sort(orderedPartitions, HdfsPartition.KV_COMPARATOR);
-
-    long totalCachedBytes = 0L;
-    long totalBytes = 0L;
-    long totalNumFiles = 0L;
-    for (FeFsPartition p: orderedPartitions) {
-      long numFiles = p.getNumFileDescriptors();
-      long size = p.getSize();
-      totalNumFiles += numFiles;
-      totalBytes += size;
-
-      TResultRowBuilder rowBuilder = new TResultRowBuilder();
-
-      // Add the partition-key values (as strings for simplicity).
-      for (LiteralExpr expr: p.getPartitionValues()) {
-        rowBuilder.add(expr.getStringValue());
-      }
-
-      // Add rows, extrapolated rows, files, bytes, cache stats, and file format.
-      rowBuilder.add(p.getNumRows());
-      // Compute and report the extrapolated row count because the set of files could
-      // have changed since we last computed stats for this partition. We also follow
-      // this policy during scan-cardinality estimation.
-      if (statsExtrap) {
-        rowBuilder.add(Utils.getExtrapolatedNumRows(table, size));
-      }
-
-      rowBuilder.add(numFiles).addBytes(size);
-      if (!p.isMarkedCached()) {
-        // Helps to differentiate partitions that have 0B cached versus partitions
-        // that are not marked as cached.
-        rowBuilder.add("NOT CACHED");
-        rowBuilder.add("NOT CACHED");
-      } else {
-        // Calculate the number the number of bytes that are cached.
-        long cachedBytes = 0L;
-        for (FileDescriptor fd: p.getFileDescriptors()) {
-          int numBlocks = fd.getNumFileBlocks();
-          for (int i = 0; i < numBlocks; ++i) {
-            FbFileBlock block = fd.getFbFileBlock(i);
-            if (FileBlock.hasCachedReplica(block)) {
-              cachedBytes += FileBlock.getLength(block);
-            }
-          }
-        }
-        totalCachedBytes += cachedBytes;
-        rowBuilder.addBytes(cachedBytes);
-
-        // Extract cache replication factor from the parameters of the table
-        // if the table is not partitioned or directly from the partition.
-        Short rep = HdfsCachingUtil.getCachedCacheReplication(
-            table.getNumClusteringCols() == 0 ?
-            p.getTable().getMetaStoreTable().getParameters() :
-            p.getParameters());
-        rowBuilder.add(rep.toString());
-      }
-      rowBuilder.add(p.getFileFormat().toString());
-      rowBuilder.add(String.valueOf(p.hasIncrementalStats()));
-      rowBuilder.add(p.getLocation());
-      rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(p.getLocationPath()));
-      result.addToRows(rowBuilder.get());
-    }
-
-    // For partitioned tables add a summary row at the bottom.
-    if (table.getNumClusteringCols() > 0) {
-      TResultRowBuilder rowBuilder = new TResultRowBuilder();
-      int numEmptyCells = table.getNumClusteringCols() - 1;
-      rowBuilder.add("Total");
-      for (int i = 0; i < numEmptyCells; ++i) {
-        rowBuilder.add("");
-      }
-
-      // Total rows, extrapolated rows, files, bytes, cache stats.
-      // Leave format empty.
-      rowBuilder.add(table.getNumRows());
-      // Compute and report the extrapolated row count because the set of files could
-      // have changed since we last computed stats for this partition. We also follow
-      // this policy during scan-cardinality estimation.
-      if (statsExtrap) {
-        rowBuilder.add(Utils.getExtrapolatedNumRows(
-            table, table.getTotalHdfsBytes()));
-      }
-      rowBuilder.add(totalNumFiles)
-          .addBytes(totalBytes)
-          .addBytes(totalCachedBytes).add("").add("").add("").add("").add("");
-      result.addToRows(rowBuilder.get());
-    }
-    return result;
   }
 
   /**
@@ -3199,14 +3072,5 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   public void setLastVersionSeenByTopicUpdate(long version) {
     lastVersionSeenByTopicUpdate_ = version;
-  }
-
-  public boolean isParquetTable() {
-    for (FeFsPartition partition: partitionMap_.values()) {
-      if (!partition.getFileFormat().isParquetBased()) {
-        return false;
-      }
-    }
-    return true;
   }
 }

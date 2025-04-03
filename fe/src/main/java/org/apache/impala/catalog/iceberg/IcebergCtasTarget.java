@@ -39,7 +39,6 @@ import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.CtasTargetTable;
 import org.apache.impala.catalog.Db;
-import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -289,7 +288,7 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   public TTableDescriptor toThriftDescriptor(int tableId,
       Set<Long> referencedPartitions) {
     TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.ICEBERG_TABLE,
-        FeCatalogUtils.getTColumnDescriptors(this),
+        getTColumnDescriptors(),
         getNumClusteringCols(),
         getName(), db_.getName());
 

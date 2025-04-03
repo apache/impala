@@ -20,7 +20,6 @@ package org.apache.impala.catalog.local;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeSystemTable;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.catalog.Type;
@@ -90,7 +89,7 @@ public class LocalSystemTable extends LocalTable implements FeSystemTable {
   public TTableDescriptor toThriftDescriptor(
       int tableId, Set<Long> referencedPartitions) {
     TTableDescriptor tableDescriptor = new TTableDescriptor(tableId,
-        TTableType.SYSTEM_TABLE, FeCatalogUtils.getTColumnDescriptors(this),
+        TTableType.SYSTEM_TABLE, getTColumnDescriptors(),
         getNumClusteringCols(), getName(), getDb().getName());
     tableDescriptor.setSystemTable(getTSystemTable());
     return tableDescriptor;

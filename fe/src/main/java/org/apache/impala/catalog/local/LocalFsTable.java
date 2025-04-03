@@ -45,10 +45,8 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FileDescriptor;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.SqlConstraints;
-import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
 import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
@@ -58,7 +56,6 @@ import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TNetworkAddress;
-import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.thrift.TValidWriteIdList;
@@ -273,7 +270,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     // for any INSERT query, even if the partition is specified.
     Collection<? extends FeFsPartition> parts;
     if (ref_ != null) {
-      parts = FeCatalogUtils.loadAllPartitions(this);
+      parts = loadAllPartitions();
     } else {
       // If this is a CTAS target, we don't want to try to load the partition list.
       parts = Collections.emptyList();
@@ -303,11 +300,6 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   }
 
   @Override
-  public TResultSet getTableStats() {
-    return HdfsTable.getTableStats(this);
-  }
-
-  @Override
   public FileSystemUtil.FsType getFsType() {
     Preconditions.checkNotNull(getHdfsBaseDir(),
             "LocalTable base dir is null");
@@ -321,7 +313,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   public TTableDescriptor toThriftDescriptor(int tableId,
       Set<Long> referencedPartitions) {
     TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
-        FeCatalogUtils.getTColumnDescriptors(this),
+        getTColumnDescriptors(),
         getNumClusteringCols(), name_, db_.getName());
     tableDesc.setHdfsTable(toTHdfsTable(referencedPartitions,
         ThriftObjectType.DESCRIPTOR_ONLY));
@@ -420,7 +412,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
           "HdfsStorageDescriptor using sd of table");
     }
     LocalPartitionSpec spec = new LocalPartitionSpec(
-        this, CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
+        CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
     return new LocalFsPartition(this, spec, Collections.emptyMap(), /*writeId=*/-1,
         hdfsStorageDescriptor, /*fileDescriptors=*/null, /*insertFileDescriptors=*/null,
         /*deleteFileDescriptors=*/null, /*partitionStats=*/null,

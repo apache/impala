@@ -37,7 +37,6 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCatalogObjectType;
-import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -170,13 +169,6 @@ public class IcebergTimeTravelTable
     desc.setIcebergTable(Utils.getTIcebergTable(this, ThriftObjectType.DESCRIPTOR_ONLY));
     desc.setHdfsTable(transformToTHdfsTable(false, ThriftObjectType.DESCRIPTOR_ONLY));
     return desc;
-  }
-
-  /**
-   * Returns a list of thrift column descriptors ordered by position.
-   */
-  public List<TColumnDescriptor> getTColumnDescriptors() {
-    return FeCatalogUtils.getTColumnDescriptors(this);
   }
 
   public ArrayType getType() { return type_; }
@@ -436,11 +428,6 @@ class ForwardingFeIcebergTable implements FeIcebergTable {
   @Override
   public List<? extends FeFsPartition> loadPartitions(Collection<Long> ids) {
     return base.loadPartitions(ids);
-  }
-
-  @Override
-  public SqlConstraints getSqlConstraints() {
-    return base.getSqlConstraints();
   }
 
   @Override

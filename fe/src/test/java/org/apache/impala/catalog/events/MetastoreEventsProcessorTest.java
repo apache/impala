@@ -726,8 +726,7 @@ public class MetastoreEventsProcessorTest {
     eventsProcessor_.processEvents();
 
     Collection<? extends FeFsPartition> parts =
-        FeCatalogUtils.loadAllPartitions((HdfsTable)
-            catalog_.getTable(TEST_DB_NAME, testTblName));
+        ((HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName)).loadAllPartitions();
     FeFsPartition singlePartition =
         Iterables.getOnlyElement(parts);
     assertTrue(newLocation.equals(singlePartition.getLocation()));
@@ -739,8 +738,7 @@ public class MetastoreEventsProcessorTest {
     eventsProcessor_.processEvents();
 
     Collection<? extends FeFsPartition> partsAfterTrivialAlter =
-        FeCatalogUtils.loadAllPartitions((HdfsTable)
-            catalog_.getTable(TEST_DB_NAME, testTblName));
+        ((HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName)).loadAllPartitions();
     FeFsPartition singlePartitionAfterTrivialAlter =
         Iterables.getOnlyElement(partsAfterTrivialAlter);
     for (String parameter : MetastoreEvents.parametersToIgnore) {
@@ -1161,7 +1159,7 @@ public class MetastoreEventsProcessorTest {
     Table tblAfterInsert = catalog_.getTable(tbl.getDb().getName(), tbl.getName());
     assertFalse(tblAfterInsert instanceof IncompleteTable);
     Collection<? extends FeFsPartition> partsAfterInsert =
-        FeCatalogUtils.loadAllPartitions((HdfsTable) tblAfterInsert);
+        ((HdfsTable) tblAfterInsert).loadAllPartitions();
     assertTrue("Partition not found after insert.",
         partsAfterInsert.size() > 0);
     FeFsPartition singlePart =
@@ -2284,8 +2282,7 @@ public class MetastoreEventsProcessorTest {
         eventsProcessor_.processEvents();
         if (shouldEventBeProcessed) {
           Collection<? extends FeFsPartition> partsAfterAdd =
-              FeCatalogUtils.loadAllPartitions((HdfsTable)
-                  catalog_.getTable(dbName, tblName));
+              ((HdfsTable) catalog_.getTable(dbName, tblName)).loadAllPartitions();
           assertTrue("Partitions should have been added.", partsAfterAdd.size() == 6);
         } else {
           assertFalse("Table should still have been in loaded state since sync is "
@@ -2306,8 +2303,7 @@ public class MetastoreEventsProcessorTest {
         eventsProcessor_.processEvents();
         if (shouldEventBeProcessed) {
           Collection<? extends FeFsPartition> partsAfterDrop =
-              FeCatalogUtils.loadAllPartitions((HdfsTable) catalog_.getTable(dbName,
-                  tblName));
+              ((HdfsTable) catalog_.getTable(dbName, tblName)).loadAllPartitions();
           assertTrue("Partitions should have been dropped", partsAfterDrop.size() == 2);
         } else {
           assertFalse("Table should still have been in loaded state since sync is "
@@ -2331,8 +2327,7 @@ public class MetastoreEventsProcessorTest {
         eventsProcessor_.processEvents();
         if (shouldEventBeProcessed) {
           Collection<? extends FeFsPartition> partsAfterAlter =
-              FeCatalogUtils.loadAllPartitions((HdfsTable)
-                  catalog_.getTable(dbName, tblName));
+              ((HdfsTable) catalog_.getTable(dbName, tblName)).loadAllPartitions();
           for (FeFsPartition part : partsAfterAlter) {
             assertTrue("Partition location should have been modified by alter.",
                 location.equals(part.getLocation()));
@@ -3314,8 +3309,7 @@ public class MetastoreEventsProcessorTest {
     assertEquals(fileMetadataLoadAfter, fileMetadataLoadBefore);
 
     Collection<? extends FeFsPartition> parts =
-        FeCatalogUtils.loadAllPartitions((HdfsTable)
-            catalog_.getTable(TEST_DB_NAME, testTblName));
+        ((HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName)).loadAllPartitions();
     FeFsPartition singlePartition =
         Iterables.getOnlyElement(parts);
     String val = singlePartition.getParameters().getOrDefault(testKey, null);

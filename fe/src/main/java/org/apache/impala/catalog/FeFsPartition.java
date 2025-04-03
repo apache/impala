@@ -23,10 +23,14 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Joiner;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.PartitionKeyValue;
+import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
@@ -39,17 +43,12 @@ import org.apache.impala.util.ListMap;
 /**
  * Frontend interface for interacting with a single filesystem-based partition.
  */
-public interface FeFsPartition {
+public interface FeFsPartition extends PrunablePartition {
   /**
    * @return a partition name formed by concatenating partition keys and their values,
    * compatible with the way Hive names partitions
    */
   String getPartitionName();
-
-  /**
-   * @return the ID for this partition which identifies it within its parent table.
-   */
-  long getId();
 
   /**
    * @return the table that contains this partition
@@ -157,7 +156,7 @@ public interface FeFsPartition {
    */
   byte[] getPartitionStatsCompressed();
 
- /**
+  /**
    * @return the size (in bytes) of all the files inside this partition
    */
   long getSize();
@@ -168,22 +167,22 @@ public interface FeFsPartition {
   long getNumRows();
 
   /**
-   * Utility method which returns a string of conjuncts of equality exprs to exactly
-   * select this partition (e.g. ((month=2009) AND (year=2012)).
-   */
-  String getConjunctSql();
-
-  /**
    * @return a list of partition values as strings. If mapNullsToHiveKey is true, any NULL
    * value is returned as the table's default null partition key string value, otherwise
    * they are returned as 'NULL'.
    */
-  List<String> getPartitionValuesAsStrings(boolean mapNullsToHiveKey);
-
-  /**
-   * @return an immutable list of partition key expressions
-   */
-  List<LiteralExpr> getPartitionValues();
+  default List<String> getPartitionValuesAsStrings(boolean mapNullsToHiveKey) {
+    List<String> ret = new ArrayList<>();
+    for (LiteralExpr partValue: getPartitionValues()) {
+      if (mapNullsToHiveKey) {
+        ret.add(PartitionKeyValue.getPartitionKeyValueString(
+            partValue, getTable().getNullPartitionKeyValue()));
+      } else {
+        ret.add(partValue.getStringValue());
+      }
+    }
+    return ret;
+  }
 
   /**
    * @return the value of the given column 'pos' for this partition
@@ -250,5 +249,28 @@ public interface FeFsPartition {
     partInfo.setIs_marked_cached(isMarkedCached());
 
     return partInfo;
+  }
+
+  /**
+   * Utility method which returns a string of conjuncts of equality exprs to exactly
+   * select this partition (e.g. ((month=2009) AND (year=2012)).
+   */
+  default String getConjunctSql() {
+    List<String> partColSql = new ArrayList<>();
+    for (Column partCol: getTable().getClusteringColumns()) {
+      partColSql.add(ToSqlUtils.getIdentSql(partCol.getName()));
+    }
+
+    List<String> conjuncts = new ArrayList<>();
+    for (int i = 0; i < partColSql.size(); ++i) {
+      LiteralExpr partVal = getPartitionValues().get(i);
+      String partValSql = partVal.toSql();
+      if (Expr.IS_NULL_LITERAL.apply(partVal) || partValSql.isEmpty()) {
+        conjuncts.add(partColSql.get(i) + " IS NULL");
+      } else {
+        conjuncts.add(partColSql.get(i) + "=" + partValSql);
+      }
+    }
+    return "(" + Joiner.on(" AND " ).join(conjuncts) + ")";
   }
 }

@@ -86,8 +86,7 @@ import org.slf4j.LoggerFactory;
  * the partition id to identify a partition instance (snapshot). The catalog versions are
  * not used actually.
  */
-public class HdfsPartition extends CatalogObjectImpl
-    implements FeFsPartition, PrunablePartition {
+public class HdfsPartition extends CatalogObjectImpl implements FeFsPartition {
   // Struct-style class for caching all the information we need to reconstruct an
   // HMS-compatible Partition object, for use in RPCs to the metastore. We do this rather
   // than cache the Thrift partition object itself as the latter can be large - thanks
@@ -397,18 +396,6 @@ public class HdfsPartition extends CatalogObjectImpl
     return partName_;
   }
 
-  @Override
-  public List<String> getPartitionValuesAsStrings(boolean mapNullsToHiveKey) {
-    return FeCatalogUtils.getPartitionValuesAsStrings(this, mapNullsToHiveKey);
-  }
-
-  @Override // FeFsPartition
-  public String getConjunctSql() {
-    // TODO: Remove this when the TODO elsewhere in this file to save and expose the
-    // list of TPartitionKeyValues has been resolved.
-    return FeCatalogUtils.getConjunctSqlForPartition(this);
-  }
-
   /**
    * Returns a string of the form part_key1=value1/part_key2=value2...
    */
@@ -445,7 +432,7 @@ public class HdfsPartition extends CatalogObjectImpl
     return new Path(getLocation());
   }
 
-  @Override // FeFsPartition
+  @Override // PrunablePartition
   public long getId() { return id_; }
 
   @Override // FeFsPartition
@@ -544,7 +531,7 @@ public class HdfsPartition extends CatalogObjectImpl
         (added ? "Added" : "Could not add"), versionNumber, inFlightEvents_.print());
   }
 
-  @Override // FeFsPartition
+  @Override // PrunablePartition
   public List<LiteralExpr> getPartitionValues() { return partitionKeyValues_; }
   @Override // FeFsPartition
   public LiteralExpr getPartitionValue(int i) { return partitionKeyValues_.get(i); }
