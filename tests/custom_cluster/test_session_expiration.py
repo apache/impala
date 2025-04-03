@@ -193,12 +193,16 @@ class TestSessionExpiration(CustomClusterTestSuite):
     be seen in the webui."""
     impalad = self.cluster.get_first_impalad()
     self.close_impala_clients()
-    # Create 2 sessions.
+    # Create 2 clients.
     client1 = impalad.service.create_hs2_client()
     client2 = impalad.service.create_hs2_client()
+    # Run query to open session.
+    client1.execute('select "client1 should succeed"')
+    client2.execute('select "client2 should succeed"')
     try:
       # Trying to open a third session should fail.
-      impalad.service.create_hs2_client()
+      client3 = impalad.service.create_hs2_client()
+      client3.execute('select "client3 should fail"')
       assert False, "should have failed"
     except Exception as e:
       assert re.match(r".*Number of sessions for user \S+ exceeds coordinator limit 2",

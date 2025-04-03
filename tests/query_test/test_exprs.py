@@ -27,6 +27,7 @@ from tests.common.test_dimensions import (
   add_exec_option_dimension,
   create_exec_option_dimension,
   create_uncompressed_text_dimension)
+from tests.common.skip import SkipIfFS
 from tests.util.test_file_parser import QueryTestSectionReader
 
 LOG = logging.getLogger('test_exprs')
@@ -288,26 +289,37 @@ class TestExprLimits(ImpalaTestSuite):
       assert False, "Failed to execute query %s: %s" % (sql_str, e)
 
 
-class TestUtcTimestampFunctions(ImpalaTestSuite):
-  """Tests for UTC timestamp functions, i.e. functions that do not depend on the behavior
-     of the flag --use_local_tz_for_unix_timestamp_conversions. Tests added here should
-     also be run in the custom cluster test test_local_tz_conversion.py to ensure they
-     have the same behavior when the conversion flag is set to true."""
+class TestTimestampFunctions(ImpalaTestSuite):
+  """Tests for UTC timestamp functions and local timestamp functions."""
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestUtcTimestampFunctions, cls).add_test_dimensions()
+    super(TestTimestampFunctions, cls).add_test_dimensions()
     # Test with and without expr rewrites to cover regular expr evaluations
     # as well as constant folding, in particular, timestamp literals.
     add_exec_option_dimension(cls, 'enable_expr_rewrites', EXPR_REWRITE_OPTIONS)
-    if cls.exploration_strategy() == 'core':
-      # Test with file format that supports codegen
-      cls.ImpalaTestMatrix.add_constraint(lambda v:
-          v.get_value('table_format').file_format == 'text'
-          and v.get_value('table_format').compression_codec == 'none')
+    add_exec_option_dimension(cls, 'use_local_tz_for_unix_timestamp_conversions',
+                              [0, 1])
+    # No need to permute different file format.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'text'
+        and v.get_value('table_format').compression_codec == 'none')
 
   def test_utc_functions(self, vector):
+    """Tests for UTC timestamp functions, i.e. functions that do not depend on the
+    behavior of the use_local_tz_for_unix_timestamp_conversions option."""
     self.run_test_case('QueryTest/utc-timestamp-functions', vector)
+
+  @SkipIfFS.hbase
+  def test_timestamp_functions(self, vector):
+    if vector.get_exec_option('use_local_tz_for_unix_timestamp_conversions') == 1:
+      # Tests for local timestamp functions, i.e. functions that depend on the
+      # behavior of the use_local_tz_for_unix_timestamp_conversions option.
+      self.run_test_case('QueryTest/local-timestamp-functions', vector)
+
+    # Test that scanning of different file formats is not affected by
+    # use_local_tz_for_unix_timestamp_conversions option.
+    self.run_test_case('QueryTest/file-formats-with-local-tz-conversion', vector)
 
 
 class TestConstantFoldingNoTypeLoss(ImpalaTestSuite):

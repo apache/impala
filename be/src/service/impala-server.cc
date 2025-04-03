@@ -370,7 +370,7 @@ DEFINE_bool(use_local_tz_for_unix_timestamp_conversions, false,
     "When true, TIMESTAMPs are interpreted in the local time zone when converting to "
     "and from Unix times. When false, TIMESTAMPs are interpreted in the UTC time zone. "
     "Set to true for Hive compatibility. "
-    "Can be overriden with the query option with the same name.");
+    "DEPRECATED: use query option with the same name instead.");
 
 // Provide a workaround for IMPALA-1658.
 DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,

@@ -380,7 +380,7 @@ class TestObservability(ImpalaTestSuite):
     the table is cached."""
     refresh_query = "refresh functional.alltypes"
     select_query = "select * from functional.alltypes"
-    self.execute_query(refresh_query).runtime_profile
+    self.execute_query(refresh_query, {'sync_ddl': '1'})
     runtime_profile = self.execute_query(select_query).runtime_profile
     event_regexes = [r'Query Compilation:',
         r'Metadata of all .* tables cached:',

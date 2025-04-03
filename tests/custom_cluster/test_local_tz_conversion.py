@@ -18,9 +18,12 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.test_vector import ImpalaTestDimension
 from tests.common.skip import SkipIfFS
-from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.test_dimensions import (
+    add_exec_option_dimension,
+    create_exec_option_dimension,
+)
+
 
 class TestLocalTzConversion(CustomClusterTestSuite):
   """Tests for --use_local_tz_for_unix_timestamp_conversions"""
@@ -32,16 +35,15 @@ class TestLocalTzConversion(CustomClusterTestSuite):
         cluster_sizes=[0], disable_codegen_options=[False, True], batch_sizes=[0]))
     # Test with and without expr rewrites to cover regular expr evaluations
     # as well as constant folding, in particular, timestamp literals.
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('enable_expr_rewrites', *[0,1]))
+    add_exec_option_dimension(cls, 'enable_expr_rewrites', [0, 1])
 
   @classmethod
   def add_custom_cluster_constraints(cls):
     # Do not call the super() implementation because this class needs to relax the
     # set of constraints.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec == 'none')
+        v.get_value('table_format').file_format == 'text'
+        and v.get_value('table_format').compression_codec == 'none')
 
   @SkipIfFS.hbase
   @pytest.mark.execute_serially
@@ -51,9 +53,6 @@ class TestLocalTzConversion(CustomClusterTestSuite):
        TODO: this test can be probably removed as a query option is created for
              use_local_tz_for_unix_timestamp_conversions in IMPALA-10171
     """
-    vector.get_value('exec_option')['enable_expr_rewrites'] = \
-        vector.get_value('enable_expr_rewrites')
-
     # Tests for UTC timestamp functions, i.e. functions that do not depend on the
     # behavior of the flag --use_local_tz_for_unix_timestamp_conversions. These tests
     # are also executed in test_exprs.py to ensure the same behavior when running

@@ -32,6 +32,7 @@ import impala.dbapi as impyla
 import impala.error as impyla_error
 import impala.hiveserver2 as hs2
 import tests.common
+from Query.ttypes import TQueryOptions
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import (
   DEFAULT_SLEEP_INTERVAL,
@@ -126,18 +127,44 @@ def build_summary_table_from_thrift(thrift_exec_summary):
   return output
 
 
-def collect_default_query_options(options, name, val, kind):
-  if kind == 'REMOVED':
-    return
+def collect_default_query_options(options, name, val):
   name = name.lower()
-  val = str(val).strip('"')
-  if ',' in val or '/' in val:
-    # Value is a list or a timezone name containing a slash. Wrap it with double quotes.
-    val = '"{}"'.format(val)
+  if val is not None:
+    val = str(val).strip('"')
+    if ',' in val or '/' in val:
+      # Value is a list or a timezone name containing a slash. Wrap it with double quotes.
+      val = '"{}"'.format(val)
   if not val:
-    # Value is optional with None as default.
+    # Value is optional with None as default or just turned into an empty string.
     val = '""'
   options[name] = val
+
+
+def parse_query_options_from_thrift():
+  """Populate 'options' map with default query options parsed from TQueryOptions
+  attributes."""
+  result = dict()
+  tquery_opts = TQueryOptions()
+  for key in dir(tquery_opts):
+    non_opts_attrs = ['read', 'write', 'validate', 'thrift_spec']
+    if not key.startswith('_') and key not in non_opts_attrs:
+      value = getattr(tquery_opts, key)
+      if isinstance(value, set):
+        # The default value of some query options, e.g.,
+        # enabled_runtime_filter_types, can be a set of integer.
+        # Turn the set into comma separated values.
+        value = ','.join([str(v) for v in value])
+      # No need to supply 'kind' since TQueryOptions already exclude
+      # removed query options.
+      collect_default_query_options(result, key, value)
+  return result
+
+
+# A map of default query option obtained from TQueryOptions.
+# Query option names (the keys) are in lower case string for consistency.
+# Values are all strings and might be double-quoted, making it legal for both setting
+# through 'SET' query or ImpalaConnection.set_configuration_option().
+DEFAULT_QUERY_OPTIONS = parse_query_options_from_thrift()
 
 
 # Common wrapper around the internal types of HS2/Beeswax operation/query handles.
@@ -202,12 +229,11 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
     """Clears all existing configuration."""
     pass
 
-  @abc.abstractmethod
   def get_default_configuration(self):
     """Return the default configuration for the connection, before any modifications are
     made to the session state. Returns a map with the config variable as the key and a
     string representation of the default value as the value."""
-    pass
+    return DEFAULT_QUERY_OPTIONS.copy()
 
   @abc.abstractmethod
   def connect(self):
@@ -421,9 +447,6 @@ class BeeswaxConnection(ImpalaConnection):
     self.__beeswax_client = ImpalaBeeswaxClient(host_port, use_kerberos, user=user,
                                                 password=password, use_ssl=use_ssl)
     self.__host_port = host_port
-    # Default query option, obtained at first call to get_default_configuration().
-    # Query option names are in lower case for consistency.
-    self.__default_query_options = None
     self.QUERY_STATES = self.__beeswax_client.query_states
 
   def get_test_protocol(self):
@@ -442,19 +465,6 @@ class BeeswaxConnection(ImpalaConnection):
         self.log_client("\n\nset {0}={1};\n".format(name, value))
       return True
     return False
-
-  def __collect_default_options(self):
-    options = {}
-    for item in self.__beeswax_client.get_default_configuration():
-      collect_default_query_options(
-        options, item.key, item.value, str(item.level))
-    LOG.debug("Default query options: {0}".format(options))
-    return options
-
-  def get_default_configuration(self):
-    if self.__default_query_options is None:
-      self.__default_query_options = self.__collect_default_options()
-    return self.__default_query_options.copy()
 
   def clear_configuration(self):
     self.__beeswax_client.clear_query_options()
@@ -597,9 +607,6 @@ class ImpylaHS2Connection(ImpalaConnection):
     # that they will not share the same session with self.__cursor.
     self.__impyla_conn = None
     self.__cursor = None
-    # Default query option obtained from initial connect.
-    # Query option names are in lower case for consistency.
-    self.__default_query_options = {}
     # List of all cursors that created through execute_async.
     self.__async_cursors = list()
     # Query options to send along with each query.
@@ -631,9 +638,6 @@ class ImpylaHS2Connection(ImpalaConnection):
       return True
     return False
 
-  def get_default_configuration(self):
-    return self.__default_query_options.copy()
-
   def clear_configuration(self):
     self.__query_options.clear()
     if hasattr(tests.common, "current_node") and not self._is_hive:
@@ -651,6 +655,11 @@ class ImpylaHS2Connection(ImpalaConnection):
       # The session may no longer be valid if the impalad was restarted during the test.
       pass
 
+  def default_cursor(self):
+    if self.__cursor is None:
+      self.__cursor = self.__open_single_cursor(user=self.__user)
+    return self.__cursor
+
   def connect(self):
     host, port = self.__host_port.split(":")
     conn_kwargs = {}
@@ -660,18 +669,8 @@ class ImpylaHS2Connection(ImpalaConnection):
       self.__impyla_conn = impyla.connect(
         host=host, port=int(port), use_http_transport=self.__use_http_transport,
         http_path=self.__http_path, use_ssl=self.__use_ssl, **conn_kwargs)
-      self.__cursor = self.__open_single_cursor(user=self.__user)
-      # Get the default query options for the session before any modifications are made.
-      self.__default_query_options = {}
-      if not self._is_hive:
-        self.__cursor.execute("set all")
-        for name, val, kind in self.__cursor:
-          collect_default_query_options(self.__default_query_options, name, val, kind)
-        self.__cursor.close_operation()
-      LOG.debug("Default query options: {0}".format(self.__default_query_options))
-      self.log_client("connected to {0} with impyla {1} session {2}".format(
-        self.__host_port, self.get_test_protocol(), self.__get_session_id(self.__cursor)
-      ))
+      self.log_client("connected to {0} with impyla {1}".format(
+        self.__host_port, self.get_test_protocol()))
     except Exception as e:
       self.log_client("failed connecting to {0} with impyla {1}".format(
         self.__host_port, self.get_test_protocol()
@@ -681,7 +680,8 @@ class ImpylaHS2Connection(ImpalaConnection):
   def close(self):
     self.log_client("closing 1 sync and {0} async {1} connections to: {2}".format(
       len(self.__async_cursors), self.get_test_protocol(), self.__host_port))
-    self.__close_single_cursor(self.__cursor)
+    if self.__cursor is not None:
+      self.__close_single_cursor(self.__cursor)
     for async_cursor in self.__async_cursors:
       self.__close_single_cursor(async_cursor)
     # Remove all async cursors.
@@ -699,8 +699,8 @@ class ImpylaHS2Connection(ImpalaConnection):
     Returns a list of (catalogName, dbName, tableName, tableType, tableComment).
     """
     self.log_client("getting tables for database: {0}".format(database))
-    self.__cursor.get_tables(database_name=database)
-    return self.__cursor.fetchall()
+    self.default_cursor().get_tables(database_name=database)
+    return self.default_cursor().fetchall()
 
   def close_query(self, operation_handle, fetch_profile_after_close=False):
     self.log_handle(operation_handle, 'closing query for operation')
@@ -719,29 +719,28 @@ class ImpylaHS2Connection(ImpalaConnection):
       (u"executing against {0} at {1}. session: {2} main_cursor: {3} "
        u"user: {4}\n{5}").format(
          (self._is_hive and 'Hive' or 'Impala'), self.__host_port,
-         self.__get_session_id(cursor), (cursor == self.__cursor), user,
+         self.__get_session_id(cursor), (cursor == self.default_cursor()), user,
          format_sql_for_logging(sql_stmt))
     )
 
   def execute(self, sql_stmt, user=None, fetch_profile_after_close=False,
               fetch_exec_summary=False, profile_format=TRuntimeProfileFormat.STRING):
-    cursor = self.__cursor
+    same_user = (user == self.__user)
+    cursor = (self.default_cursor() if same_user
+              # Must create a new cursor to supply 'user'.
+              else self.__open_single_cursor(user=user))
     result = None
     try:
-      if user != self.__user:
-        # Must create a new cursor to supply 'user'.
-        cursor = self.__open_single_cursor(user=user)
       self.__log_execute(cursor, user, sql_stmt)
       cursor.execute(sql_stmt, configuration=self.__query_options)
       handle = OperationHandle(cursor, sql_stmt)
-      self.log_handle(handle, "started query in session {0}".format(
-        self.__get_session_id(cursor)))
+      self.log_handle(handle, "query started")
       result = self.__fetch_results_and_profile(
         handle, fetch_profile_after_close=fetch_profile_after_close,
         fetch_exec_summary=fetch_exec_summary, profile_format=profile_format)
     finally:
       cursor.close_operation()
-      if cursor != self.__cursor:
+      if not same_user:
         self.__close_single_cursor(cursor)
     return result
 
@@ -1101,9 +1100,6 @@ class MinimalHS2Connection(ImpalaConnection):
     raise NotImplementedError()
 
   def clear_configuration(self):
-    raise NotImplementedError()
-
-  def get_default_configuration(self):
     raise NotImplementedError()
 
   def get_host_port(self):
