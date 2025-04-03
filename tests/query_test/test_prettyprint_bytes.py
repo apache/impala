@@ -23,10 +23,6 @@ import pytest
 class TestPrettyPrintBytes(ImpalaTestSuite):
   """Tests the built-in function prettyprint_bytes."""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   def test_prettyprint_bytes(self, vector):
     if (vector.get_value('table_format').file_format != 'text'
         or vector.get_value('table_format').compression_codec != 'none'):

@@ -38,10 +38,6 @@ SEQUENCE_CODECS.remove("ZStandard")
 
 class TestFileCodecInterop(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')

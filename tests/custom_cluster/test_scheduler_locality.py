@@ -31,10 +31,6 @@ TOTAL_ASSIGNMENTS_METRIC = "simple-scheduler.assignments.total"
 class TestSchedulerLocality(CustomClusterTestSuite):
   """Tests for local and remote disk scheduling."""
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @CustomClusterTestSuite.with_args(
       impalad_args='--hostname=localhost', cluster_size=1)
   def test_local_assignment(self, vector):

@@ -25,10 +25,6 @@ from tests.common.skip import SkipIfBuildType
 class TestAllocFail(CustomClusterTestSuite):
   """Tests for handling malloc() failure for UDF/UDA"""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--stress_fn_ctx_alloc=1")
   def test_alloc_fail_init(self, vector):

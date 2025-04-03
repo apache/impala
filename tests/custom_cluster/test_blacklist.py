@@ -41,10 +41,6 @@ def _get_disk_write_fail_action(port):
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestBlacklist(CustomClusterTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
@@ -190,10 +186,6 @@ class TestBlacklist(CustomClusterTestSuite):
 # tests.
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestBlacklistFaultyDisk(CustomClusterTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':

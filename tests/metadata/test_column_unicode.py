@@ -26,10 +26,6 @@ from tests.common.test_dimensions import create_client_protocol_dimension
 class TestColumnUnicode(ImpalaTestSuite):
 
     @classmethod
-    def get_workload(cls):
-        return 'functional-query'
-
-    @classmethod
     def add_test_dimensions(cls):
         super(TestColumnUnicode, cls).add_test_dimensions()
         cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())

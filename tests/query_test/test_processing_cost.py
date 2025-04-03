@@ -29,10 +29,6 @@ class TestProcessingCost(ImpalaTestSuite):
   """Test processing cost in non-dedicated coordinator environment."""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestProcessingCost, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

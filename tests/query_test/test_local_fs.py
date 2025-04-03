@@ -24,10 +24,6 @@ from tests.common.test_dimensions import create_single_exec_option_dimension
 
 class TestLocalFileSystem(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestLocalFileSystem, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

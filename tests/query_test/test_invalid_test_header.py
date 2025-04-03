@@ -30,10 +30,6 @@ class TestInvalidTestHeader(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_invalid_test_header(self, vector):
     """Test that running a test file with an invalid header results in the right exception
     being thrown."""

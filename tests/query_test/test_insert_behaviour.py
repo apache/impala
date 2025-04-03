@@ -34,10 +34,6 @@ from tests.util.filesystem_utils import WAREHOUSE, IS_S3
 @SkipIfLocal.hdfs_client
 class TestInsertBehaviour(ImpalaTestSuite):
   """Tests for INSERT behaviour that isn't covered by checking query results"""
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   TEST_DB_NAME = "insert_empty_result_db"
 
   def setup_method(self, method):

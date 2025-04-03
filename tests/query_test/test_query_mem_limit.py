@@ -120,10 +120,6 @@ class TestQueryMemLimit(ImpalaTestSuite):
 class TestCodegenMemLimit(ImpalaTestSuite):
   """Tests that memory limit applies to codegen """
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestCodegenMemLimit, cls).add_test_dimensions()
     # Run with num_nodes=1 to avoid races between fragments allocating memory.

@@ -23,10 +23,6 @@ from tests.common.skip import SkipIfCatalogV2
 # This test requires that testdata/avro_schema_resolution/create_table.sql has been run
 class TestAvroSchemaResolution(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestAvroSchemaResolution, cls).add_test_dimensions()
     # avro/snap is the only table format with a schema_resolution_test table

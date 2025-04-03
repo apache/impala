@@ -55,10 +55,6 @@ class TestIcebergTable(IcebergTestSuite):
   """Tests related to Iceberg tables."""
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestIcebergTable, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
@@ -1502,10 +1498,6 @@ class TestIcebergV2Table(IcebergTestSuite):
   """Tests related to Iceberg V2 tables."""
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestIcebergV2Table, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
@@ -2131,10 +2123,6 @@ class TestIcebergV2Table(IcebergTestSuite):
 # runs also with the V2 optimizations setting turned off, some tests were moved here.
 class TestIcebergDirectedMode(IcebergTestSuite):
   """Tests related to Iceberg DIRECTED distribution mode."""
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

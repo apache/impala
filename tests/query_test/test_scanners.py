@@ -89,10 +89,6 @@ def scan_multithread_constraint(vector):
 class TestScannersAllTableFormats(ImpalaTestSuite):
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestScannersAllTableFormats, cls).add_test_dimensions()
     if cls.exploration_strategy() == 'core':
@@ -118,10 +114,6 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
 class TestScannersAllTableFormatsDefaultOptions(ImpalaTestSuite):
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestScannersAllTableFormatsDefaultOptions, cls).add_test_dimensions()
     if cls.exploration_strategy() == 'core':
@@ -145,10 +137,6 @@ class TestScannersAllTableFormatsDefaultOptions(ImpalaTestSuite):
 
 
 class TestScannersVirtualColumns(ImpalaTestSuite):
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -192,10 +180,6 @@ class TestScannersVirtualColumns(ImpalaTestSuite):
 
 class TestScannersVirtualColumnsNegative(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestScannersVirtualColumnsNegative, cls).add_test_dimensions()
     # In the tests we explicitly refer to the databases, i.e. no need to
@@ -208,10 +192,6 @@ class TestScannersVirtualColumnsNegative(ImpalaTestSuite):
 
 
 class TestIcebergVirtualColumns(ImpalaTestSuite):
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -231,10 +211,6 @@ class TestIcebergVirtualColumns(ImpalaTestSuite):
 # Test all the scanners with a simple limit clause. The limit clause triggers
 # cancellation in the scanner code paths.
 class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestScannersAllTableFormatsWithLimit, cls).add_test_dimensions()
@@ -269,10 +245,6 @@ class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
 class TestScannersMixedTableFormats(ImpalaTestSuite):
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestScannersMixedTableFormats, cls).add_test_dimensions()
     # Only run with a single dimension format, since the table includes mixed formats.
@@ -290,10 +262,6 @@ class TestScannersMixedTableFormats(ImpalaTestSuite):
 # Test case to verify the scanners work properly when the table metadata (specifically the
 # number of columns in the table) does not match the number of columns in the data file.
 class TestUnmatchedSchema(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestUnmatchedSchema, cls).add_test_dimensions()
@@ -350,10 +318,6 @@ class TestUnmatchedSchema(ImpalaTestSuite):
 # Tests that scanners can read a single-column, single-row, 10MB table
 class TestWideRow(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestWideRow, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
@@ -386,10 +350,6 @@ class TestWideRow(ImpalaTestSuite):
 class TestWideTable(ImpalaTestSuite):
   # TODO: expand this to more rows when we have the capability
   NUM_COLS = [250, 500, 1000]
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -431,10 +391,6 @@ class TestWideTable(ImpalaTestSuite):
 
 
 class TestHdfsScannerSkew(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsScannerSkew, cls).add_test_dimensions()
@@ -508,10 +464,6 @@ class TestHdfsScannerSkew(ImpalaTestSuite):
 
 class TestHudiParquet(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestHudiParquet, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
@@ -524,10 +476,6 @@ class TestHudiParquet(ImpalaTestSuite):
 
 
 class TestIceberg(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestIceberg, cls).add_test_dimensions()
@@ -555,10 +503,6 @@ class TestIceberg(ImpalaTestSuite):
 
 
 class TestParquet(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestParquet, cls).add_test_dimensions()
@@ -1380,10 +1324,6 @@ MAX_SCAN_RANGE_LENGTHS = [0, 1, 2, 5, 16, 17, 32, 512]
 class TestScanRangeLengths(ImpalaTestSuite):
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestScanRangeLengths, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'max_scan_range_length', MAX_SCAN_RANGE_LENGTHS)
@@ -1479,10 +1419,6 @@ class TestTextScanRangeLengths1(ImpalaTestSuite):
       "testescape_32_lf", "testescape_32_crlf"]
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestTextScanRangeLengths1, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
@@ -1510,10 +1446,6 @@ class TestTextScanRangeLengths1(ImpalaTestSuite):
 
 # Tests behavior of split "\r\n" delimiters.
 class TestTextSplitDelimiters(ImpalaTestSuite):
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -1590,10 +1522,6 @@ class TestTextSplitDelimiters(ImpalaTestSuite):
 # Test for IMPALA-1740: Support for skip.header.line.count
 class TestTextScanRangeLengths2(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestTextScanRangeLengths2, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -1623,10 +1551,6 @@ class TestTextScanRangeLengths2(ImpalaTestSuite):
 # Missing Coverage: No coverage for truncated files errors or scans.
 @SkipIfFS.hive
 class TestScanTruncatedFiles(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestScanTruncatedFiles, cls).add_test_dimensions()
@@ -1673,10 +1597,6 @@ class TestScanTruncatedFiles(ImpalaTestSuite):
 
 class TestUncompressedText(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestUncompressedText, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
@@ -1691,10 +1611,6 @@ class TestUncompressedText(ImpalaTestSuite):
 
 
 class TestOrc(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestOrc, cls).add_test_dimensions()
@@ -2006,10 +1922,6 @@ class TestOrc(ImpalaTestSuite):
 
 class TestScannerReservation(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestScannerReservation, cls).add_test_dimensions()
     # Only run with a single dimension - all queries are format-specific and
@@ -2023,20 +1935,12 @@ class TestScannerReservation(ImpalaTestSuite):
 
 
 class TestErasureCoding(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @SkipIf.not_ec
   def test_erasure_coding(self, vector):
     self.run_test_case('QueryTest/hdfs-erasure-coding', vector)
 
 
 class TestBinaryType(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestBinaryType, cls).add_test_dimensions()
@@ -2049,10 +1953,6 @@ class TestBinaryType(ImpalaTestSuite):
 
 class TestBinaryInComplexType(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestBinaryInComplexType, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
@@ -2063,10 +1963,6 @@ class TestBinaryInComplexType(ImpalaTestSuite):
 
 
 class TestParquetV2(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestParquetV2, cls).add_test_dimensions()
@@ -2081,10 +1977,6 @@ class TestSingleFileTable(ImpalaTestSuite):
   """IMPALA-12589: Regression test for corner case behavior where a table LOCATION might
   point to a file instead of a directory. Expect SELECT and SHOW FILES to still work in
   that case."""
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

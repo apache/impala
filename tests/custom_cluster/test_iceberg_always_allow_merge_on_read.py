@@ -43,10 +43,6 @@ class TestIcebergAlwaysAllowMergeOnRead(CustomClusterTestSuite):
     return "AnalysisException: Unsupported '{0}': 'copy-on-write' for " \
         "Iceberg table: {1}.{2}".format(operation, db, self.TABLE_NAME)
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @CustomClusterTestSuite.with_args(
       impalad_args='--iceberg_always_allow_merge_on_read_operations=true')
   @pytest.mark.execute_serially

@@ -106,10 +106,6 @@ result_lut = {
 
 class TestAggregation(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestAggregation, cls).add_test_dimensions()
     # IMPALA-12383: Exercise with both num_nodes=0 (distributed plan) and num_nodes=1
@@ -195,10 +191,6 @@ class TestAggregation(ImpalaTestSuite):
 class TestAggregationQueries(ImpalaTestSuite):
   """Run the aggregation test suite, with codegen enabled and disabled, to exercise our
   non-codegen code"""
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestAggregationQueries, cls).add_test_dimensions()
@@ -360,10 +352,6 @@ class TestAggregationQueriesSingleFormat(ImpalaTestSuite):
   enabled and disabled to exercise our non-codegen code, default batch_size,
   and batch_size=1."""
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestAggregationQueriesSingleFormat, cls).add_test_dimensions()
 
@@ -448,10 +436,6 @@ class TestDistinctAggregation(ImpalaTestSuite):
   """Run the distinct aggregation test suite, with codegen and shuffle_distinct_exprs
   enabled and disabled."""
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestDistinctAggregation, cls).add_test_dimensions()
 
@@ -481,10 +465,6 @@ class TestDistinctAggregation(ImpalaTestSuite):
 
 class TestWideAggregationQueries(ImpalaTestSuite):
   """Test that aggregations with many grouping columns work"""
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestWideAggregationQueries, cls).add_test_dimensions()

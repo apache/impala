@@ -22,10 +22,6 @@ from tests.common.skip import SkipIfApacheHive
 
 class TestGeospatialFuctions(ImpalaTestSuite):
   """Tests the geospatial builtin functions"""
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @SkipIfApacheHive.feature_not_supported
   def test_esri_geospatial_functions(self, vector):
     self.run_test_case('QueryTest/geospatial-esri', vector)

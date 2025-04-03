@@ -40,10 +40,6 @@ class TestUdfPersistence(CustomClusterTestSuite):
   LOCAL_LIBRARY_DIR = "udf_persistence"
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')

@@ -33,10 +33,6 @@ class TestDelimitedText(ImpalaTestSuite):
   """
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestDelimitedText, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

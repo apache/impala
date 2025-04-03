@@ -28,10 +28,6 @@ class TestParquetEncodings(ImpalaTestSuite):
   TEST_FILE_DIRECTORY = "testdata/parquet_byte_stream_split_encoding"
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestParquetEncodings, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(

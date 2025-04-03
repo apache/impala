@@ -114,10 +114,6 @@ class TestHdfsCaching(ImpalaTestSuite):
 # TODO: Move this to TestHdfsCaching once we make exhaustive tests run for other workloads
 @SkipIfFS.hdfs_caching
 class TestHdfsCachingFallbackPath(ImpalaTestSuite):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @SkipIfFS.hdfs_encryption
   def test_hdfs_caching_fallback_path(self, vector, unique_database, testid_checksum):
     """ This tests the code path of the query execution where the hdfs cache read fails
@@ -168,10 +164,6 @@ class TestHdfsCachingFallbackPath(ImpalaTestSuite):
 
 @SkipIfFS.hdfs_caching
 class TestHdfsCachingDdl(ImpalaTestSuite):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsCachingDdl, cls).add_test_dimensions()

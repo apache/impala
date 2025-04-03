@@ -26,10 +26,6 @@ from tests.common.test_vector import ImpalaTestDimension
 
 class TestTableSample(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestTableSample, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('repeatable', *[True, False]))

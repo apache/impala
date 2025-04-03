@@ -84,10 +84,6 @@ class TestQueryRetries(CustomClusterTestSuite):
   _count_query = "select count(*) from tpch_parquet.lineitem where l_orderkey < 50"
   _count_query_result = "55"
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   def test_retries_from_cancellation_pool(self):
     """Tests that queries are retried instead of cancelled if one of the nodes leaves the
@@ -1190,10 +1186,6 @@ class TestQueryRetries(CustomClusterTestSuite):
 # query.
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestQueryRetriesFaultyDisk(CustomClusterTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':

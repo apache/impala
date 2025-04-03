@@ -43,10 +43,6 @@ from tests.util.hive_utils import HiveDbWrapper, HiveTableWrapper
 @SkipIfFS.hive
 class TestHmsIntegrationSanity(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestHmsIntegrationSanity, cls).add_test_dimensions()
     # There is no reason to run these tests using all dimensions.
@@ -135,10 +131,6 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
 
 @SkipIfFS.hive
 class TestHmsIntegration(ImpalaTestSuite):
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

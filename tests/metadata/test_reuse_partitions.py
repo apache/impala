@@ -26,10 +26,6 @@ class TestReusePartitions(ImpalaTestSuite):
   """Tests for catalogd reusing unchanged partition instances for DDL/DMLs"""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestReusePartitions, cls).add_test_dimensions()
 

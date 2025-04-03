@@ -28,10 +28,6 @@ PULL_TABLE_TYPES_FLAG = "--pull_table_types_and_comments=true"
 
 class TestShowViewsStatements(CustomClusterTestSuite):
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @CustomClusterTestSuite.with_args(
     catalogd_args=PULL_TABLE_TYPES_FLAG)
   def test_show_views(self, vector):

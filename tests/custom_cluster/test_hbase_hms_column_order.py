@@ -36,10 +36,6 @@ class TestHBaseHmsColumnOrder(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'hbase')
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @CustomClusterTestSuite.with_args(
       catalogd_args="--use_hms_column_order_for_hbase_tables=true")
   def test_hbase_hms_column_order(self, vector, unique_database):

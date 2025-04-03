@@ -31,10 +31,6 @@ from time import sleep
 # conditions in error reporting (IMPALA-3385).
 class TestErrorLogs(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestErrorLogs, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

@@ -27,10 +27,6 @@ from tests.util.filesystem_utils import get_fs_path
 
 class TestStringQueries(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestStringQueries, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
@@ -66,10 +62,6 @@ class TestStringQueries(ImpalaTestSuite):
         vector, unique_database)
 
 class TestCharFormats(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestCharFormats, cls).add_test_dimensions()

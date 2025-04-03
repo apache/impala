@@ -40,10 +40,6 @@ class TestIcebergV2UpdateStress(ImpalaTestSuite):
   EXHAUSTIVE_BATCH_SIZES = [0, 1, 11, 32]
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestIcebergV2UpdateStress, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(

@@ -40,10 +40,6 @@ class TestResultSpooling(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_result_spooling(self, vector):
     self.run_test_case('QueryTest/result-spooling', vector)
 
@@ -247,10 +243,6 @@ class TestResultSpoolingFetchSize(ImpalaTestSuite):
   _query = "select id from functional_parquet.alltypes order by id"
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestResultSpoolingFetchSize, cls).add_test_dimensions()
     # Create a test matrix with three different dimensions: BATCH_SIZE, the number of
@@ -396,10 +388,6 @@ class TestResultSpoolingFailpoints(ImpalaTestSuite):
   _query = "select * from functional.alltypes"
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestResultSpoolingFailpoints, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('debug_action',
@@ -427,10 +415,6 @@ class TestResultSpoolingMaxReservation(ImpalaTestSuite):
   # Always test with the minimal amount of spilling and running with the absolute minimum
   # memory requirement.
   DEBUG_ACTION_VALUES = [None, '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

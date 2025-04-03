@@ -54,10 +54,6 @@ class TestScratchLimit(ImpalaTestSuite):
   buffer_pool_limit = "32m"
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestScratchLimit, cls).add_test_dimensions()
     # There is no reason to run these tests using all dimensions.

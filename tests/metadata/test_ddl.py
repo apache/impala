@@ -934,10 +934,6 @@ class TestDdlStatements(TestDdlBase):
 # Test HS2, Beeswax and HS2-HTTP three clients.
 class TestAsyncDDL(TestDdlBase):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestAsyncDDL, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
@@ -1010,10 +1006,6 @@ class TestAsyncDDL(TestDdlBase):
 
 
 class TestAsyncDDLTiming(TestDdlBase):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestAsyncDDLTiming, cls).add_test_dimensions()
@@ -1156,10 +1148,6 @@ class TestDdlLogs(TestDdlBase):
 
 # IMPALA-2002: Tests repeated adding/dropping of .jar and .so in the lib cache.
 class TestLibCache(TestDdlBase):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestLibCache, cls).add_test_dimensions()

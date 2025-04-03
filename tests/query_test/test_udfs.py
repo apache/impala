@@ -283,10 +283,6 @@ location '{location}' symbol='TwentyOneArgs';
 class TestUdfExecution(TestUdfBase):
   """Test execution of UDFs with a combination of different query options."""
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestUdfExecution, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
@@ -441,10 +437,6 @@ class TestUdfExecution(TestUdfBase):
 class TestUdfTargeted(TestUdfBase):
   """Targeted UDF tests that don't need to be run under the full combination of
   exec options."""
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestUdfTargeted, cls).add_test_dimensions()

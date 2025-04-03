@@ -41,10 +41,6 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   AVRO_SCHEMA_LOC = get_fs_path("/test-warehouse/avro_schemas/functional/alltypes.json")
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestMetadataQueryStatements, cls).add_test_dimensions()
     sync_ddl_opts = [0, 1]

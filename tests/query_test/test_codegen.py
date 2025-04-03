@@ -26,10 +26,6 @@ from tests.common.test_result_verifier import get_node_exec_options,\
 
 class TestCodegen(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestCodegen, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension_from_dict({

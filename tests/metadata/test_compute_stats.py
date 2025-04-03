@@ -40,10 +40,6 @@ IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 # Tests the COMPUTE STATS command for gathering table and column stats.
 class TestComputeStats(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestComputeStats, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
@@ -334,10 +330,6 @@ class TestComputeStats(ImpalaTestSuite):
 # based on the filesystem type (S3, Isilon, etc.).
 class TestHbaseComputeStats(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestHbaseComputeStats, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
@@ -360,10 +352,6 @@ class TestHbaseComputeStats(ImpalaTestSuite):
 
 class TestCorruptTableStats(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestCorruptTableStats, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
@@ -379,10 +367,6 @@ class TestCorruptTableStats(ImpalaTestSuite):
 
 
 class TestIncompatibleColStats(ImpalaTestSuite):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestIncompatibleColStats, cls).add_test_dimensions()
@@ -426,10 +410,6 @@ class TestIncompatibleColStats(ImpalaTestSuite):
 # Test column min/max stats currently enabled for Parquet tables.
 class TestParquetComputeColumnMinMax(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestParquetComputeColumnMinMax, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
@@ -441,10 +421,6 @@ class TestParquetComputeColumnMinMax(ImpalaTestSuite):
 
 
 class TestInvalidStatsFromHms(ImpalaTestSuite):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestInvalidStatsFromHms, cls).add_test_dimensions()

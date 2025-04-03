@@ -30,10 +30,6 @@ class TestIcebergStrictDataFileLocation(CustomClusterTestSuite):
   EXCEPTION = "IcebergTableLoadingException: " \
     "Error loading metadata for Iceberg table"
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @CustomClusterTestSuite.with_args(
       catalogd_args='--iceberg_allow_datafiles_in_table_location_only=true')
   @pytest.mark.execute_serially

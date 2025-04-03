@@ -24,10 +24,6 @@ from tests.common.test_dimensions import create_single_exec_option_dimension
 
 class TestLargeNumPartitions(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestLargeNumPartitions, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

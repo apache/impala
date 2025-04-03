@@ -53,10 +53,6 @@ class TestQueryLogTableBasic(WorkloadManagementTestSuite):
     super(TestQueryLogTableBasic, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   MAX_SQL_PLAN_LEN = 2000
   LOG_DIR_MAX_WRITES = 'max_attempts_exceeded'
 

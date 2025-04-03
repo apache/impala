@@ -28,10 +28,6 @@ SHOW_FUNCTIONS = "show functions in _impala_builtins"
 class TestGeospatialLibrary(CustomClusterTestSuite):
   """Tests the geospatial_library backend flag"""
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @CustomClusterTestSuite.with_args(start_args='--geospatial_library=NONE')
   @SkipIfApacheHive.feature_not_supported
   @pytest.mark.execute_serially

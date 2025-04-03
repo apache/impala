@@ -29,10 +29,6 @@ from tests.util.filesystem_utils import IS_S3
 
 class TestDecimalQueries(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestDecimalQueries, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
@@ -63,10 +59,6 @@ class TestDecimalQueries(ImpalaTestSuite):
 # query option.
 class TestDecimalExprs(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestDecimalExprs, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -79,10 +71,6 @@ class TestDecimalExprs(ImpalaTestSuite):
 # TODO: when we have a good way to produce Avro decimal data (e.g. upgrade Hive), we can
 # run Avro through the same tests as above instead of using avro_decimal_tbl.
 class TestAvroDecimalQueries(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestAvroDecimalQueries, cls).add_test_dimensions()
@@ -99,10 +87,6 @@ class TestAvroDecimalQueries(ImpalaTestSuite):
 # query option.
 @pytest.mark.execute_serially
 class TestDecimalOverflowExprs(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestDecimalOverflowExprs, cls).add_test_dimensions()

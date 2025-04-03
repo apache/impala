@@ -26,10 +26,6 @@ from tests.util.shell_util import exec_process
 class TestKrpcSocket(CustomClusterTestSuite):
   """Test for different types of socket used by KRPC."""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--rpc_use_unix_domain_socket=false")

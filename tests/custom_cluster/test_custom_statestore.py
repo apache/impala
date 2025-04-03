@@ -57,10 +57,6 @@ class TestCustomStatestore(CustomClusterTestSuite):
   handle.bind(('localhost', 0))
   _, port = handle.getsockname()
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   def __get_protocol_version(self):
     request = Subscriber.TGetProtocolVersionRequest(
         protocol_version=Subscriber.StatestoreServiceVersion.V2)
@@ -206,10 +202,6 @@ class TestStatestoreStartupDelay(CustomClusterTestSuite):
   """This test injects a real delay in statestored startup. The impalads and catalogd are
   expected to be able to tolerate this delay with FLAGS_tolerate_statestore_startup_delay
   set as true. This is not testing anything beyond successful startup."""
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def setup_class(cls):

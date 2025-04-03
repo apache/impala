@@ -23,10 +23,6 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 class TestBlacklistedDbsAndTables(CustomClusterTestSuite):
   """Test for db and table blacklist."""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   def __expect_error_in_result(self, stmt, expected_err):
     # Drop db/table/view statements won't fail if they contains IF EXISTS. Instead,
     # the error message is returned as results.

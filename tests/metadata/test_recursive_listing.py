@@ -34,10 +34,6 @@ class TestRecursiveListing(ImpalaTestSuite):
   reset_log_level_url = "http://localhost:25020/reset_java_loglevel"
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestRecursiveListing, cls).add_test_dimensions()
     # don't use any exec options, running exactly once is fine

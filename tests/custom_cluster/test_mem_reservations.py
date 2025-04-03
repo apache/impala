@@ -28,10 +28,6 @@ from tests.verifiers.metric_verifier import MetricVerifier
 class TestMemReservations(CustomClusterTestSuite):
   """Tests for memory reservations that require custom cluster arguments."""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--buffer_pool_limit=2g --memory_maintenance_sleep_time_ms=100")

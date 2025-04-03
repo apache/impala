@@ -36,10 +36,6 @@ LOG = logging.getLogger(__name__)
 class CustomKuduTest(CustomClusterTestSuite, KuduTestSuite):
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def default_test_protocol(cls):
     # run_test_case() can produce different result types between beeswax vs hs2 protocol
     # in some tests. This fix the test to use beeswax protocol until we can migrate
@@ -66,10 +62,6 @@ class CustomKuduTest(CustomClusterTestSuite, KuduTestSuite):
 
 
 class TestKuduOperations(CustomKuduTest):
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -145,10 +137,6 @@ class TestKuduClientTimeout(CustomKuduTest):
      this turns out to be the case, specific tests may need to be re-considered or
      removed."""
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_operation_timeout_ms=1")
   @SkipIfKudu.hms_integration_enabled()
@@ -164,10 +152,6 @@ class TestKuduHMSIntegration(CustomKuduTest):
   # tests time.
   """Tests the different DDL operations when using a kudu table with Kudu's integration
      with the Hive Metastore."""
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def setup_class(cls):
@@ -412,10 +396,6 @@ class TestKuduTransactionBase(CustomKuduTest):
   _update_query = "update {0} set b='test' where a=1"
   # query to upsert a row in Kudu table.
   _upsert_query = "upsert into {0} values (3, 'hello')"
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   def _test_kudu_txn_succeed(self, unique_database):
     # Create Kudu table.
@@ -764,10 +744,6 @@ class TestKuduTxnKeepalive(CustomKuduTest):
   _insert_3_rows_query = "insert into {0} values (0, 'a'), (1, 'b'), (2, 'c')"
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     # Restart Kudu cluster with txn_keepalive_interval_ms as 1000 ms.
     KUDU_ARGS = "-txn_keepalive_interval_ms=1000"
@@ -820,10 +796,6 @@ class TestKuduDmlConflictBase(CustomKuduTest):
   _delete_by_key_query = "delete from {0} where a = {1}"
   # query to drop all rows from Kudu table.
   _delete_all_query = "delete from {0}"
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   def _check_errors(self, query_profile, expect_error, error_message, num_row_erros):
     """

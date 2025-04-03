@@ -50,10 +50,6 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
   HS2_HTTP_CONNS = "impala.thrift-server.hiveserver2-http-frontend.total-connections"
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     """Overrides all other add_dimension methods in super classes up the entire class
     hierarchy ensuring that each test in this class run using the hs2-http protocol."""

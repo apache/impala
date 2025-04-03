@@ -32,10 +32,6 @@ class TestExtDataSources(CustomClusterTestSuite):
   """Impala query tests for external data sources."""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestExtDataSources, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
@@ -180,10 +176,6 @@ class TestHivePostgresJdbcTables(CustomClusterTestSuite):
   """Tests for hive jdbc postgres tables. """
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     super(TestHivePostgresJdbcTables, cls).setup_class()
 
@@ -265,10 +257,6 @@ class TestHivePostgresJdbcTables(CustomClusterTestSuite):
 class TestMySqlExtJdbcTables(CustomClusterTestSuite):
   """Impala query tests for external jdbc tables on MySQL server.
   It also includes tests for external hive jdbc tables on mysql."""
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def _setup_mysql_test_env(cls):
@@ -393,10 +381,6 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
 
 class TestImpalaExtJdbcTables(CustomClusterTestSuite):
   """Impala query tests for external jdbc tables in Impala cluster."""
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

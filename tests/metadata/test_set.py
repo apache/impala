@@ -25,10 +25,6 @@ from tests.common.test_dimensions import (
 
 class TestSet(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestSet, cls).add_test_dimensions()
     # This test only needs to be run once.

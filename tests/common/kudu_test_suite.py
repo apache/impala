@@ -82,10 +82,6 @@ class KuduTestSuite(ImpalaTestSuite):
     super(KuduTestSuite, cls).setup_class()
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(KuduTestSuite, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(

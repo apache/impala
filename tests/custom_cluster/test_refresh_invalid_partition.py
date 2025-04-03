@@ -22,9 +22,6 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 
 class TestRefreshInvalidPartition(CustomClusterTestSuite):
-  @classmethod
-  def get_workload(self):
-      return 'functional-query'
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

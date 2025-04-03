@@ -36,10 +36,6 @@ from tests.util.filesystem_utils import get_fs_path
 class TestUdfConcurrency(CustomClusterTestSuite):
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')

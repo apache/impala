@@ -33,10 +33,6 @@ import re
 
 class TestObservability(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def default_test_protocol(cls):
     return HS2
 
@@ -1031,10 +1027,6 @@ class TestObservability(ImpalaTestSuite):
 class TestQueryStates(ImpalaTestSuite):
   """Test that the 'Query State' and 'Impala Query State' are set correctly in the
   runtime profile."""
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   def test_query_states(self):
     """Tests that the query profile shows expected query states."""

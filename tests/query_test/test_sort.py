@@ -254,10 +254,6 @@ class TestQueryFullSort(ImpalaTestSuite):
 
 class TestRandomSort(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestRandomSort, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'max_sort_run_size', MAX_SORT_RUN_SIZE)
@@ -363,10 +359,6 @@ class TestPartialSort(ImpalaTestSuite):
 class TestArraySort(ImpalaTestSuite):
   """Tests where there are arrays in the sorting tuple.
   These tests run with num_nodes=1."""
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

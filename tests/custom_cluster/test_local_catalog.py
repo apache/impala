@@ -597,10 +597,6 @@ class TestLocalCatalogObservability(CustomClusterTestSuite):
 
 
 class TestFullAcid(CustomClusterTestSuite):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @SkipIfHive2.acid
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

@@ -33,10 +33,6 @@ if IS_ISILON:
 class TestExchangeDelays(CustomClusterTestSuite):
   """Tests for handling delays in finding data stream receivers"""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       "--stress_datastream_recvr_delay_ms={0}".format(DELAY_MS)

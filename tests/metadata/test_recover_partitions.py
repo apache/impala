@@ -37,10 +37,6 @@ class TestRecoverPartitions(ImpalaTestSuite):
   DEF_NULL_PART_KEY = "__HIVE_DEFAULT_PARTITION__"
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestRecoverPartitions, cls).add_test_dimensions()
     sync_ddl_opts = [0, 1]

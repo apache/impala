@@ -29,10 +29,6 @@ class TestInsertQueriesWithPermutation(ImpalaTestSuite):
   Tests for the column permutation feature of INSERT statements
   """
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestInsertQueriesWithPermutation, cls).add_test_dimensions()
     # Fix the exec_option vector to have a single value. This is needed should we decide

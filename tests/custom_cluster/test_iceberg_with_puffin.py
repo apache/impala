@@ -34,10 +34,6 @@ class TestIcebergWithPuffinStatsStartupFlag(CustomClusterTestSuite):
   """Tests for checking the behaviour of the startup flag
   'enable_reading_puffin_stats'."""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @CustomClusterTestSuite.with_args(
       catalogd_args='--enable_reading_puffin_stats=false')
   @pytest.mark.execute_serially
@@ -83,10 +79,6 @@ class TestIcebergTableWithPuffinStats(CustomClusterTestSuite):
         bool_col BOOLEAN) STORED BY ICEBERG"""
 
   TBL_NAME = "ice_puffin_tbl"
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

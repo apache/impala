@@ -38,10 +38,6 @@ class TestNestedTypes(ImpalaTestSuite):
   """Functional tests for nested types, run for all file formats that support nested
   types."""
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestNestedTypes, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'mt_dop', MT_DOP_DIMS)
@@ -116,10 +112,6 @@ class TestNestedTypesSingleNode(ImpalaTestSuite):
 class TestNestedStructsInSelectList(ImpalaTestSuite):
   """Functional tests for nested structs provided in the select list."""
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestNestedStructsInSelectList, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
@@ -176,10 +168,6 @@ class TestNestedStructsInSelectList(ImpalaTestSuite):
 class TestNestedCollectionsInSelectList(ImpalaTestSuite):
   """Functional tests for nested arrays provided in the select list."""
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestNestedCollectionsInSelectList, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
@@ -211,10 +199,6 @@ class TestMixedCollectionsAndStructsInSelectList(ImpalaTestSuite):
   """Functional tests for the case where collections and structs are embedded into one
   another and they are provided in the select list."""
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestMixedCollectionsAndStructsInSelectList, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
@@ -241,10 +225,6 @@ class TestMixedCollectionsAndStructsInSelectList(ImpalaTestSuite):
 class TestComputeStatsWithNestedTypes(ImpalaTestSuite):
   """Functional tests for running compute stats on tables that have nested types in the
   columns."""
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestComputeStatsWithNestedTypes, cls).add_test_dimensions()
@@ -274,10 +254,6 @@ class TestComputeStatsWithNestedTypes(ImpalaTestSuite):
 class TestZippingUnnest(ImpalaTestSuite):
   """Functional tests for zipping unnest functionality."""
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestZippingUnnest, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
@@ -298,10 +274,6 @@ class TestZippingUnnest(ImpalaTestSuite):
 
 class TestZippingUnnestFromView(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestZippingUnnestFromView, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -315,10 +287,6 @@ class TestZippingUnnestFromView(ImpalaTestSuite):
 
 class TestNestedTypesNoMtDop(ImpalaTestSuite):
   """Functional tests for nested types that do not need to be run with mt_dop > 0."""
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestNestedTypesNoMtDop, cls).add_test_dimensions()
@@ -410,10 +378,6 @@ class TestNestedTypesNoMtDopOrc(ImpalaTestSuite):
   """Functional tests for nested types against ORC format only and not need to be run
   with mt_dop > 0."""
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestNestedTypesNoMtDopOrc, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
@@ -466,10 +430,6 @@ class TestNestedTypesNoMtDopParquet(ImpalaTestSuite):
   """Functional tests for nested types against Parquet format only and not need
   to be run with mt_dop > 0."""
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestNestedTypesNoMtDopParquet, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -485,10 +445,6 @@ class TestParquetArrayEncodingsBase(ImpalaTestSuite):
                               "testdata/parquet_nested_types_encodings")
 
   ARRAY_RESOLUTION_POLICIES = ["three_level", "two_level", "two_level_then_three_level"]
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -903,10 +859,6 @@ class TestMaxNestingDepth(ImpalaTestSuite):
   TABLES = ['struct', 'int_array', 'struct_array', 'int_map', 'struct_map']
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestMaxNestingDepth, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'orc_schema_resolution', ORC_RESOLUTION_DIMS)
@@ -971,10 +923,6 @@ class TestNestedTypesStarExpansion(ImpalaTestSuite):
   """Functional tests for nested types when star expansion query
   option (EXPAND_COMPLEX_TYPES) is enabled/disabled, run for all file formats that
   support nested types."""
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

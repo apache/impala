@@ -34,10 +34,6 @@ class TestParquetStatsSingleNode(ImpalaTestSuite):
   """
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestParquetStatsSingleNode, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(cluster_sizes=[1]))
@@ -71,10 +67,6 @@ class TestParquetStats(ImpalaTestSuite):
   """
   This suite tests runtime optimizations based on Parquet statistics.
   """
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

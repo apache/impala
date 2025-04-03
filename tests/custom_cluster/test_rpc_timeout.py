@@ -44,10 +44,6 @@ class TestRPCTimeout(CustomClusterTestSuite):
   SLOW_TEST_QUERY = TEST_QUERY + " where c2.int_col = sleep(1000)"
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
@@ -237,10 +233,6 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
 class TestCatalogRPCTimeout(CustomClusterTestSuite):
   """"Tests RPC timeout and retry handling for catalogd operations."""
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def setup_class(cls):

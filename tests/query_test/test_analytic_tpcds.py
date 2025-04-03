@@ -27,10 +27,6 @@ class TestAnalyticTpcds(ImpalaTestSuite):
   Batch size parameter is varied if the exploration strategy is exhaustive.
   """
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestAnalyticTpcds, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension('tpcds'))

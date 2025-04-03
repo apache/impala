@@ -52,9 +52,6 @@ class TestCatalogdHA(CustomClusterTestSuite):
 
   SS_TEST_PORT = ["25010"]
 
-  def get_workload(self):
-    return 'functional-query'
-
   # Verify port of the active catalogd of statestore is matching with the catalog
   # service port of the given catalogd service.
   def __verify_statestore_active_catalogd_port(self, catalogd_service):

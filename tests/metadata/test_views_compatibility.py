@@ -58,10 +58,6 @@ class TestViewCompatibility(ImpalaTestSuite):
                          "QUERY_HIVE_VIEW_RESULTS", "QUERY_IMPALA_VIEW_RESULTS"]
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestViewCompatibility, cls).add_test_dimensions()
 

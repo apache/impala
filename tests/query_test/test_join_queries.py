@@ -55,10 +55,6 @@ class TestJoinBase(ImpalaTestSuite):
   exhaustive exploration."""
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestJoinBase, cls).add_test_dimensions()
 
@@ -229,10 +225,6 @@ class TestSemiJoinQueriesExhaustive(TestJoinBase):
 
 
 class TestSpillingHashJoin(ImpalaTestSuite):
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

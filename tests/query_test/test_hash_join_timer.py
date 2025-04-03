@@ -78,10 +78,6 @@ class TestHashJoinTimer(ImpalaTestSuite):
   NANOS_PER_MILLI = 1000000
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestHashJoinTimer, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(

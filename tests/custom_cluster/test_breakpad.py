@@ -35,10 +35,6 @@ DAEMON_ARGS = ['impalad_args', 'state_store_args', 'catalogd_args']
 
 class TestBreakpadBase(CustomClusterTestSuite):
   """Base class with utility methods for all breakpad tests."""
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def setup_method(self, method):
     # Override parent
     # The temporary directory gets removed in teardown_method() after each test.

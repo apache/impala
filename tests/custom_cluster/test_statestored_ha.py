@@ -44,9 +44,6 @@ class TestStatestoredHA(CustomClusterTestSuite):
   All cluster components are started with starting flag FLAGS_enable_statestored_ha
   as true."""
 
-  def get_workload(self):
-    return 'functional-query'
-
   def __disable_statestored_network(self,
       service_port=DEFAULT_STATESTORE_SERVICE_PORT, disable_network=False):
     request = Subscriber.TSetStatestoreDebugActionRequest(
@@ -816,10 +813,6 @@ class TestStatestoredHAStartupDelay(CustomClusterTestSuite):
   """This test injects a real delay in statestored startup. The impalads and catalogd are
   expected to be able to tolerate this delay with FLAGS_tolerate_statestore_startup_delay
   set as true. This is not testing anything beyond successful startup."""
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def setup_class(cls):

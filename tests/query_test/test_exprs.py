@@ -35,10 +35,6 @@ EXPR_REWRITE_OPTIONS = [0, 1]
 
 class TestExprs(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestExprs, cls).add_test_dimensions()
     # Test with and without expr rewrites to cover regular expr evaluations
@@ -150,10 +146,6 @@ class TestExprLimits(ImpalaTestSuite):
   # Keep these in sync with Expr.java
   EXPR_CHILDREN_LIMIT = 10000
   EXPR_DEPTH_LIMIT = 1000
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -314,20 +306,12 @@ class TestUtcTimestampFunctions(ImpalaTestSuite):
           v.get_value('table_format').file_format == 'text'
           and v.get_value('table_format').compression_codec == 'none')
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_utc_functions(self, vector):
     self.run_test_case('QueryTest/utc-timestamp-functions', vector)
 
 
 class TestConstantFoldingNoTypeLoss(ImpalaTestSuite):
   """"Regression tests for IMPALA-11462."""
-
-  @classmethod
-  def get_workload(self):
-    return "functional-query"
 
   @classmethod
   def add_test_dimensions(cls):
@@ -374,10 +358,6 @@ class TestNonConstPatternILike(ImpalaTestSuite):
     # Fix the table format to text.
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   def test_non_const_pattern_ilike(self, vector, unique_database):
     with self.create_impala_client_from_vector(vector) as client:

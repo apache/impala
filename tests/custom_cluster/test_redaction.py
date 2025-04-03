@@ -39,10 +39,6 @@ class TestRedaction(CustomClusterTestSuite):
      limited to table data and query text since queries may refer to table data.
   '''
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @property
   def log_dir(self):
     return os.path.join(self.tmp_dir, "logs")

@@ -42,10 +42,6 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
                (not IS_HDFS and not IS_LOCAL) else 10
   timeout_flag = "--invalidate_tables_timeout_s=" + str(timeout)
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def _get_catalog_object(self):
     """ Return the catalog object of functional.alltypes serialized to string. """
     return self.cluster.catalogd.service.read_debug_webpage(

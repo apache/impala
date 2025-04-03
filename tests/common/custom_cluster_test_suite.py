@@ -115,10 +115,6 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   SHARED_CLUSTER_ARGS = {}
 
   @classmethod
-  def get_workload(cls):
-    return 'tpch'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(CustomClusterTestSuite, cls).add_test_dimensions()
     cls.add_custom_cluster_constraints()

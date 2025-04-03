@@ -37,10 +37,6 @@ class TestFetch(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_rows_sent_counters(self, vector):
     """Validate that ClientFetchWaitTimer, NumRowsFetched, RowMaterializationRate,
     and RowMaterializationTimer are set to valid values in the ImpalaServer section
@@ -168,10 +164,6 @@ class TestFetchAndSpooling(ImpalaTestSuite):
     # spool_query_results is set as true by default.
     extend_exec_option_dimension(cls, 'spool_query_results', 'false')
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_rows_sent_counters(self, vector):
     """Validate that RowsSent and RowsSentRate are set to valid values in
     the PLAN_ROOT_SINK section of the runtime profile."""
@@ -205,10 +197,6 @@ class TestFetchTimeout(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
     extend_exec_option_dimension(cls, 'spool_query_results', 'true')
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   def test_fetch_timeout(self, vector):
     """A simple test that runs a query with a low timeout and introduces delays in

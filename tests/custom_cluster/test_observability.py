@@ -25,10 +25,6 @@ from tests.util.parse_util import parse_duration_string_ms
 
 
 class TestObservability(CustomClusterTestSuite):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   def test_host_profile_jvm_gc_metrics(self, unique_database):
     self.execute_query_expect_success(self.client,

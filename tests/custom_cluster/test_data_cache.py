@@ -34,10 +34,6 @@ class TestDataCache(CustomClusterTestSuite):
   on the scheduler's behavior and number of HDFS blocks.
   """
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')

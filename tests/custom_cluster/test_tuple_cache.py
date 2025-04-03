@@ -120,10 +120,6 @@ class TestTupleCacheBase(CustomClusterTestSuite):
     super(TestTupleCacheBase, cls).teardown_class()
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestTupleCacheBase, cls).add_test_dimensions()
     add_mandatory_exec_option(cls, 'enable_tuple_cache', 'true')

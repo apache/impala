@@ -44,10 +44,6 @@ LOG = logging.getLogger(__name__)
 
 
 class TestRestart(CustomClusterTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   def test_restart_statestore(self, cursor):
     """ Regression test of IMPALA-6973. After the statestore restarts, the metadata should
@@ -526,10 +522,6 @@ def get_remain_shutdown_query_cancel(exec_shutdown_deadline_s,
 class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
   IDLE_SHUTDOWN_GRACE_PERIOD_S = 1
   IMPALA_SHUTDOWN_SIGNAL = signal.SIGRTMIN
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @SkipIfFS.shutdown_idle_fails
   @pytest.mark.execute_serially

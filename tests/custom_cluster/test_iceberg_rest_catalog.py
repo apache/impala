@@ -35,9 +35,6 @@ IMPALAD_ARGS = """--use_local_catalog=true --catalogd_deployed=false
 
 
 class TestIcebergRestCatalog(CustomClusterTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   def setup_method(self, method):
     # Invoke start-impala-cluster.py with '--no_catalogd'

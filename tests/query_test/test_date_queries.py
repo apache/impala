@@ -29,10 +29,6 @@ from tests.shell.util import create_impala_shell_executable_dimension
 
 class TestDateQueries(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestDateQueries, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(

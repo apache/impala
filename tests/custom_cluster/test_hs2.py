@@ -27,10 +27,6 @@ from TCLIService import TCLIService
 
 class TestHS2(CustomClusterTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('These tests only run in exhaustive')

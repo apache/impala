@@ -36,10 +36,6 @@ from tests.util.filesystem_utils import IS_LOCAL
 
 class TestStressInfra(ImpalaTestSuite):
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_stress_binary_search_start_point(self):
     """
     Test that the stress test can use EXPLAIN to find the start point for its binary

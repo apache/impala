@@ -40,10 +40,6 @@ class TestRewrittenFile(ImpalaTestSuite):
   LONG_FILE_NUM_ROWS = 1000
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestRewrittenFile, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

@@ -39,10 +39,6 @@ def impalad_admission_ctrl_maxmtdop_args():
 
 class TestMtDopFlags(CustomClusterTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestMtDopFlags, cls).add_test_dimensions()
 
@@ -80,10 +76,6 @@ class TestMtDopFlags(CustomClusterTestSuite):
 
 
 class TestMaxMtDop(CustomClusterTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestMaxMtDop, cls).add_test_dimensions()

@@ -162,10 +162,6 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
   """Test the impala shell interactively"""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestImpalaShellInteractive, cls).add_test_dimensions()
     # Limit to uncompressed text with default exec options

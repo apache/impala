@@ -48,10 +48,6 @@ TMP_STAGING_PATH = get_fs_path('/tmp/test_load_staging')
 class TestLoadData(ImpalaTestSuite):
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestLoadData, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
@@ -117,10 +113,6 @@ class TestLoadData(ImpalaTestSuite):
 class TestLoadDataExternal(ImpalaTestSuite):
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestLoadDataExternal, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
@@ -154,10 +146,6 @@ class TestLoadDataExternal(ImpalaTestSuite):
 
 @SkipIfLocal.hdfs_client
 class TestAsyncLoadData(ImpalaTestSuite):
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

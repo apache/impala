@@ -30,10 +30,6 @@ class TestKrpcMetrics(CustomClusterTestSuite):
       join tpch_parquet.lineitem l2 where l1.l_orderkey = l2.l_orderkey;'
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')

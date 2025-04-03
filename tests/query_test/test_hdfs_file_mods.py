@@ -49,10 +49,6 @@ class TestHdfsFileMods(ImpalaTestSuite):
         *MODIFICATION_TYPES))
     cls.ImpalaTestMatrix.add_constraint(cls.file_format_constraint)
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def setup_ext_table(self, unique_database, new_table_location):
     # Use HDFS commands to clone the table's files at the hdfs level
     old_table_location = "{0}/test-warehouse/tinytable".format(FILESYSTEM_PREFIX)

@@ -32,10 +32,6 @@ class TestCodegenCache(CustomClusterTestSuite):
   in the runtime profile and metrics are as expected.
   """
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')

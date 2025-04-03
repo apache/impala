@@ -29,10 +29,6 @@ from tests.util.filesystem_utils import IS_HDFS
 # Tests that Impala validates rows against a validWriteIdList correctly.
 class TestAcidRowValidation(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     super(TestAcidRowValidation, cls).setup_class()
     cls.acid = AcidTxn(cls.hive_client)

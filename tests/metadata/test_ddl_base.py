@@ -27,10 +27,6 @@ from tests.util.filesystem_utils import WAREHOUSE
 # as well as test dimensions and setup/teardown.
 class TestDdlBase(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestDdlBase, cls).add_test_dimensions()
     sync_ddl_opts = [0, 1]

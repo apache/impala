@@ -31,10 +31,6 @@ from tests.util.shell_util import exec_process
 class TestHdfsTimeouts(CustomClusterTestSuite):
   """Test to verify that HDFS operations time out correctly."""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--hdfs_operation_timeout_sec=5 --max_cached_file_handles=0")

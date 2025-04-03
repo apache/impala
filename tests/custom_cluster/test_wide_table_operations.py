@@ -30,10 +30,6 @@ NUM_PARTS = 50000
 @SkipIf.not_hdfs
 class TestWideTableOperations(CustomClusterTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive since it takes more than 20 mins')

@@ -31,10 +31,6 @@ from k5test import K5Realm
 class TestImpalaShellKerberosAuth(ImpalaTestSuite):
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     """Overrides all other add_dimension methods in super classes up the entire class
     hierarchy ensuring that each test in this class only get run once

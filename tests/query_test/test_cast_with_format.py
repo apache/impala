@@ -22,9 +22,6 @@ from tests.common.test_dimensions import create_client_protocol_dimension
 
 
 class TestCastWithFormat(ImpalaTestSuite):
-  @classmethod
-  def get_workload(self):
-    return "functional-query"
 
   # Run the basic tests once for Beeaswax and once for HS2. The underlying functionality
   # is independent of the file format so make sense to pick one format for testing.

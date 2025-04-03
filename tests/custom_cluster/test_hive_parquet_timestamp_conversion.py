@@ -40,10 +40,6 @@ class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
         v.get_value('table_format').file_format == 'parquet' and
         v.get_value('table_format').compression_codec == 'none')
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   def check_sanity(self, expect_converted_result):
     data = self.execute_query_expect_success(self.client, """
         SELECT COUNT(timestamp_col), COUNT(DISTINCT timestamp_col),

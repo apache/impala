@@ -30,10 +30,6 @@ class TestCalcitePlanner(CustomClusterTestSuite):
   def setup_class(cls):
     super(TestCalcitePlanner, cls).setup_class()
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(start_args="--use_calcite_planner=true")
   def test_calcite_frontend(self, vector, unique_database):

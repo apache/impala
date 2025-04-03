@@ -31,10 +31,6 @@ class TestShellClient(ImpalaTestSuite):
   """Tests for the Impala Shell clients: ImpalaBeeswaxClient and ImpalaHS2Client."""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestShellClient, cls).add_test_dimensions()
     # Limit to uncompressed text with default exec options

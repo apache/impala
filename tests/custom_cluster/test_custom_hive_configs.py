@@ -27,10 +27,6 @@ HIVE_SITE_EXT_DIR = getenv('IMPALA_HOME') + '/fe/src/test/resources/hive-site-ex
 
 class TestCustomHiveConfigs(CustomClusterTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     super(TestCustomHiveConfigs, cls).setup_class()
 

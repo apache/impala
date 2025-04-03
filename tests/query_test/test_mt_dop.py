@@ -47,10 +47,6 @@ class TestMtDop(ImpalaTestSuite):
     super(TestMtDop, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_mt_dop(self, vector):
     new_vector = deepcopy(vector)
     del new_vector.get_value('exec_option')['batch_size']  # .test file sets batch_size
@@ -102,10 +98,6 @@ class TestMtDop(ImpalaTestSuite):
 
 class TestMtDopParquet(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestMtDopParquet, cls).add_test_dimensions()
     add_exec_option_dimension(cls, 'mt_dop', MT_DOP_VALUES)
@@ -131,10 +123,6 @@ class TestMtDopParquet(ImpalaTestSuite):
 
 class TestMtDopNonZeroParquet(ImpalaTestSuite):
   """Test against parquet and MT_DOP > 0."""
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -178,10 +166,6 @@ class TestMtDopScheduling(ImpalaTestSuite):
   for different queries. This is always at most mt_dop per host, but is less where there
   are fewer fragment instances per host. The mt_dop scheduling and slot calculation is
   orthogonal to file format, so we only need to test on one format."""
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestMtDopScheduling, cls).add_test_dimensions()

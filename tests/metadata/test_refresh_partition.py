@@ -30,10 +30,6 @@ class TestRefreshPartition(ImpalaTestSuite):
   """
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestRefreshPartition, cls).add_test_dimensions()
 

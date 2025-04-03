@@ -27,10 +27,6 @@ LOG = logging.getLogger('test_jvm_mem_tracking')
 
 class TestJvmMemTracker(CustomClusterTestSuite):
   """Test that JVM heap memory consumption is counted against process usage."""
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @CustomClusterTestSuite.with_args(impalad_args="--mem_limit_includes_jvm=true \
                                     --codegen_cache_capacity=0",
                                     start_args="--jvm_args=-Xmx1g", cluster_size=1)

@@ -34,10 +34,6 @@ class TestDedicatedCoordinator(CustomClusterTestSuite):
   coordinator."""
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestDedicatedCoordinator, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

@@ -62,10 +62,6 @@ class TestScannersFuzzing(ImpalaTestSuite):
     '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestScannersFuzzing, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(

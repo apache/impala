@@ -33,10 +33,6 @@ class TestExplain(ImpalaTestSuite):
   NUM_SCANNER_THREADS = 1
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestExplain, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:\

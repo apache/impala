@@ -23,10 +23,6 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 class TestDiskSpillConfigurations(CustomClusterTestSuite):
   """Tests to exercise non-default disk spill configurations end-to-end."""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--disk_spill_encryption=false")
   def test_disk_spill_encryption_disabled(self, vector):

@@ -25,10 +25,6 @@ class TestResourceLimits(ImpalaTestSuite):
   """Test resource limit functionality."""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestResourceLimits, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(

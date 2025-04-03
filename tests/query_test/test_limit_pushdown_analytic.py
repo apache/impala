@@ -41,10 +41,6 @@ class TestLimitPushdownAnalyticTpch(ImpalaTestSuite):
 
 class TestLimitPushdownAnalyticFunctional(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestLimitPushdownAnalyticFunctional, cls).add_test_dimensions()
     # Also run with num_nodes=1 because it's easier to reproduce IMPALA-10296.

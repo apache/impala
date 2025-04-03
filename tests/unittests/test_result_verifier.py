@@ -24,10 +24,6 @@ from tests.common.test_result_verifier import compute_aggregation
 # Unittest class for the test_result_verifier module.
 class TestResultVerifier(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestResultVerifier, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(

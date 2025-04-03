@@ -25,10 +25,6 @@ from tests.common.skip import SkipIfFS
 
 class TestHBaseQueries(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestHBaseQueries, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(\

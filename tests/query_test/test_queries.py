@@ -87,10 +87,6 @@ class TestQueries(ImpalaTestSuite):
         and vector.get_value('protocol') == 'hs2'
         and vector.get_value('exec_option')["exec_single_node_rows_threshold"] == 0)
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_analytic_fns(self, vector):
     # TODO: Enable some of these tests for Avro if possible
     # Don't attempt to evaluate timestamp expressions with Avro tables which don't
@@ -225,10 +221,6 @@ class TestQueriesTextTables(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_overflow(self, vector):
     self.run_test_case('QueryTest/overflow', vector)
 
@@ -269,10 +261,6 @@ class TestQueriesJsonTables(ImpalaTestSuite):
         create_uncompressed_json_dimension(cls.get_workload()))
     add_exec_option_dimension(cls, 'disable_optimized_json_count_star', [0, 1])
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_complex(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 0
     self.run_test_case('QueryTest/complex_json', vector)
@@ -297,10 +285,6 @@ class TestQueriesParquetTables(ImpalaTestSuite):
     super(TestQueriesParquetTables, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @pytest.mark.execute_serially
   def test_very_large_strings(self, vector):
@@ -334,10 +318,6 @@ class TestHdfsQueries(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format != 'kudu')
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def test_hdfs_scan_node(self, vector):
     self.run_test_case('QueryTest/hdfs-scan-node', vector)
 
@@ -357,10 +337,6 @@ class TestPartitionKeyScans(ImpalaTestSuite):
         v.get_value('table_format').file_format not in ('kudu', 'hbase'))
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension_from_dict({
       'mt_dop': [0, 1], 'exec_single_node_rows_threshold': [0]}))
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   def test_partition_key_scans(self, vector):
     self.run_test_case('QueryTest/partition-key-scans', vector)
@@ -382,10 +358,6 @@ class TestPartitionKeyScansWithMultipleBlocks(ImpalaTestSuite):
     super(TestPartitionKeyScansWithMultipleBlocks, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format not in ('kudu', 'hbase'))
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   def _build_alltypes_multiblocks_table(self, vector, unique_database):
     file_format = vector.get_value('table_format').file_format

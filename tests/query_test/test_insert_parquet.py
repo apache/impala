@@ -134,10 +134,6 @@ class TestInsertParquetQueries(ImpalaTestSuite):
 class TestParquetQueriesMultiCodecs(ImpalaTestSuite):
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestParquetQueriesMultiCodecs, cls).add_test_dimensions()
     # Fix the exec_option vector to have a single value.
@@ -161,10 +157,6 @@ class TestParquetQueriesMultiCodecs(ImpalaTestSuite):
 
 
 class TestInsertParquetInvalidCodec(ImpalaTestSuite):
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -237,10 +229,6 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
 
 
 class TestHdfsParquetTableWriter(ImpalaTestSuite):
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -557,10 +545,6 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
 @SkipIfFS.hive
 # TODO: Should we move this to test_parquet_stats.py?
 class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

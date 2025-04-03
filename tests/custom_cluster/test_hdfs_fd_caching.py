@@ -40,10 +40,6 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
   NUM_ROWS = 100
   INSERT_TPL = "insert into cachefd.simple values"
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   def create_n_files(self, n):
     """Creates 'n' files by performing 'n' inserts with NUM_ROWS rows."""
     values = ", ".join(["({0},{0},{0})".format(x) for x in range(self.NUM_ROWS)])

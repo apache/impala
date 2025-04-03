@@ -25,10 +25,6 @@ class TestKuduNotAvailable(CustomClusterTestSuite):
      fail with the expected error message.
   """
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @CustomClusterTestSuite.with_args(
       impalad_args="--disable_kudu=true",
       catalogd_args="--disable_kudu=true",

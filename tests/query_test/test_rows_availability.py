@@ -47,10 +47,6 @@ class TestRowsAvailability(ImpalaTestSuite):
   ROWS_AVAIL_LOWER_BOUND_MS = 2000
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestRowsAvailability, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('query', *cls.QUERIES))

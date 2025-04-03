@@ -37,10 +37,6 @@ class TestHiveMetaStoreFailure(CustomClusterTestSuite):
   fails."""
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     super(TestHiveMetaStoreFailure, cls).setup_class()
 

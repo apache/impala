@@ -30,10 +30,6 @@ class TestImpala3798(CustomClusterTestSuite):
   The debug flag --skip_file_runtime_filtering disables per-file filtering, mimicing the
   race that leads to the hang.
   """
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--skip_file_runtime_filtering=true")

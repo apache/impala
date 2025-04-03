@@ -32,10 +32,6 @@ class TestEventProcessingError(CustomClusterTestSuite):
   Tests for verify event processor not going into error state whenever there are
   runtime exceptions while processing events.
   """
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=true",
     catalogd_args="--catalog_topic_mode=minimal "

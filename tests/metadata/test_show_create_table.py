@@ -62,10 +62,6 @@ class TestShowCreateTable(ImpalaTestSuite):
   FILTER_TBL_PROPERTIES = ["bucketing_version", "OBJCAPABILITIES"]
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestShowCreateTable, cls).add_test_dimensions()
     # don't use any exec options, running exactly once is fine
@@ -347,10 +343,6 @@ class TestShowCreateTableIcebergProperties(ImpalaTestSuite):
   Test that the SHOW CREATE TABLE statement does not contain irrelevant Iceberg-related
   table properties.
   """
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

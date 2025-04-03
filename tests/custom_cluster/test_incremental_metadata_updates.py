@@ -25,10 +25,6 @@ class TestIncrementalMetadataUpdate(CustomClusterTestSuite):
   """ Validates incremental metadata updates across catalogd and coordinators."""
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     super(TestIncrementalMetadataUpdate, cls).setup_class()
 

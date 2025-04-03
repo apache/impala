@@ -50,10 +50,6 @@ class TestWorkloadManagementInitBase(CustomClusterTestSuite):
   define its own setup_method and teardown_method."""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def default_test_protocol(cls):
     return HS2
 

@@ -34,10 +34,6 @@ PARQUET_CODECS = ['none', 'snappy', 'gzip', 'zstd', 'zstd:7', 'lz4']
 class TestParquetInterop(CustomClusterTestSuite):
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')

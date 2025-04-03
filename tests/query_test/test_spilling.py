@@ -45,10 +45,6 @@ EXHAUSTIVE_DEBUG_ACTION_DIMS = [
                    reason='Queries may not spill on larger clusters')
 class TestSpillingDebugActionDimensions(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestSpillingDebugActionDimensions, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.clear_constraints()
@@ -104,10 +100,6 @@ class TestSpillingDebugActionDimensions(ImpalaTestSuite):
 class TestSpillingNoDebugActionDimensions(ImpalaTestSuite):
   """Spilling tests to which we don't want to apply the debug_action dimension."""
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestSpillingNoDebugActionDimensions, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.clear_constraints()
@@ -139,10 +131,6 @@ class TestSpillingNoDebugActionDimensions(ImpalaTestSuite):
                    reason='Queries may not spill on larger clusters')
 class TestSpillingBroadcastJoins(ImpalaTestSuite):
   """Tests specifically targeted at shared broadcast joins for mt_dop."""
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestSpillingBroadcastJoins, cls).add_test_dimensions()

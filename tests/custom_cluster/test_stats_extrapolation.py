@@ -29,10 +29,6 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
   tests and metadata/test_stats_extrapolation.py."""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestStatsExtrapolation, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

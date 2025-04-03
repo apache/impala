@@ -34,10 +34,6 @@ class TestHiddenFiles(ImpalaTestSuite):
   TBL_NAME = "test_hidden_files"
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestHiddenFiles, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

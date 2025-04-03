@@ -45,10 +45,6 @@ class TestHdfsEncryption(ImpalaTestSuite):
       tests operate on both partitioned and non-partitioned tables.
   '''
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsEncryption, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

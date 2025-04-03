@@ -28,10 +28,6 @@ from tests.util.filesystem_utils import WAREHOUSE, FILESYSTEM_PREFIX
 # here.
 class TestPartitionMetadata(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestPartitionMetadata, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
@@ -120,10 +116,6 @@ class TestPartitionMetadata(ImpalaTestSuite):
 
 class TestMixedPartitions(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestMixedPartitions, cls).add_test_dimensions()
     # This test only needs to be run once.
@@ -144,10 +136,6 @@ class TestMixedPartitions(ImpalaTestSuite):
 
 
 class TestPartitionMetadataUncompressedTextOnly(ImpalaTestSuite):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestPartitionMetadataUncompressedTextOnly, cls).add_test_dimensions()

@@ -89,10 +89,6 @@ class TestCatalogStartupDelay(CustomClusterTestSuite):
      is not testing anything beyond successful startup."""
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('Catalog startup delay tests only run in exhaustive')

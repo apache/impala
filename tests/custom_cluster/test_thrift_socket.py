@@ -72,10 +72,6 @@ class TestThriftSocket(CustomClusterTestSuite):
       pytest.skip("Python version does not support tls 1.2")
     super(TestThriftSocket, cls).setup_class()
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=IDLE_ARGS, cluster_size=1, disable_log_buffering=True)

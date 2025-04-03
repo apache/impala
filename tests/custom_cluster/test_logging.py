@@ -28,10 +28,6 @@ LOG = logging.getLogger(__name__)
 class TestLoggingCore(CustomClusterTestSuite):
   """Test existence of certain log lines under some scenario."""
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   def _test_max_errors(self, max_error_logs_per_instance, max_errors, expect_downgraded):
     """Test that number of non-fatal error printed to INFO log is limited by
     max_errors and max_error_logs_per_instance."""
@@ -72,10 +68,6 @@ class TestLoggingCore(CustomClusterTestSuite):
 class TestLogFlushPermissionDenied(CustomClusterTestSuite):
     """Test logging of failures to open log files with cause Permission denied."""
     LOG_FLUSH_FAILURES_DIR = "log_flush_failures_dir"
-
-    @classmethod
-    def get_workload(cls):
-        return 'functional-query'
 
     def setup_method(self, method):
         # Override parent

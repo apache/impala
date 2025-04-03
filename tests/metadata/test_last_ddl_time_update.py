@@ -27,10 +27,6 @@ from tests.util.filesystem_utils import WAREHOUSE, IS_S3
 class TestLastDdlTimeUpdate(ImpalaTestSuite):
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestLastDdlTimeUpdate, cls).add_test_dimensions()
     # There is no reason to run these tests using all dimensions.

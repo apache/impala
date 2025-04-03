@@ -42,10 +42,6 @@ class TestDataErrors(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension(batch_sizes=cls.BATCH_SIZES))
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
 
 # Regression test for IMP-633. Added as a part of IMPALA-5198.
 @SkipIf.not_dfs
@@ -156,9 +152,6 @@ class TestHdfsRcFileScanNodeErrors(TestHdfsScanNodeErrors):
 
 
 class TestBinaryTypeInText(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

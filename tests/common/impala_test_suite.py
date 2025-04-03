@@ -190,6 +190,12 @@ class ImpalaTestSuite(BaseTestSuite):
   # not disabling glog buffering (--logbuflevel=-1).
   _warn_assert_log = False
 
+  # Use 'functional-query' as default workload. The workload affects exploration strategy
+  # if workload_exploration_strategy is set. See exploration_strategy() for more details.
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
   @classmethod
   def add_test_dimensions(cls):
     """
@@ -1431,6 +1437,12 @@ class ImpalaTestSuite(BaseTestSuite):
                                         exec_single_node_option=exec_single_node_option,
                                         disable_codegen_rows_threshold_options=[0])
 
+  # The exploration strategy is affected by both option exploration_strategy and
+  # workload_exploration_strategy+workload. workload_exploration_strategy is used
+  # by bin/run-all-test.sh - using a workload (get_workload()) that is not set in
+  # run-all-tests.sh can lead to returning "core" even in exhaustive test runs.
+  # TODO: workload handling is not used consistently in tests and it is not even
+  #       clear how it should be used (IMPALA-13929)
   @classmethod
   def exploration_strategy(cls):
     default_strategy = pytest.config.option.exploration_strategy

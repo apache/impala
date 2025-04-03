@@ -318,10 +318,6 @@ class TestScanMemLimit(ImpalaTestSuite):
   """Targeted test for scan memory limits."""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestScanMemLimit, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
@@ -421,10 +417,6 @@ class TestHashJoinMemLimit(ImpalaTestSuite):
 @SkipIfFS.read_speed_dependent
 class TestExchangeMemUsage(ImpalaTestSuite):
   """Targeted test for exchange memory limits."""
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

@@ -23,10 +23,6 @@ from tests.common.test_dimensions import (create_exec_option_dimension,
 
 class TestUtf8StringFunctions(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestUtf8StringFunctions, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(

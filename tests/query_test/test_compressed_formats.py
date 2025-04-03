@@ -51,10 +51,6 @@ class TestCompressedFormatsBase(ImpalaTestSuite):
   data files.
   """
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestCompressedFormatsBase, cls).add_test_dimensions()
 
@@ -181,10 +177,6 @@ class TestCompressedText(TestCompressedFormatsBase):
 
 class TestUnsupportedTableWriters(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestUnsupportedTableWriters, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
@@ -219,10 +211,6 @@ class TestLargeCompressedFile(ImpalaTestSuite):
   # uncompressing the buffer. 2GB is sufficient to show that we support
   # size beyond maximum 32-bit signed value.
   MAX_FILE_SIZE = 2 * CHUNK_SIZE
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -300,10 +288,6 @@ class TestBzip2Streaming(ImpalaTestSuite):
   MAX_SCAN_RANGE_LENGTHS = [0, 5]
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestBzip2Streaming, cls).add_test_dimensions()
 
@@ -331,10 +315,6 @@ class TestReadZtsdLibCompressedFile(ImpalaTestSuite):
   UNCOMPRESSED_LOCAL_FILE_PATH = "testdata/data/text_large_zstd.txt"
 
   IMPALA_HOME = os.environ['IMPALA_HOME']
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

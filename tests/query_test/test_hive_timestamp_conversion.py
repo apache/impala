@@ -27,10 +27,6 @@ class TestHiveParquetTimestampConversion(ImpalaTestSuite):
   use_legacy_hive_timestamp_conversion, and timezone to test conversion."""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestHiveParquetTimestampConversion, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:

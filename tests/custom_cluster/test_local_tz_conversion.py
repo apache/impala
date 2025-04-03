@@ -43,10 +43,6 @@ class TestLocalTzConversion(CustomClusterTestSuite):
         v.get_value('table_format').file_format == 'text' and
         v.get_value('table_format').compression_codec == 'none')
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @SkipIfFS.hbase
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--use_local_tz_for_unix_timestamp_conversions=true")

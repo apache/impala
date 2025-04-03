@@ -58,10 +58,6 @@ build_runs_slowly = ImpalaTestClusterProperties.get_instance().runs_slowly()
 @SkipIfFS.late_filters
 class TestRuntimeFilters(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestRuntimeFilters, cls).add_test_dimensions()
     # Runtime filters are disabled on HBase
@@ -196,10 +192,6 @@ class TestRuntimeFilters(ImpalaTestSuite):
 @SkipIfLocal.multiple_impalad
 class TestBloomFilters(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestBloomFilters, cls).add_test_dimensions()
     # Exercise max_num_filters_aggregated_per_host.
@@ -222,10 +214,6 @@ class TestBloomFilters(ImpalaTestSuite):
 
 @SkipIfLocal.multiple_impalad
 class TestBloomFiltersOnParquet(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestBloomFiltersOnParquet, cls).add_test_dimensions()
@@ -257,10 +245,6 @@ class TestBloomFiltersOnParquet(ImpalaTestSuite):
 
 @SkipIfLocal.multiple_impalad
 class TestMinMaxFilters(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestMinMaxFilters, cls).add_test_dimensions()
@@ -334,10 +318,6 @@ class TestMinMaxFilters(ImpalaTestSuite):
 @SkipIfLocal.multiple_impalad
 class TestOverlapMinMaxFilters(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestOverlapMinMaxFilters, cls).add_test_dimensions()
     # Overlap min-max filters are only implemented for parquet.
@@ -386,10 +366,6 @@ class TestOverlapMinMaxFilters(ImpalaTestSuite):
 
 class TestInListFilters(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestInListFilters, cls).add_test_dimensions()
     # Currently, IN-list filters are only implemented for orc.
@@ -407,10 +383,6 @@ class TestInListFilters(ImpalaTestSuite):
 
 # Apply Bloom filter, Minmax filter and IN-list filters
 class TestAllRuntimeFilters(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestAllRuntimeFilters, cls).add_test_dimensions()
@@ -437,10 +409,6 @@ class TestAllRuntimeFilters(ImpalaTestSuite):
 
 @SkipIfLocal.multiple_impalad
 class TestRuntimeRowFilters(ImpalaTestSuite):
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestRuntimeRowFilters, cls).add_test_dimensions()
@@ -475,10 +443,6 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
 @SkipIfLocal.multiple_impalad
 class TestRuntimeRowFilterReservation(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestRuntimeRowFilterReservation, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
@@ -496,10 +460,6 @@ class TestRuntimeRowFilterReservation(ImpalaTestSuite):
 class TestRuntimeFiltersLateRemoteUpdate(ImpalaTestSuite):
   """Test that distributed runtime filter aggregation still works
   when remote filter update is late to reach the intermediate aggregator."""
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

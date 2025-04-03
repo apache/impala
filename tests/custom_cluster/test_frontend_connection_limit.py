@@ -33,10 +33,6 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 class TestFrontendConnectionLimit(CustomClusterTestSuite):
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestFrontendConnectionLimit, cls).add_test_dimensions()
 

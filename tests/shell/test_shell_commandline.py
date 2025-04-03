@@ -147,10 +147,6 @@ class TestImpalaShell(ImpalaTestSuite):
   """
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestImpalaShell, cls).add_test_dimensions()
     # Limit to uncompressed text with default exec options

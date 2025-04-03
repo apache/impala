@@ -43,10 +43,6 @@ class TestLineage(CustomClusterTestSuite):
     super(TestLineage, cls).setup_class()
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def teardown_class(cls):
     super(TestLineage, cls).teardown_class()
 

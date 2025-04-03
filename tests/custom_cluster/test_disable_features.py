@@ -26,10 +26,6 @@ from tests.common.skip import SkipIfFS
 class TestDisableFeatures(CustomClusterTestSuite):
   """Tests that involve disabling features at startup."""
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @SkipIfFS.hdfs_caching
   @pytest.mark.execute_serially
   @UniqueDatabase.parametrize(sync_ddl=True)

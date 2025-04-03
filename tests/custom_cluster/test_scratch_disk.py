@@ -35,10 +35,6 @@ from tests.verifiers.metric_verifier import MetricVerifier
 
 class TestScratchDir(CustomClusterTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')

@@ -38,10 +38,6 @@ class TestQueryConcurrency(ImpalaTestSuite):
   TEST_QUERY = "select count(*) from tpch.supplier"
   POLLING_TIMEOUT_S = 15
 
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   def poll_query_page(self, impalad, query_id):
     """Polls the debug plan page of a given query id in a loop till the timeout
     of POLLING_TIMEOUT_S is hit."""

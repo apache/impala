@@ -29,10 +29,6 @@ from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 class TestQueryOptions(ImpalaTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestQueryOptions, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:\

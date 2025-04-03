@@ -39,10 +39,6 @@ build_runs_slowly = ImpalaTestClusterProperties.get_instance().runs_slowly()
 
 class TestRuntimeFilterAggregation(CustomClusterTestSuite):
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestRuntimeFilterAggregation, cls).add_test_dimensions()
     add_mandatory_exec_option(cls, 'max_num_filters_aggregated_per_host', 2)
@@ -76,10 +72,6 @@ class TestLateQueryStateInit(CustomClusterTestSuite):
   when remote query state of intermediate aggregator node is late to initialize."""
   _wait_time = WAIT_TIME_MS // 20
   _init_delay = [100, _wait_time]
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):

@@ -38,10 +38,6 @@ class TestDecimalFuzz(ImpalaTestSuite):
   decimal.getcontext().prec = 38
 
   @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     cls.ImpalaTestMatrix = ImpalaTestMatrix()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())

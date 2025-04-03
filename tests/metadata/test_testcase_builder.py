@@ -27,10 +27,6 @@ from tests.util.filesystem_utils import get_fs_path
 class TestTestcaseBuilder(ImpalaTestSuite):
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestTestcaseBuilder, cls).add_test_dimensions()
     # This test only needs to be run once.

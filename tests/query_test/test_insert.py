@@ -48,10 +48,6 @@ class TestInsertBase(ImpalaTestSuite):
   """All tests based on this class should run with 'unique_database' fixture."""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestInsertBase, cls).add_test_dimensions()
     if cls.exploration_strategy() == 'core':
@@ -217,10 +213,6 @@ class TestInsertQueriesWithDefaultFormat(TestInsertBase):
 
 class TestInsertWideTable(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestInsertWideTable, cls).add_test_dimensions()
 
@@ -277,10 +269,6 @@ class TestInsertWideTable(ImpalaTestSuite):
 
 class TestInsertPartKey(ImpalaTestSuite):
   """Regression test for IMPALA-875"""
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestInsertPartKey, cls).add_test_dimensions()
@@ -365,10 +353,6 @@ class TestInsertPartKey(ImpalaTestSuite):
 
 class TestInsertNullQueries(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestInsertNullQueries, cls).add_test_dimensions()
     # Fix the exec_option vector to have a single value. This is needed should we decide
@@ -398,10 +382,6 @@ class TestInsertNullQueries(ImpalaTestSuite):
 class TestInsertFileExtension(ImpalaTestSuite):
   """Tests that files written to a table have the correct file extension. Asserts that
   Parquet files end with .parq and text files end with .txt."""
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
@@ -434,10 +414,6 @@ class TestInsertFileExtension(ImpalaTestSuite):
 class TestInsertHdfsWriterLimit(ImpalaTestSuite):
   """Test to make sure writer fragment instances are distributed evenly when using max
       hdfs_writers query option."""
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
   @classmethod
   def default_test_protocol(cls):
     return HS2
@@ -568,10 +544,6 @@ class TestInsertHdfsWriterLimit(ImpalaTestSuite):
 
 class TestInsertNonPartitionedTable(ImpalaTestSuite):
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestInsertNonPartitionedTable, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
@@ -612,10 +584,6 @@ class TestInsertNonPartitionedTable(ImpalaTestSuite):
 
 class TestUnsafeImplicitCasts(ImpalaTestSuite):
   """Test to check 'allow_unsafe_casts' query-option behaviour on insert statements."""
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @classmethod
   def add_test_dimensions(cls):
     super(TestUnsafeImplicitCasts, cls).add_test_dimensions()

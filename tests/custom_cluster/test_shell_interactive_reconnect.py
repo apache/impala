@@ -35,10 +35,6 @@ NUM_QUERIES = 'impala-server.num-queries'
 
 class TestShellInteractiveReconnect(CustomClusterTestSuite):
   """ Check if interactive shell is using the current DB after reconnecting """
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   def test_manual_reconnect(self):
     # Iterate over test vector within test function to avoid restarting cluster.

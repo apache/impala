@@ -24,10 +24,6 @@ class TestStatestoreRpcErrors(CustomClusterTestSuite):
   """Tests for statestore RPC handling."""
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def setup_class(cls):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
@@ -59,10 +55,6 @@ class TestStatestoreRpcErrors(CustomClusterTestSuite):
 
 class TestCatalogRpcErrors(CustomClusterTestSuite):
   """Tests for catalog RPC handling."""
-
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
 
   @classmethod
   def setup_class(cls):

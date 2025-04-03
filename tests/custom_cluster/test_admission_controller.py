@@ -175,10 +175,6 @@ def wait_statestore_heartbeat(num_heartbeat=1):
 class TestAdmissionControllerBase(CustomClusterTestSuite):
 
   @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
   def default_test_protocol(cls):
     # Do not change this. Multiple test method has been hardcoded under this assumption.
     return HS2

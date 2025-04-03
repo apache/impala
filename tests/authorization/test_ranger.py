@@ -69,10 +69,6 @@ class TestRanger(CustomClusterTestSuite):
   Tests for Apache Ranger integration with Apache Impala.
   """
 
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impala_log_dir=tempfile.mkdtemp(prefix="ranger_audit_xff", dir=os.getenv("LOG_DIR")),
@@ -3163,10 +3159,6 @@ class TestRangerColumnMaskingComplexTypesInSelectList(CustomClusterTestSuite):
   this is a separate class is that directly querying complex types works only on HS2
   while some tests in TestRanger needs Beeswax interface otherwise some of them fails.
   """
-
-  @classmethod
-  def get_workload(cls):
-    return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
