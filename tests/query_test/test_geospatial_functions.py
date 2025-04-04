@@ -25,3 +25,8 @@ class TestGeospatialFuctions(ImpalaTestSuite):
   @SkipIfApacheHive.feature_not_supported
   def test_esri_geospatial_functions(self, vector):
     self.run_test_case('QueryTest/geospatial-esri', vector)
+
+  def test_esri_geospatial_planner(self, vector):
+    # These tests are not among planner tests because with default flags
+    # geospatial builtin functions are not loaded.
+    self.run_test_case('QueryTest/geospatial-esri-planner', vector)

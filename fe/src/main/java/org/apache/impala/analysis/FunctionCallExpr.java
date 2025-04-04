@@ -840,8 +840,11 @@ public class FunctionCallExpr extends Expr {
 
   @Override
   protected float computeEvalCost() {
+    Preconditions.checkState(fn_ != null);
+    boolean isJava = fn_.getBinaryType() == TFunctionBinaryType.JAVA;
+    float callCost = isJava ? JAVA_FUNCTION_CALL_COST : FUNCTION_CALL_COST;
     // TODO(tmarshall): Differentiate based on the specific function.
-    return hasChildCosts() ? getChildCosts() + FUNCTION_CALL_COST : UNKNOWN_COST;
+    return hasChildCosts() ? getChildCosts() + callCost : UNKNOWN_COST;
   }
 
   public FunctionCallExpr getMergeAggInputFn() { return mergeAggInputFn_; }
