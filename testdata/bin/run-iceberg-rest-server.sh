@@ -24,5 +24,5 @@ PATH=${PATH}:/usr/local/bin
 cd $IMPALA_HOME
 . bin/impala-config.sh
 
-mvn -f "java/iceberg-rest-catalog-test/pom.xml" exec:java \
+bin/mvn-quiet.sh -f "java/iceberg-rest-catalog-test/pom.xml" exec:java \
     -Dexec.mainClass="org.apache.iceberg.rest.IcebergRestCatalogTest"
