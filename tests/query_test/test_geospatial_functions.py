@@ -22,6 +22,7 @@ from tests.common.test_dimensions import create_single_exec_option_dimension
 
 
 class TestGeospatialFuctions(ImpalaTestSuite):
+  """Tests the geospatial builtin functions"""
 
   @classmethod
   def add_test_dimensions(cls):
@@ -31,7 +32,6 @@ class TestGeospatialFuctions(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
-  """Tests the geospatial builtin functions"""
   @SkipIfApacheHive.feature_not_supported
   def test_esri_geospatial_functions(self, vector):
     # tests generated from

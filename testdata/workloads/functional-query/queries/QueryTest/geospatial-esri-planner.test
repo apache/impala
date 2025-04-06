@@ -7,4 +7,90 @@ where st_geomfromwkb(binary_col) is not null and sqrt(id) = 1;
 ---- RUNTIME_PROFILE
 predicates: sqrt(CAST(id AS DOUBLE)) = CAST(1 AS DOUBLE), st_geomfromwkb(binary_col) IS NOT NULL
 ====
-
+---- QUERY
+# Check that NormalizeGeospatialRelationsRule is applied and the const argument is moved
+# to the first position in symmetric geospatial relations.
+# AddEnvIntersectsRule is not applied for st_disjoint().
+select * from functional.binary_tbl
+where st_disjoint(binary_col, st_point(1, 1))
+---- RUNTIME_PROFILE
+predicates: st_disjoint('unhex("000000000101000000000000000000F03F000000000000F03F")', binary_col)
+====
+---- QUERY
+# Check that AddEnvIntersectsRule adds st_envintersects() before relations.
+select * from functional.binary_tbl
+where st_touches(binary_col, st_point(id, id))
+---- RUNTIME_PROFILE
+predicates: st_envintersects(binary_col, st_point(CAST(id AS DOUBLE), CAST(id AS DOUBLE))), st_touches(binary_col, st_point(CAST(id AS DOUBLE), CAST(id AS DOUBLE)))
+====
+---- QUERY
+# Check that AddEnvIntersectsRule doesn't duplicate st_envintersects() when it is
+# already present.
+select * from functional.binary_tbl
+where st_envintersects(binary_col, st_point(id, id)) and st_touches(binary_col, st_point(id, id))
+---- RUNTIME_PROFILE
+predicates: st_envintersects(binary_col, st_point(CAST(id AS DOUBLE), CAST(id AS DOUBLE))), st_touches(binary_col, st_point(CAST(id AS DOUBLE), CAST(id AS DOUBLE)))
+====
+---- QUERY
+# Check that AddEnvIntersectsRule does NOT add st_envintersects() if child expressions
+# are expensive (more than 2 Java function calls).
+select * from functional.alltypestiny
+where st_touches(st_point(double_col, double_col), st_point(id, id))
+---- RUNTIME_PROFILE
+predicates: st_touches(st_point(double_col, double_col), st_point(CAST(id AS DOUBLE), CAST(id AS DOUBLE)))
+====
+---- QUERY
+# Check that PointEnvIntersectsRule is applied and st_envintersects() on st_point(x,y)
+# is rewritten to predicates on coordinate columns.
+select id, double_col, float_col from functional_parquet.alltypessmall
+where st_envintersects(st_geomfromtext("polygon ((-1 0, 20 0, 20 20.5, -1 20.5, -1 0))"),
+                       st_point(double_col, float_col))
+      and month = 1;
+---- TYPES
+INT,DOUBLE,FLOAT
+---- RESULTS
+0,0.0,0.0
+1,10.1,1.100000023841858
+10,0.0,0.0
+11,10.1,1.100000023841858
+20,0.0,0.0
+21,10.1,1.100000023841858
+---- RUNTIME_PROFILE
+predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
+parquet statistics predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
+parquet dictionary predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
+====
+---- QUERY
+# Check that PointEnvIntersectsRule is applied on the st_envintersects() added by
+# AddEnvIntersectsRule.
+select id, double_col, float_col from functional_parquet.alltypessmall
+where st_intersects(st_point(double_col, float_col),
+                    st_geomfromtext("polygon ((-1 0, 20 0, 20 20.5, -1 20.5, -1 0))"))
+      and month = 1;
+---- TYPES
+INT,DOUBLE,FLOAT
+---- RESULTS
+0,0.0,0.0
+1,10.1,1.100000023841858
+10,0.0,0.0
+11,10.1,1.100000023841858
+20,0.0,0.0
+21,10.1,1.100000023841858
+---- RUNTIME_PROFILE
+row_regex: .*predicates: double_col <= CAST\(20 AS DOUBLE\), double_col >= CAST\(-1 AS DOUBLE\), CAST\(float_col AS DOUBLE\) <= CAST\(20.5 AS DOUBLE\), CAST\(float_col AS DOUBLE\) >= CAST\(0 AS DOUBLE\), st_intersects.*
+parquet statistics predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
+parquet dictionary predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
+=====
+---- QUERY
+# Check that PointEnvIntersectsRule is NOT applied if children are expensive.
+select count(*) from functional_parquet.alltypessmall
+where st_envintersects(st_point(sqrt(double_col), sqrt(float_col)),
+                    st_geomfromtext("polygon ((-1 0, 20 0, 20 20.5, -1 20.5, -1 0))"))
+      and month = 1;
+---- TYPES
+BIGINT
+---- RESULTS
+25
+---- RUNTIME_PROFILE
+row_regex: .*predicates: st_envintersects\(\'unhex\(\".*\"\)\', st_point\(sqrt\(double_col\), sqrt\(CAST\(float_col AS DOUBLE\)\)\)\)
+=====

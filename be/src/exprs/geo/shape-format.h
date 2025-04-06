@@ -225,29 +225,29 @@ inline bool ParseHeader(FunctionContext* ctx, const StringVal& geom, OGCType* og
   if (UNLIKELY(geom.is_null)) return false;
 
   if (UNLIKELY(geom.len < MIN_GEOM_SIZE)) {
-    ctx->SetError("Geometry size too small.");
+    ctx->AddWarning("Geometry size too small.");
     return false;
   }
 
   const OGCType unchecked_ogc_type = getOGCType(geom);
   if (UNLIKELY(unchecked_ogc_type < UNKNOWN || unchecked_ogc_type > ST_MULTIPOLYGON)) {
-    ctx->SetError("Invalid geometry type.");
+    ctx->AddWarning("Invalid geometry type.");
     return false;
   }
 
   if (UNLIKELY(unchecked_ogc_type == UNKNOWN)) {
-    ctx->SetError("Geometry type UNKNOWN.");
+    ctx->AddWarning("Geometry type UNKNOWN.");
     return false;
   }
 
   if (UNLIKELY(unchecked_ogc_type == ST_POINT)) {
     if (geom.len < MIN_POINT_SIZE) {
-      ctx->SetError("Geometry size too small for ST_POINT type.");
+      ctx->AddWarning("Geometry size too small for ST_POINT type.");
       return false;
     }
   } else {
     if (UNLIKELY(geom.len < MIN_NON_POINT_SIZE)) {
-      ctx->SetError("Geometry size too small for non ST_POINT type.");
+      ctx->AddWarning("Geometry size too small for non ST_POINT type.");
       return false;
     }
   }

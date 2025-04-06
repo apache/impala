@@ -92,6 +92,7 @@ import org.apache.impala.planner.JoinNode;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.ScanNode;
 import org.apache.impala.planner.UnionNode;
+import org.apache.impala.rewrite.AddEnvIntersectsRule;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.ConvertToCNFRule;
 import org.apache.impala.rewrite.CountDistinctToNdvRule;
@@ -106,15 +107,19 @@ import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeCountStarRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
+import org.apache.impala.rewrite.NormalizeGeospatialRelationsRule;
+import org.apache.impala.rewrite.PointEnvIntersectsRule;
 import org.apache.impala.rewrite.SimplifyCastExprRule;
 import org.apache.impala.rewrite.SimplifyCastStringToTimestamp;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TExecutorGroupSet;
+import org.apache.impala.thrift.TGeospatialLibrary;
 import org.apache.impala.thrift.TImpalaQueryOptions;
 import org.apache.impala.thrift.TLineageGraph;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -670,6 +675,7 @@ public class Analyzer {
       this.authzFactory = authzFactory;
       this.lineageGraph = new ColumnLineageGraph();
       List<ExprRewriteRule> rules = new ArrayList<>();
+      List<ExprRewriteRule> nonIdempotentRules = new ArrayList<>();
       // BetweenPredicates must be rewritten to be executable. Other non-essential
       // expr rewrites can be disabled via a query option. When rewrites are enabled
       // BetweenPredicates should be rewritten first to help trigger other rules.
@@ -695,9 +701,15 @@ public class Analyzer {
         rules.add(CountDistinctToNdvRule.INSTANCE);
         rules.add(DefaultNdvScaleRule.INSTANCE);
         rules.add(SimplifyCastExprRule.INSTANCE);
+        if (BackendConfig.INSTANCE.getGeospatialLibrary().equals(
+                TGeospatialLibrary.HIVE_ESRI)) {
+          rules.add(NormalizeGeospatialRelationsRule.INSTANCE);
+          rules.add(PointEnvIntersectsRule.INSTANCE);
+          nonIdempotentRules.add(AddEnvIntersectsRule.INSTANCE);
+        }
       }
       rules.add(CountStarToConstRule.INSTANCE);
-      exprRewriter_ = new ExprRewriter(rules);
+      exprRewriter_ = new ExprRewriter(rules, nonIdempotentRules);
       nullSlotsCache =
           queryCtx.getClient_request().getQuery_options().use_null_slots_cache ?
           CacheBuilder.newBuilder().concurrencyLevel(1).recordStats().build() : null;

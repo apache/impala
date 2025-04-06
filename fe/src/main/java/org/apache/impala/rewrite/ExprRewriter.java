@@ -39,25 +39,46 @@ public class ExprRewriter {
   private final static Logger LOG = LoggerFactory.getLogger(ExprRewriter.class);
   private int numChanges_ = 0;
   private final List<ExprRewriteRule> rules_;
+  private final List<ExprRewriteRule> nonIdempotentRules_;
+
 
   public ExprRewriter(List<ExprRewriteRule> rules) {
     rules_ = rules;
+    nonIdempotentRules_ = Lists.newArrayList();
+  }
+
+  public ExprRewriter(List<ExprRewriteRule> rules,
+                      List<ExprRewriteRule> nonIdempotentRules) {
+    rules_ = rules;
+    nonIdempotentRules_ = nonIdempotentRules;
   }
 
   public ExprRewriter(ExprRewriteRule rule) {
     rules_ = Lists.newArrayList(rule);
+    nonIdempotentRules_ = Lists.newArrayList();
   }
 
   public Expr rewrite(Expr expr, Analyzer analyzer) throws AnalysisException {
     // Keep applying the rule list until no rule has made any changes.
     int oldNumChanges;
     Expr rewrittenExpr = expr;
+    int nonIdempotentRuleIdx = 0;
     do {
       oldNumChanges = numChanges_;
       for (ExprRewriteRule rule: rules_) {
         rewrittenExpr = applyRuleRepeatedly(rewrittenExpr, rule, analyzer);
       }
+      // Apply all possible idempotent rules before progressing with non-idempotent ones.
+      while (oldNumChanges == numChanges_
+          && nonIdempotentRuleIdx < nonIdempotentRules_.size()) {
+        // Apply nonIdempotentRules_ only once as these add expressions without removing
+        // the original and could be applied again.
+        ExprRewriteRule rule = nonIdempotentRules_.get(nonIdempotentRuleIdx);
+        rewrittenExpr = applyRuleBottomUp(rewrittenExpr, rule, analyzer);
+        nonIdempotentRuleIdx++;
+      }
     } while (oldNumChanges != numChanges_);
+
     return rewrittenExpr;
   }
 
