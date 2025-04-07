@@ -518,9 +518,19 @@ class ImpalaTestSuite(BaseTestSuite):
     return DelegatingHdfsClient(webhdfs_client, HadoopFsCommandLineClient())
 
   @classmethod
-  def all_db_names(cls):
-    results = cls.client.execute("show databases").data
+  def all_db_names(cls, client=None):
+    if client is None:
+      client = cls.client
+    results = client.execute("show databases").data
     # Extract first column - database name
+    return [row.split("\t")[0] for row in results]
+
+  @classmethod
+  def all_table_names(cls, client=None, db="default"):
+    if client is None:
+      client = cls.client
+    results = client.execute("show tables in " + db).data
+    # Extract first column - table name
     return [row.split("\t")[0] for row in results]
 
   @classmethod

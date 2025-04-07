@@ -27,7 +27,8 @@ import java.util.List;
 /**
  * A base class for COMMENT ON TABLE/VIEW.
  */
-public abstract class CommentOnTableOrViewStmt extends CommentOnStmt {
+public abstract class CommentOnTableOrViewStmt extends CommentOnStmt
+    implements SingleTableStmt {
   protected TableName tableName_;
 
   public CommentOnTableOrViewStmt(TableName tableName, String comment) {
@@ -35,6 +36,9 @@ public abstract class CommentOnTableOrViewStmt extends CommentOnStmt {
     Preconditions.checkArgument(tableName != null && !tableName.isEmpty());
     tableName_ = tableName;
   }
+
+  @Override
+  public TableName getTableName() { return tableName_;}
 
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {

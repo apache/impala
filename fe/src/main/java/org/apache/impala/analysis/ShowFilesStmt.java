@@ -35,7 +35,7 @@ import com.google.common.base.Preconditions;
  * SHOW FILES IN [dbName.]tableName [PARTITION(key=value,...)]
  *
  */
-public class ShowFilesStmt extends StatementBase {
+public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
   private final TableName tableName_;
 
   // Show files for all the partitions if this is null.
@@ -56,6 +56,9 @@ public class ShowFilesStmt extends StatementBase {
     if (partitionSet_ != null) strBuilder.append(" " + partitionSet_.toSql(options));
     return strBuilder.toString();
   }
+
+  @Override
+  public TableName getTableName() { return tableName_; }
 
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {

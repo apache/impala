@@ -34,7 +34,7 @@ import com.google.common.base.Preconditions;
  * TRUNCATE [TABLE] [IF EXISTS] [database.]table
  *
  */
-public class TruncateStmt extends StatementBase {
+public class TruncateStmt extends StatementBase implements SingleTableStmt {
   private TableName tableName_;
   private final boolean ifExists_;
 
@@ -47,6 +47,9 @@ public class TruncateStmt extends StatementBase {
     table_ = null;
     ifExists_ = ifExists;
   }
+
+  @Override
+  public TableName getTableName() { return tableName_; }
 
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {

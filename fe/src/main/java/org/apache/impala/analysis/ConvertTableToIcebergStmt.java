@@ -50,7 +50,7 @@ import org.apache.impala.util.MigrateTableUtil;
  * ALTER TABLE <table name> CONVERT TO ICEBERG
  * [TBLPROPERTIES (prop1=val1, prop2=val2 ...)]
  */
-public class ConvertTableToIcebergStmt extends StatementBase {
+public class ConvertTableToIcebergStmt extends StatementBase implements SingleTableStmt {
 
   private TableName tableName_;
   private TableName tmpHdfsTableName_;
@@ -72,6 +72,9 @@ public class ConvertTableToIcebergStmt extends StatementBase {
   public ConvertTableToIcebergStmt(TableName tableName) {
     this(tableName, Maps.newHashMap());
   }
+
+  @Override
+  public TableName getTableName() { return tableName_; }
 
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {

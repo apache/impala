@@ -62,7 +62,7 @@ import org.apache.parquet.hadoop.ParquetFileWriter;
  *  2. INSERT INTO from the temporary table to the target table
  *  3. DROP temporary table
  */
-public class LoadDataStmt extends StatementBase {
+public class LoadDataStmt extends StatementBase implements SingleTableStmt {
   private final TableName tableName_;
   private final HdfsUri sourceDataPath_;
   private final PartitionSpec partitionSpec_;
@@ -84,6 +84,9 @@ public class LoadDataStmt extends StatementBase {
     this.overwrite_ = overwrite;
     this.partitionSpec_ = partitionSpec;
   }
+
+  @Override
+  public TableName getTableName() { return tableName_; }
 
   public String getTbl() {
     return tableName_.getTbl();

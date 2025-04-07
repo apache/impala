@@ -45,7 +45,7 @@ import com.google.common.base.Preconditions;
  * REFRESH FUNCTIONS <database>
  * REFRESH AUTHORIZATION
  */
-public class ResetMetadataStmt extends StatementBase {
+public class ResetMetadataStmt extends StatementBase implements SingleTableStmt {
 
   public enum Action {
     INVALIDATE_METADATA_ALL(false),
@@ -127,6 +127,9 @@ public class ResetMetadataStmt extends StatementBase {
         /*table*/ null, /*partition*/ null);
   }
 
+  @Override
+  public String getParsedDb() { return database_; }
+  @Override
   public TableName getTableName() { return tableName_; }
 
   public PartitionSpec getPartitionSpec() { return partitionSpec_; }

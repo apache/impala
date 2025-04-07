@@ -35,7 +35,7 @@ import com.google.common.base.Preconditions;
  *
  * Syntax: SHOW CREATE (TABLE|VIEW) <table or view>
  */
-public class ShowCreateTableStmt extends StatementBase {
+public class ShowCreateTableStmt extends StatementBase implements SingleTableStmt {
   private TableName tableName_;
 
   // The object type keyword used, e.g. TABLE or VIEW, needed to output matching SQL.
@@ -46,6 +46,9 @@ public class ShowCreateTableStmt extends StatementBase {
     this.tableName_ = table;
     this.objectType_ = objectType;
   }
+
+  @Override
+  public TableName getTableName() { return tableName_; }
 
   @Override
   public String toSql(ToSqlOptions options) {

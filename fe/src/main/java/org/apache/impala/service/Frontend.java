@@ -99,6 +99,7 @@ import org.apache.impala.analysis.ShowFunctionsStmt;
 import org.apache.impala.analysis.ShowGrantPrincipalStmt;
 import org.apache.impala.analysis.ShowRolesStmt;
 import org.apache.impala.analysis.ShowTablesOrViewsStmt;
+import org.apache.impala.analysis.SingleTableStmt;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
@@ -2228,8 +2229,8 @@ public class Frontend {
    * Collect required catalog objects for query planning of the statement and update
    * the request.
    */
-  private void collectRequiredObjects(TWaitForHmsEventRequest req, StatementBase stmt,
-      String sessionDb) {
+  public static void collectRequiredObjects(TWaitForHmsEventRequest req,
+      StatementBase stmt, String sessionDb) {
     if (stmt instanceof ShowDbsStmt) {
       req.want_db_list = true;
       return;
@@ -2254,29 +2255,42 @@ public class Frontend {
       } else {
         LOG.info("Waiting for HMS events on database " + dbName);
       }
-      // 'dbName' is not null only for CREATE/DROP/ALTER database or SHOW TABLES/VIEWS
-      // statements. No more tables are needed.
+      // 'dbName' is not null only for CREATE/DROP/ALTER database or SHOW TABLES / VIEWS /
+      // FUNCTIONS statements. No more tables are needed.
       return;
     }
-    List<TableRef> tblRefs = new ArrayList<>();
-    stmt.collectTableRefs(tblRefs);
-    Set<TableName> tableNames = new HashSet<>();
-    for (TableRef ref : tblRefs) {
-      tableNames.addAll(org.apache.impala.analysis.Path.getCandidateTables(
-          ref.getPath(), sessionDb));
+    Collection<TableName> tableNames;
+    // Handle SingleTableStmt such as CREATE/DROP/ALTER TABLE separately to collect a
+    // single table name. Note that collectTableRefs() might return several candidate
+    // names or nothing (for REFRESH/INVALIDATE METADATA <table>). So we only use it for
+    // multi-table statements.
+    if (stmt instanceof SingleTableStmt) {
+      TableName tblName = ((SingleTableStmt) stmt).getTableName();
+      // Statements like global INVALIDATE METADATA don't have the table name.
+      if (tblName == null) return;
+      if (!tblName.isFullyQualified()) {
+        tblName = new TableName(sessionDb, tblName.getTbl());
+      }
+      tableNames = Collections.singletonList(tblName);
+    } else {
+      List<TableRef> tblRefs = new ArrayList<>();
+      stmt.collectTableRefs(tblRefs);
+      tableNames = new HashSet<>();
+      for (TableRef ref : tblRefs) {
+        tableNames.addAll(org.apache.impala.analysis.Path.getCandidateTables(
+            ref.getPath(), sessionDb));
+      }
     }
     Set<String> dbNames = new HashSet<>();
     for (TableName tblName : tableNames) {
       dbNames.add(tblName.getDb());
-      TCatalogObject tblDesc = new TCatalogObject();
-      tblDesc.setType(TCatalogObjectType.TABLE);
+      TCatalogObject tblDesc = new TCatalogObject(TCatalogObjectType.TABLE, 0);
       tblDesc.setTable(new TTable(tblName.getDb(), tblName.getTbl()));
       req.addToObject_descs(tblDesc);
     }
     // Add dbs needed by the tables.
     for (String name : dbNames) {
-      TCatalogObject dbDesc = new TCatalogObject();
-      dbDesc.setType(TCatalogObjectType.DATABASE);
+      TCatalogObject dbDesc = new TCatalogObject(TCatalogObjectType.DATABASE, 0);
       dbDesc.setDb(new TDatabase(name));
       req.addToObject_descs(dbDesc);
     }

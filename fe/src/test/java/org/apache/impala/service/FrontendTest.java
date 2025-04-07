@@ -19,10 +19,12 @@ package org.apache.impala.service;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -32,17 +34,23 @@ import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
 import org.apache.hive.service.rpc.thrift.TGetInfoReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
+import org.apache.impala.analysis.Parser;
+import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TWaitForHmsEventRequest;
 import org.junit.Assume;
 import org.junit.Test;
 
@@ -387,5 +395,175 @@ public class FrontendTest extends FrontendTestBase {
   private TResultSet execMetadataOp(TMetadataOpRequest req)
       throws ImpalaException {
     return frontend_.execHiveServer2MetadataOp(req);
+  }
+
+  @Test
+  public void TestCollectRequiredObjectsForHmsEventSync() throws AnalysisException {
+    String db = "session_db";
+
+    TestCollectRequiredObjectsHelper("SELECT * FROM db1.tbl1, tbl2, db3.tbl3, tbl4",
+        db, Arrays.asList("db1", "db3", db), Arrays.asList("db1.tbl1", db + ".db1",
+            db + ".tbl2", "db3.tbl3", db + ".db3", db + ".tbl4"));
+    TestCollectRequiredObjectsHelper(
+        "SELECT * FROM tbl1 t where exists (SELECT 1 FROM db1.tbl2 t2 where t2.id=t.id)",
+        db, Arrays.asList("db1", db),
+        Arrays.asList(db + ".tbl1", "db1.tbl2", db + ".db1"));
+
+    TestCollectRequiredObjectsHelper("INVALIDATE METADATA",
+        db, Collections.emptyList(), Collections.emptyList());
+    TestCollectRequiredObjectsHelper("REFRESH AUTHORIZATION",
+        db, Collections.emptyList(), Collections.emptyList());
+    TestCollectRequiredObjectsHelper("REFRESH FUNCTIONS mydb",
+        db, Arrays.asList("mydb"), Collections.emptyList());
+    TestCollectRequiredObjectsHelper("INVALIDATE METADATA mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("INVALIDATE METADATA foo",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("REFRESH mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("REFRESH foo",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("REFRESH mydb.foo PARTITION (p=1)",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("REFRESH foo PARTITION (p=1)",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+
+    TestCollectRequiredObjectsHelper("CREATE TABLE mydb.foo(i int)",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("CREATE TABLE foo(i int)",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("CREATE TABLE foo LIKE bar",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo", db + ".bar"));
+    TestCollectRequiredObjectsHelper("CREATE TABLE foo AS SELECT * FROM db1.tbl1",
+        db, Arrays.asList(db, "db1"),
+        Arrays.asList(db + ".foo", db + ".db1", "db1.tbl1"));
+
+    TestCollectRequiredObjectsHelper("ALTER TABLE foo DROP PARTITION(p=1)",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("ALTER TABLE mydb.foo ADD PARTITION(p=1)",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("ALTER TABLE foo CONVERT TO ICEBERG",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("ALTER TABLE mydb.foo CONVERT TO ICEBERG",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+
+    TestCollectRequiredObjectsHelper("DROP TABLE mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("DROP TABLE foo",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+
+    TestCollectRequiredObjectsHelper("SHOW PARTITIONS mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("SHOW FILES IN mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("SHOW TABLE STATS mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("SHOW COLUMN STATS mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+
+    TestCollectRequiredObjectsHelper("INSERT INTO foo SELECT * FROM bar, baz",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo", db + ".bar", db + ".baz"));
+
+    TestCollectRequiredObjectsHelper("LOAD DATA INPATH 'path' INTO TABLE foo",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("LOAD DATA INPATH 'path' INTO TABLE mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper(
+        "LOAD DATA INPATH 'path' INTO TABLE foo PARTITION(p=1)",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper(
+        "LOAD DATA INPATH 'path' INTO TABLE mydb.foo PARTITION(p=1)",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+
+    TestCollectRequiredObjectsHelper("COMPUTE STATS foo",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("COMPUTE STATS mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("COMPUTE INCREMENTAL STATS foo",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("COMPUTE INCREMENTAL STATS mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("COMPUTE INCREMENTAL STATS foo PARTITION(p=1)",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("COMPUTE INCREMENTAL STATS mydb.foo PARTITION(p=1)",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+
+    TestCollectRequiredObjectsHelper("DROP STATS foo",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("DROP STATS mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("DROP INCREMENTAL STATS foo PARTITION(p=1)",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("DROP INCREMENTAL STATS mydb.foo PARTITION(p=1)",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+
+    TestCollectRequiredObjectsHelper("DESCRIBE foo",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("DESCRIBE mydb.tbl",
+        db, Arrays.asList(db, "mydb"), Arrays.asList("mydb.tbl", db + ".mydb"));
+    TestCollectRequiredObjectsHelper("DESCRIBE mydb.tbl.complex_col",
+        db, Arrays.asList(db, "mydb"), Arrays.asList("mydb.tbl", db + ".mydb"));
+    TestCollectRequiredObjectsHelper("DESCRIBE mydb.tbl.complex_col.nested_col",
+        db, Arrays.asList(db, "mydb"), Arrays.asList("mydb.tbl", db + ".mydb"));
+    TestCollectRequiredObjectsHelper("DESCRIBE HISTORY foo",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("DESCRIBE HISTORY mydb.tbl",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.tbl"));
+
+    TestCollectRequiredObjectsHelper("TRUNCATE TABLE foo",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("TRUNCATE TABLE mydb.foo",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+
+    TestCollectRequiredObjectsHelper("COMMENT ON TABLE foo IS 'comment'",
+        db, Arrays.asList(db), Arrays.asList(db + ".foo"));
+    TestCollectRequiredObjectsHelper("COMMENT ON TABLE mydb.foo IS 'comment'",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("COMMENT ON DATABASE mydb IS 'comment'",
+        db, Arrays.asList("mydb"), Collections.emptyList());
+
+    TestCollectRequiredObjectsHelper("CREATE DATABASE mydb",
+        db, Arrays.asList("mydb"), Collections.emptyList());
+    TestCollectRequiredObjectsHelper("ALTER DATABASE mydb SET OWNER USER user1",
+        db, Arrays.asList("mydb"), Collections.emptyList());
+    TestCollectRequiredObjectsHelper("DROP DATABASE mydb",
+        db, Arrays.asList("mydb"), Collections.emptyList());
+
+    TestCollectRequiredObjectsHelper("SHOW FUNCTIONS",
+        db, Arrays.asList(db), Collections.emptyList());
+    TestCollectRequiredObjectsHelper("SHOW FUNCTIONS IN mydb",
+        db, Arrays.asList("mydb"), Collections.emptyList());
+    TestCollectRequiredObjectsHelper("SHOW TABLES",
+        db, Arrays.asList(db), Collections.emptyList());
+    TestCollectRequiredObjectsHelper("SHOW TABLES IN mydb",
+        db, Arrays.asList("mydb"), Collections.emptyList());
+  }
+
+  public void TestCollectRequiredObjectsHelper(String query,
+      String sessionDb, List<String> expectedDbNames, List<String> expectedTableNames)
+      throws AnalysisException {
+    StatementBase stmt = Parser.parse(query);
+    TWaitForHmsEventRequest req = new TWaitForHmsEventRequest();
+    Frontend.collectRequiredObjects(req, stmt, sessionDb);
+    if (expectedDbNames.isEmpty() && expectedTableNames.isEmpty()) {
+      assertNull(req.object_descs);
+      return;
+    }
+    List<String> dbNames = new ArrayList<>();
+    List<String> tableNames = new ArrayList<>();
+    for (TCatalogObject obj : req.getObject_descs()) {
+      if (obj.getType() == TCatalogObjectType.DATABASE) {
+        dbNames.add(obj.getDb().getDb_name());
+      } else {
+        assertEquals(TCatalogObjectType.TABLE, obj.getType());
+        tableNames.add(obj.getTable().getDb_name() + "." + obj.getTable().getTbl_name());
+      }
+    }
+    Collections.sort(dbNames);
+    Collections.sort(tableNames);
+    Collections.sort(expectedDbNames);
+    Collections.sort(expectedTableNames);
+    assertEquals(expectedDbNames, dbNames);
+    assertEquals(expectedTableNames, tableNames);
   }
 }

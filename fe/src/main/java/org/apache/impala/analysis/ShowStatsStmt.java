@@ -35,7 +35,7 @@ import com.google.common.base.Preconditions;
  * Representation of a SHOW TABLE/COLUMN STATS statement for
  * displaying column and table/partition statistics for a given table.
  */
-public class ShowStatsStmt extends StatementBase {
+public class ShowStatsStmt extends StatementBase implements SingleTableStmt {
   protected final TShowStatsOp op_;
   protected final TableName tableName_;
   protected boolean show_column_minmax_stats_ = false;
@@ -47,6 +47,9 @@ public class ShowStatsStmt extends StatementBase {
     op_ = Preconditions.checkNotNull(op);
     tableName_ = Preconditions.checkNotNull(tableName);
   }
+
+  @Override
+  public TableName getTableName() { return tableName_; }
 
   @Override
   public String toSql(ToSqlOptions options) {

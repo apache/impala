@@ -31,7 +31,7 @@ import com.google.common.base.Preconditions;
 /**
  * Base class for all ALTER TABLE statements.
  */
-public abstract class AlterTableStmt extends StatementBase {
+public abstract class AlterTableStmt extends StatementBase implements SingleTableStmt {
   protected TableName tableName_;
 
   // Set during analysis.
@@ -48,6 +48,8 @@ public abstract class AlterTableStmt extends StatementBase {
    */
   public abstract String getOperation();
 
+  @Override
+  public TableName getTableName() { return tableName_; }
   public String getTbl() { return tableName_.getTbl(); }
 
   /**

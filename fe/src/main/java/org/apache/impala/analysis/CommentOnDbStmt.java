@@ -35,6 +35,9 @@ public class CommentOnDbStmt extends CommentOnStmt {
   }
 
   @Override
+  public String getParsedDb() { return dbName_; }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     analyzer.getDb(dbName_, Privilege.ALTER);

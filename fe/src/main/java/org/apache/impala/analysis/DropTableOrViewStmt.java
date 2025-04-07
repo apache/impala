@@ -37,7 +37,7 @@ import com.google.common.base.Preconditions;
 /**
  * Represents a DROP TABLE/VIEW [IF EXISTS] statement
  */
-public class DropTableOrViewStmt extends StatementBase {
+public class DropTableOrViewStmt extends StatementBase implements SingleTableStmt {
   private static final Logger LOG = LoggerFactory.getLogger(DropTableOrViewStmt.class);
 
   protected final TableName tableName_;
@@ -164,6 +164,8 @@ public class DropTableOrViewStmt extends StatementBase {
     return dbName_;
   }
 
+  @Override
+  public TableName getTableName() { return tableName_; }
   public String getTbl() { return tableName_.getTbl(); }
   public boolean isDropTable() { return dropTable_; }
 }

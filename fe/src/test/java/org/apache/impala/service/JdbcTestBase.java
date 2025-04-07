@@ -32,7 +32,6 @@ import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.junit.After;
 import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 import org.junit.runner.RunWith;
 
 import com.google.common.collect.Lists;
@@ -118,7 +117,7 @@ public abstract class JdbcTestBase {
     // Once the stmt was executed successfully, add the fully-qualified table name
     // for cleanup in @After.
     CreateTableStmt parsedStmt = (CreateTableStmt) result;
-    testTableNames_.add(parsedStmt.getTblName().toString());
+    testTableNames_.add(parsedStmt.getTableName().toString());
   }
 
   protected void dropTestTable(String tableName) throws SQLException {

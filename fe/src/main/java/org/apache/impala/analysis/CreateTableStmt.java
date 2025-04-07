@@ -63,7 +63,7 @@ import com.google.common.primitives.Ints;
 /**
  * Represents a CREATE TABLE statement.
  */
-public class CreateTableStmt extends StatementBase {
+public class CreateTableStmt extends StatementBase implements SingleTableStmt {
 
   @VisibleForTesting
   final static String KUDU_STORAGE_HANDLER_ERROR_MESSAGE = "Kudu tables must be"
@@ -106,8 +106,9 @@ public class CreateTableStmt extends StatementBase {
   @Override
   public CreateTableStmt clone() { return new CreateTableStmt(this); }
 
-  public String getTbl() { return getTblName().getTbl(); }
-  public TableName getTblName() { return tableDef_.getTblName(); }
+  public String getTbl() { return getTableName().getTbl(); }
+  @Override
+  public TableName getTableName() { return tableDef_.getTblName(); }
   public boolean getIfNotExists() { return tableDef_.getIfNotExists(); }
   public List<ColumnDef> getColumnDefs() { return tableDef_.getColumnDefs(); }
   private void setColumnDefs(List<ColumnDef> colDefs) {
@@ -191,7 +192,7 @@ public class CreateTableStmt extends StatementBase {
    */
   public String getDb() {
     Preconditions.checkState(isAnalyzed());
-    return getTblName().getDb();
+    return getTableName().getDb();
   }
 
   @Override
@@ -580,17 +581,17 @@ public class CreateTableStmt extends StatementBase {
         // No Avro schema was explicitly set in the serde or table properties, so infer
         // the Avro schema from the column definitions.
         Schema inferredSchema = AvroSchemaConverter.convertColumnDefs(
-            getColumnDefs(), getTblName().toString());
+            getColumnDefs(), getTableName().toString());
         avroSchema = inferredSchema.toString();
       }
       if (Strings.isNullOrEmpty(avroSchema)) {
         throw new AnalysisException("Avro schema is null or empty: " +
-            getTblName().toString());
+            getTableName().toString());
       }
       avroCols = AvroSchemaParser.parse(avroSchema);
     } catch (SchemaParseException e) {
       throw new AnalysisException(String.format(
-          "Error parsing Avro schema for table '%s': %s", getTblName().toString(),
+          "Error parsing Avro schema for table '%s': %s", getTableName().toString(),
           e.getMessage()));
     }
     Preconditions.checkNotNull(avroCols);

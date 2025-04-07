@@ -112,7 +112,7 @@ import com.google.common.collect.Sets;
  * TODO: Allow more coarse (db)
  * TODO: Compute stats on complex types.
  */
-public class ComputeStatsStmt extends StatementBase {
+public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
   private static final Logger LOG = Logger.getLogger(ComputeStatsStmt.class);
 
   private static String AVRO_SCHEMA_MSG_PREFIX = "Cannot COMPUTE STATS on Avro table " +
@@ -1028,6 +1028,7 @@ public class ComputeStatsStmt extends StatementBase {
     return partitionSet_;
   }
 
+  @Override
   public TableName getTableName() {
     return tableName_;
   }

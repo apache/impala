@@ -30,7 +30,7 @@ import com.google.common.base.Preconditions;
  * Represents both a DROP STATS statement, and the DROP INCREMENTAL STATS <tbl> PARTITION
  * <part_spec> variant.
  */
-public class DropStatsStmt extends StatementBase {
+public class DropStatsStmt extends StatementBase implements SingleTableStmt {
   protected final TableName tableName_;
 
   // Set during analysis
@@ -51,6 +51,9 @@ public class DropStatsStmt extends StatementBase {
     this.tableName_ = Preconditions.checkNotNull(tableName);;
     this.partitionSet_ = partitionSet;
   }
+
+  @Override
+  public TableName getTableName() { return tableName_; }
 
   @Override
   public String toSql(ToSqlOptions options) {

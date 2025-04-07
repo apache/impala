@@ -40,7 +40,7 @@ import com.google.common.base.Preconditions;
  *         DESCRIBE HISTORY <table> FROM <ts>;
  *         DESCRIBE HISTORY <table> FROM now() - interval 1 days;
  */
-public class DescribeHistoryStmt extends StatementBase {
+public class DescribeHistoryStmt extends StatementBase implements SingleTableStmt {
   private final static Logger LOG = LoggerFactory.getLogger(TimeTravelSpec.class);
 
   // Represents the predicate with which this statement was called.
@@ -93,6 +93,9 @@ public class DescribeHistoryStmt extends StatementBase {
     betweenEndTime_ = Preconditions.checkNotNull(between2);
     kind_ = Kind.BETWEEN;
   }
+
+  @Override
+  public TableName getTableName() { return tableName_; }
 
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {

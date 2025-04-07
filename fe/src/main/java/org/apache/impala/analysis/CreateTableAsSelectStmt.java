@@ -105,7 +105,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
         pkvs.add(new PartitionKeyValue(key, null));
       }
     }
-    insertStmt_ = InsertStmt.createInsert(null, createStmt_.getTblName(), false, pkvs,
+    insertStmt_ = InsertStmt.createInsert(null, createStmt_.getTableName(), false, pkvs,
         planHints, null, params.queryStmt, null);
   }
 

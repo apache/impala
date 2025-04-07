@@ -1975,6 +1975,89 @@ class TestRanger(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS,
+    catalogd_args=CATALOGD_ARGS + " --hms_event_polling_interval_s=5")
+  def test_alter_owner_hms_event_sync(self, unique_name):
+    """Test Impala queries that depends on database ownership changes in Hive.
+       Use a longer polling interval to mimic lag in event processing."""
+    test_user = getuser()
+    test_db = unique_name + "_db"
+    # A client that only used by 'test_user'. Just need to set the username at the
+    # first statement. It will keep using the same username.
+    user_client = self.create_impala_client()
+    user_client.set_configuration({"sync_hms_events_wait_time_s": 10,
+                                   "sync_hms_events_strict_mode": True})
+
+    # Methods to change ownership in Hive which will generate ALTER_DATABASE events.
+    def change_db_owner_to_user():
+      self.run_stmt_in_hive(
+        "alter database {0} set owner user {1}".format(test_db, test_user), ADMIN)
+
+    def reset_db_owner_to_admin():
+      self.run_stmt_in_hive(
+        "alter database {0} set owner user {1}".format(test_db, ADMIN), ADMIN)
+
+    # Create a test database as "admin" user. Owner is set accordingly.
+    # By default, only the "admin" user and owner of the db can read/write this db.
+    self._run_query_as_user(
+        "drop database if exists {0} cascade".format(test_db), ADMIN, expect_success=True)
+    self._run_query_as_user(
+        "create database {0}".format(test_db), ADMIN, expect_success=True)
+    try:
+      # Test table statement waits for db alter owner events
+      # Try to create a table under test_db as current user. It should fail since
+      # test_user is not the db owner.
+      create_tbl_stmt = "create table {0}.foo(a int)".format(test_db)
+      self.execute_query_expect_failure(user_client, create_tbl_stmt, user=test_user)
+      change_db_owner_to_user()
+      # Creating the table again should succeed once the ALTER_DATABASE event is synced.
+      self.execute_query_expect_success(user_client, create_tbl_stmt)
+      reset_db_owner_to_admin()
+
+      # Test table statement waits for table alter owner events
+      stmts = [
+        "describe {}.foo".format(test_db),
+        "insert into {}.foo values (0)".format(test_db),
+        "select * from {}.foo".format(test_db),
+        "compute stats {}.foo".format(test_db),
+        "refresh {}.foo".format(test_db),
+        "drop table {}.foo".format(test_db),
+      ]
+      for stmt in stmts:
+        # Change table owner to admin
+        self.run_stmt_in_hive(
+            "alter table {0}.foo set owner user {1}".format(test_db, ADMIN), ADMIN)
+        self.execute_query_expect_failure(user_client, stmt)
+        # Change table owner to user
+        self.run_stmt_in_hive(
+            "alter table {0}.foo set owner user {1}".format(test_db, test_user), ADMIN)
+        self.execute_query_expect_success(user_client, stmt)
+      # Create the table again since the last statement is DROP TABLE.
+      change_db_owner_to_user()
+      self.execute_query_expect_success(user_client, create_tbl_stmt)
+      reset_db_owner_to_admin()
+
+      # Test SHOW DATABASES waits for db change owner events. The db is invisible if user
+      # is not the owner.
+      assert test_db not in self.all_db_names(user_client)
+      change_db_owner_to_user()
+      assert test_db in self.all_db_names(user_client)
+      reset_db_owner_to_admin()
+
+      # Test SHOW TABLES
+      # Run a query on the table to make its ownership info loaded. Otherwise, it will
+      # be missing in SHOW TABLES due to IMPALA-8937.
+      self.execute_query_expect_success(user_client, "describe {}.foo".format(test_db))
+      # SHOW TABLES should fail since user is not the owner of this db
+      self.execute_query_expect_failure(user_client, "show tables in " + test_db)
+      change_db_owner_to_user()
+      assert ["foo"] == self.all_table_names(user_client, test_db)
+      reset_db_owner_to_admin()
+    finally:
+      self._run_query_as_user("drop database {0} cascade".format(test_db), ADMIN, True)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_select_function_with_fallback_db(self, unique_name):
     """Verifies that Impala should not allow using functions in the fallback database
