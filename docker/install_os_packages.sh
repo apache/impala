@@ -288,7 +288,11 @@ fi
 # the sticky bit (i.e. +t). Some versions of Redhat UBI images do not have
 # this set by default, so specifically set the sticky bit for both /tmp and /var/tmp.
 mkdir -p /var/tmp
-chmod a=rwx,o+t /var/tmp /tmp
+chmod a=rwxt /var/tmp /tmp
+# The busybox implementation of chmod is known to ignore certain chmod syntax variations,
+# so check if the directories actually have the correct permissions
+diff <(stat -c '%u %g %a'  /tmp) - <<<'0 0 1777'
+diff <(stat -c '%u %g %a'  /var/tmp) - <<<'0 0 1777'
 
 # To minimize the size for the Docker image, clean up any unnecessary files.
 if [[ $DISTRIBUTION == Ubuntu ]]; then
