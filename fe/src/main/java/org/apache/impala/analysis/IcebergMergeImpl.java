@@ -333,18 +333,14 @@ public class IcebergMergeImpl implements MergeImpl {
 
     boolean hasEqualityDeleteFiles = !icebergTable_.getContentFileStore()
         .getEqualityDeleteFiles().isEmpty();
-    boolean hasPositionDeleteFiles = !icebergTable_.getContentFileStore()
-        .getPositionDeleteFiles().isEmpty();
 
-    if (!mergeStmt_.hasOnlyInsertCases() || hasPositionDeleteFiles) {
-      // DELETE/UPDATE cases require position information to write/read delete files
-      deleteMetaExpressions.add(new SlotRef(
-              ImmutableList.of(targetTableRef_.getUniqueAlias(),
-                  VirtualColumn.INPUT_FILE_NAME.getName())));
-      deleteMetaExpressions.add(new SlotRef(
-          ImmutableList.of(targetTableRef_.getUniqueAlias(),
-              VirtualColumn.FILE_POSITION.getName())));
-    }
+    // Required for duplicate checks and for UPDATE and DELETE clauses
+    deleteMetaExpressions.add(new SlotRef(
+            ImmutableList.of(targetTableRef_.getUniqueAlias(),
+                VirtualColumn.INPUT_FILE_NAME.getName())));
+    deleteMetaExpressions.add(new SlotRef(
+        ImmutableList.of(targetTableRef_.getUniqueAlias(),
+            VirtualColumn.FILE_POSITION.getName())));
 
     if (hasEqualityDeleteFiles) {
       deleteMetaExpressions.add(new SlotRef(

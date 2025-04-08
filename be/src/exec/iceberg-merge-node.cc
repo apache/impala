@@ -17,6 +17,8 @@
 
 #include "exec/iceberg-merge-node.h"
 
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/status.h"
@@ -181,6 +183,11 @@ Status IcebergMergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
         ReachedLimit() || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_);
     if (*eos || child_row_idx_ == child_row_batch_->num_rows()) {
       child_row_idx_ = 0;
+      if (previous_row_ != nullptr) {
+        // Materialize it as a string
+        previous_row_file_path_materialized_ = std::string(previous_row_file_path_);
+        previous_row_file_path_ = std::string_view(previous_row_file_path_materialized_);
+      }
       child_row_batch_->Reset();
     }
   } while (!*eos && !row_batch->AtCapacity());
@@ -192,11 +199,11 @@ Status IcebergMergeNode::EvaluateCases(RowBatch* output_batch) {
     ++child_row_idx_;
     auto row = iter.Get();
 
-    if (IsDuplicateRow(row)) {
+    if (IsDuplicateTargetTuplePtr(row) && IsDuplicateTargetRowIdent(row)) {
       return Status(
           "Duplicate row found: one target table row matched more than one source row");
     }
-    previous_row_target_tuple_ = row->GetTuple(target_tuple_idx_);
+    SavePreviousRowPtrAndIdent(row);
 
     auto row_present = row_present_evaluator_->GetTinyIntVal(row).val;
     IcebergMergeCase* selected_case = nullptr;
@@ -272,17 +279,41 @@ void IcebergMergeNode::AddRow(
   IncrementNumRowsReturned(1);
 }
 
-bool IcebergMergeNode::IsDuplicateRow(TupleRow* actual_row) {
-  if (previous_row_target_tuple_ == nullptr) { return false; }
+bool IcebergMergeNode::IsDuplicateTargetTuplePtr(TupleRow* actual_row) {
+  if (previous_row_ == nullptr) { return false; }
+  auto previous_row_target_tuple = previous_row_->GetTuple(target_tuple_idx_);
+  if (previous_row_target_tuple == nullptr) { return false; }
   auto actual_row_target_tuple = actual_row->GetTuple(target_tuple_idx_);
-  return previous_row_target_tuple_ == actual_row_target_tuple;
+  return previous_row_target_tuple == actual_row_target_tuple;
+}
+
+bool IcebergMergeNode::IsDuplicateTargetRowIdent(TupleRow* actual_row) {
+  auto file_path_sv = delete_meta_evaluators_[0]->GetStringVal(actual_row);
+  auto file_pos = delete_meta_evaluators_[1]->GetBigIntVal(actual_row);
+  if (previous_row_file_pos_ != file_pos.val) { return false; }
+  auto file_path =
+      std::string_view(reinterpret_cast<const char*>(file_path_sv.ptr), file_path_sv.len);
+  return file_path == previous_row_file_path_;
+}
+
+void IcebergMergeNode::SavePreviousRowPtrAndIdent(TupleRow* actual_row) {
+  impala_udf::StringVal file_path_sv =
+      delete_meta_evaluators_[0]->GetStringVal(actual_row);
+  auto file_pos = delete_meta_evaluators_[1]->GetBigIntVal(actual_row);
+  previous_row_file_pos_ = file_pos.val;
+  previous_row_file_path_ =
+      std::string_view(reinterpret_cast<char*>(file_path_sv.ptr), file_path_sv.len);
+  previous_row_ = actual_row;
 }
 
 Status IcebergMergeNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   child_row_batch_->TransferResourceOwnership(row_batch);
   child_row_idx_ = 0;
   child_eos_ = false;
-  previous_row_target_tuple_ = nullptr;
+  previous_row_ = nullptr;
+  previous_row_file_path_ = {};
+  previous_row_file_path_materialized_ = {};
+  previous_row_file_pos_ = -1;
   return ExecNode::Reset(state, row_batch);
 }
 

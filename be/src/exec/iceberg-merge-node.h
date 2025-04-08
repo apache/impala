@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "exec/exec-node.h"
@@ -109,7 +111,9 @@ class IcebergMergeNode : public ExecNode {
   Status EvaluateCases(RowBatch* output_batch);
   void AddRow(RowBatch* output_batch, IcebergMergeCase* merge_case, TupleRow* row);
   bool CheckCase(const IcebergMergeCase * merge_case, TupleRow* row);
-  bool IsDuplicateRow(TupleRow* actual_row);
+  bool IsDuplicateTargetTuplePtr(TupleRow* actual_row);
+  bool IsDuplicateTargetRowIdent(TupleRow* actual_row);
+  void SavePreviousRowPtrAndIdent(TupleRow* actual_row);
 
   std::vector<IcebergMergeCase*> matched_cases_;
   std::vector<IcebergMergeCase*> not_matched_by_target_cases_;
@@ -125,8 +129,15 @@ class IcebergMergeNode : public ExecNode {
   std::vector<ScalarExprEvaluator*> partition_meta_evaluators_;
   ScalarExprEvaluator* row_present_evaluator_;
 
-  /// Pointer to the last processed tuple from target table, used for duplicate filtering
-  Tuple* previous_row_target_tuple_ = nullptr;
+  /// Pointer to the last processed tuple row from target table, used for duplicate
+  /// filtering
+  TupleRow* previous_row_ = nullptr;
+  /// Previous target row's file position
+  int64_t previous_row_file_pos_ = -1;
+  /// Previous target row's file path
+  std::string_view previous_row_file_path_;
+  /// Previous target row's file path materialized as a string
+  std::string previous_row_file_path_materialized_;
 
   /// Index of the merge action tuple in the row descriptor
   int merge_action_tuple_idx_ = -1;
