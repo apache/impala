@@ -1,0 +1,20 @@
+====
+---- QUERY
+create table merge_duplicate_check
+partitioned by spec(id)
+stored by iceberg
+tblproperties('format-version'='2') as
+    select id, bigint_col, string_col
+    from functional_parquet.alltypes
+    where id < 1000;
+
+set num_nodes=1;
+set mt_dop=1;
+merge into merge_duplicate_check target using functional.alltypes source on (target.id = source.id)
+when matched then update set target.bigint_col = target.bigint_col + 1;
+select sum(bigint_col) from merge_duplicate_check;
+---- RESULTS
+46000
+---- TYPES
+BIGINT
+====

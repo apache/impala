@@ -2078,6 +2078,12 @@ class TestIcebergV2Table(IcebergTestSuite):
         warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
     self.run_test_case('QueryTest/iceberg-merge-equality-insert', vector, unique_database)
 
+  def test_merge_duplicate_check(self, vector, unique_database):
+    """Regression test for IMPALA-13932"""
+    # Remove 'num_nodes' option so we can set it at .test file.
+    vector.unset_exec_option('num_nodes')
+    self.run_test_case('QueryTest/iceberg-merge-duplicate-check', vector, unique_database)
+
   def test_cleanup(self, unique_database):
       """Test that all uncommitted files written by Impala are removed from the file
       system when a DML commit to an Iceberg table fails, and that the effects of the
