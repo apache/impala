@@ -8,8 +8,8 @@ CREATE TABLE str_insert (s string) STORED AS $FILE_FORMAT
 INSERT INTO str_insert
 SELECT case when ss_promo_sk % 2 = 0 then 'even' else 'odd' end
 FROM tpcds.store_sales
----- RESULTS
-: 2880404
+---- RUNTIME_PROFILE
+NumModifiedRows: 2880404
 ====
 ---- QUERY: TPCDS-STR-INSERT-CASE
 SELECT COUNT(*) FROM str_insert

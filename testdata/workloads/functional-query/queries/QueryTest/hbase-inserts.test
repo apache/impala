@@ -3,8 +3,8 @@
 insert into table insertalltypesagg
 select id, bigint_col, cast(string_col as binary), bool_col, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
----- RESULTS
-: 11000
+---- RUNTIME_PROFILE
+NumModifiedRows: 11000
 ====
 ---- QUERY
 select id, bool_col from insertalltypesagg
@@ -21,8 +21,8 @@ INT, BOOLEAN
 insert into table insertalltypesagg
 select 9999999, bigint_col, cast(string_col as binary), false, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
----- RESULTS
-: 11000
+---- RUNTIME_PROFILE
+NumModifiedRows: 11000
 ====
 ---- QUERY
 select id, bool_col from insertalltypesagg
@@ -39,8 +39,8 @@ INT, BOOLEAN
 # using limit 1 to reduce execution time
 insert into table insertalltypesagg
 select * from insertalltypesagg limit 1
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 # test inserting Hive's default text representation of NULL '\N'
@@ -48,8 +48,8 @@ select * from insertalltypesagg limit 1
 insert into table insertalltypesagg
 select 9999999, bigint_col, cast("\\N" as binary), false, "\\N", day, double_col, float_col,
 int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from functional.alltypesagg limit 1
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 select id, date_string_col, string_col, binary_col from insertalltypesagg
@@ -63,8 +63,8 @@ INT, STRING, STRING, BINARY
 insert into table insertalltypesaggbinary
 select id, bigint_col, cast(string_col as binary), bool_col, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
----- RESULTS
-: 11000
+---- RUNTIME_PROFILE
+NumModifiedRows: 11000
 ====
 ---- QUERY
 select count(*) from (
@@ -111,8 +111,8 @@ INT, BOOLEAN
 insert into table insertalltypesaggbinary
 select 9999999, bigint_col,  cast(string_col as binary), false, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
----- RESULTS
-: 11000
+---- RUNTIME_PROFILE
+NumModifiedRows: 11000
 ====
 ---- QUERY
 select id, bool_col from insertalltypesaggbinary
@@ -129,8 +129,8 @@ INT, BOOLEAN
 # using limit 1 to reduce execution time
 insert into table insertalltypesaggbinary
 select * from insertalltypesaggbinary limit 1
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 # test inserting Hive's default text representation of NULL '\N'
@@ -138,8 +138,8 @@ select * from insertalltypesaggbinary limit 1
 insert into table insertalltypesaggbinary
 select 9999999, bigint_col,  cast("\\N" as binary), false, "\\N", day, double_col, float_col,
 int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from functional.alltypesagg limit 1
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 select id, date_string_col, string_col, binary_col from insertalltypesaggbinary
@@ -152,8 +152,8 @@ INT, STRING, STRING, BINARY
 ---- QUERY
 #IMPALA-715 handle large string value
 insert into table insertalltypesagg(id, string_col) values(9999999, rpad('a', 50000, 'b'))
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 select id, length(string_col) from insertalltypesagg
@@ -166,8 +166,8 @@ INT, INT
 ---- QUERY
 # IMPALA-2133
 insert into table insertalltypesagg (id, string_col) values (99999999, 'William\'s'), (999999999, "Other\"s")
----- RESULTS
-: 2
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
 ====
 ---- QUERY
 select id, string_col from insertalltypesagg where id = 99999999
@@ -194,8 +194,8 @@ INT, STRING
 insert into table insert_date_tbl
 select id_col, date_col, date_part
 from functional.date_tbl
----- RESULTS
-: 22
+---- RUNTIME_PROFILE
+NumModifiedRows: 22
 ====
 ---- QUERY
 select id_col, date_col from insert_date_tbl
@@ -212,8 +212,8 @@ INT, DATE
 insert into table insert_date_tbl
 select 9999999, date_col, '1521-12-13'
 from functional.date_tbl
----- RESULTS
-: 22
+---- RUNTIME_PROFILE
+NumModifiedRows: 22
 ====
 ---- QUERY
 select id_col, date_part from insert_date_tbl
@@ -230,14 +230,14 @@ INT, DATE
 # using limit 1 to reduce execution time
 insert into table insert_date_tbl
 select * from insert_date_tbl limit 1
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 # Insert special characters to binary_col.
 insert into table insertalltypesagg (id, binary_col) values (99999999, cast(unhex('00112233445566778899AABBCCDDEEFF') as binary))
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 select id, hex(cast(binary_col as string)) from insertalltypesagg where id = 99999999

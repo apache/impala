@@ -25,8 +25,8 @@ CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
 from functional.alltypes
 order by id
 limit 5;
----- RESULTS
-: 5
+---- RUNTIME_PROFILE
+NumModifiedRows: 5
 ====
 ---- QUERY
 select * from iceberg_alltypes;
@@ -104,8 +104,8 @@ stored as iceberg
 tblproperties('iceberg.catalog'='hadoop.catalog',
   'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/hadoop_catalog_test');
 insert into iceberg_hadoop_cat values (1), (2), (3);
----- RESULTS
-: 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
 ====
 ---- QUERY
 select * from iceberg_hadoop_cat;
@@ -131,8 +131,8 @@ tblproperties('iceberg.catalog'='hadoop.catalog',
   'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/hadoop_catalog_test',
   'iceberg.table_identifier'='test.custom_db.int_table');
 insert into iceberg_hadoop_cat_ti values (1), (2), (3);
----- RESULTS
-: 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
 ====
 ---- QUERY
 select * from iceberg_hadoop_cat_ti;
@@ -179,8 +179,8 @@ stored as iceberg
 location '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE.db/custom_hive_cat'
 tblproperties('iceberg.catalog'='hive.catalog');
 insert into iceberg_hive_cat_custom_loc values (1), (2), (3);
----- RESULTS
-: 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
 ====
 ---- QUERY
 select * from iceberg_hive_cat_custom_loc;
@@ -227,8 +227,8 @@ insert into iceberg_alltypes_parq_tblprop
 select id, bool_col, int_col, bigint_col, float_col, double_col,
 CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
 from functional.alltypes;
----- RESULTS
-: 7300
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
 ====
 ---- QUERY
 alter table iceberg_alltypes_parq_tblprop set tblproperties (
@@ -242,8 +242,8 @@ insert into iceberg_alltypes_parq_tblprop
 select id, bool_col, int_col, bigint_col, float_col, double_col,
 CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
 from functional.alltypes;
----- RESULTS
-: 7300
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
 ====
 ---- QUERY
 alter table iceberg_alltypes_parq_tblprop set tblproperties (
@@ -258,8 +258,8 @@ insert into iceberg_alltypes_parq_tblprop
 select id, bool_col, int_col, bigint_col, float_col, double_col,
 CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
 from functional.alltypes;
----- RESULTS
-: 7300
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
 ====
 ---- QUERY
 alter table iceberg_alltypes_parq_tblprop set tblproperties (
@@ -274,8 +274,8 @@ insert into iceberg_alltypes_parq_tblprop
 select id, bool_col, int_col, bigint_col, float_col, double_col,
 CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
 from functional.alltypes;
----- RESULTS
-: 7300
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
 ====
 ---- QUERY
 alter table iceberg_alltypes_parq_tblprop set tblproperties (
@@ -290,8 +290,8 @@ insert into iceberg_alltypes_parq_tblprop
 select id, bool_col, int_col, bigint_col, float_col, double_col,
 CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
 from functional.alltypes;
----- RESULTS
-: 7300
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
 ====
 ---- QUERY
 alter table iceberg_alltypes_parq_tblprop set tblproperties (
@@ -306,8 +306,8 @@ insert into iceberg_alltypes_parq_tblprop
 select id, bool_col, int_col, bigint_col, float_col, double_col,
 CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
 from functional.alltypes;
----- RESULTS
-: 7300
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
 ====
 ---- QUERY
 alter table iceberg_alltypes_parq_tblprop unset tblproperties (
@@ -322,8 +322,8 @@ insert into iceberg_alltypes_parq_tblprop
 select id, bool_col, int_col, bigint_col, float_col, double_col,
 CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
 from functional.alltypes;
----- RESULTS
-: 7300
+---- RUNTIME_PROFILE
+NumModifiedRows: 7300
 ====
 ---- QUERY
 select count(*) from iceberg_alltypes_parq_tblprop;

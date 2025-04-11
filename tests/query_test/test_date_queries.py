@@ -18,7 +18,6 @@
 # Targeted tests for date type.
 
 from __future__ import absolute_import, division, print_function
-import pytest
 from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS
@@ -27,10 +26,11 @@ from tests.common.test_dimensions import (create_exec_option_dimension_from_dict
 from tests.shell.util import create_impala_shell_executable_dimension
 
 
-class TestDateQueries(ImpalaTestSuite):
+class TestDateQueriesBase(ImpalaTestSuite):
+
   @classmethod
   def add_test_dimensions(cls):
-    super(TestDateQueries, cls).add_test_dimensions()
+    super(TestDateQueriesBase, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
       create_exec_option_dimension_from_dict({
         'batch_size': [0, 1],
@@ -49,6 +49,9 @@ class TestDateQueries(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
     cls.ImpalaTestMatrix.add_dimension(create_impala_shell_executable_dimension())
 
+
+class TestDateQueriesAllFormat(TestDateQueriesBase):
+
   def test_queries(self, vector):
     if vector.get_value('table_format').file_format == 'avro':
       # Avro date test queries are in a separate test file.
@@ -60,12 +63,20 @@ class TestDateQueries(ImpalaTestSuite):
     else:
       self.run_test_case('QueryTest/date', vector)
 
+
+class TestDateQueriesTextFormat(TestDateQueriesBase):
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestDateQueriesTextFormat, cls).add_test_dimensions()
+    # Only run this test class with 'text' table_format.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'text')
+
   def test_partitioning(self, vector, unique_database):
     """ Test partitioning by DATE. """
     # This test specifies databases explicitly. No need to execute it for anything other
     # than text fileformat.
-    if vector.get_value('table_format').file_format != 'text':
-      pytest.skip()
     self.run_test_case('QueryTest/date-partitioning', vector, use_db=unique_database)
 
   @SkipIfFS.qualified_path
@@ -75,8 +86,6 @@ class TestDateQueries(ImpalaTestSuite):
     """
     # This test specifies databases and locations explicitly. No need to execute it for
     # anything other than text fileformat on HDFS.
-    if vector.get_value('table_format').file_format != 'text':
-      pytest.skip()
 
     # Parquet table with date column.
     TABLE_NAME = "parquet_date_tbl"

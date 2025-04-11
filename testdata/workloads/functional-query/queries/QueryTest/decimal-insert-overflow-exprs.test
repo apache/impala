@@ -6,8 +6,8 @@ set decimal_v2=true;
 insert into table overflowed_decimal_tbl_1
 select 1, cast(cast(65496456343.9565 as decimal (28,7))*44658*2.111
 as decimal (28,10));
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 # Verify that decimal value, which is expressed with decimal expression with one
@@ -16,8 +16,8 @@ set decimal_v2=true;
 insert into table overflowed_decimal_tbl_1
 select 2, cast(a*44658*2.111 as decimal (28,10)) from
 (select cast(65496456.9565 as decimal (28,7)) as a) q;
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 # Verify that decimal value, which is expressed with decimal expression with three
@@ -28,8 +28,8 @@ select 3, cast(a*b*c as decimal (28,10)) from
 (select cast(65496456.9565 as decimal (28,7)) as a,
  cast(44658 as decimal (28,7)) as b,
  cast(2.111 as decimal (28,7)) as c) q;
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 # Verify that overflow behaviour of decimal_v1 is unchanged.

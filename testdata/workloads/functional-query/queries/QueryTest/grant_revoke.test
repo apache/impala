@@ -454,8 +454,8 @@ STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, 
 ====
 ---- QUERY
 insert overwrite grant_rev_db.test_tbl1 select 1
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from grant_rev_db.test_tbl1

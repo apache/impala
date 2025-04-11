@@ -34,8 +34,8 @@ STRING, STRING, STRING
 ---- QUERY
 insert overwrite table $DATABASE.testtbl SELECT 1, 'Hi'
 from functional.alltypes limit 10
----- RESULTS
-: 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 10
 ====
 ---- QUERY
 select * from $DATABASE.testtbl

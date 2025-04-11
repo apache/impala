@@ -126,8 +126,8 @@ create table if not exists jointbl_like like jointbl_like
 ---- QUERY
 insert overwrite table jointbl_like
 select * from functional.jointbl order by test_id limit 5
----- RESULTS
-: 5
+---- RUNTIME_PROFILE
+NumModifiedRows: 5
 ====
 ---- QUERY
 # Make sure we can read the data.

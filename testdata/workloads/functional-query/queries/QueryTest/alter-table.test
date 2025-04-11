@@ -177,8 +177,8 @@ string,string,string
 ---- QUERY
 # Should be able to read/write using the new column types
 insert overwrite table t2 select 1, '50', 2 from functional.alltypes limit 2
----- RESULTS
-: 2
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
 ====
 ---- QUERY
 select * from t2
@@ -752,8 +752,8 @@ CREATE TABLE imp1016 (string1 string)
 ====
 ---- QUERY
 INSERT INTO imp1016 VALUES ('test')
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 ALTER TABLE imp1016 ADD COLUMNS (string2 string)
@@ -813,8 +813,8 @@ CREATE TABLE imp1016Large (string1 string)
 # There is a codepath that operates on chunks of 1024 tuples, inserting
 # more than 1024 tuples
 INSERT INTO imp1016Large SELECT 'test' FROM functional.alltypes LIMIT 2000
----- RESULTS
-: 2000
+---- RUNTIME_PROFILE
+NumModifiedRows: 2000
 ====
 ---- QUERY
 ALTER TABLE imp1016Large ADD COLUMNS (string2 string)

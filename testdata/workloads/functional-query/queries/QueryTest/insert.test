@@ -12,8 +12,8 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=04
----- RESULTS
-: 25
+---- RUNTIME_PROFILE
+NumModifiedRows: 25
 ====
 ---- QUERY
 # search the overwritten table to verify the results
@@ -57,8 +57,8 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=04
----- RESULTS
-: 25
+---- RUNTIME_PROFILE
+NumModifiedRows: 25
 ====
 ---- QUERY
 # search the table to verify it contains 25 rows
@@ -630,8 +630,8 @@ year=2009/month=4: 4
 insert overwrite table alltypesnopart_insert
 select NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 from functional.alltypessmall limit 10
----- RESULTS
-: 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 10
 ====
 ---- QUERY
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
@@ -655,8 +655,8 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 insert overwrite alltypesnopart_insert(float_col, double_col)
 values(CAST(1/0 AS FLOAT), 1/0), (CAST(-1/0 AS FLOAT), -1/0),
       (CAST(0/0 AS FLOAT), 0/0), (CAST(-sqrt(-1) AS FLOAT), -sqrt(-1))
----- RESULTS
-: 4
+---- RUNTIME_PROFILE
+NumModifiedRows: 4
 ====
 ---- QUERY
 # Results have to be cast to strings, because nan == f is always false for all f
@@ -693,8 +693,8 @@ BIGINT
 insert overwrite table alltypesnopart_insert
 select 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 from functional.alltypessmall limit 0
----- RESULTS
-: 0
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
 ====
 ---- QUERY
 select count(*) from alltypesnopart_insert
@@ -756,8 +756,8 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 # IMPALA-1740: Test inserting into table with the skip.header.line.count tblproperty
 truncate table_with_header_insert;
 insert into table_with_header_insert values (1), (2), (3), (4);
----- RESULTS
-: 4
+---- RUNTIME_PROFILE
+NumModifiedRows: 4
 ====
 ---- QUERY
 select * from table_with_header_insert;
@@ -917,8 +917,8 @@ insert into table alltypesnopart_insert
  /*+ noclustered,shuffle */
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col, timestamp_col from functional.alltypessmall;
----- RESULTS
-: 100
+---- RUNTIME_PROFILE
+NumModifiedRows: 100
 ====
 ---- QUERY
 # IMPALA-6280: clustered (default) with outer join, inline view, and TupleisNullPredicate

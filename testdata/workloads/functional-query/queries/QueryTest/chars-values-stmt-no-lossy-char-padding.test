@@ -9,8 +9,8 @@ insert overwrite test_char_values_string_col_tmp values
 (cast("1" as char(1))),
 (cast("12" as char(2))),
 (cast("123" as char(3)));
----- RESULTS
-: 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
 ====
 ---- QUERY
 select length(s) from test_char_values_string_col_tmp;
@@ -30,13 +30,15 @@ create table test_char_values_varchar_col_tmp (v varchar(5));
 insert overwrite test_char_values_varchar_col_tmp values
 (cast("1" as char(1))),
 (cast("12" as char(2)));
----- RESULTS
-: 2
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
 ====
 ---- QUERY
 select v from test_char_values_varchar_col_tmp;
 ---- TYPES
 string
+---- HS2_TYPES
+varchar
 ---- RESULTS
 '1'
 '12'
@@ -58,8 +60,8 @@ create table test_char_values_char_col_tmp (c char(5));
 insert overwrite test_char_values_char_col_tmp values
 (cast("1" as char(1))),
 (cast("12" as char(2)));
----- RESULTS
-: 2
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
 ====
 ---- QUERY
 select c from test_char_values_char_col_tmp;
@@ -78,13 +80,15 @@ create table test_char_values_mixed_cols_tmp (c char(5), s string, v varchar(8))
 insert overwrite test_char_values_mixed_cols_tmp values
 (cast("1" as char(1)), cast("str" as char(3)), cast("vchar" as char(5))),
 (cast("10" as char(4)), cast("str_2" as char(5)), cast("vchar_2" as char(7)))
----- RESULTS
-: 2
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
 ====
 ---- QUERY
 select c, s, v from test_char_values_mixed_cols_tmp;
 ---- TYPES
 char,string,string
+---- HS2_TYPES
+char,string,varchar
 ---- RESULTS
 '1    ','str','vchar'
 '10   ','str_2','vchar_2'
@@ -98,13 +102,15 @@ create table test_char_values_mixed_cols_different_order_tmp (s string, c char(5
 insert overwrite test_char_values_mixed_cols_different_order_tmp values
 (cast("str" as char(3)), cast("1" as char(1)), cast("vchar" as char(5))),
 (cast("str_2" as char(5)), cast("10" as char(4)), cast("vchar_2" as char(7)))
----- RESULTS
-: 2
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
 ====
 ---- QUERY
 select s, c, v from test_char_values_mixed_cols_different_order_tmp;
 ---- TYPES
 string,char,string
+---- HS2_TYPES
+string,char,varchar
 ---- RESULTS
 'str','1    ','vchar'
 'str_2','10   ','vchar_2'
@@ -115,13 +121,15 @@ string,char,string
 insert overwrite test_char_values_mixed_cols_different_order_tmp values
 (cast("str" as char(3)), cast("1" as char(1)), cast("vchar" as char(5))),
 (cast("str" as char(3)), cast("10" as char(4)), cast("vchar_2" as char(7)))
----- RESULTS
-: 2
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
 ====
 ---- QUERY
 select s, c, v from test_char_values_mixed_cols_different_order_tmp;
 ---- TYPES
 string,char,string
+---- HS2_TYPES
+string,char,varchar
 ---- RESULTS
 'str','1    ','vchar'
 'str','10   ','vchar_2'
@@ -133,13 +141,15 @@ insert overwrite test_char_values_mixed_cols_different_order_tmp values
 (cast("str" as char(3)), cast("1" as char(1)), cast("vchar" as char(5))),
 (cast("str_1" as char(5)), cast("1" as char(1)), cast("vchar" as char(5))),
 ("str_2", cast("10" as char(4)), cast("vchar_2" as char(7)))
----- RESULTS
-: 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
 ====
 ---- QUERY
 select s, c, v from test_char_values_mixed_cols_different_order_tmp;
 ---- TYPES
 string,char,string
+---- HS2_TYPES
+string,char,varchar
 ---- RESULTS
 'str','1    ','vchar'
 'str_1','1    ','vchar'

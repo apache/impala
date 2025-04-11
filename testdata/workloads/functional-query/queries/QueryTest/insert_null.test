@@ -21,8 +21,8 @@ create table nullformat_custom like $ORIGINAL_DB.nullformat_custom;
 # Test that we properly write null values to text tables.
 insert overwrite table nullinsert
 select NULL, "", "NULL", "\\N", NULL from functional.alltypes limit 1
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from nullinsert
@@ -162,8 +162,8 @@ select 2, true, "", 1, 1 union all
 select 3, false, "NULL", 2, 2 union all
 select 4, false, "xyz", 3, 3 union all
 select 5, false, "xyzbar", 4, 4
----- RESULTS
-: 5
+---- RUNTIME_PROFILE
+NumModifiedRows: 5
 ====
 ---- QUERY
 # Test correct interpretation of NULLs with custom

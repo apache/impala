@@ -3,8 +3,8 @@
 # Inserting into parquet table works.
 insert into $DATABASE.parquet_date_tbl
 values ('2011-05-06'), ('9999-12-31'), ('0001-01-01');
----- RESULTS
-: 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
 ====
 ---- QUERY
 # Querying parquet table written by Parquet-MR and Impala works.

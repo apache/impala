@@ -42,8 +42,8 @@ insert into cbn values
 ('abc , abc', 'xyz \\ xyz', 1, 2),
 ('abc ,,, abc', 'xyz \\\\\\ xyz', 3, 4),
 ('abc \\,\\, abc', 'xyz ,\\,\\ xyz', 5, 6)
----- RESULTS
-: 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
 ====
 ---- QUERY
 select * from cbn
@@ -60,8 +60,8 @@ insert into dhp values
 ('abc $ abc', 'xyz # xyz', 1, 2),
 ('abc $$$ abc', 'xyz ### xyz', 3, 4),
 ('abc #$#$ abc', 'xyz $#$# xyz', 5, 6)
----- RESULTS
-: 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
 ====
 ---- QUERY
 select * from dhp

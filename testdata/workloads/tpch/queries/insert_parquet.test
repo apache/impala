@@ -4,8 +4,8 @@
 create table if not exists orders_insert_test like tpch_parquet.orders
 location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/orders_insert_table';
 insert overwrite table orders_insert_test select * from tpch.orders
----- RESULTS
-: 1500000
+---- RUNTIME_PROFILE
+NumModifiedRows: 1500000
 ====
 ---- QUERY
 select count(distinct o_orderkey) from orders_insert_test
@@ -63,8 +63,8 @@ insert overwrite table test_insert_huge_vals
   select cast(l_orderkey as string) from tpch.lineitem
   union select group_concat(concat(s_name, s_address, s_phone)) from tpch.supplier
   union select group_concat(concat(s_name, s_address, s_phone, s_name)) from tpch.supplier
----- RESULTS
-: 1500002
+---- RUNTIME_PROFILE
+NumModifiedRows: 1500002
 ====
 ---- QUERY
 # Verify the values written to test_insert_huge_vals were as expected by counting

@@ -7,8 +7,8 @@ create table cached_tbl_nopart (i int) cached in 'testPool'
 ====
 ---- QUERY
 insert into cached_tbl_nopart select 1
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from cached_tbl_nopart

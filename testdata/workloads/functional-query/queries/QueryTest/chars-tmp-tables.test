@@ -6,8 +6,8 @@ create table test_char_tmp (c char(5))
 ====
 ---- QUERY
 insert into test_char_tmp select cast("hello" as char(5))
----- RESULTS
-: 1
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
 ====
 ---- QUERY
 select * from test_char_tmp
@@ -74,6 +74,8 @@ insert into test_varchar_tmp values (cast("hello" as varchar(5)))
 select * from test_varchar_tmp
 ---- TYPES
 string
+---- HS2_TYPES
+varchar
 ---- RESULTS
 'hello'
 ====
@@ -95,6 +97,8 @@ insert into test_varchar_tmp values (cast("hel" as varchar(4)))
 select * from test_varchar_tmp
 ---- TYPES
 string
+---- HS2_TYPES
+varchar
 ---- RESULTS
 'hello'
 'hel'
@@ -113,6 +117,8 @@ cast("123456" as varchar(5)))
 select cshort, clong, vc from allchars
 ---- TYPES
 char,char,string
+---- HS2_TYPES
+char,char,varchar
 ---- RESULTS
 '12345','123456                                                                                                                                      ','12345'
 ====
@@ -130,6 +136,8 @@ cast("123456" as varchar(5)))
 select cshort, clong, vc from allchars_par
 ---- TYPES
 char,char,string
+---- HS2_TYPES
+char,char,varchar
 ---- RESULTS
 '12345','123456                                                                                                                                      ','12345'
 ====
@@ -144,6 +152,8 @@ insert into char_parts (csp, clp, vcp, vc) select cs, cl, vc, vc from functional
 select csp, clp, vcp from char_parts where csp != cast('dne' as char(5)) order by csp
 ---- TYPES
 char, char, string
+---- HS2_TYPES
+char,char,varchar
 ---- RESULTS
 '1aaaa','1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','1cccc'
 '2aaaa','2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','2cccccc'
@@ -163,6 +173,8 @@ vcp=cast('myvar' as varchar(32))) select cast('val' as varchar(32));
 select csp, clp, vcp from char_parts where csp = cast('foo' as char(5))
 ---- TYPES
 char, char, string
+---- HS2_TYPES
+char,char,varchar
 ---- RESULTS
 'foo  ','01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789','myvar'
 ====
@@ -203,8 +215,8 @@ test_char_nulls ( c20 char(20),
 insert into test_char_nulls
 values (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
        (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
----- RESULTS
-: 2
+---- RUNTIME_PROFILE
+NumModifiedRows: 2
 ====
 ---- QUERY
 # Regression test for IMPALA-1339

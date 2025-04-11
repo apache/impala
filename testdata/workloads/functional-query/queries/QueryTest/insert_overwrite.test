@@ -8,8 +8,8 @@ create table insert_overwrite_partitioned like $ORIGINAL_DB.insert_overwrite_par
 insert overwrite table insert_overwrite_nopart
 select int_col
 from functional.tinyinttable
----- RESULTS
-: 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 10
 ====
 ---- QUERY
 # Check results - note larger limit than expected in case there's more data written than there should be
@@ -36,8 +36,8 @@ int
 insert overwrite table insert_overwrite_nopart
 select 10
 from functional.tinyinttable
----- RESULTS
-: 10
+---- RUNTIME_PROFILE
+NumModifiedRows: 10
 ====
 ---- QUERY
 # check results from previous insert
@@ -64,8 +64,8 @@ insert overwrite table insert_overwrite_nopart
 select 3
 from functional.tinyinttable
 limit 0
----- RESULTS
-: 0
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
 ====
 ---- QUERY
 select count(*) from insert_overwrite_nopart
