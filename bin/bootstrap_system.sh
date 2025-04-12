@@ -278,12 +278,6 @@ ubuntu sudo update-java-alternatives -l || true
 ubuntu sudo update-java-alternatives -v -s \
     java-1.${UBUNTU_JAVA_VERSION}.0-openjdk-${UBUNTU_PACKAGE_ARCH}
 
-# update-java-alternatives may not take effect if there is a Java in PATH
-which java
-java -version
-which javac
-javac -version
-
 redhat sudo yum install -y file gawk gcc gcc-c++ git krb5-devel krb5-server \
         krb5-workstation libevent-devel libffi-devel make openssl-devel cyrus-sasl \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
@@ -292,6 +286,12 @@ redhat sudo yum install -y file gawk gcc gcc-c++ git krb5-devel krb5-server \
         procps psmisc lsof openssh-server python3-devel python3-setuptools \
         net-tools langpacks-en glibc-langpack-en libxml2-devel libxslt-devel \
         java-${REDHAT_JAVA_VERSION}-openjdk-src java-${REDHAT_JAVA_VERSION}-openjdk-devel
+
+# update-java-alternatives may not take effect if there is a Java in PATH
+which java
+java -version
+which javac
+javac -version
 
 # fuse-devel doesn't exist for Redhat 9
 redhat7 sudo yum install -y fuse-devel curl
