@@ -18,11 +18,16 @@
 # Targeted tests for date type.
 
 from __future__ import absolute_import, division, print_function
+
 from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS
-from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
-    create_client_protocol_dimension, hs2_parquet_constraint)
+from tests.common.test_dimensions import (
+    create_client_protocol_dimension,
+    create_exec_option_dimension_from_dict,
+    create_uncompressed_text_dimension,
+    default_protocol_or_parquet_constraint,
+)
 from tests.shell.util import create_impala_shell_executable_dimension
 
 
@@ -46,11 +51,16 @@ class TestDateQueriesBase(ImpalaTestSuite):
     # Run these queries through both beeswax and HS2 to get coverage of date returned
     # via both protocols.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
     cls.ImpalaTestMatrix.add_dimension(create_impala_shell_executable_dimension())
 
 
 class TestDateQueriesAllFormat(TestDateQueriesBase):
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestDateQueriesAllFormat, cls).add_test_dimensions()
+    # Limit to 'parquet/none' for non-default test protocol.
+    cls.ImpalaTestMatrix.add_constraint(default_protocol_or_parquet_constraint)
 
   def test_queries(self, vector):
     if vector.get_value('table_format').file_format == 'avro':
@@ -69,9 +79,9 @@ class TestDateQueriesTextFormat(TestDateQueriesBase):
   @classmethod
   def add_test_dimensions(cls):
     super(TestDateQueriesTextFormat, cls).add_test_dimensions()
-    # Only run this test class with 'text' table_format.
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'text')
+    # Only run this test class with 'text/none' table_format.
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
 
   def test_partitioning(self, vector, unique_database):
     """ Test partitioning by DATE. """

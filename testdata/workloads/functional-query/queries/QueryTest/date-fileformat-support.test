@@ -45,18 +45,18 @@ NULL
 # Inserting text partitions to $DATABASE.date_tbl is OK.
 insert into $DATABASE.date_tbl partition (date_part)
 select date_col, date_part from functional.date_tbl;
----- RESULTS
-date_part=0001-01-01: 7
-date_part=1399-06-27: 3
-date_part=2017-11-27: 10
-date_part=9999-12-31: 2
+---- RUNTIME_PROFILE
+NumModifiedRows: 7
+NumModifiedRows: 3
+NumModifiedRows: 10
+NumModifiedRows: 2
 ====
 ---- QUERY
 # Inserting into parquet partition is supported.
 insert into $DATABASE.date_tbl partition(date_part='1899-12-31')
 select date_col from functional_parquet.date_tbl where date_part = '1399-06-27';
----- RESULTS
-date_part=1899-12-31: 3
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
 ====
 ---- QUERY
 # Adding ORC partition works even though Impala cannot write ORC format.

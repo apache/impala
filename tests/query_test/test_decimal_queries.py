@@ -18,12 +18,16 @@
 # Targeted tests for decimal type.
 
 from __future__ import absolute_import, division, print_function
+
 import pytest
 
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
-    create_client_protocol_dimension, hs2_parquet_constraint)
+from tests.common.test_dimensions import (
+    create_client_protocol_dimension,
+    create_exec_option_dimension_from_dict,
+    default_protocol_or_parquet_constraint,
+)
 from tests.util.filesystem_utils import IS_S3
 
 
@@ -33,22 +37,22 @@ class TestDecimalQueries(ImpalaTestSuite):
     super(TestDecimalQueries, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
       create_exec_option_dimension_from_dict({
-        'decimal_v2' : ['false', 'true'],
-        'batch_size' : [0, 1],
-        'disable_codegen' : ['false', 'true'],
-        'disable_codegen_rows_threshold' : [0]}))
+        'decimal_v2': ['false', 'true'],
+        'batch_size': [0, 1],
+        'disable_codegen': ['false', 'true'],
+        'disable_codegen_rows_threshold': [0]}))
     # Hive < 0.11 does not support decimal so we can't run these tests against the other
     # file formats.
     # TODO: Enable them on Hive >= 0.11.
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        (v.get_value('table_format').file_format == 'text' and
-         v.get_value('table_format').compression_codec == 'none') or
-         v.get_value('table_format').file_format in ['parquet', 'orc', 'kudu', 'json'])
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc', 'kudu', 'json']
+        or (v.get_value('table_format').file_format == 'text'
+            and v.get_value('table_format').compression_codec == 'none'))
 
     # Run these queries through both beeswax and HS2 to get coverage of decimals returned
     # via both protocols.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
+    cls.ImpalaTestMatrix.add_constraint(default_protocol_or_parquet_constraint)
 
   def test_queries(self, vector):
     self.run_test_case('QueryTest/decimal', vector)
@@ -75,8 +79,8 @@ class TestAvroDecimalQueries(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestAvroDecimalQueries, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format == 'avro' and
-         v.get_value('table_format').compression_codec == 'snap'))
+        v.get_value('table_format').file_format == 'avro'
+        and v.get_value('table_format').compression_codec == 'snap')
 
   def test_avro_queries(self, vector):
     self.run_test_case('QueryTest/decimal_avro', vector)
@@ -91,7 +95,7 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestDecimalOverflowExprs, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format in ['kudu', 'parquet', 'text']))
+        v.get_value('table_format').file_format in ['kudu', 'parquet', 'text'])
 
   def test_insert_select_exprs(self, vector, unique_database):
     TBL_NAME_1 = '`{0}`.`overflowed_decimal_tbl_1`'.format(unique_database)

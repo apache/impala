@@ -16,24 +16,27 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import (create_exec_option_dimension,
-    create_client_protocol_dimension, hs2_parquet_constraint)
+from tests.common.test_dimensions import (
+    create_client_protocol_dimension,
+    create_exec_option_dimension,
+)
 
 
 class TestUtf8StringFunctions(ImpalaTestSuite):
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestUtf8StringFunctions, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
       create_exec_option_dimension(disable_codegen_options=[False, True]))
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ['parquet'] and
-        v.get_value('table_format').compression_codec in ['none'])
+        v.get_value('table_format').file_format in ['parquet']
+        and v.get_value('table_format').compression_codec in ['none'])
     # Run these queries through both beeswax and HS2 to get coverage of CHAR/VARCHAR
     # returned via both protocols.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
 
   def test_string_functions(self, vector):
     self.run_test_case('QueryTest/utf8-string-functions', vector)

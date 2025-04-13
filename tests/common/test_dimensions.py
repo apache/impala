@@ -18,18 +18,25 @@
 # Common test dimensions and associated utility functions.
 
 from __future__ import absolute_import, division, print_function
-from builtins import range
 import copy
-import os
-import pytest
 from itertools import product
+import os
+
+from builtins import range
+import pytest
 
 from tests.common.test_vector import (
-  EXEC_OPTION, PROTOCOL, TABLE_FORMAT,
-  BEESWAX, HS2, HS2_HTTP,
-  ImpalaTestDimension, ImpalaTestVector, assert_exec_option_key)
-from tests.util.filesystem_utils import (
-    IS_HDFS)
+    assert_exec_option_key,
+    BEESWAX,
+    EXEC_OPTION,
+    HS2,
+    HS2_HTTP,
+    ImpalaTestDimension,
+    ImpalaTestVector,
+    PROTOCOL,
+    TABLE_FORMAT,
+)
+from tests.util.filesystem_utils import IS_HDFS
 
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 
@@ -190,18 +197,18 @@ def create_client_protocol_no_strict_dimension():
   return ImpalaTestDimension('strict_hs2_protocol', False)
 
 
-def hs2_parquet_constraint(v):
-  """Constraint function, used to only run HS2 against Parquet format, because file format
-  and the client protocol are orthogonal."""
-  return (v.get_protocol() == BEESWAX
+def default_protocol_or_parquet_constraint(v):
+  """Constraint function, used to limit non-default test protocol against uncompressed
+  parquet format, because file format and the client protocol are orthogonal."""
+  return (v.get_protocol() == pytest.config.option.default_test_protocol
           or (v.get_table_format().file_format == 'parquet'
               and v.get_table_format().compression_codec == 'none'))
 
 
-def hs2_text_constraint(v):
-  """Constraint function, used to only run HS2 against uncompressed text, because file
-  format and the client protocol are orthogonal."""
-  return (v.get_protocol() == BEESWAX
+def default_protocol_or_text_constraint(v):
+  """Constraint function, used to limit non-default test protocol against uncompressed
+  text format, because file format and the client protocol are orthogonal."""
+  return (v.get_protocol() == pytest.config.option.default_test_protocol
           or (v.get_table_format().file_format == 'text'
               and v.get_table_format().compression_codec == 'none'))
 

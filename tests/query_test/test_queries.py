@@ -18,20 +18,28 @@
 # General Impala query tests
 
 from __future__ import absolute_import, division, print_function
-import pytest
-import re
 from copy import deepcopy
+import re
+from subprocess import check_call
+
+import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (
-    SkipIfEC, SkipIfCatalogV2, SkipIfNotHdfsMinicluster, SkipIfFS)
+from tests.common.skip import SkipIfFS, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
-    create_uncompressed_text_dimension, create_uncompressed_json_dimension,
-    create_exec_option_dimension_from_dict, create_client_protocol_dimension,
-    hs2_parquet_constraint, extend_exec_option_dimension, FILE_FORMAT_TO_STORED_AS_MAP,
-    add_exec_option_dimension, create_exec_option_dimension)
+    add_exec_option_dimension,
+    create_client_protocol_dimension,
+    create_exec_option_dimension,
+    create_exec_option_dimension_from_dict,
+    create_uncompressed_json_dimension,
+    create_uncompressed_text_dimension,
+    default_protocol_or_parquet_constraint,
+    extend_exec_option_dimension,
+    FILE_FORMAT_TO_STORED_AS_MAP,
+)
+from tests.common.test_vector import BEESWAX
 from tests.util.filesystem_utils import get_fs_path
-from subprocess import check_call
+
 
 class TestQueries(ImpalaTestSuite):
 
@@ -54,7 +62,7 @@ class TestQueries(ImpalaTestSuite):
     # Don't run all combinations of table format and protocol - the dimensions should
     # be orthogonal.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
+    cls.ImpalaTestMatrix.add_constraint(default_protocol_or_parquet_constraint)
 
     # Adding a test dimension here to test the small query opt in exhaustive.
     if cls.exploration_strategy() == 'exhaustive':
@@ -212,6 +220,7 @@ class TestQueries(ImpalaTestSuite):
       pytest.xfail("null data does not appear to work in hbase")
     self.run_test_case('QueryTest/null_data', vector)
 
+
 # Tests in this class are only run against text/none either because that's the only
 # format that is supported, or the tests don't exercise the file format.
 class TestQueriesTextTables(ImpalaTestSuite):
@@ -254,6 +263,13 @@ class TestQueriesTextTables(ImpalaTestSuite):
 # Tests in this class are only run against json/none either because that's the only
 # format that is supported, or the tests don't exercise the file format.
 class TestQueriesJsonTables(ImpalaTestSuite):
+
+  @classmethod
+  def default_test_protocol(cls):
+    # Some assertions in this test relies on beeswax-specific return values such as
+    # Infinity, NaN, false, and true. HS2 returns inf, nan, False, and True instead.
+    return BEESWAX
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueriesJsonTables, cls).add_test_dimensions()
@@ -276,6 +292,7 @@ class TestQueriesJsonTables(ImpalaTestSuite):
   def test_overflow(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 0
     self.run_test_case('QueryTest/overflow_json', vector)
+
 
 # Tests in this class are only run against Parquet because the tests don't exercise the
 # file format.
@@ -303,6 +320,7 @@ class TestQueriesParquetTables(ImpalaTestSuite):
     vector.get_value('exec_option')['disable_outermost_topn'] = 1
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/single-node-large-sorts', vector)
+
 
 # Tests for queries in HDFS-specific tables, e.g. AllTypesAggMultiFilesNoPart.
 class TestHdfsQueries(ImpalaTestSuite):
@@ -386,6 +404,7 @@ class TestPartitionKeyScansWithMultipleBlocks(ImpalaTestSuite):
     result = self.execute_query_expect_success(self.client,
           "SELECT max(year) FROM %s.alltypes_multiblocks" % (unique_database))
     assert int(result.get_data()) == 2010
+
 
 class TestTopNReclaimQuery(ImpalaTestSuite):
   """Test class to validate that TopN periodically reclaims tuple pool memory

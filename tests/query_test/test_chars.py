@@ -19,11 +19,16 @@ from __future__ import absolute_import, division, print_function
 from copy import deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import (create_exec_option_dimension,
-    create_client_protocol_dimension, hs2_parquet_constraint, hs2_text_constraint)
+from tests.common.test_dimensions import (
+    create_client_protocol_dimension,
+    create_exec_option_dimension,
+    default_protocol_or_parquet_constraint,
+    default_protocol_or_text_constraint,
+)
 
 
 class TestStringQueries(ImpalaTestSuite):
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestStringQueries, cls).add_test_dimensions()
@@ -35,7 +40,7 @@ class TestStringQueries(ImpalaTestSuite):
     # Run these queries through both beeswax and HS2 to get coverage of CHAR/VARCHAR
     # returned via both protocols.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_constraint(hs2_text_constraint)
+    cls.ImpalaTestMatrix.add_constraint(default_protocol_or_text_constraint)
 
   def test_chars(self, vector):
     self.run_test_case('QueryTest/chars', vector)
@@ -57,6 +62,7 @@ class TestStringQueries(ImpalaTestSuite):
 
 
 class TestCharFormats(ImpalaTestSuite):
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestCharFormats, cls).add_test_dimensions()
@@ -72,7 +78,7 @@ class TestCharFormats(ImpalaTestSuite):
     # Run these queries through both beeswax and HS2 to get coverage of CHAR/VARCHAR
     # returned via both protocols.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
-    cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
+    cls.ImpalaTestMatrix.add_constraint(default_protocol_or_parquet_constraint)
 
   def test_char_format(self, vector):
     self.run_test_case('QueryTest/chars-formats', vector)
