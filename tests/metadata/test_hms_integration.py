@@ -51,7 +51,7 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
         create_uncompressed_text_dimension(cls.get_workload()))
 
   @pytest.mark.execute_serially
-  def test_sanity(self, vector, cluster_properties):
+  def test_sanity(self, cluster_properties):
     """Verifies that creating a catalog entity (database, table) in Impala using
     'IF NOT EXISTS' while the entity exists in HMS, does not throw an error."""
     # Create a database in Hive
@@ -129,6 +129,7 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
     finally:
       self.run_stmt_in_hive("drop database %s cascade" % db)
 
+
 @SkipIfFS.hive
 class TestHmsIntegration(ImpalaTestSuite):
 
@@ -159,7 +160,7 @@ class TestHmsIntegration(ImpalaTestSuite):
           'create database if not exists ' + self.db_name)
       return self.db_name
 
-    def __exit__(self, typ, value, traceback):
+    def __exit__(self, typ, value, traceback):  # noqa: U100
       self.impala.cleanup_db(self.db_name)
 
   class ImpalaTableWrapper(object):
@@ -179,7 +180,7 @@ class TestHmsIntegration(ImpalaTestSuite):
           (self.table_name, self.table_spec))
       return self.table_name
 
-    def __exit__(self, typ, value, traceback):
+    def __exit__(self, typ, value, traceback):  # noqa: U100
       self.impala.client.execute('drop table if exists %s' % self.table_name)
 
   def impala_table_stats(self, table):
@@ -297,26 +298,24 @@ class TestHmsIntegration(ImpalaTestSuite):
           command, strs_in_error)
 
   @pytest.mark.execute_serially
-  def test_hive_db_hive_table_add_partition(self, vector):
-    self.add_hive_partition_helper(vector, HiveDbWrapper, HiveTableWrapper)
+  def test_hive_db_hive_table_add_partition(self):
+    self.add_hive_partition_helper(HiveDbWrapper, HiveTableWrapper)
 
   @pytest.mark.execute_serially
-  def test_hive_db_impala_table_add_partition(self, vector):
-    self.add_hive_partition_helper(vector, HiveDbWrapper, self.ImpalaTableWrapper)
+  def test_hive_db_impala_table_add_partition(self):
+    self.add_hive_partition_helper(HiveDbWrapper, self.ImpalaTableWrapper)
 
   @pytest.mark.execute_serially
-  def test_impala_db_impala_table_add_partition(self, vector):
-    self.add_hive_partition_helper(vector, self.ImpalaDbWrapper,
-                                   self.ImpalaTableWrapper)
+  def test_impala_db_impala_table_add_partition(self):
+    self.add_hive_partition_helper(self.ImpalaDbWrapper, self.ImpalaTableWrapper)
 
   @pytest.mark.execute_serially
-  def test_impala_db_hive_table_add_partition(self, vector):
-    self.add_hive_partition_helper(vector, self.ImpalaDbWrapper,
-                                   HiveTableWrapper)
+  def test_impala_db_hive_table_add_partition(self):
+    self.add_hive_partition_helper(self.ImpalaDbWrapper, HiveTableWrapper)
 
   @pytest.mark.xfail(run=False, reason="This is a bug: IMPALA-2426")
   @pytest.mark.execute_serially
-  def test_incremental_stats_new_partition(self, vector):
+  def test_incremental_stats_new_partition(self):
     with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
       with self.ImpalaTableWrapper(self, db_name + '.' + self.unique_string(),
                                    '(x int) partitioned by (y int)') as table_name:
@@ -330,7 +329,7 @@ class TestHmsIntegration(ImpalaTestSuite):
         assert '0' == table_stats[('333',)]['#rows']
         assert '0' == table_stats[('333',)]['#files']
 
-  def add_hive_partition_helper(self, vector, DbWrapper, TableWrapper):
+  def add_hive_partition_helper(self, DbWrapper, TableWrapper):
     """
     Partitions added in Hive can be viewed in Impala after computing stats.
     """
@@ -348,10 +347,9 @@ class TestHmsIntegration(ImpalaTestSuite):
         assert [('333', '5309')] == self.get_impala_partition_info(table_name, 'y', 'z')
         # Impala's compute stats didn't alter Hive's knowledge of the partition
         assert ['y=333/z=5309'] == self.hive_partition_names(table_name)
-    self.add_hive_partition_table_stats_helper(vector, DbWrapper, TableWrapper)
+    self.add_hive_partition_table_stats_helper(DbWrapper, TableWrapper)
 
-  def add_hive_partition_table_stats_helper(
-          self, vector, DbWrapper, TableWrapper):
+  def add_hive_partition_table_stats_helper(self, DbWrapper, TableWrapper):
     """
     Partitions added in Hive don't make Impala's table stats incorrect.
     """
@@ -376,7 +374,7 @@ class TestHmsIntegration(ImpalaTestSuite):
             ('42', '867')]
 
   @pytest.mark.execute_serially
-  def test_add_impala_partition(self, vector):
+  def test_add_impala_partition(self):
     """
     Partitions added in Impala can be viewed in Hive immediately
     """
@@ -390,7 +388,7 @@ class TestHmsIntegration(ImpalaTestSuite):
         assert ['y=42/z=867'] == self.hive_partition_names(table_name)
 
   @pytest.mark.execute_serially
-  def test_drop_column_maintains_stats(self, vector):
+  def test_drop_column_maintains_stats(self):
     """
     Dropping a column in Impala doesn't alter the stats of other columns in Hive
     or Impala.
@@ -424,7 +422,7 @@ class TestHmsIntegration(ImpalaTestSuite):
             'x']
 
   @pytest.mark.execute_serially
-  def test_select_without_compute_stats(self, vector):
+  def test_select_without_compute_stats(self):
     """
     Data added in Hive shows up in Impala 'select *', and if the table is not
     partitioned, 'compute incremental stats' is not required.
@@ -453,7 +451,7 @@ class TestHmsIntegration(ImpalaTestSuite):
 
   @pytest.mark.xfail(run=False, reason="This is a bug: IMPALA-2458")
   @pytest.mark.execute_serially
-  def test_overwrite_added_column(self, vector):
+  def test_overwrite_added_column(self):
     """
     Impala can't overwrite Hive's column types, and vice versa.
     """
@@ -488,7 +486,7 @@ class TestHmsIntegration(ImpalaTestSuite):
 
   @SkipIfHive3.col_stat_separated_by_engine
   @pytest.mark.execute_serially
-  def test_compute_stats_get_to_hive(self, vector):
+  def test_compute_stats_get_to_hive(self):
     """Stats computed in Impala are also visible in Hive."""
     with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
       with self.ImpalaTableWrapper(self, db_name + '.' + self.unique_string(),
@@ -504,7 +502,7 @@ class TestHmsIntegration(ImpalaTestSuite):
 
   @SkipIfHive3.col_stat_separated_by_engine
   @pytest.mark.execute_serially
-  def test_compute_stats_get_to_impala(self, vector):
+  def test_compute_stats_get_to_impala(self):
     """Column stats computed in Hive are also visible in Impala."""
     with HiveDbWrapper(self, self.unique_string()) as db_name:
       with HiveTableWrapper(self, db_name + '.' + self.unique_string(),
@@ -529,7 +527,7 @@ class TestHmsIntegration(ImpalaTestSuite):
         assert '0' == new_impala_stats['x']['#nulls']
 
   @SkipIfHive2.col_stat_not_separated_by_engine
-  def test_engine_separates_col_stats(self, vector):
+  def test_engine_separates_col_stats(self):
     """
     The 'engine' column in TAB_COL_STATS and PART_COL_STATS HMS tables is used to
     differentiate among column stats computed by different engines.
@@ -577,7 +575,7 @@ class TestHmsIntegration(ImpalaTestSuite):
           assert '0' == hive_x_stats['num_nulls']
 
   @SkipIfHive2.col_stat_not_separated_by_engine
-  def test_engine_separates_partitioned_col_stats(self, vector):
+  def test_engine_separates_partitioned_col_stats(self):
     """
     The 'engine' column in TAB_COL_STATS and PART_COL_STATS HMS tables is used to
     differentiate among column stats computed by different engines.
@@ -628,7 +626,7 @@ class TestHmsIntegration(ImpalaTestSuite):
           assert '0' == hive_x_stats['num_nulls']
 
   @pytest.mark.execute_serially
-  def test_drop_partition(self, vector):
+  def test_drop_partition(self):
     """
     Impala can see that a partitions was dropped by Hive by invalidating
     metadata.
@@ -647,7 +645,7 @@ class TestHmsIntegration(ImpalaTestSuite):
             'select * from %s' % table_name).get_data()
 
   @pytest.mark.execute_serially
-  def test_drop_column_with_data(self, vector):
+  def test_drop_column_with_data(self):
     """Columns dropped by Hive are ignored in Impala 'select *'."""
     with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
       with self.ImpalaTableWrapper(self, db_name + '.' + self.unique_string(),
@@ -660,7 +658,7 @@ class TestHmsIntegration(ImpalaTestSuite):
             'select * from %s' % table_name).get_data()
 
   @pytest.mark.execute_serially
-  def test_add_column(self, vector):
+  def test_add_column(self):
     """Columns added in one engine are visible in the other via DESCRIBE."""
     with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
       with self.ImpalaTableWrapper(self, db_name + '.' + self.unique_string(),
@@ -682,14 +680,14 @@ class TestHmsIntegration(ImpalaTestSuite):
         assert expected == self.impala_columns(table_name)
 
   @pytest.mark.execute_serially
-  def test_drop_database(self, vector):
+  def test_drop_database(self):
     """
     If a DB is created, then dropped, in Hive, Impala can create one with the
     same name without invalidating metadata.
     """
 
     test_db = self.unique_string()
-    with HiveDbWrapper(self, test_db) as db_name:
+    with HiveDbWrapper(self, test_db):
       pass
     # if events processing is turned on we should make sure that the drop
     # database event above is processed to avoid flakiness
@@ -701,11 +699,11 @@ class TestHmsIntegration(ImpalaTestSuite):
          self.unique_string()),
         'Database does not exist: %s' %
         test_db)
-    with self.ImpalaDbWrapper(self, test_db) as db_name:
+    with self.ImpalaDbWrapper(self, test_db):
       pass
 
   @pytest.mark.execute_serially
-  def test_table_format_change(self, vector):
+  def test_table_format_change(self):
     """
     Hive storage format changes propagate to Impala.
     """
@@ -724,7 +722,7 @@ class TestHmsIntegration(ImpalaTestSuite):
         assert 'AVRO' == self.impala_table_stats(table_name)[()]['format']
 
   @pytest.mark.execute_serially
-  def test_change_column_type(self, vector):
+  def test_change_column_type(self):
     """Hive column type changes propagate to Impala."""
 
     with HiveDbWrapper(self, self.unique_string()) as db_name:
@@ -741,7 +739,7 @@ class TestHmsIntegration(ImpalaTestSuite):
         assert 'string' == self.impala_columns(table_name)['y']['type']
 
   @pytest.mark.execute_serially
-  def test_change_parquet_column_type(self, vector):
+  def test_change_parquet_column_type(self):
     """
     Changing column types in Parquet doesn't always work in Hive and it causes
     'select *' to fail in Impala as well, after invalidating metadata. This is a
@@ -786,7 +784,7 @@ class TestHmsIntegration(ImpalaTestSuite):
         # The error message is different in newer Javas than in 17
         # TODO: find out which version changed it exactly
         err_msg = err_msg.format(
-            "class " if os.environ.get('IMPALA_JDK_VERSION_NUM') >= 17 else "")
+            "class " if int(os.environ.get('IMPALA_JDK_VERSION_NUM')) >= 17 else "")
         self.assert_sql_error(
             self.run_stmt_in_hive, 'select * from %s' % table_name, err_msg)
         self.client.execute('invalidate metadata %s' % table_name)
@@ -795,7 +793,7 @@ class TestHmsIntegration(ImpalaTestSuite):
             "Column type: INT, Parquet schema:")
 
   @SkipIfHive2.acid
-  def test_acid_inserts(self, vector, unique_database):
+  def test_acid_inserts(self, unique_database):
     """
     Insert data to insert-only ACID table from Impala and checks that Hive is able to
     see the data.
@@ -858,7 +856,7 @@ class TestHmsIntegration(ImpalaTestSuite):
     assert '4,41' == hive_result[4]
 
   @SkipIfHive2.acid
-  def test_drop_acid_table(self, vector, unique_database):
+  def test_drop_acid_table(self, unique_database):
     """
     Tests that a transactional table dropped by Impala is also dropped if we check from
     Hive.
@@ -876,7 +874,7 @@ class TestHmsIntegration(ImpalaTestSuite):
     assert "acid_insert" not in show_tables_result_after_drop
 
   @SkipIfHive2.acid
-  def test_truncate_acid_table(self, vector, unique_database):
+  def test_truncate_acid_table(self, unique_database):
     """
     Tests that a transactional table truncated by Impala shows no rows when
     queried by Hive.
@@ -896,7 +894,7 @@ class TestHmsIntegration(ImpalaTestSuite):
     assert "0" == query_result_after_truncate.split('\n')[1]
 
   @pytest.mark.execute_serially
-  def test_change_table_name(self, vector):
+  def test_change_table_name(self):
     """
     Changing the table name in Hive propagates to Impala after 'invalidate
     metadata'.
@@ -919,7 +917,7 @@ class TestHmsIntegration(ImpalaTestSuite):
                               'Could not resolve path')
 
   @pytest.mark.execute_serially
-  def test_impala_partitions_accessible_in_hive(self, vector):
+  def test_impala_partitions_accessible_in_hive(self):
     """
     IMPALA-1670, IMPALA-4141: Partitions added in Impala are accessible through Hive
     """
