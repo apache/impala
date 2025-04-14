@@ -171,6 +171,12 @@ public class LdapImpalaShellTest {
     // 6. Without username and password. Should fail.
     String[] commandWithoutAuth = {
         "impala-shell.sh", "", String.format("--query=%s", query)};
+    // 7. Valid username with long password to trigger IMPALA-13746. Should succeed.
+    String[] validCommandLongPsw = {"impala-shell.sh", "", "--ldap",
+        "--auth_creds_ok_in_clear", "--verbose",
+        String.format("--user=%s", TEST_USER_LONG_PSW),
+        String.format("--ldap_password_cmd=printf %s", TEST_PASSWORD_LONG),
+        String.format("--query=%s", query)};
     String protocolTemplate = "--protocol=%s";
 
     // Sorted list of cookies for validCommand, where all cookies are preserved.
@@ -228,6 +234,11 @@ public class LdapImpalaShellTest {
       commandWithoutAuth[1] = protocol;
       RunShellCommand.Run(
           commandWithoutAuth, /*shouldSucceed*/ false, "", "Not connected to Impala");
+
+      validCommandLongPsw[1] = protocol;
+      RunShellCommand.Run(validCommandLongPsw,
+          /*shouldSucceed*/ true, TEST_USER_LONG_PSW,
+          "Starting Impala Shell with LDAP-based authentication");
     }
   }
 
