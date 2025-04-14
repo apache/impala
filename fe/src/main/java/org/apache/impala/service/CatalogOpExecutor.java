@@ -7721,6 +7721,7 @@ public class CatalogOpExecutor {
     }
 
     if (insertEventReqDatas.isEmpty()) return;
+    catalogTimeline.markEvent("Prepared InsertEvent data");
 
     MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient(catalogTimeline);
     TableInsertEventInfo insertEventInfo = new TableInsertEventInfo(

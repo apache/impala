@@ -547,7 +547,7 @@ class TestObservability(ImpalaTestSuite):
           "Didn't find event '" + regex + "' for query '" + query + \
           "' in profile: \n" + runtime_profile
 
-  def test_create_table_profile_events(self, unique_database):
+  def test_ddl_profile_events(self, unique_database):
     """Test that specific DDL timeline event labels exist in the profile. Note that
        labels of HMS events are not used so this test is expected to pass with or without
        event processor enabled"""
@@ -590,6 +590,15 @@ class TestObservability(ImpalaTestSuite):
     self.__verify_event_labels_in_profile(stmt, [
         "Got Metastore client",
         "Added 2 partitions in Metastore",
+        "Loaded file metadata for 2 partitions",
+        "Finished updateCatalog request"
+    ])
+    # INSERT into existing partitions
+    stmt = "insert into %s.t1 partition(p) values (0,0), (1,1)" % unique_database
+    self.__verify_event_labels_in_profile(stmt, [
+        "Got Metastore client",
+        "Prepared InsertEvent data",
+        "Fired Metastore events",
         "Loaded file metadata for 2 partitions",
         "Finished updateCatalog request"
     ])

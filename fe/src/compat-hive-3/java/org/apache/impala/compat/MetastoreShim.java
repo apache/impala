@@ -487,9 +487,8 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkState(!insertEventDataList.isEmpty(), "Atleast one insert event "
         + "info must be provided.");
-    LOG.debug(String.format(
-        "Firing %s insert event(s) for %s.%s", insertEventDataList.size(), dbName,
-        tableName));
+    LOG.debug("Firing {} insert event(s) for {}.{}", insertEventDataList.size(), dbName,
+        tableName);
     FireEventRequestData data = new FireEventRequestData();
     FireEventRequest rqst = new FireEventRequest(true, data);
     rqst.setDbName(dbName);
