@@ -19,14 +19,19 @@ from __future__ import absolute_import, division, print_function
 import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_dimensions import (
-    create_exec_option_dimension,
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
+from tests.common.test_vector import HS2
+
 
 class TestStatsExtrapolation(CustomClusterTestSuite):
   """Minimal end-to-end test for the --enable_stats_extrapolation impalad flag. This test
   primarly checks that the flag is propagated to the FE. More testing is done in FE unit
   tests and metadata/test_stats_extrapolation.py."""
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
 
   @classmethod
   def add_test_dimensions(cls):
@@ -52,13 +57,13 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
         "compute stats {0} tablesample system (13)".format(part_test_tbl))
     # Check that table stats were set.
     table_stats = self.client.execute("show table stats {0}".format(part_test_tbl))
-    col_names = [fs.name.upper() for fs in table_stats.schema.fieldSchemas]
+    col_names = table_stats.column_labels
     extrap_rows_idx = col_names.index("EXTRAP #ROWS")
     for row in table_stats.data:
       assert int(row.split("\t")[extrap_rows_idx]) >= 0
     # Check that column stats were set.
     col_stats = self.client.execute("show column stats {0}".format(part_test_tbl))
-    col_names = [fs.name.upper() for fs in col_stats.schema.fieldSchemas]
+    col_names = col_stats.column_labels
     ndv_col_idx = col_names.index("#DISTINCT VALUES")
     for row in col_stats.data:
       assert int(row.split("\t")[ndv_col_idx]) >= 0

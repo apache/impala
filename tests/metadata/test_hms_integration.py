@@ -36,6 +36,7 @@ from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIfHive3
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
+from tests.common.test_vector import HS2
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.util.hive_utils import HiveDbWrapper, HiveTableWrapper
 
@@ -132,6 +133,10 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
 
 @SkipIfFS.hive
 class TestHmsIntegration(ImpalaTestSuite):
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
 
   @classmethod
   def add_test_dimensions(cls):

@@ -956,6 +956,11 @@ class ImpylaHS2ResultSet(object):
     """Return the raw HS2 result set, which is a list of tuples."""
     return self.__result_tuples
 
+  def get_data(self):
+    if self.data:
+      return '\n'.join(self.data)
+    return ''
+
   def __convert_result_row(self, result_tuple):
     """Take primitive values from a result tuple and construct the tab-separated string
     that would have been returned via beeswax."""

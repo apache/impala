@@ -18,10 +18,15 @@
 from __future__ import absolute_import, division, print_function
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfFS
+from tests.common.test_vector import HS2
 
 
 @SkipIfFS.hive
 class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0")
   def test_refresh_updated_partitions(self, unique_database):
@@ -121,7 +126,7 @@ class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
     assert len(result) == 6
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0")
-  def test_add_overlapping_partitions(self, vector, unique_database):
+  def test_add_overlapping_partitions(self, unique_database):
     """
     IMPALA-1670, IMPALA-4141: Test interoperability with Hive when adding overlapping
     partitions to a table
@@ -183,7 +188,7 @@ class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
     assert x1_location.endswith("/x=1")
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0")
-  def test_add_preexisting_partitions_with_data(self, unique_database, vector):
+  def test_add_preexisting_partitions_with_data(self, unique_database):
     """
     IMPALA-1670, IMPALA-4141: After addding partitions that already exist in HMS, Impala
     can access the partition data.
@@ -223,7 +228,7 @@ class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
                 'select x, a from %s order by x, a' % table_name).get_data().split('\n')
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0")
-  def test_refresh_invalid_partition(self, vector, unique_database):
+  def test_refresh_invalid_partition(self, unique_database):
     """
     Trying to refresh a partition that does not exist does not modify anything
     either in impala or hive.
@@ -241,7 +246,7 @@ class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
     assert ['y=333/z=5309'] == self.hive_partition_names(table_name)
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0")
-  def test_add_data_and_refresh(self, vector, unique_database):
+  def test_add_data_and_refresh(self, unique_database):
     """
     Data added through hive is visible in impala after refresh of partition.
     """
@@ -266,7 +271,7 @@ class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
         'select * from %s' % table_name).get_data()
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=0")
-  def test_refresh_partition_num_rows(self, vector, unique_database):
+  def test_refresh_partition_num_rows(self, unique_database):
     """Refreshing a partition should not change it's numRows stat."""
     # Create a partitioned table and add data to it.
     tbl = unique_database + ".t1"

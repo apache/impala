@@ -19,6 +19,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.skip import SkipIfFS
+from tests.common.test_vector import HS2
 from tests.util.filesystem_utils import get_fs_path
 
 
@@ -28,6 +29,10 @@ class TestRefreshPartition(ImpalaTestSuite):
   This class tests the functionality to refresh a partition individually
   for a table in HDFS
   """
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
 
   @classmethod
   def add_test_dimensions(cls):
@@ -162,4 +167,4 @@ class TestRefreshPartition(ImpalaTestSuite):
     # Check that data is visible for the second partition after refresh
     self.client.execute("refresh %s partition (year=2010, month=2)" % table_name)
     result = self.client.execute("select count(*) from %s" % table_name)
-    assert result.data == [str(file_num_rows*2)]
+    assert result.data == [str(file_num_rows * 2)]

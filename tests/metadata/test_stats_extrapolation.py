@@ -17,18 +17,22 @@
 
 from __future__ import absolute_import, division, print_function
 from builtins import range
-from os import path
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfEC
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
+from tests.common.test_vector import HS2
 
 
 class TestStatsExtrapolation(ImpalaTestSuite):
   """Test stats extrapolation and compute stats tablesample. Stats extrapolation is
   enabled via table property and not via the impalad startup flag so these tests can be
   run as regular tests (non-custom-cluster) and in parallel with other tests."""
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
 
   @classmethod
   def add_test_dimensions(cls):
@@ -70,8 +74,8 @@ class TestStatsExtrapolation(ImpalaTestSuite):
 
     # Test unpartitioned table.
     nopart_test_tbl = unique_database + ".alltypesnopart"
-    self.client.execute("create table {0} as select * from functional.alltypes"\
-      .format(nopart_test_tbl))
+    self.client.execute(
+        "create table {0} as select * from functional.alltypes".format(nopart_test_tbl))
     # Clone to use as a baseline. We run the regular COMPUTE STATS on this table.
     nopart_test_tbl_base = unique_database + ".alltypesnopart_base"
     self.clone_table(nopart_test_tbl, nopart_test_tbl_base, False, vector)
@@ -118,7 +122,7 @@ class TestStatsExtrapolation(ImpalaTestSuite):
 
   def __set_extrapolation_tblprop(self, tbl):
     """Alters the given table to enable stats extrapolation via tblproperty."""
-    self.client.execute("alter table {0} set "\
+    self.client.execute("alter table {0} set "
       "tblproperties('impala.enable.stats.extrapolation'='true')".format(tbl))
 
   def __run_sampling_test(self, tbl, cols, expected_tbl, perc, seed):
@@ -127,8 +131,9 @@ class TestStatsExtrapolation(ImpalaTestSuite):
     the resulting table and column stats are reasonably close to those of
     'expected_tbl'."""
     self.client.execute("drop stats {0}".format(tbl))
-    self.client.execute("compute stats {0}{1} tablesample system ({2}) repeatable ({3})"\
-      .format(tbl, cols, perc, seed))
+    self.client.execute(
+        "compute stats {0}{1} tablesample system ({2}) repeatable ({3})".format(
+            tbl, cols, perc, seed))
     self.__check_table_stats(tbl, expected_tbl)
     self.__check_column_stats(cols, tbl, expected_tbl)
 
@@ -139,8 +144,8 @@ class TestStatsExtrapolation(ImpalaTestSuite):
     actual = self.client.execute("show table stats {0}".format(tbl))
     expected = self.client.execute("show table stats {0}".format(expected_tbl))
     assert len(actual.data) == len(expected.data)
-    assert len(actual.schema.fieldSchemas) == len(expected.schema.fieldSchemas)
-    col_names = [fs.name.upper() for fs in actual.schema.fieldSchemas]
+    assert len(actual.column_labels) == len(expected.column_labels)
+    col_names = actual.column_labels
     rows_col_idx = col_names.index("#ROWS")
     extrap_rows_col_idx = col_names.index("EXTRAP #ROWS")
     for i in range(0, len(actual.data)):
@@ -149,7 +154,7 @@ class TestStatsExtrapolation(ImpalaTestSuite):
       assert int(exp_cols[rows_col_idx]) >= 0
       # The expected_tbl is expected to have valid extrapolated #rows for every partition.
       assert int(act_cols[extrap_rows_col_idx]) >= 0
-      self.appx_equals(\
+      self.appx_equals(
         int(act_cols[extrap_rows_col_idx]), int(exp_cols[rows_col_idx]), 1.0)
       # Only the table-level row count is stored. The partition row counts
       # are extrapolated.
@@ -167,8 +172,8 @@ class TestStatsExtrapolation(ImpalaTestSuite):
     actual = self.client.execute("show column stats {0}".format(tbl))
     expected = self.client.execute("show column stats {0}".format(expected_tbl))
     assert len(actual.data) == len(expected.data)
-    assert len(actual.schema.fieldSchemas) == len(expected.schema.fieldSchemas)
-    col_names = [fs.name.upper() for fs in actual.schema.fieldSchemas]
+    assert len(actual.column_labels) == len(expected.column_labels)
+    col_names = actual.column_labels
     ndv_col_idx = col_names.index("#DISTINCT VALUES")
     for i in range(0, len(actual.data)):
       act_cols = actual.data[i].split("\t")

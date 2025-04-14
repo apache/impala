@@ -569,10 +569,10 @@ class ImpalaTestSuite(BaseTestSuite):
     'include_fields'. Field names are compared case-insensitively.
     """
     exec_result = self.client.execute('show partitions %s' % table_name)
-    fieldSchemas = exec_result.schema.fieldSchemas
+    column_labels = exec_result.column_labels
     fields_dict = {}
-    for idx, fs in enumerate(fieldSchemas):
-      fields_dict[fs.name.lower()] = idx
+    for idx, name in enumerate(column_labels):
+      fields_dict[name.lower()] = idx
 
     rows = exec_result.get_data().split('\n')
     rows.pop()
