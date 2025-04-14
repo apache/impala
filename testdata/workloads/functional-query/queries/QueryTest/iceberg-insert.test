@@ -234,7 +234,7 @@ NumModifiedRows: 7300
 alter table iceberg_alltypes_parq_tblprop set tblproperties (
     'write.parquet.row-group-size-bytes'='536870912',
     'write.parquet.compression-codec'='none',
-    'write.parquet.page-size-bytes'='134217728',
+    'write.parquet.page-size-bytes'='131072',
     'write.parquet.dict-size-bytes'='805306368');
 ====
 ---- QUERY
@@ -250,7 +250,7 @@ alter table iceberg_alltypes_parq_tblprop set tblproperties (
     'write.parquet.row-group-size-bytes'='1073741824',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='1',
-    'write.parquet.page-size-bytes'='402653184',
+    'write.parquet.page-size-bytes'='196608',
     'write.parquet.dict-size-bytes'='536870912');
 ====
 ---- QUERY
@@ -266,7 +266,7 @@ alter table iceberg_alltypes_parq_tblprop set tblproperties (
     'write.parquet.row-group-size-bytes'='1610612736',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='13',
-    'write.parquet.page-size-bytes'='536870912',
+    'write.parquet.page-size-bytes'='262144',
     'write.parquet.dict-size-bytes'='402653184');
 ====
 ---- QUERY
@@ -282,7 +282,7 @@ alter table iceberg_alltypes_parq_tblprop set tblproperties (
     'write.parquet.row-group-size-bytes'='1879048192',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='18',
-    'write.parquet.page-size-bytes'='805306368',
+    'write.parquet.page-size-bytes'='327680',
     'write.parquet.dict-size-bytes'='134217728');
 ====
 ---- QUERY
@@ -298,7 +298,7 @@ alter table iceberg_alltypes_parq_tblprop set tblproperties (
     'write.parquet.row-group-size-bytes'='2146435072',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='22',
-    'write.parquet.page-size-bytes'='1073741824',
+    'write.parquet.page-size-bytes'='1048576',
     'write.parquet.dict-size-bytes'='65536');
 ====
 ---- QUERY
@@ -331,4 +331,13 @@ select count(*) from iceberg_alltypes_parq_tblprop;
 51100
 ---- TYPES
 BIGINT
+====
+---- QUERY
+set MT_DOP=1;
+create table lineitem_iceberg_comment
+stored as iceberg
+tblproperties("write.parquet.page-size-bytes"="1048576")
+as select l_comment from tpch_parquet.lineitem;
+---- RESULTS
+row_regex:.*6001215.*
 ====

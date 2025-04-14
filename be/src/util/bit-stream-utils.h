@@ -50,7 +50,7 @@ class BitWriter {
   /// fraction of a byte). Includes buffered values.
   int bytes_written() const { return byte_offset_ + BitUtil::Ceil(bit_offset_, 8); }
   uint8_t* buffer() const { return buffer_; }
-  int buffer_len() const { return max_bytes_; }
+  int64_t buffer_len() const { return max_bytes_; }
 
   /// Writes a value to buffered_values_, flushing to buffer_ if necessary.  This is bit
   /// packed.  Returns false if there was not enough space. num_bits must be <= 64.
@@ -99,7 +99,7 @@ class BitWriter {
 
  private:
   uint8_t* buffer_;
-  int max_bytes_;
+  int64_t max_bytes_;
 
   /// Bit-packed values are initially written to this variable before being memcpy'd to
   /// buffer_. This is faster than writing values byte by byte directly to buffer_.

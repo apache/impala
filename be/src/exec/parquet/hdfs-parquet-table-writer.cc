@@ -131,7 +131,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
       total_uncompressed_byte_size_(0),
       dict_encoder_base_(nullptr),
       def_levels_(nullptr),
-      values_buffer_len_(DEFAULT_DATA_PAGE_SIZE),
+      values_buffer_len_(plain_page_size_),
       page_stats_base_(nullptr),
       row_group_stats_base_(nullptr),
       table_sink_mem_tracker_(parent_->parent_->mem_tracker()),
@@ -539,6 +539,8 @@ class HdfsParquetTableWriter::ColumnWriter :
         DCHECK_GT(current_page_->header.uncompressed_page_size, 0);
         return false;
       }
+      DCHECK_LE(current_page_->header.uncompressed_page_size + *bytes_needed,
+          values_buffer_len_);
       uint8_t* dst_ptr = values_buffer_ + current_page_->header.uncompressed_page_size;
       int64_t written_len =
           ParquetPlainEncoder::Encode(*val, plain_encoded_value_size_, dst_ptr);
