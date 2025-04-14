@@ -585,11 +585,11 @@ class ImpalaClient(object):
     if self.use_ldap:
       # Set the BASIC authorization
       user_passwd = "{0}:{1}".format(self.user, self.ldap_password)
-      if sys.version_info.major < 3 or \
-          sys.version_info.major == 3 and sys.version_info.minor == 0:
-        auth = base64.encodestring(user_passwd.encode()).decode().strip('\n')
-      else:
-        auth = base64.encodebytes(user_passwd.encode()).decode().strip('\n')
+      # Produce RFC 2617-compliant basic credentials:
+      #  - RFC 2045 encoding of username:password without limitations to 76 chars
+      #    per line (and without trailing newline)
+      #  - No translation of characters (+,/) for URL-safety
+      auth = base64.b64encode(user_passwd.encode()).decode()
       transport.setLdapAuth(auth)
     elif self.jwt is not None:
       transport.setJwtAuth(self.jwt)
