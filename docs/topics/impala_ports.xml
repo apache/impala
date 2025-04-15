@@ -70,13 +70,6 @@ under the License.
           </row>
           <row>
             <entry>Impala Daemon </entry>
-            <entry>--be_port</entry>
-            <entry>22000 </entry>
-            <entry>Internal use only. Impala daemons use this port for Thrift
-              based communication with each other. </entry>
-          </row>
-          <row>
-            <entry>Impala Daemon </entry>
             <entry>--state_store_subscriber_port</entry>
             <entry>23000 </entry>
             <entry>Internal use only. Impala daemons listen on this port for
