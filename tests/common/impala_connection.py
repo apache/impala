@@ -27,10 +27,10 @@ import re
 import time
 
 from future.utils import with_metaclass
+
 import impala.dbapi as impyla
 import impala.error as impyla_error
 import impala.hiveserver2 as hs2
-
 from impala_thrift_gen.beeswax.BeeswaxService import QueryState
 from impala_thrift_gen.Query.ttypes import TQueryOptions
 from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
@@ -724,6 +724,8 @@ class ImpylaHS2Connection(ImpalaConnection):
 
   def execute(self, sql_stmt, user=None, fetch_profile_after_close=False,
               fetch_exec_summary=False, profile_format=TRuntimeProfileFormat.STRING):
+    if user is None:
+      user = self.__user
     same_user = (user == self.__user)
     cursor = (self.default_cursor() if same_user
               # Must create a new cursor to supply 'user'.
@@ -769,6 +771,8 @@ class ImpylaHS2Connection(ImpalaConnection):
 
   def execute_async(self, sql_stmt, user=None):
     async_cursor = None
+    if user is None:
+      user = self.__user
     try:
       async_cursor = self.__open_single_cursor(user=user)
       handle = OperationHandle(async_cursor, sql_stmt)
@@ -964,9 +968,12 @@ class ImpylaHS2ResultSet(object):
   def __convert_result_row(self, result_tuple):
     """Take primitive values from a result tuple and construct the tab-separated string
     that would have been returned via beeswax."""
-    return '\t'.join([self.__convert_result_value(val) for val in result_tuple])
+    row = list()
+    for idx, val in enumerate(result_tuple):
+      row.append(self.__convert_result_value(val, self.column_types[idx]))
+    return '\t'.join(row)
 
-  def __convert_result_value(self, val):
+  def __convert_result_value(self, val, col_type):
     """Take a primitive value from a result tuple and its type and construct the string
     that would have been returned via beeswax."""
     if val is None:
@@ -974,24 +981,29 @@ class ImpylaHS2ResultSet(object):
     if type(val) == float:
       # Same format as what Beeswax uses in the backend.
       return "{:.16g}".format(val)
+    elif col_type == 'BOOLEAN':
+      # Beeswax return 'false' or 'true' for boolean column.
+      # HS2 return 'False' or 'True'.
+      return str(val).lower()
     else:
       return str(val)
 
 
 def create_connection(host_port, use_kerberos=False, protocol=BEESWAX,
-    is_hive=False, use_ssl=False, collect_profile_and_log=True):
+    is_hive=False, use_ssl=False, collect_profile_and_log=True, user=None):
   if protocol == BEESWAX:
     c = BeeswaxConnection(host_port=host_port, use_kerberos=use_kerberos,
-                          use_ssl=use_ssl)
+                          user=user, use_ssl=use_ssl)
   elif protocol == HS2:
     c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos,
         is_hive=is_hive, use_ssl=use_ssl,
-        collect_profile_and_log=collect_profile_and_log)
+        collect_profile_and_log=collect_profile_and_log, user=user)
   else:
     assert protocol == HS2_HTTP
     c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos,
         is_hive=is_hive, use_http_transport=True, http_path='cliservice',
-        use_ssl=use_ssl, collect_profile_and_log=collect_profile_and_log)
+        use_ssl=use_ssl, collect_profile_and_log=collect_profile_and_log,
+        user=user)
 
   # A hook in conftest sets tests.common.current_node. Skip for Hive connections since
   # Hive cannot modify client_identifier at runtime.

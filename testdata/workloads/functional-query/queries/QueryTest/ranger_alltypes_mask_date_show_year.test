@@ -55,4 +55,6 @@ select * from functional.chars_tiny
 'x    ','x                                                                                                                                           ','x'
 ---- TYPES
 CHAR,CHAR,STRING
+---- HS2_TYPES
+CHAR,CHAR,VARCHAR
 ====

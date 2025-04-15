@@ -21,20 +21,21 @@
 
 from __future__ import absolute_import, division, print_function
 from collections import defaultdict
+from datetime import datetime
 import json
 import logging
 import os
 import re
-import requests
 import socket
 import subprocess
-from datetime import datetime
 from time import sleep, time
+
+import requests
+from thrift.transport.TSocket import TSocket
+from thrift.transport.TTransport import TBufferedTransport
 
 from tests.common.impala_connection import create_connection, create_ldap_connection
 from tests.common.test_vector import BEESWAX, HS2, HS2_HTTP
-from thrift.transport.TSocket import TSocket
-from thrift.transport.TTransport import TBufferedTransport
 
 LOG = logging.getLogger('impala_service')
 LOG.setLevel(level=logging.DEBUG)
@@ -479,9 +480,10 @@ class ImpaladService(BaseImpalaService):
     client.connect()
     return client
 
-  def create_hs2_client(self):
+  def create_hs2_client(self, user=None):
     """Creates a new HS2 client connection to the impalad"""
-    client = create_connection('%s:%d' % (self.hostname, self.hs2_port), protocol=HS2)
+    client = create_connection('%s:%d' % (self.hostname, self.hs2_port),
+                               protocol=HS2, user=user)
     client.connect()
     return client
 

@@ -1410,10 +1410,10 @@ class TestAdmissionController(TestAdmissionControllerBase):
 
     # Another query should be rejected
     impalad = self.cluster.impalads[limit % 2]
-    client = impalad.service.create_hs2_client()
+    client = impalad.service.create_hs2_client(user=user)
     client.set_configuration({'request_pool': pool})
     try:
-      client.execute(SLOW_QUERY, user=user)
+      client.execute(SLOW_QUERY)
       assert False, "query should fail"
     except IMPALA_CONNECTION_EXCEPTION as e:
       # Construct the expected error message.
@@ -1440,9 +1440,9 @@ class TestAdmissionController(TestAdmissionControllerBase):
 
   def execute_async_and_wait_for_running(self, impalad, query, user, pool):
     # Execute a query asynchronously, and wait for it to be running.
-    client = impalad.service.create_hs2_client()
+    client = impalad.service.create_hs2_client(user=user)
     client.set_configuration({'request_pool': pool})
-    handle = client.execute_async(query, user=user)
+    handle = client.execute_async(query)
     timeout_s = 10
     # Make sure the query has been admitted and is running.
     client.wait_for_impala_state(handle, RUNNING, timeout_s)

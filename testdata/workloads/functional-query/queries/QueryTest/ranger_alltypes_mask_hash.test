@@ -55,4 +55,6 @@ select * from functional.chars_tiny
 '95e4a','c8fcce134c7d85f738457e0b1aa3b82090cb981de4ed54840a25e3e49a623900                                                                            ','2e7d2c03a9507ae265ecf5b5356885a5'
 ---- TYPES
 CHAR,CHAR,STRING
+---- HS2_TYPES
+CHAR,CHAR,VARCHAR
 ====

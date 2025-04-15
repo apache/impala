@@ -372,7 +372,7 @@ class ImpalaTestSuite(BaseTestSuite):
     return True
 
   @classmethod
-  def create_impala_client(cls, host_port=None, protocol=None, is_hive=False):
+  def create_impala_client(cls, host_port=None, protocol=None, is_hive=False, user=None):
     """
     Create a new ImpalaConnection client.
     Make sure to always call this method using a with-as statement or manually close
@@ -381,9 +381,9 @@ class ImpalaTestSuite(BaseTestSuite):
       protocol = cls.default_test_protocol()
     if host_port is None:
       host_port = cls.__get_default_host_port(protocol)
-    client = create_connection(host_port=host_port,
-        use_kerberos=pytest.config.option.use_kerberos, protocol=protocol,
-        is_hive=is_hive)
+    client = create_connection(
+        host_port=host_port, use_kerberos=pytest.config.option.use_kerberos,
+        protocol=protocol, is_hive=is_hive, user=user)
     client.connect()
     return client
 
