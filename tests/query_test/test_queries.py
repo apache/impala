@@ -37,7 +37,6 @@ from tests.common.test_dimensions import (
     extend_exec_option_dimension,
     FILE_FORMAT_TO_STORED_AS_MAP,
 )
-from tests.common.test_vector import BEESWAX
 from tests.util.filesystem_utils import get_fs_path
 
 
@@ -265,14 +264,10 @@ class TestQueriesTextTables(ImpalaTestSuite):
 class TestQueriesJsonTables(ImpalaTestSuite):
 
   @classmethod
-  def default_test_protocol(cls):
-    # Some assertions in this test relies on beeswax-specific return values such as
-    # Infinity, NaN, false, and true. HS2 returns inf, nan, False, and True instead.
-    return BEESWAX
-
-  @classmethod
   def add_test_dimensions(cls):
     super(TestQueriesJsonTables, cls).add_test_dimensions()
+    # Test that all protocol works.
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_json_dimension(cls.get_workload()))
     add_exec_option_dimension(cls, 'disable_optimized_json_count_star', [0, 1])

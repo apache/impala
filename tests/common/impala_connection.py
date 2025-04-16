@@ -23,6 +23,7 @@ from __future__ import absolute_import, division, print_function
 import abc
 import getpass
 import logging
+import math
 import re
 import time
 
@@ -980,7 +981,15 @@ class ImpylaHS2ResultSet(object):
       return 'NULL'
     if type(val) == float:
       # Same format as what Beeswax uses in the backend.
-      return "{:.16g}".format(val)
+      if math.isnan(val):
+        return 'NaN'
+      elif math.isinf(val):
+        if val < 0:
+          return '-Infinity'
+        else:
+          return 'Infinity'
+      else:
+        return "{:.16g}".format(val)
     elif col_type == 'BOOLEAN':
       # Beeswax return 'false' or 'true' for boolean column.
       # HS2 return 'False' or 'True'.
