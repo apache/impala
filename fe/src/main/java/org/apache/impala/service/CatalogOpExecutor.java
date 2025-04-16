@@ -1213,28 +1213,21 @@ public class CatalogOpExecutor {
     // version to the table being altered.
     InProgressTableModification modification =
         new InProgressTableModification(catalog_, tbl);
+    catalog_.getLock().writeLock().unlock();
     modification.addCatalogServiceIdentifiersToTable();
     final Timer.Context context
         = tbl.getMetrics().getTimer(Table.ALTER_DURATION_METRIC).time();
     try {
       if (params.getAlter_type() == TAlterTableType.RENAME_VIEW
           || params.getAlter_type() == TAlterTableType.RENAME_TABLE) {
-        // RENAME is implemented as an ADD + DROP, so we need to execute it as we hold
-        // the catalog lock.
-        try {
-          alterTableOrViewRename(tbl,
-              TableName.fromThrift(params.getRename_params().getNew_table_name()),
-              modification, wantMinimalResult, response, catalogTimeline);
-          modification.validateInProgressModificationComplete();
-          return;
-        } finally {
-          // release the version taken in the tryLock call above
-          catalog_.getLock().writeLock().unlock();
-        }
+        alterTableOrViewRename(tbl,
+            TableName.fromThrift(params.getRename_params().getNew_table_name()),
+            modification, wantMinimalResult, response, catalogTimeline);
+        modification.validateInProgressModificationComplete();
+        return;
       }
 
       String responseSummaryMsg = null;
-      catalog_.getLock().writeLock().unlock();
 
       if (tbl instanceof KuduTable && altersKuduTable(params.getAlter_type())) {
         alterKuduTable(params, response, (KuduTable) tbl, modification, wantMinimalResult,
@@ -5687,8 +5680,7 @@ public class CatalogOpExecutor {
   private void alterTableOrViewRename(Table oldTbl, TableName newTableName,
       InProgressTableModification modification, boolean wantMinimalResult,
       TDdlExecResponse response, EventSequence catalogTimeline) throws ImpalaException {
-    Preconditions.checkState(oldTbl.isWriteLockedByCurrentThread()
-        && catalog_.getLock().isWriteLockedByCurrentThread());
+    Preconditions.checkState(oldTbl.isWriteLockedByCurrentThread());
     TableName tableName = oldTbl.getTableName();
     org.apache.hadoop.hive.metastore.api.Table msTbl =
         oldTbl.getMetaStoreTable().deepCopy();

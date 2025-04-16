@@ -22,6 +22,9 @@ import itertools
 import pytest
 import re
 import time
+import threading
+from multiprocessing.pool import ThreadPool
+from multiprocessing import TimeoutError
 
 from copy import deepcopy
 from tests.metadata.test_ddl_base import TestDdlBase
@@ -52,6 +55,7 @@ from tests.util.filesystem_utils import (
     FILESYSTEM_NAME)
 from tests.common.impala_cluster import ImpalaCluster
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX
+from tests.util.shell_util import dump_server_stacktraces
 
 
 def get_trash_path(bucket, path):
@@ -478,6 +482,56 @@ class TestDdlStatements(TestDdlBase):
   def test_alter_set_column_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/alter-table-set-column-stats', vector,
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
+
+  @UniqueDatabase.parametrize(num_dbs=2)
+  def test_concurrent_alter_table_rename(self, vector, unique_database):
+    test_self = self
+
+    class ThreadLocalClient(threading.local):
+      def __init__(self):
+        self.client = test_self.create_impala_client_from_vector(vector)
+
+    pool = ThreadPool(processes=8)
+    tlc = ThreadLocalClient()
+
+    def run_rename(i):
+      if i % 2 == 0:
+        tlc.client.execute("set sync_ddl=1")
+      is_partitioned = i % 4 < 2
+      tbl_name = "{}.tbl_{}".format(unique_database, i)
+      tlc.client.execute("create table {}(i int){}".format(
+          tbl_name, "partitioned by(p int)" if is_partitioned else ""))
+      if i % 8 < 4:
+        # Rename inside the same db
+        new_tbl_name = tbl_name + "_new"
+      else:
+        # Move to another db
+        new_tbl_name = "{}2.tbl_{}".format(unique_database, i)
+      stmts = [
+        "alter table {} rename to {}".format(tbl_name, new_tbl_name),
+        "alter table {} rename to {}".format(new_tbl_name, tbl_name),
+      ]
+      # Move the table back and forth in several rounds
+      for _ in range(4):
+        for query in stmts:
+          # Run the query asynchronously to avoid getting stuck by it
+          handle = tlc.client.execute_async(query)
+          is_finished = tlc.client.wait_for_finished_timeout(handle, timeout=60)
+          assert is_finished, "Query timeout(60s): " + query
+          tlc.client.close_query(handle)
+      return True
+
+    # Run renames in parallel
+    NUM_ITERS = 16
+    worker = [None] * (NUM_ITERS + 1)
+    for i in range(1, NUM_ITERS + 1):
+      worker[i] = pool.apply_async(run_rename, (i,))
+    for i in range(1, NUM_ITERS + 1):
+      try:
+        assert worker[i].get(timeout=100)
+      except TimeoutError:
+        dump_server_stacktraces()
+        assert False, "Timeout in thread run_ddls(%d)" % i
 
   @SkipIfFS.hbase
   @UniqueDatabase.parametrize(sync_ddl=True)

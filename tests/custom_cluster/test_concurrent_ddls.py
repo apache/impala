@@ -110,6 +110,10 @@ class TestConcurrentDdls(CustomClusterTestSuite):
         # Below queries could fail if running with invalidate metadata concurrently
         "alter table %s_part add partition (j=1)" % tbl_name,
         "alter table %s_part add partition (j=2)" % tbl_name,
+        "alter table {0} rename to {0}_2".format(tbl_name),
+        "alter table {0}_part rename to {0}_part2".format(tbl_name),
+        "alter table {0}_2 rename to {0}".format(tbl_name),
+        "alter table {0}_part2 rename to {0}_part".format(tbl_name),
         "invalidate metadata %s_part" % tbl_name,
         "refresh %s" % tbl_name,
         "refresh %s_part" % tbl_name,
