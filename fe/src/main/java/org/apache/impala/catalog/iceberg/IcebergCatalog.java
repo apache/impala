@@ -26,6 +26,7 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergTableLoadingException;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.JniUtil;
 
 /**
  * Interface for Iceberg catalogs. Only contains a minimal set of methods to make
@@ -86,14 +87,13 @@ public interface IcebergCatalog {
   /**
    * Some of the implemetation methods might be running on native threads as they might
    * be invoked via JNI. In that case the context class loader for those threads are
-   * null. 'Catalogs' uses JNDI to load the catalog implementations, e.g. HadoopCatalog
-   * or HiveCatalog. JNDI uses the context class loader, but as it is null it falls back
+   * null. 'Catalogs' dynamically loads catalog implementations, e.g. HadoopCatalog or
+   * HiveCatalog. It uses the context class loader, but as it is null it falls back
    * to the bootstrap class loader that doesn't have the Iceberg classes on its classpath.
    * To avoid ClassNotFoundException we set the context class loader to the class loader
    * that loaded this class.
    */
   default void setContextClassLoader() {
-    if (Thread.currentThread().getContextClassLoader() != null) return;
-    Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
+    JniUtil.setContextClassLoaderForThisThread(this.getClass().getClassLoader());
   }
 }

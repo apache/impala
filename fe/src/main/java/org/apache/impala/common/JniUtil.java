@@ -410,4 +410,17 @@ public class JniUtil {
     }
     return groups;
   }
+
+  /**
+   * Some methods might be running on native threads as they might be invoked via JNI.
+   * In that case the context class loader for those threads are null. Dynamic class
+   * loading uses the context class loader, but as it is null it falls back to the
+   * bootstrap class loader that doesn't have the Iceberg classes on its classpath. To
+   * avoid ClassNotFoundException we can set the context class loader with this method.
+   * It will only set the context class loader if it is NULL.
+   */
+  public static void setContextClassLoaderForThisThread(ClassLoader cl) {
+    if (Thread.currentThread().getContextClassLoader() != null) return;
+    Thread.currentThread().setContextClassLoader(cl);
+  }
 }

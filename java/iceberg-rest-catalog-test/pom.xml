@@ -33,12 +33,19 @@ under the License.
   <name>Iceberg REST Catalog Test</name>
 
   <dependencies>
+
+    <dependency>
+      <groupId>org.apache.impala</groupId>
+      <artifactId>impala-executor-deps</artifactId>
+      <version>${project.version}</version>
+      <type>pom</type>
+    </dependency>
+
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <version>${hadoop.version}</version>
       <exclusions>
-          <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
         <exclusion>
           <groupId>io.netty</groupId>
           <artifactId>*</artifactId>
@@ -66,7 +73,6 @@ under the License.
         <version>${iceberg.version}</version>
       </dependency>
 
-
       <dependency>
         <groupId>org.apache.iceberg</groupId>
         <artifactId>iceberg-core</artifactId>
@@ -85,6 +91,24 @@ under the License.
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.5.0</version>
+        <executions>
+          <execution>
+            <id>write-classpath</id>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <outputFile>${project.build.directory}/build-classpath.txt</outputFile>
+              <includeScope>runtime</includeScope>
+              <excludeTypes>pom</excludeTypes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
         <configuration>
@@ -92,7 +116,6 @@ under the License.
           <target>1.8</target>
         </configuration>
       </plugin>
-
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
@@ -101,6 +124,19 @@ under the License.
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
         </configuration>
       </plugin>
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-jar-plugin</artifactId>
+      <version>3.3.0</version>
+      <configuration>
+        <archive>
+          <manifest>
+            <addClasspath>true</addClasspath>
+            <mainClass>org.apache.iceberg.rest.IcebergRestCatalogTest</mainClass>
+          </manifest>
+        </archive>
+      </configuration>
+    </plugin>
     </plugins>
   </build>
 

@@ -17,12 +17,19 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# We can expect that mvn can be found in /usr/local/bin
-# set bin/bootstrap_build.sh and bin/bootstrap_system.sh
-PATH=${PATH}:/usr/local/bin
-
 cd $IMPALA_HOME
 . bin/impala-config.sh
 
-bin/mvn-quiet.sh -f "java/iceberg-rest-catalog-test/pom.xml" exec:java \
-    -Dexec.mainClass="org.apache.iceberg.rest.IcebergRestCatalogTest"
+CP_FILE="$IMPALA_HOME/java/iceberg-rest-catalog-test/target/build-classpath.txt"
+
+if [ ! -s "$CP_FILE" ]; then
+  >&2 echo Iceberg REST Catalog classpath file $CP_FILE missing.
+  >&2 echo Build java/iceberg-rest-catalog-test first.
+  return 1
+fi
+
+CLASSPATH=$(cat $CP_FILE):"$CLASSPATH"
+
+java -cp java/iceberg-rest-catalog-test/target/impala-iceberg-rest-catalog-test-${IMPALA_VERSION}.jar:$CLASSPATH \
+    org.apache.iceberg.rest.IcebergRestCatalogTest
+

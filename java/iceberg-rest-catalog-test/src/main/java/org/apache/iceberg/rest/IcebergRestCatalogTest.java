@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.rest.responses.ErrorResponse;
@@ -60,7 +60,10 @@ public class IcebergRestCatalogTest {
   }
 
   private Catalog initializeBackendCatalog() throws IOException {
-    HdfsConfiguration conf = new HdfsConfiguration();
+    Configuration conf = new Configuration();
+    conf.set("io-impl", "org.apache.iceberg.hadoop.HadoopFileIO");
+    LOG.info("Default filesystem configured for this Iceberg REST Catalog is " +
+        conf.get("fs.defaultFS"));
     return new HadoopCatalog(conf, getWarehouseLocation());
   }
 

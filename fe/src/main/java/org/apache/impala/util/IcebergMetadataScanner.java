@@ -31,6 +31,7 @@ import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.MetadataTableUtils;
 import org.apache.iceberg.StructLike;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.common.JniUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.iceberg.Table;
@@ -78,6 +79,10 @@ public class IcebergMetadataScanner {
    * the Iceberg Api.
    */
   public void ScanMetadataTable() {
+    // If we are on a stack frame that was created through JNI we need to set the context
+    // class loader as Iceberg might use reflection to dynamically load classes and
+    // methods.
+    JniUtil.setContextClassLoaderForThisThread(this.getClass().getClassLoader());
     // Create and scan the metadata table
     LOG.trace("Metadata table schema: " + metadataTable_.schema().toString());
     TableScan scan = metadataTable_.newScan();
