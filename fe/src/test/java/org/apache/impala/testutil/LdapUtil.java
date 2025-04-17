@@ -40,6 +40,7 @@ public class LdapUtil {
 
   public static final String TEST_USER_7 = "Test7Ldap";
 
+  // user:password is base64 encoded as 84 chars (above 76) to test IMPALA-13746.
   public static final String TEST_USER_LONG_PSW = "TestLdapLongPsw";
   public static final String TEST_PASSWORD_LONG =
       "verylongpasswordthatcreatesalongbasic64encoding";
