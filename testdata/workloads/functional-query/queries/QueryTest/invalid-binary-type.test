@@ -4,8 +4,8 @@ SELECT * FROM invalid_binary;
 ---- ERRORS
 Error converting column: 1 to BINARY
 Error converting column: 1 to BINARY
-Error parsing row: file: __HDFS_FILENAME__, before offset: 123
-Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+Error parsing row: file: __HDFS_FILENAME__, before offset: 91
+Error parsing row: file: __HDFS_FILENAME__, before offset: 91
 ---- RESULTS
 39,'NULL','2016-10-31 20:46:09.871'
 40,'NULL','2016-10-31 20:46:10.137'
@@ -17,8 +17,8 @@ SELECT bindata FROM invalid_binary;
 ---- ERRORS
 Error converting column: 1 to BINARY
 Error converting column: 1 to BINARY
-Error parsing row: file: __HDFS_FILENAME__, before offset: 123
-Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+Error parsing row: file: __HDFS_FILENAME__, before offset: 91
+Error parsing row: file: __HDFS_FILENAME__, before offset: 91
 ---- RESULTS
 'NULL'
 'NULL'
@@ -30,8 +30,8 @@ SELECT id, bindata FROM invalid_binary;
 ---- ERRORS
 Error converting column: 1 to BINARY
 Error converting column: 1 to BINARY
-Error parsing row: file: __HDFS_FILENAME__, before offset: 123
-Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+Error parsing row: file: __HDFS_FILENAME__, before offset: 91
+Error parsing row: file: __HDFS_FILENAME__, before offset: 91
 ---- RESULTS
 39,'NULL'
 40,'NULL'
@@ -43,8 +43,8 @@ SELECT bindata, date_str FROM invalid_binary;
 ---- ERRORS
 Error converting column: 1 to BINARY
 Error converting column: 1 to BINARY
-Error parsing row: file: __HDFS_FILENAME__, before offset: 123
-Error parsing row: file: __HDFS_FILENAME__, before offset: 123
+Error parsing row: file: __HDFS_FILENAME__, before offset: 91
+Error parsing row: file: __HDFS_FILENAME__, before offset: 91
 ---- RESULTS
 'NULL','2016-10-31 20:46:09.871'
 'NULL','2016-10-31 20:46:10.137'
