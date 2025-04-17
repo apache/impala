@@ -1406,14 +1406,14 @@ class TestAdmissionController(TestAdmissionControllerBase):
       query_handles.append(query_handle)
 
     # Let state sync across impalads.
-    wait_statestore_heartbeat()
+    wait_statestore_heartbeat(num_heartbeat=3)
 
     # Another query should be rejected
     impalad = self.cluster.impalads[limit % 2]
     client = impalad.service.create_hs2_client(user=user)
     client.set_configuration({'request_pool': pool})
     try:
-      client.execute(SLOW_QUERY)
+      client.execute('select count(*) from functional.alltypes')
       assert False, "query should fail"
     except IMPALA_CONNECTION_EXCEPTION as e:
       # Construct the expected error message.
