@@ -19,9 +19,10 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.FrontendTestBase;
-import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.service.BackendConfig;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.ColumnSchema.Encoding;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.google.common.base.Joiner;
@@ -33,6 +34,11 @@ import java.util.List;
  * Tests on DDL analysis for Kudu tables.
  */
 public class AnalyzeKuduDDLTest extends FrontendTestBase {
+
+  @BeforeClass
+  public static void setup() {
+    BackendConfig.INSTANCE.getBackendCfg().setKudu_master_hosts("127.0.0.1");
+  }
 
   /**
    * This is wrapper around super.AnalyzesOk method. The additional boolean is used to
@@ -319,7 +325,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "(PARTITION VALUE = 'abc')' is not a key column. Only key columns can be used " +
         "in PARTITION BY", isExternalPurgeTbl);
     // Kudu num_tablet_replicas is specified in tblproperties
-    String kuduMasters = catalog_.getDefaultKuduMasterHosts();
+    String kuduMasters = BackendConfig.INSTANCE.getBackendCfg().kudu_master_hosts;
     AnalyzesOk(String.format("create table tab (x int primary key) partition by " +
         "hash (x) partitions 8 stored as kudu tblproperties " +
         "('kudu.num_tablet_replicas'='1', 'kudu.master_addresses' = '%s')",
@@ -629,7 +635,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
 
   @Test
   public void TestCreateExternalKuduTable() {
-    final String kuduMasters = catalog_.getDefaultKuduMasterHosts();
+    final String kuduMasters = BackendConfig.INSTANCE.getBackendCfg().kudu_master_hosts;
     AnalyzesOk("create external table t stored as kudu " +
         "tblproperties('kudu.table_name'='t')");
     // Use all allowed optional table props.

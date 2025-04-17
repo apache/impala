@@ -2436,6 +2436,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "select double_col, int_col, tinyint_col from functional.alltypes",
         "Partition column name mismatch: tinyint_col != int_col");
 
+    BackendConfig.INSTANCE.getBackendCfg().setKudu_master_hosts("127.0.0.1");
+
     // CTAS into managed Kudu tables
     AnalyzesOk("create table t primary key (id) partition by hash (id) partitions 3" +
         " stored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col, " +

@@ -74,7 +74,7 @@ public class LocalCatalogTest {
   public void setupCatalog() throws Exception {
     FeSupport.loadLibrary();
     provider_ = new CatalogdMetaProvider(BackendConfig.INSTANCE.getBackendCfg());
-    catalog_ = new LocalCatalog(provider_, /*defaultKuduMasterHosts=*/null);
+    catalog_ = new LocalCatalog(provider_);
     fe_ = new Frontend(new NoopAuthorizationFactory(), catalog_);
   }
 

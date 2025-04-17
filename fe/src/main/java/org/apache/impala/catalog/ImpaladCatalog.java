@@ -105,17 +105,12 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
   // Object that is used to synchronize on and signal when a catalog update is received.
   private final Object catalogUpdateEventNotifier_ = new Object();
 
-  // The addresses of the Kudu masters to use if no Kudu masters were explicitly provided.
-  // Used during table creation.
-  private final String defaultKuduMasterHosts_;
   private final AtomicReference<? extends AuthorizationChecker> authzChecker_;
 
-  public ImpaladCatalog(String defaultKuduMasterHosts,
-      AtomicReference<? extends AuthorizationChecker> authzChecker) {
+  public ImpaladCatalog(AtomicReference<? extends AuthorizationChecker> authzChecker) {
     super();
     authzChecker_ = authzChecker;
     addDb(BuiltinsDb.getInstance());
-    defaultKuduMasterHosts_ = defaultKuduMasterHosts;
     // Ensure the contents of the CatalogObjectVersionSet instance are cleared when a
     // new instance of ImpaladCatalog is created (see IMPALA-6486).
     CatalogObjectVersionSet.INSTANCE.clear();
@@ -677,8 +672,6 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
   }
   @Override // FeCatalog
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
-  @Override // FeCatalog
-  public String getDefaultKuduMasterHosts() { return defaultKuduMasterHosts_; }
 
   private void LibCacheSetNeedsRefresh(String hdfsLocation) {
     if (!FeSupport.NativeLibCacheSetNeedsRefresh(hdfsLocation)) {

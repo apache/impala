@@ -49,8 +49,6 @@ import org.apache.thrift.TException;
  * from the catalogd via the statestore.
  */
 public abstract class FeCatalogManager {
-  private static String DEFAULT_KUDU_MASTER_HOSTS =
-      BackendConfig.INSTANCE.getBackendCfg().kudu_master_hosts;
 
   protected AtomicReference<? extends AuthorizationChecker> authzChecker_;
 
@@ -148,7 +146,7 @@ public abstract class FeCatalogManager {
     }
 
     private ImpaladCatalog createNewCatalog() {
-      return new ImpaladCatalog(DEFAULT_KUDU_MASTER_HOSTS, authzChecker_);
+      return new ImpaladCatalog(authzChecker_);
     }
   }
 
@@ -163,7 +161,7 @@ public abstract class FeCatalogManager {
     @Override
     public FeCatalog getOrCreateCatalog() {
       PROVIDER.setAuthzChecker(authzChecker_);
-      return new LocalCatalog(PROVIDER, DEFAULT_KUDU_MASTER_HOSTS);
+      return new LocalCatalog(PROVIDER);
     }
 
     @Override
@@ -189,7 +187,7 @@ public abstract class FeCatalogManager {
           throw new IllegalStateException("Create IcebergMetaProvider failed", e);
         }
       }
-      return new LocalCatalog(PROVIDER, null);
+      return new LocalCatalog(PROVIDER);
     }
 
     IcebergMetaProvider initProvider() throws IOException {

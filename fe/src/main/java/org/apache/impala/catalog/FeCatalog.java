@@ -109,8 +109,6 @@ public interface FeCatalog {
   TUniqueId getCatalogServiceId();
 
   AuthorizationPolicy getAuthPolicy();
-  String getDefaultKuduMasterHosts();
-
 
   /**
    * Returns true if the catalog is ready to accept requests (has

@@ -351,7 +351,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
     analyzeKuduTableProperties(analyzer);
     if (isExternalWithNoPurge()) {
       // this is an external table
-      analyzeExternalKuduTableParams(analyzer);
+      analyzeExternalKuduTableParams();
     } else {
       // this is either a managed table or an external table with external.table.purge
       // property set to true
@@ -364,7 +364,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
    * Kudu tables.
    */
   private void analyzeKuduTableProperties(Analyzer analyzer) throws AnalysisException {
-    String kuduMasters = getKuduMasters(analyzer);
+    String kuduMasters = getKuduMasters();
     if (kuduMasters.isEmpty()) {
       throw new AnalysisException(String.format(
           "Table property '%s' is required when the impalad startup flag " +
@@ -432,10 +432,10 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
    *  Populates Kudu master addresses either from table property or
    *  the -kudu_master_hosts flag.
    */
-  private String getKuduMasters(Analyzer analyzer) {
+  private String getKuduMasters() {
     String kuduMasters = getTblProperties().get(KuduTable.KEY_MASTER_HOSTS);
     if (Strings.isNullOrEmpty(kuduMasters)) {
-      kuduMasters = analyzer.getCatalog().getDefaultKuduMasterHosts();
+      kuduMasters = BackendConfig.INSTANCE.getBackendCfg().kudu_master_hosts;
     }
     return kuduMasters;
   }
@@ -443,7 +443,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
   /**
    * Analyzes and checks parameters specified for external Kudu tables.
    */
-  private void analyzeExternalKuduTableParams(Analyzer analyzer)
+  private void analyzeExternalKuduTableParams()
       throws AnalysisException {
     Preconditions.checkState(!Boolean
         .parseBoolean(getTblProperties().get(KuduTable.TBL_PROP_EXTERNAL_TABLE_PURGE)));
@@ -476,7 +476,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
       throw new AnalysisException(String.format("Table property '%s' cannot be set to " +
           "true with an managed Kudu table.", KuduTable.TBL_PROP_EXTERNAL_TABLE_PURGE));
     }
-    analyzeSynchronizedKuduTableName(analyzer);
+    analyzeSynchronizedKuduTableName();
 
     // Check column types are valid Kudu types
     for (ColumnDef col: getColumnDefs()) {
@@ -513,12 +513,12 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
    * it in TableDef.generatedKuduTableName_. Throws if the Kudu table
    * name was given manually via TBLPROPERTIES.
    */
-  private void analyzeSynchronizedKuduTableName(Analyzer analyzer)
+  private void analyzeSynchronizedKuduTableName()
       throws AnalysisException {
     AnalysisUtils.throwIfNotNull(getTblProperties().get(KuduTable.KEY_TABLE_NAME),
         String.format("Not allowed to set '%s' manually for synchronized Kudu tables.",
             KuduTable.KEY_TABLE_NAME));
-    String kuduMasters = getKuduMasters(analyzer);
+    String kuduMasters = getKuduMasters();
     boolean isHMSIntegrationEnabled;
     try {
       // Check if Kudu's integration with the Hive Metastore is enabled. Validation

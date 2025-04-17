@@ -18,6 +18,8 @@
 package org.apache.impala.planner;
 
 import static org.junit.Assert.fail;
+
+import org.apache.impala.service.BackendConfig;
 import org.junit.Assert;
 
 import java.io.FileWriter;
@@ -123,6 +125,7 @@ public class PlannerTestBase extends FrontendTestBase {
     String logDir = System.getenv("IMPALA_FE_TEST_LOGS_DIR");
     if (logDir == null) logDir = "/tmp";
     outDir_ = Paths.get(logDir, "PlannerTest");
+    BackendConfig.INSTANCE.getBackendCfg().setKudu_master_hosts("127.0.0.1");
   }
 
   @BeforeClass

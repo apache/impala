@@ -1910,6 +1910,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     // ALL/OWNER privileges on SERVER are not required to create external Kudu tables
     // when 'kudu.master_addresses' is not specified as long as the RWSTORAGE privilege
     // is granted on the storage handler URI.
+    BackendConfig.INSTANCE.getBackendCfg().setKudu_master_hosts("127.0.0.1");
     authorize("create external table functional.kudu_tbl stored as kudu " +
         "tblproperties ('kudu.table_name'='tbl')")
         .ok(onDatabase("functional", TPrivilegeLevel.ALL),

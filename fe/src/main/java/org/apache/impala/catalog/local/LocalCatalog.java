@@ -81,11 +81,9 @@ public class LocalCatalog implements FeCatalog {
   private Map<String, FeDb> dbs_ = new HashMap<>();
   private Map<String, HdfsCachePool> hdfsCachePools_ = null;
   private String nullPartitionKeyValue_;
-  private final String defaultKuduMasterHosts_;
 
-  public LocalCatalog(MetaProvider metaProvider, String defaultKuduMasterHosts) {
+  public LocalCatalog(MetaProvider metaProvider) {
     metaProvider_ = Preconditions.checkNotNull(metaProvider);
-    defaultKuduMasterHosts_ = defaultKuduMasterHosts;
   }
 
   public String getProviderURI() {
@@ -306,11 +304,6 @@ public class LocalCatalog implements FeCatalog {
   @Override
   public AuthorizationPolicy getAuthPolicy() {
     return metaProvider_.getAuthPolicy();
-  }
-
-  @Override
-  public String getDefaultKuduMasterHosts() {
-    return defaultKuduMasterHosts_;
   }
 
   public String getNullPartitionKeyValue() {

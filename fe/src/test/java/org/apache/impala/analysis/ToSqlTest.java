@@ -23,6 +23,7 @@ import static org.junit.Assert.fail;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.TestUtils;
 import org.junit.Test;
 
@@ -352,7 +353,8 @@ public class ToSqlTest extends FrontendTestBase {
         "SORT BY ZORDER ( a, b ) STORED AS TEXTFILE" , true);
 
     // Kudu table with a TIMESTAMP column default value
-    String kuduMasters = catalog_.getDefaultKuduMasterHosts();
+    String kuduMasters = "127.0.0.1";
+    BackendConfig.INSTANCE.getBackendCfg().setKudu_master_hosts(kuduMasters);
     testToSql(String.format("create table p (a bigint primary key, " +
         "b timestamp default '1987-05-19') partition by hash(a) partitions 3 " +
         "stored as kudu tblproperties ('kudu.master_addresses'='%s')", kuduMasters),
@@ -416,7 +418,8 @@ public class ToSqlTest extends FrontendTestBase {
         "( int_col, bool_col ) STORED AS TEXTFILE AS SELECT " +
         "int_col, bool_col, string_col FROM functional.alltypes", true);
     // Kudu table with multiple partition params
-    String kuduMasters = catalog_.getDefaultKuduMasterHosts();
+    String kuduMasters = "127.0.0.1";
+    BackendConfig.INSTANCE.getBackendCfg().setKudu_master_hosts(kuduMasters);
     testToSql(String.format("create table p primary key (a,b) " +
         "partition by hash(a) partitions 3, range (b) (partition value = 1) " +
         "stored as kudu tblproperties ('kudu.master_addresses'='%s') as select " +

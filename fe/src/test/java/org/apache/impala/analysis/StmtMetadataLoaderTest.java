@@ -248,7 +248,7 @@ public class StmtMetadataLoaderTest {
     FeSupport.loadLibrary();
     CatalogdMetaProvider provider = new CatalogdMetaProvider(
         BackendConfig.INSTANCE.getBackendCfg());
-    LocalCatalog catalog = new LocalCatalog(provider, /*defaultKuduMasterHosts=*/null);
+    LocalCatalog catalog = new LocalCatalog(provider);
     Frontend fe = new Frontend(new NoopAuthorizationFactory(), catalog);
     EventSequence timeline = new EventSequence("Test Timeline");
     User user = new User("user");
