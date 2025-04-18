@@ -609,6 +609,16 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     if (eventTypeSkipList != null) {
       eventRequest.setEventTypeSkipList(eventTypeSkipList);
     }
+    // Due to the bug of HIVE-28912, fetching COMMIT_COMPACTION_EVENT or
+    // ALLOC_WRITE_ID_EVENT shouldn't specify the catName.
+    // 'eventTypeSkipList' is null or doesn't contain a type means we want this type.
+    if (eventRequest.isSetCatName() && (eventTypeSkipList == null
+        || !eventTypeSkipList.contains(
+            MetastoreEventType.COMMIT_COMPACTION_EVENT.toString())
+        || !eventTypeSkipList.contains(
+            MetastoreEventType.ALLOC_WRITE_ID_EVENT.toString()))) {
+      eventRequest.unsetCatName();
+    }
     return msClient.getThriftClient().get_next_notification(eventRequest);
   }
 

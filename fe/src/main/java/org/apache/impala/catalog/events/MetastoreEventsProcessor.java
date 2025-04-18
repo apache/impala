@@ -1920,9 +1920,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         MetaDataFilter.TABLE_EVENT_TYPES : MetaDataFilter.TABLE_EXIST_EVENT_TYPES;
     for (String dbName : db2Tables.keySet()) {
       Set<String> tblNames = new HashSet<>(db2Tables.get(dbName));
+      // Due to HIVE-28912 we don't check catName in the filter
       NotificationFilter filter = e -> dbName.equalsIgnoreCase(e.getDbName())
           && tblNames.contains(e.getTableName().toLowerCase())
-          && MetastoreShim.isDefaultCatalog(e.getCatName())
+          // Due to HIVE-28912 we don't check catName in the filter
+          // && MetastoreShim.isDefaultCatalog(e.getCatName())
           && eventTypes.contains(e.getEventType());
       MetaDataFilter metaDataFilter = new MetaDataFilter(filter,
           MetastoreShim.getDefaultCatalogName(), dbName, db2Tables.get(dbName));

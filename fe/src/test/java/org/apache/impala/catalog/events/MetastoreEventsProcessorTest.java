@@ -4167,16 +4167,16 @@ public class MetastoreEventsProcessorTest {
   @Test
   public void testNotificationEventRequest() throws Exception {
     long currentEventId = eventsProcessor_.getCurrentEventId();
-    int EVENTS_BATCH_SIZE_PER_RPC = 1000;
     // Generate some DB only related events
     createDatabaseFromImpala(TEST_DB_NAME, null);
     String testDbParamKey = "testKey", testDbParamVal = "testVal";
     String testTable1 = "testNotifyTable1", testTable2 = "testNotifyTable2";
     addDatabaseParameters(testDbParamKey, testDbParamVal);
     eventsProcessor_.processEvents();
-    // Verify DB related events only.
 
     // Generate some table events for managed table
+    // Insert into a transactional table and abort the txn. This generates OPEN_TXN,
+    // ALLOC_WRITE_ID_EVENT and ABORT_TXN events.
     testInsertIntoTransactionalTable(testTable1, true, false);
     alterTableAddColsFromImpala(
         TEST_DB_NAME, testTable1, "newCol", TPrimitiveType.STRING);
@@ -4197,45 +4197,54 @@ public class MetastoreEventsProcessorTest {
         .equals(event.getEventType());
     MetaDataFilter metaDataFilter = new MetaDataFilter(filter,
         MetastoreShim.getDefaultCatalogName(), TEST_DB_NAME);
-    assertEquals(MetastoreEventsProcessor
-        .getNextMetastoreEventsWithFilterInBatches(catalog_, currentEventId,
-            metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 1);
+    // Get one CREATE_DATABASE event
+    assertEventCount(currentEventId, metaDataFilter, 1);
     Db db = catalog_.getDb(TEST_DB_NAME);
     metaDataFilter.setNotificationFilter(
         MetastoreEventsProcessor.getDbNotificationEventFilter(db));
-    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
-        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 2);
+    // Get all db events: CREATE_DATABASE, ALTER_DATABASE
+    assertEventCount(currentEventId, metaDataFilter, 2);
 
     // verify events for table 1
-    filter = event -> "ALTER_TABLE".equals(event.getEventType());
+    filter = event -> AlterTableEvent.EVENT_TYPE.equals(event.getEventType());
     metaDataFilter = new MetaDataFilter(filter, MetastoreShim.getDefaultCatalogName(),
         TEST_DB_NAME, testTable1);
-    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
-        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 2);
+    // Get 2 ALTER_TABLE events of adding and removing columns respectively.
+    assertEventCount(currentEventId, metaDataFilter, 2);
+    // Without filter, there are 4 events: CREATE_TABLE, ALLOC_WRITE_ID_EVENT,
+    // ALTER_TABLE, ALTER_TABLE.
     metaDataFilter.setNotificationFilter(null);
-    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
-        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 3);
+    assertEventCount(currentEventId, metaDataFilter, 4);
 
     // verify events for table 2
-    filter = event -> "ALTER_TABLE".equals(event.getEventType());
+    filter = event -> AlterTableEvent.EVENT_TYPE.equals(event.getEventType());
     metaDataFilter = new MetaDataFilter(filter, MetastoreShim.getDefaultCatalogName(),
         TEST_DB_NAME, testTable2);
-    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
-        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 2);
+    // Get 2 ALTER_TABLE events of setting owner and file format respectively.
+    assertEventCount(currentEventId, metaDataFilter, 2);
+    // Without the filter, get one more CREATE_TABLE event so it's 3 in total.
     metaDataFilter.setNotificationFilter(null);
-    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
-        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 3);
+    assertEventCount(currentEventId, metaDataFilter, 3);
 
     // verify all events
-    filter = event -> "ALTER_TABLE".equals(event.getEventType());
+    filter = event -> AlterTableEvent.EVENT_TYPE.equals(event.getEventType());
     metaDataFilter = new MetaDataFilter(filter, MetastoreShim.getDefaultCatalogName(),
         TEST_DB_NAME);
-    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
-        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 4);
+    // 4 ALTER_TABLE events in this db
+    assertEventCount(currentEventId, metaDataFilter, 4);
     metaDataFilter.setNotificationFilter(null);
-    // 2 DB + 6 table events
-    assertEquals(MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
-        catalog_, currentEventId, metaDataFilter, EVENTS_BATCH_SIZE_PER_RPC).size(), 8);
+    // 2 DB + 7 table events
+    // CREATE_DATABASE, ALTER_DATABASE, CREATE_TABLE, ALLOC_WRITE_ID_EVENT, ALTER_TABLE,
+    // ALTER_TABLE, CREATE_TABLE, ALTER_TABLE, ALTER_TABLE.
+    assertEventCount(currentEventId, metaDataFilter, 9);
+  }
+
+  private void assertEventCount(long currentEventId, MetaDataFilter metaDataFilter,
+      int expected) throws MetastoreNotificationFetchException {
+    List<NotificationEvent> events =
+        MetastoreEventsProcessor.getNextMetastoreEventsWithFilterInBatches(
+            catalog_, currentEventId, metaDataFilter, 1000);
+    assertEquals("Actual events: " + events, expected, events.size());
   }
 
   @Test
