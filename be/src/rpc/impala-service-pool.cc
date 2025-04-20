@@ -25,7 +25,6 @@
 
 #include "exec/kudu/kudu-util.h"
 #include "gutil/strings/numbers.h"
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/join.h"
 #include "kudu/rpc/inbound_call.h"

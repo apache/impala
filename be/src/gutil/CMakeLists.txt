@@ -19,7 +19,6 @@ INCLUDE_DIRECTORIES(${GLOG_INCLUDE_DIR})
 
 set(GUTIL_SRCS
   bits.cc
-  callback_internal.cc
   cpu.cc
   dynamic_annotations.c
   hash/city.cc

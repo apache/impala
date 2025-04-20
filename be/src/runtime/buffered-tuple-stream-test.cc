@@ -25,7 +25,6 @@
 #include <string>
 
 #include "codegen/llvm-codegen.h"
-#include "gutil/gscoped_ptr.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/query-state.h"
 #include "runtime/bufferpool/reservation-tracker.h"
@@ -47,7 +46,6 @@
 
 #include "common/names.h"
 
-using kudu::FreeDeleter;
 using std::numeric_limits;
 
 static const int BATCH_SIZE = 250;
@@ -72,6 +70,14 @@ static const StringValue STRINGS[] = {
 };
 
 static const int NUM_STRINGS = sizeof(STRINGS) / sizeof(StringValue);
+
+// Function object which invokes 'free' on its parameter, which must be
+// a pointer. Can be used to store malloc-allocated pointers in unique_ptr
+struct FreeDeleter {
+  inline void operator()(void* ptr) const {
+    free(ptr);
+  }
+};
 
 class SimpleTupleStreamTest : public testing::Test {
  protected:
@@ -1967,13 +1973,13 @@ TEST_F(MultiNullableTupleStreamTest, TestComputeRowSize) {
 
   BufferedTupleStream stream(
       runtime_state_, string_desc_, &client_, PAGE_LEN, PAGE_LEN, external_slots);
-  gscoped_ptr<TupleRow, FreeDeleter> row(
+  unique_ptr<TupleRow, FreeDeleter> row(
       reinterpret_cast<TupleRow*>(malloc(tuple_descs.size() * sizeof(Tuple*))));
-  gscoped_ptr<Tuple, FreeDeleter> tuple0(
+  unique_ptr<Tuple, FreeDeleter> tuple0(
       reinterpret_cast<Tuple*>(malloc(tuple_descs[0]->byte_size())));
-  gscoped_ptr<Tuple, FreeDeleter> tuple1(
+  unique_ptr<Tuple, FreeDeleter> tuple1(
       reinterpret_cast<Tuple*>(malloc(tuple_descs[1]->byte_size())));
-  gscoped_ptr<Tuple, FreeDeleter> tuple2(
+  unique_ptr<Tuple, FreeDeleter> tuple2(
       reinterpret_cast<Tuple*>(malloc(tuple_descs[2]->byte_size())));
   memset(tuple0.get(), 0, tuple_descs[0]->byte_size());
   memset(tuple1.get(), 0, tuple_descs[1]->byte_size());
@@ -2032,11 +2038,11 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
     const int tuple_null_indicator_bytes = 1; // Need 1 bytes for 2 tuples.
     int expected_row_size = tuple_null_indicator_bytes + tuple_descs[0]->byte_size()
         + tuple_descs[1]->byte_size();
-    gscoped_ptr<TupleRow, FreeDeleter> row(
+    unique_ptr<TupleRow, FreeDeleter> row(
         reinterpret_cast<TupleRow*>(malloc(tuple_descs.size() * sizeof(Tuple*))));
-    gscoped_ptr<Tuple, FreeDeleter> tuple0(
+    unique_ptr<Tuple, FreeDeleter> tuple0(
         reinterpret_cast<Tuple*>(malloc(tuple_descs[0]->byte_size())));
-    gscoped_ptr<Tuple, FreeDeleter> tuple1(
+    unique_ptr<Tuple, FreeDeleter> tuple1(
         reinterpret_cast<Tuple*>(malloc(tuple_descs[1]->byte_size())));
     memset(tuple0.get(), 0, tuple_descs[0]->byte_size());
     memset(tuple1.get(), 0, tuple_descs[1]->byte_size());
@@ -2131,11 +2137,11 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
 
   BufferedTupleStream stream(
       runtime_state_, array_desc_, &client_, PAGE_LEN, PAGE_LEN, external_slots);
-  gscoped_ptr<TupleRow, FreeDeleter> row(
+  unique_ptr<TupleRow, FreeDeleter> row(
       reinterpret_cast<TupleRow*>(malloc(tuple_descs.size() * sizeof(Tuple*))));
-  gscoped_ptr<Tuple, FreeDeleter> tuple0(
+  unique_ptr<Tuple, FreeDeleter> tuple0(
       reinterpret_cast<Tuple*>(malloc(tuple_descs[0]->byte_size())));
-  gscoped_ptr<Tuple, FreeDeleter> tuple1(
+  unique_ptr<Tuple, FreeDeleter> tuple1(
       reinterpret_cast<Tuple*>(malloc(tuple_descs[1]->byte_size())));
   memset(tuple0.get(), 0, tuple_descs[0]->byte_size());
   memset(tuple1.get(), 0, tuple_descs[1]->byte_size());

@@ -23,7 +23,6 @@
 
 #include "common/atomic.h"
 #include "exec/kudu/kudu-scan-node-base.h"
-#include "gutil/gscoped_ptr.h"
 
 namespace impala {
 

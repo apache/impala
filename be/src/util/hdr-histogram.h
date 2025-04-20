@@ -44,10 +44,11 @@
 // (or better).
 
 #include <stdint.h>
+#include <memory>
 #include <vector>
 
 #include <gutil/atomicops.h>
-#include <gutil/gscoped_ptr.h>
+#include <gutil/macros.h>
 
 namespace impala {
 
@@ -189,7 +190,7 @@ class HdrHistogram {
   base::subtle::Atomic64 total_sum_;
   base::subtle::Atomic64 min_value_;
   base::subtle::Atomic64 max_value_;
-  gscoped_array<base::subtle::Atomic64> counts_;
+  std::unique_ptr<base::subtle::Atomic64[]> counts_;
 
   HdrHistogram& operator=(const HdrHistogram& other); // Disable assignment operator.
 };

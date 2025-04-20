@@ -29,7 +29,6 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
-#include "gutil/gscoped_ptr.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"

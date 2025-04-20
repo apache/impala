@@ -2,11 +2,14 @@
 
 #include "gutil/strings/join.h"
 
+#include <memory>
+
 #include <common/logging.h>
 #include "gutil/logging-inl.h"
-#include "gutil/gscoped_ptr.h"
 #include "gutil/strings/ascii_ctype.h"
 #include "gutil/strings/escaping.h"
+
+using std::unique_ptr;
 
 // ----------------------------------------------------------------------
 // JoinUsing()
@@ -179,7 +182,7 @@ void JoinCSVLineWithDelimiter(const vector<string>& cols, char delimiter,
       // Double the original size, for escaping, plus two bytes for
       // the bracketing double-quotes, and one byte for the closing \0.
       int size = 2 * col.size() + 3;
-      gscoped_array<char> buf(new char[size]);
+      unique_ptr<char[]> buf(new char[size]);
 
       // Leave space at beginning and end for bracketing double-quotes.
       int escaped_size = strings::EscapeStrForCSV(col.c_str(),

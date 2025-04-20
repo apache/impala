@@ -32,7 +32,6 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/slot-ref.h"
-#include "gutil/gscoped_ptr.h"
 #include "gutil/strings/substitute.h"
 #include "kudu/util/block_bloom_filter.h"
 #include "kudu/util/logging.h"

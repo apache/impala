@@ -22,7 +22,6 @@
 #include <vector>
 
 #include "kudu/gutil/macros.h"
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/rpc/rpc_service.h"
 #include "kudu/rpc/service_queue.h"
