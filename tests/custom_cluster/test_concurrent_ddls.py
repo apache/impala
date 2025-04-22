@@ -18,7 +18,9 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 import pytest
+import re
 import threading
+import time
 
 from multiprocessing.pool import ThreadPool
 from multiprocessing import TimeoutError
@@ -30,7 +32,9 @@ from tests.util.shell_util import dump_server_stacktraces
 
 
 class TestConcurrentDdls(CustomClusterTestSuite):
-  """Test concurrent DDLs with invalidate metadata"""
+  """Test concurrent DDLs with invalidate metadata
+     TODO: optimize the time dropping the unique_database at the end which dominants
+     test time. It currently takes >1m. Most of the time spent in HMS."""
 
   def _make_per_impalad_args(local_catalog_enabled):
     assert isinstance(local_catalog_enabled, list)
@@ -48,7 +52,7 @@ class TestConcurrentDdls(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=false",
-    catalogd_args="--catalog_topic_mode=full")
+    catalogd_args="--catalog_topic_mode=full --max_wait_time_for_sync_ddl_s=10")
   def test_ddls_with_invalidate_metadata_sync_ddl(self, unique_database):
     self._run_ddls_with_invalidation(unique_database, sync_ddl=True)
 
@@ -62,7 +66,7 @@ class TestConcurrentDdls(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     start_args=_make_per_impalad_args([True, False]),
-    catalogd_args="--catalog_topic_mode=mixed")
+    catalogd_args="--catalog_topic_mode=mixed --max_wait_time_for_sync_ddl_s=10")
   def test_mixed_catalog_ddls_with_invalidate_metadata_sync_ddl(self, unique_database):
     self._run_ddls_with_invalidation(unique_database, sync_ddl=True)
 
@@ -76,7 +80,7 @@ class TestConcurrentDdls(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=true",
-    catalogd_args="--catalog_topic_mode=minimal")
+    catalogd_args="--catalog_topic_mode=minimal --max_wait_time_for_sync_ddl_s=10")
   def test_local_catalog_ddls_with_invalidate_metadata_sync_ddl(self, unique_database):
     self._run_ddls_with_invalidation(unique_database, sync_ddl=True)
 
@@ -94,6 +98,9 @@ class TestConcurrentDdls(CustomClusterTestSuite):
     tls = ThreadLocalClient()
 
     def run_ddls(i):
+      # Add a sleep so global INVALIDATE has more chance to run concurrently with other
+      # DDLs.
+      time.sleep(i % 5)
       tbl_name = db + ".test_" + str(i)
       # func_name = "f_" + str(i)
       for query in [
@@ -124,14 +131,25 @@ class TestConcurrentDdls(CustomClusterTestSuite):
         "insert overwrite table %s_part partition(j=2) "
         "values (1), (2), (3), (4), (5)" % tbl_name
       ]:
-        try:
-          handle = tls.client.execute_async(query)
-          is_finished = tls.client.wait_for_finished_timeout(handle, timeout=60)
-          assert is_finished, "Query timeout(60s): " + query
-          tls.client.close_query(handle)
-        except IMPALA_CONNECTION_EXCEPTION as e:
-          # Could raise exception when running with INVALIDATE METADATA
-          assert TestConcurrentDdls.is_acceptable_error(str(e), sync_ddl), str(e)
+        # Running concurrent with INVALIDATE METADATA can raise an exception. These are
+        # safe to retry, so do that until we get a success.
+        while True:
+          try:
+            handle = tls.client.execute_async(query)
+            is_finished = tls.client.wait_for_finished_timeout(handle, timeout=60)
+            assert is_finished, "Query timeout(60s): " + query
+            tls.client.close_query(handle)
+            # Success, next case.
+            break
+          except IMPALA_CONNECTION_EXCEPTION as e:
+            err = str(e)
+            if self.handle_rename_failure(tls.client, tbl_name, err):
+              # Table was successfully renamed, next case.
+              break
+            elif self.is_transient_error(err):
+              # Retry the query.
+              continue
+            assert self.is_acceptable_error(err, sync_ddl), err
       self.execute_query_expect_success(tls.client, "invalidate metadata")
       return True
 
@@ -157,18 +175,33 @@ class TestConcurrentDdls(CustomClusterTestSuite):
         assert False, "Timeout in thread run_ddls(%d)" % i
 
   @classmethod
-  def is_acceptable_error(cls, err, sync_ddl):
+  def is_transient_error(cls, err):
     # DDL/DMLs may fail if running with invalidate metadata concurrently, since in-flight
     # table loadings can't finish if the target table is changed (e.g. reset to unloaded
     # state). See more in CatalogOpExecutor.getExistingTable().
     if "CatalogException: Table" in err and \
         "was modified while operation was in progress, aborting execution" in err:
       return True
+    return False
+
+  @classmethod
+  def is_acceptable_error(cls, err, sync_ddl):
     # TODO: Consider remove this case after IMPALA-9135 is fixed.
-    if sync_ddl and "Couldn't retrieve the catalog topic version for the SYNC_DDL " \
-                    "operation after 5 attempts.The operation has been successfully " \
-                    "executed but its effects may have not been broadcast to all the " \
-                    "coordinators." in err:
+    if sync_ddl:
+      if "Couldn't retrieve the catalog topic version for the SYNC_DDL operation" in err\
+        and ("The operation has been successfully executed but its effects may have not "
+             "been broadcast to all the coordinators.") in err:
+        return True
+    return False
+
+  def handle_rename_failure(self, client, tbl_name, err):
+    if "Table/view rename succeeded in the Hive Metastore, " \
+       "but failed in Impala's Catalog Server." in err:
+      # Invalidate the target table so we reload it from HMS.
+      tbl_names = re.findall(r"{}[^']*".format(tbl_name), err)
+      assert len(tbl_names) == 2
+      self.execute_query_expect_success(
+          client, "invalidate metadata {0}".format(tbl_names[1]))
       return True
     return False
 
