@@ -58,7 +58,7 @@ DESCRIBE FORMATTED ice.airports_parquet;
 'OwnerType:          ','USER                ','NULL'
 'Owner:              ','null                ','NULL'
 'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/airports_parquet','NULL'
-'Erasure Coding Policy:','NONE                ','NULL'
+row_regex:'Erasure Coding Policy:','$ERASURECODE_POLICY *','NULL'
 'Table Type:         ','EXTERNAL_TABLE      ','NULL'
 'Table Parameters:','NULL','NULL'
 '','EXTERNAL            ','TRUE                '
