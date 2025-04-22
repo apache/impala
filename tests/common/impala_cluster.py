@@ -246,11 +246,11 @@ class ImpalaCluster(object):
     for impalad in self.impalads:
       # lookup /varz page. webserver should up already.
       flags = impalad.service.get_flag_current_values()
-      if flags['is_coordinator'] != 'true':
+      if flags.get('is_coordinator', 'true') != 'true':
         continue
-      if flags['stress_catalog_init_delay_ms'] != '0':
+      if flags.get('stress_catalog_init_delay_ms', '0') != '0':
         continue
-      if flags['use_local_catalog'] != 'false':
+      if flags.get('use_local_catalog', 'false') != 'false':
         wait_num_table = -1
       impalad.wait_for_coordinator_services(sleep_interval, check_processes_still_running,
                                             wait_num_table=wait_num_table)
