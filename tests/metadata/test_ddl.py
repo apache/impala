@@ -55,6 +55,7 @@ from tests.util.filesystem_utils import (
     FILESYSTEM_NAME)
 from tests.common.impala_cluster import ImpalaCluster
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX
+from tests.util.parse_util import parse_duration_string_ms
 from tests.util.shell_util import dump_server_stacktraces
 
 
@@ -482,6 +483,46 @@ class TestDdlStatements(TestDdlBase):
   def test_alter_set_column_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/alter-table-set-column-stats', vector,
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
+
+  def test_alter_table_rename_independent(self, vector, unique_database):
+    """Tests that two alter table renames run concurrently do not block each other."""
+
+    def table_name(i):
+      return "{}.tbl_{}".format(unique_database, i)
+
+    def alter(i, j):
+      return "alter table {} rename to {}".format(table_name(i), table_name(j))
+
+    def get_read_lock_duration_ms(profile):
+      read_lock_durations = re.findall(r"Got catalog version read lock: [^ ]*", profile)
+      assert len(read_lock_durations) == 1
+      return parse_duration_string_ms(read_lock_durations[0].split(" ")[-1])
+
+    self.client.execute("create table {} (i int)".format(table_name(1)))
+    self.client.execute("create table {} (i int)".format(table_name(2)))
+    # Ensure loading metadata is not a factor in alter execution time.
+    self.client.execute("describe {}".format(table_name(1)))
+    self.client.execute("describe {}".format(table_name(2)))
+
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['debug_action'] = \
+        "catalogd_table_rename_delay:SLEEP@5000"
+    with self.create_impala_client_from_vector(new_vector) as client1, \
+         self.create_impala_client_from_vector(new_vector) as client2:
+      start = time.time()
+      handle1 = client1.execute_async(alter(1, 3))
+      handle2 = client2.execute_async(alter(2, 4))
+      assert client1.wait_for_finished_timeout(handle1, timeout=10)
+      assert client2.wait_for_finished_timeout(handle2, timeout=10)
+      assert time.time() - start < 10
+
+      profile1 = client1.get_runtime_profile(handle1)
+      assert get_read_lock_duration_ms(profile1) < 5000
+      profile2 = client2.get_runtime_profile(handle2)
+      assert get_read_lock_duration_ms(profile2) < 5000
+
+      client1.close_query(handle1)
+      client2.close_query(handle2)
 
   @UniqueDatabase.parametrize(num_dbs=2)
   def test_concurrent_alter_table_rename(self, vector, unique_database):

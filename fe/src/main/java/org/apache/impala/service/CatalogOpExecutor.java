@@ -1222,7 +1222,7 @@ public class CatalogOpExecutor {
           || params.getAlter_type() == TAlterTableType.RENAME_TABLE) {
         alterTableOrViewRename(tbl,
             TableName.fromThrift(params.getRename_params().getNew_table_name()),
-            modification, wantMinimalResult, response, catalogTimeline);
+            modification, wantMinimalResult, response, catalogTimeline, debugAction);
         modification.validateInProgressModificationComplete();
         return;
       }
@@ -5674,7 +5674,8 @@ public class CatalogOpExecutor {
    */
   private void alterTableOrViewRename(Table oldTbl, TableName newTableName,
       InProgressTableModification modification, boolean wantMinimalResult,
-      TDdlExecResponse response, EventSequence catalogTimeline) throws ImpalaException {
+      TDdlExecResponse response, EventSequence catalogTimeline,
+      @Nullable String debugAction) throws ImpalaException {
     Preconditions.checkState(oldTbl.isWriteLockedByCurrentThread());
     TableName tableName = oldTbl.getTableName();
     org.apache.hadoop.hive.metastore.api.Table msTbl =
@@ -5713,6 +5714,9 @@ public class CatalogOpExecutor {
         Table.updateTimestampProperty(msTbl, Table.TBL_PROP_LAST_DDL_TIME);
         msClient.getHiveClient().alter_table(
             tableName.getDb(), tableName.getTbl(), msTbl);
+        if (debugAction != null) {
+          DebugUtils.executeDebugAction(debugAction, DebugUtils.TABLE_RENAME_DELAY);
+        }
         catalogTimeline.markEvent("Renamed table in Metastore");
       } catch (TException e) {
         throw new ImpalaRuntimeException(
