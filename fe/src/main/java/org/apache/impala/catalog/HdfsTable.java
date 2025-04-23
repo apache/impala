@@ -38,6 +38,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -795,16 +797,23 @@ public class HdfsTable extends Table implements FeFsTable {
     Preconditions.checkNotNull(location);
     FileSystem fs = location.getFileSystem(CONF);
 
+    String hdfsAuthClass = CONF.get("dfs.namenode.inode.attributes.provider.class");
+    boolean hdfsRangerEnabled = false;
+
+    if (hdfsAuthClass != null && hdfsAuthClass.equals("org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer")) {
+      hdfsRangerEnabled = true;
+    }
+
     if (assumeReadWriteAccess(fs)) return TAccessLevel.READ_WRITE;
 
     while (location != null) {
       try {
         FsPermissionChecker.Permissions perms = permCache.getPermissions(location);
-        if (perms.canReadAndWrite()) {
+        if (hdfsRangerEnabled ? checkAccess(location, fs, FsAction.getFsAction("rw-")) : perms.canReadAndWrite()) {
           return TAccessLevel.READ_WRITE;
-        } else if (perms.canRead()) {
+        } else if (hdfsRangerEnabled ? checkAccess(location, fs, FsAction.getFsAction("r--")) : perms.canRead()) {
           return TAccessLevel.READ_ONLY;
-        } else if (perms.canWrite()) {
+        } else if (hdfsRangerEnabled ? checkAccess(location, fs, FsAction.getFsAction("-w-")) : perms.canWrite()) {
           return TAccessLevel.WRITE_ONLY;
         }
         return TAccessLevel.NONE;
@@ -3209,4 +3218,14 @@ public class HdfsTable extends Table implements FeFsTable {
     }
     return true;
   }
+
+  public static boolean checkAccess(Path path, FileSystem fs, FsAction action) throws IOException {
+    try {
+      fs.access(path, action);
+    } catch (AccessControlException e) {
+      return false;
+    }
+    return true;
+  }
+
 }
