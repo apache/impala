@@ -5742,28 +5742,46 @@ public class CatalogOpExecutor {
         result.second.setCreateEventId(renamedTable.first);
       }
     }
-    if (result.first == null || result.second == null) {
-      // The rename succeeded in the HMS but failed in the catalog cache. The cache is in
-      // an inconsistent state, but can likely be fixed by running "invalidate metadata".
-      throw new ImpalaRuntimeException(String.format(
-          "Table/view rename succeeded in the Hive Metastore, but failed in Impala's " +
-          "Catalog Server. Running 'invalidate metadata <tbl>' on the old table name " +
-          "'%s' and the new table name '%s' may fix the problem." , tableName,
-          newTableName));
-    }
-    // TODO: call addVersionsForInflightEvents using InProgressTableModification object
-    // that is passed into catalog_.renameTable()
-    catalog_.addVersionsForInflightEvents(
-        false, result.second, modification.newVersionNumber());
-    if (wantMinimalResult) {
-      response.result.addToRemoved_catalog_objects(result.first.toInvalidationObject());
-      response.result.addToUpdated_catalog_objects(result.second.toInvalidationObject());
+    TCatalogObject oldTblDesc = null, newTblDesc = null;
+    if (result.first == null) {
+      // The old table object has been removed by a concurrent operation, e.g. INVALIDATE
+      // METADATA <table>. Fetch the latest delete from deleteLog.
+      oldTblDesc = wantMinimalResult ?
+          oldTbl.toInvalidationObject() : oldTbl.toMinimalTCatalogObject();
+      long version = catalog_.getDeleteLog().getLatestRemovedVersion(oldTblDesc);
+      if (version > 0) {
+        oldTblDesc.setCatalog_version(version);
+      } else {
+        LOG.warn("Deletion update on the old table {} not found. Impalad might still "
+            + "have its metadata until the deletion update arrives from statestore.",
+            tableName);
+      }
     } else {
-      response.result.addToRemoved_catalog_objects(
-          result.first.toMinimalTCatalogObject());
-      response.result.addToUpdated_catalog_objects(result.second.toTCatalogObject());
+      oldTblDesc = wantMinimalResult ?
+          result.first.toInvalidationObject() : result.first.toMinimalTCatalogObject();
     }
-    response.result.setVersion(result.second.getCatalogVersion());
+    if (result.second == null) {
+      // The rename succeeded in HMS but failed in the catalog cache. The cache is in an
+      // inconsistent state, so invalidate the new table to reload it.
+      newTblDesc = catalog_.invalidateTable(newTableName.toThrift(),
+          new Reference<>(), new Reference<>(), catalogTimeline);
+      if (newTblDesc == null) {
+        throw new ImpalaRuntimeException(String.format(
+            "The new table/view %s was concurrently removed during rename.",
+            newTableName));
+      }
+    } else {
+      Preconditions.checkNotNull(result.first);
+      // TODO: call addVersionsForInflightEvents using InProgressTableModification object
+      // that is passed into catalog_.renameTable()
+      catalog_.addVersionsForInflightEvents(
+          false, result.second, modification.newVersionNumber());
+      newTblDesc = wantMinimalResult ?
+          result.second.toInvalidationObject() : result.second.toTCatalogObject();
+    }
+    response.result.addToRemoved_catalog_objects(oldTblDesc);
+    response.result.addToUpdated_catalog_objects(newTblDesc);
+    response.result.setVersion(newTblDesc.getCatalog_version());
     addSummary(response, "Renaming was successful.");
   }
 

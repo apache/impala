@@ -143,10 +143,7 @@ class TestConcurrentDdls(CustomClusterTestSuite):
             break
           except IMPALA_CONNECTION_EXCEPTION as e:
             err = str(e)
-            if self.handle_rename_failure(tls.client, tbl_name, err):
-              # Table was successfully renamed, next case.
-              break
-            elif self.is_transient_error(err):
+            if self.is_transient_error(err):
               # Retry the query.
               continue
             assert self.is_acceptable_error(err, sync_ddl), err
@@ -192,17 +189,6 @@ class TestConcurrentDdls(CustomClusterTestSuite):
         and ("The operation has been successfully executed but its effects may have not "
              "been broadcast to all the coordinators.") in err:
         return True
-    return False
-
-  def handle_rename_failure(self, client, tbl_name, err):
-    if "Table/view rename succeeded in the Hive Metastore, " \
-       "but failed in Impala's Catalog Server." in err:
-      # Invalidate the target table so we reload it from HMS.
-      tbl_names = re.findall(r"{}[^']*".format(tbl_name), err)
-      assert len(tbl_names) == 2
-      self.execute_query_expect_success(
-          client, "invalidate metadata {0}".format(tbl_names[1]))
-      return True
     return False
 
   @pytest.mark.execute_serially
