@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.SetOperationStmt.SetOperand;
 import org.apache.impala.analysis.SetOperationStmt.SetOperator;
 import org.apache.impala.common.AnalysisException;
@@ -773,7 +772,13 @@ public class StmtRewriter {
         break;
       }
 
-      if (!hasEqJoinPred && !inlineView.isCorrelated()) {
+      if (!hasEqJoinPred && !inlineView.isCorrelated() && !isDisjunctive) {
+        // IMPALA-13991: It is not safe to rewrite into CROSS_JOIN if
+        // isDisjunctive is True, regardless of joinConjunct value.
+        // If joinConjunct is NOT NULL, the inlineView maybe correlated through
+        // that joinConjunct.
+        // If joinConjunct is NULL, then expr is a (NOT) EXISTS predicate.
+        // EXISTS within a disjunct is not supported yet (see IMPALA-9931).
         // TODO: IMPALA-9948: we could support non-equi joins here
         // TODO: Remove this when independent subquery evaluation is implemented.
         // TODO: IMPALA-5100 to cover all cases, we do let through runtime scalars with

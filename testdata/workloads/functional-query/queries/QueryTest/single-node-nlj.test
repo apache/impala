@@ -223,3 +223,20 @@ limit 5
 ---- TYPES
 INT
 ====
+---- QUERY
+# IMPALA-13991: Disable CROSS_JOIN rewrite if there is a scalar subquery inside
+# disjunctive expression. right_tc is '2009-04-01 01:01:00'.
+select id, timestamp_col from functional.alltypes
+where (id in (1000, 1001))
+  or ((id in (1, 2))
+      and timestamp_col < (select hours_add(timestamp_col, 1) right_tc
+                           from functional.alltypestiny
+                           order by timestamp_col DESC limit 1));
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,2009-01-01 00:01:00
+2,2009-01-01 00:02:00.100000000
+1000,2009-04-11 01:40:04.500000000
+1001,2009-04-11 01:41:04.500000000
+---- TYPES
+INT,TIMESTAMP
+====

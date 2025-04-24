@@ -328,3 +328,39 @@ PLAN-ROOT SINK
    HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====
+# IMPALA-13991: Disable CROSS_JOIN rewrite if there is a scalar subquery inside
+# disjunctive expression. right_tc is '2009-04-01 01:01:00'.
+select id, timestamp_col from functional.alltypes
+where (id in (1000, 1001))
+  or ((id in (1, 2))
+      and timestamp_col < (select hours_add(timestamp_col, 1) right_tc
+                           from functional.alltypestiny
+                           order by timestamp_col DESC limit 1));
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
+|  join predicates: timestamp_col < hours_add(timestamp_col, 1)
+|  predicates: (id IN (1000, 1001)) OR ((id IN (1, 2)) AND hours_add(timestamp_col, 1) IS NOT NULL)
+|  row-size=36B cardinality=7.30K
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  04:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: timestamp_col DESC
+|  |  limit: 1
+|  |
+|  02:TOP-N [LIMIT=1]
+|  |  order by: timestamp_col DESC
+|  |  row-size=16B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=16B cardinality=8
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=20B cardinality=7.30K
+====

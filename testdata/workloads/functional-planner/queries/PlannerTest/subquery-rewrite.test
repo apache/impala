@@ -4106,17 +4106,19 @@ PLAN-ROOT SINK
    HDFS partitions=24/24 files=24 size=478.45KB
    row-size=8B cardinality=7.30K
 ====
-# Uncorrelated subquery in BETWEEN in OR rewritten to INNER JOIN.
+# Uncorrelated subquery in BETWEEN in OR rewritten to LEFT OUTER JOIN.
+# Subquery will return 1.
 select int_col from functional.alltypes t
-where (t.int_col is null or
+where (t.int_col = 0 or
       (t.int_col between
           (select min(int_col) from functional.alltypesagg t2)
           and 2))
 ---- PLAN
 PLAN-ROOT SINK
 |
-03:NESTED LOOP JOIN [INNER JOIN]
-|  predicates: t.int_col >= min(int_col), (t.int_col IS NULL OR min(int_col) IS NOT NULL AND t.int_col <= 2)
+03:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  join predicates: t.int_col >= min(int_col)
+|  predicates: (t.int_col = 0 OR min(int_col) IS NOT NULL AND t.int_col <= 2)
 |  row-size=8B cardinality=7.30K
 |
 |--02:AGGREGATE [FINALIZE]
@@ -4135,8 +4137,9 @@ PLAN-ROOT SINK
 |
 07:EXCHANGE [UNPARTITIONED]
 |
-03:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
-|  predicates: t.int_col >= min(int_col), (t.int_col IS NULL OR min(int_col) IS NOT NULL AND t.int_col <= 2)
+03:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
+|  join predicates: t.int_col >= min(int_col)
+|  predicates: (t.int_col = 0 OR min(int_col) IS NOT NULL AND t.int_col <= 2)
 |  row-size=8B cardinality=7.30K
 |
 |--06:EXCHANGE [BROADCAST]
@@ -4149,7 +4152,7 @@ PLAN-ROOT SINK
 |  |
 |  02:AGGREGATE
 |  |  output: min(int_col)
-|  |  row-size=4B cardinality=1
+|  |  row-size=4B cardinality=3
 |  |
 |  01:SCAN HDFS [functional.alltypesagg t2]
 |     HDFS partitions=11/11 files=11 size=814.73KB
