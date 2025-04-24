@@ -265,6 +265,9 @@ class ImpalaShell(cmd.Cmd, object):
     # Tracks query handle of the last query executed. Used by the 'profile' command.
     self.last_query_handle = None
 
+    # Whether to print num rows report at the end of each query like beeswax, or not.
+    self.beeswax_compat_num_rows = options.beeswax_compat_num_rows
+
     # live_summary and live_progress are turned off in strict_hs2_protocol mode
     if options.strict_hs2_protocol:
       if options.live_summary:
@@ -1389,6 +1392,15 @@ class ImpalaShell(cmd.Cmd, object):
     else:
       return "Time elapsed: %2.2fs" % time_elapsed
 
+  def _format_no_result_set(self, query_str, start_time):
+    # Print the elapsed time except for USE.
+    if not (query_str[:3].lower().startswith('use')):
+      num_fetched_rows = 0 if self.beeswax_compat_num_rows else None
+      time_elapsed = time.time() - start_time
+      row_report = self._format_num_rows_report(
+          time_elapsed, num_fetched_rows=num_fetched_rows)
+      self._print_if_verbose(row_report)
+
   def _execute_stmt(self, query_str, is_dml=False, print_web_link=False):
     """Executes 'query_str' with options self.set_query_options on the Impala server.
     The query is run to completion and close with any results, warnings, errors or
@@ -1433,6 +1445,7 @@ class ImpalaShell(cmd.Cmd, object):
         if not self.imp_client.expect_result_metadata(query_str, self.last_query_handle):
           # Close the query
           self.imp_client.close_query(self.last_query_handle)
+          self._format_no_result_set(query_str, start_time)
           return CmdStatus.SUCCESS
 
         self._format_outputstream()

@@ -1395,8 +1395,9 @@ class ImpalaBeeswaxClient(ImpalaClient):
   def expect_result_metadata(self, query_str, query_handle):
     # Beeswax doesn't provide us this metadata; try to guess whether to expect it based
     # on the query string.
+    query_substr = query_str[:3].lower()
     excluded_query_types = ['use']
-    if True in set(map(query_str.startswith, excluded_query_types)):
+    if any(map(query_substr.startswith, excluded_query_types)):
       return False
     return True
 

@@ -1070,6 +1070,29 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       result = run_impala_shell_interactive(vector, query)
       assert '| 1 ' in result.stdout
 
+  def test_beeswax_compat_num_rows(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("This test uses Impala specific query.")
+    queries = [
+      "INVALIDATE METADATA functional.alltypes",
+      "REFRESH functional.alltypessmall",
+      "USE functional_parquet",
+    ]
+    for query in queries:
+      for arg in [[], ['--beeswax_compat_num_rows']]:
+        result = run_impala_shell_interactive(vector, query, shell_args=arg)
+        row_report = 'Fetched 0 row(s) in'
+        if vector.get_value('protocol') != 'beeswax' and not arg:
+          row_report = 'Time elapsed: '
+        has_row_report = row_report in result.stderr
+        if query.startswith('USE'):
+          # USE query should remain silent.
+          assert not has_row_report, (
+              "Expected no '{0}' but one exist:\n{1}").format(row_report, result.stderr)
+        else:
+          assert has_row_report, (
+              "Expected '{0}' but none exist:\n{1}").format(row_report, result.stderr)
+
   def test_shell_prompt(self, vector):
     shell_cmd = get_shell_cmd(vector)
     proc = spawn_shell(shell_cmd)

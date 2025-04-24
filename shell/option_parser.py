@@ -362,6 +362,12 @@ def get_option_parser(defaults):
                     dest="hs2_x_forward", default=None,
                     help="When using the hs2-http protocol, set this value in the "
                     "X-Forwarded-For header. This is primarily for testing purposes.")
+  parser.add_option("--beeswax_compat_num_rows", dest="beeswax_compat_num_rows",
+                    action="store_true",
+                    help="If specified, always print num rows report at the end of query "
+                    "execution, even if query does not expect to fetch any rows. "
+                    "This is the default behavior when using beeswax protocol. "
+                    "Default to false for other Impala protocol.")
 
   # add default values to the help text
   for option in parser.option_list:
