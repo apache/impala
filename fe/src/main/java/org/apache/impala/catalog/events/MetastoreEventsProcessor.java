@@ -1679,15 +1679,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         } else if (catalogObject.isSetTable()) {
           TTable table = catalogObject.getTable();
           if (catalog_.getDb(table.db_name) == null) {
-            // We will check existence of missing dbs. Once the missing db is added,
-            // the underlying tables are also added (as IncompleteTables). So don't
-            // need to check table events. I.e. there are no stale metadata on those
-            // tables.
+            // We will check existence of missing dbs.
             dbNames.add(table.db_name);
-          } else {
-            db2Tables.computeIfAbsent(table.db_name, k -> new ArrayList<>())
-                .add(table.tbl_name);
           }
+          db2Tables.computeIfAbsent(table.db_name, k -> new ArrayList<>())
+              .add(table.tbl_name);
         }
       }
       // Step 2: Check DB events

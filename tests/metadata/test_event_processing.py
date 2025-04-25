@@ -599,3 +599,16 @@ class TestEventSyncWaiting(ImpalaTestSuite):
         "alter table {} partition(p=0)compact 'minor' and wait".format(tbl))
     res = self.execute_query_expect_success(client, "show files in " + tbl)
     assert len(res.data) == 1
+
+  def test_hms_event_sync_on_missing_db(self, vector, unique_name):
+    client = self.create_impala_client_from_vector(vector)
+    db = unique_name + "_db"
+    try:
+      self.run_stmt_in_hive("""create database {0};
+          create table {0}.tbl(i int);
+          create table {0}.tbl_2(i int);""".format(db))
+      self.execute_query_expect_success(
+          client, "insert into {0}.tbl values (0)".format(db))
+    finally:
+      self.run_stmt_in_hive(
+          "drop database if exists {0} cascade".format(db))
