@@ -145,8 +145,9 @@ DebugActionTokens TokenizeDebugActions(const string& debug_actions);
 std::vector<std::string> TokenizeDebugActionParams(const string& action);
 
 /// Slow path implementing DebugAction() for the case where 'debug_action' is non-empty.
+/// In case of 'verify_only' the debug action is only verified and not executed.
 Status DebugActionImpl(const string& debug_action, const char* label,
-    const std::vector<string>& args) WARN_UNUSED_RESULT;
+    const std::vector<string>& args, bool verify_only) WARN_UNUSED_RESULT;
 
 /// If debug_action query option has a "global action" (i.e. not exec-node specific)
 /// and matches the given 'label' and 'args', apply the the action. See
@@ -154,9 +155,10 @@ Status DebugActionImpl(const string& debug_action, const char* label,
 /// ExecNode code, use ExecNode::ExecDebugAction() instead. Will return OK unless either
 /// an invalid debug action is specified or the FAIL action is executed.
 WARN_UNUSED_RESULT static inline Status DebugAction(const string& debug_action,
-    const char* label, const std::vector<string>& args = std::vector<string>()) {
+    const char* label, const std::vector<string>& args = std::vector<string>(),
+    bool verify_only = false) {
   if (LIKELY(debug_action.empty())) return Status::OK();
-  return DebugActionImpl(debug_action, label, args);
+  return DebugActionImpl(debug_action, label, args, verify_only);
 }
 
 WARN_UNUSED_RESULT static inline Status DebugAction(
@@ -177,6 +179,11 @@ static inline void DebugActionNoFail(const string& debug_action, const char* lab
 static inline void DebugActionNoFail(
     const TQueryOptions& query_options, const char* label) {
   DebugActionNoFail(query_options.debug_action, label);
+}
+
+WARN_UNUSED_RESULT static inline Status DebugActionVerifyOnly(const string& debug_action){
+  if (LIKELY(debug_action.empty())) return Status::OK();
+  return DebugAction(debug_action, "", std::vector<string>(), true);
 }
 
 /// Map of exception string to the exception throwing function which is used when

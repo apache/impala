@@ -28,9 +28,11 @@
 #include <gutil/strings/strip.h>
 #include <gutil/strings/substitute.h>
 
+#include "exec/exec-node.h"
 #include "exprs/timezone_db.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Query_constants.h"
+#include "runtime/debug-options.h"
 #include "runtime/runtime-filter.h"
 #include "service/query-option-parser.h"
 #include "thirdparty/datasketches/MurmurHash3.h"
@@ -230,6 +232,15 @@ static bool IsTrue(const string& value) {
   return iequals(value, "true") || iequals(value, "1");
 }
 
+static Status VerifyExecNodeDebugAction(const TDebugOptions& debug_options) {
+  if (debug_options.action == TDebugAction::DELAY) {
+    int64_t sleep_duration_ms;
+    RETURN_IF_ERROR(ExecNode::ParseAndValidateSleepDuration(
+        debug_options.action_param, &sleep_duration_ms));
+  }
+  return Status::OK();
+}
+
 // Note that we allow numerical values for boolean and enum options. This is because
 // TQueryOptionsToMap() will output the numerical values, and we need to parse its output
 // configuration.
@@ -302,6 +313,15 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         break;
       };
       case TImpalaQueryOptions::DEBUG_ACTION: {
+        // Verify General DebugAction's first. In case it's valid proceed to
+        // ExecNode verification. 'invalid command' error status might indicate ExecNode
+        // DebugAction, so in that case also proceed to ExecNode verification.
+        Status status = DebugActionVerifyOnly(value);
+        if (!status.ok() && string::npos == status.msg().msg().find("invalid command")){
+          return status;
+        }
+        DebugOptions debug_options(value);
+        RETURN_IF_ERROR(VerifyExecNodeDebugAction(debug_options.ToThrift()));
         query_options->__set_debug_action(value);
         break;
       };

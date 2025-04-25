@@ -33,6 +33,7 @@ namespace impala {
 class DebugOptions {
  public:
   DebugOptions(const TQueryOptions& query_options);
+  DebugOptions(const string& debug_action);
   TDebugOptions ToThrift() const;
 
   /// query-wide fragment instance index; -1 if not set

@@ -463,18 +463,26 @@ Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* s
   } else {
     DCHECK_EQ(debug_options_.action, TDebugAction::DELAY);
     int64_t sleep_duration_ms = 100;
-    if (!debug_options_.action_param.empty()) {
-      const string& param = debug_options_.action_param;
-      StringParser::ParseResult result;
-      sleep_duration_ms =
-          StringParser::StringToInt<int64_t>(param.c_str(), param.length(), &result);
-      if (result != StringParser::PARSE_SUCCESS || sleep_duration_ms < 0) {
-        return Status(Substitute("Invalid sleep duration: '$0'. "
-              "Only non-negative numbers are allowed.", param));
-      }
-    }
+    RETURN_IF_ERROR(
+        ParseAndValidateSleepDuration(debug_options_.action_param, &sleep_duration_ms));
     VLOG(1) << "DEBUG_ACTION: Sleeping for " << sleep_duration_ms << "ms";
     SleepForMs(sleep_duration_ms);
+  }
+  return Status::OK();
+}
+
+Status ExecNode::ParseAndValidateSleepDuration(
+    const string& param, int64_t* sleep_duration_ms) {
+  if (!param.empty()) {
+    DCHECK(sleep_duration_ms != nullptr);
+    StringParser::ParseResult result;
+    *sleep_duration_ms =
+        StringParser::StringToInt<int64_t>(param.c_str(), param.length(), &result);
+    if (result != StringParser::PARSE_SUCCESS || *sleep_duration_ms < 0) {
+      return Status(Substitute("Invalid sleep duration: '$0'. "
+                               "Only non-negative numbers are allowed.",
+          param));
+    }
   }
   return Status::OK();
 }

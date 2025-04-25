@@ -361,6 +361,9 @@ class ExecNode {
   /// Names of counters shared by all exec nodes
   static const std::string ROW_THROUGHPUT_COUNTER;
 
+  static Status ParseAndValidateSleepDuration(
+      const string& param, int64_t* sleep_duration_ms);
+
  protected:
   friend class DataSink;
   friend class ScopedGetNextEventAdder;

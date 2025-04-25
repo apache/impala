@@ -357,25 +357,35 @@ static bool ParseProbability(const string& prob_str, bool* should_execute) {
 /// actions in the Java code. See DebugUtils.java for more details. Any changes to the
 /// implementation logic here like adding a new type of action, should make changes in
 /// the DebugUtils.java too.
-Status DebugActionImpl(
-    const string& debug_action, const char* label, const std::vector<string>& args) {
+Status DebugActionImpl(const string& debug_action, const char* label,
+    const std::vector<string>& args, bool verify_only) {
   const DebugActionTokens& action_list = TokenizeDebugActions(debug_action);
   static const char ERROR_MSG[] = "Invalid debug_action $0:$1 ($2)";
   for (const vector<string>& components : action_list) {
-    // 'components' should be of the form {label, arg_0, ..., arg_n, action}
-    if (components.size() != 2 + args.size() || !iequals(components[0], label)) {
-      continue;
-    }
-    // Check if the arguments match.
-    bool matches = true;
-    for (int i = 0; i < args.size(); ++i) {
-      if (!iequals(components[i + 1], args[i])) {
-        matches = false;
-        break;
+    string action_str;
+    if (!verify_only) {
+      // 'components' should be of the form {label, arg_0, ..., arg_n, action}
+      if (components.size() != 2 + args.size() || !iequals(components[0], label)) {
+        continue;
       }
+      // Check if the arguments match.
+      bool matches = true;
+      for (int i = 0; i < args.size(); ++i) {
+        if (!iequals(components[i + 1], args[i])) {
+          matches = false;
+          break;
+        }
+      }
+      if (!matches) continue;
+      action_str = components[args.size() + 1];
     }
-    if (!matches) continue;
-    const string& action_str = components[args.size() + 1];
+    else {
+      if (components.size() < 2) {
+        continue;
+      }
+      action_str = components.back();
+    }
+
     // 'tokens' becomes {command, param0, param1, ... }
     vector<string> tokens = TokenizeDebugActionParams(action_str);
     DCHECK_GE(tokens.size(), 1);
@@ -418,33 +428,40 @@ Status DebugActionImpl(
         }
         if (!should_execute) continue;
       }
-      string error_msg = tokens.size() == 3 ?
-          tokens[2] :
-          Substitute("Debug Action: $0:$1", components[0], action_str);
+      if (!verify_only) {
+        string error_msg = tokens.size() == 3 ?
+            tokens[2] :
+            Substitute("Debug Action: $0:$1", components[0], action_str);
 
-      if (ImpaladMetrics::DEBUG_ACTION_NUM_FAIL != nullptr) {
-        ImpaladMetrics::DEBUG_ACTION_NUM_FAIL->Increment(1l);
+        if (ImpaladMetrics::DEBUG_ACTION_NUM_FAIL != nullptr) {
+          ImpaladMetrics::DEBUG_ACTION_NUM_FAIL->Increment(1l);
+        }
+        return Status(TErrorCode::INTERNAL_ERROR, error_msg);
       }
-      return Status(TErrorCode::INTERNAL_ERROR, error_msg);
     } else if (iequals(cmd, "EXCEPTION")) {
       //EXCEPTION@<exception_type>
-      if (tokens.size() != 2) {
+      // Java debug_actions also support "EXCEPTION@<exception_type>@<error message>"
+      if (tokens.size() != 2 && tokens.size() != 3) {
         return Status(Substitute(ERROR_MSG, components[0], action_str,
             "expected EXCEPTION@<exception_type>"));
       }
-      static const auto end = EXCEPTION_STR_MAP.end();
-      auto it = EXCEPTION_STR_MAP.find(tokens[1]);
-      if (it != end) {
-        it->second();
-      } else {
-        return Status(
-            Substitute(ERROR_MSG, components[0], action_str, "Invalid exception type"));
+      if (!verify_only) {
+        static const auto end = EXCEPTION_STR_MAP.end();
+        auto it = EXCEPTION_STR_MAP.find(tokens[1]);
+        if (it != end) {
+          it->second();
+        } else {
+          return Status(
+              Substitute(ERROR_MSG, components[0], action_str, "Invalid exception type"));
+        }
       }
     } else {
-      DCHECK(false) << "Invalid debug action";
+      if (!verify_only) {
+        DCHECK(false) << "Invalid debug action";
+      }
       return Status(Substitute(ERROR_MSG, components[0], action_str, "invalid command"));
     }
-    if (sleep_millis > 0) {
+    if (!verify_only && sleep_millis > 0) {
       VLOG(1) << Substitute("Debug Action: $0:$1 sleeping for $2 ms", components[0],
           action_str, sleep_millis);
       SleepForMs(sleep_millis);

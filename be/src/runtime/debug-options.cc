@@ -29,15 +29,21 @@ using namespace std;
 using namespace boost;
 
 DebugOptions::DebugOptions(const TQueryOptions& query_options)
+  : DebugOptions(query_options.__isset.debug_action ? query_options.debug_action : "") {
+}
+
+DebugOptions::DebugOptions(const string& debug_action)
   : instance_idx_(-1),
     node_id_(-1),
     action_(TDebugAction::WAIT),
     phase_(TExecNodePhase::INVALID) {
-  if (!query_options.__isset.debug_action || query_options.debug_action.empty()) {
+
+  if (debug_action.empty()) {
     // signal not set
     return;
   }
-  const DebugActionTokens& actions = TokenizeDebugActions(query_options.debug_action);
+
+  const DebugActionTokens& actions = TokenizeDebugActions(debug_action);
   for (const vector<string>& components : actions) {
     // This will filter out global debug actions which only have two components.
     if (components.size() < 3 || components.size() > 4) continue;
