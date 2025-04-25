@@ -53,7 +53,6 @@ import org.apache.impala.thrift.TSymbolLookupResult;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TWaitForHmsEventRequest;
-import org.apache.impala.thrift.TWaitForHmsEventResponse;
 import org.apache.impala.util.NativeLibUtil;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;

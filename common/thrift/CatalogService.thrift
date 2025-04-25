@@ -794,6 +794,9 @@ struct TWaitForHmsEventRequest {
 
   // Whether to check tables used by views.
   7: optional bool should_expand_views = false
+
+  // Passes the debug actions to catalogd if the query option is set.
+  8: optional string debug_action
 }
 
 struct TWaitForHmsEventResponse {

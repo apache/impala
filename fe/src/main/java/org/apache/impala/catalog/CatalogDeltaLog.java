@@ -17,17 +17,22 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents a log of deleted catalog objects.
@@ -53,11 +58,18 @@ import com.google.common.collect.ImmutableList;
  *
  * b) Building catalog topic updates in the catalogd
  *   The catalogd uses this log to identify deleted catalog objects that have been deleted
- *   since the last catalog topic update. Once the catalog topic update is constructed,
- *   the old entries in the log are garbage collected to prevent the log from growing
- *   indefinitely.
+ *   since the last deleteLogTtl_ catalog topic updates. Once the catalog topic update is
+ *   constructed, the aged out entries in the log are garbage collected to prevent the log
+ *   from growing indefinitely.
  */
 public class CatalogDeltaLog {
+  private final static Logger LOG = LoggerFactory.getLogger(CatalogDeltaLog.class);
+  // Times of catalog updates an entry can survive for.
+  // BackendConfig.INSTANCE could be null in some FE tests that don't care what this is.
+  private final int deleteLogTtl_ = BackendConfig.INSTANCE == null ?
+      60 : BackendConfig.INSTANCE.getBackendCfg().catalog_delete_log_ttl;
+  private final Queue<Long> catalogUpdateVersions_ = new ArrayDeque<>(deleteLogTtl_);
+
   // Map of the catalog version an object was removed from the catalog
   // to the catalog object, ordered by catalog version.
   private SortedMap<Long, TCatalogObject> removedCatalogObjects_ = new TreeMap<>();
@@ -113,19 +125,34 @@ public class CatalogDeltaLog {
   }
 
   /**
-   * Given the current catalog version, removes all items with catalogVersion <
-   * currectCatalogVersion. Such objects do not need to be tracked in the delta
-   * log anymore because they are consistent with the state store's view of the
-   * catalog.
+   * Garbage-collects delete log entries older than the last deleteLogTtl_ topic updates,
+   * in case some deleteLog readers still need the item.
    */
-  public synchronized void garbageCollect(long currentCatalogVersion) {
+  public synchronized void garbageCollect(long lastTopicUpdateVersion) {
+    if (!catalogUpdateVersions_.isEmpty()
+        && catalogUpdateVersions_.size() >= deleteLogTtl_) {
+      garbageCollectInternal(catalogUpdateVersions_.poll());
+    }
+    catalogUpdateVersions_.offer(lastTopicUpdateVersion);
+  }
+
+  /**
+   * Given a catalog version, removes all items with catalogVersion < it.
+   */
+  public void garbageCollectInternal(long catalogVersion) {
     // Nothing will be garbage collected so avoid creating a new object.
     if (!removedCatalogObjects_.isEmpty() &&
-        removedCatalogObjects_.firstKey() < currentCatalogVersion) {
+        removedCatalogObjects_.firstKey() < catalogVersion) {
+      int originalSize = removedCatalogObjects_.size();
       removedCatalogObjects_ = new TreeMap<>(
-          removedCatalogObjects_.tailMap(currentCatalogVersion));
+          removedCatalogObjects_.tailMap(catalogVersion));
       latestRemovedVersions_.entrySet().removeIf(
-          e -> e.getValue() < currentCatalogVersion);
+          e -> e.getValue() < catalogVersion);
+      int numCleared = originalSize - removedCatalogObjects_.size();
+      if (numCleared > 0) {
+        LOG.info("Cleared {} removed items older than version {}", numCleared,
+            catalogVersion);
+      }
     }
   }
 

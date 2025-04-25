@@ -238,7 +238,6 @@ import org.apache.impala.thrift.TUnit;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.thrift.TWaitForHmsEventRequest;
-import org.apache.impala.thrift.TWaitForHmsEventResponse;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.EventSequence;
@@ -2321,6 +2320,9 @@ public class Frontend {
     req.setHeader(createCatalogServiceRequestHeader(
         TSessionStateUtil.getEffectiveUser(queryCtx.session), queryCtx));
     collectRequiredObjects(req, stmt, queryCtx.session.database);
+    if (queryOptions.isSetDebug_action()) {
+      req.setDebug_action(queryOptions.debug_action);
+    }
     // TODO: share 'timeline' to BE so we know when the updates are applied
     TStatus status = FeSupport.WaitForHmsEvents(req, queryOptions);
     if (status.status_code != TErrorCode.OK) {

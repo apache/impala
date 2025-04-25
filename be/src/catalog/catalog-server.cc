@@ -174,6 +174,19 @@ DEFINE_int32(topic_update_log_gc_frequency, 1000, "Frequency at which the entrie
     "of the catalog topic update log are garbage collected. An entry may survive "
     "for (2 * TOPIC_UPDATE_LOG_GC_FREQUENCY) - 1 topic updates.");
 
+DEFINE_int32(catalog_delete_log_ttl, 60, "Number of catalog topic updates that an entry "
+    "in the catalog delete log can survive for.");
+
+static bool ValidatePositiveInt(const char* flagname, int32_t value) {
+  if (value > 0) return true;
+  LOG(ERROR) << Substitute(
+      "$0 must be a positive integer, value $1 is invalid", flagname, value);
+  return false;
+}
+
+DEFINE_validator(topic_update_log_gc_frequency, &ValidatePositiveInt);
+DEFINE_validator(catalog_delete_log_ttl, &ValidatePositiveInt);
+
 DEFINE_bool(invalidate_metadata_on_event_processing_failure, true,
     "This configuration is used to invalidate metadata for table(s) upon event process "
     "failure other than HMS connection issues. The default value is true. When enabled, "

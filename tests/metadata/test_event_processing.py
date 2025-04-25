@@ -16,6 +16,7 @@
 # under the License.
 from __future__ import absolute_import, division, print_function
 from subprocess import check_call
+import logging
 import pytest
 import re
 import time
@@ -31,7 +32,7 @@ from tests.metadata.test_event_processing_base import TestEventProcessingBase
 from tests.util.event_processor_utils import EventProcessorUtils
 
 PROCESSING_TIMEOUT_S = 10
-
+LOG = logging.getLogger(__name__)
 
 @SkipIfFS.hive
 @SkipIfCatalogV2.hms_event_polling_disabled()
@@ -612,3 +613,64 @@ class TestEventSyncWaiting(ImpalaTestSuite):
     finally:
       self.run_stmt_in_hive(
           "drop database if exists {0} cascade".format(db))
+
+  def test_hms_event_sync_on_deletion(self, vector, unique_name):
+    """Regression test for IMPALA-13829: TWaitForHmsEventResponse not able to collect
+    removed objects due to their items in deleteLog being GCed."""
+    client = self.create_impala_client_from_vector(vector)
+    # Set a sleep time so catalogd has time to GC the deleteLog.
+    client.execute("set debug_action='collect_catalog_results_delay:SLEEP@1000'")
+    db = unique_name + "_db"
+    tbl = db + ".foo"
+    self.execute_query("drop database if exists {} cascade".format(db))
+    self.execute_query("drop database if exists {}_2 cascade".format(db))
+    self.execute_query("create database {}".format(db))
+    self.execute_query("create database {}_2".format(db))
+    # Create HMS Thrift clients to drop db/tables in the fastest way
+    hive_clients = []
+    hive_transports = []
+    for _ in range(2):
+      c, t = ImpalaTestSuite.create_hive_client()
+      hive_clients.append(c)
+      hive_transports.append(t)
+
+    try:
+      # Drop 2 dbs concurrently. So their DROP_DATABASE events are processed together (in
+      # the same event batch). We need more than one db to be dropped so one of them in
+      # catalogd's deleteLog can be GCed since its version < latest catalog version.
+      # Note that this is no longer the way catalogd GCs the deleteLog after IMPALA-13829,
+      # but it can be used to trigger the issue before this fix.
+      def drop_db_in_hive(i, db_name):
+        hive_clients[i].drop_database(db_name, deleteData=True, cascade=True)
+        LOG.info("Dropped database {} in Hive".format(db_name))
+      ts = [threading.Thread(target=drop_db_in_hive, args=params)
+            for params in [[0, db], [1, db + "_2"]]]
+      for t in ts:
+        t.start()
+      for t in ts:
+        t.join()
+      client.execute("create database " + db)
+
+      self.execute_query("create table {}(i int)".format(tbl))
+      self.execute_query("create table {}_2(i int)".format(tbl))
+
+      # Drop 2 tables concurrently. So their DROP_TABLE events are processed together (in
+      # the same event batch). We need more than one table to be dropped so one of them in
+      # catalogd's deleteLog can be GCed since its version < latest catalog version.
+      # Note that this is no longer the way catalogd GCs the deleteLog after IMPALA-13829,
+      # but it can be used to trigger the issue before this fix.
+      def drop_table_in_hive(i, tbl_name):
+        hive_clients[i].drop_table(db, tbl_name, deleteData=True)
+        LOG.info("Dropped table {}.{} in Hive".format(db, tbl_name))
+      ts = [threading.Thread(target=drop_table_in_hive, args=params)
+            for params in [[0, "foo"], [1, "foo_2"]]]
+      for t in ts:
+        t.start()
+      for t in ts:
+        t.join()
+      client.execute("create table {}(i int)".format(tbl))
+    finally:
+      for t in hive_transports:
+        t.close()
+      self.execute_query("drop database if exists {} cascade".format(db))
+      self.execute_query("drop database if exists {}_2 cascade".format(db))

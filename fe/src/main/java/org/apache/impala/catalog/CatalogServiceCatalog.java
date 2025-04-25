@@ -4364,6 +4364,8 @@ public class CatalogServiceCatalog extends Catalog {
     res.setResult(new TCatalogUpdateResult());
     res.getResult().setCatalog_service_id(JniCatalog.getServiceId());
 
+    DebugUtils.executeDebugAction(req.debug_action,
+        DebugUtils.COLLECT_CATALOG_RESULTS_DELAY);
     // Collect catalog objects required by the query
     boolean wantMinimalResponse = req.header.want_minimal_response;
     if (req.isSetObject_descs()) {

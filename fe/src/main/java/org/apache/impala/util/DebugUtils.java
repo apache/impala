@@ -111,6 +111,11 @@ public class DebugUtils {
   // the write lock.
   public static final String RESET_METADATA_LOOP_LOCKED = "reset_metadata_loop_locked";
 
+  // debug action label for introducing delay before collecting catalog results for
+  // TWaitForHmsEventResponse.
+  public static final String COLLECT_CATALOG_RESULTS_DELAY =
+      "collect_catalog_results_delay";
+
   /**
    * Returns true if the label of action is set in the debugActions
    */

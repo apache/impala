@@ -325,4 +325,6 @@ struct TBackendGflags {
   146: required string catalog_config_dir
 
   147: required i32 catalog_partial_fetch_max_files
+
+  148: required i32 catalog_delete_log_ttl
 }
