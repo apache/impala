@@ -713,11 +713,15 @@ class TestAllowIncompleteData(CustomClusterTestSuite):
     catalogd_args="--catalog_topic_mode=minimal --catalog_partial_fetch_max_files=1")
   def test_too_many_files(self, unique_database):
     """Test the error reporting the limit is too small"""
-    exception = self.execute_query_expect_failure(
-        self.client, "show files in tpch_parquet.lineitem")
-    err = ("Too many files to collect in table tpch_parquet.lineitem: 3. Current limit "
-           "is 1 configured by startup flag 'catalog_partial_fetch_max_files'. Consider "
-           "compacting files of the table.")
+    # Create a non-partitioned table with multiple files
+    tbl = unique_database + ".tbl"
+    self.execute_query("create table {0} (i int)".format(tbl))
+    self.execute_query("insert into {0} values (0)".format(tbl))
+    self.execute_query("insert into {0} values (1)".format(tbl))
+    exception = self.execute_query_expect_failure(self.client, "show files in " + tbl)
+    err = ("Too many files to collect in table {0}: 2. Current limit is 1 configured by "
+           "startup flag 'catalog_partial_fetch_max_files'. Consider compacting files of"
+           " the table.").format(tbl)
     assert err in str(exception)
     self.assert_catalogd_log_contains("ERROR", err)
 
