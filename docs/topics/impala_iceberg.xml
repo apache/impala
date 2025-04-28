@@ -576,11 +576,7 @@ MERGE INTO ice_t USING source ON ice_t.a = source.id
         </codeblock>
       </p>
       <p>
-        The limitations of the <codeph>UPDATE</codeph> statement also apply to the <codeph>MERGE</codeph> statement; in addition,
-        the limitations of the <codeph>MERGE</codeph> statement:
-        <ul>
-          <li>Subqueries in source statements must be simple queries as internal rewrite is not supported.</li>
-        </ul>
+        The limitations of the <codeph>UPDATE</codeph> statement also apply to the <codeph>MERGE</codeph> statement.
       </p>
       <p>
         More information about the <codeph>MERGE</codeph> statement can be found at <xref href="impala_merge.xml"/>.
