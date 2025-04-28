@@ -1,0 +1,40 @@
+====
+---- QUERY
+SHOW DATABASES LIKE "ice";
+---- RESULTS: VERIFY_IS_SUBSET
+'ice',''
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+SHOW DATABASES LIKE "berg";
+---- RESULTS: VERIFY_IS_SUBSET
+'berg',''
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+USE ice;
+====
+---- QUERY
+SELECT lat FROM berg.airports_parquet WHERE iata = '00R';
+---- RESULTS
+30.68586111
+---- TYPES
+DOUBLE
+====
+---- QUERY
+SELECT ice_air.iata, ice_air.lat, berg_air.lon
+FROM ice.airports_parquet ice_air
+INNER JOIN berg.airports_parquet berg_air
+ON berg_air.iata = ice_air.iata AND berg_air.iata = "00M"
+---- RESULTS
+'00M',31.95376472,-89.2345047
+---- TYPES
+STRING, DOUBLE, DOUBLE
+====
+---- QUERY
+INSERT INTO berg.airports_parquet(lat) VALUES (32.1)
+---- CATCH
+AnalysisException: Write not supported. Table berg.airports_parquet  access type is: READONLY
+====

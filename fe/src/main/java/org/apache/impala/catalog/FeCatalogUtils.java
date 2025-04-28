@@ -44,6 +44,7 @@ import org.apache.impala.catalog.local.LocalIcebergTable;
 import org.apache.impala.catalog.local.LocalKuduTable;
 import org.apache.impala.catalog.local.LocalView;
 import org.apache.impala.catalog.local.MetaProvider;
+import org.apache.impala.catalog.local.MultiMetaProvider;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.service.BackendConfig;
@@ -396,6 +397,9 @@ public abstract class FeCatalogUtils {
     if (!BackendConfig.INSTANCE.getBackendCfg().use_local_catalog) return;
     Preconditions.checkState(catalog instanceof LocalCatalog);
     MetaProvider provider = ((LocalCatalog) catalog).getMetaProvider();
+    if (provider instanceof MultiMetaProvider) {
+      provider = ((MultiMetaProvider) provider).getPrimaryProvider();
+    }
     if (!(provider instanceof CatalogdMetaProvider)) return;
 
     CacheStats stats = ((CatalogdMetaProvider) provider).getCacheStats();

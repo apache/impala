@@ -106,15 +106,11 @@ public class IcebergMetaProvider implements MetaProvider {
 
   public IcebergMetaProvider(Properties properties) {
     properties_ = properties;
-    iceCatalog_ = initCatalog();
+    iceCatalog_ = new IcebergRESTCatalog(properties);
   }
 
   public String getURI() {
     return "Iceberg REST (" + iceCatalog_.getUri() + ")";
-  }
-
-  private IcebergRESTCatalog initCatalog() {
-    return IcebergRESTCatalog.getInstance(properties_);
   }
 
   public void setAuthzChecker(

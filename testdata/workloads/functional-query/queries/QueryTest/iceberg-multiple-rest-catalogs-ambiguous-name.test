@@ -1,0 +1,6 @@
+====
+---- QUERY
+select * from ice.iceberg_v2_positional_not_all_data_files_have_delete_files;
+---- CATCH
+TException: Ambiguous table name
+====

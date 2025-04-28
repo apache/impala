@@ -20,7 +20,7 @@ package org.apache.impala.authorization;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.service.FeCatalogManager;
+import org.apache.impala.service.catalogmanager.FeCatalogManager;
 
 import java.util.function.Supplier;
 

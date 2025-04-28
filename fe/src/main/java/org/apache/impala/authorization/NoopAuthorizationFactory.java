@@ -24,7 +24,7 @@ import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.service.FeCatalogManager;
+import org.apache.impala.service.catalogmanager.FeCatalogManager;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;

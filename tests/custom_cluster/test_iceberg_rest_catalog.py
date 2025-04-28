@@ -22,16 +22,102 @@ import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite, HIVE_CONF_DIR
 from tests.common.iceberg_rest_server import IcebergRestServer
 
-REST_SERVER_PORT = 9084
+
 IMPALA_HOME = os.environ['IMPALA_HOME']
-START_ARGS = 'start_args'
-IMPALAD_ARGS = """--use_local_catalog=true --catalogd_deployed=false
+NO_CATALOGD_STARTARGS = '--no_catalogd'
+REST_STANDALONE_IMPALAD_ARGS = """--use_local_catalog=true --catalogd_deployed=false
     --catalog_config_dir={}/testdata/configs/catalog_configs/iceberg_rest_config"""\
         .format(IMPALA_HOME)
+MULTICATALOG_IMPALAD_ARGS = """--use_local_catalog=true
+    --catalog_config_dir={}/testdata/configs/catalog_configs/iceberg_rest_config"""\
+        .format(IMPALA_HOME)
+MULTIPLE_REST_IMPALAD_ARGS = """--use_local_catalog=true
+    --catalog_config_dir={}/testdata/configs/catalog_configs/multicatalog_rest_config"""\
+        .format(IMPALA_HOME)
+MULTIPLE_REST_WITHOUT_CATALOGD_IMPALAD_ARGS = """--use_local_catalog=true
+    --catalogd_deployed=false \
+    --catalog_config_dir={}/testdata/configs/catalog_configs/multicatalog_rest_config"""\
+        .format(IMPALA_HOME)
+MULTICATALOG_CATALOGD_ARGS = "--catalog_topic_mode=minimal"
 
 
-class TestIcebergRestCatalog(CustomClusterTestSuite):
-  """Test suite for Iceberg REST Catalog."""
+def RestServerProperties(*server_configs):
+  """
+  Annotation to specify configurations for multiple REST servers to be started.
+  Each argument should be a dictionary with 'port' and 'catalog_location' keys.
+  Example:
+  @RestServerProperties({'port': 9085}, {'port': 9086, 'catalog_location': '/tmp/cat2'})
+  """
+  def decorator(func):
+    func.rest_server_configs = list(server_configs)
+    return func
+  return decorator
+
+
+class IcebergRestCatalogTests(CustomClusterTestSuite):
+  """Base class for Iceberg REST Catalog tests."""
+  def setup_method(self, method):
+    args = method.__dict__
+    if HIVE_CONF_DIR in args:
+      raise Exception("Cannot specify HIVE_CONF_DIR because the tests of this class are "
+          "running without Hive.")
+    self.servers = []
+
+    server_configs = getattr(method, 'rest_server_configs', None)
+
+    if server_configs:
+      for config in server_configs:
+        port = config.get('port', IcebergRestServer.DEFAULT_REST_SERVER_PORT)
+        catalog_location = config.get('catalog_location',
+            IcebergRestServer.DEFAULT_CATALOG_LOCATION)
+        print("Starting REST server with annotation properties: "
+              "Port=%s, Catalog Location=%s" % (port, catalog_location))
+        self.servers.append(IcebergRestServer(port, catalog_location))
+
+    try:
+      for server in self.servers:
+        server.start_rest_server(300)
+      super(IcebergRestCatalogTests, self).setup_method(method)
+      # At this point we can create the Impala clients that we will need.
+      self.create_impala_clients()
+    except Exception as e:
+      for server in self.servers:
+        server.stop_rest_server(10)
+      raise e
+
+  def teardown_method(self, method):
+    for server in self.servers:
+      server.stop_rest_server()
+    super(IcebergRestCatalogTests, self).teardown_method(method)
+
+
+class TestIcebergRestCatalogWithHms(IcebergRestCatalogTests):
+  """Test suite for Iceberg REST Catalog. HMS running while tests are running"""
+  @RestServerProperties({'port': 9084})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=MULTICATALOG_IMPALAD_ARGS,
+     catalogd_args=MULTICATALOG_CATALOGD_ARGS)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_multicatalog(self, vector):
+    self.run_test_case('QueryTest/iceberg-multicatalog',
+                       vector, use_db="ice")
+
+  @RestServerProperties(
+    {'port': 9084},
+    {'port': 9085,
+     'catalog_location': '/test-warehouse/iceberg_test/secondary_hadoop_catalog'}
+  )
+  @CustomClusterTestSuite.with_args(
+     impalad_args=MULTIPLE_REST_IMPALAD_ARGS,
+     catalogd_args=MULTICATALOG_CATALOGD_ARGS)
+  @pytest.mark.execute_serially
+  def test_multiple_rest_catalogs(self, vector):
+    self.run_test_case('QueryTest/iceberg-multiple-rest-catalogs',
+                       vector, use_db="ice")
+
+
+class TestIcebergRestCatalogNoHms(IcebergRestCatalogTests):
+  """Test suite for Iceberg REST Catalog. HMS is stopped while tests are running"""
 
   @classmethod
   def need_default_clients(cls):
@@ -40,13 +126,7 @@ class TestIcebergRestCatalog(CustomClusterTestSuite):
 
   @classmethod
   def setup_class(cls):
-    super(TestIcebergRestCatalog, cls).setup_class()
-    try:
-      cls.iceberg_rest_server = IcebergRestServer()
-      cls.iceberg_rest_server.start_rest_server(300)
-    except Exception as e:
-      cls.iceberg_rest_server.stop_rest_server(10)
-      raise e
+    super(TestIcebergRestCatalogNoHms, cls).setup_class()
 
     try:
       cls._stop_hive_service()
@@ -57,29 +137,41 @@ class TestIcebergRestCatalog(CustomClusterTestSuite):
   @classmethod
   def teardown_class(cls):
     cls.cleanup_infra_services()
-    return super(TestIcebergRestCatalog, cls).teardown_class()
+    return super(TestIcebergRestCatalogNoHms, cls).teardown_class()
 
   @classmethod
   def cleanup_infra_services(cls):
-    cls.iceberg_rest_server.stop_rest_server(10)
     cls._start_hive_service(None)
 
-  def setup_method(self, method):
-    args = method.__dict__
-    if HIVE_CONF_DIR in args:
-      raise Exception("Cannot specify HIVE_CONF_DIR because the tests of this class are "
-          "running without Hive.")
-    # Invoke start-impala-cluster.py with '--no_catalogd'
-    start_args = "--no_catalogd"
-    if START_ARGS in args:
-      start_args = args[START_ARGS] + " " + start_args
-    args[START_ARGS] = start_args
-
-    super(TestIcebergRestCatalog, self).setup_method(method)
-    # At this point we can create the Impala clients that we will need.
-    self.create_impala_clients()
-
-  @CustomClusterTestSuite.with_args(impalad_args=IMPALAD_ARGS)
+  @RestServerProperties({'port': 9084})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS)
   @pytest.mark.execute_serially
   def test_rest_catalog_basic(self, vector):
     self.run_test_case('QueryTest/iceberg-rest-catalog', vector, use_db="ice")
+
+  @RestServerProperties(
+    {'port': 9084},
+    {'port': 9085,
+     'catalog_location': '/test-warehouse/iceberg_test/secondary_hadoop_catalog'}
+  )
+  @CustomClusterTestSuite.with_args(
+     impalad_args=MULTIPLE_REST_WITHOUT_CATALOGD_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS)
+  @pytest.mark.execute_serially
+  def test_multiple_rest_catalogs_without_catalogd(self, vector):
+    self.run_test_case('QueryTest/iceberg-multiple-rest-catalogs',
+                       vector, use_db="ice")
+
+  @RestServerProperties(
+    {'port': 9084},
+    {'port': 9085}
+  )
+  @CustomClusterTestSuite.with_args(
+     impalad_args=MULTIPLE_REST_WITHOUT_CATALOGD_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS)
+  @pytest.mark.execute_serially
+  def test_multiple_rest_catalogs_with_ambiguous_tables(self, vector):
+    self.run_test_case('QueryTest/iceberg-multiple-rest-catalogs-ambiguous-name',
+                       vector, use_db="ice")

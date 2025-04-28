@@ -59,7 +59,7 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.service.CompilerFactory;
 import org.apache.impala.service.CompilerFactoryImpl;
-import org.apache.impala.service.FeCatalogManager;
+import org.apache.impala.service.catalogmanager.FeCatalogManager;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.testutil.ImpaladTestCatalog;

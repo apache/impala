@@ -1,0 +1,45 @@
+====
+---- QUERY
+SHOW DATABASES like "ice";
+---- RESULTS: VERIFY_IS_SUBSET
+'ice',''
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+SHOW DATABASES like "functional_parquet";
+---- RESULTS: VERIFY_IS_SUBSET
+'functional_parquet',''
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+USE ice;
+====
+---- QUERY
+SELECT lat FROM airports_parquet WHERE iata = '00R';
+---- RESULTS
+30.68586111
+---- TYPES
+DOUBLE
+====
+---- QUERY
+SELECT * FROM functional_parquet.alltypes WHERE id = 3650
+---- RESULTS
+3650,true,0,0,0,0,0,0,'01/01/10','0',2010-01-01 00:00:00,2010,1
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+SELECT p_float, string_col from ice.iceberg_alltypes_part ice_alltypes INNER JOIN functional_parquet.alltypes alltypes ON alltypes.id = ice_alltypes.i
+---- RESULTS
+1.100000023841858,'2'
+1.100000023841858,'1'
+---- TYPES
+FLOAT, STRING
+====
+---- QUERY
+INSERT INTO ice.iceberg_alltypes_part(i) VALUES (567)
+---- CATCH
+AnalysisException: Write not supported. Table ice.iceberg_alltypes_part  access type is: READONLY
+====

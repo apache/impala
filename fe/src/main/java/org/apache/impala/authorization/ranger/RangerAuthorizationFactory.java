@@ -27,7 +27,7 @@ import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.service.FeCatalogManager;
+import org.apache.impala.service.catalogmanager.FeCatalogManager;
 
 import java.util.function.Supplier;
 

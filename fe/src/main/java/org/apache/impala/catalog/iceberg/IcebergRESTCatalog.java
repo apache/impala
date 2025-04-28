@@ -40,18 +40,9 @@ import org.apache.impala.util.IcebergUtil;
 public class IcebergRESTCatalog implements IcebergCatalog {
   private final String REST_URI;
 
-  private static IcebergRESTCatalog instance_;
   private final RESTCatalog restCatalog_;
 
-  public synchronized static IcebergRESTCatalog getInstance(
-      Properties properties) {
-    if (instance_ == null) {
-      instance_ = new IcebergRESTCatalog(properties);
-    }
-    return instance_;
-  }
-
-  private IcebergRESTCatalog(Properties properties) {
+  public IcebergRESTCatalog(Properties properties) {
     setContextClassLoader();
 
     RESTCatalogProperties restConfig = new RESTCatalogProperties(properties);
