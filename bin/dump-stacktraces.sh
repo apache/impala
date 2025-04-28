@@ -27,7 +27,7 @@ function collect_gdb_backtraces() {
   pid=$2
   result="${IMPALA_TIMEOUT_LOGS_DIR}/${name}_${pid}_$(date +%Y%m%d-%H%M%S).txt"
   echo "**** Generating backtrace of $name with process id: $pid to $result ****"
-  gdb -ex "thread apply all bt" --batch -p $pid >"$result"
+  gdb -ex "thread apply all -c bt" --batch -p $pid >"$result"
 }
 
 function collect_jstacks() {
@@ -43,15 +43,15 @@ WORKER_PIDS=()
 mkdir -p "$IMPALA_TIMEOUT_LOGS_DIR"
 
 for pid in $(pgrep impalad); do
-  collect_gdb_backtraces impalad $pid && collect_jstacks impalad $pid &
+  collect_jstacks impalad $pid && collect_gdb_backtraces impalad $pid &
   WORKER_PIDS+=($!)
 done
 
 # Catalogd's process name may change. Use 'ps' directly to search the binary name.
 CATALOGD_PID=$(ps aux | grep [c]atalogd | awk '{print $2}')
 if [[ ! -z $CATALOGD_PID ]]; then
-  collect_gdb_backtraces catalogd $CATALOGD_PID && \
-      collect_jstacks catalogd $CATALOGD_PID &
+  collect_jstacks catalogd $CATALOGD_PID && \
+      collect_gdb_backtraces catalogd $CATALOGD_PID &
   WORKER_PIDS+=($!)
 fi
 
