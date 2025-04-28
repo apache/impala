@@ -1,5 +1,7 @@
 # Regression test for IMPALA-12510: select star on empty table
 select * from functional.emptytable;
+---- QUERYOPTIONS
+MAX_FRAGMENT_INSTANCES_PER_NODE=16
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
 Per-Host Resource Estimates: Memory=10MB
@@ -47,6 +49,8 @@ group by rollup (
   ss_net_paid,
   ss_ext_sales_price)
 limit 100
+---- QUERYOPTIONS
+MAX_FRAGMENT_INSTANCES_PER_NODE=16
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=1.81GB Threads=11
 Per-Host Resource Estimates: Memory=2.38GB
@@ -140,6 +144,8 @@ max-parallelism=21 segment-costs=[89349287, 198453333]
    in pipelines: 00(GETNEXT)
 ====
 select * from income_band;
+---- QUERYOPTIONS
+MAX_FRAGMENT_INSTANCES_PER_NODE=16
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=4.02MB Threads=2
 Per-Host Resource Estimates: Memory=20MB
@@ -170,6 +176,8 @@ max-parallelism=1 segment-costs=[28]
 ====
 # Scan cost should be exactly the same as select star without limit.
 select * from income_band limit 1000000000;
+---- QUERYOPTIONS
+MAX_FRAGMENT_INSTANCES_PER_NODE=16
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=4.02MB Threads=2
 Per-Host Resource Estimates: Memory=20MB
@@ -209,6 +217,8 @@ select
 from functional.emptytable
 ) b
 where rk = 1;
+---- QUERYOPTIONS
+MAX_FRAGMENT_INSTANCES_PER_NODE=16
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=48.00MB Threads=4
 Per-Host Resource Estimates: Memory=48MB
@@ -277,4 +287,119 @@ max-parallelism=1 segment-costs=[0, 0]
    mem-estimate=0B mem-reservation=0B thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=0 cost=0
    in pipelines: 00(GETNEXT)
+====
+# IMPALA-14006: Regression test for UNPARTITIONED fragment in probe side.
+# F03 should schedule 2 instances because F01 is only 1 node and 1 instance.
+select
+  timestamp_col,
+  rank
+from
+  functional.alltypessmall alts
+  left outer join (
+    select id, dense_rank() over(order by id) as rank, int_col from functional.alltypes
+  ) rank_view on (rank_view.id = alts.id)
+  where rank < 10;
+---- QUERYOPTIONS
+MAX_FRAGMENT_INSTANCES_PER_NODE=2
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=15.98MB Threads=6
+Per-Host Resource Estimates: Memory=49MB
+F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[233] cpu-comparison-result=8 [max(5 (self) vs 8 (sum children))]
+PLAN-ROOT SINK
+|  output exprs: timestamp_col, dense_rank()
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=200
+|
+09:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7N,6N,0 row-size=32B cardinality=100 cost=33
+|  in pipelines: 02(GETNEXT)
+|
+F03:PLAN FRAGMENT [HASH(alts.id)] hosts=3 instances=2 (adjusted from 6)
+Per-Instance Resources: mem-estimate=193.11KB mem-reservation=0B thread-reservation=1
+max-parallelism=3 segment-costs=[713]
+05:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash-table-id=00
+|  hash predicates: id = alts.id
+|  fk/pk conjuncts: id = alts.id
+|  other predicates: dense_rank() < CAST(10 AS BIGINT)
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=7N,6N,0 row-size=32B cardinality=100 cost=205
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+|--F05:PLAN FRAGMENT [HASH(alts.id)] hosts=3 instances=2 (adjusted from 6)
+|  |  Per-Instance Resources: mem-estimate=1.95MB mem-reservation=1.94MB thread-reservation=1
+|  |  max-parallelism=3 segment-costs=[120]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: alts.id
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=100
+|  |
+|  08:EXCHANGE [HASH(alts.id)]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=0 row-size=20B cardinality=100 cost=20
+|  |  in pipelines: 00(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 4)
+|  Per-Instance Resources: mem-estimate=16.19MB mem-reservation=8.00KB thread-reservation=1
+|  max-parallelism=3 segment-costs=[409]
+|  00:SCAN HDFS [functional.alltypessmall alts, RANDOM]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     stored statistics:
+|       table: rows=100 size=6.32KB
+|       partitions: 4/4 rows=100
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=25
+|     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
+|     tuple-ids=0 row-size=20B cardinality=100 cost=229
+|     in pipelines: 00(GETNEXT)
+|
+07:EXCHANGE [HASH(id)]
+|  mem-estimate=17.11KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7,6 row-size=12B cardinality=730 cost=148
+|  in pipelines: 02(GETNEXT)
+|
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Instance Resources: mem-estimate=4.19MB mem-reservation=4.00MB thread-reservation=1
+max-parallelism=1 segment-costs=[17820]
+04:SELECT
+|  predicates: dense_rank() < CAST(10 AS BIGINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=7,6 row-size=12B cardinality=730 cost=7300
+|  in pipelines: 02(GETNEXT)
+|
+03:ANALYTIC
+|  functions: dense_rank()
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=7,6 row-size=12B cardinality=7.30K cost=7300
+|  in pipelines: 02(GETNEXT)
+|
+06:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|  mem-estimate=33.50KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7 row-size=4B cardinality=7.30K cost=1904
+|  in pipelines: 02(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3 (adjusted from 6)
+Per-Instance Resources: mem-estimate=22.00MB mem-reservation=6.03MB thread-reservation=1
+max-parallelism=3 segment-costs=[20162, 3059]
+02:SORT
+|  order by: id ASC
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=7 row-size=4B cardinality=7.30K cost=2819
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+01:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=1 row-size=4B cardinality=7.30K cost=17343
+   in pipelines: 01(GETNEXT)
 ====

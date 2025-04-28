@@ -1504,7 +1504,7 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = tpcdsParquetQueryOptions();
     options.setCompute_processing_cost(true);
     options.setProcessing_cost_min_threads(2);
-    options.setMax_fragment_instances_per_node(16);
+    // MAX_FRAGMENT_INSTANCES_PER_NODE option is set at test file.
     runPlannerTestFile("tpcds-processing-cost", "tpcds_partitioned_parquet_snap", options,
         tpcdsParquetTestOptions());
   }

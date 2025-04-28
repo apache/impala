@@ -457,9 +457,10 @@ Status Scheduler::CheckEffectiveInstanceCount(
     return Status(Substitute(
         "$0 scheduled instance count ($1) is higher than maximum instances per node"
         " ($2), indicating a planner bug. Consider running the query with"
-        " COMPUTE_PROCESSING_COST=false.",
+        " COMPUTE_PROCESSING_COST=false. Scheduler see $3 hosts for this fragment"
+        " with at most $4 fragment instance assignment at one host.",
         fragment_state->fragment.display_name, largest_inst_per_host,
-        qc.MAX_FRAGMENT_INSTANCES_PER_NODE));
+        qc.MAX_FRAGMENT_INSTANCES_PER_NODE, num_host, largest_inst_per_host));
   }
 
   int planned_inst_per_host = ceil((float)effective_instance_count / num_host);
@@ -924,6 +925,18 @@ void Scheduler::CreateInputCollocatedInstances(
     for (const FInstanceScheduleState& input_instance_state :
         input_fragment_state.instance_states) {
       all_hosts.insert({input_instance_state.host, input_instance_state.krpc_host});
+    }
+    // Sanity check max_instances with information from Planner, if set.
+    if (state->request().__isset.max_parallelism_per_node) {
+      int max_global = all_hosts.size() * state->request().max_parallelism_per_node;
+      if (max_instances > max_global) {
+        LOG(WARNING) << Substitute(
+            "Fragment $0 lowered max_instance from $1 to $2 due to num_host=$3 and "
+            "max_parallelism_per_node=$4",
+            fragment.display_name, max_instances, max_global, all_hosts.size(),
+            state->request().max_parallelism_per_node);
+        max_instances = max_global;
+      }
     }
     // This implementation creates the desired number of instances while balancing them
     // across hosts and ensuring that instances on the same host get consecutive instance

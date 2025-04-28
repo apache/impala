@@ -1118,5 +1118,9 @@ struct TQueryExecRequest {
   // The unbounded version of cores_required. Used by Frontend to do executor group-set
   // assignment for the query. Should either be unset or set with positive value.
   18: optional i32 cores_required_unbounded
+
+  // Propagated value from Analyzer.getMaxParallelismPerNode().
+  // Used by scheduler.cc as sanity check during scheduling.
+  19: optional i32 max_parallelism_per_node
 }
 

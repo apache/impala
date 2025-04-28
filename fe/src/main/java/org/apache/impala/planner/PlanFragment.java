@@ -196,7 +196,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     setFragmentInPlanTree(planRoot_);
     coordinatorOnly_ = coordinatorOnly;
 
-    // Coordinator-only fragments must be unpartitined as there is only one instance of
+    // Coordinator-only fragments must be unpartitioned as there is only one instance of
     // them.
     Preconditions.checkState(!coordinatorOnly ||
         dataPartition_.equals(DataPartition.UNPARTITIONED));
@@ -1101,10 +1101,10 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
     // step 1: Set initial parallelism to the maximum possible.
     //   Subsequent steps after this will not exceed maximum parallelism sets here.
-    boolean canTryLower = adjustToMaxParallelism(
+    ScalingVerdict verdict = adjustToMaxParallelism(
         minThreadPerNode, maxThreadPerNode, parentFragment, nodeStepCount, queryOptions);
 
-    if (canTryLower) {
+    if (verdict == ScalingVerdict.CAN_LOWER && getAdjustedInstanceCount() > 1) {
       // step 2: Try lower parallelism by comparing output ProcessingCost of the input
       //   child fragment against this fragment's segment costs.
       Preconditions.checkState(getChildCount() > 0);
@@ -1117,8 +1117,29 @@ public class PlanFragment extends TreeNode<PlanFragment> {
           nodeStepCount, minParallelism, maxParallelism);
       setAdjustedInstanceCount(effectiveParallelism);
       if (LOG.isTraceEnabled() && effectiveParallelism != maxParallelism) {
-        logCountAdjustmentTrace(maxParallelism, effectiveParallelism,
+        logCountAdjustmentTrace(maxParallelism, effectiveParallelism, verdict,
             "Lower parallelism based on load and produce-consume rate ratio.");
+      }
+    }
+    // If this is probe traversal from Planner.computeEffectiveParallelism()
+    // (parentFragment == null), check possibility of left-child node (probe) being
+    // underparallelized.
+    if (parentFragment == null && hasChild(0)
+        && verdict != ScalingVerdict.FIXED_BY_PLAN_NODE
+        && verdict != ScalingVerdict.FIXED_BY_PARTITIONED_JOIN_BUILD) {
+      // Cap max parallelism at left child max.
+      // This is to prevent Scheduler::CreateInputCollocatedInstances to overparallelize.
+      // It is safe to do if verdict is neither of FIXED_BY_PLAN_NODE nor
+      // FIXED_BY_PARTITIONED_JOIN_BUILD.
+      PlanFragment lc = getChild(0);
+      int lcNumNode = lc.getNumNodes();
+      int lcMaxParallelism = IntMath.saturatedMultiply(maxThreadPerNode, lcNumNode);
+      if (lcMaxParallelism < getAdjustedInstanceCount()) {
+        LOG.warn("Reducing instance count of {} from {} to {} to follow left-child node "
+                + "{} (num_nodes={}, num_instance={}). Scaling verdict was {}.",
+            getId(), getAdjustedInstanceCount(), lcMaxParallelism, lc.getId(),
+            lc.getNumNodes(), lc.getAdjustedInstanceCount(), verdict);
+        setAdjustedInstanceCount(lcMaxParallelism);
       }
     }
     validateProcessingCosts();
@@ -1192,6 +1213,15 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     return maxParallelism;
   }
 
+  private enum ScalingVerdict {
+    CAN_LOWER,
+    FIXED_BY_PLAN_NODE,
+    FIXED_BY_PARTITIONED_JOIN_BUILD,
+    UNION_FRAGMENT_BOUNDED,
+    SCAN_FRAGMENT_BOUNDED,
+    MIN_GLOBAL_PARALLELISM
+  }
+
   /**
    * Adjust parallelism of this fragment to the maximum allowed.
    * This method initialize maxParallelism_ and adjustedInstanceCount_.
@@ -1204,33 +1234,38 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * @param parentFragment Parent fragment of this fragment.
    * @param nodeStepCount The step count used to increase this fragment's parallelism.
    *                      Usually equal to number of nodes or just 1.
-   * @return True if it is possible to lower this fragment's parallelism through
-   * ProcessingCost comparison. False if the parallelism should not be changed anymore.
+   * @return a ScalingVerdict. If CAN_LOWER, it is possible to lower this fragment's
+   * parallelism through ProcessingCost comparison.
    */
-  private boolean adjustToMaxParallelism(final int minThreadPerNode,
+  private ScalingVerdict adjustToMaxParallelism(final int minThreadPerNode,
       final int maxThreadPerNode, final @Nullable PlanFragment parentFragment,
       final int nodeStepCount, TQueryOptions queryOptions) {
     int maxThreadAllowed = IntMath.saturatedMultiply(maxThreadPerNode, getNumNodes());
-    boolean canTryLower = true;
+    ScalingVerdict verdict = ScalingVerdict.CAN_LOWER;
 
     // Compute selectedParallelism as the maximum allowed parallelism.
     int selectedParallelism = getNumInstances();
     if (isFixedParallelism_) {
       selectedParallelism = getAdjustedInstanceCount();
       maxParallelism_ = selectedParallelism;
-      canTryLower = false;
+      verdict = ScalingVerdict.FIXED_BY_PLAN_NODE;
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("{} instance count fixed to {}. verdict={}", getId(), maxParallelism_,
+            verdict);
+      }
     } else if (isPartitionedJoinBuildFragment()) {
       // This is a non-shared (PARTITIONED) join build fragment.
       // Parallelism of this fragment is equal to its parent parallelism.
       Preconditions.checkNotNull(parentFragment);
       final int parentParallelism = parentFragment.getAdjustedInstanceCount();
-      if (LOG.isTraceEnabled() && selectedParallelism != parentParallelism) {
-        logCountAdjustmentTrace(selectedParallelism, parentParallelism,
-            "Partitioned join build fragment follow parent's parallelism.");
-      }
       selectedParallelism = parentParallelism;
       maxParallelism_ = parentFragment.getMaxParallelism();
-      canTryLower = false; // no need to compute effective parallelism anymore.
+      // no need to compute effective parallelism anymore.
+      verdict = ScalingVerdict.FIXED_BY_PARTITIONED_JOIN_BUILD;
+      if (LOG.isTraceEnabled()) {
+        logCountAdjustmentTrace(selectedParallelism, parentParallelism, verdict,
+            "Partitioned join build fragment follow parent's parallelism.");
+      }
     } else {
       UnionNode unionNode = getUnionNode();
 
@@ -1242,17 +1277,17 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         if (maxParallelism_ > maxThreadAllowed) {
           selectedParallelism = maxThreadAllowed;
           if (LOG.isTraceEnabled()) {
-            logCountAdjustmentTrace(
-                getNumInstances(), selectedParallelism, "Follow maxThreadPerNode.");
+            logCountAdjustmentTrace(getNumInstances(), selectedParallelism, verdict,
+                "Follow maxThreadPerNode.");
           }
         } else {
           selectedParallelism = maxParallelism_;
           if (LOG.isTraceEnabled()) {
-            logCountAdjustmentTrace(getNumInstances(), selectedParallelism,
+            logCountAdjustmentTrace(getNumInstances(), selectedParallelism, verdict,
                 "Follow minimum work per thread or max child count.");
           }
         }
-        canTryLower = false;
+        verdict = ScalingVerdict.UNION_FRAGMENT_BOUNDED;
       } else {
         // This is an interior fragment or fragment with single scan node.
         // We calculate maxParallelism_, minParallelism, and selectedParallelism across
@@ -1286,7 +1321,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
           // Prevent caller from lowering parallelism if fragment has ScanNode
           // because there is no child fragment to compare with.
-          canTryLower = false;
+          verdict = ScalingVerdict.SCAN_FRAGMENT_BOUNDED;
         }
 
         int minParallelism = Math.min(
@@ -1297,20 +1332,20 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         if (boundedParallelism > maxThreadAllowed) {
           selectedParallelism = maxThreadAllowed;
           if (LOG.isTraceEnabled()) {
-            logCountAdjustmentTrace(
-                getNumInstances(), selectedParallelism, "Follow maxThreadPerNode.");
+            logCountAdjustmentTrace(getNumInstances(), selectedParallelism, verdict,
+                "Follow maxThreadPerNode.");
           }
         } else {
           if (boundedParallelism < minParallelism && minParallelism < maxScannerThreads) {
             boundedParallelism = minParallelism;
-            canTryLower = false;
+            verdict = ScalingVerdict.MIN_GLOBAL_PARALLELISM;
             if (LOG.isTraceEnabled()) {
-              logCountAdjustmentTrace(
-                  getNumInstances(), boundedParallelism, "Follow minThreadPerNode.");
+              logCountAdjustmentTrace(getNumInstances(), boundedParallelism, verdict,
+                  "Follow minThreadPerNode.");
             }
           } else if (LOG.isTraceEnabled()) {
-            logCountAdjustmentTrace(
-                getNumInstances(), boundedParallelism, "Follow minimum work per thread.");
+            logCountAdjustmentTrace(getNumInstances(), boundedParallelism, verdict,
+                "Follow minimum work per thread.");
           }
           selectedParallelism = boundedParallelism;
         }
@@ -1325,7 +1360,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
     // Initialize this fragment's parallelism to the selectedParallelism.
     setAdjustedInstanceCount(selectedParallelism);
-    return canTryLower && selectedParallelism > 1;
+    return verdict;
   }
 
   /**
@@ -1392,8 +1427,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
 
     int adjustedCount = getAdjustedInstanceCount();
     if (LOG.isTraceEnabled() && originalInstanceCount_ != adjustedCount) {
-      logCountAdjustmentTrace(
-          originalInstanceCount_, adjustedCount, "Finalize effective parallelism.");
+      LOG.trace("{} finalize instance count from {} to {}.", getId(),
+          originalInstanceCount_, adjustedCount);
     }
 
     for (PlanNode node : collectPlanNodes()) { node.numInstances_ = adjustedCount; }
@@ -1403,9 +1438,10 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     }
   }
 
-  private void logCountAdjustmentTrace(int oldCount, int newCount, String reason) {
-    LOG.trace("{} adjust instance count from {} to {}. {}", getId(), oldCount, newCount,
-        reason);
+  private void logCountAdjustmentTrace(
+      int oldCount, int newCount, ScalingVerdict verdict, String reason) {
+    LOG.trace("{} adjust instance count from {} to {}. verdict={} reason={}", getId(),
+        oldCount, newCount, verdict, reason);
   }
 
   private static boolean isBlockingNode(PlanNode node) {

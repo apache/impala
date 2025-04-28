@@ -782,6 +782,12 @@ class TestTpcdsQueryWithProcessingCost(TestTpcdsQuery):
     new_vector.get_value('exec_option')['max_fragment_instances_per_node'] = 2
     self.run_test_case(self.get_workload() + '-q67a', new_vector)
 
+  def test_unpartitioned_probe(self, vector):
+    """Set max_fragment_instances_per_node to 2 to contrast against num_nodes."""
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['max_fragment_instances_per_node'] = 2
+    self.run_test_case('unpartitioned-probe', new_vector)
+
 
 @SkipIfBuildType.dev_build
 @SkipIfDockerizedCluster.insufficient_mem_limit

@@ -619,6 +619,7 @@ public class Planner {
     CoreCount unboundedCores = computeBlockingAwareCores(postOrderFragments, true);
     int coresRequiredUnbounded = Math.max(1, unboundedCores.totalWithoutCoordinator());
     request.setCores_required_unbounded(coresRequiredUnbounded);
+    request.setMax_parallelism_per_node(rootAnalyzer.getMaxParallelismPerNode());
     LOG.info("CoreCountUnbounded=" + unboundedCores
         + ", coresRequiredUnbounded=" + coresRequiredUnbounded);
   }

@@ -1,0 +1,30 @@
+====
+---- QUERY: UNPARTITIONED_PROBE
+# Validate num nodes and num instances from ExecSummary.
+select
+  timestamp_col,
+  rank
+from
+  functional.alltypessmall alts
+  left outer join (
+    select id, dense_rank() over(order by id) as rank, int_col from functional.alltypes
+  ) rank_view on (rank_view.id = alts.id)
+  where rank < 10;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2009-01-01 00:00:00,1
+2009-01-01 00:01:00,2
+2009-01-01 00:02:00.100000000,3
+2009-01-01 00:03:00.300000000,4
+2009-01-01 00:04:00.600000000,5
+2009-01-01 00:05:00.100000000,6
+2009-01-01 00:06:00.150000000,7
+2009-01-01 00:07:00.210000000,8
+2009-01-01 00:08:00.280000000,9
+---- TYPES
+TIMESTAMP, BIGINT
+---- RUNTIME_PROFILE
+row_regex: F03:EXCHANGE SENDER .* 1 .* 2 .*
+row_regex: 05:HASH JOIN .* 1 .* 2 .*
+row_regex: F01:EXCHANGE SENDER .* 1 .* 1 .*
+row_regex: 04:SELECT .* 1 .* 1 .*
+====
