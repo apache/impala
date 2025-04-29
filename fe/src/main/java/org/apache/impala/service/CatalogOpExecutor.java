@@ -1182,8 +1182,11 @@ public class CatalogOpExecutor {
 
   /**
    * Execute the ALTER TABLE command according to the TAlterTableParams and refresh the
-   * table metadata, except for RENAME, ADD PARTITION and DROP PARTITION. This call is
-   * thread-safe, i.e. concurrent operations on the same table are serialized.
+   * table metadata, except for:
+   * - RENAME for Iceberg tables
+   * - RENAME, ADD PARTITION and DROP PARTITION for HDFS tables.
+   * This call is thread-safe, i.e. concurrent operations on the same table are
+   * serialized.
    */
   private void alterTable(TAlterTableParams params, @Nullable String debugAction,
       boolean wantMinimalResult, TDdlExecResponse response, EventSequence catalogTimeline)
@@ -1299,14 +1302,23 @@ public class CatalogOpExecutor {
         case DROP_PARTITION:
           TAlterTableDropPartitionParams dropPartParams =
               params.getDrop_partition_params();
-          // Drop the partition from the corresponding table. If "purge" option is
-          // specified partition data is purged by skipping Trash, if configured.
-          alterTableDropPartition(tbl, dropPartParams.getPartition_set(),
-              dropPartParams.isIf_exists(), dropPartParams.isPurge(),
-              numUpdatedPartitions, catalogTimeline, modification);
-          responseSummaryMsg =
-              "Dropped " + numUpdatedPartitions.getRef() + " partition(s).";
-          reloadMetadata = false;
+          if (tbl instanceof IcebergTable) {
+            // The partitions of Iceberg tables are not listed in HMS. DROP PARTITION is a
+            // metadata-only change for Iceberg tables.
+            updateHmsAfterIcebergOnlyModification(
+                (IcebergTable) tbl, catalogTimeline,modification);
+          } else {
+            // DROP PARTITION for HDFS tables is different, because partitions are listed
+            // in HMS.
+            // Drop the partition from the corresponding table. If "purge" option is
+            // specified partition data is purged by skipping Trash, if configured.
+            alterTableDropPartition(tbl, dropPartParams.getPartition_set(),
+                dropPartParams.isIf_exists(), dropPartParams.isPurge(),
+                numUpdatedPartitions, catalogTimeline, modification);
+            responseSummaryMsg =
+                "Dropped " + numUpdatedPartitions.getRef() + " partition(s).";
+            reloadMetadata = false;
+          }
           break;
         case RENAME_TABLE:
         case RENAME_VIEW:
@@ -1419,6 +1431,13 @@ public class CatalogOpExecutor {
           alterTableOrViewSetOwner(
               tbl, params.getSet_owner_params(), response, catalogTimeline, modification);
           responseSummaryMsg = "Updated table/view.";
+          break;
+        // ALTER a non-managed Iceberg table.
+        case EXECUTE:
+        case SET_PARTITION_SPEC:
+          Preconditions.checkState(tbl instanceof IcebergTable);
+          updateHmsAfterIcebergOnlyModification(
+              (IcebergTable) tbl, catalogTimeline, modification);
           break;
         default:
           throw new UnsupportedOperationException(
@@ -1582,7 +1601,6 @@ public class CatalogOpExecutor {
         case EXECUTE:
           Preconditions.checkState(params.isSetSet_execute_params());
           // All the EXECUTE functions operate only on Iceberg data.
-          needsToUpdateHms = false;
           TAlterTableExecuteParams setExecuteParams = params.getSet_execute_params();
           if (setExecuteParams.isSetExecute_rollback_params()) {
             String rollbackSummary = IcebergCatalogOpExecutor.alterTableExecuteRollback(
@@ -1601,7 +1619,6 @@ public class CatalogOpExecutor {
           break;
         case SET_PARTITION_SPEC:
           // Partition spec is not stored in HMS.
-          needsToUpdateHms = false;
           TAlterTableSetPartitionSpecParams setPartSpecParams =
               params.getSet_partition_spec_params();
           IcebergCatalogOpExecutor.alterTableSetPartitionSpec(tbl,
@@ -1617,8 +1634,7 @@ public class CatalogOpExecutor {
           addSummary(response, "Updated table.");
           break;
         case DROP_PARTITION:
-          // Metadata change only
-          needsToUpdateHms = false;
+          // Partitions are not stored in HMS, this is a metadata change only.
           long droppedPartitions = IcebergCatalogOpExecutor.alterTableDropPartition(
               iceTxn, params.getDrop_partition_params());
           addSummary(
@@ -1633,6 +1649,14 @@ public class CatalogOpExecutor {
               params.getAlter_type());
       }
       catalogTimeline.markEvent("Iceberg operations are prepared for commit");
+      // Modify "transient_lastDdlTime" table property through Iceberg.
+      // Non-managed Iceberg tables also need to update this property in HMS separately
+      // in 'alterTable()', regardless of whether the modification itself needs to update
+      // HMS or affects only Iceberg metadata stored on the file system.
+      Map<String, String> property = new HashMap<>();
+      property.put(Table.TBL_PROP_LAST_DDL_TIME,
+          Long.toString(System.currentTimeMillis() / 1000));
+      IcebergCatalogOpExecutor.setTblProperties(iceTxn, property);
       if (!needsToUpdateHms) {
         // registerInflightEvent() before committing transaction.
         modification.registerInflightEvent();
@@ -1653,8 +1677,7 @@ public class CatalogOpExecutor {
     }
 
     if (!needsToUpdateHms) {
-      // We don't need to update HMS because either it is already done by Iceberg's
-      // HiveCatalog, or we modified the Iceberg data which is not stored in HMS.
+      // We don't need to update HMS because it is already done by Iceberg's HiveCatalog.
       loadTableMetadata(tbl, modification.newVersionNumber(), true, true,
           "ALTER Iceberg TABLE " + params.getAlter_type().name(), debugAction,
           catalogTimeline);
@@ -1681,8 +1704,8 @@ public class CatalogOpExecutor {
 
   /**
    * Iceberg format from V2 supports row-level modifications. We set write modes to
-   * "merge-on-read" which is the write mode Impala will eventually
-   * support (IMPALA-11664). Unless the user specified otherwise in the table properties.
+   * "merge-on-read" which is the write mode Impala supports.
+   * Unless the user specified otherwise in the table properties.
    */
   private void addMergeOnReadPropertiesIfNeeded(IcebergTable tbl,
       Map<String, String> properties) {
@@ -1712,6 +1735,23 @@ public class CatalogOpExecutor {
     if (unsetParams.getTarget() != TTablePropertyType.TBL_PROPERTY) return false;
     IcebergCatalogOpExecutor.unsetTblProperties(iceTxn, unsetParams.getProperty_keys());
     return true;
+  }
+
+  /**
+   * Update HMS about an ALTER TABLE issued on a non-managed Iceberg table. In case the
+   * modification only affects Iceberg metadata, there would be no update to HMS, but
+   * 'transient_lastDdlTime' table property still needs to be updated in Hive Metastore.
+   */
+  private void updateHmsAfterIcebergOnlyModification(IcebergTable tbl,
+      EventSequence catalogTimeline, InProgressTableModification modification)
+      throws ImpalaRuntimeException {
+    // Managed Iceberg tables in HMS are updated by Iceberg's HiveCatalog together with
+    // committing the Iceberg transaction. HMS should not be updated directly in parallel
+    // with that because of potential data loss.
+    Preconditions.checkState(!IcebergUtil.isHiveCatalog(tbl.getMetaStoreTable()));
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
+    org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
+    applyAlterAndInProgressTableModification(msTbl, catalogTimeline, modification);
   }
 
   /**
