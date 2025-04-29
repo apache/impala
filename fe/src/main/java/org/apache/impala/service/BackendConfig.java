@@ -573,4 +573,8 @@ public class BackendConfig {
   public int getMaxOutstandingEventsOnExecutors() {
     return backendCfg_.max_outstanding_events_on_executors;
   }
+
+  public boolean consolidateGrantRevokeRequests() {
+    return backendCfg_.consolidate_grant_revoke_requests;
+  }
 }

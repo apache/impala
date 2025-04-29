@@ -337,4 +337,6 @@ struct TBackendGflags {
   152: required i32 min_event_processor_idle_ms
 
   153: required i32 max_outstanding_events_on_executors
+
+  154: required bool consolidate_grant_revoke_requests
 }

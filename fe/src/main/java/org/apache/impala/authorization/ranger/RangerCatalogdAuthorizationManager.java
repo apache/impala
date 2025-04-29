@@ -30,6 +30,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.UnsupportedFeatureException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecResponse;
@@ -430,7 +431,8 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
       }
     }
 
-    return consolidateGrantRevokeRequests(requests);
+    return BackendConfig.INSTANCE.consolidateGrantRevokeRequests() ?
+        consolidateGrantRevokeRequests(requests) : requests;
   }
 
   private static GrantRevokeRequest createGrantRevokeRequest(String grantor, String user,

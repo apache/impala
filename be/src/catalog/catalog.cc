@@ -48,6 +48,9 @@ DEFINE_int32(initial_hms_cnxn_timeout_s, 120,
     "before exiting.");
 DEFINE_bool(enable_reading_puffin_stats, false, "Impala will only read Iceberg Puffin "
     "stats files if this flag is set to true.");
+DEFINE_bool(consolidate_grant_revoke_requests, false, "Impala will create only one "
+    "Ranger policy when there are multiple columns in the GRANT statement if this flag "
+    "is set to true.");
 
 Catalog::Catalog() {
   JniMethodDescriptor methods[] = {

@@ -142,6 +142,7 @@ DECLARE_int32(num_db_event_executors);
 DECLARE_int32(num_table_event_executors_per_db_event_executor);
 DECLARE_int32(min_event_processor_idle_ms);
 DECLARE_int32(max_outstanding_events_on_executors);
+DECLARE_bool(consolidate_grant_revoke_requests);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -532,6 +533,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_min_event_processor_idle_ms(FLAGS_min_event_processor_idle_ms);
   cfg.__set_max_outstanding_events_on_executors(
       FLAGS_max_outstanding_events_on_executors);
+  cfg.__set_consolidate_grant_revoke_requests(FLAGS_consolidate_grant_revoke_requests);
   return Status::OK();
 }
 

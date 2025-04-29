@@ -1263,6 +1263,17 @@ class TestRanger(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS, reset_ranger=True)
   def test_grant_multiple_columns(self):
+    self._test_grant_multiple_columns(13)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS,
+    catalogd_args="{0} {1}".format(CATALOGD_ARGS, "--consolidate_grant_revoke_requests"),
+    reset_ranger=True)
+  def test_grant_multiple_columns_consolidate_grant_revoke_requests(self):
+    self._test_grant_multiple_columns(1)
+
+  def _test_grant_multiple_columns(self, expected_num_policies):
     admin_client = self.create_impala_client(user=ADMIN)
     access_type = "select"
     db = "functional"
@@ -1297,7 +1308,7 @@ class TestRanger(CustomClusterTestSuite):
         # After the GRANT statement above, there should be only one single Ranger policy
         # that grants the privilege of 'access_type' on the column 'db'.'tbl'.'col' to
         # the principal 'principal_name' for each column in 'cols'.
-        assert len(policy_ids) == 1
+        assert len(policy_ids) == expected_num_policies
       finally:
         admin_client.execute("revoke {0}({1}) on table {2}.{3} from {4} {5}"
             .format(access_type, cols_str, db, tbl, kw, principal_name))
