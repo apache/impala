@@ -1618,6 +1618,7 @@ class TestEventSyncFailures(TestEventProcessingCustomConfigsBase):
     assert len(results.data) == 1
 
 
+@SkipIfFS.hive
 class TestEventSyncWaiting(TestEventProcessingCustomConfigsBase):
 
   @CustomClusterTestSuite.with_args(
