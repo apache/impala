@@ -176,6 +176,9 @@ class QueryDriver {
   void TryQueryRetry(ClientRequestState* client_request_state, Status* error,
       bool* was_retried = nullptr);
 
+  /// Sets the execution time limit based on the query option.
+  void SetExecTimeLimit(const ClientRequestState* request_state);
+
   /// Finalize this QueryDriver. Must be called before Unregister(...) is called.
   /// This indicates that the query should no longer be considered registered from the
   /// client's point of view. Returns an INVALID_QUERY_HANDLE error if finalization

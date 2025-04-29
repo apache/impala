@@ -2057,6 +2057,9 @@ public class Frontend {
       // can handle various planner fallback execution logic (e.g. allowing one
       // planner, if execution fails, to call a different planner)
       TExecRequest result = getTExecRequestWithFallback(planCtx, timeline);
+      DebugUtils.executeDebugAction(
+          planCtx.getQueryContext().client_request.query_options.getDebug_action(),
+          DebugUtils.PLAN_CREATE);
       timeline.markEvent("Planning finished");
       result.setTimeline(timeline.toThrift());
       result.setProfile(FrontendProfile.getCurrent().emitAsThrift());

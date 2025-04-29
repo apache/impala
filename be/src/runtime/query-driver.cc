@@ -264,6 +264,10 @@ void QueryDriver::TryQueryRetry(
   }
 }
 
+void QueryDriver::SetExecTimeLimit(const ClientRequestState* request_state) {
+  parent_server_->SetExecTimeLimit(request_state);
+}
+
 void QueryDriver::RetryQueryFromThread(
     const Status& error, const shared_ptr<QueryDriver>& query_driver) {
   // This method does not require holding the ClientRequestState::lock_ for the original

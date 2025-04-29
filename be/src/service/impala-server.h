@@ -931,6 +931,10 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Collect ExecSummary and update it to the profile in request_state
   void UpdateExecSummary(const QueryHandle& query_handle) const;
 
+  /// Sets the execution time limit based on the query option.
+  /// Note: This function may acquire the query_expiration_lock_.
+  void SetExecTimeLimit(const ClientRequestState* request_state);
+
   /// Initialize "default_configs_" to show the default values for ImpalaQueryOptions and
   /// "support_start_over/false" to indicate that Impala does not support start over
   /// in the fetch call.

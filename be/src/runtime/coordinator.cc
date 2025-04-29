@@ -531,6 +531,7 @@ Status Coordinator::StartBackendExec() {
   VLOG_QUERY << "starting execution on " << num_backends << " backends for query_id="
              << PrintId(query_id());
   query_events_->MarkEvent(Substitute("Ready to start on $0 backends", num_backends));
+  parent_query_driver_->SetExecTimeLimit(parent_request_state_);
 
   // Serialize the TQueryCtx once and pass it to each backend. The serialized buffer must
   // stay valid until WaitOnExecRpcs() has returned.

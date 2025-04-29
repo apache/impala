@@ -116,6 +116,9 @@ public class DebugUtils {
   public static final String COLLECT_CATALOG_RESULTS_DELAY =
       "collect_catalog_results_delay";
 
+  // debug action label for plan creation.
+  public static final String PLAN_CREATE = "plan_create";
+
   /**
    * Returns true if the label of action is set in the debugActions
    */

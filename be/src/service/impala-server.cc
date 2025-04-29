@@ -1527,13 +1527,12 @@ Status ImpalaServer::SetQueryInflight(
 
   // If the query has a timeout or time limit, schedule checks.
   int32_t idle_timeout_s = GetIdleTimeout(query_handle->query_options());
-  int32_t exec_time_limit_s = query_handle->query_options().exec_time_limit_s;
   int64_t cpu_limit_s = query_handle->query_options().cpu_limit_s;
   int64_t scan_bytes_limit = query_handle->query_options().scan_bytes_limit;
   int64_t join_rows_produced_limit =
       query_handle->query_options().join_rows_produced_limit;
-  if (idle_timeout_s > 0 || exec_time_limit_s > 0 || cpu_limit_s > 0
-      || scan_bytes_limit > 0 || join_rows_produced_limit > 0) {
+  if (idle_timeout_s > 0 || cpu_limit_s > 0 || scan_bytes_limit > 0
+      || join_rows_produced_limit > 0) {
     DebugActionNoFail(query_handle->query_options(), "SET_QUERY_INFLIGHT_EXPIRATION");
     lock_guard<mutex> l2(query_expiration_lock_);
     int64_t now = UnixMillis();
@@ -1542,12 +1541,6 @@ Status ImpalaServer::SetQueryInflight(
                  << PrettyPrinter::Print(idle_timeout_s, TUnit::TIME_S);
       queries_by_timestamp_.emplace(ExpirationEvent{
           now + (1000L * idle_timeout_s), query_id, ExpirationKind::IDLE_TIMEOUT});
-    }
-    if (exec_time_limit_s > 0) {
-      VLOG_QUERY << "Query " << PrintId(query_id) << " has execution time limit of "
-                 << PrettyPrinter::Print(exec_time_limit_s, TUnit::TIME_S);
-      queries_by_timestamp_.emplace(ExpirationEvent{
-          now + (1000L * exec_time_limit_s), query_id, ExpirationKind::EXEC_TIME_LIMIT});
     }
     if (cpu_limit_s > 0 || scan_bytes_limit > 0 || join_rows_produced_limit > 0) {
       if (cpu_limit_s > 0) {
@@ -1567,6 +1560,18 @@ Status ImpalaServer::SetQueryInflight(
     }
   }
   return Status::OK();
+}
+
+void ImpalaServer::SetExecTimeLimit(const ClientRequestState* request_state) {
+  int32_t exec_time_limit_s = request_state->query_options().exec_time_limit_s;
+  if (exec_time_limit_s <= 0) return;
+  const TUniqueId& query_id = request_state->query_id();
+  int64_t now = UnixMillis();
+  VLOG_QUERY << "Query " << PrintId(query_id) << " starts execution with time limit of "
+             << PrettyPrinter::Print(exec_time_limit_s, TUnit::TIME_S);
+  lock_guard<mutex> l(query_expiration_lock_);
+  queries_by_timestamp_.emplace(ExpirationEvent{
+      now + (1000L * exec_time_limit_s), query_id, ExpirationKind::EXEC_TIME_LIMIT});
 }
 
 void ImpalaServer::UpdateExecSummary(const QueryHandle& query_handle) const {
