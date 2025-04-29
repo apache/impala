@@ -481,13 +481,32 @@ Status ExecEnv::Init() {
   }
 
 #if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
+  const static char* TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES =
+    "tcmalloc.max_total_thread_cache_bytes";
   // Change the total TCMalloc thread cache size if necessary.
   if (FLAGS_tcmalloc_max_total_thread_cache_bytes > 0 &&
       !MallocExtension::instance()->SetNumericProperty(
-          "tcmalloc.max_total_thread_cache_bytes",
+          TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES,
           FLAGS_tcmalloc_max_total_thread_cache_bytes)) {
-    return Status("Failed to change TCMalloc total thread cache size.");
+    return Status(Substitute("Failed to change {0}",
+        TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES));
   }
+  // Read the value back from tcmalloc to verify it matches what we set.
+  size_t actual_max_total_thread_cache_bytes = 0;
+  bool retval = MallocExtension::instance()->GetNumericProperty(
+    TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES,
+    &actual_max_total_thread_cache_bytes);
+  if (!retval) {
+    return Status(Substitute("Could not retrieve value of {0}.",
+        TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES));
+  }
+  if (actual_max_total_thread_cache_bytes !=
+      FLAGS_tcmalloc_max_total_thread_cache_bytes) {
+    LOG(WARNING) << "Set " << TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES << " to "
+                 << FLAGS_tcmalloc_max_total_thread_cache_bytes << " bytes but actually "
+                 << "using " << actual_max_total_thread_cache_bytes << " bytes.";
+  }
+
   // A MemTracker for TCMalloc overhead which is the difference between the physical bytes
   // reserved (TcmallocMetric::PHYSICAL_BYTES_RESERVED) and the bytes in use
   // (TcmallocMetrics::BYTES_IN_USE). This overhead accounts for all the cached freelists

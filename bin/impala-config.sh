@@ -81,13 +81,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=63-3a0ac57d41
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=491-3a0ac57d41
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=78-49a326be6f
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=509-49a326be6f
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-810d0f47572d9ac4036c34eb2ad6342d51d510cd}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-49a326be6f1836127b1189cea71ea9832b31b7aa}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -135,7 +135,7 @@ export IMPALA_GFLAGS_VERSION=2.2.0-p2
 unset IMPALA_GFLAGS_URL
 export IMPALA_GLOG_VERSION=0.3.5-p3
 unset IMPALA_GLOG_URL
-export IMPALA_GPERFTOOLS_VERSION=2.10
+export IMPALA_GPERFTOOLS_VERSION=2.10-p1
 unset IMPALA_GPERFTOOLS_URL
 export IMPALA_GTEST_VERSION=1.14.0
 unset IMPALA_GTEST_URL
