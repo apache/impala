@@ -484,6 +484,9 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/alter-table-set-column-stats', vector,
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
+  # Run serially as alter waits for catalog to catch up before marking "DDL finished" so
+  # we don't have a good way to confirm the alter timeline if catalog gets delayed.
+  @pytest.mark.execute_serially
   def test_alter_table_rename_independent(self, vector, unique_database):
     """Tests that two alter table renames run concurrently do not block each other."""
 
