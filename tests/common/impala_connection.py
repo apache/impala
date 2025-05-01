@@ -1142,12 +1142,27 @@ class MinimalHS2Connection(ImpalaConnection):
   def get_impala_exec_state(self, operation_handle):  # noqa: U100
     raise NotImplementedError()
 
-  def get_runtime_profile(self, operation_handle,  # noqa: U100
-                          profile_format=TRuntimeProfileFormat.STRING):  # noqa: U100
-    raise NotImplementedError()
+  def get_runtime_profile(self, operation_handle,
+                          profile_format=TRuntimeProfileFormat.STRING):
+    return self.__get_operation(operation_handle).get_profile(profile_format)
 
   def wait_for_admission_control(self, operation_handle, timeout_s=60):  # noqa: U100
     raise NotImplementedError()
 
   def get_exec_summary(self, operation_handle):  # noqa: U100
     raise NotImplementedError()
+
+  def wait_for_finished_timeout(self, operation_handle, timeout):
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+      start_rpc_time = time.time()
+      hs2_state = self.get_state(operation_handle)
+      rpc_time = time.time() - start_rpc_time
+      # if the rpc succeeded, the output is the query state
+      if hs2_state == "FINISHED_STATE":
+        return True
+      elif hs2_state == "ERROR_STATE":
+        break
+      if rpc_time < DEFAULT_SLEEP_INTERVAL:
+        time.sleep(DEFAULT_SLEEP_INTERVAL - rpc_time)
+    return False
