@@ -198,7 +198,7 @@ function DrawBars(svg, rownum, row_height, events, xoffset, px_per_ns) {
   // }
   const BAR_HEIGHT = row_height - 2;
   const LAST_E_INDEX = events.length - 1;
-  const LAST_TS_INDEX = events[last_e_index].ts_list.length - 1;
+  const LAST_TS_INDEX = events[LAST_E_INDEX].ts_list.length - 1;
   let plan_node = getSvgGroup();
   plan_node.classList.add("plan_node");
   // coordinates start with (0,0) in the top-left corner
@@ -275,15 +275,15 @@ function DrawBars(svg, rownum, row_height, events, xoffset, px_per_ns) {
     let top_edge_ts, bottom_edge_ts;
     if (bucketed) {
       top_edge_ts = events[LAST_E_INDEX].parts[0].max;
-      bottom_edge_ts = events[LAST_E_INDEX].parts[bucket_size - 1].max;
+      bottom_edge_ts = events[LAST_E_INDEX].parts[BUCKET_SIZE - 1].max;
     } else {
       top_edge_ts = events[LAST_E_INDEX].ts_list[0];
       bottom_edge_ts = events[LAST_E_INDEX].ts_list[LAST_TS_INDEX];
     }
     plan_node.appendChild(getSvgLine(stroke_fill_colors.black, xoffset, y,
         xoffset + top_edge_ts * px_per_ns, y, false));
-    plan_node.appendChild(getSvgLine(stroke_fill_colors.black, xoffset, y + bar_height,
-        xoffset +  bottom_edge_ts * px_per_ns, y + bar_height,
+    plan_node.appendChild(getSvgLine(stroke_fill_colors.black, xoffset, y + BAR_HEIGHT,
+        xoffset +  bottom_edge_ts * px_per_ns, y + BAR_HEIGHT,
         false));
   }
 
