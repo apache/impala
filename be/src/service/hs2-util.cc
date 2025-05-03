@@ -85,7 +85,6 @@ void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
   string* nulls;
   bool is_null;
   switch (type.types[0].scalar_type.type) {
-    case TPrimitiveType::NULL_TYPE:
     case TPrimitiveType::BOOLEAN:
       is_null = !col_val.__isset.bool_val;
       column->boolVal.values.push_back(col_val.bool_val);
@@ -117,6 +116,7 @@ void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
       column->doubleVal.values.push_back(col_val.double_val);
       nulls = &column->doubleVal.nulls;
       break;
+    case TPrimitiveType::NULL_TYPE:
     case TPrimitiveType::TIMESTAMP:
     case TPrimitiveType::DATE:
     case TPrimitiveType::STRING:
@@ -150,6 +150,25 @@ void ReserveSpace(int reserve_count, T* hs2Vals) {
   // behaviour from repeated small increases in size.
   hs2Vals->values.reserve(BitUtil::RoundUpToPowerOfTwo(reserve_count));
   hs2Vals->nulls.reserve(BitUtil::RoundUpToPowerOfTwo(num_null_bytes));
+}
+
+// Implementation for NULL.
+// Internally, Impala implement NULL expession using nullable-BooleanVal (IMPALA-914).
+// To match with HiveServer2 behavior, IMPALA-14027 change the result mapping to use
+// TColumn.stringVal rather than TColumn.boolVal.
+static void NullExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
+    int start_idx, int num_rows, uint32_t output_row_idx,
+    apache::hive::service::cli::thrift::TColumn* column) {
+  FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
+    // It is actually not necessary to evaluate expr_eval here. But we choose to do it
+    // and DCHECK the result to be consistent with other functions.
+    BooleanVal val = expr_eval->GetBooleanVal(it.Get());
+    DCHECK(val.is_null);
+    // emplace empty string and set null bit.
+    column->stringVal.values.emplace_back();
+    SetNullBit(output_row_idx, val.is_null, &column->stringVal.nulls);
+    ++output_row_idx;
+  }
 }
 
 // Implementation for BOOL.
@@ -454,6 +473,9 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
 
   switch (type.types[0].scalar_type.type) {
     case TPrimitiveType::NULL_TYPE:
+      ReserveSpace(expected_result_count, &column->stringVal);
+      NullExprValuesToHS2TColumn(
+          expr_eval, batch, start_idx, num_rows, output_row_idx, column);
     case TPrimitiveType::BOOLEAN:
       ReserveSpace(expected_result_count, &column->boolVal);
       BoolExprValuesToHS2TColumn(
@@ -598,9 +620,9 @@ void impala::ExprValueToHS2TColumnValue(const void* value, const TColumnType& ty
   DCHECK_EQ(1, type.types[0].__isset.scalar_type);
   switch (type.types[0].scalar_type.type) {
     case TPrimitiveType::NULL_TYPE:
-      // Set NULLs in the bool_val.
-      hs2_col_val->__isset.boolVal = true;
-      hs2_col_val->boolVal.__isset.value = false;
+      // Set NULLs in the stringVal, but don't set the value itself.
+      hs2_col_val->__isset.stringVal = true;
+      hs2_col_val->stringVal.__isset.value = false;
       break;
     case TPrimitiveType::BOOLEAN:
       hs2_col_val->__isset.boolVal = true;
@@ -868,10 +890,8 @@ thrift::TTypeEntry impala::ColumnToHs2Type(
   const ColumnType& type = ColumnType::FromThrift(columnType);
   thrift::TPrimitiveTypeEntry type_entry;
   switch (type.type) {
-    // Map NULL_TYPE to BOOLEAN, otherwise Hive's JDBC driver won't
-    // work for queries like "SELECT NULL" (IMPALA-914).
     case TYPE_NULL:
-      type_entry.__set_type(thrift::TTypeId::BOOLEAN_TYPE);
+      type_entry.__set_type(thrift::TTypeId::NULL_TYPE);
       break;
     case TYPE_BOOLEAN:
       type_entry.__set_type(thrift::TTypeId::BOOLEAN_TYPE);

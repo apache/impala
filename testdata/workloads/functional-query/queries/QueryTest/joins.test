@@ -195,7 +195,7 @@ limit 6
 ---- TYPES
 int, tinyint, null
 ---- HS2_TYPES
-int, tinyint, boolean
+int, tinyint, null
 ====
 ---- QUERY
 # check cross joins within a subquery

@@ -599,10 +599,10 @@ public class JdbcTest extends JdbcTestBase {
 
   @Test
   public void testSelectNull() throws SQLException {
-    // Regression test for IMPALA-914.
+    // Regression test for IMPALA-914 / IMPALA-1370 / IMPALA-14027.
     ResultSet rs = con_.createStatement().executeQuery("select NULL");
-    // Expect the column to be of type BOOLEAN to be compatible with Hive.
-    assertEquals(rs.getMetaData().getColumnType(1), Types.BOOLEAN);
+    // Expect the column to be of type NULL to be compatible with HiveServer2.
+    assertEquals(rs.getMetaData().getColumnType(1), Types.NULL);
     try {
       // We expect exactly one result row with a NULL inside the first column.
       assertTrue(rs.next());

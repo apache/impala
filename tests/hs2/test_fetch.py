@@ -242,21 +242,21 @@ class TestFetch(HS2TestSuite):
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
 
-    # Check that the expected type is boolean (for compatibility with Hive, see also
-    # IMPALA-914)
+    # Check that the expected type is NULL_TYPE (for compatibility with HiveServer2,
+    # see also IMPALA-914, IMPALA-1370, and IMPALA-14027 for history).
     get_result_metadata_req = TCLIService.TGetResultSetMetadataReq()
     get_result_metadata_req.operationHandle = execute_statement_resp.operationHandle
     get_result_metadata_resp = \
         self.hs2_client.GetResultSetMetadata(get_result_metadata_req)
     col = get_result_metadata_resp.schema.columns[0]
-    assert col.typeDesc.types[0].primitiveEntry.type == TTypeId.BOOLEAN_TYPE
+    assert col.typeDesc.types[0].primitiveEntry.type == TTypeId.NULL_TYPE
 
-    # Check that the actual type is boolean
+    # Check that the actual type is string
     fetch_results_req = TCLIService.TFetchResultsReq()
     fetch_results_req.operationHandle = execute_statement_resp.operationHandle
     fetch_results_req.maxRows = 1
     fetch_results_resp = self.fetch(fetch_results_req)
-    assert fetch_results_resp.results.columns[0].boolVal is not None
+    assert fetch_results_resp.results.columns[0].stringVal is not None
 
     assert self.column_results_to_string(
       fetch_results_resp.results.columns) == (1, "NULL\n")

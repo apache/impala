@@ -463,7 +463,7 @@ values(1, 'a', NULL, 10.0)
 ---- TYPES
 tinyint, string, null, decimal
 ---- HS2_TYPES
-tinyint, string, boolean, decimal
+tinyint, string, null, decimal
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 1,'a',NULL,10.0
 ====

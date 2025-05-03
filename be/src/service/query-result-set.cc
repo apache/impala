@@ -410,7 +410,6 @@ int HS2ColumnarResultSet::AddRows(
       primitiveType = TPrimitiveType::STRING;
     }
     switch (primitiveType) {
-      case TPrimitiveType::NULL_TYPE:
       case TPrimitiveType::BOOLEAN:
         StitchNulls(
             num_rows_, rows_added, start_idx, from->boolVal.nulls, &(to->boolVal.nulls));
@@ -454,6 +453,7 @@ int HS2ColumnarResultSet::AddRows(
             from->doubleVal.values.begin() + start_idx,
             from->doubleVal.values.begin() + start_idx + rows_added);
         break;
+      case TPrimitiveType::NULL_TYPE:
       case TPrimitiveType::TIMESTAMP:
       case TPrimitiveType::DATE:
       case TPrimitiveType::DECIMAL:
@@ -509,7 +509,6 @@ void HS2ColumnarResultSet::InitColumns() {
       DCHECK(type_nodes[0].__isset.scalar_type);
       TPrimitiveType::type input_type = type_nodes[0].scalar_type.type;
       switch (input_type) {
-        case TPrimitiveType::NULL_TYPE:
         case TPrimitiveType::BOOLEAN:
           col_output.__isset.boolVal = true;
           break;
@@ -529,6 +528,7 @@ void HS2ColumnarResultSet::InitColumns() {
         case TPrimitiveType::DOUBLE:
           col_output.__isset.doubleVal = true;
           break;
+        case TPrimitiveType::NULL_TYPE:
         case TPrimitiveType::TIMESTAMP:
         case TPrimitiveType::DATE:
         case TPrimitiveType::DECIMAL:

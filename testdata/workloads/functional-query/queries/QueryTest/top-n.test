@@ -903,7 +903,7 @@ limit 6
 int, tinyint, null
 ---- HS2_TYPES
 # HS2 maps NULL to BOOLEAN
-int, tinyint, boolean
+int, tinyint, null
 ====
 ---- QUERY
 # check cross joins within a subquery
