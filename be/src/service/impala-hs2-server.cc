@@ -890,25 +890,33 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
   // Secret is inherited from session.
   TUniqueId query_id;
   TUniqueId op_secret;
-  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
-      request.operationHandle.operationId, &query_id, &op_secret),
-      SQLSTATE_GENERAL_ERROR);
+  Status status = THandleIdentifierToTUniqueId(
+      request.operationHandle.operationId, &query_id, &op_secret);
+  if (!status.ok()) {
+    return_val.__set_operationState(TOperationState::ERROR_STATE);
+    HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
+  }
   VLOG_ROW << "GetOperationStatus(): query_id=" << PrintId(query_id);
 
-  // Make query id available to the following HS2_RETURN_IF_ERROR().
+  // Make query id available to the following HS2_RETURN_ERROR().
   ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_id);
 
   QueryHandle query_handle;
-  HS2_RETURN_IF_ERROR(
-      return_val, GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
+  status = GetActiveQueryHandle(query_id, &query_handle);
+  if (!status.ok()) {
+    return_val.__set_operationState(TOperationState::ERROR_STATE);
+    HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
+  }
 
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = query_handle->session_id();
   shared_ptr<SessionState> session;
-  HS2_RETURN_IF_ERROR(return_val,
-      session_handle.WithSession(
-          session_id, SecretArg::Operation(op_secret, query_id), &session),
-      SQLSTATE_GENERAL_ERROR);
+  status = session_handle.WithSession(
+      session_id, SecretArg::Operation(op_secret, query_id), &session);
+  if (!status.ok()) {
+    return_val.__set_operationState(TOperationState::ERROR_STATE);
+    HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
+  }
 
   // When using long polling, this waits up to long_polling_time_ms milliseconds for
   // query completion.polling

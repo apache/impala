@@ -29,7 +29,7 @@ from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.common.impala_connection import MinimalHS2Connection
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT, ImpalaTestSuite
 from tests.common.test_dimensions import add_mandatory_exec_option
-from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_vector import HS2, ImpalaTestDimension
 from tests.util.cancel_util import cancel_query_and_validate_state
 from tests.verifiers.metric_verifier import MetricVerifier
 
@@ -88,6 +88,11 @@ USE_KILL_QUERY_STATEMENT = [False, True]
 
 
 class TestCancellation(ImpalaTestSuite):
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
+
   @classmethod
   def get_workload(self):
     return 'tpch'
@@ -179,7 +184,8 @@ class TestCancellation(ImpalaTestSuite):
 
     # Execute the query multiple times, cancelling it each time.
     for i in range(vector.get_value('num_cancellation_iterations')):
-      cancel_query_and_validate_state(self.client, query,
+      cancel_query_and_validate_state(
+          query,
           vector.get_value('exec_option'), vector.get_value('table_format'),
           vector.get_value('cancel_delay'), vector.get_value('join_before_close'),
           use_kill_query_statement=vector.get_value('use_kill_query_statement'))
@@ -246,7 +252,6 @@ class TestCancellation(ImpalaTestSuite):
       assert "Invalid or unknown query handle" in str(
           cancel_client.fetch_error(query_handle))
 
-
   def teardown_method(self, method):
     # For some reason it takes a little while for the query to get completely torn down
     # when the debug action is WAIT, causing TestValidateMetrics.test_metrics_are_zero to
@@ -257,6 +262,11 @@ class TestCancellation(ImpalaTestSuite):
 
 
 class TestCancellationParallel(TestCancellation):
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestCancellationParallel, cls).add_test_dimensions()
@@ -267,6 +277,11 @@ class TestCancellationParallel(TestCancellation):
 
 
 class TestCancellationSerial(TestCancellation):
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestCancellationSerial, cls).add_test_dimensions()
@@ -299,6 +314,11 @@ class TestCancellationSerial(TestCancellation):
 
 
 class TestCancellationFullSort(TestCancellation):
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestCancellationFullSort, cls).add_test_dimensions()
@@ -322,6 +342,11 @@ class TestCancellationFullSort(TestCancellation):
 
 
 class TestCancellationFinalizeDelayed(ImpalaTestSuite):
+
+  @classmethod
+  def default_test_protocol(cls):
+    return HS2
+
   @classmethod
   def get_workload(self):
     return 'tpch'
@@ -344,5 +369,6 @@ class TestCancellationFinalizeDelayed(ImpalaTestSuite):
   def test_cancellation(self, vector):
     query = "select l_returnflag from tpch_parquet.lineitem"
     cancel_delay = 0
-    cancel_query_and_validate_state(self.client, query,
+    cancel_query_and_validate_state(
+        query,
         vector.get_value('exec_option'), vector.get_value('table_format'), cancel_delay)

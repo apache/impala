@@ -26,7 +26,7 @@ from tests.common.errors import Timeout
 from tests.common.impala_connection import FINISHED
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_vector import HS2, ImpalaTestDimension
 from tests.util.cancel_util import cancel_query_and_validate_state
 from tests.util.failpoints_util import execute_query_expect_debug_action_failure
 
@@ -326,6 +326,10 @@ class TestResultSpoolingCancellation(ImpalaTestSuite):
   _cancel_delay_in_seconds = [0, 0.01, 0.1, 1, 4]
 
   @classmethod
+  def default_test_protocol(cls):
+    return HS2
+
+  @classmethod
   def get_workload(cls):
     return 'tpch'
 
@@ -345,7 +349,8 @@ class TestResultSpoolingCancellation(ImpalaTestSuite):
 
   def test_cancellation(self, vector):
     vector.get_value('exec_option')['spool_query_results'] = 'true'
-    cancel_query_and_validate_state(self.client, vector.get_value('query'),
+    cancel_query_and_validate_state(
+        vector.get_value('query'),
         vector.get_value('exec_option'), vector.get_value('table_format'),
         vector.get_value('cancel_delay'))
 
@@ -359,9 +364,7 @@ class TestResultSpoolingCancellation(ImpalaTestSuite):
       handle = self.execute_query_async(vector.get_value('query'),
           vector.get_value('exec_option'))
       sleep(vector.get_value('cancel_delay'))
-      cancel_result = self.client.cancel(handle)
-      assert cancel_result.status_code == 0,\
-          "Unexpected status code from cancel request: {0}".format(cancel_result)
+      self.client.cancel(handle)
     finally:
       if handle: self.client.close_query(handle)
 

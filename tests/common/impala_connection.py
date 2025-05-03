@@ -563,10 +563,6 @@ class BeeswaxConnection(ImpalaConnection):
     query_id = operation_handle.get_handle().id
     return query_id if query_id else str(operation_handle)
 
-  def log_handle(self, operation_handle, message):
-    handle_id = self.handle_id(operation_handle)
-    LOG.info(u"{0}: {1}".format(handle_id, message))
-
   def get_query_id(self, operation_handle):
     return operation_handle.get_handle().id
 
@@ -579,7 +575,7 @@ class ImpylaHS2Connection(ImpalaConnection):
   """
 
   # ClientRequestState::TOperationState()
-  __OPERATION_STATE_TO_EXEC_STATE = {
+  OPERATION_STATE_TO_EXEC_STATE = {
     'INITIALIZED_STATE': INITIALIZED,
     'PENDING_STATE': PENDING,
     'RUNNING_STATE': RUNNING,
@@ -825,7 +821,7 @@ class ImpylaHS2Connection(ImpalaConnection):
 
   def get_impala_exec_state(self, operation_handle):
     try:
-      return self.__OPERATION_STATE_TO_EXEC_STATE[self.get_state(operation_handle)]
+      return self.OPERATION_STATE_TO_EXEC_STATE[self.get_state(operation_handle)]
     except impyla_error.Error:
       return ERROR
     except Exception as e:
@@ -1051,16 +1047,28 @@ class MinimalHS2Connection(ImpalaConnection):
     self.__conn = hs2.connect(host, port, auth_mechanism='NOSASL')
     self.__user = user if user is not None else getpass.getuser()
     self.__session = self.__conn.open_session(self.__user)
+    self.__query_options = dict()
 
   def connect(self):
     pass  # Do nothing
 
   def close(self):
-    LOG.info("-- closing connection to: %s" % self.__host_port)
+    self.log_client("closing connection to: %s" % self.__host_port)
     try:
       self.__session.close()
     finally:
       self.__conn.close()
+
+  def __log_execute(self, sql_stmt):
+    session_id = session_handle_to_session_id(self.__session.handle)
+    self.log_client(
+      u"executing at {0}. session: {1} user: {2}\n{3}".format(
+        self.__host_port, session_id, self.__user, format_sql_for_logging(sql_stmt))
+    )
+
+  def log_client(self, message):
+    """Log 'message' at INFO level, prefixed wih the protocol name of this connection."""
+    LOG.info(u"minimal_{0}: {1}".format(self.get_test_protocol(), message))
 
   def execute(self, sql_stmt, user=None, fetch_profile_after_close=False,  # noqa: U100
               fetch_exec_summary=False,  # noqa: U100
@@ -1068,9 +1076,10 @@ class MinimalHS2Connection(ImpalaConnection):
     raise NotImplementedError()
 
   def execute_async(self, sql_stmt):
-    hs2_operation = self.__session.execute(sql_stmt)
+    self.__log_execute(sql_stmt)
+    hs2_operation = self.__session.execute(sql_stmt, configuration=self.__query_options)
     operation_handle = MinimalHS2OperationHandle(hs2_operation.handle, sql_stmt)
-    LOG.info("Started query {0}".format(operation_handle))
+    self.log_handle(operation_handle, "query started")
     return operation_handle
 
   def __get_operation(self, operation_handle):
@@ -1081,7 +1090,7 @@ class MinimalHS2Connection(ImpalaConnection):
     Fetch the results of the query. It will block the current connection if the results
     are not available yet.
     """
-    LOG.info("-- fetching results from: {0}".format(operation_handle))
+    self.log_handle(operation_handle, "fetching results")
     return self.__get_operation(operation_handle).fetch(max_rows=max_rows)
 
   def fetch_error(self, operation_handle):
@@ -1111,11 +1120,11 @@ class MinimalHS2Connection(ImpalaConnection):
       time.sleep(0.1)
 
   def cancel(self, operation_handle):
-    LOG.info("-- canceling operation: {0}".format(operation_handle))
+    self.log_handle(operation_handle, "canceling operation")
     return self.__get_operation(operation_handle).cancel()
 
   def close_query(self, operation_handle):
-    LOG.info("-- closing query for operation handle: {0}".format(operation_handle))
+    self.log_handle(operation_handle, "closing query for operation")
     return self.__get_operation(operation_handle).close()
 
   def state_is_finished(self, operation_handle):  # noqa: U100
@@ -1124,11 +1133,22 @@ class MinimalHS2Connection(ImpalaConnection):
   def get_log(self, operation_handle):
     return self.__get_operation(operation_handle).get_log()
 
-  def set_configuration_option(self, name, value):  # noqa: U100
-    raise NotImplementedError()
+  def set_configuration_option(self, name, value, is_log_sql=True):
+    # Only set the option if it's not already set to the same value.
+    # value must be parsed to string.
+    name = name.lower()
+    value = str(value)
+    if self.__query_options.get(name, "") != value:
+      self.__query_options[name] = value
+      if is_log_sql:
+        self.log_client("\n\nset {0}={1};\n".format(name, value))
+      return True
+    return False
 
   def clear_configuration(self):
-    raise NotImplementedError()
+    self.__query_options.clear()
+    if hasattr(tests.common, "current_node"):
+      self.set_configuration_option("client_identifier", tests.common.current_node)
 
   def get_host_port(self):
     return self.__host_port
@@ -1136,21 +1156,36 @@ class MinimalHS2Connection(ImpalaConnection):
   def get_test_protocol(self):
     return HS2
 
-  def handle_id(self, operation_handle):  # noqa: U100
+  def handle_id(self, operation_handle):
     return str(operation_handle)
 
   def get_admission_result(self, operation_handle):  # noqa: U100
     raise NotImplementedError()
 
-  def get_impala_exec_state(self, operation_handle):  # noqa: U100
-    raise NotImplementedError()
+  def get_impala_exec_state(self, operation_handle):
+    try:
+      return ImpylaHS2Connection.OPERATION_STATE_TO_EXEC_STATE[
+        self.get_state(operation_handle)]
+    except impyla_error.Error:
+      return ERROR
+    except Exception as e:
+      raise e
 
   def get_runtime_profile(self, operation_handle,
                           profile_format=TRuntimeProfileFormat.STRING):
     return self.__get_operation(operation_handle).get_profile(profile_format)
 
-  def wait_for_admission_control(self, operation_handle, timeout_s=60):  # noqa: U100
-    raise NotImplementedError()
+  def wait_for_admission_control(self, operation_handle, timeout_s=60):
+    self.log_handle(operation_handle, 'waiting for completion of the admission control')
+    start_time = time.time()
+    while time.time() - start_time < timeout_s:
+      start_rpc_time = time.time()
+      if self.is_admitted(operation_handle):
+        return True
+      rpc_time = time.time() - start_rpc_time
+      if rpc_time < DEFAULT_SLEEP_INTERVAL:
+        time.sleep(DEFAULT_SLEEP_INTERVAL - rpc_time)
+    return False
 
   def get_exec_summary(self, operation_handle):  # noqa: U100
     raise NotImplementedError()
