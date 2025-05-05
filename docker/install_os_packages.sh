@@ -221,6 +221,7 @@ elif [[ $DISTRIBUTION == Chainguard ]]; then
     localedef \
     cyrus-sasl \
     krb5-libs \
+    krb5 \
     openssl \
     openldap-dev \
     openjdk-${JAVA_VERSION}-jre \
