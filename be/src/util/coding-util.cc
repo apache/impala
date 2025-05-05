@@ -191,10 +191,16 @@ bool Base64DecodeBufLen(const char* in, int64_t in_len, int64_t* out_max) {
   // producing one fewer byte of output. This is repeated if the second-to-last character
   // is '='. One more byte must be allocated to account for Base64Decode's null-padding
   // of its output.
+  if (UNLIKELY(in_len == 0)) {
+    *out_max = 0;
+    return true;
+  }
   if (UNLIKELY((in_len & 3) != 0)) return false;
   *out_max = 1 + 3 * (in_len / 4);
+  DCHECK_GE(in_len, 1);
   if (in[in_len - 1] == '=') {
     --(*out_max);
+    DCHECK_GE(in_len, 2);
     if (in[in_len - 2] == '=') {
       --(*out_max);
     }

@@ -144,6 +144,16 @@ TEST(Base64Test, Basic) {
   TestBase64(string("a\0b\0", 4), "YQBiAA==");
 }
 
+TEST(Base64Test, TinyLength) {
+  string str = "====";
+  int64_t len;
+  // Length of 1 should fail as it is not divisible with 4.
+  EXPECT_FALSE(Base64DecodeBufLen(str.data(), 1, &len));
+  // Length of 0 is valid and should return 0 (regression test for IMPALA-14030).
+  EXPECT_TRUE(Base64DecodeBufLen(str.data()+2, 0, &len));
+  EXPECT_EQ(len, 0);
+}
+
 TEST(Base64Test, VariousInitialVariableValues) {
   TestBase64EncodeWithInitialValues(0, 0);
   TestBase64EncodeWithInitialValues(5, -10);
