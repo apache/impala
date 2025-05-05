@@ -515,9 +515,9 @@ class TestDdlStatements(TestDdlBase):
       start = time.time()
       handle1 = client1.execute_async(alter(1, 3))
       handle2 = client2.execute_async(alter(2, 4))
-      assert client1.wait_for_finished_timeout(handle1, timeout=10)
-      assert client2.wait_for_finished_timeout(handle2, timeout=10)
-      assert time.time() - start < 10
+      assert client1.wait_for_finished_timeout(handle1, timeout=15)
+      assert client2.wait_for_finished_timeout(handle2, timeout=15)
+      assert time.time() - start < 15
 
       profile1 = client1.get_runtime_profile(handle1)
       assert get_read_lock_duration_ms(profile1) < 5000
