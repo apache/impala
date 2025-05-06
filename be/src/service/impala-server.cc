@@ -344,7 +344,7 @@ DEFINE_int64(accepted_client_cnxn_timeout, 300000,
     "the post-accept, pre-setup connection queue before it is timed out and the "
     "connection request is rejected. A value of 0 means there is no timeout.");
 
-DEFINE_int32(client_keepalive_probe_period_s, 0,
+DEFINE_int32(client_keepalive_probe_period_s, 600,
     "The duration in seconds after a client connection has gone idle before a TCP "
     "keepalive probe is sent to the client. Set to 0 to disable TCP keepalive probes "
     "from being sent.");
