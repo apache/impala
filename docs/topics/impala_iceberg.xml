@@ -210,6 +210,36 @@ CREATE TABLE ice_ctas_part_spec PARTITIONED BY SPEC (truncate(3, s)) STORED AS I
     </conbody>
   </concept>
 
+  <concept id="iceberg_scan_metrics">
+    <title>Iceberg Scan Metrics</title>
+    <conbody>
+      <p>
+        When Impala runs queries on Iceberg tables, sometimes it uses Iceberg's
+        'planFiles()' API during planning. As it is an expensive call, Impala avoids it
+        when possible, but it is necessary in the following cases:
+          - if one or more predicates are pushed down to Iceberg
+          - if there is time travel.
+
+        The call to 'planFiles()', on the other hand, also collects metrics, e.g. the
+        total Iceberg planning time, the number of data/delete files and manifests and how
+        many of these can be skipped.
+
+        These metrics are integrated into the query profile under the "Frontend" section.
+        As they are per-table, if multiple tables are scanned for the query, there will be
+        multiple sections in the profile.
+
+        Note that for Iceberg tables where Iceberg's 'planFiles()' API was not used in
+        planning, the metrics are not available and the profile will contain a short note
+        describing this.
+
+        To facilitate pairing the metrics with scans, the metrics header
+        references the plan node responsible for the scan. This will always be
+        the top level node for the scan, so it can be a SCAN node, a JOIN node
+        or a UNION node depending on whether the table has delete files.
+      </p>
+    </conbody>
+  </concept>
+
   <concept id="iceberg_v2">
     <title>Iceberg V2 tables</title>
     <conbody>
