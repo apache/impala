@@ -105,6 +105,11 @@ public class CoerceOperandShuttle extends RexShuttle {
     // recursively call all embedded RexCalls first
     RexCall castedOperandsCall = (RexCall) super.visitCall(call);
 
+    // need to 'flatten' before putting it back into a filter or else some
+    // tpcds queries will fail in the junit tests because of an assert statement
+    // in the Filter constructor.
+    castedOperandsCall = (RexCall) RexUtil.flatten(rexBuilder, castedOperandsCall);
+
     // Certain operators will never need casting for their operands.
     if (!isCastingNeeded(castedOperandsCall)) {
       return castedOperandsCall;

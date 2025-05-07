@@ -319,6 +319,13 @@ do
     fi
     popd
 
+    # Run Calcite FE tests
+    pushd ${IMPALA_HOME}/java/calcite-planner
+    if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test ; then
+      TEST_RET_CODE=1
+    fi
+    popd
+
     # Restore old (likely empty) JAVA_TOOL_OPTIONS to avoid polluting other tests.
     export JAVA_TOOL_OPTIONS=$PREV_JAVA_TOOL_OPTIONS
   fi

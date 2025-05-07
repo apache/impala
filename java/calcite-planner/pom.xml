@@ -53,9 +53,21 @@ under the License.
       <artifactId>value</artifactId>
       <version>2.10.1</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.impala</groupId>
+      <artifactId>impala-frontend</artifactId>
+      <version>${project.version}</version>
+      <classifier>tests</classifier>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
  <build>
+     <resources>
+       <resource>
+         <directory>${env.IMPALA_HOME}/fe/src/test/resources</directory>
+       </resource>
+     </resources>
      <pluginManagement>
       <plugins>
         <plugin>
@@ -192,6 +204,37 @@ under the License.
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.0.0</version>
+        <configuration>
+          <trimStackTrace>false</trimStackTrace>
+          <reportsDirectory>${surefire.reports.dir}</reportsDirectory>
+          <redirectTestOutputToFile>true</redirectTestOutputToFile>
+          <groups>${testcase.groups}</groups>
+          <environmentVariables>
+            <!-- Set LD_LIBRARY_PATH and LD_PRELOAD to pick up libraries required for
+                 running fe tests:
+                 * LD_LIBRARY_PATH needs to include the GCC libraries that libfesupport.so
+                   was built against.
+                 * LD_PRELOAD needs to include libjsig.so for JVM/native signal handling.
+            -->
+            <LD_LIBRARY_PATH>
+              ${env.IMPALA_TOOLCHAIN_PACKAGES_HOME}/gcc-${env.IMPALA_GCC_VERSION}/lib64:${env.IMPALA_HOME}/be/build/latest/service
+            </LD_LIBRARY_PATH>
+            <LD_PRELOAD>
+              ${env.LIB_JSIG}
+            </LD_PRELOAD>
+            <USE_CALCITE_PLANNER>true</USE_CALCITE_PLANNER>
+          </environmentVariables>
+          <!-- These tests need to find core-site.xml but don't natually know about
+               fe/src/test/resources, so add it. -->
+          <additionalClasspathElements>
+            <additionalClasspathElement>${env.IMPALA_HOME}/fe/src/test/resources</additionalClasspathElement>
+          </additionalClasspathElements>
+        </configuration>
       </plugin>
     </plugins>
   </build>
