@@ -103,7 +103,7 @@ namespace impala {
 const char* TEST_TZ_WITHOUT_DST = "America/Anguilla";
 
 scoped_ptr<ImpaladQueryExecutor> executor_;
-scoped_ptr<MetricGroup> statestore_metrics(new MetricGroup("statestore_metrics"));
+MetricGroup* statestore_metrics;
 Statestore* statestore;
 
 template <typename ORIGINAL_TYPE, typename VAL_TYPE>
@@ -222,12 +222,19 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
       FLAGS_disable_optimization_passes = true;
     }
 
+    // Since the statestore is leaked and threads can be running at exit, it is
+    // unsafe to destroy the statestore_metrics before exit. Running threads can
+    // try to access metrics and run into TSAN issues or access memory that has
+    // been freed.
+    statestore_metrics = new MetricGroup("statestore_metrics");
+    IGNORE_LEAKING_OBJECT(statestore_metrics);
+
     // Create an in-process Impala server and in-process backends for test environment
     // without any startup validation check
     FLAGS_abort_on_config_error = false;
     VLOG_CONNECTION << "creating test env";
     VLOG_CONNECTION << "starting backends";
-    statestore = new Statestore(statestore_metrics.get());
+    statestore = new Statestore(statestore_metrics);
     IGNORE_LEAKING_OBJECT(statestore);
 
     // Pass in 0 to have the statestore use an ephemeral port for the service.
