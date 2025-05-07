@@ -25,5 +25,6 @@ public enum DatabaseType {
   POSTGRES,
   MSSQL,
   JETHRO_DATA,
-  IMPALA
+  IMPALA,
+  HIVE
 }

@@ -35,28 +35,28 @@ class TestExtDataSources(CustomClusterTestSuite):
   def add_test_dimensions(cls):
     super(TestExtDataSources, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-        exec_single_node_option=[100]))
+      exec_single_node_option=[100]))
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--use_local_catalog=true",
-      catalogd_args="--catalog_topic_mode=minimal")
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal")
   def test_data_source_tables(self, vector, unique_database, unique_name):
     """Start Impala cluster in LocalCatalog Mode"""
     self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database,
-        test_file_vars={'$UNIQUE_DATASOURCE': unique_name})
+                       test_file_vars={'$UNIQUE_DATASOURCE': unique_name})
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--use_local_catalog=true",
-      catalogd_args="--catalog_topic_mode=minimal")
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal")
   def test_jdbc_data_source(self, vector, unique_database):
     """Start Impala cluster in LocalCatalog Mode"""
     self.run_test_case('QueryTest/jdbc-data-source', vector, use_db=unique_database)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args='--data_source_batch_size=2048')
+    impalad_args='--data_source_batch_size=2048')
   def test_data_source_big_batch_size(self, vector, unique_database, unique_name):
     """Run test with batch size greater than default size 1024"""
     self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database,
@@ -64,7 +64,7 @@ class TestExtDataSources(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args='--data_source_batch_size=512')
+    impalad_args='--data_source_batch_size=512')
   def test_data_source_small_batch_size(self, vector, unique_database, unique_name):
     """Run test with batch size less than default size 1024"""
     self.run_test_case('QueryTest/data-source-tables', vector, use_db=unique_database,
@@ -175,6 +175,242 @@ class TestExtDataSources(CustomClusterTestSuite):
     assert "FailoverInSyncJdbcDataSource" not in result.get_data()
 
 
+class TestPostgresJdbcTables(CustomClusterTestSuite):
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    super(TestPostgresJdbcTables, cls).setup_class()
+
+  @pytest.mark.execute_serially
+  def test_postgres_jdbc_tables(self, vector, unique_database):
+    sql = """
+    DROP TABLE IF EXISTS {0}.country_postgres;
+    CREATE EXTERNAL TABLE {0}.country_postgres (
+      id INT,
+      name STRING,
+      bool_col BOOLEAN,
+      tinyint_col     SMALLINT,
+      smallint_col    SMALLINT,
+      int_col         INT,
+      bigint_col      BIGINT,
+      float_col       FLOAT,
+      double_col      DOUBLE,
+      date_col        DATE,
+      string_col      STRING,
+      timestamp_col   TIMESTAMP)
+    STORED BY JDBC
+    TBLPROPERTIES (
+      "database.type"="POSTGRES",
+      "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+      "jdbc.auth"="AuthMech=0",
+      "jdbc.driver"="org.postgresql.Driver",
+      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "dbcp.username"="hiveuser",
+      "dbcp.password"="password",
+      "table"="country");
+
+    DROP TABLE IF EXISTS {0}.quoted_col;
+    CREATE EXTERNAL TABLE {0}.quoted_col
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        `freeze`      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY JDBC
+    TBLPROPERTIES (
+      "database.type"="POSTGRES",
+      "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+      "jdbc.auth"="AuthMech=0",
+      "jdbc.driver"="org.postgresql.Driver",
+      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "dbcp.username"="hiveuser",
+      "dbcp.password"="password",
+      "table"="quoted_col"
+    );
+
+    DROP TABLE IF EXISTS {0}.country_keystore_postgres;
+    CREATE EXTERNAL TABLE {0}.country_keystore_postgres (
+      id INT,
+      name STRING,
+      bool_col BOOLEAN,
+      tinyint_col     SMALLINT,
+      smallint_col    SMALLINT,
+      int_col         INT,
+      bigint_col      BIGINT,
+      float_col       FLOAT,
+      double_col      DOUBLE,
+      date_col        DATE,
+      string_col      STRING,
+      timestamp_col   TIMESTAMP)
+    STORED BY JDBC
+    TBLPROPERTIES (
+      "database.type"="POSTGRES",
+      "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+      "jdbc.auth"="AuthMech=0",
+      "jdbc.driver"="org.postgresql.Driver",
+      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "dbcp.username"="hiveuser",
+      "dbcp.password"="password",
+      "table"="country");
+
+    DROP TABLE IF EXISTS {0}.country_postgres_query;
+    CREATE EXTERNAL TABLE {0}.country_postgres_query (
+      id INT,
+      name STRING,
+      bool_col BOOLEAN,
+      tinyint_col     SMALLINT,
+      smallint_col    SMALLINT,
+      int_col         INT,
+      bigint_col      BIGINT,
+      float_col       FLOAT,
+      double_col      DOUBLE,
+      date_col        DATE,
+      string_col      STRING,
+      timestamp_col   TIMESTAMP)
+    STORED BY JDBC
+    TBLPROPERTIES (
+      "database.type"="POSTGRES",
+      "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+      "jdbc.auth"="AuthMech=0",
+      "jdbc.driver"="org.postgresql.Driver",
+      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "dbcp.username"="hiveuser",
+      "dbcp.password"="password",
+      "query"="select id,name,bool_col,tinyint_col,smallint_col,
+        int_col,bigint_col,float_col,double_col,date_col,string_col,
+        timestamp_col from country");
+
+    DROP TABLE IF EXISTS {0}.country_keystore_postgres_query;
+    CREATE EXTERNAL TABLE {0}.country_keystore_postgres_query (
+      id INT,
+      name STRING,
+      bool_col BOOLEAN,
+      tinyint_col     SMALLINT,
+      smallint_col    SMALLINT,
+      int_col         INT,
+      bigint_col      BIGINT,
+      float_col       FLOAT,
+      double_col      DOUBLE,
+      date_col        DATE,
+      string_col      STRING,
+      timestamp_col   TIMESTAMP)
+    STORED BY JDBC
+    TBLPROPERTIES (
+      "database.type"="POSTGRES",
+      "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+      "jdbc.auth"="AuthMech=0",
+      "jdbc.driver"="org.postgresql.Driver",
+      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "dbcp.username"="hiveuser",
+      "dbcp.password"="password",
+      "query"="select id,name,bool_col,tinyint_col,smallint_col,
+        int_col,bigint_col,float_col,double_col,date_col,string_col,
+        timestamp_col from country");
+    """.format(unique_database)
+
+    '''
+    try:
+      self.client.execute(sql)
+    except Exception as e:
+      print("\n[DEBUG] Failed to create JDBC table")
+      print("[DEBUG] Exception type:", type(e))
+      print("[DEBUG] Exception message:", str(e))
+      print("[DEBUG] Traceback:\n" + "".join(traceback.format_tb(e.__traceback__)))
+      pytest.xfail(reason="Can't create JDBC table.")
+    '''
+    # Split into statements and execute one-by-one.
+    stmts = [s.strip() for s in sql.split(';')]
+    for i, stmt in enumerate(stmts):
+      if not stmt:
+        continue
+      # Optional: skip pure comment lines (if any)
+      if stmt.startswith('--') or stmt.startswith('/*'):
+        continue
+
+      # Log the statement (truncate for readability)
+      truncated = (stmt[:200] + '...') if len(stmt) > 200 else stmt
+      print("\n[DEBUG] Executing statement #%d:\n%s\n" % (i + 1, truncated))
+
+      try:
+        # Use run_stmt_in_hive as before (this is what the test harness uses).
+        self.client.execute(stmt + ';')
+      except Exception as e:
+        print("\n[DEBUG] Statement #%d failed." % (i + 1))
+        print("[DEBUG] Exception type:", type(e))
+        print("[DEBUG] Exception message:", str(e))
+        raise
+
+    self.client.execute("INVALIDATE METADATA {0}.country_postgres"
+                        .format(unique_database))
+    self.client.execute("INVALIDATE METADATA {0}.country_keystore_postgres"
+                        .format(unique_database))
+    self.client.execute("INVALIDATE METADATA {0}.country_postgres_query"
+                        .format(unique_database))
+    self.client.execute("INVALIDATE METADATA {0}"
+                        ".country_keystore_postgres_query"
+                        .format(unique_database))
+    self.client.execute("DESCRIBE {0}.country_postgres_query"
+                        .format(unique_database))
+    self.client.execute("DESCRIBE {0}"
+                        ".country_keystore_postgres_query"
+                        .format(unique_database))
+    self.run_test_case('QueryTest/hive-jdbc-postgres-tables',
+                       vector, use_db=unique_database)
+
+  def test_invalid_postgres_jdbc_table(self, unique_database):
+    sql_both_set = """
+    CREATE EXTERNAL TABLE {0}.invalid_both_props (
+      id INT,
+      name STRING
+    )
+    STORED BY JDBC
+    TBLPROPERTIES (
+      "database.type"="POSTGRES",
+      "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+      "jdbc.auth"="AuthMech=0",
+      "jdbc.driver"="org.postgresql.Driver",
+      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "dbcp.username"="hiveuser",
+      "dbcp.password"="password",
+      "table"="country",
+      "query"="SELECT * FROM country");
+    """.format(unique_database)
+
+    with pytest.raises(Exception, match="Only one of 'table' or 'query' should be set"):
+      self.run_stmt_in_hive(sql_both_set)
+
+    sql_none_set = """
+    CREATE EXTERNAL TABLE {0}.invalid_no_props (
+      id INT,
+      name STRING
+    )
+    STORED BY JDBC
+    TBLPROPERTIES (
+      "database.type"="POSTGRES",
+      "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+      "jdbc.auth"="AuthMech=0",
+      "jdbc.driver"="org.postgresql.Driver",
+      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "dbcp.username"="hiveuser",
+      "dbcp.password"="password");
+    """.format(unique_database)
+
+    with pytest.raises(Exception, match="Either 'table' or 'query' must be set"):
+      self.run_stmt_in_hive(sql_none_set)
+
 class TestHivePostgresJdbcTables(CustomClusterTestSuite):
   """Tests for hive jdbc postgres tables. """
 
@@ -265,6 +501,64 @@ class TestHivePostgresJdbcTables(CustomClusterTestSuite):
         "hive.sql.dbcp.password.key" = "hiveuser",
         "hive.sql.table" = "country"
     );
+
+    DROP TABLE IF EXISTS {0}.country_postgres_query;
+    CREATE EXTERNAL TABLE {0}.country_postgres_query
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        string_col      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "POSTGRES",
+        "hive.sql.jdbc.driver" = "org.postgresql.Driver",
+        "hive.sql.jdbc.url" = "jdbc:postgresql://localhost:5432/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password" = "password",
+        "hive.sql.query" = "select id,name,bool_col,tinyint_col,smallint_col,
+        int_col,bigint_col,float_col,double_col,date_col,string_col,
+        timestamp_col from country"
+    );
+
+    DROP TABLE IF EXISTS {0}.country_keystore_postgres_query;
+    CREATE EXTERNAL TABLE {0}.country_keystore_postgres_query
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        string_col      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "POSTGRES",
+        "hive.sql.jdbc.driver" = "org.postgresql.Driver",
+        "hive.sql.jdbc.url" = "jdbc:postgresql://localhost:5432/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password.keystore" =
+        "jceks://hdfs/test-warehouse/data-sources/test.jceks",
+        "hive.sql.dbcp.password.key" = "hiveuser",
+        "hive.sql.query" = "select id,name,bool_col,tinyint_col,smallint_col,
+        int_col,bigint_col,float_col,double_col,date_col,string_col,
+        timestamp_col from country"
+    );
     """.format(unique_database)
     try:
       self.run_stmt_in_hive(hive_sql)
@@ -274,14 +568,61 @@ class TestHivePostgresJdbcTables(CustomClusterTestSuite):
                         format(unique_database))
     self.client.execute("INVALIDATE METADATA {0}.country_keystore_postgres".
                         format(unique_database))
+    self.client.execute("INVALIDATE METADATA {0}.country_postgres_query".
+                        format(unique_database))
+    self.client.execute("INVALIDATE METADATA {0}.country_keystore_postgres_query".
+                        format(unique_database))
     # Describing postgres hive jdbc table in Impala.
-    self.client.execute("DESCRIBE {0}.country_postgres".format(unique_database))
-    self.client.execute("DESCRIBE {0}.country_keystore_postgres".format(unique_database))
+    self.client.execute("DESCRIBE {0}.country_postgres_query".format(unique_database))
+    self.client.execute("DESCRIBE {0}.country_keystore_postgres_query"
+        .format(unique_database))
 
     # Select statements are verified in hive-jdbc-postgres-tables.test.
     self.run_test_case('QueryTest/hive-jdbc-postgres-tables', vector,
                        use_db=unique_database)
 
+  def test_invalid_postgres_hive_jdbc_table(self, unique_database):
+    """Negative tests for hive jdbc tables with postgres"""
+
+    # Both hive.sql.table and hive.sql.query are set
+    sql_both_set = """
+    CREATE EXTERNAL TABLE {0}.invalid_both_props (
+        id INT,
+        name STRING
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "POSTGRES",
+        "hive.sql.jdbc.driver" = "org.postgresql.Driver",
+        "hive.sql.jdbc.url" = "jdbc:postgresql://localhost:5432/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password" = "password",
+        "hive.sql.table" = "country",
+        "hive.sql.query" = "SELECT * FROM country"
+    )
+    """.format(unique_database)
+
+    with pytest.raises(Exception, match="Only one of 'hive.sql.table' or"
+      " 'hive.sql.query' should be set"): self.run_stmt_in_hive(sql_both_set)
+
+    # Neither hive.sql.table nor hive.sql.query is set
+    sql_none_set = """
+    CREATE EXTERNAL TABLE {0}.invalid_no_props (
+        id INT,
+        name STRING
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "POSTGRES",
+        "hive.sql.jdbc.driver" = "org.postgresql.Driver",
+        "hive.sql.jdbc.url" = "jdbc:postgresql://localhost:5432/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password" = "password"
+    )
+    """.format(unique_database)
+
+    with pytest.raises(Exception, match="Either 'hive.sql.table' or"
+      " 'hive.sql.query' must be set"): self.run_stmt_in_hive(sql_none_set)
 
 class TestMySqlExtJdbcTables(CustomClusterTestSuite):
   """Impala query tests for external jdbc tables on MySQL server.
@@ -416,6 +757,60 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
         "hive.sql.dbcp.password.key" = "hiveuser",
         "hive.sql.table" = "country"
     );
+
+    DROP TABLE IF EXISTS {0}.country_mysql_query;
+    CREATE EXTERNAL TABLE {0}.country_mysql_query
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        string_col      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "MYSQL",
+        "hive.sql.jdbc.driver" = "com.mysql.cj.jdbc.Driver",
+        "hive.sql.jdbc.url" = "jdbc:mysql://localhost:3306/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password" = "password",
+        "hive.sql.query" = "select * from country"
+    );
+
+    DROP TABLE IF EXISTS {0}.country_keystore_mysql_query;
+    CREATE EXTERNAL TABLE {0}.country_keystore_mysql_query
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        string_col      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "MYSQL",
+        "hive.sql.jdbc.driver" = "com.mysql.cj.jdbc.Driver",
+        "hive.sql.jdbc.url" = "jdbc:mysql://localhost:3306/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password.keystore" =
+        "jceks://hdfs/test-warehouse/data-sources/test.jceks",
+        "hive.sql.dbcp.password.key" = "hiveuser",
+        "hive.sql.query" = "select * from country"
+    );
     """.format(unique_database)
     try:
       self.run_stmt_in_hive(hive_sql)
@@ -425,14 +820,67 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
                         .format(unique_database))
     self.client.execute("INVALIDATE METADATA {0}.country_keystore_mysql"
                         .format(unique_database))
+    self.client.execute("INVALIDATE METADATA {0}.country_mysql_query"
+                        .format(unique_database))
+    self.client.execute("INVALIDATE METADATA {0}.country_keystore_mysql_query"
+                        .format(unique_database))
     # Describing mysql hive jdbc table in Impala.
     self.client.execute("DESCRIBE {0}.country_mysql".format(unique_database))
     self.client.execute("DESCRIBE {0}.country_keystore_mysql".format(unique_database))
+    self.client.execute("DESCRIBE {0}.country_mysql_query".format(unique_database))
+    self.client.execute("DESCRIBE {0}.country_keystore_mysql_query"
+        .format(unique_database))
 
-  # Select statements are verified in hive-jdbc-mysql-tables.test.
+    # Select statements are verified in hive-jdbc-mysql-tables.test.
     self.run_test_case('QueryTest/hive-jdbc-mysql-tables', vector,
                        use_db=unique_database)
 
+  @pytest.mark.execute_serially
+  def test_invalid_mysql_hive_jdbc_table_properties(self, unique_database):
+    """Negative tests for hive jdbc tables with hive"""
+    add_jar_stmt =\
+      "ADD JAR hdfs:///test-warehouse/data-sources/jdbc-drivers/mysql-jdbc.jar;"
+    self.run_stmt_in_hive(add_jar_stmt)
+
+    # Both hive.sql.table and hive.sql.query are set
+    sql_both_set = """
+    CREATE EXTERNAL TABLE {0}.invalid_both_props_mysql (
+        id INT,
+        name STRING
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "MYSQL",
+        "hive.sql.jdbc.driver" = "com.mysql.cj.jdbc.Driver",
+        "hive.sql.jdbc.url" = "jdbc:mysql://localhost:3306/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password" = "password",
+        "hive.sql.table" = "country",
+        "hive.sql.query" = "SELECT id, name FROM country"
+    )
+    """.format(unique_database)
+
+    with pytest.raises(Exception, match="Only one of 'hive.sql.table' or"
+      " 'hive.sql.query' should be set"): self.run_stmt_in_hive(sql_both_set)
+
+    # Neither hive.sql.table nor hive.sql.query is set
+    sql_none_set = """
+    CREATE EXTERNAL TABLE {0}.invalid_no_props_mysql (
+        id INT,
+        name STRING
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "MYSQL",
+        "hive.sql.jdbc.driver" = "com.mysql.cj.jdbc.Driver",
+        "hive.sql.jdbc.url" = "jdbc:mysql://localhost:3306/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password" = "password"
+    )
+    """.format(unique_database)
+
+    with pytest.raises(Exception, match="Either 'hive.sql.table' or"
+      " 'hive.sql.query' must be set"): self.run_stmt_in_hive(sql_none_set)
 
 class TestImpalaExtJdbcTables(CustomClusterTestSuite):
   """Impala query tests for external jdbc tables in Impala cluster."""
@@ -441,13 +889,13 @@ class TestImpalaExtJdbcTables(CustomClusterTestSuite):
   def add_test_dimensions(cls):
     super(TestImpalaExtJdbcTables, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
-        exec_single_node_option=[100]))
+      exec_single_node_option=[100]))
 
   @classmethod
   def _download_impala_jdbc_driver(cls):
     # Download Impala jdbc driver and copy jdbc driver to HDFS.
     script = os.path.join(
-        os.environ['IMPALA_HOME'], 'testdata/bin/download-impala-jdbc-driver.sh')
+      os.environ['IMPALA_HOME'], 'testdata/bin/download-impala-jdbc-driver.sh')
     run_cmd = [script]
     try:
       subprocess.check_call(run_cmd, close_fds=True)

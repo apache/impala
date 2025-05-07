@@ -17,6 +17,7 @@
 
 package org.apache.impala.extdatasource.jdbc.conf;
 
+import com.google.common.base.Strings;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -96,10 +97,23 @@ public class JdbcStorageConfigManager {
   }
 
   private static void checkRequiredPropertiesAreDefined(Map<String, String> props) {
-
+    DatabaseType dbType = null;
     try {
       String dbTypeName = props.get(JdbcStorageConfig.DATABASE_TYPE.getPropertyName());
-      DatabaseType.valueOf(dbTypeName.toUpperCase());
+      dbType = DatabaseType.valueOf(dbTypeName.toUpperCase());
+
+      if (dbType != DatabaseType.HIVE) {
+        String table = props.get(JdbcStorageConfig.TABLE.getPropertyName());
+        String query = props.get(JdbcStorageConfig.QUERY.getPropertyName());
+        if (Strings.isNullOrEmpty(table) && Strings.isNullOrEmpty(query)) {
+          throw new IllegalArgumentException(
+              "For JDBC tables, either 'table' or 'query' property must be set.");
+        }
+        if (!Strings.isNullOrEmpty(table) && !Strings.isNullOrEmpty(query)) {
+          throw new IllegalArgumentException("Only one of 'hive.sql.table' or" +
+              " 'hive.sql.query' should be set.");
+        }
+      }
     } catch (Exception e) {
       throw new IllegalArgumentException("Unknown database type.", e);
     }

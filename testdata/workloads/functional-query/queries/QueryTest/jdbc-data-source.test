@@ -598,12 +598,6 @@ select * from jdbc_test order by id limit 5;
 INT, BOOLEAN, INT
 ====
 ---- QUERY
-# Alter JDBC table to unset the required JDBC configuration "table".
-ALTER TABLE jdbc_test UNSET TBLPROPERTIES ("table");
----- CATCH
-row_regex:.*AnalysisException: Unsetting the 'table' table property is not supported for JDBC DataSource table
-====
----- QUERY
 # Alter table to drop a column.
 ALTER TABLE jdbc_test DROP COLUMN int_col;
 ---- RESULTS

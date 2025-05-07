@@ -18,6 +18,7 @@
 package org.apache.impala.catalog;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
@@ -227,12 +228,20 @@ public class TableLoader {
     } else {
       impala_tbl_props.put("dbcp.username", val);
     }
-    val = msTbl.getParameters().get("hive.sql.table");
-    if (val == null) {
-      throw new TableLoadingException("Required parameter: hive.sql.table" +
-          "is missing.");
+    // Ensure either 'hive.sql.table' or 'hive.sql.query' is set
+    String table = msTbl.getParameters().get("hive.sql.table");
+    String query = msTbl.getParameters().get("hive.sql.query");
+
+    if (Strings.isNullOrEmpty(table) && Strings.isNullOrEmpty(query)) {
+      throw new TableLoadingException("Either 'hive.sql.table' or" +
+          " 'hive.sql.query' must be set.");
+    } else if (!Strings.isNullOrEmpty(table) && !Strings.isNullOrEmpty(query)) {
+      throw new TableLoadingException("Only one of 'hive.sql.table' or" +
+          " 'hive.sql.query' should be set.");
+    } else if (!Strings.isNullOrEmpty(table)) {
+      impala_tbl_props.put("table", table);
     } else {
-      impala_tbl_props.put("table", val);
+      impala_tbl_props.put("query", query);
     }
     val = msTbl.getParameters().get("hive.sql.jdbc.driver");
     if (val == null) {

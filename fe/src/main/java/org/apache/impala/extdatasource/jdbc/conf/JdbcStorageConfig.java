@@ -55,7 +55,7 @@ public enum JdbcStorageConfig {
   // User need to specify either “table” or “query” in the create table statement.
   QUERY("query", false),
   // Name of the external table to be mapped in Impala.
-  TABLE("table", true),
+  TABLE("table", false),
   // Mapping of column names between external table and Impala.
   COLUMN_MAPPING("column.mapping", false);
 

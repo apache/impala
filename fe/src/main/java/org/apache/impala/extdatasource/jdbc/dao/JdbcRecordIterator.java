@@ -107,51 +107,52 @@ public class JdbcRecordIterator {
       }
       Preconditions.checkState(type.getTypesSize() == 1);
       TScalarType scalarType = type.types.get(0).scalar_type;
+      String columnName = colDescs.get(i).getName();
       try {
-        Object value = rs.getObject(i + 1);
+        Object value = rs.getObject(columnName);
         if (value == null) {
           colData.addToIs_null(true);
           continue;
         }
         switch (scalarType.type) {
           case TINYINT:
-            colData.addToByte_vals(rs.getByte(i + 1));
+            colData.addToByte_vals(rs.getByte(columnName));
             break;
           case SMALLINT:
-            colData.addToShort_vals(rs.getShort(i + 1));
+            colData.addToShort_vals(rs.getShort(columnName));
             break;
           case INT:
-            colData.addToInt_vals(rs.getInt(i + 1));
+            colData.addToInt_vals(rs.getInt(columnName));
             break;
           case DATE:
-            LocalDate localDate = Instant.ofEpochMilli(rs.getDate(i + 1).getTime())
+            LocalDate localDate = Instant.ofEpochMilli(rs.getDate(columnName).getTime())
                 .atZone(ZoneId.systemDefault())
                 .toLocalDate();
             colData.addToInt_vals((int) localDate.toEpochDay());
             break;
           case BIGINT:
-            colData.addToLong_vals(rs.getLong(i + 1));
+            colData.addToLong_vals(rs.getLong(columnName));
             break;
           case DOUBLE:
-            colData.addToDouble_vals(rs.getDouble(i + 1));
+            colData.addToDouble_vals(rs.getDouble(columnName));
             break;
           case FLOAT:
-            colData.addToDouble_vals(rs.getFloat(i + 1));
+            colData.addToDouble_vals(rs.getFloat(columnName));
             break;
           case STRING:
-            colData.addToString_vals(rs.getString(i + 1));
+            colData.addToString_vals(rs.getString(columnName));
             break;
           case BOOLEAN:
-            colData.addToBool_vals(rs.getBoolean(i + 1));
+            colData.addToBool_vals(rs.getBoolean(columnName));
             break;
           case TIMESTAMP:
             // Use UTC time zone instead of system default time zone
             colData.addToBinary_vals(
-                SerializationUtils.encodeTimestamp(rs.getTimestamp(i + 1,
+                SerializationUtils.encodeTimestamp(rs.getTimestamp(columnName,
                     Calendar.getInstance(TimeZone.getTimeZone(ZoneOffset.UTC)))));
             break;
           case DECIMAL:
-            BigDecimal val = rs.getBigDecimal(i + 1);
+            BigDecimal val = rs.getBigDecimal(columnName);
             int valPrecision = val.precision();
             int valScale = val.scale();
             // Check if there is enough precision and scale in the destination decimal.
