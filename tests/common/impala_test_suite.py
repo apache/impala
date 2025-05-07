@@ -265,9 +265,6 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.hs2_http_client = None
     cls.hive_client = None
     cls.hive_transport = None
-
-    # Default query options are populated on demand.
-    cls.default_query_options = {}
     cls.impalad_test_service = cls.create_impala_service()
 
     # Override the shell history path so that commands run by any tests
@@ -547,23 +544,10 @@ class ImpalaTestSuite(BaseTestSuite):
     """
     Restore the list of modified query options to their default values.
     """
-    # Populate the default query option if it's empty.
-    if not self.default_query_options:
-      query_options = impalad_client.get_default_configuration()
-      for key, value in query_options.items():
-        self.default_query_options[key.lower()] = value
     # Restore all the changed query options.
     for query_option in query_options_changed:
       query_option = query_option.lower()
-      if query_option not in self.default_query_options:
-        continue
-      default_val = self.default_query_options[query_option]
-      # No need to quote default_val because get_default_configuration() returns
-      # map values that already contain double quote if needed
-      # (see collect_default_query_options() in impala_connection.py).
-      # The "restore option" comment is there to differentiate between SET issued
-      # by test method and SET issued by this method.
-      query_str = "SET {0}={1}; -- restore option".format(query_option, default_val)
+      query_str = 'SET {0}=""'.format(query_option)
       try:
         impalad_client.execute(query_str)
       except Exception as e:
@@ -1212,13 +1196,8 @@ class ImpalaTestSuite(BaseTestSuite):
     result = self.execute_query_using_client(client, query, vector)
     # Restore client configuration before returning.
     modified_configs = vector.get_exec_option_dict().keys()
-    options_to_restore = dict()
-    for name, val in client.get_default_configuration().items():
-      lower_name = name.lower()
-      if lower_name in modified_configs:
-        options_to_restore[lower_name] = val
-    if options_to_restore:
-      client.set_configuration(options_to_restore)
+    for name in modified_configs:
+      client.set_configuration_option(name, "")
     return result
 
   @execute_wrapper

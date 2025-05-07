@@ -230,9 +230,12 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
     pass
 
   def get_default_configuration(self):
-    """Return the default configuration for the connection, before any modifications are
-    made to the session state. Returns a map with the config variable as the key and a
-    string representation of the default value as the value."""
+    """Return the default configuration that is known from TQueryOption attributes.
+    Note that this might not be the server default. Server default can be different
+    depending on its --default_query_options flag value.
+    Returns a map with the config variable as the key and a string representation of
+    the default value as the value.
+    IMPALA-14060: Remove this and related functions."""
     return DEFAULT_QUERY_OPTIONS.copy()
 
   @abc.abstractmethod
@@ -631,7 +634,7 @@ class ImpylaHS2Connection(ImpalaConnection):
     # value must be parsed to string.
     name = name.lower()
     value = str(value)
-    if self.__query_options.get(name) != value:
+    if self.__query_options.get(name, "") != value:
       self.__query_options[name] = value
       if is_log_sql:
         self.log_client("\n\nset {0}={1};\n".format(name, value))
