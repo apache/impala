@@ -65,7 +65,8 @@ public class CalciteSingleNodePlanner implements SingleNodePlannerIntf {
     RelNode logicalPlan = relNodeConverter.convert(analysisResult_.getValidatedNode());
 
     // Optimize the query
-    CalciteOptimizer optimizer = new CalciteOptimizer(analysisResult_);
+    CalciteOptimizer optimizer =
+        new CalciteOptimizer(analysisResult_, ctx_.getTimeline());
     ImpalaPlanRel optimizedPlan = optimizer.optimize(logicalPlan);
 
     // Create Physical Impala PlanNodes

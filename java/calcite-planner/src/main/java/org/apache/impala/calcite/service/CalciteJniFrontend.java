@@ -144,7 +144,8 @@ public class CalciteJniFrontend extends JniFrontend {
       markEvent(mdHandler, logicalPlan, queryCtx, "Created initial logical plan");
 
       // Optimize the query
-      CalciteOptimizer optimizer = new CalciteOptimizer(validator);
+      CalciteOptimizer optimizer = new CalciteOptimizer(validator,
+          queryCtx.getTimeline());
       ImpalaPlanRel optimizedPlan = optimizer.optimize(logicalPlan);
       markEvent(mdHandler, optimizedPlan, queryCtx, "Optimized logical plan");
 

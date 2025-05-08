@@ -51,7 +51,9 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.impala.calcite.operators.ImpalaConvertletTable;
+import org.apache.impala.calcite.operators.ImpalaRexBuilder;
 import org.apache.impala.calcite.schema.ImpalaRelMetadataProvider;
+import org.apache.impala.calcite.util.LogUtil;
 
 import java.util.List;
 
@@ -85,7 +87,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
     this.planner_ = new VolcanoPlanner();
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
     cluster_ =
-        RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
+        RelOptCluster.create(planner_, new ImpalaRexBuilder(typeFactory_));
     viewExpander_ = createViewExpander(
         analysisResult.getSqlValidator().getCatalogReader().getRootSchema().plus());
     cluster_.setMetadataProvider(ImpalaRelMetadataProvider.DEFAULT);
@@ -98,7 +100,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
     this.planner_ = new VolcanoPlanner();
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
     cluster_ =
-        RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
+        RelOptCluster.create(planner_, new ImpalaRexBuilder(typeFactory_));
     viewExpander_ = createViewExpander(validator.getCatalogReader()
         .getRootSchema().plus());
     cluster_.setMetadataProvider(ImpalaRelMetadataProvider.DEFAULT);
@@ -136,7 +138,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
     // Convert the valid AST into a logical plan
     RelRoot root = relConverter.convertQuery(validatedNode, false, true);
     RelNode relNode = root.project();
-    logDebug(relNode);
+    LogUtil.logDebug(relNode, "Plan after conversion from Abstract Syntax Tree");
 
     RelNode subQueryRemovedPlan =
         runProgram(
@@ -146,14 +148,14 @@ public class CalciteRelNodeConverter implements CompilerStep {
                 CoreRules.FILTER_SUB_QUERY_TO_CORRELATE
             ),
             relNode);
-    logDebug(subQueryRemovedPlan);
+    LogUtil.logDebug(subQueryRemovedPlan, "Plan after subquery removal phase");
 
     RelBuilder relBuilder = RelFactories.LOGICAL_BUILDER.create(cluster_,
         reader_);
     RelNode decorrelatedPlan =
         RelDecorrelator.decorrelateQuery(subQueryRemovedPlan, relBuilder);
 
-    logDebug(decorrelatedPlan);
+    LogUtil.logDebug(decorrelatedPlan, "Plan after subquery decorrelation phase");
     return decorrelatedPlan;
   }
 
@@ -163,17 +165,11 @@ public class CalciteRelNodeConverter implements CompilerStep {
 
   @Override
   public void logDebug(Object resultObject) {
-    if (!(resultObject instanceof RelNode)) {
-      LOG.debug("RelNodeConverter produced an unknown output: " + resultObject);
-      return;
-    }
-    LOG.info(RelOptUtil.dumpPlan("[Logical plan]", (RelNode) resultObject,
-        SqlExplainFormat.TEXT, SqlExplainLevel.NON_COST_ATTRIBUTES));
+    LogUtil.logDebug(resultObject, "RelNodeConverter plan");
   }
 
   private RelNode runProgram(List<RelOptRule> rules, RelNode currentNode) {
     HepProgramBuilder builder = new HepProgramBuilder();
-    // rules to convert Calcite nodes into ImpalaPlanRel nodes
     builder.addRuleCollection(rules);
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
 

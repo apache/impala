@@ -35,6 +35,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.Util;
@@ -371,13 +372,20 @@ public class CoerceNodes{
    */
   private static List<RexNode> processRexNodes(RelNode relNode, List<RelNode> inputs,
       List<RexNode> rexNodes) {
+    RexBuilder rexBuilder = relNode.getCluster().getRexBuilder();
     CoerceOperandShuttle shuttle = new CoerceOperandShuttle(
-        relNode.getCluster().getTypeFactory(),
-        relNode.getCluster().getRexBuilder(), inputs);
+        relNode.getCluster().getTypeFactory(), rexBuilder, inputs);
     List<RexNode> changedRexNodes = new ArrayList<>();
     boolean rexNodeChanged = false;
     for (RexNode rexNode : rexNodes) {
       RexNode changedRexNode = shuttle.apply(rexNode);
+
+      changedRexNode = RexUtil.pullFactors(rexBuilder, changedRexNode);
+      // TODO: IMPALA-13436: use max_cnf_exprs query option instead of hardcoded 100.
+      // The default for max_cnf_exprs is 200, but we use 100 here because tpcds
+      // q41 is super slow when the value is at 200.
+      changedRexNode = RexUtil.toCnf(rexBuilder, 100, changedRexNode);
+
       changedRexNodes.add(changedRexNode);
       rexNodeChanged |= (changedRexNode != rexNode);
     }
