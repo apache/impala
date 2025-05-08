@@ -73,7 +73,7 @@ public class MetaStoreUtil {
 
   // The default maximum number of partitions to fetch from the Hive metastore in one
   // RPC.
-  private static final short DEFAULT_MAX_PARTITIONS_PER_RPC = 1000;
+  public static final short DEFAULT_MAX_PARTITIONS_PER_RPC = 1000;
 
   // The maximum number of partitions to fetch from the metastore in one RPC.
   // Read from the 'hive.metastore.batch.retrieve.table.partition.max' Hive configuration

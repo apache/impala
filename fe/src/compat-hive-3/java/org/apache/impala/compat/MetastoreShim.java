@@ -76,6 +76,7 @@ import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.SourceTable;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
+import org.apache.hadoop.hive.metastore.api.WriteNotificationLogBatchRequest;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogRequest;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
@@ -127,6 +128,7 @@ import org.apache.impala.hive.common.MutableValidWriteIdList;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.util.AcidUtils.TblTransaction;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -443,26 +445,33 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   private static void fireInsertTransactionalEventHelper(
       IMetaStoreClient hiveClient, TableInsertEventInfo insertEventInfo, String dbName,
       String tableName) throws TException {
-    for (InsertEventRequestData insertData : insertEventInfo.getInsertEventReqData()) {
-      // TODO(Vihang) unfortunately there is no bulk insert event API for transactional
-      // tables. It is possible that this may take long time here if there are lots of
-      // partitions which were inserted.
+    int insertBatchSize = insertEventInfo.getInsertEventReqData().size();
+    int maxRPCBatchSize = MetaStoreUtil.DEFAULT_MAX_PARTITIONS_PER_RPC;
+    for (int i = 0; i < insertBatchSize; i += maxRPCBatchSize) {
+      List<WriteNotificationLogRequest> batchRequestList = new ArrayList<>();
+      StringBuilder sb = new StringBuilder();
+      List<InsertEventRequestData> insertDataList =
+          insertEventInfo.getInsertEventReqData().subList(i,
+              Math.min(i + maxRPCBatchSize, insertBatchSize));
+      for (InsertEventRequestData insertData : insertDataList) {
+        WriteNotificationLogRequest req = new WriteNotificationLogRequest(
+            insertEventInfo.getTxnId(), insertEventInfo.getWriteId(), dbName, tableName,
+            insertData);
+        if (insertData.isSetPartitionVal()) {
+          req.setPartitionVals(insertData.getPartitionVal());
+          sb.append(insertData.getPartitionVal());
+        }
+        batchRequestList.add(req);
+      }
+      WriteNotificationLogBatchRequest batchedReq = new WriteNotificationLogBatchRequest(
+          getDefaultCatalogName(), dbName, tableName, batchRequestList);
+      hiveClient.addWriteNotificationLogInBatch(batchedReq);
       if (LOG.isDebugEnabled()) {
-        String msg =
-            "Firing write notification log request for table " + dbName + "." + tableName
-                + (insertData.isSetPartitionVal() ? " on partition " + insertData
-                .getPartitionVal() : "");
+        String msg = "Firing write notification log request for table " + dbName + "."
+            + tableName + (!sb.toString().isEmpty() ? " on partitions "
+            + sb.toString() : "");
         LOG.debug(msg);
       }
-      WriteNotificationLogRequest rqst = new WriteNotificationLogRequest(
-          insertEventInfo.getTxnId(), insertEventInfo.getWriteId(), dbName, tableName,
-          insertData);
-      if (insertData.isSetPartitionVal()) {
-        rqst.setPartitionVals(insertData.getPartitionVal());
-      }
-      // TODO(Vihang) metastore should return the event id here so that we can get rid
-      // of firing INSERT event types for transactional tables.
-      hiveClient.addWriteNotificationLog(rqst);
     }
   }
 
