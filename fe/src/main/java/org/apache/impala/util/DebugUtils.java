@@ -87,6 +87,10 @@ public class DebugUtils {
   // debug action label for introducing delay in loading table metadata.
   public static final String LOAD_TABLES_DELAY = "impalad_load_tables_delay";
 
+  // debug action label for introducing delay in loading file checksums.
+  public static final String LOAD_FILE_CHECKSUMS_DELAY =
+      "catalogd_load_file_checksums_delay";
+
   // debug action label for introducing delay in HMS alter_table rename RPC.
   public static final String TABLE_RENAME_DELAY = "catalogd_table_rename_delay";
 

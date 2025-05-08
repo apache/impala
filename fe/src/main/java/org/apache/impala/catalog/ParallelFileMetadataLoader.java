@@ -22,13 +22,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
+
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnList;
@@ -71,15 +74,24 @@ public class ParallelFileMetadataLoader {
   private static final int MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG = 100;
 
   private final String logPrefix_;
-  private final Map<String, FileMetadataLoader> loaders_;
-  private final Map<String, List<HdfsPartition.Builder>> partsByPath_;
   private final FileSystem fs_;
 
+  // Loaders run in parallel and return a result Object.
+  private final List<Pair<String, Callable<Object>>> loaders_;
+  // Updaters are run sequentially after the loaders finish. They process the result
+  // Object returned by the corresponding loader.
+  private final List<Consumer<Object>> updaters_;
+
+  /**
+   * Constructs a loader for file descriptors and metadata stats.
+   */
   public ParallelFileMetadataLoader(FileSystem fs,
       Collection<Builder> partBuilders,
       ValidWriteIdList writeIdList, ValidTxnList validTxnList, boolean isRecursive,
       @Nullable ListMap<TNetworkAddress> hostIndex, String debugAction,
       String logPrefix) {
+    fs_ = fs;
+    logPrefix_ = logPrefix;
     if (writeIdList != null || validTxnList != null) {
       // make sure that both either both writeIdList and validTxnList are set or both
       // of them are not.
@@ -87,72 +99,82 @@ public class ParallelFileMetadataLoader {
     }
     // Group the partitions by their path (multiple partitions may point to the same
     // path).
-    partsByPath_ = Maps.newHashMap();
+    Map<String, List<HdfsPartition.Builder>> partsByPath = Maps.newHashMap();
     for (HdfsPartition.Builder p : partBuilders) {
-      partsByPath_.computeIfAbsent(p.getLocation(), (path) -> new ArrayList<>())
-          .add(p);
+      partsByPath.computeIfAbsent(p.getLocation(), (path) -> new ArrayList<>()).add(p);
     }
-    // Create a FileMetadataLoader for each path.
-    loaders_ = Maps.newHashMap();
-    for (Map.Entry<String, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
-      List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
-      FileMetadataLoader loader;
-      HdfsFileFormat format = e.getValue().get(0).getFileFormat();
+    // Create a loader (FileMetadataLoader) and updater for each path.
+    loaders_ = new ArrayList<>(partsByPath.size());
+    updaters_ = new ArrayList<>(partsByPath.size());
+    for (Map.Entry<String, List<HdfsPartition.Builder>> e : partsByPath.entrySet()) {
+      List<HdfsPartition.Builder> builders = e.getValue();
+      List<FileDescriptor> oldFds = builders.get(0).getFileDescriptors();
+      HdfsFileFormat format = builders.get(0).getFileFormat();
       Preconditions.checkState(!HdfsFileFormat.ICEBERG.equals(format));
-      loader = new FileMetadataLoader(e.getKey(), isRecursive, oldFds, hostIndex,
-          validTxnList, writeIdList, format);
+      FileMetadataLoader loader = new FileMetadataLoader(e.getKey(), isRecursive, oldFds,
+          hostIndex, validTxnList, writeIdList, format);
       // If there is a cached partition mapped to this path, we recompute the block
       // locations even if the underlying files have not changed.
       // This is done to keep the cached block metadata up to date.
-      boolean hasCachedPartition = Iterables.any(e.getValue(),
+      boolean hasCachedPartition = Iterables.any(builders,
           HdfsPartition.Builder::isMarkedCached);
       loader.setForceRefreshBlockLocations(hasCachedPartition);
       loader.setDebugAction(debugAction);
-      loaders_.put(e.getKey(), loader);
+
+      loaders_.add(new Pair<>(e.getKey(), () -> { loader.load(); return loader; }));
+
+      updaters_.add((result) ->
+          updatePartBuilders((FileMetadataLoader) result, builders));
     }
-    this.logPrefix_ = logPrefix;
-    this.fs_ = fs;
+  }
+
+  /**
+   * Store the loaded FDs from loader into the partitions via builders.
+   */
+  private static void updatePartBuilders(FileMetadataLoader loader,
+      List<HdfsPartition.Builder> builders) {
+    for (HdfsPartition.Builder partBuilder : builders) {
+      // Checks if we can reuse the old file descriptors. Partition builders in the
+      // list may have different file descriptors. We need to verify them one by one.
+      if ((!loader.hasFilesChangedCompareTo(partBuilder.getFileDescriptors()))) {
+        LOG.trace("Detected files unchanged on partition {}",
+            partBuilder.getPartitionName());
+        continue;
+      }
+      partBuilder.clearFileDescriptors();
+      List<FileDescriptor> deleteDescriptors = loader.getLoadedDeleteDeltaFds();
+      if (deleteDescriptors != null && !deleteDescriptors.isEmpty()) {
+        partBuilder.setInsertFileDescriptors(loader.getLoadedInsertDeltaFds());
+        partBuilder.setDeleteFileDescriptors(loader.getLoadedDeleteDeltaFds());
+      } else {
+        partBuilder.setFileDescriptors(loader.getLoadedFds());
+      }
+      partBuilder.setFileMetadataStats(loader.getFileMetadataStats());
+    }
+  }
+
+  /**
+   * Constructs a loader from provided loaders and updaters.
+   */
+  public ParallelFileMetadataLoader(FileSystem fs, String logPrefix,
+      List<Pair<String, Callable<Object>>> loaders,
+      List<Consumer<Object>> updaters) {
+    Preconditions.checkNotNull(loaders);
+    Preconditions.checkNotNull(updaters);
+    Preconditions.checkArgument(loaders.size() == updaters.size());
+    fs_ = fs;
+    logPrefix_ = logPrefix;
+    loaders_ = loaders;
+    updaters_ = updaters;
   }
 
   /**
    * Loads the file metadata for the given list of Partitions in the constructor. If the
-   * load is successful also set the fileDescriptors in the HdfsPartition.Builders.
+   * load is successful also set the fileDescriptors in the HdfsPartition.Builders. Any
+   * successful loaders are guaranteed to complete before any exception is thrown.
    * @throws TableLoadingException
    */
-  void load() throws TableLoadingException {
-    loadInternal();
-
-    // Store the loaded FDs into the partitions.
-    for (Map.Entry<String, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
-      FileMetadataLoader loader = loaders_.get(e.getKey());
-
-      for (HdfsPartition.Builder partBuilder : e.getValue()) {
-        // Checks if we can reuse the old file descriptors. Partition builders in the list
-        // may have different old file descriptors. We need to verify them one by one.
-        if ((!loader.hasFilesChangedCompareTo(partBuilder.getFileDescriptors()))) {
-          LOG.trace("Detected files unchanged on partition {}",
-              partBuilder.getPartitionName());
-          continue;
-        }
-        partBuilder.clearFileDescriptors();
-        List<FileDescriptor> deleteDescriptors = loader.getLoadedDeleteDeltaFds();
-        if (deleteDescriptors != null && !deleteDescriptors.isEmpty()) {
-          partBuilder.setInsertFileDescriptors(loader.getLoadedInsertDeltaFds());
-          partBuilder.setDeleteFileDescriptors(loader.getLoadedDeleteDeltaFds());
-        } else {
-          partBuilder.setFileDescriptors(loader.getLoadedFds());
-        }
-        partBuilder.setFileMetadataStats(loader.getFileMetadataStats());
-      }
-    }
-  }
-
-  /**
-   * Call 'load()' in parallel on all of the loaders. If any loaders fail, throws
-   * an exception. However, any successful loaders are guaranteed to complete
-   * before any exception is thrown.
-   */
-  private void loadInternal() throws TableLoadingException {
+  public void load() throws TableLoadingException {
     if (loaders_.isEmpty()) return;
 
     int failedLoadTasks = 0;
@@ -161,21 +183,22 @@ public class ParallelFileMetadataLoader {
     TOTAL_THREADS.addAndGet(poolSize);
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(logPrefix_)) {
       TOTAL_TABLES.incrementAndGet();
-      List<Pair<FileMetadataLoader, Future<Void>>> futures =
-          new ArrayList<>(loaders_.size());
-      for (FileMetadataLoader loader : loaders_.values()) {
-        futures.add(new Pair<>(
-            loader, pool.submit(() -> { loader.load(); return null; })));
+      List<Pair<String, Future<Object>>> futures = new ArrayList<>(loaders_.size());
+      for (Pair<String, Callable<Object>> loader : loaders_) {
+        futures.add(new Pair<>(loader.first, pool.submit(loader.second)));
       }
 
       // Wait for the loaders to finish.
+      Preconditions.checkState(futures.size() == updaters_.size());
       for (int i = 0; i < futures.size(); i++) {
+        Pair<String, Future<Object>> future = futures.get(i);
         try {
-          futures.get(i).second.get();
+          Object result = future.second.get();
+          updaters_.get(i).accept(result);
         } catch (ExecutionException | InterruptedException e) {
           if (++failedLoadTasks <= MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG) {
-            LOG.error(logPrefix_ + " encountered an error loading data for path " +
-                futures.get(i).first.getPartDir(), e);
+            LOG.error("{} encountered an error loading data for path {}",
+                logPrefix_, future.first, e);
           }
         }
       }
@@ -187,8 +210,8 @@ public class ParallelFileMetadataLoader {
     if (failedLoadTasks > 0) {
       int errorsNotLogged = failedLoadTasks - MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG;
       if (errorsNotLogged > 0) {
-        LOG.error(logPrefix_ + " error loading {} paths. Only the first {} errors " +
-            "were logged", failedLoadTasks, MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG);
+        LOG.error("{} error loading {} paths. Only the first {} errors were logged",
+            logPrefix_, failedLoadTasks, MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG);
       }
       throw new TableLoadingException(logPrefix_ + ": failed to load " + failedLoadTasks
           + " paths. Check the catalog server log for more details.");

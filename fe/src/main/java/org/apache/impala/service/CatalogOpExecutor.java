@@ -48,8 +48,10 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -125,6 +127,7 @@ import org.apache.impala.catalog.HiveStorageDescriptorFactory;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.ParallelFileMetadataLoader;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PartitionStatsUtil;
@@ -7345,8 +7348,8 @@ public class CatalogOpExecutor {
     final FeFsTable feFsTable = (FeFsTable) table;
 
     // Collect file checksums (and ACID dir path) before taking table lock.
-    Map<String, List<FileMetadata>> fileMetadata = getFileMetadata(
-        feFsTable, update.getUpdated_partitions(), catalogTimeline);
+    Map<String, List<FileMetadata>> fileMetadata = getFileMetadata(feFsTable,
+        update.getUpdated_partitions(), update.getDebug_action(), catalogTimeline);
 
     tryWriteLock(table, "updating the catalog", catalogTimeline);
     final Timer.Context context
@@ -7864,45 +7867,72 @@ public class CatalogOpExecutor {
     }
   }
 
+  private FileSystem getFileSystemOrNull(FeFsTable table) {
+    try {
+      return table.getFileSystem();
+    } catch (CatalogException e) {
+      LOG.warn("Failed to get FileSystem for table {}", table.getFullName(), e);
+    }
+    return null;
+  }
+
   /**
    * Returns a map of partition name to list of file metadata: name, checksum, and
    * acidDirPath. Logs errors on individual files.
    */
   private Map<String, List<FileMetadata>> getFileMetadata(FeFsTable table,
-      Map<String, TUpdatedPartition> updatedPartitions, EventSequence catalogTimeline) {
+      Map<String, TUpdatedPartition> updatedPartitions, String debugAction,
+      EventSequence catalogTimeline) {
     if (!shouldGenerateInsertEvents(table)) return null;
     boolean isPartitioned = table.isPartitioned();
     boolean isTransactional = AcidUtils.isTransactionalTable(table);
 
     // Get table file system with table location.
-    FileSystem tableFs = null;
-    try {
-      tableFs = table.getFileSystem();
-    } catch (CatalogException e) {
-      LOG.warn("Failed to get FileSystem for table {}", table.getFullName(), e);
-    }
+    final FileSystem tableFs = getFileSystemOrNull(table);
 
+    // Create a loader and updater for each path.
+    List<Pair<String, Callable<Object>>> loaders = new ArrayList<>();
+    List<Consumer<Object>> updaters = new ArrayList<>();
     Map<String, List<FileMetadata>> fileMetadata = Maps.newHashMap();
+    int numFiles = 0;
     for (Map.Entry<String, TUpdatedPartition> e : updatedPartitions.entrySet()) {
+      numFiles += e.getValue().getFiles().size();
       List<FileMetadata> files = new ArrayList<>(e.getValue().getFiles().size());
       for (String file : e.getValue().getFiles()) {
-        FileChecksum checksum = null;
-        String acidDirPath = null;
-        try {
-          Path filePath = new Path(file);
-          FileSystem fs = (isPartitioned || tableFs == null) ?
-              FeFsTable.getFileSystem(filePath) : tableFs;
-          checksum = fs.getFileChecksum(filePath);
-          if (isTransactional) {
-            acidDirPath = AcidUtils.getFirstLevelAcidDirPath(filePath, fs);
+        loaders.add(new Pair<>(file, () -> {
+          FileChecksum checksum = null;
+          String acidDirPath = null;
+          try {
+            Path filePath = new Path(file);
+            FileSystem fs = (isPartitioned || tableFs == null) ?
+                FeFsTable.getFileSystem(filePath) : tableFs;
+            if (debugAction != null) {
+              DebugUtils.executeDebugAction(
+                  debugAction, DebugUtils.LOAD_FILE_CHECKSUMS_DELAY);
+            }
+            checksum = fs.getFileChecksum(filePath);
+            if (isTransactional) {
+              acidDirPath = AcidUtils.getFirstLevelAcidDirPath(filePath, fs);
+            }
+          } catch (CatalogException | IOException ex) {
+            LOG.error("Failed to collect insert metadata for {} in table {}",
+                file, table.getFullName(), ex);
           }
-        } catch (CatalogException | IOException ex) {
-          LOG.error("Failed to collect insert metadata for {} in table {}",
-              file, table.getFullName(), ex);
-        }
-        files.add(new FileMetadata(file, checksum, acidDirPath));
+          return new FileMetadata(file, checksum, acidDirPath);
+        }));
+        updaters.add((result) -> files.add((FileMetadata) result));
+        fileMetadata.put(e.getKey(), files);
       }
-      fileMetadata.put(e.getKey(), files);
+    }
+
+    String logPrefix = String.format("Loading file checksums for %s paths for table %s",
+        numFiles, table.getFullName());
+    try {
+      new ParallelFileMetadataLoader(
+          table.getFileSystem(), logPrefix, loaders, updaters).load();
+    } catch (CatalogException e) {
+      LOG.error("Failed to collect insert metadata for table {}",
+          table.getFullName(), e);
     }
     catalogTimeline.markEvent("Collected file checksums");
     return fileMetadata;

@@ -172,6 +172,29 @@ class TestInsertQueries(TestInsertBase):
           test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
           .get_db_name_from_format(vector.get_value('table_format'))})
 
+  @pytest.mark.execute_serially
+  def test_parallel_checksum(self, vector, unique_database):
+    """Test that checksum is calculated in parallel when inserting into a table
+    with multiple files."""
+    # Ensure source table is loaded into catalogd.
+    self.execute_query("describe functional.alltypesaggmultifilesnopart")
+
+    exec_options = vector.get_value('exec_option')
+    exec_options['debug_action'] = 'catalogd_load_file_checksums_delay:SLEEP@3000'
+    handle = self.execute_query_async("create table {0}.test as select * from "
+        "functional.alltypesaggmultifilesnopart".format(unique_database), exec_options)
+
+    # Test file has 4 files, so work can be distributed across 3 executors. This results
+    # in writing 3 new files in 3 threads.
+    catalogd = ImpalaCluster.get_e2e_test_cluster().catalogd.service
+    catalogd.wait_for_metric_value(
+        "catalog-server.metadata.file.num-loading-threads", 3)
+    catalogd.wait_for_metric_value(
+        "catalog-server.metadata.table.num-loading-file-metadata", 1)
+
+    # Stop the query and cleanup.
+    self.close_query(handle)
+
 
 class TestInsertQueriesWithDefaultFormat(TestInsertBase):
 
