@@ -188,7 +188,7 @@ void FlushCoverageOnExit() {
 // the first time it's called.
 //
 // NOTE: this is only used in coverage builds!
-void FailureWriterWithCoverage(const char* data, int size) {
+void FailureWriterWithCoverage(const char* data, size_t size) {
   FlushCoverageOnExit();
 
   // Original implementation from glog:
@@ -201,7 +201,8 @@ void FailureWriterWithCoverage(const char* data, int size) {
 // ensure that we flush coverage even on crashes.
 //
 // NOTE: this is only used in coverage builds!
-void FlushCoverageAndAbort() {
+// NOTE: __attribute__((noreturn)) is needed for Clang builds.
+__attribute__((noreturn)) void FlushCoverageAndAbort() {
   FlushCoverageOnExit();
   abort();
 }

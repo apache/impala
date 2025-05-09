@@ -116,7 +116,7 @@ class TraceGLog {
       // we defer the tracing until the google::LogMessage has destructed and the
       // glog lock is available again.
       str_ = ToString(severity, base_filename, line,
-                      tm_time, message, message_len);
+                      google::LogMessageTime(*tm_time), message, message_len);
     }
     virtual ~TraceLogSink() {
       TRACE_EVENT_INSTANT1(category_, "vlog", TRACE_EVENT_SCOPE_THREAD,

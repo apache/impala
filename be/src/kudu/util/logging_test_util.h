@@ -32,7 +32,7 @@ class StringVectorSink : public google::LogSink {
             const struct ::tm* tm_time,
             const char* message, size_t message_len) override {
     logged_msgs_.push_back(ToString(severity, base_filename, line,
-                                    tm_time, message, message_len));
+        google::LogMessageTime(*tm_time), message, message_len));
   }
 
   std::vector<std::string>& logged_msgs() {

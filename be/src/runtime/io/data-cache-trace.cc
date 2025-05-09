@@ -174,7 +174,7 @@ class SimpleLoggerWrapper : public google::base::Logger {
   void Write(bool force_flush,
              time_t timestamp,
              const char* message,
-             int message_len) override {
+             size_t message_len) override {
     string message_str(message, message_len);
     Status status = logger_.AppendEntry(message_str);
     if (!status.ok()) {
