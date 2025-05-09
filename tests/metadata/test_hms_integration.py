@@ -25,9 +25,9 @@
 
 from __future__ import absolute_import, division, print_function
 from builtins import range
-import os
 import pytest
 import random
+import re
 import string
 
 from tests.common.environ import HIVE_MAJOR_VERSION
@@ -282,7 +282,7 @@ class TestHmsIntegration(ImpalaTestSuite):
     return ''.join([random.choice(string.ascii_lowercase)
                     for i in range(0, 16)])
 
-  def assert_sql_error(self, engine, command, *strs_in_error):
+  def assert_sql_error(self, engine, command, str_re_in_error):
     """
     Passes 'command' to 'engine' callable (e.g. execute method of a BeeswaxConnection
     object) and makes sure that it raises an exception.
@@ -296,11 +296,12 @@ class TestHmsIntegration(ImpalaTestSuite):
     try:
       engine(command)
     except Exception as e:
-      for str_in_error in strs_in_error:
-        assert str_in_error in str(e)
+      str_e = str(e)
+      assert re.search(str_re_in_error, str_e), "{} not found in {}".format(
+        str_re_in_error, str_e)
     else:
       assert False, '%s should have triggered an error containing %s' % (
-          command, strs_in_error)
+          command, str_re_in_error)
 
   @pytest.mark.execute_serially
   def test_hive_db_hive_table_add_partition(self):
@@ -784,14 +785,12 @@ class TestHmsIntegration(ImpalaTestSuite):
         # Modify HMS table metadata again, change the type of column 'y' back to INT.
         self.run_stmt_in_hive('alter table %s change y y int' % table_name)
         # Neither Hive 2 and 3, nor Impala converts STRINGs to INTs implicitly.
-        err_msg = ("{0}org.apache.hadoop.io.Text cannot be "
-                  "cast to {0}org.apache.hadoop.io.IntWritable")
         # The error message is different in newer Javas than in 17
         # TODO: find out which version changed it exactly
-        err_msg = err_msg.format(
-            "class " if int(os.environ.get('IMPALA_JDK_VERSION_NUM')) >= 17 else "")
+        err_msgs = (r".*org.apache.hadoop.io.Text cannot be cast to "
+                    r".*org.apache.hadoop.io.IntWritable")
         self.assert_sql_error(
-            self.run_stmt_in_hive, 'select * from %s' % table_name, err_msg)
+            self.run_stmt_in_hive, 'select * from %s' % table_name, err_msgs)
         self.client.execute('invalidate metadata %s' % table_name)
         self.assert_sql_error(
             self.client.execute, 'select * from %s' % table_name,
