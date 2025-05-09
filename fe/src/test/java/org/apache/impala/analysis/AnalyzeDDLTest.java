@@ -1940,12 +1940,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "Invalid percent of bytes value '101'. " +
           "The percent of bytes to sample must be between 0 and 100.");
       AnalysisError("compute stats functional_kudu.alltypes tablesample system (1)",
-          "TABLESAMPLE is only supported on HDFS tables.");
+          "TABLESAMPLE is only supported on file-based tables.");
       AnalysisError("compute stats functional_hbase.alltypes tablesample system (2)",
-          "TABLESAMPLE is only supported on HDFS tables.");
+          "TABLESAMPLE is only supported on file-based tables.");
       AnalysisError(
           "compute stats functional.alltypes_datasource tablesample system (3)",
-          "TABLESAMPLE is only supported on HDFS tables.");
+          "TABLESAMPLE is only supported on file-based tables.");
 
       // Test file formats with columns whitelist.
       gflags.setEnable_stats_extrapolation(true);
@@ -1957,12 +1957,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "Invalid percent of bytes value '101'. " +
           "The percent of bytes to sample must be between 0 and 100.");
       AnalysisError("compute stats functional_kudu.alltypes tablesample system (1)",
-          "TABLESAMPLE is only supported on HDFS tables.");
+          "TABLESAMPLE is only supported on file-based tables.");
       AnalysisError("compute stats functional_hbase.alltypes tablesample system (2)",
-          "TABLESAMPLE is only supported on HDFS tables.");
+          "TABLESAMPLE is only supported on file-based tables.");
       AnalysisError(
           "compute stats functional.alltypes_datasource tablesample system (3)",
-          "TABLESAMPLE is only supported on HDFS tables.");
+          "TABLESAMPLE is only supported on file-based tables.");
 
       // Test different COMPUTE_STATS_MIN_SAMPLE_BYTES.
       TQueryOptions queryOpts = new TQueryOptions();

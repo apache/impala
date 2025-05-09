@@ -1001,8 +1001,17 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     runPlannerTestFile("tablesample", options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+            PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS));
+  }
+
+  @Test
+  public void testTableSampleIceberg() {
+    TQueryOptions options = defaultQueryOptions();
+    runPlannerTestFile("tablesample-iceberg", options,
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
             PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS,
-            PlannerTestOption.VALIDATE_ICEBERG_SNAPSHOT_IDS));
+            PlannerTestOption.VALIDATE_ICEBERG_SNAPSHOT_IDS,
+            PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test

@@ -148,7 +148,7 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
   protected FeTable table_;
 
   // Effective sampling percent based on the total number of bytes in the files sample.
-  // Set to -1 for non-HDFS tables or if TABLESAMPLE was not specified.
+  // Set to -1 for non-FS tables or if TABLESAMPLE was not specified.
   // We run the regular COMPUTE STATS for 0.0 and 1.0 where sampling has no benefit.
   protected double effectiveSamplePerc_ = -1;
 
@@ -805,10 +805,10 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
   private String analyzeTableSampleClause(Analyzer analyzer) throws AnalysisException {
     if (sampleParams_ == null) return "";
     if (!(table_ instanceof FeFsTable)) {
-      throw new AnalysisException("TABLESAMPLE is only supported on HDFS tables.");
+      throw new AnalysisException("TABLESAMPLE is only supported on file-based tables.");
     }
-    FeFsTable hdfsTable = (FeFsTable) table_;
-    if (!FeFsTable.Utils.isStatsExtrapolationEnabled(hdfsTable)) {
+    FeFsTable feFsTable = (FeFsTable) table_;
+    if (!FeFsTable.Utils.isStatsExtrapolationEnabled(feFsTable)) {
       throw new AnalysisException(String.format(
           "COMPUTE STATS TABLESAMPLE requires stats extrapolation which is disabled.\n" +
           "Stats extrapolation can be enabled service-wide with %s=true or by altering " +
@@ -827,17 +827,15 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
     // Compute the sample of files and set 'sampleFileBytes_'.
     long minSampleBytes = analyzer.getQueryOptions().compute_stats_min_sample_size;
     long samplePerc = sampleParams_.getPercentBytes();
-    // TODO(todd): can we avoid loading all the partitions for this?
-    Collection<? extends FeFsPartition> partitions = hdfsTable.loadAllPartitions();
-    Map<Long, List<FileDescriptor>> sample = FeFsTable.Utils.getFilesSample(
-        hdfsTable, partitions, samplePerc, minSampleBytes, sampleSeed);
+    Map<Long, List<FileDescriptor>> sample = feFsTable.getFilesSample(
+        samplePerc, minSampleBytes, sampleSeed);
     long sampleFileBytes = 0;
     for (List<FileDescriptor> fds: sample.values()) {
       for (FileDescriptor fd: fds) sampleFileBytes += fd.getFileLength();
     }
 
     // Compute effective sampling percent.
-    long totalFileBytes = ((FeFsTable)table_).getTotalHdfsBytes();
+    long totalFileBytes = feFsTable.getTotalHdfsBytes();
     if (totalFileBytes > 0) {
       effectiveSamplePerc_ = (double) sampleFileBytes / (double) totalFileBytes;
     } else {

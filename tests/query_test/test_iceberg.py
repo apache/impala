@@ -1545,6 +1545,14 @@ class TestIcebergV2Table(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-v2-read-position-deletes-stats', vector)
     self.run_test_case('QueryTest/iceberg-v2-read-position-deletes-orc-stats', vector)
 
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
+  @pytest.mark.execute_serially
+  def test_compute_stats_table_sampling(self, vector):
+    """Tests COMPUTE STATS with table sampling."""
+    vector.get_value('exec_option')['COMPUTE_STATS_MIN_SAMPLE_SIZE'] = 0
+    self.run_test_case('QueryTest/iceberg-v2-compute-stats-table-sampling', vector)
+
   @SkipIfFS.hive
   def test_read_mixed_format_position_deletes(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-mixed-format-position-deletes',

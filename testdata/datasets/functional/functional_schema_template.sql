@@ -3213,7 +3213,8 @@ iceberg_partitioned
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 STORED AS ICEBERG
 LOCATION '/test-warehouse/iceberg_test/iceberg_partitioned'
-TBLPROPERTIES('write.format.default'='parquet', 'iceberg.catalog'='hadoop.tables');
+TBLPROPERTIES('write.format.default'='parquet', 'iceberg.catalog'='hadoop.tables',
+    'impala.enable.stats.extrapolation'='true');
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_partitioned /test-warehouse/iceberg_test/
@@ -3226,7 +3227,8 @@ iceberg_non_partitioned
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 STORED AS ICEBERG
 LOCATION '/test-warehouse/iceberg_test/iceberg_non_partitioned'
-TBLPROPERTIES('write.format.default'='parquet', 'iceberg.catalog'='hadoop.tables');
+TBLPROPERTIES('write.format.default'='parquet', 'iceberg.catalog'='hadoop.tables',
+    'impala.enable.stats.extrapolation'='true');
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_non_partitioned /test-warehouse/iceberg_test/
@@ -3627,6 +3629,7 @@ STORED AS ICEBERG
 TBLPROPERTIES('write.format.default'='parquet', 'iceberg.catalog'='hadoop.catalog',
               'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
               'iceberg.table_identifier'='ice.iceberg_v2_delete_equality_partitioned',
+              'impala.enable.stats.extrapolation'='true',
               'format-version'='2');
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog/ice && \
@@ -3764,6 +3767,7 @@ STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
               'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
               'iceberg.table_identifier'='ice.iceberg_v2_positional_not_all_data_files_have_delete_files',
+              'impala.enable.stats.extrapolation'='true',
               'format-version'='2');
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog/ice && \
@@ -3779,6 +3783,7 @@ STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
               'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
               'iceberg.table_identifier'='ice.iceberg_v2_positional_not_all_data_files_have_delete_files_orc',
+              'impala.enable.stats.extrapolation'='true',
               'format-version'='2', 'write.format.default'='orc');
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog/ice && \

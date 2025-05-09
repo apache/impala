@@ -275,6 +275,12 @@ public class IcebergContentFileStore {
         dataFilesWithDeletes_.getList());
   }
 
+  public Iterable<IcebergFileDescriptor> getAllDeleteFiles() {
+    return Iterables.concat(
+        positionDeleteFiles_.getList(),
+        equalityDeleteFiles_.getList());
+  }
+
   public boolean hasAvro() { return hasAvro_; }
   public boolean hasOrc() { return hasOrc_; }
   public boolean hasParquet() { return hasParquet_; }

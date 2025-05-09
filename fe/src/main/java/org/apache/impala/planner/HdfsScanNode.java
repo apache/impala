@@ -223,7 +223,7 @@ public class HdfsScanNode extends ScanNode {
   // An estimate of the width of a row when the information is not available.
   private double DEFAULT_ROW_WIDTH_ESTIMATE = 1.0;
 
-  private final FeFsTable tbl_;
+  protected final FeFsTable tbl_;
 
   // List of partitions to be scanned. Partitions have been pruned.
   protected final List<FeFsPartition> partitions_;
@@ -2719,6 +2719,8 @@ public class HdfsScanNode extends ScanNode {
     }
     return super.isTableMissingTableStats();
   }
+
+  public TableSampleClause getSampleParams() { return sampleParams_; }
 
   @Override
   public boolean hasCorruptTableStats() { return hasCorruptTableStats_; }

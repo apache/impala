@@ -393,27 +393,27 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Only applicable to HDFS base table refs.
     AnalysisError("select * from functional_kudu.alltypes tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS tables: functional_kudu.alltypes");
+        "TABLESAMPLE is only supported on file-based tables: functional_kudu.alltypes");
     AnalysisError("select * from functional_hbase.alltypes tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS tables: functional_hbase.alltypes");
+        "TABLESAMPLE is only supported on file-based tables: functional_hbase.alltypes");
     AnalysisError("select * from functional.alltypes_datasource tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS tables: " +
+        "TABLESAMPLE is only supported on file-based tables: " +
         "functional.alltypes_datasource");
     AnalysisError("select * from (select * from functional.alltypes) v " +
         "tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS tables: v");
+        "TABLESAMPLE is only supported on file-based tables: v");
     AnalysisError("with v as (select * from functional.alltypes) " +
         "select * from v tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS tables: v");
+        "TABLESAMPLE is only supported on file-based tables: v");
     AnalysisError("select * from functional.alltypes_view tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS tables: functional.alltypes_view");
+        "TABLESAMPLE is only supported on file-based tables: functional.alltypes_view");
     AnalysisError("select * from functional.allcomplextypes.int_array_col " +
         "tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS tables: " +
+        "TABLESAMPLE is only supported on file-based tables: " +
         "functional.allcomplextypes.int_array_col");
     AnalysisError("select * from functional.allcomplextypes a, a.int_array_col " +
         "tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS tables: a.int_array_col");
+        "TABLESAMPLE is only supported on file-based tables: a.int_array_col");
   }
 
   /**

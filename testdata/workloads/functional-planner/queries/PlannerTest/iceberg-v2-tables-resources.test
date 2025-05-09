@@ -475,7 +475,7 @@ PLAN-ROOT SINK
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=1 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -486,7 +486,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=36B cardinality=6
 |     in pipelines: 00(GETNEXT)
@@ -497,7 +497,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=36B cardinality=4
    in pipelines: 03(GETNEXT)
@@ -542,7 +542,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=1 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -553,7 +553,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=36B cardinality=6
 |     in pipelines: 00(GETNEXT)
@@ -564,7 +564,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=36B cardinality=4
    in pipelines: 03(GETNEXT)
@@ -595,7 +595,7 @@ PLAN-ROOT SINK
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=1 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -606,7 +606,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=36B cardinality=6
 |     in pipelines: 00(GETNEXT)
@@ -617,7 +617,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=36B cardinality=4
    in pipelines: 03(GETNEXT)
@@ -660,7 +660,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=1 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -671,7 +671,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=36B cardinality=6
 |     in pipelines: 00(GETNEXT)
@@ -682,7 +682,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=36B cardinality=4
    in pipelines: 03(GETNEXT)
@@ -739,7 +739,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=1 size=2.63KB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1
+|     extrapolated-rows=unavailable max-scan-range-rows=1
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=2 row-size=267B cardinality=1
 |     in pipelines: 01(GETNEXT)
@@ -750,7 +750,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10 size=7.77KB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=10
+   extrapolated-rows=unavailable max-scan-range-rows=10
    mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=3
    in pipelines: 00(GETNEXT)
@@ -799,7 +799,7 @@ Per-Host Resources: mem-estimate=32.02MB mem-reservation=16.76KB thread-reservat
 |     stored statistics:
 |       table: rows=1 size=2.63KB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1
+|     extrapolated-rows=unavailable max-scan-range-rows=1
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=2 row-size=267B cardinality=1
 |     in pipelines: 01(GETNEXT)
@@ -810,7 +810,7 @@ Per-Host Resources: mem-estimate=32.02MB mem-reservation=16.76KB thread-reservat
    stored statistics:
      table: rows=10 size=7.77KB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=10
+   extrapolated-rows=unavailable max-scan-range-rows=10
    mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=3
    in pipelines: 00(GETNEXT)
@@ -841,7 +841,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=1 size=2.63KB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1
+|     extrapolated-rows=unavailable max-scan-range-rows=1
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=2 row-size=267B cardinality=1
 |     in pipelines: 01(GETNEXT)
@@ -852,7 +852,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10 size=7.77KB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=10
+   extrapolated-rows=unavailable max-scan-range-rows=10
    mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=3
    in pipelines: 00(GETNEXT)
@@ -901,7 +901,7 @@ Per-Host Resources: mem-estimate=32.02MB mem-reservation=16.76KB thread-reservat
 |     stored statistics:
 |       table: rows=1 size=2.63KB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1
+|     extrapolated-rows=unavailable max-scan-range-rows=1
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=2 row-size=267B cardinality=1
 |     in pipelines: 01(GETNEXT)
@@ -912,7 +912,7 @@ Per-Host Resources: mem-estimate=32.02MB mem-reservation=16.76KB thread-reservat
    stored statistics:
      table: rows=10 size=7.77KB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=10
+   extrapolated-rows=unavailable max-scan-range-rows=10
    mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=3
    in pipelines: 00(GETNEXT)
@@ -943,7 +943,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=4 size=5.33KB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=2
+|     extrapolated-rows=unavailable max-scan-range-rows=2
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=2 row-size=267B cardinality=4
 |     in pipelines: 01(GETNEXT)
@@ -954,7 +954,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10 size=7.77KB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=6
    in pipelines: 00(GETNEXT)
@@ -1003,7 +1003,7 @@ Per-Host Resources: mem-estimate=32.02MB mem-reservation=16.76KB thread-reservat
 |     stored statistics:
 |       table: rows=4 size=5.33KB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=2
+|     extrapolated-rows=unavailable max-scan-range-rows=2
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=2 row-size=267B cardinality=4
 |     in pipelines: 01(GETNEXT)
@@ -1014,7 +1014,7 @@ Per-Host Resources: mem-estimate=32.02MB mem-reservation=16.76KB thread-reservat
    stored statistics:
      table: rows=10 size=7.77KB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=6
    in pipelines: 00(GETNEXT)
@@ -1248,7 +1248,7 @@ PLAN-ROOT SINK
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=1 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -1260,7 +1260,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     parquet statistics predicates: i > CAST(2 AS INT)
 |     parquet dictionary predicates: i > CAST(2 AS INT)
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
@@ -1274,7 +1274,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    parquet statistics predicates: i > CAST(2 AS INT)
    parquet dictionary predicates: i > CAST(2 AS INT)
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
@@ -1319,7 +1319,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=1 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -1331,7 +1331,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     parquet statistics predicates: i > CAST(2 AS INT)
 |     parquet dictionary predicates: i > CAST(2 AS INT)
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
@@ -1345,7 +1345,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    parquet statistics predicates: i > CAST(2 AS INT)
    parquet dictionary predicates: i > CAST(2 AS INT)
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
@@ -1374,7 +1374,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns: unavailable
-|     extrapolated-rows=disabled max-scan-range-rows=10
+|     extrapolated-rows=unavailable max-scan-range-rows=10
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=3 row-size=16B cardinality=3
 |     in pipelines: 06(GETNEXT)
@@ -1403,7 +1403,7 @@ PLAN-ROOT SINK
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=5 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -1414,7 +1414,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=36B cardinality=6
 |     in pipelines: 00(GETNEXT)
@@ -1425,7 +1425,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=36B cardinality=4
    in pipelines: 03(GETNEXT)
@@ -1462,7 +1462,7 @@ Per-Host Resources: mem-estimate=130.02MB mem-reservation=35.94MB thread-reserva
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns: unavailable
-|     extrapolated-rows=disabled max-scan-range-rows=10
+|     extrapolated-rows=unavailable max-scan-range-rows=10
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=3 row-size=16B cardinality=3
 |     in pipelines: 06(GETNEXT)
@@ -1511,7 +1511,7 @@ Per-Host Resources: mem-estimate=192.17MB mem-reservation=34.03MB thread-reserva
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=5 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -1522,7 +1522,7 @@ Per-Host Resources: mem-estimate=192.17MB mem-reservation=34.03MB thread-reserva
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=36B cardinality=6
 |     in pipelines: 00(GETNEXT)
@@ -1533,7 +1533,7 @@ Per-Host Resources: mem-estimate=192.17MB mem-reservation=34.03MB thread-reserva
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=36B cardinality=4
    in pipelines: 03(GETNEXT)
@@ -1565,7 +1565,7 @@ PLAN-ROOT SINK
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=2 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -1577,7 +1577,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     parquet dictionary predicates: CAST(i AS BIGINT) + CAST(1000 AS BIGINT) > CAST(1003 AS BIGINT)
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=36B cardinality=1
@@ -1590,7 +1590,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    parquet dictionary predicates: CAST(i AS BIGINT) + CAST(1000 AS BIGINT) > CAST(1003 AS BIGINT)
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=36B cardinality=1
@@ -1634,7 +1634,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=2 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -1646,7 +1646,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     parquet dictionary predicates: CAST(i AS BIGINT) + CAST(1000 AS BIGINT) > CAST(1003 AS BIGINT)
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=36B cardinality=1
@@ -1659,7 +1659,7 @@ Per-Host Resources: mem-estimate=64.17MB mem-reservation=32.76KB thread-reservat
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    parquet dictionary predicates: CAST(i AS BIGINT) + CAST(1000 AS BIGINT) > CAST(1003 AS BIGINT)
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=36B cardinality=1
@@ -1751,7 +1751,7 @@ PLAN-ROOT SINK
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=4 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -1763,7 +1763,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=36B cardinality=6
 |     in pipelines: 00(GETNEXT)
@@ -1775,7 +1775,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=36B cardinality=4
    in pipelines: 03(GETNEXT)
@@ -1903,7 +1903,7 @@ Per-Host Resources: mem-estimate=67.11MB mem-reservation=2.97MB thread-reservati
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=4 row-size=267B cardinality=4
 |  |     in pipelines: 01(GETNEXT)
@@ -1915,7 +1915,7 @@ Per-Host Resources: mem-estimate=67.11MB mem-reservation=2.97MB thread-reservati
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns missing stats: i, s
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=36B cardinality=6
 |     in pipelines: 00(GETNEXT)
@@ -1927,7 +1927,7 @@ Per-Host Resources: mem-estimate=67.11MB mem-reservation=2.97MB thread-reservati
    stored statistics:
      table: rows=10 size=7.77KB
      columns missing stats: i, s
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=36B cardinality=4
    in pipelines: 03(GETNEXT)
@@ -2237,7 +2237,7 @@ PLAN-ROOT SINK
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=10 row-size=267B cardinality=4
 |  |     in pipelines: 06(GETNEXT)
@@ -2248,7 +2248,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=4 row-size=20B cardinality=6
 |     in pipelines: 05(GETNEXT)
@@ -2282,7 +2282,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=4 size=5.33KB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=2
+|     extrapolated-rows=unavailable max-scan-range-rows=2
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=7 row-size=267B cardinality=4
 |     in pipelines: 01(GETNEXT)
@@ -2293,7 +2293,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10 size=7.77KB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=6
    in pipelines: 00(GETNEXT)
@@ -2354,7 +2354,7 @@ PLAN-ROOT SINK
 |  |     stored statistics:
 |  |       table: rows=4 size=5.33KB
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=2
+|  |     extrapolated-rows=unavailable max-scan-range-rows=2
 |  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |  |     tuple-ids=10 row-size=267B cardinality=4
 |  |     in pipelines: 06(GETNEXT)
@@ -2365,7 +2365,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=10 size=7.77KB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=5
+|     extrapolated-rows=unavailable max-scan-range-rows=5
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=4 row-size=20B cardinality=6
 |     in pipelines: 05(GETNEXT)
@@ -2426,7 +2426,7 @@ Per-Host Resources: mem-estimate=32.02MB mem-reservation=16.76KB thread-reservat
 |     stored statistics:
 |       table: rows=4 size=5.33KB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=2
+|     extrapolated-rows=unavailable max-scan-range-rows=2
 |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=7 row-size=267B cardinality=4
 |     in pipelines: 01(GETNEXT)
@@ -2437,7 +2437,7 @@ Per-Host Resources: mem-estimate=32.02MB mem-reservation=16.76KB thread-reservat
    stored statistics:
      table: rows=10 size=7.77KB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=5
+   extrapolated-rows=unavailable max-scan-range-rows=5
    mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=6
    in pipelines: 00(GETNEXT)
@@ -2872,7 +2872,7 @@ PLAN-ROOT SINK
 |  |     stored statistics:
 |  |       table: rows=3 size=1.33KB
 |  |       columns missing stats: s, d
-|  |     extrapolated-rows=disabled max-scan-range-rows=1
+|  |     extrapolated-rows=unavailable max-scan-range-rows=1
 |  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
 |  |     tuple-ids=2 row-size=24B cardinality=3
 |  |     in pipelines: 01(GETNEXT)
@@ -2883,7 +2883,7 @@ PLAN-ROOT SINK
 |     stored statistics:
 |       table: rows=8 size=4.81KB
 |       columns missing stats: i, s, d
-|     extrapolated-rows=disabled max-scan-range-rows=4
+|     extrapolated-rows=unavailable max-scan-range-rows=4
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=28B cardinality=5
 |     in pipelines: 00(GETNEXT)
@@ -2894,7 +2894,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=8 size=4.81KB
      columns missing stats: i, s, d
-   extrapolated-rows=disabled max-scan-range-rows=4
+   extrapolated-rows=unavailable max-scan-range-rows=4
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=28B cardinality=3
    in pipelines: 03(GETNEXT)
@@ -2938,7 +2938,7 @@ Per-Host Resources: mem-estimate=64.12MB mem-reservation=1.94MB thread-reservati
 |  |     stored statistics:
 |  |       table: rows=3 size=1.33KB
 |  |       columns missing stats: s, d
-|  |     extrapolated-rows=disabled max-scan-range-rows=1
+|  |     extrapolated-rows=unavailable max-scan-range-rows=1
 |  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
 |  |     tuple-ids=2 row-size=24B cardinality=3
 |  |     in pipelines: 01(GETNEXT)
@@ -2956,7 +2956,7 @@ Per-Host Resources: mem-estimate=64.12MB mem-reservation=1.94MB thread-reservati
 |     stored statistics:
 |       table: rows=8 size=4.81KB
 |       columns missing stats: i, s, d
-|     extrapolated-rows=disabled max-scan-range-rows=4
+|     extrapolated-rows=unavailable max-scan-range-rows=4
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=0 row-size=28B cardinality=5
 |     in pipelines: 00(GETNEXT)
@@ -2967,7 +2967,7 @@ Per-Host Resources: mem-estimate=64.12MB mem-reservation=1.94MB thread-reservati
    stored statistics:
      table: rows=8 size=4.81KB
      columns missing stats: i, s, d
-   extrapolated-rows=disabled max-scan-range-rows=4
+   extrapolated-rows=unavailable max-scan-range-rows=4
    mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=28B cardinality=3
    in pipelines: 03(GETNEXT)

@@ -573,6 +573,12 @@ public interface FeFsTable extends FeTable {
     return result;
   }
 
+  default Map<Long, List<FileDescriptor>> getFilesSample(
+      long percentBytes, long minSampleBytes, long randomSeed) {
+    return Utils.getFilesSample(this, loadAllPartitions(), percentBytes, minSampleBytes,
+        randomSeed);
+  }
+
   /**
    * Utility functions for operating on FeFsTable. When we move fully to Java 8,
    * these can become default methods of the interface.

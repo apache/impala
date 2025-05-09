@@ -204,50 +204,12 @@ public class IcebergScanNode extends HdfsScanNode {
 
   /**
    * Returns a sample of file descriptors associated to this scan node.
-   * The algorithm is based on FeFsTable.Utils.getFilesSample()
    */
   @Override
   protected Map<Long, List<FileDescriptor>> getFilesSample(
       long percentBytes, long minSampleBytes, long randomSeed) {
-    Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
-    Preconditions.checkState(minSampleBytes >= 0);
-
-    // Ensure a consistent ordering of files for repeatable runs.
-    List<FileDescriptor> orderedFds = Lists.newArrayList(fileDescs_);
-    if (!filesAreSorted_) {
-      Collections.sort(orderedFds);
-    }
-
-    Preconditions.checkState(partitions_.size() == 1);
-    FeFsPartition part = partitions_.get(0);
-
-    long totalBytes = 0;
-    for (FileDescriptor fd : orderedFds) {
-      totalBytes += fd.getFileLength();
-    }
-
-    int numFilesRemaining = orderedFds.size();
-    double fracPercentBytes = (double) percentBytes / 100;
-    long targetBytes = (long) Math.round(totalBytes * fracPercentBytes);
-    targetBytes = Math.max(targetBytes, minSampleBytes);
-
-    // Randomly select files until targetBytes has been reached or all files have been
-    // selected.
-    Random rnd = new Random(randomSeed);
-    long selectedBytes = 0;
-    List<FileDescriptor> sampleFiles = Lists.newArrayList();
-    while (selectedBytes < targetBytes && numFilesRemaining > 0) {
-      int selectedIdx = rnd.nextInt(numFilesRemaining);
-      FileDescriptor fd = orderedFds.get(selectedIdx);
-      sampleFiles.add(fd);
-      selectedBytes += fd.getFileLength();
-      // Avoid selecting the same file multiple times.
-      orderedFds.set(selectedIdx, orderedFds.get(numFilesRemaining - 1));
-      --numFilesRemaining;
-    }
-    Map<Long, List<FileDescriptor>> result = new HashMap<>();
-    result.put(part.getId(), sampleFiles);
-    return result;
+    return FeIcebergTable.Utils.getFilesSample((FeIcebergTable) tbl_, fileDescs_,
+        filesAreSorted_, percentBytes, minSampleBytes, randomSeed);
   }
 
   @Override

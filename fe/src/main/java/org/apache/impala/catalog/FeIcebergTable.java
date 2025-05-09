@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -236,7 +237,7 @@ public interface FeIcebergTable extends FeFsTable {
 
   @Override
   default long getTotalHdfsBytes() {
-    return getFeFsTable().getTotalHdfsBytes();
+    return getTTableStats().getTotal_file_bytes();
   }
 
   @Override
@@ -326,6 +327,48 @@ public interface FeIcebergTable extends FeFsTable {
       if (iceCol.getFieldId() == partField.getSourceId()) return true;
     }
     return false;
+  }
+
+  @Override /* FeFsTable */
+  default Map<Long, List<FileDescriptor>> getFilesSample(
+      long percentBytes, long minSampleBytes, long randomSeed) {
+    // There will be two separate IcebergScanNodes for data files without delete, and for
+    // data files with deletes, which means they will be sampled independently. Let's also
+    // sample them separately here.
+    Map<Long, List<FileDescriptor>> dataFilesWithoutDeletesSample = Utils.getFilesSample(
+        this, getContentFileStore().getDataFilesWithoutDeletes(), false,
+        percentBytes, minSampleBytes, randomSeed);
+    Map<Long, List<FileDescriptor>> dataFilesWithDeletesSample = Utils.getFilesSample(
+        this, getContentFileStore().getDataFilesWithDeletes(), false,
+        percentBytes, minSampleBytes, randomSeed);
+
+    Map<Long, List<FileDescriptor>> mergedResult = new HashMap<>();
+    mergedResult.putAll(dataFilesWithoutDeletesSample);
+    for (Map.Entry<Long, List<FileDescriptor>> entry :
+        dataFilesWithDeletesSample.entrySet()) {
+      List<FileDescriptor> fds = mergedResult.get(entry.getKey());
+      if (fds != null) {
+        fds.addAll(entry.getValue());
+      } else {
+        mergedResult.put(entry.getKey(), entry.getValue());
+      }
+    }
+
+    // There is no need to add the delete files if there are no data files.
+    if (mergedResult.isEmpty()) return mergedResult;
+
+    // We should have only a single element in the map as there is only a single
+    // partition in the table.
+    Preconditions.checkState(mergedResult.size() == 1);
+
+    // We don't sample delete files (for correctness), let's add all of them to
+    // the merged result.
+    for (Map.Entry<Long, List<FileDescriptor>> entry : mergedResult.entrySet()) {
+      for (FileDescriptor fd : getContentFileStore().getAllDeleteFiles()) {
+        entry.getValue().add(fd);
+      }
+    }
+    return mergedResult;
   }
 
   THdfsTable transformToTHdfsTable(boolean updatePartitionFlag, ThriftObjectType type);
@@ -699,6 +742,62 @@ public interface FeIcebergTable extends FeFsTable {
         }
       }
       return fileDescMap;
+    }
+
+    /**
+     * Return a sample of data files (choosing from 'fileDescs') according to the
+     * parameters.
+     * @filesAreSorted if true then the file descriptors are already sorted
+     * @percentBytes percent of the total number of bytes we want to sample at least.
+     * @minSampleBytes minimum number of bytes need to be selected.
+     * @randomSeed random seed for repeatable sampling.
+     * The algorithm is based on FeFsTable.Utils.getFilesSample()
+     */
+    public static Map<Long, List<FileDescriptor>> getFilesSample(
+        FeIcebergTable iceTbl, Iterable<? extends FileDescriptor> fileDescs,
+        boolean filesAreSorted,
+        long percentBytes, long minSampleBytes, long randomSeed) {
+      Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
+      Preconditions.checkState(minSampleBytes >= 0);
+
+      // Ensure a consistent ordering of files for repeatable runs.
+      List<FileDescriptor> orderedFds = Lists.newArrayList(fileDescs);
+      if (!filesAreSorted) {
+        Collections.sort(orderedFds);
+      }
+
+      List<FeFsPartition> partitions = new ArrayList<>(
+          iceTbl.getFeFsTable().loadAllPartitions());
+      Preconditions.checkState(partitions.size() == 1);
+      FeFsPartition part = partitions.get(0);
+
+      long totalBytes = 0;
+      for (FileDescriptor fd : orderedFds) {
+        totalBytes += fd.getFileLength();
+      }
+
+      int numFilesRemaining = orderedFds.size();
+      double fracPercentBytes = (double) percentBytes / 100;
+      long targetBytes = (long) Math.round(totalBytes * fracPercentBytes);
+      targetBytes = Math.max(targetBytes, minSampleBytes);
+
+      // Randomly select files until targetBytes has been reached or all files have been
+      // selected.
+      Random rnd = new Random(randomSeed);
+      long selectedBytes = 0;
+      List<FileDescriptor> sampleFiles = Lists.newArrayList();
+      while (selectedBytes < targetBytes && numFilesRemaining > 0) {
+        int selectedIdx = rnd.nextInt(numFilesRemaining);
+        FileDescriptor fd = orderedFds.get(selectedIdx);
+        sampleFiles.add(fd);
+        selectedBytes += fd.getFileLength();
+        // Avoid selecting the same file multiple times.
+        orderedFds.set(selectedIdx, orderedFds.get(numFilesRemaining - 1));
+        --numFilesRemaining;
+      }
+      Map<Long, List<FileDescriptor>> result = new HashMap<>();
+      result.put(part.getId(), sampleFiles);
+      return result;
     }
 
     /**

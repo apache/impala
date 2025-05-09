@@ -42,7 +42,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |     stored statistics:
 |       table: rows=20 size=22.90KB
 |       columns: unavailable
-|     extrapolated-rows=disabled max-scan-range-rows=1
+|     extrapolated-rows=unavailable max-scan-range-rows=1
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=1 row-size=44B cardinality=20
 |     in pipelines: 01(GETNEXT)
@@ -103,7 +103,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |     stored statistics:
 |       table: rows=20 size=22.90KB
 |       columns: unavailable
-|     extrapolated-rows=disabled max-scan-range-rows=1
+|     extrapolated-rows=unavailable max-scan-range-rows=1
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=1 row-size=44B cardinality=20
 |     in pipelines: 01(GETNEXT)
@@ -180,7 +180,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |     stored statistics:
 |       table: rows=20 size=22.90KB
 |       columns: unavailable
-|     extrapolated-rows=disabled max-scan-range-rows=1
+|     extrapolated-rows=unavailable max-scan-range-rows=1
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=1 row-size=44B cardinality=20
 |     in pipelines: 01(GETNEXT)
@@ -249,7 +249,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |     stored statistics:
 |       table: rows=20 size=22.90KB
 |       columns: unavailable
-|     extrapolated-rows=disabled max-scan-range-rows=1
+|     extrapolated-rows=unavailable max-scan-range-rows=1
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=1 row-size=44B cardinality=20
 |     in pipelines: 01(GETNEXT)

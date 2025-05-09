@@ -26,6 +26,7 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.JoinOperator;
+import org.apache.impala.analysis.TableSampleClause;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -94,14 +95,26 @@ public class IcebergDeleteNode extends JoinNode {
     // Also assume that the left side's selectivity applies to the delete records as well.
     // Please note that left side's cardinality already takes the selectivity into
     // account (i.e. no need to do leftSelectivity * leftCard).
-    long leftCardWithSelectivity = getChild(0).cardinality_;
+    PlanNode leftChild = getChild(0);
+    Preconditions.checkState(leftChild instanceof HdfsScanNode);
+    HdfsScanNode leftScanChild = (HdfsScanNode) leftChild;
+    TableSampleClause leftSampleParams = leftScanChild.getSampleParams();
+    long leftCardWithSelectivity = leftScanChild.cardinality_;
     long rightCard = getChild(1).cardinality_;
-    // Both sides should have non-zero cardinalities.
-    Preconditions.checkState(leftCardWithSelectivity > 0);
-    Preconditions.checkState(rightCard > 0);
-    double leftSelectivity = getChild(0).computeSelectivity();
-    long rightCardWithSelectivity = (long)(leftSelectivity * rightCard);
-    cardinality_ = Math.max(1, leftCardWithSelectivity - rightCardWithSelectivity);
+    // Both sides should have non-negative cardinalities.
+    Preconditions.checkState(leftCardWithSelectivity >= 0);
+    Preconditions.checkState(rightCard >= 0);
+    // The delete records on the right might refer to data records that are filtered
+    // out by predicates or table sampling. Let's incorporate this into our cardinality
+    // estimation.
+    double leftSelectivity = leftScanChild.computeSelectivity();
+    long effectiveRightCardinality = (long)(leftSelectivity * rightCard);
+    double leftSampling = leftSampleParams == null ?
+        1.0 : leftSampleParams.getPercentBytes() / 100.0;
+    Preconditions.checkState(leftSampling >= 0);
+    Preconditions.checkState(leftSampling <= 1.0);
+    effectiveRightCardinality = (long)(effectiveRightCardinality * leftSampling);
+    cardinality_ = Math.max(1, leftCardWithSelectivity - effectiveRightCardinality);
   }
 
   @Override

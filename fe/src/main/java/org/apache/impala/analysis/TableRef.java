@@ -482,7 +482,7 @@ public class TableRef extends StmtNode {
     if (!(this instanceof BaseTableRef)
         || !(resolvedPath_.destTable() instanceof FeFsTable)) {
       throw new AnalysisException(
-          "TABLESAMPLE is only supported on HDFS tables: " + getUniqueAlias());
+          "TABLESAMPLE is only supported on file-based tables: " + getUniqueAlias());
     }
   }
 
