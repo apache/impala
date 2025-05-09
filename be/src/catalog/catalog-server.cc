@@ -329,6 +329,9 @@ const string HADOOP_VARZ_TEMPLATE = "hadoop-varz.tmpl";
 const string HADOOP_VARZ_WEB_PAGE = "/hadoop-varz";
 
 const int REFRESH_METRICS_INTERVAL_MS = 1000;
+// Catalog version that signal that the first metadata reset has begun.
+// This should match Catalog.CATALOG_VERSION_AFTER_FIRST_RESET
+const int MIN_CATALOG_VERSION_TO_ACCEPT_REQUEST = 100;
 
 // Implementation for the CatalogService thrift interface.
 class CatalogServiceThriftIf : public CatalogServiceIf {
@@ -547,6 +550,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
  private:
   CatalogServer* catalog_server_;
   string server_address_;
+  bool has_initiated_first_reset_ = false;
 
   // Check if catalog protocols are compatible between client and catalog server.
   // Return Status::OK() if the protocols are compatible and catalog server is active.
@@ -558,6 +562,19 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     } else if (FLAGS_enable_catalogd_ha && !catalog_server_->IsActive()) {
       status = Status(Substitute("Request for Catalog service is rejected since "
           "catalogd $0 is in standby mode", server_address_));
+    }
+    while (status.ok() && !has_initiated_first_reset_) {
+      long current_catalog_version = 0;
+      status = catalog_server_->catalog()->GetCatalogVersion(&current_catalog_version);
+      if (!status.ok()) break;
+      if (current_catalog_version >= MIN_CATALOG_VERSION_TO_ACCEPT_REQUEST) {
+        has_initiated_first_reset_ = true;
+      } else {
+        VLOG(1) << "Catalog is not initialized yet. Waiting for catalog version ("
+                << current_catalog_version << ") to be >= "
+                << MIN_CATALOG_VERSION_TO_ACCEPT_REQUEST;
+        SleepForMs(100);
+      }
     }
     return status;
   }

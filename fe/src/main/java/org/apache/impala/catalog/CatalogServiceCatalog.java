@@ -2297,7 +2297,12 @@ public class CatalogServiceCatalog extends Catalog {
     // In case of an empty new catalog, the version should still change to reflect the
     // reset operation itself and to unblock impalads by making the catalog version >
     // INITIAL_CATALOG_VERSION. See Frontend.waitForCatalog()
-    ++catalogVersion_;
+    if (catalogVersion_ < Catalog.CATALOG_VERSION_AFTER_FIRST_RESET) {
+      catalogVersion_ = Catalog.CATALOG_VERSION_AFTER_FIRST_RESET;
+      LOG.info("First reset initiated. Version: " + catalogVersion_);
+    } else {
+      ++catalogVersion_;
+    }
 
     // Update data source, db and table metadata
     try {
