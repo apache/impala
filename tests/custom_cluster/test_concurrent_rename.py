@@ -32,6 +32,7 @@ class TestConcurrentRename(CustomClusterTestSuite):
   """Test concurrent rename with invalidate and other DDLs."""
 
   def test_rename_drop(self, vector, unique_database):
+    catalogd = self.cluster.catalogd
     name = "{}.tbl".format(unique_database)
     self.execute_query("create table {} (s string)".format(name))
     self.execute_query("describe {}".format(name))
@@ -41,9 +42,16 @@ class TestConcurrentRename(CustomClusterTestSuite):
         "catalogd_table_rename_delay:SLEEP@5000"
     with self.create_impala_client_from_vector(new_vector) as alter_client, \
          self.create_impala_client() as reset_client:
+      version_after_create = catalogd.service.get_catalog_version()
       alter_handle = alter_client.execute_async(
         "alter table {0} rename to {0}2".format(name))
-      time.sleep(0.1)
+      alter_client.wait_for_admission_control(alter_handle, timeout_s=10)
+      # Wait for at most 10 second until catalogd increase the version for rename
+      # operation.
+      start_time = time.time()
+      while (time.time() - start_time < 10.0
+             and catalogd.service.get_catalog_version() <= version_after_create):
+        time.sleep(0.05)
       reset_handle = reset_client.execute_async("invalidate metadata {}".format(name))
       self.execute_query("invalidate metadata {}2".format(name))
       self.execute_query("drop table {}2".format(name))
