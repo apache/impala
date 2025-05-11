@@ -31,6 +31,7 @@
 #include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/os-util.h"
+#include "util/time.h"
 
 #include "common/names.h"
 
@@ -440,6 +441,8 @@ void JvmThreadsUrlCallback(const Webserver::WebRequest& req, Document* doc) {
   overview.AddMember("thread_count", response.total_thread_count, doc->GetAllocator());
   overview.AddMember("daemon_count", response.daemon_thread_count, doc->GetAllocator());
   overview.AddMember("peak_count", response.peak_thread_count, doc->GetAllocator());
+  overview.AddMember("timestamp", ToStringFromUnixMillis(UnixMillis(),
+      TimePrecision::Millisecond), doc->GetAllocator());
   doc->AddMember("overview", overview, doc->GetAllocator());
 
   Value lst(kArrayType);

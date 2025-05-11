@@ -64,6 +64,7 @@ class TestWebPage(ImpalaTestSuite):
   HEALTHZ_URL = "http://localhost:{0}/healthz"
   EVENT_PROCESSOR_URL = "http://localhost:{0}/events"
   HADOOP_VARZ_URL = "http://localhost:{0}/hadoop-varz"
+  JVM_THREADZ_URL = "http://localhost:{0}/jvm-threadz"
 
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -126,6 +127,16 @@ class TestWebPage(ImpalaTestSuite):
       other_info = json.loads(other_info_page)
       assert "effective_locale" in other_info
       assert "glibc_version" in other_info
+
+  def test_jvm_threadz(self):
+      """Tests if timestamp is available in jvm-threadz page"""
+      for port in self.TEST_PORTS_WITHOUT_SS:
+        response = requests.get(self.JVM_THREADZ_URL.format(port) + "?json")
+        assert response.status_code == requests.codes.ok
+        jvm_threadz_page = json.loads(response.text)
+        overview = jvm_threadz_page["overview"]
+        assert len(overview) == 4
+        assert "timestamp" in overview
 
   def test_memz(self):
     """Tests /memz at impalad / statestored / catalogd"""
