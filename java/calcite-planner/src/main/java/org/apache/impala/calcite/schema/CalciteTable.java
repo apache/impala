@@ -93,7 +93,7 @@ public class CalciteTable extends RelOptAbstractTable
     checkIfTableIsSupported(table);
   }
 
-  private static RelDataType buildColumnsForRelDataType(FeTable table)
+  public static RelDataType buildColumnsForRelDataType(FeTable table)
       throws ImpalaException {
     RelDataTypeFactory typeFactory = new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
 

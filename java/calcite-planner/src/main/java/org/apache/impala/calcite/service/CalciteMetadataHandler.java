@@ -36,15 +36,11 @@ import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.calcite.schema.CalciteDb;
-import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.calcite.schema.ImpalaCalciteCatalogReader;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
-import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TQueryCtx;
@@ -101,7 +97,7 @@ public class CalciteMetadataHandler implements CompilerStep {
     // schema needs to contain the columns in the table for validation, which cannot
     // be done when it's an IncompleteTable
     List<String> errorTables = populateCalciteSchema(reader_,
-        queryCtx.getFrontend().getCatalog(), tableVisitor.tableNames_);
+        queryCtx.getFrontend().getCatalog(), stmtTableCache_);
 
     tableVisitor.checkForComplexTable(stmtTableCache_, errorTables, queryCtx);
   }
@@ -129,11 +125,12 @@ public class CalciteMetadataHandler implements CompilerStep {
    * list of tables in the query that are not found in the database.
    */
   public static List<String> populateCalciteSchema(CalciteCatalogReader reader,
-      FeCatalog catalog, Set<TableName> tableNames) throws ImpalaException {
+      FeCatalog catalog, StmtMetadataLoader.StmtTableCache stmtTableCache)
+      throws ImpalaException {
     List<String> notFoundTables = new ArrayList<>();
     CalciteSchema rootSchema = reader.getRootSchema();
     Map<String, CalciteDb.Builder> dbSchemas = new HashMap<>();
-    for (TableName tableName : tableNames) {
+    for (TableName tableName : stmtTableCache.tables.keySet()) {
       FeDb db = catalog.getDb(tableName.getDb());
       // db is not found, this will probably fail in the validation step
       if (db == null) {
@@ -146,12 +143,6 @@ public class CalciteMetadataHandler implements CompilerStep {
       if (feTable == null) {
         notFoundTables.add(tableName.toString());
         continue;
-      }
-      if (!(feTable instanceof HdfsTable)) {
-        throw new UnsupportedFeatureException(
-            "Table " + feTable.getFullName() + " has unsupported type " +
-            feTable.getClass().getSimpleName() + ". The Calcite planner only supports " +
-            "HDFS tables.");
       }
 
       // populate the dbschema with its table, creating the dbschema if it's the

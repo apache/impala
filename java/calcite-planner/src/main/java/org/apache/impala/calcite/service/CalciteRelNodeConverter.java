@@ -19,6 +19,7 @@ package org.apache.impala.calcite.service;
 
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import com.google.common.collect.ImmutableList;
+import org.apache.calcite.avatica.util.Quoting;
 import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCostImpl;
@@ -35,13 +36,18 @@ import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.impala.calcite.operators.ImpalaConvertletTable;
+import org.apache.calcite.prepare.PlannerImpl;
+import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
+import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 
 import org.apache.calcite.sql.validate.SqlValidator;
@@ -60,8 +66,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
   protected static final Logger LOG =
       LoggerFactory.getLogger(CalciteRelNodeConverter.class.getName());
 
-  private static final RelOptTable.ViewExpander NOOP_EXPANDER =
-      (type, query, schema, path) -> null;
+  private final RelOptTable.ViewExpander viewExpander_;
 
   private final RelOptCluster cluster_;
 
@@ -81,6 +86,8 @@ public class CalciteRelNodeConverter implements CompilerStep {
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
     cluster_ =
         RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
+    viewExpander_ = createViewExpander(
+        analysisResult.getSqlValidator().getCatalogReader().getRootSchema().plus());
   }
 
   public CalciteRelNodeConverter(CalciteValidator validator) {
@@ -91,11 +98,33 @@ public class CalciteRelNodeConverter implements CompilerStep {
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
     cluster_ =
         RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
+    viewExpander_ = createViewExpander(validator.getCatalogReader()
+        .getRootSchema().plus());
+  }
+
+  private static RelOptTable.ViewExpander createViewExpander(SchemaPlus schemaPlus) {
+    SqlParser.Config parserConfig =
+        SqlParser.configBuilder().setCaseSensitive(false).build()
+            // This makes SqlParser expect identifiers that require quoting to be
+            // enclosed by backticks.
+            .withQuoting(Quoting.BACK_TICK);
+    FrameworkConfig config = Frameworks.newConfigBuilder()
+        .defaultSchema(schemaPlus)
+        // This makes 'connectionConfig' in PlannerImpl case-insensitive, which in turn
+        // makes the CalciteCatalogReader used to validate the view in
+        // PlannerImpl#expandView() case-insensitive. Otherwise,
+        // CalciteRelNodeConverter#convert() would fail.
+        .parserConfig(parserConfig)
+        // We need to add ConventionTraitDef.INSTANCE to avoid the call to
+        // table.getStatistic() in LogicalTableScan#create().
+        .traitDefs(ConventionTraitDef.INSTANCE)
+        .build();
+    return new PlannerImpl(config);
   }
 
   public RelNode convert(SqlNode validatedNode) {
     SqlToRelConverter relConverter = new SqlToRelConverter(
-        NOOP_EXPANDER,
+        viewExpander_,
         sqlValidator_,
         reader_,
         cluster_,

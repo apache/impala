@@ -17,6 +17,7 @@
 
 package org.apache.impala.calcite.type;
 
+import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeSystemImpl;
@@ -60,6 +61,8 @@ public class ImpalaTypeSystemImpl extends RelDataTypeSystemImpl {
   private static final int DEFAULT_FLOAT_PRECISION    = 7;
   private static final int DEFAULT_DOUBLE_PRECISION   = 15;
 
+  public static final RelDataTypeFactory TYPE_FACTORY =
+      new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
 
   @Override
   public int getMaxScale(SqlTypeName typeName) {

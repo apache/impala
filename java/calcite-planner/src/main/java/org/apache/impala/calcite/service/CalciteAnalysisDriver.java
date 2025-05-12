@@ -100,8 +100,15 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
     try {
       reader_ = CalciteMetadataHandler.createCalciteCatalogReader(stmtTableCache_,
           queryCtx_, queryCtx_.session.database);
+      // When CalciteRelNodeConverter#convert() is called to convert the valid AST into a
+      // logical plan, ViewTable#expandView() in Apache Calcite would be invoked if a
+      // regular view is involved in the query. expandView() validates the SQL statement
+      // defining the view. During the validation, all referenced tables by the regular
+      // view are required. Thus, we need all the tables in 'stmtTableCache_'.
+      // Recall that parsedStmt_.getTablesInQuery(null) only contains TableName's in the
+      // given query but not the underlying tables referenced by a regular view.
       CalciteMetadataHandler.populateCalciteSchema(reader_, ctx_.getCatalog(),
-          parsedStmt_.getTablesInQuery(null));
+          stmtTableCache_);
 
       typeFactory_ = new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
       sqlValidator_ = SqlValidatorUtil.newValidator(
