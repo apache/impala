@@ -81,7 +81,8 @@ if [ ${REPORT_ACTION} -eq 1 ]; then
     --exclude=".*src/kudu.*" \
     --exclude=".*generated-sources/gen-cpp.*" \
     --exclude=".*src/util/bit-packing.inline.h.*" \
-    --html --html-details -o "${REPORT_DIRECTORY}/index.html" \
+    --html --html-details="${REPORT_DIRECTORY}/index.html" \
+    ${EXTRA_COVERAGE_REPORTING_ARGUMENTS[@]} \
     > "${REPORT_DIRECTORY}/gcovr.out" 2>&1
 fi
 
