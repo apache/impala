@@ -31,6 +31,7 @@ from tests.common.test_dimensions import (
     create_client_protocol_dimension,
     create_exec_option_dimension,
     create_exec_option_dimension_from_dict,
+    create_single_exec_option_dimension,
     create_uncompressed_json_dimension,
     create_uncompressed_text_dimension,
     default_protocol_or_parquet_constraint,
@@ -451,3 +452,17 @@ class TestAnalyticFnsTpch(ImpalaTestSuite):
 
   def test_analytic_predicate(self, vector):
     self.run_test_case('analytic-fns', vector)
+
+
+class TestTopNHighNdv(ImpalaTestSuite):
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTopNHighNdv, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+      create_uncompressed_text_dimension(cls.get_workload()))
+
+  def test_topn_high_ndv(self, vector, unique_database):
+    self.run_test_case(
+      'QueryTest/partitioned-top-n-high-ndv', vector, use_db=unique_database)

@@ -312,7 +312,7 @@ public class SortNode extends PlanNode implements SpillableOperator {
       List<Expr> partExprs = info_.getSortExprs().subList(0, numPartitionExprs_);
       long partNdv = numPartitionExprs_ == 0 ? 1 : Expr.getNumDistinctValues(partExprs);
       if (partNdv >= 0) {
-        long maxRowsInHeaps = partNdv * getPerPartitionLimit();
+        long maxRowsInHeaps = checkedMultiply(partNdv, getPerPartitionLimit());
         if (cardinality_ < 0 || cardinality_ > maxRowsInHeaps) {
           cardinality_ = maxRowsInHeaps;
         }

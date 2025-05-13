@@ -1,0 +1,74 @@
+====
+---- QUERY
+# IMPALA-14070: Create table with artificially high NDV.
+CREATE TABLE $DATABASE.high_ndv_cols (part1 STRING, part2 STRING, part3 STRING, col4 STRING, col5 STRING, col6 STRING,
+  PRIMARY KEY (part1, part2, part3) )
+PARTITION BY HASH (part1, part2, part3)
+PARTITIONS 3 STORED AS KUDU;
+insert into $DATABASE.high_ndv_cols values ("A", "A", "A", "A", "A", "A");
+alter table $DATABASE.high_ndv_cols set column stats part1 ('numDVs'='7792','numNulls'='0');
+alter table $DATABASE.high_ndv_cols set column stats part2 ('numDVs'='12502840','numNulls'='0');
+alter table $DATABASE.high_ndv_cols set column stats part3 ('numDVs'='4245286','numNulls'='0');
+alter table $DATABASE.high_ndv_cols set column stats col4 ('numDVs'='963','numNulls'='0');
+alter table $DATABASE.high_ndv_cols set column stats col5 ('numDVs'='2','numNulls'='0');
+====
+---- QUERY
+# IMPALA-14070: Run EXPLAIN.
+EXPLAIN with vw1 as (select part1, part2, part3, col4,
+    rank() OVER (PARTITION BY part1, part2, part3, col4, col5 ORDER BY col6 ASC) rk
+from $DATABASE.high_ndv_cols)
+select * from vw1 where rk<=2 LIMIT 100;
+---- RESULTS
+'Max Per-Host Resource Reservation: Memory=32.00MB Threads=4'
+'Per-Host Resource Estimates: Memory=8192.00PB'
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'$DATABASE.high_ndv_cols'
+''
+'PLAN-ROOT SINK'
+'|'
+'06:EXCHANGE [UNPARTITIONED]'
+'|  limit: 100'
+'|'
+'03:SELECT'
+'|  predicates: rank() <= 2'
+'|  limit: 100'
+'|  row-size=80B cardinality=100'
+'|'
+'02:ANALYTIC'
+'|  functions: rank()'
+'|  partition by: part1, part2, part3, col4, col5'
+'|  order by: col6 ASC'
+'|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW'
+'|  row-size=80B cardinality=9223372.04T'
+'|'
+'05:TOP-N'
+'|  partition by: part1, part2, part3, col4, col5'
+'|  order by: col6 ASC'
+'|  partition limit: 2 (include ties)'
+'|  row-size=72B cardinality=9223372.04T'
+'|'
+'04:EXCHANGE [HASH(part1,part2,part3,col4,col5)]'
+'|'
+'01:TOP-N'
+'|  partition by: part1, part2, part3, col4, col5'
+'|  order by: col6 ASC'
+'|  partition limit: 2 (include ties)'
+'|  source expr: rank() <= CAST(2 AS BIGINT)'
+'|  row-size=72B cardinality=9223372.04T'
+'|'
+'00:SCAN KUDU [$DATABASE.high_ndv_cols]'
+'   row-size=96B cardinality=unavailable'
+---- TYPES
+STRING
+====
+---- QUERY
+# IMPALA-14070: Run query.
+with vw1 as (select part1, part2, part3, col4,
+    rank() OVER (PARTITION BY part1, part2, part3, col4, col5 ORDER BY col6 ASC) rk
+from $DATABASE.high_ndv_cols)
+select * from vw1 where rk<=2 LIMIT 100;
+---- RESULTS
+'A','A','A','A',1
+---- TYPES
+STRING, STRING, STRING, STRING, BIGINT
+====
