@@ -3000,20 +3000,9 @@ void AggregatedRuntimeProfile::ToJsonSubclass(
   // 3. Info strings
   {
     lock_guard<SpinLock> l(agg_info_strings_lock_);
-    Value info_strings_json;
-
-    if (parent->HasMember("info_strings")) {
-      info_strings_json = (*parent)["info_strings"];
-    } else {
-      info_strings_json = Value(kArrayType);
-    }
 
     // Collect only the required info strings
-    CollectInfoStringIntoJson("Table Name", &info_strings_json, d);
-
-    if (info_strings_json.Size() > 0) {
-      parent->AddMember("info_strings", info_strings_json, allocator);
-    }
+    CollectInfoStringIntoJson("Table Name", parent, d);
   }
 }
 
@@ -3046,15 +3035,16 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value& event_sequence_js
   }
 
   // In case of missing event timestamps, order them according to 'labels_ordered',
-  // maintain alignment by substituting zeros, for skipping them later
+  // maintain alignment by substituting -1, for skipping them later
   size_t num_instances = timestamps.size();
   std::unordered_set<size_t> missing_event_instances;
+  const int64_t MISSING_TIMESTAMP = -1;
   if (order_found) {
     // Order and align timestamps using stored index references
     for (size_t instance_idx = 0; instance_idx < num_instances; ++instance_idx) {
       if (timestamps[instance_idx].size() < events_count) {
         vector<int64_t> inst_timestamps = std::move(timestamps[instance_idx]);
-        timestamps[instance_idx] = vector<int64_t>(events_count);
+        timestamps[instance_idx] = vector<int64_t>(events_count, MISSING_TIMESTAMP);
         const vector<int32_t>& idxs = label_idxs[instance_idx];
         int32_t inst_event_count = idxs.size();
         for (int32_t i = 0; i < inst_event_count; ++i) {
@@ -3065,11 +3055,11 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value& event_sequence_js
       }
     }
   } else {
-    // When all instances contain missing events, supplement with zeros to maintain
+    // When all instances contain missing events, supplement with -1 to maintain
     // a consistent number of timestamps
     for (size_t instance_idx = 0; instance_idx < num_instances; ++instance_idx) {
       if (timestamps[instance_idx].size() < events_count) {
-        timestamps[instance_idx].resize(events_count, 0);
+        timestamps[instance_idx].resize(events_count, MISSING_TIMESTAMP);
         // Record instances with missing events
         missing_event_instances.insert(instance_idx);
       }
@@ -3108,7 +3098,7 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value& event_sequence_js
       max_ts = 0;
       for (const vector<int64_t>& inst_timestamps : timestamps) {
         ts = inst_timestamps[event_idx];
-        if (ts == 0) continue;
+        if (ts == MISSING_TIMESTAMP) continue;
         if (ts < min_ts) min_ts = ts;
         if (ts > max_ts) max_ts = ts;
       }
@@ -3124,7 +3114,7 @@ void AggregatedRuntimeProfile::AggEventSequence::ToJson(Value& event_sequence_js
       // Perform streaming computation of timestamps "in-place" to find aggregates
       for (const vector<int64_t>& inst_timestamps : timestamps) {
         ts = inst_timestamps[event_idx];
-        if (ts == 0) continue;
+        if (ts == MISSING_TIMESTAMP) continue;
         division_idx = (ts - min_ts) * BUCKET_SIZE / ev_ts_span;
         if (division_idx >= BUCKET_SIZE) division_idx = BUCKET_SIZE - 1;
         if (ts < min_ts_list[division_idx]) min_ts_list[division_idx] = ts;
@@ -3202,7 +3192,14 @@ void AggregatedRuntimeProfile::CollectInfoStringIntoJson(const string& info_stri
 
     info_string_json.AddMember("key", info_string_name, allocator);
     info_string_json.AddMember("values", info_values_json, allocator);
-    parent->PushBack(info_string_json, allocator);
+
+    if (parent->HasMember("info_strings") && (*parent)["info_strings"].IsArray()) {
+      (*parent)["info_strings"].PushBack(info_string_json, allocator);
+    } else {
+      Value info_strings_json(kArrayType);
+      info_strings_json.PushBack(info_string_json, allocator);
+      parent->AddMember("info_strings", info_strings_json, allocator);
+    }
   }
 }
 

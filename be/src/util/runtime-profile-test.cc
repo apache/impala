@@ -2155,8 +2155,8 @@ class AggregatedEventSequenceToJsonTest : public ::testing::Test {
         // Each instance must have event timestamps in increasing order
         for (size_t j = 0; j < ts_list_cur_json.Size(); ++j) {
           ts_cur = ts_list_cur_json[j].GetInt64();
-          // Skip zeros inserted to handle missing event timestamps
-          if (ts_cur == 0) {
+          // Skip -1 s inserted to handle missing event timestamps
+          if (ts_cur == -1) {
             EXPECT_EQ(missing_event_instances.count(j), 1);
           } else {
             EXPECT_GT(ts_cur, ts_list_prev_json[j].GetInt64());
