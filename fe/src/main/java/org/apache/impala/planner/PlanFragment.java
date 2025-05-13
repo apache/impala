@@ -38,6 +38,7 @@ import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TPlanFragmentTree;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -638,7 +639,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       if (dataPartition_.getPartitionExprs().contains(expr)) {
         partition = true;
       }
-      result = PlanNode.checkedMultiply(result, numDistinct);
+      result = MathUtil.multiplyCardinalities(result, numDistinct);
       maxNdv = Math.max(maxNdv, numDistinct);
     }
     if (partition) {

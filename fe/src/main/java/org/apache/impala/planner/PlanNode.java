@@ -59,6 +59,7 @@ import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TQueryOptionsHash;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.ExprUtil;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +67,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.google.common.math.LongMath;
 
 /**
  * Each PlanNode represents a single relational operator
@@ -632,6 +632,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public void init(Analyzer analyzer) throws ImpalaException {
     assignConjuncts(analyzer);
     computeStats(analyzer);
+    validateCardinality();
     createDefaultSmap(analyzer);
   }
 
@@ -748,8 +749,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
   }
 
+  protected void validateCardinality() { Preconditions.checkState(cardinality_ >= -1); }
+
   protected long capCardinalityAtLimit(long cardinality) {
-    return smallestValidCardinality(cardinality, limit_);
+    return MathUtil.smallestValidCardinality(cardinality, limit_);
   }
 
   // Default implementation of computing the total data processed in bytes.
@@ -949,37 +952,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   /**
    * Returns true if stats-related variables are valid.
+   * Only use this for Preconditions.
    */
   public boolean hasValidStats() {
     return (numNodes_ == -1 || numNodes_ >= 0) &&
            (numInstances_ == -1 || numInstances_ >= 0) &&
            (cardinality_ == -1 || cardinality_ >= 0);
-  }
-
-  /**
-   * Computes and returns the sum of two long values. If an overflow occurs,
-   * the maximum Long value is returned (Long.MAX_VALUE).
-   */
-  public static long checkedAdd(long a, long b) {
-    try {
-      return LongMath.checkedAdd(a, b);
-    } catch (ArithmeticException e) {
-      LOG.warn("overflow when adding longs: " + a + ", " + b);
-      return Long.MAX_VALUE;
-    }
-  }
-
-  /**
-   * Computes and returns the product of two cardinalities. If an overflow
-   * occurs, the maximum Long value is returned (Long.MAX_VALUE).
-   */
-  public static long checkedMultiply(long a, long b) {
-    try {
-      return LongMath.checkedMultiply(a, b);
-    } catch (ArithmeticException e) {
-      LOG.warn("overflow when multiplying longs: " + a + ", " + b);
-      return Long.MAX_VALUE;
-    }
   }
 
   /**
@@ -1144,7 +1122,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     for(PlanNode p : children_) {
       long tmp = p.getCardinality();
       if (tmp == -1) return -1;
-      sum = checkedAdd(sum, tmp);
+      sum = MathUtil.addCardinalities(sum, tmp);
     }
     return sum;
   }
@@ -1412,24 +1390,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * this to return true if this is an unfavorable caching location.
    */
   public boolean omitTupleCache() { return false; }
-
-  /**
-   * Return the least between 'cardinality1' and 'cardinality2'
-   * that is not a negative number (unknown).
-   * Can return -1 if both number is less than 0.
-   * Both argument should not be < -1.
-   */
-  protected static long smallestValidCardinality(long cardinality1, long cardinality2) {
-    Preconditions.checkArgument(
-        cardinality1 >= -1, "cardinality1 is invalid: %s", cardinality1);
-    Preconditions.checkArgument(
-        cardinality2 >= -1, "cardinality2 is invalid: %s", cardinality2);
-    if (cardinality1 >= 0) {
-      if (cardinality2 >= 0) return Math.min(cardinality1, cardinality2);
-      return cardinality1;
-    }
-    return Math.max(-1, cardinality2);
-  }
 
   /**
    * Return True if Impala Coordinator node has scratch_dirs flag configured and

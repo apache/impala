@@ -32,7 +32,7 @@ import org.apache.impala.thrift.TNestedLoopJoinNode;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
-import org.apache.impala.util.ExprUtil;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,12 +91,12 @@ public class NestedLoopJoinNode extends JoinNode {
       TQueryOptions queryOptions) {
     // TODO: This seems a bug below that the total data is not divided by numInstances_.
     long perInstanceMemEstimate;
-    if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
-        || numNodes_ == 0) {
+    long rhsChildNode = getChild(1).getCardinality();
+    if (rhsChildNode == -1 || getChild(1).getAvgRowSize() == -1 || numNodes_ == 0) {
       perInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
     } else {
-      perInstanceMemEstimate =
-          (long) Math.ceil(getChild(1).cardinality_ * getChild(1).avgRowSize_);
+      double memMult = rhsChildNode * getChild(1).avgRowSize_;
+      perInstanceMemEstimate = (long) Math.ceil(memMult);
     }
     ResourceProfile buildProfile = ResourceProfile.noReservation(perInstanceMemEstimate);
     // Memory requirements for the probe side are minimal - batches are just streamed
@@ -113,7 +113,7 @@ public class NestedLoopJoinNode extends JoinNode {
     // We return the full cost in the first element of the Pair.
     long probeCardinality = getProbeCardinalityForCosting();
     long buildCardinality = Math.max(0, getChild(1).getCardinality());
-    long cardProduct = checkedMultiply(probeCardinality, buildCardinality);
+    long cardProduct = MathUtil.multiplyCardinalities(probeCardinality, buildCardinality);
     long perInstanceBuildCardinality =
         (long) Math.ceil(buildCardinality / fragment_.getNumInstancesForCosting());
     double totalCost = 0.0F;

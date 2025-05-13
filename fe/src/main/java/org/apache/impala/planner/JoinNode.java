@@ -42,11 +42,11 @@ import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
 import org.apache.impala.thrift.TEqJoinCondition;
 import org.apache.impala.thrift.TExecNodePhase;
-import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TJoinDistributionMode;
 import org.apache.impala.thrift.TJoinNode;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -827,7 +827,7 @@ public abstract class JoinNode extends PlanNode {
       long leftCard = getChild(0).cardinality_;
       long rightCard = getChild(1).cardinality_;
       if (leftCard != -1 && rightCard != -1) {
-        cardinality_ = checkedMultiply(leftCard, rightCard);
+        cardinality_ = MathUtil.multiplyCardinalities(leftCard, rightCard);
       }
     }
 
@@ -835,6 +835,11 @@ public abstract class JoinNode extends PlanNode {
     long leftCard = getChild(0).cardinality_;
     long rightCard = getChild(1).cardinality_;
     switch (joinOp_) {
+      case INNER_JOIN: {
+        // Do nothing. It is already handled above.
+        // This is here just to complete the enum cases.
+        break;
+      }
       case LEFT_SEMI_JOIN: {
         if (leftCard != -1) {
           cardinality_ = Math.min(leftCard, cardinality_);
@@ -861,7 +866,7 @@ public abstract class JoinNode extends PlanNode {
       }
       case FULL_OUTER_JOIN: {
         if (leftCard != -1 && rightCard != -1) {
-          long cardinalitySum = checkedAdd(leftCard, rightCard);
+          long cardinalitySum = MathUtil.addCardinalities(leftCard, rightCard);
           cardinality_ = Math.max(cardinalitySum, cardinality_);
         }
         break;
@@ -884,8 +889,8 @@ public abstract class JoinNode extends PlanNode {
         if (getChild(0).cardinality_ == -1 || getChild(1).cardinality_ == -1) {
           cardinality_ = -1;
         } else {
-          cardinality_ = checkedMultiply(getChild(0).cardinality_,
-              getChild(1).cardinality_);
+          cardinality_ = MathUtil.multiplyCardinalities(
+              getChild(0).cardinality_, getChild(1).cardinality_);
         }
         break;
       }

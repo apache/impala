@@ -1314,30 +1314,6 @@ public class CardinalityTest extends PlannerTestBase {
   }
 
   @Test
-  public void testSmallestValidCardinality() {
-    long[] validCard = {0, 1, Long.MAX_VALUE};
-    long unknown = -1;
-
-    // Case 1: both argument is valid.
-    for (long c1 : validCard) {
-      for (long c2 : validCard) {
-        assertEquals(c1 + " vs " + c2, Math.min(c1, c2),
-            PlanNode.smallestValidCardinality(c1, c2));
-      }
-    }
-    // Case 2: One argument is valid, the other is unknown.
-    for (long c : validCard) {
-      assertEquals(
-          c + " vs " + unknown, c, PlanNode.smallestValidCardinality(c, unknown));
-      assertEquals(
-          unknown + " vs " + c, c, PlanNode.smallestValidCardinality(unknown, c));
-    }
-    // Case 3: both argument is unknown.
-    assertEquals(unknown + " vs " + unknown, unknown,
-        PlanNode.smallestValidCardinality(unknown, unknown));
-  }
-
-  @Test
   public void testEstimatePreaggCardinality() {
     List<Long> positiveLong = Arrays.asList(1L, 2L, 5L, 10L, 100L, 1000L, Long.MAX_VALUE);
     List<Long> validCard = new ArrayList<>(positiveLong);
@@ -1360,7 +1336,7 @@ public class CardinalityTest extends PlannerTestBase {
             assertTrue(message + ", expect=0", outputCard == 0);
           } else if (inputCard == -1 || totalInstances == 1) {
             long leastInputVsNdv =
-                PlanNode.smallestValidCardinality(inputCard, globalNdv);
+                MathUtil.smallestValidCardinality(inputCard, globalNdv);
             assertTrue(
                 message + ", expect=" + leastInputVsNdv, outputCard == leastInputVsNdv);
           } else {
@@ -1373,10 +1349,9 @@ public class CardinalityTest extends PlannerTestBase {
           message = String.format(
               pattern, totalInstances, globalNdv, inputCard, true, false, -1, outputCard);
           assertTrue(message + ", expect>=0", outputCard >= 0);
-          long allDuplicate =
-              MathUtil.saturatingMultiplyCardinalities(globalNdv, totalInstances);
+          long allDuplicate = MathUtil.multiplyCardinalities(globalNdv, totalInstances);
           long leastInputVsAllDuplicate =
-              PlanNode.smallestValidCardinality(inputCard, allDuplicate);
+              MathUtil.smallestValidCardinality(inputCard, allDuplicate);
           if (allDuplicate < inputCard) {
             assertTrue(message + ", expect=" + leastInputVsAllDuplicate,
                 outputCard == leastInputVsAllDuplicate);
@@ -1390,10 +1365,9 @@ public class CardinalityTest extends PlannerTestBase {
             message = String.format(pattern, totalInstances, globalNdv, inputCard, false,
                 true, limit, outputCard);
             assertTrue(message + ", expect>=0", outputCard >= 0);
-            long allAtLimit =
-                MathUtil.saturatingMultiplyCardinalities(totalInstances, limit);
+            long allAtLimit = MathUtil.multiplyCardinalities(totalInstances, limit);
             long leastOfAll =
-                PlanNode.smallestValidCardinality(allAtLimit, leastInputVsAllDuplicate);
+                MathUtil.smallestValidCardinality(allAtLimit, leastInputVsAllDuplicate);
             assertTrue(message + ", expect=" + leastOfAll, outputCard == leastOfAll);
           }
         }

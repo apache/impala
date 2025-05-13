@@ -35,6 +35,7 @@ import org.apache.impala.thrift.TIcebergDeleteNode;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -169,9 +170,7 @@ public class IcebergDeleteNode extends JoinNode {
     for (Expr eqJoinPredicate : eqJoinConjuncts_) {
       long rhsPdNdv = getNdv(eqJoinPredicate.getChild(1));
       rhsPdNdv = Math.min(rhsPdNdv, rhsCard);
-      if (rhsPdNdv != -1) {
-        rhsNdv = PlanNode.checkedMultiply(rhsNdv, rhsPdNdv);
-      }
+      if (rhsPdNdv != -1) rhsNdv = MathUtil.multiplyCardinalities(rhsNdv, rhsPdNdv);
     }
 
     // The memory of the data stored in hash table is the file path of the data files

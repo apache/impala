@@ -39,6 +39,7 @@ import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTableSinkType;
 import org.apache.impala.util.BitUtil;
+import org.apache.impala.util.MathUtil;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -222,8 +223,8 @@ public class HdfsTableSink extends TableSink {
           Math.max(1L, inputNode.getCardinality() / numInstances);
       long perInstanceInputBytes =
           (long) Math.ceil(perInstanceInputCardinality * inputNode.getAvgRowSize());
-      long perInstanceMemReq =
-          PlanNode.checkedMultiply(numBufferedPartitionsPerInstance, perPartitionMemReq);
+      long perInstanceMemReq = MathUtil.multiplyCardinalities(
+          numBufferedPartitionsPerInstance, perPartitionMemReq);
       perInstanceMemEstimate = Math.min(perInstanceInputBytes, perInstanceMemReq);
     }
     resourceProfile_ = ResourceProfile.noReservation(perInstanceMemEstimate);

@@ -37,6 +37,7 @@ import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.thrift.TVirtualColumnType;
 import org.apache.impala.util.KuduUtil;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1347,7 +1348,7 @@ public class DistributedPlanner {
       Preconditions.checkState(node == childSortNode);
       if (hasLimit) {
         childSortNode.unsetLimit();
-        childSortNode.setLimit(PlanNode.checkedAdd(limit, offset));
+        childSortNode.setLimit(MathUtil.addCardinalities(limit, offset));
       }
       childSortNode.setOffset(0);
     }

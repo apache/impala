@@ -27,6 +27,7 @@ import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.MathUtil;
 
 import com.google.common.base.Preconditions;
 
@@ -88,8 +89,8 @@ public class SubplanNode extends PlanNode {
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     if (getChild(0).cardinality_ != -1 && getChild(1).cardinality_ != -1) {
-      cardinality_ =
-          checkedMultiply(getChild(0).cardinality_, getChild(1).cardinality_);
+      cardinality_ = MathUtil.multiplyCardinalities(
+          getChild(0).cardinality_, getChild(1).cardinality_);
     } else {
       cardinality_ = -1;
     }

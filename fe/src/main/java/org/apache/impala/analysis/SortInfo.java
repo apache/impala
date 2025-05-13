@@ -21,21 +21,19 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.MapType;
-import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.TreeNode;
-import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.ProcessingCost;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.ExprUtil;
+import org.apache.impala.util.MathUtil;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -290,7 +288,7 @@ public class SortInfo {
    * operator and 'offset' is the value in the 'OFFSET [x]' clause.
    */
   public long estimateTopNMaterializedSize(long cardinality, long offset) {
-    long totalRows = PlanNode.checkedAdd(cardinality, offset);
+    long totalRows = MathUtil.addCardinalities(cardinality, offset);
     return estimateMaterializedSize(totalRows);
   }
 

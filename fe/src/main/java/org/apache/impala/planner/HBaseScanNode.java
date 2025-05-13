@@ -347,14 +347,14 @@ public class HBaseScanNode extends ScanNode {
         }
       }
     }
+
+    // Safe guard for cardinality_ < -1, e.g. when hbase sampling fails and numRows
+    // in HMS is abnormally set to be < -1.
+    cardinality_ = Math.max(-1, cardinality_);
     inputCardinality_ = cardinality_;
 
     if (cardinality_ > 0) {
       cardinality_ = applyConjunctsSelectivity(cardinality_);
-    } else {
-      // Safe guard for cardinality_ < -1, e.g. when hbase sampling fails and numRows
-      // in HMS is abnormally set to be < -1.
-      cardinality_ = Math.max(-1, cardinality_);
     }
     cardinality_ = capCardinalityAtLimit(cardinality_);
     if (LOG.isTraceEnabled()) {

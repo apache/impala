@@ -41,6 +41,7 @@ import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,19 +130,29 @@ public class IcebergScanNode extends HdfsScanNode {
         for (FileDescriptor fd : sampledFileDescs) {
           Preconditions.checkState(fd instanceof IcebergFileDescriptor);
           IcebergFileDescriptor iceFd = (IcebergFileDescriptor) fd;
-          cardinality_ += iceFd.getFbFileMetadata().icebergMetadata().recordCount();
+          cardinality_ = MathUtil.addCardinalities(
+              cardinality_, iceFd.getFbFileMetadata().icebergMetadata().recordCount());
         }
       }
     } else {
       for (IcebergFileDescriptor fd : fileDescs_) {
-        cardinality_ += fd.getFbFileMetadata().icebergMetadata().recordCount();
+        cardinality_ = MathUtil.addCardinalities(
+            cardinality_, fd.getFbFileMetadata().icebergMetadata().recordCount());
       }
     }
 
     // Adjust cardinality for all collections referenced along the tuple's path.
-    for (Type t: desc_.getPath().getMatchedTypes()) {
-      if (t.isCollectionType()) cardinality_ *= PlannerContext.AVG_COLLECTION_SIZE;
+    if (cardinality_ > 0) {
+      for (Type t : desc_.getPath().getMatchedTypes()) {
+        if (t.isCollectionType()) {
+          cardinality_ = MathUtil.multiplyCardinalities(
+              cardinality_, PlannerContext.AVG_COLLECTION_SIZE);
+        }
+      }
     }
+
+    // Sanity check scan node cardinality.
+    cardinality_ = Math.max(-1, cardinality_);
     inputCardinality_ = cardinality_;
 
     if (cardinality_ > 0) {

@@ -35,6 +35,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
 import org.apache.impala.thrift.TSortNode;
 import org.apache.impala.thrift.TSortType;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,7 +126,7 @@ public class SortNode extends PlanNode implements SpillableOperator {
       PlanNodeId id, PlanNode input, SortInfo info, long offset, long limit,
       boolean includeTies) {
     long topNBytesLimit = queryOptions.topn_bytes_limit;
-    long topNCardinality = smallestValidCardinality(input.cardinality_, limit);
+    long topNCardinality = MathUtil.smallestValidCardinality(input.cardinality_, limit);
     long estimatedTopNMaterializedSize =
         info.estimateTopNMaterializedSize(topNCardinality, offset);
 
@@ -221,7 +222,8 @@ public class SortNode extends PlanNode implements SpillableOperator {
     Preconditions.checkState(!hasLimit());
     Preconditions.checkState(!hasOffset());
     long topNBytesLimit = analyzer.getQueryOptions().topn_bytes_limit;
-    long topNCardinality = smallestValidCardinality(getChild(0).cardinality_, limit);
+    long topNCardinality =
+        MathUtil.smallestValidCardinality(getChild(0).cardinality_, limit);
     long estimatedTopNMaterializedSize =
         info_.estimateTopNMaterializedSize(topNCardinality, offset_);
 
@@ -302,7 +304,8 @@ public class SortNode extends PlanNode implements SpillableOperator {
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     if (isTypeTopN() && includeTies_) {
-      cardinality_ = smallestValidCardinality(getChild(0).cardinality_, limitWithTies_);
+      cardinality_ =
+          MathUtil.smallestValidCardinality(getChild(0).cardinality_, limitWithTies_);
     } else {
       cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_);
     }
@@ -312,7 +315,8 @@ public class SortNode extends PlanNode implements SpillableOperator {
       List<Expr> partExprs = info_.getSortExprs().subList(0, numPartitionExprs_);
       long partNdv = numPartitionExprs_ == 0 ? 1 : Expr.getNumDistinctValues(partExprs);
       if (partNdv >= 0) {
-        long maxRowsInHeaps = checkedMultiply(partNdv, getPerPartitionLimit());
+        long maxRowsInHeaps =
+            MathUtil.multiplyCardinalities(partNdv, getPerPartitionLimit());
         if (cardinality_ < 0 || cardinality_ > maxRowsInHeaps) {
           cardinality_ = maxRowsInHeaps;
         }

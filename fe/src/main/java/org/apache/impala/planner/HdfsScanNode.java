@@ -1678,18 +1678,21 @@ public class HdfsScanNode extends ScanNode {
     }
 
     // Adjust cardinality for all collections referenced along the tuple's path.
-    if (cardinality_ != -1) {
+    if (cardinality_ > 0) {
       for (Type t: desc_.getPath().getMatchedTypes()) {
-        if (t.isCollectionType()) cardinality_ *= PlannerContext.AVG_COLLECTION_SIZE;
+        if (t.isCollectionType()) {
+          cardinality_ = MathUtil.multiplyCardinalities(
+              cardinality_, PlannerContext.AVG_COLLECTION_SIZE);
+        }
       }
     }
-    inputCardinality_ = cardinality_;
 
     // Sanity check scan node cardinality.
     if (cardinality_ < -1) {
       hasCorruptTableStats_ = true;
       cardinality_ = -1;
     }
+    inputCardinality_ = cardinality_;
 
     if (cardinality_ > 0) {
       if (LOG.isTraceEnabled()) {
@@ -1760,7 +1763,7 @@ public class HdfsScanNode extends ScanNode {
       } else if (partNumRows > -1) {
         // Consider partition with good stats.
         if (partitionNumRows_ == -1) partitionNumRows_ = 0;
-        partitionNumRows_ = checkedAdd(partitionNumRows_, partNumRows);
+        partitionNumRows_ = MathUtil.addCardinalities(partitionNumRows_, partNumRows);
         ++numPartitionsWithNumRows_;
       }
     }
@@ -2428,8 +2431,9 @@ public class HdfsScanNode extends ScanNode {
       Preconditions.checkState(maxScannerThreads == 1);
       perThreadIoBuffers = 2;
     }
-    long perInstanceMemEstimate = checkedMultiply(
-        checkedMultiply(maxScannerThreads, perThreadIoBuffers), maxIoBufferSize);
+    long perInstanceMemEstimate = MathUtil.multiplyCardinalities(
+        MathUtil.multiplyCardinalities(maxScannerThreads, perThreadIoBuffers),
+        maxIoBufferSize);
 
     // Sanity check: the tighter estimation should not exceed the per-host maximum.
     long perHostUpperBound = getPerHostMemUpperBound();
@@ -2811,8 +2815,8 @@ public class HdfsScanNode extends ScanNode {
           // This is a simple in-list predicate.
           Preconditions.checkState(statsConjunct.getChildCount() > 1,
               "InPredicate must have at least two child expressions");
-          ndvMult = MathUtil.saturatingMultiplyCardinalities(
-              ndvMult, statsConjunct.getChildCount() - 1);
+          ndvMult =
+              MathUtil.multiplyCardinalities(ndvMult, statsConjunct.getChildCount() - 1);
           it.remove();
         } else if (statsConjunct instanceof IsNullPredicate) {
           // This is an is-null predicate.

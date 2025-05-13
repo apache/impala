@@ -780,7 +780,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_without_stats, OVERWRI
 |  in pipelines: 02(GETNEXT), 00(OPEN)
 |
 01:EXCHANGE [HASH(ss_item_sk)]
-|  mem-estimate=12.19MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=22.19MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=0 row-size=100B cardinality=unavailable cost=0
 |  in pipelines: 00(GETNEXT)
 |

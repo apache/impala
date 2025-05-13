@@ -114,6 +114,12 @@ abstract public class ScanNode extends PlanNode {
     hasHardEstimates_ = !hasScanConjuncts() && !isAccessingCollectionType();
   }
 
+  @Override
+  protected void validateCardinality() {
+    Preconditions.checkState(cardinality_ >= -1);
+    Preconditions.checkState(inputCardinality_ >= -1);
+  }
+
   public TupleDescriptor getTupleDesc() { return desc_; }
 
   @Override

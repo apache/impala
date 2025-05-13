@@ -34,6 +34,7 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TUnionNode;
+import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,7 +126,8 @@ public class UnionNode extends PlanNode {
       // ignore missing child cardinality info in the hope it won't matter enough
       // to change the planning outcome
       if (child.cardinality_ >= 0) {
-        totalChildCardinality = checkedAdd(totalChildCardinality, child.cardinality_);
+        totalChildCardinality =
+            MathUtil.addCardinalities(totalChildCardinality, child.cardinality_);
         haveChildWithCardinality = true;
       }
       // Union fragments are scheduled on the union of hosts of all scans in the fragment
@@ -139,7 +141,8 @@ public class UnionNode extends PlanNode {
     // Consider estimate valid if we have at least one child with known cardinality, or
     // only constant values.
     if (haveChildWithCardinality || children_.size() == 0) {
-      cardinality_ = checkedAdd(totalChildCardinality, constExprLists_.size());
+      cardinality_ =
+          MathUtil.addCardinalities(totalChildCardinality, constExprLists_.size());
     } else {
       cardinality_ = -1;
     }
@@ -163,8 +166,8 @@ public class UnionNode extends PlanNode {
     for (int i = firstMaterializedChildIdx_; i < resultExprLists_.size(); i++) {
       PlanNode child = children_.get(i);
       if (child.cardinality_ >= 0) {
-        totalMaterializedCardinality =
-            checkedAdd(totalMaterializedCardinality, Math.max(0, child.cardinality_));
+        totalMaterializedCardinality = MathUtil.addCardinalities(
+            totalMaterializedCardinality, Math.max(0, child.cardinality_));
       }
     }
     long estBytesMaterialized =

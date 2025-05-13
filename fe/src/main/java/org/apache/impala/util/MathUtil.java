@@ -20,40 +20,79 @@ package org.apache.impala.util;
 import com.google.common.base.Preconditions;
 import com.google.common.math.LongMath;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class MathUtil {
+  private final static Logger LOG = LoggerFactory.getLogger(MathUtil.class);
 
   // Multiply two numbers. If the multiply would overflow, return either Long.MIN_VALUE
-  // (if a xor b is negative) or Long.MAX_VALUE otherwise. The overflow path is not
-  // optimised at all and may be somewhat slow.
+  // (if a xor b is negative) or Long.MAX_VALUE otherwise.
   public static long saturatingMultiply(long a, long b) {
-    try {
-      return LongMath.checkedMultiply(a, b);
-    } catch (ArithmeticException e) {
-      return a < 0 != b < 0 ? Long.MIN_VALUE : Long.MAX_VALUE;
-    }
+    return LongMath.saturatedMultiply(a, b);
   }
 
-  // Multiply two cardinality numbers like saturatingMultiply() but with additional
-  // precondition check that both must be a valid cardinality value.
-  // Return -1 if any argument is -1.
-  public static long saturatingMultiplyCardinalities(
-      long cardinality1, long cardinality2) {
+  // Add two numbers. If the add would overflow, return either Long.MAX_VALUE if both are
+  // positive or Long.MIN_VALUE if both are negative.
+  public static long saturatingAdd(long a, long b) {
+    return LongMath.saturatedAdd(a, b);
+  }
+
+  /**
+   * Computes and returns the sum of two cardinality numbers. If an overflow occurs,
+   * the maximum Long value is returned (Long.MAX_VALUE).
+   * Both number should be a valid cardinality number (>= -1).
+   * Return -1 if any argument is -1.
+   */
+  public static long addCardinalities(long cardinality1, long cardinality2) {
     Preconditions.checkArgument(
         cardinality1 >= -1, "cardinality1 is invalid: %s", cardinality1);
     Preconditions.checkArgument(
         cardinality2 >= -1, "cardinality2 is invalid: %s", cardinality2);
     if (cardinality1 == -1 || cardinality2 == -1) return -1;
-    return saturatingMultiply(cardinality1, cardinality2);
+    try {
+      return LongMath.checkedAdd(cardinality1, cardinality2);
+    } catch (ArithmeticException e) {
+      LOG.warn("overflow when adding longs: " + cardinality1 + ", " + cardinality2);
+      return Long.MAX_VALUE;
+    }
   }
 
-  // Add two numbers. If the add would overflow, return either Long.MAX_VALUE if both are
-  // positive or Long.MIN_VALUE if both are negative. The overflow path is not optimised
-  // at all and may be somewhat slow.
-  public static long saturatingAdd(long a, long b) {
+  /**
+   * Computes and returns the product of two cardinality numbers. If an overflow
+   * occurs, the maximum Long value is returned (Long.MAX_VALUE).
+   * Both number should be a valid cardinality number (>= -1).
+   * Return -1 if any argument is -1.
+   */
+  public static long multiplyCardinalities(long cardinality1, long cardinality2) {
+    Preconditions.checkArgument(
+        cardinality1 >= -1, "cardinality1 is invalid: %s", cardinality1);
+    Preconditions.checkArgument(
+        cardinality2 >= -1, "cardinality2 is invalid: %s", cardinality2);
+    if (cardinality1 == -1 || cardinality2 == -1) return -1;
     try {
-      return LongMath.checkedAdd(a, b);
+      return LongMath.checkedMultiply(cardinality1, cardinality2);
     } catch (ArithmeticException e) {
-      return a < 0 ? Long.MIN_VALUE : Long.MAX_VALUE;
+      LOG.warn("overflow when multiplying longs: " + cardinality1 + ", " + cardinality2);
+      return Long.MAX_VALUE;
     }
+  }
+
+  /**
+   * Return the least between 'cardinality1' and 'cardinality2'
+   * that is not a negative number (unknown).
+   * Can return -1 if both number is less than 0.
+   * Both argument should not be < -1.
+   */
+  public static long smallestValidCardinality(long cardinality1, long cardinality2) {
+    Preconditions.checkArgument(
+        cardinality1 >= -1, "cardinality1 is invalid: %s", cardinality1);
+    Preconditions.checkArgument(
+        cardinality2 >= -1, "cardinality2 is invalid: %s", cardinality2);
+    if (cardinality1 >= 0) {
+      if (cardinality2 >= 0) return Math.min(cardinality1, cardinality2);
+      return cardinality1;
+    }
+    return Math.max(-1, cardinality2);
   }
 }

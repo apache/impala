@@ -34,11 +34,11 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
-import org.apache.impala.util.ExprUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.common.math.LongMath;
 
 /**
  * Receiver side of a 1:n data stream. Logically, an ExchangeNode consumes the data
@@ -314,7 +314,7 @@ public class ExchangeNode extends PlanNode {
     long estimatedDeferredRPCQueueSize = estimateDeferredRPCQueueSize(queryOptions,
         numSenders);
     long estimatedMem = Math.max(
-        checkedAdd(estimatedTotalQueueByteSize, estimatedDeferredRPCQueueSize),
+        LongMath.saturatedAdd(estimatedTotalQueueByteSize, estimatedDeferredRPCQueueSize),
         MIN_ESTIMATE_BYTES);
     nodeResourceProfile_ = ResourceProfile.noReservation(estimatedMem);
   }
@@ -344,7 +344,7 @@ public class ExchangeNode extends PlanNode {
     // queries without stats.
     long estimatedTotalQueueByteSize = numQueues * maxQueueByteSize;
     // Set an upper limit based on estimated cardinality.
-    if (hasValidStats()) {
+    if (getCardinality() > -1 && (isBroadcastExchange() || getNumNodes() > 0)) {
       long totalBytesToReceive = (long) Math.ceil(getAvgRowSize() * getCardinality());
       // Assuming no skew in distribution during data shuffling.
       long bytesToReceivePerExchNode = isBroadcastExchange() ? totalBytesToReceive

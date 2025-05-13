@@ -345,12 +345,12 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
                 groupingExprs.isEmpty(), canCompleteEarly, getLimit());
           }
         } else if (canCompleteEarly) {
-          aggOutputCard = smallestValidCardinality(aggOutputCard, getLimit());
+          aggOutputCard = MathUtil.smallestValidCardinality(aggOutputCard, getLimit());
         }
         aggClassOutputCardinality_.add(aggOutputCard);
         // IMPALA-2945: Behavior change if estimatePreaggDuplicate is true.
-        cardinality_ =
-            checkedAdd(cardinality_, estimatePreaggDuplicate ? aggOutputCard : numGroups);
+        cardinality_ = MathUtil.addCardinalities(
+            cardinality_, estimatePreaggDuplicate ? aggOutputCard : numGroups);
       }
       aggIdx++;
     }
@@ -446,25 +446,24 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
 
     if (canCompleteEarly) {
       Preconditions.checkArgument(limit > -1, "limit must not be negative.");
-      long limitMultiple =
-          MathUtil.saturatingMultiplyCardinalities(limit, totalInstances);
-      long ndvMultiple =
-          MathUtil.saturatingMultiplyCardinalities(globalNdv, totalInstances);
-      return smallestValidCardinality(
-          inputCardinality, smallestValidCardinality(ndvMultiple, limitMultiple));
+      long limitMultiple = MathUtil.multiplyCardinalities(limit, totalInstances);
+      long ndvMultiple = MathUtil.multiplyCardinalities(globalNdv, totalInstances);
+      return MathUtil.smallestValidCardinality(inputCardinality,
+          MathUtil.smallestValidCardinality(ndvMultiple, limitMultiple));
     } else if (isNonGroupingAggregation) {
-      return smallestValidCardinality(inputCardinality,
-          MathUtil.saturatingMultiplyCardinalities(globalNdv, totalInstances));
+      return MathUtil.smallestValidCardinality(
+          inputCardinality, MathUtil.multiplyCardinalities(globalNdv, totalInstances));
     } else if (totalInstances > 1 && inputCardinality > globalNdv) {
       double perInstanceInputCard = Math.ceil((double) inputCardinality / totalInstances);
       double globalNdvInDouble = (double) globalNdv;
       double probValExist = 1.0
           - Math.pow((globalNdvInDouble - 1.0) / globalNdvInDouble, perInstanceInputCard);
       double perInstanceNdv = Math.ceil(probValExist * globalNdvInDouble);
-      long preaggOutputCard = MathUtil.saturatingMultiplyCardinalities(
-          Math.round(perInstanceNdv), totalInstances);
+      long preaggOutputCard =
+          MathUtil.multiplyCardinalities(Math.round(perInstanceNdv), totalInstances);
       // keep bounding at aggInputCardinality_ max.
-      preaggOutputCard = smallestValidCardinality(inputCardinality, preaggOutputCard);
+      preaggOutputCard =
+          MathUtil.smallestValidCardinality(inputCardinality, preaggOutputCard);
       LOG.trace("inputCardinality={} perInstanceInputCard={} globalNdv={} probValExist={}"
               + " perInstanceNdv={} preaggOutputCard={}",
           inputCardinality, perInstanceInputCard, globalNdv, probValExist, perInstanceNdv,
@@ -472,7 +471,7 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
       return preaggOutputCard;
     }
     // Input is likely unique already.
-    return smallestValidCardinality(inputCardinality, globalNdv);
+    return MathUtil.smallestValidCardinality(inputCardinality, globalNdv);
   }
 
   /**
@@ -485,7 +484,7 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     if (groupingExprs.isEmpty()) {
       return NON_GROUPING_AGG_NUM_GROUPS;
     } else {
-      return smallestValidCardinality(preaggNumGroup, aggInputCardinality);
+      return MathUtil.smallestValidCardinality(preaggNumGroup, aggInputCardinality);
     }
   }
 
@@ -578,10 +577,10 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
             Preconditions.checkState(
                 filteredNdv > 0, "filteredNdv must be greater than 0.");
             ndvBasedNumGroup =
-                MathUtil.saturatingMultiplyCardinalities(ndvBasedNumGroup, filteredNdv);
+                MathUtil.multiplyCardinalities(ndvBasedNumGroup, filteredNdv);
           }
           long numGroupFromCommonTuple =
-              smallestValidCardinality(producerCardinality, ndvBasedNumGroup);
+              MathUtil.smallestValidCardinality(producerCardinality, ndvBasedNumGroup);
 
           if (numGroupFromCommonTuple < 0) {
             // Can not reason about tuple cardinality.
@@ -600,9 +599,9 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     }
     if (numGroups < 0) return numGroups;
     for (Long entry : tupleBasedNumGroups) {
-      numGroups = MathUtil.saturatingMultiplyCardinalities(numGroups, entry);
+      numGroups = MathUtil.multiplyCardinalities(numGroups, entry);
     }
-    return smallestValidCardinality(numGroups, aggInputCardinality);
+    return MathUtil.smallestValidCardinality(numGroups, aggInputCardinality);
   }
 
   /**
@@ -620,7 +619,7 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     // Also, worst-case output cardinality is better than an unknown output cardinality.
     // Note that this will still be -1 (unknown) if both numGroups
     // and aggInputCardinality is unknown.
-    return smallestValidCardinality(numGroups, aggInputCardinality);
+    return MathUtil.smallestValidCardinality(numGroups, aggInputCardinality);
   }
 
   /**
@@ -936,8 +935,8 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
         long aggClassOutputCardinality = estimatePreaggDuplicate ?
             prevAggNode.aggClassOutputCardinality_.get(aggIdx) :
             prevAggNode.aggClassNumGroups_.get(aggIdx);
-        inputCardinality =
-            smallestValidCardinality(inputCardinality, aggClassOutputCardinality);
+        inputCardinality = MathUtil.smallestValidCardinality(
+            inputCardinality, aggClassOutputCardinality);
       }
       resourceProfiles_.add(computeAggClassResourceProfile(
           queryOptions, aggInfo, inputCardinality, maxMemoryEstimatePerInstance));

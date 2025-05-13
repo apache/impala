@@ -501,25 +501,25 @@ from functional_parquet.alltypes
     left join functional_parquet.alltypestiny on alltypes.id = alltypestiny.id
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=38.17MB Threads=5
-Per-Host Resource Estimates: Memory=2.04GB
+Per-Host Resource Estimates: Memory=2.06GB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypes, functional_parquet.alltypestiny
 Analyzed query: SELECT /* +straight_join */ * FROM functional_parquet.alltypes
 LEFT OUTER JOIN functional_parquet.alltypestiny ON alltypes.id = alltypestiny.id
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.49MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=20.49MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: functional_parquet.alltypes.id, functional_parquet.alltypes.bool_col, functional_parquet.alltypes.tinyint_col, functional_parquet.alltypes.smallint_col, functional_parquet.alltypes.int_col, functional_parquet.alltypes.bigint_col, functional_parquet.alltypes.float_col, functional_parquet.alltypes.double_col, functional_parquet.alltypes.date_string_col, functional_parquet.alltypes.string_col, functional_parquet.alltypes.timestamp_col, functional_parquet.alltypes.year, functional_parquet.alltypes.month, functional_parquet.alltypestiny.id, functional_parquet.alltypestiny.bool_col, functional_parquet.alltypestiny.tinyint_col, functional_parquet.alltypestiny.smallint_col, functional_parquet.alltypestiny.int_col, functional_parquet.alltypestiny.bigint_col, functional_parquet.alltypestiny.float_col, functional_parquet.alltypestiny.double_col, functional_parquet.alltypestiny.date_string_col, functional_parquet.alltypestiny.string_col, functional_parquet.alltypestiny.timestamp_col, functional_parquet.alltypestiny.year, functional_parquet.alltypestiny.month
 |  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=503.95KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=10.49MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=0,1N row-size=160B cardinality=unavailable
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=2.02GB mem-reservation=34.09MB thread-reservation=2
+Per-Host Resources: mem-estimate=2.03GB mem-reservation=34.09MB thread-reservation=2
 02:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: alltypes.id = alltypestiny.id
 |  fk/pk conjuncts: assumed fk/pk
@@ -528,7 +528,7 @@ Per-Host Resources: mem-estimate=2.02GB mem-reservation=34.09MB thread-reservati
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--03:EXCHANGE [BROADCAST]
-|  |  mem-estimate=251.92KB mem-reservation=0B thread-reservation=0
+|  |  mem-estimate=10.25MB mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=1 row-size=80B cardinality=unavailable
 |  |  in pipelines: 01(GETNEXT)
 |  |
@@ -557,20 +557,20 @@ Per-Host Resources: mem-estimate=2.02GB mem-reservation=34.09MB thread-reservati
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=72.34MB Threads=6
-Per-Host Resource Estimates: Memory=2.08GB
+Per-Host Resource Estimates: Memory=2.10GB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypestiny
 Analyzed query: SELECT /* +straight_join */ * FROM functional_parquet.alltypes
 LEFT OUTER JOIN functional_parquet.alltypestiny ON alltypes.id = alltypestiny.id
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.98MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=20.98MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: functional_parquet.alltypes.id, functional_parquet.alltypes.bool_col, functional_parquet.alltypes.tinyint_col, functional_parquet.alltypes.smallint_col, functional_parquet.alltypes.int_col, functional_parquet.alltypes.bigint_col, functional_parquet.alltypes.float_col, functional_parquet.alltypes.double_col, functional_parquet.alltypes.date_string_col, functional_parquet.alltypes.string_col, functional_parquet.alltypes.timestamp_col, functional_parquet.alltypes.year, functional_parquet.alltypes.month, functional_parquet.alltypestiny.id, functional_parquet.alltypestiny.bool_col, functional_parquet.alltypestiny.tinyint_col, functional_parquet.alltypestiny.smallint_col, functional_parquet.alltypestiny.int_col, functional_parquet.alltypestiny.bigint_col, functional_parquet.alltypestiny.float_col, functional_parquet.alltypestiny.double_col, functional_parquet.alltypestiny.date_string_col, functional_parquet.alltypestiny.string_col, functional_parquet.alltypestiny.timestamp_col, functional_parquet.alltypestiny.year, functional_parquet.alltypestiny.month
 |  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=1007.95KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=10.98MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=0,1N row-size=160B cardinality=unavailable
 |  in pipelines: 00(GETNEXT)
 |
@@ -585,14 +585,14 @@ Per-Instance Resources: mem-estimate=16.66MB mem-reservation=88.00KB thread-rese
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=2.00GB mem-reservation=68.00MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=2.01GB mem-reservation=68.00MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: alltypestiny.id
 |  |  mem-estimate=2.00GB mem-reservation=68.00MB spill-buffer=2.00MB thread-reservation=0
 |  |
 |  03:EXCHANGE [BROADCAST]
-|  |  mem-estimate=335.92KB mem-reservation=0B thread-reservation=0
+|  |  mem-estimate=10.33MB mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=1 row-size=80B cardinality=unavailable
 |  |  in pipelines: 01(GETNEXT)
 |  |
@@ -1011,25 +1011,25 @@ from functional_parquet.alltypestiny
 group by string_col
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=72.01MB Threads=4
-Per-Host Resource Estimates: Memory=282MB
+Per-Host Resource Estimates: Memory=302MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypestiny
 Analyzed query: SELECT string_col, count(*) FROM functional_parquet.alltypestiny
 GROUP BY string_col
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.07MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=20.07MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: string_col, count(*)
 |  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=71.99KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=10.07MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=1 row-size=20B cardinality=unavailable
 |  in pipelines: 03(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(string_col)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=128.09MB mem-reservation=34.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=138.07MB mem-reservation=34.00MB thread-reservation=1
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: string_col
@@ -1038,7 +1038,7 @@ Per-Host Resources: mem-estimate=128.09MB mem-reservation=34.00MB thread-reserva
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:EXCHANGE [HASH(string_col)]
-|  mem-estimate=71.99KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=10.07MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=1 row-size=20B cardinality=unavailable
 |  in pipelines: 00(GETNEXT)
 |
@@ -1063,25 +1063,25 @@ Per-Host Resources: mem-estimate=144.28MB mem-reservation=34.01MB thread-reserva
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=140.02MB Threads=5
-Per-Host Resource Estimates: Memory=555MB
+Per-Host Resource Estimates: Memory=585MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypestiny
 Analyzed query: SELECT string_col, count(*) FROM functional_parquet.alltypestiny
 GROUP BY string_col
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.09MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=20.09MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: string_col, count(*)
 |  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=95.99KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=10.09MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=1 row-size=20B cardinality=unavailable
 |  in pipelines: 03(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(string_col)] hosts=3 instances=4
-Per-Instance Resources: mem-estimate=128.09MB mem-reservation=34.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=138.09MB mem-reservation=34.00MB thread-reservation=1
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
 |  group by: string_col
@@ -1090,7 +1090,7 @@ Per-Instance Resources: mem-estimate=128.09MB mem-reservation=34.00MB thread-res
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:EXCHANGE [HASH(string_col)]
-|  mem-estimate=95.99KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=10.09MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=1 row-size=20B cardinality=unavailable
 |  in pipelines: 00(GETNEXT)
 |
