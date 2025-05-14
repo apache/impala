@@ -331,7 +331,7 @@ void impala::ShutdownLogging() {
 
 void impala::LogCommandLineFlags() {
   LOG(INFO) << "Flags (see also /varz are on debug webserver):" << endl
-            << kudu::CommandlineFlagsIntoString(kudu::EscapeMode::NONE);
+      << kudu::CommandlineFlagsIntoString(kudu::EscapeMode::NONE, kudu::Selection::ALL);
 
   vector<google::CommandLineFlagInfo> flags;
   google::GetAllFlags(&flags, true);

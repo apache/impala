@@ -231,13 +231,13 @@ kudu::Status ImpalaServicePool::QueueInboundCall(
     return kudu::Status::OK();
   }
 
-  boost::optional<kudu::rpc::InboundCall*> evicted;
+  std::optional<kudu::rpc::InboundCall*> evicted;
   auto queue_status = service_queue_.Put(c, &evicted);
   if (UNLIKELY(queue_status == kudu::rpc::QueueStatus::QUEUE_FULL)) {
     RejectTooBusy(c);
     return kudu::Status::OK();
   }
-  if (UNLIKELY(evicted != boost::none)) {
+  if (UNLIKELY(evicted.has_value())) {
     RejectTooBusy(*evicted);
   }
 

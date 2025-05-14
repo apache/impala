@@ -19,6 +19,9 @@
 # The top-level CMakeLists sets a ${KRB5_REALM_OVERRIDE} variable which should
 # be linked first into all Kudu binaries.
 
+# Target including all protobuf-generated code.
+add_custom_target(kudu-security-proto-deps)
+
 ##############################
 # krb5_realm_override
 ##############################
@@ -28,6 +31,8 @@ target_link_libraries(krb5_realm_override glog)
 if(NOT APPLE)
   target_link_libraries(krb5_realm_override dl)
 endif()
+
+add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
 
 ##############################
 # token_proto
@@ -44,6 +49,7 @@ ADD_EXPORTABLE_LIBRARY(token_proto
   DEPS ${TOKEN_PROTO_LIBS}
   NONLINK_DEPS ${TOKEN_PROTO_TGTS})
 
+add_dependencies(kudu-security-proto-deps ${TOKEN_PROTO_TGTS})
 
 ##############################
 # security
@@ -95,12 +101,23 @@ ADD_EXPORTABLE_LIBRARY(security
   SRCS ${SECURITY_SRCS}
   DEPS ${SECURITY_LIBS})
 
+# Since Kudu tests are explicitly disabled, we want to expose some of their sources
+# to Impala using another variable.
+set(SECURITY_TEST_SRCS_FOR_IMPALA test/mini_kdc.cc)
+add_library(security-test-for-impala ${SECURITY_TEST_SRCS_FOR_IMPALA})
+target_link_libraries(security-test-for-impala
+  gutil
+  kudu_test_util
+  kudu_util
+  security)
+
 ##############################
 # mini_kdc
 ##############################
 
 # The mini_kdc is used only for tests.
-if (KUDU_CLI_TEST_TOOL_ENABLED)
+# Note: Impala needs it.
+#if (KUDU_CLI_TEST_TOOL_ENABLED)
   set(MINI_KDC_SRCS test/mini_kdc.cc)
 
   add_library(mini_kdc ${MINI_KDC_SRCS})
@@ -108,7 +125,7 @@ if (KUDU_CLI_TEST_TOOL_ENABLED)
     gutil
     kudu_test_util
     kudu_util)
-endif()
+#endif()
 
 ##############################
 # security_test_util

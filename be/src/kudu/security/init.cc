@@ -73,16 +73,13 @@ DEFINE_bool(use_system_auth_to_local, kDefaultSystemAuthToLocal,
             "'kudu/foo.example.com@EXAMPLE' will map to 'kudu'.");
 TAG_FLAG(use_system_auth_to_local, advanced);
 
-DEFINE_string(principal, "kudu/_HOST",
-              "Kerberos principal that this daemon will log in as. The special token "
-              "_HOST will be replaced with the FQDN of the local host.");
+// Defined in Impala in common/global-flags.cc
+DECLARE_string(principal);
 TAG_FLAG(principal, advanced);
 TAG_FLAG(principal, stable);
 
-DEFINE_string(keytab_file, "",
-              "Path to the Kerberos Keytab file for this server. Specifying a "
-              "keytab file will cause the server to kinit, and enable Kerberos "
-              "to be used to authenticate RPC connections.");
+// Defined in Impala in common/global-flags.cc
+DECLARE_string(keytab_file);
 TAG_FLAG(keytab_file, stable);
 
 using std::mt19937;
