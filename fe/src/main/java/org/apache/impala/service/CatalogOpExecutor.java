@@ -5774,6 +5774,7 @@ public class CatalogOpExecutor {
     // ALTER TABLE/VIEW RENAME is implemented as an ADD + DROP.
     Pair<Table, Table> result =
         catalog_.renameTable(tableName.toThrift(), newTableName.toThrift());
+    Preconditions.checkNotNull(result);
     if (renamedTable != null) {
       org.apache.hadoop.hive.metastore.api.Table tblBefore = renamedTable.second.first;
       addToDeleteEventLog(renamedTable.first, DeleteEventLog

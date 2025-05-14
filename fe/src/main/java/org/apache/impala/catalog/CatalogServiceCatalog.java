@@ -2796,7 +2796,7 @@ public class CatalogServiceCatalog extends Catalog {
       TTableName oldTableName, TTableName newTableName) {
     // Remove the old table name from the cache and add the new table.
     Db db = getDb(oldTableName.getDb_name());
-    if (db == null) return null;
+    if (db == null) return Pair.create(null, null);
     versionLock_.writeLock().lock();
     try {
       Table oldTable =

@@ -39,7 +39,7 @@ class TestConcurrentRename(CustomClusterTestSuite):
 
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['debug_action'] = \
-        "catalogd_table_rename_delay:SLEEP@5000"
+        "catalogd_table_rename_delay:SLEEP@6000"
     with self.create_impala_client_from_vector(new_vector) as alter_client, \
          self.create_impala_client() as reset_client:
       version_after_create = catalogd.service.get_catalog_version()
@@ -52,9 +52,12 @@ class TestConcurrentRename(CustomClusterTestSuite):
       while (time.time() - start_time < 10.0
              and catalogd.service.get_catalog_version() <= version_after_create):
         time.sleep(0.05)
-      reset_handle = reset_client.execute_async("invalidate metadata {}".format(name))
-      self.execute_query("invalidate metadata {}2".format(name))
-      self.execute_query("drop table {}2".format(name))
+      invalidate_1 = "invalidate metadata {}".format(name)
+      invalidate_2 = "invalidate metadata {}2".format(name)
+      drop_query = "drop table {}2".format(name)
+      reset_handle = reset_client.execute_async(invalidate_1)
+      inv_success = self.execute_query_until_success(invalidate_2)
+      drop_success = self.execute_query_until_success(drop_query)
 
       try:
         alter_client.wait_for_finished_timeout(alter_handle, timeout=10)
@@ -66,6 +69,8 @@ class TestConcurrentRename(CustomClusterTestSuite):
       finally:
         reset_client.wait_for_finished_timeout(reset_handle, timeout=10)
         reset_client.close_query(reset_handle)
+      assert inv_success, "Expect '{}' to succeed, but failed.".format(invalidate_2)
+      assert drop_success, "Expect '{}' to succeed, but failed.".format(drop_query)
 
   def test_rename_invalidate(self, vector, unique_database):
     name = "{}.tbl".format(unique_database)
@@ -83,3 +88,14 @@ class TestConcurrentRename(CustomClusterTestSuite):
 
       alter_client.wait_for_finished_timeout(alter_handle, timeout=10)
       alter_client.close_query(alter_handle)
+
+  def execute_query_until_success(self, query, max_retry=3):
+    success = False
+    while not success and max_retry > 0:
+      try:
+        result = self.execute_query(query)
+        success = result.success
+      except Exception:
+        # ignore
+        max_retry -= 1
+    return success
