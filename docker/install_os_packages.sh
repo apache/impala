@@ -291,8 +291,17 @@ mkdir -p /var/tmp
 chmod a=rwxt /var/tmp /tmp
 # The busybox implementation of chmod is known to ignore certain chmod syntax variations,
 # so check if the directories actually have the correct permissions
-diff <(stat -c '%u %g %a'  /tmp) - <<<'0 0 1777'
-diff <(stat -c '%u %g %a'  /var/tmp) - <<<'0 0 1777'
+check_dir_stat() {
+    target_dir=$1
+    stat_expect=$2
+    stat=$(stat -c '%u %g %a' $target_dir)
+    if [[ "$stat" != "$stat_expect" ]]; then
+        echo "Expect $target_dir permission '$stat_expect' but got '$stat' instead."
+        exit 1
+    fi
+}
+check_dir_stat "/tmp" "0 0 1777"
+check_dir_stat "/var/tmp" "0 0 1777"
 
 # To minimize the size for the Docker image, clean up any unnecessary files.
 if [[ $DISTRIBUTION == Ubuntu ]]; then
