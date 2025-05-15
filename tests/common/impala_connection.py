@@ -33,7 +33,6 @@ import impala.dbapi as impyla
 import impala.error as impyla_error
 import impala.hiveserver2 as hs2
 from impala_thrift_gen.beeswax.BeeswaxService import QueryState
-from impala_thrift_gen.Query.ttypes import TQueryOptions
 from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.beeswax.impala_beeswax import (
     DEFAULT_SLEEP_INTERVAL,
@@ -127,46 +126,6 @@ def build_summary_table_from_thrift(thrift_exec_summary):
   return output
 
 
-def collect_default_query_options(options, name, val):
-  name = name.lower()
-  if val is not None:
-    val = str(val).strip('"')
-    if ',' in val or '/' in val:
-      # Value is a list or a timezone name containing a slash. Wrap it with double quotes.
-      val = '"{}"'.format(val)
-  if not val:
-    # Value is optional with None as default or just turned into an empty string.
-    val = '""'
-  options[name] = val
-
-
-def parse_query_options_from_thrift():
-  """Populate 'options' map with default query options parsed from TQueryOptions
-  attributes."""
-  result = dict()
-  tquery_opts = TQueryOptions()
-  for key in dir(tquery_opts):
-    non_opts_attrs = ['read', 'write', 'validate', 'thrift_spec']
-    if not key.startswith('_') and key not in non_opts_attrs:
-      value = getattr(tquery_opts, key)
-      if isinstance(value, set):
-        # The default value of some query options, e.g.,
-        # enabled_runtime_filter_types, can be a set of integer.
-        # Turn the set into comma separated values.
-        value = ','.join([str(v) for v in value])
-      # No need to supply 'kind' since TQueryOptions already exclude
-      # removed query options.
-      collect_default_query_options(result, key, value)
-  return result
-
-
-# A map of default query option obtained from TQueryOptions.
-# Query option names (the keys) are in lower case string for consistency.
-# Values are all strings and might be double-quoted, making it legal for both setting
-# through 'SET' query or ImpalaConnection.set_configuration_option().
-DEFAULT_QUERY_OPTIONS = parse_query_options_from_thrift()
-
-
 # Common wrapper around the internal types of HS2/Beeswax operation/query handles.
 class OperationHandle(object):
   def __init__(self, handle, sql_stmt):
@@ -228,15 +187,6 @@ class ImpalaConnection(with_metaclass(abc.ABCMeta, object)):
   def clear_configuration(self):
     """Clears all existing configuration."""
     pass
-
-  def get_default_configuration(self):
-    """Return the default configuration that is known from TQueryOption attributes.
-    Note that this might not be the server default. Server default can be different
-    depending on its --default_query_options flag value.
-    Returns a map with the config variable as the key and a string representation of
-    the default value as the value.
-    IMPALA-14060: Remove this and related functions."""
-    return DEFAULT_QUERY_OPTIONS.copy()
 
   @abc.abstractmethod
   def connect(self):
