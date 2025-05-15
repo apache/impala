@@ -40,7 +40,6 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.TableMigrationUtil;
-import org.apache.iceberg.relocated.com.google.common.collect.Lists;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeFsPartition;

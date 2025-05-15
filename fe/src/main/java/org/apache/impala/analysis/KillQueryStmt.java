@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import com.google.common.base.Preconditions;
+
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.User;
@@ -24,8 +26,6 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TKillQueryReq;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.TUniqueIdUtil;
-
-import hiveexec.com.google.common.base.Preconditions;
 
 public final class KillQueryStmt extends StatementBase {
   private final String queryIdString_;

@@ -26,8 +26,8 @@ import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TExecutorGroupSet;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
-import org.apache.kudu.shaded.com.google.common.base.Preconditions;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 
 /**

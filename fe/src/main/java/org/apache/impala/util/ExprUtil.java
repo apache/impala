@@ -18,8 +18,8 @@
 package org.apache.impala.util;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
-import org.apache.curator.shaded.com.google.common.collect.Lists;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.Expr;
