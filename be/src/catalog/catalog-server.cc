@@ -550,7 +550,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
  private:
   CatalogServer* catalog_server_;
   string server_address_;
-  bool has_initiated_first_reset_ = false;
+  AtomicBool has_initiated_first_reset_{false};
 
   // Check if catalog protocols are compatible between client and catalog server.
   // Return Status::OK() if the protocols are compatible and catalog server is active.
@@ -563,12 +563,14 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
       status = Status(Substitute("Request for Catalog service is rejected since "
           "catalogd $0 is in standby mode", server_address_));
     }
-    while (status.ok() && !has_initiated_first_reset_) {
+    if (!status.ok()) return status;
+
+    while (!has_initiated_first_reset_.Load()) {
       long current_catalog_version = 0;
       status = catalog_server_->catalog()->GetCatalogVersion(&current_catalog_version);
       if (!status.ok()) break;
       if (current_catalog_version >= MIN_CATALOG_VERSION_TO_ACCEPT_REQUEST) {
-        has_initiated_first_reset_ = true;
+        has_initiated_first_reset_.Store(true);
       } else {
         VLOG(1) << "Catalog is not initialized yet. Waiting for catalog version ("
                 << current_catalog_version << ") to be >= "
