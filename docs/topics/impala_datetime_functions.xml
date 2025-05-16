@@ -92,8 +92,7 @@ under the License.
       </li>
 
       <li>
-        <xref href="#datetime_functions/current_timestamp"
-          >CURRENT_TIMESTAMP</xref>
+        <xref href="#datetime_functions/current_timestamp">CURRENT_TIMESTAMP</xref>
       </li>
 
       <li>
@@ -117,7 +116,7 @@ under the License.
       </li>
 
       <li>
-        <xref href="#datetime_functions/day">DAY</xref>
+        <xref href="#datetime_functions/day">DAY, DAYOFMONTH</xref>
       </li>
 
       <li>
@@ -153,8 +152,7 @@ under the License.
       </li>
 
       <li>
-        <xref href="#datetime_functions/from_utc_timestamp"
-          >FROM_UTC_TIMESTAMP</xref>
+        <xref href="#datetime_functions/from_utc_timestamp">FROM_UTC_TIMESTAMP</xref>
       </li>
 
       <li>
@@ -170,18 +168,15 @@ under the License.
       </li>
 
       <li>
-        <xref href="#datetime_functions/int_months_between"
-          >INT_MONTHS_BETWEEN</xref>
+        <xref href="#datetime_functions/int_months_between">INT_MONTHS_BETWEEN</xref>
       </li>
 
       <li>
-        <xref href="#datetime_functions/microseconds_add"
-          >MICROSECONDS_ADD</xref>
+        <xref href="#datetime_functions/microseconds_add">MICROSECONDS_ADD</xref>
       </li>
 
       <li>
-        <xref href="#datetime_functions/microseconds_sub"
-          >MICROSECONDS_SUB</xref>
+        <xref href="#datetime_functions/microseconds_sub">MICROSECONDS_SUB</xref>
       </li>
 
       <li>
@@ -189,13 +184,11 @@ under the License.
       </li>
 
       <li>
-        <xref href="#datetime_functions/milliseconds_add"
-          >MILLISECONDS_ADD</xref>
+        <xref href="#datetime_functions/milliseconds_add">MILLISECONDS_ADD</xref>
       </li>
 
       <li>
-        <xref href="#datetime_functions/milliseconds_sub"
-          >MILLISECONDS_SUB</xref>
+        <xref href="#datetime_functions/milliseconds_sub">MILLISECONDS_SUB</xref>
       </li>
 
       <li>
@@ -283,8 +276,7 @@ under the License.
       </li>
 
       <li>
-        <xref href="#datetime_functions/to_utc_timestamp"
-          >TO_UTC_TIMESTAMP</xref>
+        <xref href="#datetime_functions/to_utc_timestamp">TO_UTC_TIMESTAMP</xref>
       </li>
 
       <li>
@@ -300,7 +292,7 @@ under the License.
       </li>
 
       <li>
-        <xref href="#datetime_functions/weekofyear">WEEKOFYEAR</xref>
+        <xref href="#datetime_functions/weekofyear">WEEK, WEEKOFYEAR</xref>
       </li>
 
       <li>

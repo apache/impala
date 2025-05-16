@@ -132,7 +132,7 @@ under the License.
       </li>
 
       <li>
-        <xref href="#math_functions/exp">EXP</xref>
+        <xref href="#math_functions/exp">EXP, DEXP</xref>
       </li>
 
       <li>
@@ -180,7 +180,7 @@ under the License.
       </li>
 
       <li>
-        <xref href="#math_functions/log10">LOG10</xref>
+        <xref href="#math_functions/log10">LOG10, DLOG10</xref>
       </li>
 
       <li>
@@ -188,13 +188,11 @@ under the License.
       </li>
 
       <li>
-        <xref href="#math_functions/max_int">MAX_INT, MAX_TINYINT, MAX_SMALLINT,
-        MAX_BIGINT</xref>
+        <xref href="#math_functions/max_int">MAX_INT, MAX_TINYINT, MAX_SMALLINT, MAX_BIGINT</xref>
       </li>
 
       <li>
-        <xref href="#math_functions/min_int">MIN_INT, MIN_TINYINT, MIN_SMALLINT,
-        MIN_BIGINT</xref>
+        <xref href="#math_functions/min_int">MIN_INT, MIN_TINYINT, MIN_SMALLINT, MIN_BIGINT</xref>
       </li>
 
       <li>
