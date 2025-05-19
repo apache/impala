@@ -617,12 +617,15 @@ class TestObservability(ImpalaTestSuite):
     ])
     # REFRESH
     stmt = "refresh %s.t1" % unique_database
-    self.__verify_event_labels_in_profile(stmt, [
-      "Got Metastore client",
-      "Fetched table from Metastore",
-      "Loaded file metadata for 2 partitions",
-      "Finished resetMetadata request"
-    ])
+    for i in (0, 1):
+      self.client.execute("set refresh_updated_hms_partitions=" + str(i))
+      self.__verify_event_labels_in_profile(stmt, [
+        "Got Metastore client",
+        "Fetched table from Metastore",
+        "Fetched partition names" if i == 0 else "Fetched all partitions",
+        "Loaded file metadata for 2 partitions",
+        "Finished resetMetadata request"
+      ])
     # Drop table
     stmt = "drop table %s.t1" % unique_database
     self.__verify_event_labels_in_profile(stmt, [

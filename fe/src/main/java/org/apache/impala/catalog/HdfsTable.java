@@ -1621,10 +1621,12 @@ public class HdfsTable extends Table implements FeFsTable {
         partitionList = MetaStoreUtil
             .fetchPartitionsByName(client, Lists.newArrayList(partitionsToUpdate),
                 msTable_);
+        catalogTimeline.markEvent("Fetched updated partitions");
       } else {
         partitionList =
             MetaStoreUtil.fetchAllPartitions(
                 client_, msTable_, NUM_PARTITION_FETCH_RETRIES);
+        catalogTimeline.markEvent("Fetched all partitions");
       }
       LOG.debug("Time taken to fetch all partitions of table {}: {} msec", getFullName(),
           sw.stop().elapsed(TimeUnit.MILLISECONDS));
@@ -1726,6 +1728,7 @@ public class HdfsTable extends Table implements FeFsTable {
       // (~.3 secs for 30K partitions).
       partitionNamesFromHms_ = new HashSet<>(client_
           .listPartitionNames(db_.getName(), name_, (short) -1));
+      catalogTimeline.markEvent("Fetched partition names");
     }
 
     @Override
