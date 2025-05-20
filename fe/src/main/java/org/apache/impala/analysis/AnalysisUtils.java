@@ -21,28 +21,27 @@ import org.apache.impala.common.AnalysisException;
 
 import java.util.Collection;
 
-class AnalysisUtils {
+public class AnalysisUtils {
 
-  static <T> void throwIfNotNull(T o, String message) throws AnalysisException {
+  public static <T> void throwIfNotNull(T o, String message) throws AnalysisException {
     if (o != null) throw new AnalysisException(message);
   }
 
-  static void throwIfNotEmpty(Collection<?> c, String message)
+  public static void throwIfNotEmpty(Collection<?> c, String message)
       throws AnalysisException {
     if (c != null && !c.isEmpty()) throw new AnalysisException(message);
   }
 
-  static <T> void throwIfNull(T o, String message) throws AnalysisException {
+  public static <T> void throwIfNull(T o, String message) throws AnalysisException {
     if (o == null) throw new AnalysisException(message);
   }
 
-  static void throwIfNullOrEmpty(Collection<?> c, String message)
+  public static void throwIfNullOrEmpty(Collection<?> c, String message)
       throws AnalysisException {
     if (c == null || c.isEmpty()) throw new AnalysisException(message);
   }
 
-  static void throwIfTrue(boolean cond, String message)
-      throws AnalysisException {
+  public static void throwIfTrue(boolean cond, String message) throws AnalysisException {
     if (cond) throw new AnalysisException(message);
   }
 }

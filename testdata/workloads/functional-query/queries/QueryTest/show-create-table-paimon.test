@@ -1,0 +1,201 @@
+====
+---- CREATE_TABLE
+CREATE TABLE test_create_managed_paimon_table (
+    user_id BIGINT COMMENT 'The user_id field',
+    item_id BIGINT COMMENT 'The item_id field',
+    behavior STRING COMMENT 'The behavior field'
+)
+STORED AS PAIMON;
+---- RESULTS-HIVE
+CREATE TABLE show_create_table_test_db.test_create_managed_paimon_table (
+  user_id BIGINT,
+  item_id BIGINT,
+  behavior STRING
+)
+STORED AS PAIMON
+TBLPROPERTIES ('deletion-vectors.enabled'='true')
+====
+---- CREATE_TABLE
+CREATE TABLE test_create_managed_paimon_table (
+user_id BIGINT COMMENT 'The user_id field',
+item_id BIGINT COMMENT 'The item_id field',
+behavior STRING COMMENT 'The behavior field'
+)
+STORED AS PAIMON;
+---- RESULTS-HIVE
+CREATE TABLE show_create_table_test_db.test_create_managed_paimon_table (
+user_id BIGINT,
+item_id BIGINT,
+behavior STRING
+)
+STORED AS PAIMON
+TBLPROPERTIES ('deletion-vectors.enabled'='true')
+====
+---- CREATE_TABLE
+CREATE TABLE test_create_managed_part_paimon_table (
+user_id BIGINT COMMENT 'The user_id field',
+item_id BIGINT COMMENT 'The item_id field',
+behavior STRING COMMENT 'The behavior field'
+)
+PARTITIONED BY (
+dt STRING COMMENT 'The dt field',
+hh STRING COMMENT 'The hh field'
+)
+STORED AS PAIMON;
+---- RESULTS-HIVE
+CREATE TABLE show_create_table_test_db.test_create_managed_part_paimon_table (
+user_id BIGINT,
+item_id BIGINT,
+behavior STRING
+)
+PARTITIONED BY (
+dt STRING,
+hh STRING
+)
+STORED AS PAIMON
+TBLPROPERTIES ('deletion-vectors.enabled'='true')
+====
+---- CREATE_TABLE
+CREATE TABLE test_create_managed_part_pk_paimon_table (
+user_id BIGINT COMMENT 'The user_id field',
+item_id BIGINT COMMENT 'The item_id field',
+behavior STRING COMMENT 'The behavior field'
+)
+PARTITIONED BY (
+dt STRING COMMENT 'The dt field',
+hh STRING COMMENT 'The hh field'
+)
+STORED AS PAIMON
+TBLPROPERTIES (
+'primary-key'='user_id'
+);
+---- RESULTS-HIVE
+CREATE TABLE show_create_table_test_db.test_create_managed_part_pk_paimon_table (
+user_id BIGINT,
+item_id BIGINT,
+behavior STRING,
+PRIMARY KEY (user_id)
+)
+PARTITIONED BY (
+dt STRING,
+hh STRING
+)
+STORED AS PAIMON
+TBLPROPERTIES ('deletion-vectors.enabled'='true')
+====
+---- CREATE_TABLE
+CREATE TABLE test_create_managed_part_pkstmt_paimon_table (
+user_id BIGINT COMMENT 'The user_id field',
+item_id BIGINT COMMENT 'The item_id field',
+behavior STRING COMMENT 'The behavior field',
+PRIMARY KEY (user_id)
+)
+PARTITIONED BY (
+dt STRING COMMENT 'The dt field',
+hh STRING COMMENT 'The hh field'
+)
+STORED AS PAIMON;
+---- RESULTS-HIVE
+CREATE TABLE show_create_table_test_db.test_create_managed_part_pkstmt_paimon_table (
+user_id BIGINT,
+item_id BIGINT,
+behavior STRING,
+PRIMARY KEY (user_id)
+)
+PARTITIONED BY (
+dt STRING,
+hh STRING
+)
+STORED AS PAIMON
+TBLPROPERTIES ('deletion-vectors.enabled'='true')
+====
+---- CREATE_TABLE
+CREATE TABLE test_create_managed_bucket_paimon_table (
+user_id BIGINT COMMENT 'The user_id field',
+item_id BIGINT COMMENT 'The item_id field',
+behavior STRING COMMENT 'The behavior field'
+)
+STORED AS PAIMON
+TBLPROPERTIES (
+'bucket' = '4',
+'bucket-key'='behavior'
+);
+---- RESULTS-HIVE
+CREATE TABLE show_create_table_test_db.test_create_managed_bucket_paimon_table (
+user_id BIGINT,
+item_id BIGINT,
+behavior STRING
+)
+STORED AS PAIMON
+TBLPROPERTIES ('bucket'='4', 'bucket-key'='behavior', 'deletion-vectors.enabled'='true')
+====
+---- CREATE_TABLE
+CREATE EXTERNAL TABLE test_create_external_hivecat_nocol_paimon_table
+STORED AS PAIMON
+LOCATION 'hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/paimon_non_partitioned';
+---- RESULTS-HIVE
+CREATE EXTERNAL TABLE show_create_table_test_db.test_create_external_hivecat_nocol_paimon_table (
+userid INT,
+movieid INT,
+rating FLOAT,
+`timestamp` BIGINT
+)
+STORED AS PAIMON
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('deletion-vectors.enabled'='true')
+====
+---- CREATE_TABLE
+CREATE EXTERNAL TABLE test_create_external_hadoopcat_nocol_paimon_table
+STORED AS PAIMON
+TBLPROPERTIES('paimon.catalog'='hadoop',
+'paimon.catalog_location'='hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse',
+'paimon.table_identifier'='functional.paimon_non_partitioned');
+---- RESULTS-HIVE
+CREATE EXTERNAL TABLE show_create_table_test_db.test_create_external_hadoopcat_nocol_paimon_table (
+userid INT,
+movieid INT,
+rating FLOAT,
+`timestamp` BIGINT
+)
+STORED AS PAIMON
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('deletion-vectors.enabled'='true', 'paimon.catalog'='hadoop', 'paimon.catalog_location'='hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse', 'paimon.table_identifier'='functional.paimon_non_partitioned')
+====
+---- CREATE_TABLE
+CREATE EXTERNAL TABLE test_create_external_hivecat_nocol_paimon_part_table
+STORED AS PAIMON
+LOCATION 'hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/paimon_partitioned';
+---- RESULTS-HIVE
+CREATE EXTERNAL TABLE show_create_table_test_db.test_create_external_hivecat_nocol_paimon_part_table (
+movieid INT,
+rating FLOAT,
+ts BIGINT
+)
+PARTITIONED BY (
+userid INT
+)
+STORED AS PAIMON
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('deletion-vectors.enabled'='true')
+====
+---- CREATE_TABLE
+CREATE EXTERNAL TABLE test_create_external_hadoopcat_nocol_paimon_part_table
+STORED AS PAIMON
+TBLPROPERTIES('paimon.catalog'='hadoop',
+'paimon.catalog_location'='hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse',
+'paimon.table_identifier'='functional.paimon_partitioned')
+---- RESULTS-HIVE
+CREATE EXTERNAL TABLE show_create_table_test_db.test_create_external_hadoopcat_nocol_paimon_part_table (
+movieid INT,
+rating FLOAT,
+ts BIGINT
+)
+PARTITIONED BY (
+userid INT
+)
+STORED AS PAIMON
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('deletion-vectors.enabled'='true', 'paimon.catalog'='hadoop', 'paimon.catalog_location'='hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse', 'paimon.table_identifier'='functional.paimon_partitioned')
+
+
+

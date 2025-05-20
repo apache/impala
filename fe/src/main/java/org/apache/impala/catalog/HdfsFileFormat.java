@@ -85,8 +85,10 @@ public enum HdfsFileFormat {
       "org.apache.iceberg.mr.hive.HiveIcebergSerDe", false, false, false),
   JDBC("org.apache.hadoop.hive.jdbc.JdbcInputFormat",
       "org.apache.hadoop.hive.jdbc.JdbcOutputFormat",
-      "org.apache.hadoop.hive.jdbc.JdbcSerDe", false, false, true);
-
+      "org.apache.hadoop.hive.jdbc.JdbcSerDe", false, false, true),
+  PAIMON("org.apache.paimon.hive.mapred.PaimonInputFormat",
+      "org.apache.paimon.hive.mapred.PaimonOutputFormat",
+      "org.apache.paimon.hive.PaimonSerDe", true, false, true);
 
   private final String inputFormat_;
   private final String outputFormat_;
@@ -143,6 +145,7 @@ public enum HdfsFileFormat {
           .put(ORC.inputFormat(), ORC)
           .put(HUDI_PARQUET.inputFormat(), HUDI_PARQUET)
           .put(ICEBERG.inputFormat(), ICEBERG)
+          .put(PAIMON.inputFormat(), PAIMON)
           .build();
 
   /**
@@ -197,6 +200,7 @@ public enum HdfsFileFormat {
       case ICEBERG: return HdfsFileFormat.ICEBERG;
       case JSON: return HdfsFileFormat.JSON;
       case JDBC: return HdfsFileFormat.JDBC;
+      case PAIMON: return HdfsFileFormat.PAIMON;
       default:
         throw new RuntimeException("Unknown THdfsFileFormat: "
             + thriftFormat + " - should never happen!");
@@ -216,6 +220,7 @@ public enum HdfsFileFormat {
       case ICEBERG: return THdfsFileFormat.ICEBERG;
       case JSON: return THdfsFileFormat.JSON;
       case JDBC: return THdfsFileFormat.JDBC;
+      case PAIMON: return THdfsFileFormat.PAIMON;
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
@@ -243,6 +248,8 @@ public enum HdfsFileFormat {
       case ICEBERG: return "ICEBERG";
       case JSON: return "JSONFILE";
       case JDBC: return "JDBC";
+      case PAIMON: return "PAIMON";
+
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
@@ -308,6 +315,7 @@ public enum HdfsFileFormat {
    * Returns true if the format is Parquet, false otherwise.
    */
   public boolean isParquetBased() {
-    return this == HdfsFileFormat.PARQUET || this == HdfsFileFormat.HUDI_PARQUET;
+    return this == HdfsFileFormat.PARQUET || this == HdfsFileFormat.HUDI_PARQUET
+        || this == HdfsFileFormat.PAIMON;
   }
 }

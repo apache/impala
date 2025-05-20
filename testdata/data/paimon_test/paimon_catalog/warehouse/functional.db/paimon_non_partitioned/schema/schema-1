@@ -1,0 +1,29 @@
+{
+  "version" : 3,
+  "id" : 1,
+  "fields" : [ {
+    "id" : 0,
+    "name" : "userId",
+    "type" : "INT"
+  }, {
+    "id" : 1,
+    "name" : "movieId",
+    "type" : "INT"
+  }, {
+    "id" : 2,
+    "name" : "rating",
+    "type" : "FLOAT"
+  }, {
+    "id" : 3,
+    "name" : "timestamp",
+    "type" : "BIGINT"
+  } ],
+  "highestFieldId" : 3,
+  "partitionKeys" : [ ],
+  "primaryKeys" : [ ],
+  "options" : {
+    "owner" : "jichen",
+    "deletion-vectors.enabled" : "true"
+  },
+  "timeMillis" : 1737734737038
+}

@@ -157,6 +157,10 @@ import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreNotificationException;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.monitor.CatalogOperationTracker;
+import org.apache.impala.catalog.paimon.FePaimonTable;
+import org.apache.impala.catalog.paimon.PaimonCatalogOpExecutor;
+import org.apache.impala.catalog.paimon.PaimonTableLoadingException;
+import org.apache.impala.catalog.paimon.PaimonUtil;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -231,6 +235,7 @@ import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TKuduPartitionParam;
+import org.apache.impala.thrift.TPaimonCatalog;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
@@ -267,6 +272,7 @@ import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
 import org.apache.impala.util.NoOpEventSequence;
 import org.apache.impala.util.ThreadNameAnnotator;
+import org.apache.paimon.table.DataTable;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -3322,7 +3328,10 @@ public class CatalogOpExecutor {
               tableName.getTbl()), e);
         }
       }
-
+      if (existingTbl instanceof FePaimonTable) {
+        needsHmsDropTable = PaimonCatalogOpExecutor.dropTable(
+            msTbl, existingTbl, catalogTimeline, params);
+      }
 
       if (needsHmsDropTable) {
         try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
@@ -3866,6 +3875,9 @@ public class CatalogOpExecutor {
           params.if_not_exists, params.getColumns(), params.getPartition_spec(),
           params.getPrimary_key_column_names(), params.getTable_properties(),
           params.getComment(), debugAction);
+    } else if (PaimonUtil.isPaimonTable(tbl)) {
+      return createPaimonTable(
+          tbl, wantMinimalResult, response, catalogTimeline, params, debugAction);
     }
     Preconditions.checkState(params.getColumns().size() > 0,
         "Empty column list given as argument to Catalog.createTable");
@@ -4349,6 +4361,134 @@ public class CatalogOpExecutor {
     } finally {
       getMetastoreDdlLock().unlock();
     }
+
+    addSummary(response, "Table has been created.");
+    return true;
+  }
+
+  /**
+   * Creates a new Paimon table.
+   */
+  private boolean createPaimonTable(org.apache.hadoop.hive.metastore.api.Table newTable,
+      boolean wantMinimalResult, TDdlExecResponse response, EventSequence catalogTimeline,
+      TCreateTableParams params, @Nullable String debugAction) throws ImpalaException {
+    Preconditions.checkState(PaimonUtil.isPaimonTable(newTable));
+
+    acquireMetastoreDdlLock(catalogTimeline);
+    try {
+      // Add the table to the HMS and the catalog cache. Acquire metastoreDdlLock_ to
+      // ensure the atomicity of these operations.
+      List<NotificationEvent> events;
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
+        boolean tableInMetastore = msClient.getHiveClient().tableExists(
+            newTable.getDbName(), newTable.getTableName());
+        catalogTimeline.markEvent(CHECKED_HMS_TABLE_EXISTENCE);
+        if (!tableInMetastore) {
+          long eventId = getCurrentEventId(msClient, catalogTimeline);
+          String location = newTable.getSd().getLocation();
+          // Create table in paimon if necessary
+          if (PaimonUtil.isSynchronizedTable(newTable)) {
+            // Set location here if not been specified in sql
+            if (location == null) {
+              location = PaimonUtil.getPaimonCatalogLocation(msClient, newTable);
+            }
+            if (debugAction != null) {
+              DebugUtils.executeDebugAction(debugAction, DebugUtils.PAIMON_CREATE);
+            }
+            String tableLoc = PaimonCatalogOpExecutor.createTable(
+                PaimonUtil.getTableIdentifier(newTable), location, params, newTable);
+            newTable.getSd().setLocation(tableLoc);
+            catalogTimeline.markEvent(PaimonCatalogOpExecutor.CREATED_PAIMON_TABLE +
+                newTable.getTableName());
+          } else {
+            // If this is not a synchronized table, we assume that the table must be
+            // existing in an Paimon Catalog.
+            TPaimonCatalog underlyingCatalog = PaimonUtil.getTPaimonCatalog(newTable);
+            if (underlyingCatalog != TPaimonCatalog.HADOOP_CATALOG &&
+                 underlyingCatalog != TPaimonCatalog.HIVE_CATALOG) {
+                throw new TableLoadingException(
+                  "Paimon table only support hadoop catalog and hive catalog.");
+            }
+            String locationToLoadFrom;
+            if (underlyingCatalog == TPaimonCatalog.HIVE_CATALOG) {
+              if (location == null) {
+                addSummary(response,
+                    "Location is necessary for external paimon table with hive catalog.");
+                return false;
+              }
+              locationToLoadFrom = location;
+            } else {
+              // For HadoopCatalog tables 'locationToLoadFrom' is the location of the
+              // hadoop catalog. For HiveCatalog tables it remains null.
+              locationToLoadFrom =
+                  PaimonUtil.getPaimonCatalogLocation(msClient, newTable);
+            }
+            try {
+              org.apache.paimon.table.Table paimonTable =
+                  PaimonUtil.createFileStoreTable(locationToLoadFrom);
+              // Populate the HMS table schema based on the Paimon table's schema because
+              // the Paimon metadata is the source of truth. This also avoids an
+              // unnecessary ALTER TABLE.
+              PaimonCatalogOpExecutor.populateExternalTableSchemaFromPaimonTable(
+                  newTable, paimonTable);
+              catalogTimeline.markEvent(PaimonCatalogOpExecutor.LOADED_PAIMON_TABLE);
+              if (location == null) {
+                // Using the location of the loaded Paimon table we can also get the
+                // correct location for tables stored in nested namespaces.
+                newTable.getSd().setLocation(
+                    ((DataTable) paimonTable).location().toString());
+              }
+            } catch (Exception ex) {
+              // if failed to load paimon table
+              if (newTable.getSd().getCols().isEmpty()) {
+                // if user doesn't specify schema in table, we should load from underlying
+                // paimon table, but it fails. throw the exception.
+                throw new PaimonTableLoadingException(
+                    "Failed to extract paimon schema from underlying paimon table", ex);
+              } else {
+                // user has specify schema in table ddl, try to create a new paimon table
+                // instead.
+                String tableLoc = PaimonCatalogOpExecutor.createTable(
+                    PaimonUtil.getTableIdentifier(newTable), location, params, newTable);
+                newTable.getSd().setLocation(tableLoc);
+              }
+            }
+          }
+
+          msClient.getHiveClient().createTable(newTable);
+          catalogTimeline.markEvent(CREATED_HMS_TABLE);
+          events = getNextMetastoreEventsForTableIfEnabled(catalogTimeline, eventId,
+              newTable.getDbName(), newTable.getTableName(), CreateTableEvent.EVENT_TYPE);
+        } else {
+          addSummary(response, "Table already exists.");
+          return false;
+        }
+      }
+      Pair<Long, org.apache.hadoop.hive.metastore.api.Table> eventTblPair =
+          getTableFromEvents(events, params.if_not_exists);
+      long createEventId = eventTblPair == null ? -1 : eventTblPair.first;
+      org.apache.hadoop.hive.metastore.api.Table msTable =
+          eventTblPair == null ? null : eventTblPair.second;
+      setTableNameAndCreateTimeInResponse(msTable, newTable.getDbName(),
+          newTable.getTableName(), response, catalogTimeline);
+      // Add the table to the catalog cache
+      Table newTbl =
+          catalog_.addIncompleteTable(newTable.getDbName(), newTable.getTableName(),
+              TImpalaTableType.TABLE, params.getComment(), createEventId);
+      catalogTimeline.markEvent(CREATED_CATALOG_TABLE);
+      LOG.debug("Created an paimon table {} in catalog with create event Id {} ",
+          newTbl.getFullName(), createEventId);
+      addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
+    } catch (Exception e) {
+      if (params.if_not_exists
+          && (e instanceof AlreadyExistsException
+              || e instanceof org.apache.iceberg.exceptions.AlreadyExistsException)) {
+        addSummary(response, "Table already exists.");
+        return false;
+      }
+      throw new ImpalaRuntimeException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
+    } finally { getMetastoreDdlLock().unlock(); }
 
     addSummary(response, "Table has been created.");
     return true;

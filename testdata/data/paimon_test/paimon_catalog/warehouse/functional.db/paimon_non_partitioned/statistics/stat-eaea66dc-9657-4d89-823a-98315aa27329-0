@@ -1,0 +1,44 @@
+{
+  "snapshotId" : 11,
+  "schemaId" : 1,
+  "mergedRecordCount" : 452,
+  "mergedRecordSize" : 7352,
+  "colStats" : {
+    "rating" : {
+      "colId" : 2,
+      "distinctCount" : 5,
+      "min" : "1.0",
+      "max" : "5.0",
+      "nullCount" : 0,
+      "avgLen" : 4,
+      "maxLen" : 4
+    },
+    "movieId" : {
+      "colId" : 1,
+      "distinctCount" : 386,
+      "min" : "1",
+      "max" : "3893",
+      "nullCount" : 0,
+      "avgLen" : 4,
+      "maxLen" : 4
+    },
+    "userId" : {
+      "colId" : 0,
+      "distinctCount" : 5,
+      "min" : "1",
+      "max" : "5",
+      "nullCount" : 0,
+      "avgLen" : 4,
+      "maxLen" : 4
+    },
+    "timestamp" : {
+      "colId" : 3,
+      "distinctCount" : 228,
+      "min" : "978241072",
+      "max" : "978824351",
+      "nullCount" : 0,
+      "avgLen" : 8,
+      "maxLen" : 8
+    }
+  }
+}

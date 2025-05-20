@@ -40,11 +40,13 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.events.InFlightEvents;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
-import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.catalog.paimon.PaimonTable;
+import org.apache.impala.catalog.paimon.PaimonUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObject;
@@ -558,6 +560,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       table = new KuduTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (IcebergTable.isIcebergTable(msTbl)) {
       table = new IcebergTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+    } else if (PaimonUtil.isPaimonTable(msTbl)) {
+      table = new PaimonTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
       // It's important to check if this is a DataSourceTable before HdfsTable because
       // DataSourceTables are still represented by HDFS tables in the metastore but

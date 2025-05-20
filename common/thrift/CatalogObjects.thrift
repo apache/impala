@@ -65,6 +65,7 @@ enum TTableType {
   MATERIALIZED_VIEW = 7
   // Represents a system table reflecting backend internal state.
   SYSTEM_TABLE = 8
+  PAIMON_TABLE = 9
 }
 
 // TODO: Separate the storage engines (e.g. Kudu) from the file formats.
@@ -82,6 +83,7 @@ enum THdfsFileFormat {
   ICEBERG = 8
   JSON = 9
   JDBC = 10
+  PAIMON = 11
 }
 
 enum TVirtualColumnType {
@@ -90,7 +92,9 @@ enum TVirtualColumnType {
   FILE_POSITION,
   PARTITION_SPEC_ID,
   ICEBERG_PARTITION_SERIALIZED,
-  ICEBERG_DATA_SEQUENCE_NUMBER
+  ICEBERG_DATA_SEQUENCE_NUMBER,
+  PARTITION_VALUE_SERIALIZED,
+  BUCKET_ID
 }
 
 // TODO: Since compression is also enabled for Kudu columns, we should
@@ -698,6 +702,25 @@ struct TSystemTable {
   1: required TSystemTableName table_name
 }
 
+enum TPaimonCatalog {
+  HADOOP_CATALOG = 0
+  HIVE_CATALOG = 1
+}
+
+// Paimon Table kind
+enum TPaimonTableKind {
+  JNI = 0
+  NATIVE = 1
+}
+
+// Represents a Paimon Table
+struct TPaimonTable {
+  // Paimon table kind.
+  1: required TPaimonTableKind kind
+  // Jni table object.
+  2: optional binary jni_tbl_obj
+}
+
 // Represents a table or view.
 struct TTable {
   // Name of the parent database. Case insensitive, expected to be stored as lowercase.
@@ -759,6 +782,9 @@ struct TTable {
 
   // Set if this is a system table
   19: optional TSystemTable system_table
+
+  // Set if this is a paimon table
+  20: optional TPaimonTable paimon_table
 }
 
 // Represents a database.

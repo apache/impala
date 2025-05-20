@@ -1084,7 +1084,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "only supported on TEXT file format");
     }
     String[] unsupportedFileFormats = {
-        "parquet", "rcfile", "avro", "iceberg"};
+        "parquet", "rcfile", "avro", "iceberg", "paimon"};
     for (String format: unsupportedFileFormats) {
       AnalysisError("create table " + tmpTableName + " (id int) with serdeproperties(" +
           "'serialization.encoding'='GBK') stored as " + format,
@@ -2446,7 +2446,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table foo stored as RCFILE as select 1",
         "CREATE TABLE AS SELECT does not support the (RCFILE) file format. " +
          "Supported formats are: (PARQUET, TEXTFILE, KUDU, ICEBERG)");
-
+    AnalysisError("create table foo stored as PAIMON as select 1",
+         "CREATE TABLE AS SELECT does not support the (PAIMON) file format. " +
+          "Supported formats are: (PARQUET, TEXTFILE, KUDU, ICEBERG)");
     // CTAS with a WITH clause and inline view (IMPALA-1100)
     AnalyzesOk("create table test_with as with with_1 as (select 1 as int_col from " +
         "functional.alltypes as t1 right join (select 1 as int_col from " +
@@ -3050,7 +3052,55 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("CREATE EXTERNAL TABLE Foo (i int) PARTITIONED BY (d decimal) " +
         "STORED BY JDBC ",
         "PARTITIONED BY cannot be used in a JDBC table.");
-
+    // Create Paimon tables.
+    AnalyzesOk("CREATE TABLE IF NOT EXISTS foo (user_id BIGINT, item_id BIGINT, " +
+        "behavior STRING) STORED AS PAIMON");
+    AnalyzesOk("CREATE TABLE IF NOT EXISTS foo (user_id BIGINT, item_id BIGINT, " +
+        "behavior STRING) PARTITIONED BY (dt STRING, hh STRING) STORED AS PAIMON");
+    AnalyzesOk("CREATE TABLE foo (user_id BIGINT, item_id BIGINT, behavior STRING) " +
+        "PARTITIONED BY (dt STRING, hh STRING) STORED AS PAIMON TBLPROPERTIES " +
+        "('primary-key'='user_id')");
+    AnalyzesOk("CREATE TABLE foo (user_id BIGINT, item_id BIGINT, behavior STRING, " +
+        "PRIMARY KEY(user_id)) PARTITIONED BY (dt STRING, hh STRING) STORED AS PAIMON");
+    AnalyzesOk("CREATE TABLE foo (user_id BIGINT, item_id BIGINT, behavior STRING)" +
+        " STORED AS PAIMON TBLPROPERTIES ('bucket' = '4', 'bucket-key'='behavior')");
+    AnalyzesOk("CREATE TABLE foo (user_id BIGINT, item_id BIGINT, behavior STRING, " +
+        "PRIMARY KEY(user_id)) PARTITIONED BY (dt STRING, hh STRING) STORED AS PAIMON " +
+        "LOCATION 'hdfs:///test-warehouse/test_create_managed_location_paimon_table'");
+    AnalyzesOk("CREATE TABLE foo (`USER_ID` BIGINT, `ITEM_ID` BIGINT, BEHAVIOR STRING, " +
+        "PRIMARY KEY(`USER_ID`)) PARTITIONED BY (`DT` STRING, `HH` STRING) " +
+        "STORED AS PAIMON");
+    AnalyzesOk("CREATE EXTERNAL TABLE foo STORED AS PAIMON LOCATION " +
+        "'hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/" +
+        "paimon_non_partitioned'");
+    AnalyzesOk("CREATE EXTERNAL TABLE foo STORED AS PAIMON LOCATION " +
+        "'hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/" +
+        "paimon_partitioned'");
+    AnalyzesOk("CREATE EXTERNAL TABLE foo STORED AS PAIMON TBLPROPERTIES" +
+        "('paimon.catalog'='hadoop', 'paimon.catalog_location'='hdfs:///test-warehouse" +
+        "/paimon_test/paimon_catalog/warehouse', 'paimon.table_identifier'=" +
+        "'functional.paimon_non_partitioned')");
+    AnalyzesOk("CREATE EXTERNAL TABLE foo STORED AS PAIMON TBLPROPERTIES(" +
+        "'paimon.catalog'='hadoop', 'paimon.catalog_location'='hdfs:///test-warehouse" +
+        "/paimon_test/paimon_catalog/warehouse', 'paimon.table_identifier'=" +
+        "'functional.paimon_partitioned')");
+    AnalyzesOk("CREATE TABLE foo (col_boolean BOOLEAN, col_tinyint TINYINT, " +
+        "col_smallint SMALLINT, col_int INT, col_integer INTEGER, col_bigint BIGINT, " +
+        "col_float FLOAT, col_double DOUBLE, col_decimal DECIMAL(10,2), " +
+        "col_string STRING, col_char CHAR(20), col_varchar VARCHAR(100), " +
+        "col_timestamp TIMESTAMP, col_date DATE, col_binary BINARY) STORED AS PAIMON");
+    AnalysisError("CREATE TABLE impala_paimon_complex_types_array " +
+        "(col_array_string ARRAY<STRING>) STORED AS PAIMON;",
+        "Tables stored by Paimon do not support the " +
+        "column col_array_string type: ARRAY<STRING>");
+    AnalysisError("CREATE TABLE impala_paimon_complex_types_map " +
+        "(col_map_string MAP<STRING,STRING>) STORED AS PAIMON;",
+        "Tables stored by Paimon do not support the" +
+        " column col_map_string type: MAP<STRING,STRING>");
+    AnalysisError("CREATE TABLE impala_paimon_complex_types_struct " +
+        "(col_struct_string STRUCT<f1:STRING, f2:STRING>) STORED AS PAIMON;",
+        "Tables stored by Paimon do not support the " +
+        "column col_struct_string type: STRUCT<f1:STRING,f2:STRING>");
     // Create table PRODUCED BY DATA SOURCE
     final String DATA_SOURCE_NAME = "TestDataSource1";
     catalog_.addDataSource(new DataSource(DATA_SOURCE_NAME, "/foo.jar",
@@ -3131,7 +3181,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
         "CLUSTERED BY(i) SORT BY (s) INTO 24 BUCKETS");
 
-    // Bucketed table not supported for Kudu, ICEBERG and JDBC table
+    // Bucketed table not supported for Kudu, ICEBERG, PAIMON and JDBC table
     AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
         "CLUSTERED BY (i) INTO 24 BUCKETS STORED BY KUDU", "CLUSTERED BY not " +
         "support fileformat: 'KUDU'");
@@ -3141,6 +3191,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
         "CLUSTERED BY (i) INTO 24 BUCKETS STORED BY JDBC",
         "CLUSTERED BY not support fileformat: 'JDBC'");
+    AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
+         "CLUSTERED BY (i) INTO 24 BUCKETS STORED BY PAIMON",
+         "CLUSTERED BY clause is not support by PAIMON now, use property " +
+         "bucket-key instead.");
     // Bucketed columns must not contain partition column and don't duplicate
     AnalysisError("CREATE TABLE functional.bucket (i int COMMENT 'hello', s string) " +
         "PARTITIONED BY(dt string) CLUSTERED BY (dt) INTO 24 BUCKETS",

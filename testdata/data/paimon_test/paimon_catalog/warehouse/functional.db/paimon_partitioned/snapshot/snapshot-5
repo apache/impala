@@ -1,0 +1,18 @@
+{
+  "version" : 3,
+  "id" : 5,
+  "schemaId" : 5,
+  "baseManifestList" : "manifest-list-fececc90-17e5-4cde-bc69-84a98da91b79-0",
+  "baseManifestListSize" : 1028,
+  "deltaManifestList" : "manifest-list-fececc90-17e5-4cde-bc69-84a98da91b79-1",
+  "deltaManifestListSize" : 992,
+  "changelogManifestList" : null,
+  "commitUser" : "0bd4c93e-9d0c-466c-9cd6-68cec360df29",
+  "commitIdentifier" : 9223372036854775807,
+  "commitKind" : "OVERWRITE",
+  "timeMillis" : 1748963555332,
+  "logOffsets" : { },
+  "totalRecordCount" : 452,
+  "deltaRecordCount" : 452,
+  "changelogRecordCount" : 0
+}

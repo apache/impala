@@ -440,3 +440,7 @@ table_name:unique_with_nulls, constraint:restrict_to, table_format:parquet/none/
 # The table is used to test casting string values to date type. Don't need to test on
 # all formats.
 table_name:timestamp_with_tz_str, constraint:restrict_to, table_format:parquet/none/none
+
+# Paimon tests are executed in the PARQUET file format dimension
+table_name:paimon_partitioned, constraint:restrict_to, table_format:parquet/none/none
+table_name:paimon_non_partitioned, constraint:restrict_to, table_format:parquet/none/none

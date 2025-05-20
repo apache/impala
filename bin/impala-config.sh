@@ -296,7 +296,7 @@ export IMPALA_DBCP2_VERSION=2.9.0
 export IMPALA_DROPWIZARD_METRICS_VERSION=4.2.26
 export IMPALA_AIRCOMPRESSOR_VERSION=0.27
 export IMPALA_DATASKETCHES_VERSION=6.0.0
-
+export IMPALA_PAIMON_VERSION=1.1.1
 # When Impala is building docker images on Redhat-based distributions,
 # it is useful to be able to customize the base image. Some users will
 # want to use open source / free distributions like Centos/Rocky/Alma/etc.
@@ -1242,6 +1242,7 @@ echo "IMPALA_HUDI_VERSION     = $IMPALA_HUDI_VERSION"
 echo "IMPALA_KUDU_VERSION     = $IMPALA_KUDU_VERSION"
 echo "IMPALA_RANGER_VERSION   = $IMPALA_RANGER_VERSION"
 echo "IMPALA_ICEBERG_VERSION  = $IMPALA_ICEBERG_VERSION"
+echo "IMPALA_PAIMON_VERSION   = $IMPALA_PAIMON_VERSION"
 echo "IMPALA_COS_VERSION      = $IMPALA_COS_VERSION"
 echo "IMPALA_OBS_VERSION      = $IMPALA_OBS_VERSION"
 echo "IMPALA_SYSTEM_PYTHON2   = $IMPALA_SYSTEM_PYTHON2"

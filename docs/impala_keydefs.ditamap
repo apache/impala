@@ -61,6 +61,10 @@ under the License.
     <topicmeta><linktext>the Apache Iceberg Puffin site</linktext></topicmeta>
   </keydef>
 
+  <keydef href="https://https://paimon.apache.org" scope="external" format="html" keys="upstream_paimon_site">
+    <topicmeta><linktext>the Apache Paimon site</linktext></topicmeta>
+  </keydef>
+
   <keydef href="https://ozone.apache.org" scope="external" format="html" keys="upstream_ozone_site">
     <topicmeta><linktext>the Apache Ozone site</linktext></topicmeta>
   </keydef>

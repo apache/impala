@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.paimon.FeShowFileStmtSupport;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TTableName;
@@ -78,13 +79,23 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
     }
     table_ = tableRef.getTable();
     Preconditions.checkNotNull(table_);
-    if (!(table_ instanceof FeFsTable)) {
-      throw new AnalysisException("SHOW FILES is applicable only to a HDFS table");
+    if (!(table_ instanceof FeFsTable) && !(table_ instanceof FeShowFileStmtSupport)) {
+      throw new AnalysisException("SHOW FILES is applicable only to file-based tables.");
     }
     tableRef.analyze(analyzer);
 
     // Analyze the partition spec, if one was specified.
     if (partitionSet_ != null) {
+        if (table_ instanceof FeShowFileStmtSupport) {
+            FeShowFileStmtSupport showFileStmtSupport = (FeShowFileStmtSupport) table_;
+            if (!showFileStmtSupport.supportPartitionFilter()) {
+                throw new AnalysisException(
+                        "SHOW FILES with partition filter is not applicable to" +
+                        " table type:" +
+                        showFileStmtSupport.getTableFormat().name()
+                );
+            }
+        }
       partitionSet_.setTableName(table_.getTableName());
       partitionSet_.setPartitionShouldExist();
       partitionSet_.setPrivilegeRequirement(Privilege.VIEW_METADATA);

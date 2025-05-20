@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_paimon">
+
+  <title id="paimon">Using Impala with Paimon Tables</title>
+  <titlealts audience="PDF"><navtitle>Paimon Tables</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Paimon"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Tables"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      <indexterm audience="hidden">Paimon</indexterm>
+      Impala now adds experimental support for Apache Paimon, which is an open table format for realtime lakehouse.
+      With this functionality, you can access any existing Paimon tables using SQL and perform
+      analytics over them. It now supports Hive catalog and Hadoop catalog.
+    </p>
+
+    <p>
+      For more information on Paimon, see <xref keyref="upstream_paimon_site"/>.
+    </p>
+
+    <p outputclass="toc inpage"/>
+  </conbody>
+
+  <concept id="paimon_features">
+    <title>Overview of Paimon features</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Concepts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <ul>
+      <li>
+        <b>Real time updates:</b>
+        <ul>
+          <li>
+            Primary key table supports writing of large-scale updates, has very high update performance,
+            typically through Flink Streaming.
+          </li>
+          <li>
+            Support defining Merge Engines, update records however you like.
+            Deduplicate to keep the last row, or partial-update, or aggregate records, or first-row, you decide.
+          </li>
+        </ul>
+      </li>
+      <li>
+        <b>Data Lake Capabilities:</b>
+        <ul>
+          <li>
+            Scalable metadata: supports storing Petabyte large-scale datasets and storing a large
+            number of partitions.
+          </li>
+          <li>
+            Supports ACID Transactions &amp; Time Travel &amp; Schema Evolution.
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </conbody>
+  </concept>
+
+  <concept id="paimon_create">
+
+    <title>Creating Paimon tables with Impala</title>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Concepts"/>
+    </metadata>
+  </prolog>
+
+    <conbody>
+      <p>
+        When you have an existing Paimon table that is not yet present in the Hive Metastore,
+        you can use the <codeph>CREATE EXTERNAL TABLE</codeph> command in Impala to add the table to the Hive
+        Metastore and make Impala able to interact with this table. Currently Impala supports
+        HadoopCatalog, and HiveCatalog. If you have an existing table in HiveCatalog,
+        and you are using the same Hive Metastore, you need no further actions.
+      </p>
+      <ul>
+        <li>
+          <b>HadoopCatalog</b>. A table in HadoopCatalog means that there is a catalog location
+          in the file system under which Paimon tables are stored. Use the following command
+          to add a table in a HadoopCatalog to Impala:
+          <codeblock>
+CREATE EXTERNAL TABLE paimon_hadoop_cat
+STORED AS PAIMON
+TBLPROPERTIES('paimon.catalog'='hadoop',
+'paimon.catalog_location'='/path/to/paimon_hadoop_catalog',
+'paimon.table_identifier'='paimondb.paimontable');
+          </codeblock>
+        </li>
+        <li>
+          <b>HiveCatalog</b>. User can create managed paimon table in HMS like below :
+          <codeblock>
+CREATE TABLE paimon_hive_cat(userid INT,movieId INT)
+STORED AS PAIMON;
+          </codeblock>
+        </li>
+      </ul>
+      <p>
+        <b>Syntax for creating DDL tables</b>
+        <codeblock>
+CREATE [EXTERNAL] TABLE [IF NOT EXISTS] [db_name.]table_name
+(
+[col_name data_type ,...]
+[PRIMARY KEY (col1,col2)]
+)
+[PARTITIONED BY (col_name data_type [COMMENT 'col_comment'], ...)]
+STORED AS PAIMON
+[LOCATION 'hdfs_path']
+[TBLPROPERTIES (
+'primary-key'='col1,col2',
+'file.format' = 'orc/parquet',
+'bucket' = '2',
+'bucket-key' = 'col3',
+]
+        </codeblock>
+      </p>
+      <ul>
+        <li>
+          <b>Create Partitioned paimon table example:</b>
+          <codeblock>
+CREATE TABLE support_partitioned_by_table2 (
+user_id BIGINT COMMENT 'The user_id field',
+item_id BIGINT COMMENT 'The item_id field',
+behavior STRING COMMENT 'The behavior field',
+)
+PARTITIONED BY (
+dt STRING COMMENT 'The dt field',
+hh STRING COMMENT 'The hh field'
+)
+STORED AS PAIMON;
+          </codeblock>
+        </li>
+        <li>
+          <b>Create Partitioned paimon table example with primary key:</b>
+          <codeblock>
+CREATE TABLE test_create_managed_part_pk_paimon_table (
+user_id BIGINT COMMENT 'The user_id field',
+item_id BIGINT COMMENT 'The item_id field',
+behavior STRING COMMENT 'The behavior field'
+)
+PARTITIONED BY (
+dt STRING COMMENT 'The dt field',
+hh STRING COMMENT 'The hh field'
+)
+STORED AS PAIMON
+TBLPROPERTIES (
+'primary-key'='user_id'
+);
+          </codeblock>
+        </li>
+        <li>
+          <b>Create Partitioned paimon table example with bucket:</b>
+          <codeblock>
+CREATE TABLE test_create_managed_bucket_paimon_table (
+user_id BIGINT COMMENT 'The user_id field',
+item_id BIGINT COMMENT 'The item_id field',
+behavior STRING COMMENT 'The behavior field'
+)
+STORED AS PAIMON
+TBLPROPERTIES (
+'bucket' = '4',
+'bucket-key'='behavior'
+);
+          </codeblock>
+        </li>
+        <li>
+        <b>Create External paimon table example with no column definitions:</b>
+        <p>For external table creation, user can ignore column definitions, impala will infer schema from underlying paimon
+        table. for example:</p>
+          <codeblock>
+CREATE EXTERNAL TABLE ext_paimon_table
+STORED AS PAIMON
+[LOCATION 'underlying_paimon_table_location']
+          </codeblock>
+        </li>
+      </ul>
+    </conbody>
+  </concept>
+
+  <concept id="paimon_drop">
+    <title>Dropping Paimon tables</title>
+    <conbody>
+      <p>
+        One can use <codeph>DROP TABLE</codeph> statement to remove an Paimon table:
+        <codeblock>
+DROP TABLE test_create_managed_bucket_paimon_table;
+        </codeblock>
+      </p>
+      <p>
+        When <codeph>external.table.purge</codeph> table property is set to true, then the
+        <codeph>DROP TABLE</codeph> statement will also delete the data files. This property
+        is set to true when Impala creates the Paimon table via <codeph>CREATE TABLE</codeph>.
+        When <codeph>CREATE EXTERNAL TABLE</codeph> is used (the table already exists in some
+        catalog) then this <codeph>external.table.purge</codeph> is set to false, i.e.
+        <codeph>DROP TABLE</codeph> doesn't remove any files, only the table definition
+        in HMS.
+      </p>
+    </conbody>
+  </concept>
+
+  <concept id="paimon_types">
+    <title>Supported Data Types for Paimon Columns</title>
+    <conbody>
+
+      <p>
+        You can get information about the supported Paimon data types in
+        <xref href="https://paimon.apache.org/docs/1.1/concepts/data-types/" scope="external" format="html">
+          the Paimon spec</xref>.
+      </p>
+
+      <p>
+        The Paimon data types can be mapped to the following SQL types in Impala:
+        <table rowsep="1" colsep="1" id="paimon_types_sql_types">
+          <tgroup cols="2">
+            <colspec colname="c1" colnum="1"/>
+            <colspec colname="c2" colnum="2"/>
+            <thead>
+              <row>
+                <entry>Paimon type</entry>
+                <entry>SQL type in Impala</entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry>BOOLEAN</entry>
+                <entry>BOOLEAN</entry>
+              </row>
+              <row>
+                <entry>TINYINT</entry>
+                <entry>TINYINT</entry>
+              </row>
+              <row>
+                <entry>SMALLINT</entry>
+                <entry>SMALLINT</entry>
+              </row>
+              <row>
+                <entry>INT</entry>
+                <entry>INTEGER</entry>
+              </row>
+              <row>
+                <entry>BIGINT</entry>
+                <entry>BIGINT</entry>
+              </row>
+              <row>
+                <entry>FLOAT</entry>
+                <entry>FLOAT</entry>
+              </row>
+              <row>
+                <entry>DOUBLE</entry>
+                <entry>DOUBLE</entry>
+              </row>
+              <row>
+                <entry>STRING</entry>
+                <entry>STRING</entry>
+              </row>
+              <row>
+                <entry>DECIMAL(P,S)</entry>
+                <entry>DECIMAL(P,S)</entry>
+              </row>
+              <row>
+                <entry>TIMESTAMP</entry>
+                <entry>TIMESTAMP</entry>
+              </row>
+              <row>
+                <entry>TIMESTAMP(*WITH*TIMEZONE)</entry>
+                <entry>Not Supported</entry>
+              </row>
+              <row>
+                <entry>CHAR(N)</entry>
+                <entry>CHAR(N)</entry>
+              </row>
+              <row>
+                <entry>VARCHAR(N)</entry>
+                <entry>VARCHAR(N)</entry>
+              </row>
+              <row>
+                <entry>BINARY(N)</entry>
+                <entry>BINARY(N)</entry>
+              </row>
+              <row>
+                <entry>VARBINARY(N)</entry>
+                <entry>BINARY(N)</entry>
+              </row>
+              <row>
+                <entry>DATE</entry>
+                <entry>DATE</entry>
+              </row>
+              <row>
+                <entry>TIME</entry>
+                <entry>Not Supported</entry>
+              </row>
+              <row>
+                <entry>Not Supported</entry>
+                <entry>DATETIME</entry>
+              </row>
+              <row>
+                <entry>MULTISET&lt;t&gt;</entry>
+                <entry>Not Supported</entry>
+              </row>
+              <row>
+                <entry>ARRAY&lt;t&gt;</entry>
+                <entry>Not Supported For Now</entry>
+              </row>
+              <row>
+                <entry>MAP&lt;t&gt;</entry>
+                <entry>Not Supported For Now</entry>
+              </row>
+              <row>
+                <entry>ROW&lt;n1 t1,n2 t2&gt;</entry>
+                <entry>Not Supported For Now</entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+      </p>
+      <p>
+      note: the unsupported type for paimon and impala is noted as "Not Supported".
+      The item noted 'Not Supported for Now' will be supported later.
+      </p>
+    </conbody>
+  </concept>
+</concept>

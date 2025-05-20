@@ -1,0 +1,28 @@
+{
+  "version" : 3,
+  "id" : 0,
+  "fields" : [ {
+    "id" : 0,
+    "name" : "userId",
+    "type" : "INT"
+  }, {
+    "id" : 1,
+    "name" : "movieId",
+    "type" : "INT"
+  }, {
+    "id" : 2,
+    "name" : "rating",
+    "type" : "FLOAT"
+  }, {
+    "id" : 3,
+    "name" : "ts",
+    "type" : "BIGINT"
+  } ],
+  "highestFieldId" : 3,
+  "partitionKeys" : [ "userId" ],
+  "primaryKeys" : [ ],
+  "options" : {
+    "owner" : "jichen"
+  },
+  "timeMillis" : 1741358917111
+}

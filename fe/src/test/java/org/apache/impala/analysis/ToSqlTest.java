@@ -382,6 +382,48 @@ public class ToSqlTest extends FrontendTestBase {
         + "test_pk_fk.fk ( seq INT, id INT, year STRING, a INT, FOREIGN KEY(id, year) "
         + "REFERENCES functional.parent_table(id, year), FOREIGN KEY(a) REFERENCES "
         + "functional.parent_table_2(a) ) STORED AS TEXTFILE", true);
+    // Test create table for paimon table.
+    testToSql("CREATE TABLE test_create_managed_paimon_table ("
+        + "user_id BIGINT, item_id BIGINT, behavior STRING) STORED AS PAIMON",
+        "default",
+        "CREATE TABLE default.test_create_managed_paimon_table ("
+        + " user_id BIGINT, item_id BIGINT, behavior STRING )"
+        + " STORED AS PAIMON TBLPROPERTIES ('deletion-vectors.enabled'='true', "
+        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler')",
+       true);
+
+      testToSql("CREATE TABLE  test_create_managed_part_paimon_table ("
+        + " user_id BIGINT, item_id BIGINT, behavior STRING) PARTITIONED BY ("
+        + "dt STRING, hh STRING ) STORED AS PAIMON", "default",
+        "CREATE TABLE default.test_create_managed_part_paimon_table ("
+        + " user_id BIGINT, item_id BIGINT, behavior STRING ) "
+        + "PARTITIONED BY ( dt STRING, hh STRING ) STORED AS PAIMON "
+        + "TBLPROPERTIES ('deletion-vectors.enabled'='true', "
+        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler')",
+            true);
+
+    testToSql("CREATE TABLE test_create_managed_part_pk_paimon_table ("
+        + "user_id BIGINT, item_id BIGINT, behavior STRING) PARTITIONED BY ("
+        + "dt STRING, hh STRING) STORED AS PAIMON TBLPROPERTIES ("
+        + "'primary-key'='user_id')", "default",
+        "CREATE TABLE default.test_create_managed_part_pk_paimon_table ( "
+        + "user_id BIGINT, item_id BIGINT, behavior STRING ) "
+        + "PARTITIONED BY ( dt STRING, hh STRING ) "
+        + "STORED AS PAIMON TBLPROPERTIES ('deletion-vectors.enabled'='true',"
+        + " 'primary-key'='user_id', "
+        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler')",
+      true);
+
+    testToSql("CREATE TABLE test_create_managed_bucket_paimon_table ("
+        + "user_id BIGINT, item_id BIGINT, behavior STRING) STORED AS PAIMON "
+        + "TBLPROPERTIES ('bucket' = '4', 'bucket-key'='behavior')", "default",
+        "CREATE TABLE default.test_create_managed_bucket_paimon_table ("
+        + " user_id BIGINT, item_id BIGINT, behavior STRING ) "
+        + "STORED AS PAIMON TBLPROPERTIES "
+        + "('bucket'='4', 'bucket-key'='behavior', "
+        + "'deletion-vectors.enabled'='true', "
+        + "'storage_handler'='org.apache.paimon.hive.PaimonStorageHandler')",
+        true);
   }
 
   @Test

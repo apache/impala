@@ -147,6 +147,8 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
+import org.apache.impala.catalog.paimon.FePaimonTable;
+import org.apache.impala.catalog.paimon.FeShowFileStmtSupport;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.UserCancelledException;
 import org.apache.impala.common.FileSystemUtil;
@@ -1755,6 +1757,8 @@ public class Frontend {
       return ((FeHBaseTable) table).getTableStats();
     } else if (table instanceof FeDataSourceTable) {
       return ((FeDataSourceTable) table).getTableStats();
+    } else if (table instanceof FePaimonTable) {
+      return ((FePaimonTable) table).getTableStats(op);
     } else if (table instanceof FeKuduTable) {
       if (op == TShowStatsOp.RANGE_PARTITIONS) {
         return FeKuduTable.Utils.getRangePartitions((FeKuduTable) table, false);
@@ -3456,7 +3460,9 @@ public class Frontend {
       throws ImpalaException{
     FeTable table = getCatalog().getTable(request.getTable_name().getDb_name(),
         request.getTable_name().getTable_name());
-    if (table instanceof FeFsTable) {
+    if (table instanceof FeShowFileStmtSupport) {
+      return ((FeShowFileStmtSupport) table).doGetTableFiles(request);
+    } else if (table instanceof FeFsTable) {
       return FeFsTable.Utils.getFiles((FeFsTable)table, request.getPartition_set());
     } else {
       throw new InternalException("SHOW FILES only supports Hdfs table. " +

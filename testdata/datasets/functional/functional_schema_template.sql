@@ -4800,3 +4800,28 @@ delimited fields terminated by ','
 insert overwrite table {db_name}{db_suffix}.{table_name}
 select id, concat(cast(timestamp_col as string format 'YYYY-MM-DD HH24:MM:SS'), ' +08:00') from functional.alltypestiny;
 ====
+
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+paimon_partitioned
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS PAIMON
+LOCATION '/test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/paimon_partitioned';
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/paimon_test/paimon_catalog/warehouse/functional.db/paimon_partitioned /test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+paimon_non_partitioned
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS PAIMON
+LOCATION '/test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/paimon_non_partitioned'
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db && \
+hadoop fs -put -f ${IMPALA_HOME}//testdata/data/paimon_test/paimon_catalog/warehouse/functional.db/paimon_non_partitioned /test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db
+====

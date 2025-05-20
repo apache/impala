@@ -21,7 +21,7 @@ import re
 import shlex
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfFS, SkipIfHive2
+from tests.common.skip import SkipIf, SkipIfFS, SkipIfHive2
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.test_file_parser import QueryTestSectionReader, remove_comments
 from tests.common.environ import HIVE_MAJOR_VERSION
@@ -85,6 +85,12 @@ class TestShowCreateTable(ImpalaTestSuite):
   @SkipIfHive2.acid
   def test_show_create_table_full_acid(self, vector, unique_database):
     self.__run_show_create_table_test_case('QueryTest/show-create-table-full-acid',
+                                           vector,
+                                           unique_database)
+
+  @SkipIf.not_hdfs
+  def test_show_create_table_paimon(self, vector, unique_database):
+    self.__run_show_create_table_test_case('QueryTest/show-create-table-paimon',
                                            vector,
                                            unique_database)
 

@@ -50,6 +50,14 @@ public class VirtualColumn extends Column {
       Type.BIGINT,
       TVirtualColumnType.ICEBERG_DATA_SEQUENCE_NUMBER);
 
+  // Paimon-related virtual columns.
+  public static VirtualColumn PARTITION_VALUE_SERIALIZED = new
+          VirtualColumn("PARTITION__VALUE__SERIALIZED", Type.BINARY,
+          TVirtualColumnType.PARTITION_VALUE_SERIALIZED);
+  public static VirtualColumn BUCKET_ID = new VirtualColumn("BUCKET_ID",
+      Type.INT, TVirtualColumnType.BUCKET_ID);
+
+
   public static VirtualColumn getVirtualColumn(TVirtualColumnType virtColType) {
     switch (virtColType) {
       case INPUT_FILE_NAME: return INPUT_FILE_NAME;
@@ -57,6 +65,8 @@ public class VirtualColumn extends Column {
       case PARTITION_SPEC_ID: return PARTITION_SPEC_ID;
       case ICEBERG_PARTITION_SERIALIZED: return ICEBERG_PARTITION_SERIALIZED;
       case ICEBERG_DATA_SEQUENCE_NUMBER: return ICEBERG_DATA_SEQUENCE_NUMBER;
+      case PARTITION_VALUE_SERIALIZED: return PARTITION_VALUE_SERIALIZED;
+      case BUCKET_ID: return BUCKET_ID;
       default: break;
     }
     return null;

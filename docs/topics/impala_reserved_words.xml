@@ -1589,6 +1589,13 @@ See the history, any recent changes, here:
                 <entry/>
               </row>
               <row>
+                <entry><codeph>paimon</codeph></entry>
+                <entry/>
+                <entry/>
+                <entry>X<fn>Impala 5.0 and higher</fn></entry>
+                <entry/>
+              </row>
+              <row>
                 <entry><codeph>identity</codeph></entry>
                 <entry>X</entry>
                 <entry/>

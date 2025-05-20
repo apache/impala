@@ -66,6 +66,9 @@ public class DebugUtils {
   // debug action label for Iceberg create table.
   public static final String ICEBERG_CREATE = "catalogd_iceberg_create";
 
+  // debug action label for Paimon create table.
+  public static final String PAIMON_CREATE = "catalogd_paimon_create";
+
   // debug action label for throwing an exception during loadFileMetadataForPartitions.
   public static final String LOAD_FILE_METADATA_THROW_EXCEPTION =
       "catalogd_load_file_metadata_throw_exception";

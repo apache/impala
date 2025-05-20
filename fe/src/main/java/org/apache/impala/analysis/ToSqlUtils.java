@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.antlr.runtime.ANTLRStringStream;
 import org.antlr.runtime.RecognitionException;
@@ -52,7 +53,10 @@ import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.paimon.FePaimonTable;
+import org.apache.impala.catalog.paimon.PaimonUtil;
 import org.apache.impala.common.Pair;
+import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TBucketInfo;
 import org.apache.impala.thrift.TBucketType;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -61,6 +65,7 @@ import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.BucketUtils;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
+import org.apache.paimon.CoreOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -470,6 +475,50 @@ public class ToSqlUtils {
       } catch (Exception e) {
         throw new CatalogException("Could not get primary key/foreign keys sql.", e);
       }
+    } else if (table instanceof FePaimonTable) {
+      // format
+      String inputFormat = msTable.getSd().getInputFormat();
+      String serDeLib = msTable.getSd().getSerdeInfo().getSerializationLib();
+      format = HdfsFileFormat.fromHdfsInputFormatClass(inputFormat, serDeLib);
+      storageHandlerClassName = null;
+      isPrimaryKeyUnique = true;
+      properties.remove(CoreOptions.PRIMARY_KEY.key());
+      properties.remove(CoreOptions.PARTITION.key());
+      properties.remove(PaimonUtil.STORAGE_HANDLER);
+      properties.remove(CatalogOpExecutor.CAPABILITIES_KEY);
+      // for synchronized table, show sql like a managed table
+      if (PaimonUtil.isSynchronizedTable(msTable)) {
+        properties.remove("TRANSLATED_TO_EXTERNAL");
+        properties.remove(Table.TBL_PROP_EXTERNAL_TABLE_PURGE);
+        if ((location != null)
+            && location.toLowerCase().endsWith(table.getName().toLowerCase())) {
+          location = null;
+        }
+        isExternal = false;
+      }
+      try {
+        FePaimonTable fePaimonTable = (FePaimonTable) table;
+        primaryKeySql = fePaimonTable.getPaimonApiTable()
+                            .primaryKeys()
+                            .stream()
+                            .map(String::toLowerCase)
+                            .collect(Collectors.toList());
+
+        partitionColsSql = new ArrayList<>();
+        for (int i = 0; i < table.getNumClusteringCols(); i++) {
+          Column col = table.getColumns().get(i);
+          partitionColsSql.add(columnToSql(col));
+        }
+
+        colsSql = new ArrayList<>();
+
+        for (int i = table.getNumClusteringCols(); i < table.getColumns().size(); i++) {
+          Column col = table.getColumns().get(i);
+          colsSql.add(columnToSql(col));
+        }
+      } catch (Exception e) {
+        throw new CatalogException("Could not get primary key/foreign keys sql.", e);
+      }
     } else if (table instanceof FeDataSourceTable) {
       // Mask sensitive table properties for external JDBC table.
       Set<String> keysToBeMasked = DataSourceTable.getJdbcTblPropertyMaskKeys();
@@ -641,8 +690,16 @@ public class ToSqlUtils {
     return sb.toString();
   }
 
+  private static String encodeColumnName(String name) {
+    if (impalaNeedsQuotes(name)) {
+      return String.format("`%s`", name);
+    } else {
+      return name;
+    }
+  }
+
   private static String columnToSql(Column col) {
-    StringBuilder sb = new StringBuilder(col.getName());
+    StringBuilder sb = new StringBuilder(encodeColumnName(col.getName()));
     if (col.getType() != null) sb.append(" " + col.getType().toSql());
     if (col instanceof KuduColumn) {
       KuduColumn kuduCol = (KuduColumn) col;

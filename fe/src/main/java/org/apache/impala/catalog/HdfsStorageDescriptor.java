@@ -79,7 +79,8 @@ public class HdfsStorageDescriptor {
       // support for the new input/output format classes. See IMPALA-4214.
       "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", // (parquet)
       "org.apache.iceberg.mr.hive.HiveIcebergSerDe", // (iceberg)
-      "org.apache.hadoop.hive.serde2.JsonSerDe");// (json)
+      "org.apache.hadoop.hive.serde2.JsonSerDe", // (json)
+      "org.apache.paimon.hive.PaimonSerDe"); // (paimon)
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
 

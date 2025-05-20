@@ -49,6 +49,7 @@ import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
+import org.apache.impala.catalog.paimon.PaimonUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.compat.MetastoreShim;
@@ -129,12 +130,13 @@ abstract class LocalTable implements FeTable {
       t = LocalKuduTable.loadFromKudu(db, msTbl, ref);
     } else if (IcebergTable.isIcebergTable(msTbl)) {
       t = LocalIcebergTable.loadIcebergTableViaMetaProvider(db, msTbl, ref);
+    } else if (PaimonUtil.isPaimonTable(msTbl)) {
+      t = LocalPaimonTable.load(db, msTbl, ref);
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
       t = LocalDataSourceTable.load(db, msTbl, ref);
     } else if (SystemTable.isSystemTable(msTbl)) {
       t = LocalSystemTable.load(db, msTbl, ref);
-    } else if (HdfsFileFormat.isHdfsInputFormatClass(
-        msTbl.getSd().getInputFormat())) {
+    } else if (HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
       t = LocalFsTable.load(db, msTbl, ref);
     }
 

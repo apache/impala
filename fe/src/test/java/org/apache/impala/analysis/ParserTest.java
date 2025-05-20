@@ -2894,8 +2894,8 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("CREATE TABLE T (i int COMMENT 'hi') PARTITIONED BY (j int COMMENT 'bye')");
 
     // Supported file formats
-    String [] supportedFileFormats =
-        {"TEXTFILE", "SEQUENCEFILE", "PARQUET", "PARQUETFILE", "RCFILE", "AVRO"};
+    String[] supportedFileFormats = {
+        "TEXTFILE", "SEQUENCEFILE", "PARQUET", "PARQUETFILE", "RCFILE", "AVRO", "PAIMON"};
     for (String format: supportedFileFormats) {
       ParsesOk("CREATE TABLE Foo (i int, s string) STORED AS " + format);
       ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) STORED AS " + format);

@@ -29,6 +29,7 @@ import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.mr.Catalogs;
+import org.apache.impala.analysis.paimon.PaimonAnalyzer;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
@@ -135,12 +136,12 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
   public TSortingOrder getSortingOrder() { return tableDef_.getSortingOrder(); }
   public String getComment() { return tableDef_.getComment(); }
   public Map<String, String> getTblProperties() { return tableDef_.getTblProperties(); }
-  private HdfsCachingOp getCachingOp() { return tableDef_.getCachingOp(); }
+  public HdfsCachingOp getCachingOp() { return tableDef_.getCachingOp(); }
   public HdfsUri getLocation() { return tableDef_.getLocation(); }
   Map<String, String> getSerdeProperties() { return tableDef_.getSerdeProperties(); }
   public THdfsFileFormat getFileFormat() { return tableDef_.getFileFormat(); }
   RowFormat getRowFormat() { return tableDef_.getRowFormat(); }
-  private void putGeneratedProperty(String key, String value) {
+  public void putGeneratedProperty(String key, String value) {
     tableDef_.putGeneratedProperty(key, value);
   }
   public Map<String, String> getGeneratedKuduProperties() {
@@ -272,8 +273,9 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
     // Avro tables can have empty column defs because they can infer them from the Avro
     // schema. Likewise for external Kudu tables, the schema can be read from Kudu.
     if (getColumnDefs().isEmpty() && getFileFormat() != THdfsFileFormat.AVRO
-        && getFileFormat() != THdfsFileFormat.KUDU && getFileFormat() !=
-        THdfsFileFormat.ICEBERG) {
+        && getFileFormat() != THdfsFileFormat.KUDU
+        && getFileFormat() != THdfsFileFormat.ICEBERG
+        && getFileFormat() != THdfsFileFormat.PAIMON) {
       throw new AnalysisException("Table requires at least 1 column");
     }
     if (getRowFormat() != null) {
@@ -318,6 +320,10 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
 
     if (getFileFormat() == THdfsFileFormat.JDBC) {
       analyzeJdbcSchema(analyzer);
+    }
+
+    if (getFileFormat() == THdfsFileFormat.PAIMON) {
+      PaimonAnalyzer.analyzeCreateTableStmt(this, analyzer);
     }
 
     // If lineage logging is enabled, compute minimal lineage graph.
@@ -932,7 +938,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
   /**
    * @return true for external tables that don't have "external.table.purge" set to true.
    */
-  private boolean isExternalWithNoPurge() {
+  public boolean isExternalWithNoPurge() {
     return isExternal() && !Boolean.parseBoolean(getTblProperties().get(
       Table.TBL_PROP_EXTERNAL_TABLE_PURGE));
   }

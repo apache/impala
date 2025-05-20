@@ -79,6 +79,7 @@ import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.VirtualTable;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.catalog.local.LocalKuduTable;
+import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.ImpalaException;
@@ -1136,7 +1137,8 @@ public class Analyzer {
       Preconditions.checkState(table instanceof FeFsTable ||
           table instanceof FeKuduTable ||
           table instanceof FeHBaseTable ||
-          table instanceof FeDataSourceTable);
+          table instanceof FeDataSourceTable ||
+          table instanceof FePaimonTable);
       return new BaseTableRef(tableRef, resolvedPath);
     } else {
       return new CollectionTableRef(tableRef, resolvedPath, false);

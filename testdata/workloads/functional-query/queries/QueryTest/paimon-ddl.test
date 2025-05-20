@@ -1,0 +1,211 @@
+====
+---- QUERY
+CREATE TABLE IF NOT EXISTS test_create_managed_paimon_table (
+    user_id BIGINT COMMENT 'The user_id field',
+    item_id BIGINT COMMENT 'The item_id field',
+    behavior STRING COMMENT 'The behavior field'
+)
+STORED AS PAIMON;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE TABLE IF NOT EXISTS test_create_managed_part_paimon_table (
+    user_id BIGINT COMMENT 'The user_id field',
+    item_id BIGINT COMMENT 'The item_id field',
+    behavior STRING COMMENT 'The behavior field'
+)
+PARTITIONED BY (
+    dt STRING COMMENT 'The dt field',
+    hh STRING COMMENT 'The hh field'
+)
+STORED AS PAIMON;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE TABLE test_create_managed_part_pk_paimon_table (
+    user_id BIGINT COMMENT 'The user_id field',
+    item_id BIGINT COMMENT 'The item_id field',
+    behavior STRING COMMENT 'The behavior field'
+)
+PARTITIONED BY (
+    dt STRING COMMENT 'The dt field',
+    hh STRING COMMENT 'The hh field'
+)
+STORED AS PAIMON
+TBLPROPERTIES (
+    'primary-key'='user_id'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE TABLE test_create_managed_part_pkstmt_paimon_table (
+    user_id BIGINT COMMENT 'The user_id field',
+    item_id BIGINT COMMENT 'The item_id field',
+    behavior STRING COMMENT 'The behavior field',
+    PRIMARY KEY(user_id)
+)
+PARTITIONED BY (
+    dt STRING COMMENT 'The dt field',
+    hh STRING COMMENT 'The hh field'
+)
+STORED AS PAIMON;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE TABLE test_create_managed_bucket_paimon_table (
+    user_id BIGINT COMMENT 'The user_id field',
+    item_id BIGINT COMMENT 'The item_id field',
+    behavior STRING COMMENT 'The behavior field'
+)
+STORED AS PAIMON
+TBLPROPERTIES (
+    'bucket' = '4',
+    'bucket-key'='behavior'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE TABLE test_create_managed_location_paimon_table (
+    user_id BIGINT COMMENT 'The user_id field',
+    item_id BIGINT COMMENT 'The item_id field',
+    behavior STRING COMMENT 'The behavior field',
+    PRIMARY KEY(user_id)
+)
+PARTITIONED BY (
+    dt STRING COMMENT 'The dt field',
+    hh STRING COMMENT 'The hh field'
+)
+STORED AS PAIMON
+LOCATION 'hdfs:///test-warehouse/test_create_managed_location_paimon_table';
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE TABLE TEST_CREATE_MANAGED_UPPERCASE_PAIMON_TABLE (
+    `USER_ID` BIGINT COMMENT 'The user_id field',
+    `ITEM_ID` BIGINT COMMENT 'The item_id field',
+    BEHAVIOR STRING COMMENT 'The behavior field',
+    PRIMARY KEY(`USER_ID`)
+)
+PARTITIONED BY (
+    `DT` STRING COMMENT 'The dt field',
+    `HH` STRING COMMENT 'The hh field'
+)
+STORED AS PAIMON;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE EXTERNAL TABLE test_create_external_hivecat_nocol_paimon_table
+STORED AS PAIMON
+LOCATION 'hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/paimon_non_partitioned';
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE EXTERNAL TABLE test_create_external_hivecat_nocol_paimon_part_table
+STORED AS PAIMON
+LOCATION 'hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/paimon_partitioned';
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE EXTERNAL TABLE test_create_external_hadoopcat_nocol_paimon_table
+STORED AS PAIMON
+TBLPROPERTIES('paimon.catalog'='hadoop',
+'paimon.catalog_location'='hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse',
+'paimon.table_identifier'='functional.paimon_non_partitioned');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE EXTERNAL TABLE test_create_external_hadoopcat_nocol_paimon_part_table
+STORED AS PAIMON
+TBLPROPERTIES('paimon.catalog'='hadoop',
+'paimon.catalog_location'='hdfs:///test-warehouse/paimon_test/paimon_catalog/warehouse',
+'paimon.table_identifier'='functional.paimon_partitioned');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+CREATE TABLE impala_paimon_data_types_test (
+    col_boolean BOOLEAN,
+    col_tinyint TINYINT,
+    col_smallint SMALLINT,
+    col_int INT,
+    col_integer INTEGER,
+    col_bigint BIGINT,
+    col_float FLOAT,
+    col_double DOUBLE,
+    col_decimal DECIMAL(10,2),
+    col_string STRING,
+    col_char CHAR(20),
+    col_varchar VARCHAR(100),
+    col_timestamp TIMESTAMP,
+    col_date DATE,
+    col_binary BINARY
+)
+COMMENT 'Table to test all Impala paimon-supported data types'
+STORED AS PAIMON;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+DROP TABLE IF EXISTS test_create_managed_paimon_table;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+DROP TABLE IF EXISTS test_create_managed_part_paimon_table;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+DROP TABLE IF EXISTS test_create_managed_part_pk_paimon_table;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+DROP TABLE IF EXISTS test_create_managed_part_pkstmt_paimon_table;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+DROP TABLE IF EXISTS test_create_managed_bucket_paimon_table;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+DROP TABLE IF EXISTS test_create_managed_location_paimon_table;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+DROP TABLE IF EXISTS TEST_CREATE_MANAGED_UPPERCASE_PAIMON_TABLE;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+DROP TABLE IF EXISTS test_create_external_hivecat_nocol_paimon_part_table;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+DROP TABLE IF EXISTS test_create_external_hadoopcat_nocol_paimon_table;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+DROP TABLE IF EXISTS test_create_external_hadoopcat_nocol_paimon_part_table;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+DROP TABLE IF EXISTS impala_paimon_data_types_test;
+---- RESULTS
+'Table has been dropped.'

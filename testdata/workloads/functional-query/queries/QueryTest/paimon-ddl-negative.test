@@ -1,0 +1,24 @@
+====
+---- QUERY
+CREATE TABLE impala_paimon_complex_types_array (
+    col_array_string ARRAY<STRING>
+)
+STORED AS PAIMON;
+---- CATCH
+AnalysisException: Tables stored by Paimon do not support the column col_array_string type: ARRAY<STRING>
+====
+---- QUERY
+CREATE TABLE impala_paimon_complex_types_map (
+    col_map_string MAP<STRING,STRING>
+)
+STORED AS PAIMON;
+---- CATCH
+AnalysisException: Tables stored by Paimon do not support the column col_map_string type: MAP<STRING,STRING>
+====
+---- QUERY
+CREATE TABLE impala_paimon_complex_types_struct (
+    col_struct_string STRUCT<f1:STRING, f2:STRING>
+)
+STORED AS PAIMON;
+---- CATCH
+AnalysisException: Tables stored by Paimon do not support the column col_struct_string type: STRUCT<f1:STRING,f2:STRING>
