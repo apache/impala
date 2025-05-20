@@ -17,6 +17,7 @@
 
 #include "scheduling/local-admission-control-client.h"
 
+#include "observe/span-manager.h"
 #include "runtime/exec-env.h"
 #include "util/runtime-profile-counters.h"
 #include "util/uid-util.h"
@@ -25,7 +26,8 @@
 
 namespace impala {
 
-LocalAdmissionControlClient::LocalAdmissionControlClient(const TUniqueId& query_id) {
+LocalAdmissionControlClient::LocalAdmissionControlClient(const TUniqueId& query_id)
+    : was_queued_(false) {
   TUniqueIdToUniqueIdPB(query_id, &query_id_);
 }
 
@@ -33,7 +35,7 @@ Status LocalAdmissionControlClient::SubmitForAdmission(
     const AdmissionController::AdmissionRequest& request,
     RuntimeProfile::EventSequence* query_events,
     std::unique_ptr<QuerySchedulePB>* schedule_result,
-    int64_t* wait_start_time_ms, int64_t* wait_end_time_ms) {
+    int64_t* wait_start_time_ms, int64_t* wait_end_time_ms, SpanManager* span_mgr) {
   ScopedEvent completedEvent(
       query_events, AdmissionControlClient::QUERY_EVENT_COMPLETED_ADMISSION);
   query_events->MarkEvent(QUERY_EVENT_SUBMIT_FOR_ADMISSION);
@@ -41,6 +43,10 @@ Status LocalAdmissionControlClient::SubmitForAdmission(
   Status status = ExecEnv::GetInstance()->admission_controller()->SubmitForAdmission(
       request, &admit_outcome_, schedule_result, queued);
   if (queued) {
+    was_queued_ = true;
+    if (span_mgr != nullptr) {
+      span_mgr->AddChildSpanEvent(QUERY_EVENT_QUEUED);
+    }
     query_events->MarkEvent(QUERY_EVENT_QUEUED);
     DCHECK(status.ok());
     status = ExecEnv::GetInstance()->admission_controller()->WaitOnQueued(

@@ -671,3 +671,61 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     """Override ImpalaTestSuite to return 1st impalad of custom cluster.
     Returns None if no impalad was started."""
     return cls.cluster.impalads[0].service if cls.cluster.impalads else None
+
+  def query_id_from_ui(self, section, match_func=None, match_query=None, coord_idx=0):
+    """
+      Calls to the debug UI's queries page and loops over all queries in the specified
+      section calling the provided func for each query, Returns the string id of the
+      first query that matches or None if no query matches.
+
+      Parameters:
+        section:     UI section where the query is located, valid values are
+                     "completed_queries" or "in_flight_queries"
+        match_func:  Function that takes a single argument (a dictionary) and returns
+                     True if the query matches, False otherwise. The dictionary parameter
+                     keys mirror the JSON returned by calling the /queries?json endpoint
+                     on a coordinator. If specified, this is used instead of match_query.
+        match_query: String of the exact query statement to match. If specified, this
+                     is used instead of match_func.
+        coord_idx:   Index of the Impalad to use as the coordinator. This is used to
+                     determine which impalad's UI to query.
+
+      Returns:
+        String of the query id of the first matching query or None if no query matches.
+        Fails an assert if no matching query is found.
+    """
+    assert section == "completed_queries" or section == "in_flight_queries"
+    assert match_func is not None or match_query is not None, \
+        "Must specify either match_func or match_query"
+    assert match_func is None or match_query is None, \
+        "Cannot specify both match_func and match_query"
+
+    if match_query is not None:
+      match_query = match_query.lower().strip()
+
+    service = self.cluster.impalads[coord_idx].service
+    queries_json = service.get_debug_webpage_json('/queries')
+
+    for query in queries_json[section]:
+      if (match_query is not None and query["stmt"].lower() == match_query.lower()) \
+          or (match_func is not None and match_func(query)):
+        query_id = query['query_id']
+        return query_id, service.read_query_profile_page(query_id)
+
+    assert False, "No matching query found in section '{}'".format(section)
+
+  def query_profile_from_ui(self, query_id, coord_idx=0):
+    """
+      Wrapper function around ImpaladService.read_query_profile_page() to fetch the query
+      profile for a given query id from the UI of the specified coordinator.
+
+      Parameters:
+        query_id:  String id of the query to fetch the profile for.
+        coord_idx: Index of the Impalad to use as the coordinator. This is used to
+                   determine which impalad's UI to query.
+
+      Returns:
+        String of the query profile.
+    """
+    service = self.cluster.impalads[coord_idx].service
+    return service.read_query_profile_page(query_id)

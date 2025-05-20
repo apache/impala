@@ -28,6 +28,7 @@ from subprocess import check_call
 
 from tests.util.filesystem_utils import get_fs_path, WAREHOUSE_PREFIX
 from tests.util.iceberg_metadata_util import rewrite_metadata
+from tests.util.retry import retry
 
 
 def create_iceberg_table_from_directory(impala_client, unique_database, table_name,
@@ -199,3 +200,22 @@ def cleanup_tmp_test_dir(dir_path):
   """Remove temporary 'dir_path' and its content.
   Ignore errors upon deletion."""
   shutil.rmtree(dir_path, ignore_errors=True)
+
+
+def count_lines(file_path):
+  """Counts the number of lines in the file located at 'file_path'."""
+  with open(file_path, 'rb') as file:
+    return sum(1 for _ in file.readlines())
+
+
+def wait_for_file_line_count(file_path, expected_line_count, max_attempts=3,
+    sleep_time_s=1, backoff=2):
+  """Waits until the given file contains the expected number of lines or until the
+      timeout is reached. Fails an assert if the timeout is reached before the expected
+      number of lines is found."""
+  def assert_trace_file_lines():
+    return count_lines(file_path) == expected_line_count
+
+  assert retry(assert_trace_file_lines, max_attempts, sleep_time_s, backoff), \
+      "File '{}' did not reach expected line count of '{}'. actual line count: '{}'" \
+      .format(file_path, expected_line_count, count_lines(file_path))

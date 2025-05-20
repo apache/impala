@@ -387,6 +387,7 @@ if (DOXYGEN_FOUND)
     ${CMAKE_SOURCE_DIR}/be/src/common/
     ${CMAKE_SOURCE_DIR}/be/src/exec/
     ${CMAKE_SOURCE_DIR}/be/src/exprs/
+    ${CMAKE_SOURCE_DIR}/be/src/observe/
     ${CMAKE_SOURCE_DIR}/be/src/runtime/
     ${CMAKE_SOURCE_DIR}/be/src/scheduling/
     ${CMAKE_SOURCE_DIR}/be/src/service/
@@ -540,6 +541,7 @@ set (IMPALA_LIBS
   rpc_header_proto
   rpc_introspection_proto
   pb_util_proto
+  Observe
   Runtime
   RuntimeIr
   Scheduling
@@ -631,6 +633,7 @@ if (BUILD_SHARED_LIBS)
     ExecIcebergMetadata
     CodeGen
     Exprs
+    Observe
     Rpc
     Service
     security
@@ -878,6 +881,7 @@ add_subdirectory(src/exprs)
 add_subdirectory(src/kudu/security)
 add_subdirectory(src/kudu/rpc)
 add_subdirectory(src/kudu/util)
+add_subdirectory(src/observe)
 add_subdirectory(src/runtime)
 add_subdirectory(src/scheduling)
 add_subdirectory(src/statestore)
@@ -904,6 +908,7 @@ link_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/build/common
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exec
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exprs
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/observe
   ${CMAKE_CURRENT_SOURCE_DIR}/build/rpc
   ${CMAKE_CURRENT_SOURCE_DIR}/build/runtime
   ${CMAKE_CURRENT_SOURCE_DIR}/build/statestore

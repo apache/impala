@@ -47,7 +47,7 @@ using namespace kudu::rpc;
 namespace impala {
 
 RemoteAdmissionControlClient::RemoteAdmissionControlClient(const TQueryCtx& query_ctx)
-  : query_ctx_(query_ctx) {
+  : query_ctx_(query_ctx), was_queued_(false) {
   TUniqueIdToUniqueIdPB(query_ctx.query_id, &query_id_);
 }
 
@@ -98,7 +98,7 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
     const AdmissionController::AdmissionRequest& request,
     RuntimeProfile::EventSequence* query_events,
     std::unique_ptr<QuerySchedulePB>* schedule_result,
-    int64_t* wait_start_time_ms, int64_t* wait_end_time_ms) {
+    int64_t* wait_start_time_ms, int64_t* wait_end_time_ms, SpanManager* span_mgr) {
   ScopedEvent completedEvent(
       query_events, AdmissionControlClient::QUERY_EVENT_COMPLETED_ADMISSION);
 
@@ -145,7 +145,6 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
   KUDU_RETURN_IF_ERROR(admit_rpc_status, "AdmitQuery rpc failed");
   RETURN_IF_ERROR(admit_status);
 
-  bool is_query_queued = false;
   while (true) {
     RpcController rpc_controller2;
     GetQueryStatusRequestPB get_status_req;
@@ -179,9 +178,12 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
       break;
     }
 
-    if (!is_query_queued) {
+    if (!was_queued_) {
       query_events->MarkEvent(QUERY_EVENT_QUEUED);
-      is_query_queued = true;
+      if (span_mgr != nullptr) {
+        span_mgr->AddChildSpanEvent(QUERY_EVENT_QUEUED);
+      }
+      was_queued_ = true;
     }
 
     SleepForMs(FLAGS_admission_status_retry_time_ms);

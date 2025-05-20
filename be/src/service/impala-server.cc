@@ -57,6 +57,7 @@
 #include "kudu/security/security_flags.h"
 #include "kudu/util/random_util.h"
 #include "kudu/util/version_util.h"
+#include "observe/otel.h"
 #include "rpc/authentication.h"
 #include "rpc/rpc-mgr.h"
 #include "rpc/rpc-trace.h"
@@ -256,6 +257,14 @@ const string SSL_MIN_VERSION_HELP = "The minimum SSL/TLS version that Thrift "
     "services should use for both client and server connections. Supported versions are "
     "TLSv1.0, TLSv1.1 and TLSv1.2 (as long as the system OpenSSL library supports them)";
 DEFINE_string(ssl_minimum_version, "tlsv1.2", SSL_MIN_VERSION_HELP.c_str());
+DEFINE_validator(ssl_minimum_version, [](const char* flagname, const string& value) {
+  const std::string trimmed = boost::algorithm::trim_copy(value);
+  return boost::iequals(trimmed, "tlsv1")
+      || boost::iequals(trimmed, "tlsv1.0")
+      || boost::iequals(trimmed, "tlsv1.1")
+      || boost::iequals(trimmed, "tlsv1.2")
+      || boost::iequals(trimmed, "tlsv1.3");
+});
 
 DEFINE_int32(idle_session_timeout, 0, "The time, in seconds, that a session may be idle"
     " for before it is closed (and all running queries cancelled) by Impala. If 0, idle"
@@ -1335,6 +1344,11 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
   // ClientRequestState as well.
   QueryDriver::CreateNewDriver(this, query_handle, query_ctx, session_state);
 
+  if ((*query_handle)->otel_trace_query()) {
+    (*query_handle)->otel_span_manager()->EndChildSpanInit();
+    (*query_handle)->otel_span_manager()->StartChildSpanSubmitted();
+  }
+
   bool is_external_req = external_exec_request != nullptr;
 
   if (is_external_req && external_exec_request->remote_submit_time) {
@@ -1342,6 +1356,11 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
   }
 
   (*query_handle)->query_events()->MarkEvent("Query submitted");
+
+  if ((*query_handle)->otel_trace_query()) {
+    (*query_handle)->otel_span_manager()->EndChildSpanSubmitted();
+    (*query_handle)->otel_span_manager()->StartChildSpanPlanning();
+  }
 
   {
     // Keep a lock on query_handle so that registration and setting
@@ -1391,6 +1410,11 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
     if (result.__isset.result_set_metadata) {
       (*query_handle)->set_result_metadata(result.result_set_metadata);
     }
+
+    if ((*query_handle)->otel_trace_query()) {
+      (*query_handle)->otel_span_manager()->EndChildSpanPlanning();
+    }
+
   }
   VLOG(2) << "Execution request: "
           << ThriftDebugString((*query_handle)->exec_request());
@@ -3582,6 +3606,10 @@ bool ImpalaServer::CancelQueriesForGracefulShutdown() {
 
   // Clean up temporary files if needed.
   ExecEnv::GetInstance()->tmp_file_mgr()->CleanupAtShutdown();
+
+  if (FLAGS_is_coordinator && otel_trace_enabled()) {
+    shutdown_otel_tracer();
+  }
 
   // Drain the completed queries queue to the query log table.
   if (FLAGS_enable_workload_mgmt) {

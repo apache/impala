@@ -24,6 +24,7 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/admission_control_service.pb.h"
 #include "gen-cpp/common.pb.h"
+#include "observe/span-manager.h"
 #include "scheduling/admission-controller.h"
 
 namespace impala {
@@ -46,7 +47,7 @@ class AdmissionControlClient {
   virtual Status SubmitForAdmission(const AdmissionController::AdmissionRequest& request,
       RuntimeProfile::EventSequence* query_events,
       std::unique_ptr<QuerySchedulePB>* schedule_result,
-      int64_t* wait_start_time_ms, int64_t* wait_end_time_ms) = 0;
+      int64_t* wait_start_time_ms, int64_t* wait_end_time_ms, SpanManager* span_mgr) = 0;
 
   // Called when the query has completed to release all of its resources.
   virtual void ReleaseQuery(int64_t peak_mem_consumption) = 0;
@@ -57,6 +58,9 @@ class AdmissionControlClient {
 
   // Called to cancel admission for the query.
   virtual void CancelAdmission() = 0;
+
+  // Indicates if the query was queued or not.
+  virtual bool WasQueued() const = 0;
 };
 
 } // namespace impala

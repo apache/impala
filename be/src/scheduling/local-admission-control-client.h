@@ -38,15 +38,21 @@ class LocalAdmissionControlClient : public AdmissionControlClient {
   virtual Status SubmitForAdmission(const AdmissionController::AdmissionRequest& request,
       RuntimeProfile::EventSequence* query_events,
       std::unique_ptr<QuerySchedulePB>* schedule_result,
-      int64_t* wait_start_time_ms, int64_t* wait_end_time_ms) override;
+      int64_t* wait_start_time_ms, int64_t* wait_end_time_ms,
+      SpanManager* span_mgr) override;
   virtual void ReleaseQuery(int64_t peak_mem_consumption) override;
   virtual void ReleaseQueryBackends(
       const std::vector<NetworkAddressPB>& host_addr) override;
   virtual void CancelAdmission() override;
 
+  bool WasQueued() const override { return was_queued_; }
+
  private:
   // The id of the query being considered for admission.
   UniqueIdPB query_id_;
+
+  // Whether or not the query was queued.
+  bool was_queued_;
 
   /// Promise used by the admission controller. AdmissionController:SubmitForAdmission()
   /// will block on this promise until the query is either rejected, admitted, times out,

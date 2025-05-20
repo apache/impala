@@ -33,6 +33,8 @@
 #include "exprs/timezone_db.h"
 #include "gen-cpp/Types_types.h"
 #include "kudu/rpc/rpc_controller.h"
+#include "observe/otel.h"
+#include "observe/span-manager.h"
 #include "rpc/rpc-mgr.inline.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
@@ -121,6 +123,14 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
     start_time_us_(UnixMicros()),
     fetch_rows_timeout_us_(MICROS_PER_MILLI * query_options().fetch_rows_timeout_ms),
     parent_driver_(query_driver) {
+
+  if (otel_trace_enabled() && should_otel_trace_query(sql_stmt().c_str())) {
+    // initialize OpenTelemetry for this query
+    VLOG(2) << "Initializing OpenTelemetry for query " << PrintId(query_id());
+    otel_span_manager_ = build_span_manager(this);
+    otel_span_manager_->StartChildSpanInit();
+  }
+
   bool is_external_fe = session_type() == TSessionType::EXTERNAL_FRONTEND;
   // "Impala Backend Timeline" was specifically chosen to exploit the lexicographical
   // ordering defined by the underlying std::map holding the timelines displayed in
@@ -643,15 +653,25 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
   DCHECK(exec_req.__isset.query_exec_request);
   UniqueIdPB query_id_pb;
   TUniqueIdToUniqueIdPB(query_id(), &query_id_pb);
+  if (otel_trace_query()) {
+    otel_span_manager_->StartChildSpanAdmissionControl();
+  }
+
   Status admit_status = admission_control_client_->SubmitForAdmission(
       {query_id_pb, ExecEnv::GetInstance()->backend_id(),
           exec_req.query_exec_request, exec_req.query_options,
           summary_profile_, blacklisted_executor_addresses_},
-      query_events_, &schedule_, &wait_start_time_ms_, &wait_end_time_ms_);
+      query_events_, &schedule_, &wait_start_time_ms_, &wait_end_time_ms_,
+      otel_span_manager_.get());
   {
     lock_guard<mutex> l(lock_);
     if (!UpdateQueryStatus(admit_status).ok()) return;
   }
+
+  if (otel_trace_query()) {
+    otel_span_manager_->EndChildSpanAdmissionControl();
+  }
+
   DCHECK(schedule_.get() != nullptr);
   // Note that we don't need to check for cancellation between admission and query
   // startup. The query was not cancelled right before being admitted and the window here
@@ -765,6 +785,9 @@ void ClientRequestState::ExecDdlRequestImpl(bool exec_in_worker_thread) {
 
   Status status = catalog_op_executor_->Exec(exec_req.catalog_op_request);
   query_events_->MarkEvent("CatalogDdlRequest finished");
+  if (otel_trace_query()) {
+    otel_span_manager_->AddChildSpanEvent("UpdateCatalogFinished");
+  }
   AddCatalogTimeline();
   {
     lock_guard<mutex> l(lock_);
@@ -1120,6 +1143,11 @@ Status ClientRequestState::ExecEventProcessorCmd() {
 }
 
 void ClientRequestState::Finalize(const Status* cause) {
+  if (otel_trace_query()) {
+    // No need to end previous child span since this function takes care of it.
+    otel_span_manager_->StartChildSpanClose(cause);
+  }
+
   Cancel(cause, /*wait_until_finalized=*/true);
   MarkActive();
   // Make sure we join on wait_thread_ before we finish (and especially before this object
@@ -1174,6 +1202,10 @@ void ClientRequestState::Finalize(const Status* cause) {
   // Update the timeline here so that all of the above work is captured in the timeline.
   query_events_->MarkEvent("Unregister query");
   UnRegisterRemainingRPCs();
+  if (otel_trace_query()) {
+   otel_span_manager_->AddChildSpanEvent("QueryUnregistered");
+   otel_span_manager_->EndChildSpanClose();
+  }
 }
 
 Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
@@ -1230,6 +1262,9 @@ void ClientRequestState::Wait() {
     lock_guard<mutex> l(lock_);
     if (returns_result_set()) {
       query_events()->MarkEvent("Rows available");
+      if (otel_trace_query()) {
+        otel_span_manager_->AddChildSpanEvent("RowsAvailable");
+      }
     } else {
       query_events()->MarkEvent("Request finished");
       UpdateEndTime();
@@ -1699,6 +1734,9 @@ Status ClientRequestState::UpdateCatalog() {
     }
   }
   query_events_->MarkEvent("DML Metastore update finished");
+  if (otel_trace_query()) {
+     otel_span_manager_->AddChildSpanEvent("MetastoreUpdateFinished");
+  }
   return Status::OK();
 }
 

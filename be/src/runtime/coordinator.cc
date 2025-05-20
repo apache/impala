@@ -16,7 +16,6 @@
 // under the License.
 
 #include "runtime/coordinator.h"
-
 #include <cerrno>
 #include <iomanip>
 #include <list>
@@ -40,6 +39,7 @@
 #include "gen-cpp/admission_control_service.pb.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_sidecar.h"
+#include "observe/otel.h"
 #include "runtime/coordinator-backend-state.h"
 #include "runtime/coordinator-filter-state.h"
 #include "runtime/debug-options.h"
@@ -533,6 +533,9 @@ Status Coordinator::StartBackendExec() {
   query_events_->MarkEvent(Substitute("Ready to start on $0 backends", num_backends));
   parent_query_driver_->SetExecTimeLimit(parent_request_state_);
 
+  if (parent_request_state_->otel_trace_query()) {
+     parent_request_state_->otel_span_manager()->StartChildSpanQueryExecution();
+  }
   // Serialize the TQueryCtx once and pass it to each backend. The serialized buffer must
   // stay valid until WaitOnExecRpcs() has returned.
   ThriftSerializer serializer(true);
@@ -593,6 +596,10 @@ Status Coordinator::StartBackendExec() {
   query_events_->MarkEvent(
       Substitute("All $0 execution backends ($1 fragment instances) started",
           num_backends, exec_params_.GetNumFragmentInstances()));
+
+  if (parent_request_state_->otel_trace_query()) {
+    parent_request_state_->otel_span_manager()->AddChildSpanEvent("AllBackendsStarted");
+  }
   return Status::OK();
 }
 
@@ -1016,6 +1023,9 @@ Status Coordinator::Wait() {
   RETURN_IF_ERROR(SetNonErrorTerminalState(ExecState::RETURNED_RESULTS));
   query_profile_->AddInfoString(
       "DML Stats", dml_exec_state_.OutputPartitionStats("\n"));
+  if (parent_request_state_->otel_trace_query()) {
+    parent_request_state_->otel_span_manager()->AddChildSpanEvent("LastRowFetched");
+  }
   return Status::OK();
 }
 
@@ -1053,6 +1063,9 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos,
   if (!first_row_fetched_ && results->size() > 0) {
     query_events_->MarkEvent(Coordinator::PROFILE_EVENT_LABEL_FIRST_ROW_FETCHED);
     first_row_fetched_ = true;
+    if (parent_request_state_->otel_trace_query()) {
+      parent_request_state_->otel_span_manager()->AddChildSpanEvent("FirstRowFetched");
+    }
   }
   RETURN_IF_ERROR(UpdateExecState(
           status, &runtime_state->fragment_instance_id(), FLAGS_hostname));
@@ -1470,6 +1483,10 @@ void Coordinator::ReleaseQueryAdmissionControlResources() {
   admission_control_client->ReleaseQuery(
       ComputeQueryResourceUtilization().peak_per_host_mem_consumption);
   query_events_->MarkEvent("Released admission control resources");
+  if (parent_request_state_->otel_trace_query()) {
+    parent_request_state_->otel_span_manager()->AddChildSpanEvent(
+        "ReleasedAdmissionControlResources");
+  }
 }
 
 void Coordinator::ReleaseBackendAdmissionControlResources(

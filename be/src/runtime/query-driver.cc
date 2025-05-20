@@ -483,6 +483,10 @@ void QueryDriver::CreateRetriedClientRequestState(ClientRequestState* request_st
   if (retry_exec_request_->__isset.result_set_metadata) {
     (*retry_request_state)->set_result_metadata(retry_exec_request_->result_set_metadata);
   }
+
+  if ((*retry_request_state)->otel_trace_query()) {
+    (*retry_request_state)->otel_span_manager()->EndChildSpanInit();
+  }
 }
 
 void QueryDriver::HandleRetryFailure(Status* status, string* error_msg,

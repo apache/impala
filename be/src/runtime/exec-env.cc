@@ -30,6 +30,7 @@
 #include "exec/kudu/kudu-util.h"
 #include "exprs/ai-functions.h"
 #include "kudu/rpc/service_if.h"
+#include "observe/otel.h"
 #include "rpc/rpc-mgr.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
@@ -344,6 +345,12 @@ Status ExecEnv::InitForFeSupport() {
 
 Status ExecEnv::Init() {
   LOG(INFO) << "Initializing impalad with backend uuid: " << PrintId(backend_id_);
+
+  // Initialize OTel
+  if (FLAGS_is_coordinator && otel_trace_enabled()) {
+    RETURN_IF_ERROR(init_otel_tracer());
+  }
+
   // Initialize thread pools
   if (FLAGS_is_coordinator) {
     RETURN_IF_ERROR(hdfs_op_thread_pool_->Init());

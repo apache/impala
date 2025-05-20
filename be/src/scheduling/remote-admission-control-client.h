@@ -54,11 +54,14 @@ class RemoteAdmissionControlClient : public AdmissionControlClient {
   virtual Status SubmitForAdmission(const AdmissionController::AdmissionRequest& request,
       RuntimeProfile::EventSequence* query_events,
       std::unique_ptr<QuerySchedulePB>* schedule_result,
-      int64_t* wait_start_time_ms, int64_t* wait_end_time_ms) override;
+      int64_t* wait_start_time_ms, int64_t* wait_end_time_ms,
+      SpanManager* span_mgr) override;
   virtual void ReleaseQuery(int64_t peak_mem_consumption) override;
   virtual void ReleaseQueryBackends(
       const std::vector<NetworkAddressPB>& host_addr) override;
   virtual void CancelAdmission() override;
+
+  bool WasQueued() const override { return was_queued_; }
 
  private:
   // Owned by the ClientRequestState.
@@ -77,6 +80,9 @@ class RemoteAdmissionControlClient : public AdmissionControlClient {
   /// If true, CancelAdmission() was called. If SubmitForAdmission() is called
   /// subsequently, it will not send the AdmitQuery rpc
   bool cancelled_ = false;
+
+  // Whether or not the query was queued.
+  bool was_queued_;
 
   /// Constants related to retrying the idempotent rpcs.
   static const int RPC_NUM_RETRIES = 3;
