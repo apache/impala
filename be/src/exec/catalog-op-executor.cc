@@ -48,6 +48,7 @@ using namespace impala;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 
+DECLARE_bool(catalogd_deployed);
 DECLARE_bool(use_local_catalog);
 DECLARE_string(debug_actions);
 
@@ -106,6 +107,10 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
       // Compute stats stmts must be executed via ExecComputeStats().
       DCHECK(request.ddl_params.ddl_type != TDdlType::COMPUTE_STATS);
 
+      if (!FLAGS_catalogd_deployed) {
+        return Status("Operation is not supported without CatalogD.");
+      }
+
       exec_response_.reset(new TDdlExecResponse());
       int attempt = 0; // Used for debug action only.
       CatalogServiceConnection::RpcStatus rpc_status =
@@ -133,6 +138,17 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
       return status;
     }
     case TCatalogOpType::RESET_METADATA: {
+      if (!FLAGS_catalogd_deployed) {
+        if (request.__isset.reset_metadata_params) {
+          const TResetMetadataRequest& metadata_params = request.reset_metadata_params;
+          if (metadata_params.authorization) {
+            return fe_->RefreshAuthorization();
+          }
+        }
+        // We don't cache metadata without CatalogD.
+        return Status::OK();
+      }
+
       TResetMetadataResponse response;
       int attempt = 0; // Used for debug action only.
       CatalogServiceConnection::RpcStatus rpc_status =

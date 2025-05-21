@@ -150,6 +150,7 @@ Frontend::Frontend() {
     {"abortTransaction", "(J)V", &abort_txn_},
     {"addTransaction", "([B)V", &add_txn_},
     {"unregisterTransaction", "(J)V", &unregister_txn_},
+    {"refreshAuthorization", "()V", &refresh_authorization_},
     {"getSaml2Redirect", "([B)[B", &get_saml2_redirect_id_},
     {"validateSaml2Response", "([B)[B", &validate_saml2_response_id_},
     {"validateSaml2Bearer", "([B)Ljava/lang/String;", &validate_saml2_bearer_id_},
@@ -374,6 +375,10 @@ Status Frontend::AbortTransaction(int64_t transaction_id) {
 
 Status Frontend::UnregisterTransaction(int64_t transaction_id) {
   return JniUtil::CallJniMethod(fe_, unregister_txn_, transaction_id);
+}
+
+Status Frontend::RefreshAuthorization() {
+  return JniUtil::CallJniMethod(fe_, refresh_authorization_);
 }
 
 bool Frontend::IsAuthorizationError(const Status& status) {

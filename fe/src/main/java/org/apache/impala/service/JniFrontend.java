@@ -669,6 +669,11 @@ public class JniFrontend {
     frontend_.waitForCatalog();
   }
 
+  public void refreshAuthorization() {
+    Preconditions.checkNotNull(frontend_);
+    frontend_.refreshAuthorization();
+  }
+
   FeTable getCatalogTable(byte[] tableNameParam) throws ImpalaException {
     Preconditions.checkNotNull(frontend_);
     TTableName tableName = new TTableName();

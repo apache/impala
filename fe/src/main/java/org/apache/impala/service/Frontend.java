@@ -596,6 +596,10 @@ public class Frontend {
 
   public AuthorizationChecker getAuthzChecker() { return authzChecker_.get(); }
 
+  public void refreshAuthorization() {
+    authzChecker_.get().invalidateAuthorizationCache();
+  }
+
   public AuthorizationManager getAuthzManager() { return authzManager_; }
 
   public ImpaladTableUsageTracker getImpaladTableUsageTracker() {

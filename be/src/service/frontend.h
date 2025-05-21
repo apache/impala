@@ -206,6 +206,9 @@ class Frontend {
   /// Unregisters an already committed transaction.
   Status UnregisterTransaction(int64_t transaction_id);
 
+  /// Refreshes authorization.
+  Status RefreshAuthorization();
+
   /// Returns true if the error returned by the FE was due to an AuthorizationException.
   static bool IsAuthorizationError(const Status& status);
 
@@ -295,6 +298,7 @@ class Frontend {
   jmethodID add_txn_; // JniFrontend.addTransaction()
   jmethodID abort_txn_; // JniFrontend.abortTransaction()
   jmethodID unregister_txn_; // JniFrontend.unregisterTransaction()
+  jmethodID refresh_authorization_; // JniFrontend.refreshAuthorization()
   jmethodID get_saml2_redirect_id_; // JniFrontend.getSaml2Redirect()
   jmethodID validate_saml2_response_id_; // JniFrontend.validateSaml2Response()
   jmethodID validate_saml2_bearer_id_; // JniFrontend.validateSaml2Bearer()

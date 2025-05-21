@@ -33,6 +33,7 @@ import requests
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.file_utils import copy_files_to_hdfs_dir
+from tests.common.iceberg_rest_server import IcebergRestServer
 from tests.common.skip import SkipIf, SkipIfFS, SkipIfHive2
 from tests.common.test_dimensions import (
     create_client_protocol_dimension,
@@ -3231,3 +3232,102 @@ class TestRangerColumnMaskingComplexTypesInSelectList(CustomClusterTestSuite):
     finally:
       for i in range(policy_cnt):
         TestRanger._remove_policy(unique_name + str(i))
+
+
+START_ARGS = 'start_args'
+ICEBERG_REST_IMPALAD_ARGS = """--use_local_catalog=true --catalogd_deployed=false
+    --catalog_config_dir={}/testdata/configs/catalog_configs/iceberg_rest_config """\
+        .format(os.environ['IMPALA_HOME']) + IMPALAD_ARGS
+
+
+class ScopedPrivilege(object):
+    def __init__(self, user, resource, access):
+      self.user = user
+      self.resource = resource
+      self.access = access
+
+    def __enter__(self):
+      TestRanger._grant_ranger_privilege(self.user, self.resource, self.access)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100
+      TestRanger._revoke_ranger_privilege(self.user, self.resource, self.access)
+
+
+class TestRangerIcebergRestCatalog(TestRanger):
+  """
+  Tests for Apache Ranger policies on Iceberg tables in the REST Catalog.
+  """
+
+  @classmethod
+  def default_test_protocol(cls):
+      return HS2
+
+  @classmethod
+  def add_custom_cluster_constraints(cls):
+    # Do not call the super() implementation because this class needs to relax the
+    # set of constraints.
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def setup_method(self, method):
+    # Invoke start-impala-cluster.py with '--no_catalogd'
+    start_args = "--no_catalogd"
+    if START_ARGS in method.__dict__:
+      start_args = method.__dict__[START_ARGS] + " " + start_args
+    method.__dict__[START_ARGS] = start_args
+
+    try:
+      self.iceberg_rest_server = IcebergRestServer()
+      self.iceberg_rest_server.start_rest_server(300)
+      super(TestRangerIcebergRestCatalog, self).setup_method(method)
+      self.admin_client = self.create_impala_client(user=ADMIN)
+    except Exception as e:
+      print(e)
+      self.iceberg_rest_server.stop_rest_server(10)
+      raise e
+
+  def teardown_method(self, method):
+    self.iceberg_rest_server.stop_rest_server(10)
+    super(TestRangerIcebergRestCatalog, self).teardown_method(method)
+
+  def _get_all_resource(self):
+    return {
+      "database": "*",
+      "column": "*",
+      "table": "*"
+    }
+
+  def _get_limited_resource(self):
+    return {
+      "database": "ice",
+      "column": "*",
+      "table": "airports_parquet"
+    }
+
+  def _get_access(self):
+    return ["select", "read"]
+
+  @CustomClusterTestSuite.with_args(
+     impalad_args=ICEBERG_REST_IMPALAD_ARGS)
+  def test_rest_catalog_basic(self, vector):
+    """Run iceberg-rest-catalog.test with all the required privileges."""
+    with ScopedPrivilege(getuser(), self._get_all_resource(), self._get_access()):
+      self.admin_client.execute("refresh authorization")
+      self.run_test_case('QueryTest/iceberg-rest-catalog', vector, use_db="ice")
+
+  @CustomClusterTestSuite.with_args(
+     impalad_args=ICEBERG_REST_IMPALAD_ARGS)
+  def test_rest_catalog_fgac(self, vector):
+    """Test that fine-grained access control work with Iceberg REST Catalog."""
+    with ScopedPrivilege(getuser(), self._get_limited_resource(), self._get_access()):
+      self.admin_client.execute("refresh authorization")
+      try:
+        self._add_column_masking_policy("column-masking-for-airports_parquet", getuser(),
+            "ice", "airports_parquet", "lat", "CUSTOM", "lat + 1000")
+        self._add_row_filtering_policy("row-filtering-for-airports_parquet", getuser(),
+            "ice", "airports_parquet", "country = 'USA'")
+        self.admin_client.execute("refresh authorization")
+        self.run_test_case('QueryTest/iceberg-rest-fgac', vector, use_db="ice")
+      finally:
+        self._remove_policy("column-masking-for-airports_parquet")
+        self._remove_policy("row-filtering-for-airports_parquet")

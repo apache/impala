@@ -1,0 +1,119 @@
+====
+---- QUERY
+SHOW DATABASES;
+---- RESULTS
+'ice',''
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# User can only see table 'airports_parquet'.
+SHOW TABLES;
+---- RESULTS
+'airports_parquet'
+---- TYPES
+STRING
+====
+---- QUERY
+# 'lat' values have +1000 because of colum masking rule.
+SELECT lat, lon, city, airport FROM airports_parquet WHERE iata = '00R';
+---- RESULTS
+1030.68586111,-95.01792777999999,'Livingston','Livingston Municipal'
+---- TYPES
+DOUBLE,DOUBLE,STRING,STRING
+====
+---- QUERY
+# count(*) with row filtering
+SELECT count(*) FROM airports_parquet;
+---- RESULTS
+3376
+---- TYPES
+BIGINT
+====
+---- QUERY
+# User can only see country = 'USA' due to row filtering.
+SELECT distinct country FROM airports_parquet;
+---- RESULTS
+'USA'
+---- TYPES
+STRING
+====
+---- QUERY
+DESCRIBE ice.airports_parquet
+---- RESULTS
+'iata','string','','true'
+'airport','string','','true'
+'city','string','','true'
+'state','double','','true'
+'country','string','','true'
+'lat','double','','true'
+'lon','double','','true'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+DESCRIBE FORMATTED ice.airports_parquet;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'iata','string','NULL'
+'airport','string','NULL'
+'city','string','NULL'
+'state','double','NULL'
+'country','string','NULL'
+'lat','double','NULL'
+'lon','double','NULL'
+'','NULL','NULL'
+'# Detailed Table Information','NULL','NULL'
+'Database:           ','ice                 ','NULL'
+'OwnerType:          ','USER                ','NULL'
+'Owner:              ','null                ','NULL'
+'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/ice/airports_parquet','NULL'
+row_regex:'Erasure Coding Policy:','$ERASURECODE_POLICY *','NULL'
+'Table Type:         ','EXTERNAL_TABLE      ','NULL'
+'Table Parameters:','NULL','NULL'
+'','EXTERNAL            ','TRUE                '
+'','bucketing_version   ','2                   '
+'','engine.hive.enabled ','true                '
+'','gc.enabled          ','TRUE                '
+'','numFiles            ','1                   '
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'','table_type          ','ICEBERG             '
+'','write.format.default','parquet             '
+'','NULL','NULL'
+'# Storage Information','NULL','NULL'
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+'Compressed:         ','No                  ','NULL'
+'Sort Columns:       ','[]                  ','NULL'
+'','NULL','NULL'
+'# Constraints','NULL','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+SELECT * FROM airports_orc;
+---- CATCH
+does not have privileges to execute 'SELECT'
+====
+---- QUERY
+SELECT * FROM ice.airports_orc.history;
+---- CATCH
+does not have privileges to execute 'SELECT'
+====
+---- QUERY
+DESCRIBE ice.airports_orc;
+---- CATCH
+does not have privileges to access: ice.airports_orc.*
+====
+---- QUERY
+DESCRIBE FORMATTED ice.airports_orc;
+---- CATCH
+does not have privileges to access: ice.airports_orc.*
+====
+---- QUERY
+show table stats ice.airports_orc;
+---- CATCH
+does not have privileges to access: ice.airports_orc
+====

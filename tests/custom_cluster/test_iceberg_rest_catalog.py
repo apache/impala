@@ -17,14 +17,10 @@
 
 from __future__ import absolute_import, division, print_function
 import os
-import socket
-import time
 import pytest
-import signal
-import subprocess
-import sys
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.iceberg_rest_server import IcebergRestServer
 
 REST_SERVER_PORT = 9084
 IMPALA_HOME = os.environ['IMPALA_HOME']
@@ -35,6 +31,7 @@ IMPALAD_ARGS = """--use_local_catalog=true --catalogd_deployed=false
 
 
 class TestIcebergRestCatalog(CustomClusterTestSuite):
+  """Test suite for Iceberg REST Catalog."""
 
   def setup_method(self, method):
     # Invoke start-impala-cluster.py with '--no_catalogd'
@@ -44,41 +41,16 @@ class TestIcebergRestCatalog(CustomClusterTestSuite):
     method.__dict__[START_ARGS] = start_args
 
     try:
-      self._start_rest_server()
-      self._wait_for_rest_server(300)
+      self.iceberg_rest_server = IcebergRestServer()
+      self.iceberg_rest_server.start_rest_server(300)
       super(TestIcebergRestCatalog, self).setup_method(method)
     except Exception as e:
-      self._stop_rest_server()
+      self.iceberg_rest_server.stop_rest_server(10)
       raise e
 
   def teardown_method(self, method):
-    self._stop_rest_server()
+    self.iceberg_rest_server.stop_rest_server(10)
     super(TestIcebergRestCatalog, self).teardown_method(method)
-
-  def _start_rest_server(self):
-    self.process = subprocess.Popen(
-        'testdata/bin/run-iceberg-rest-server.sh',
-        stdout=sys.stdout, stderr=sys.stderr, shell=True,
-        preexec_fn=os.setsid, cwd=IMPALA_HOME)
-
-  def _stop_rest_server(self):
-    if self.process:
-      os.killpg(self.process.pid, signal.SIGTERM)
-
-  def _wait_for_rest_server(self, timeout_s):
-    sleep_interval_s = 0.5
-    start_time = time.time()
-    while time.time() - start_time < timeout_s:
-      s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-      try:
-        if s.connect_ex(('localhost', REST_SERVER_PORT)) == 0:
-          print("Iceberg REST server is available.")
-          return
-      finally:
-        s.close()
-      time.sleep(sleep_interval_s)
-    raise Exception(
-        "Webserver did not become available within {} seconds.".format(timeout_s))
 
   @CustomClusterTestSuite.with_args(
      impalad_args=IMPALAD_ARGS)
