@@ -16,10 +16,13 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from copy import deepcopy
 import time
 
-from copy import deepcopy
+import pytest
+
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.util.filesystem_utils import IS_HDFS
 
 
 @CustomClusterTestSuite.with_args(
@@ -31,7 +34,11 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 class TestConcurrentRename(CustomClusterTestSuite):
   """Test concurrent rename with invalidate and other DDLs."""
 
+  @pytest.mark.skipif(
+      not IS_HDFS, reason="Test is not deterministic in non-HDFS environment")
   def test_rename_drop(self, vector, unique_database):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
     catalogd = self.cluster.catalogd
     name = "{}.tbl".format(unique_database)
     self.execute_query("create table {} (s string)".format(name))
