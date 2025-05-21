@@ -18,6 +18,7 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -140,13 +141,29 @@ public class TupleCacheInfo {
   // These fields accumulate partial results until finalizeHash() is called.
   private Hasher hasher_ = Hashing.murmur3_128().newHasher();
 
-  // The hash trace keeps a human-readable record of the items hashed into the cache key.
-  private StringBuilder hashTraceBuilder_ = new StringBuilder();
+  // To ease debugging hash differences, the hash trace is divided into individual
+  // elements to track each piece incorporated.
+  public static class HashTraceElement {
+    private String comment_;
+    private String hashTrace_;
+
+    public HashTraceElement(String comment, String hashTrace) {
+      Preconditions.checkNotNull(comment, "Hash trace comment must not be null");
+      comment_ = comment;
+      hashTrace_ = hashTrace;
+    }
+
+    public String getComment() { return comment_; }
+    public String getHashTrace() { return hashTrace_; }
+  }
+
+  // Hash trace for tracking what items influence the cache key. finalizeHash()
+  // converts this to an immutable list.
+  private List<HashTraceElement> hashTraces_ = new ArrayList<HashTraceElement>();
 
   // When finalizeHash() is called, these final values are filled in and the hasher and
   // hash trace builder are destroyed.
   private boolean finalized_ = false;
-  private String finalizedHashTrace_ = null;
   private String finalizedHashString_ = null;
 
   public TupleCacheInfo(DescriptorTable descTbl) {
@@ -184,11 +201,11 @@ public class TupleCacheInfo {
     return finalizedHashString_;
   }
 
-  public String getHashTrace() {
+  public List<HashTraceElement> getHashTraces() {
     Preconditions.checkState(isEligible(),
         "TupleCacheInfo only has a hash trace if it is cache eligible");
     Preconditions.checkState(finalized_, "TupleCacheInfo not finalized");
-    return finalizedHashTrace_;
+    return hashTraces_;
   }
 
   /**
@@ -199,8 +216,8 @@ public class TupleCacheInfo {
   public void finalizeHash() {
     finalizedHashString_ = hasher_.hash().toString();
     hasher_ = null;
-    finalizedHashTrace_ = hashTraceBuilder_.toString();
-    hashTraceBuilder_ = null;
+    // Make the hashTraces_ immutable
+    hashTraces_ = Collections.unmodifiableList(hashTraces_);
     finalized_ = true;
   }
 
@@ -209,9 +226,10 @@ public class TupleCacheInfo {
    * ineligible, then this is marked ineligible and there is no need to calculate
    * a hash. If the child is eligible, it incorporates the child's hash into this
    * hash. Returns true if the child was merged, false if it was ineligible.
+   * The "comment" should provide useful information for debugging the hash trace.
    */
-  public boolean mergeChild(TupleCacheInfo child) {
-    if (!mergeChildImpl(child)) {
+  public boolean mergeChild(String comment, TupleCacheInfo child) {
+    if (!mergeChildImpl(comment, child, /* mergeChildHashTrace */ false)) {
       return false;
     }
 
@@ -223,19 +241,26 @@ public class TupleCacheInfo {
   /**
    * Pull in a child's TupleCacheInfo into this TupleCacheInfo while also incorporating
    * all of its scan ranges into the key. This returns true if the child is eligible
-   * and false otherwise.
+   * and false otherwise. The "comment" should provide useful information for debugging
+   * the hash trace.
    */
-  public boolean mergeChildWithScans(TupleCacheInfo child) {
+  public boolean mergeChildWithScans(String comment, TupleCacheInfo child) {
     if (!child.isEligible()) {
-      return mergeChild(child);
+      return mergeChild(comment, child);
     }
     // Use a temporary TupleCacheInfo to incorporate the scan ranges for this child.
+    // This temporary is behaving the same way that the exchange node would behave
+    // in this case.
     TupleCacheInfo tmpInfo = new TupleCacheInfo(descriptorTable_);
-    boolean success = tmpInfo.mergeChild(child);
+    boolean success = tmpInfo.mergeChild(comment, child);
     Preconditions.checkState(success);
     tmpInfo.incorporateScans();
     tmpInfo.finalizeHash();
-    return mergeChild(tmpInfo);
+    Preconditions.checkState(tmpInfo.inputScanNodes_.size() == 0);
+    // Since this is using a temporary to merge the scan range information, the parent
+    // should merge in the temporary's hash traces, as they are not displayed anywhere
+    // else.
+    return mergeChildImpl(comment, tmpInfo, /* mergeChildHashTrace */ true);
   }
 
   /**
@@ -258,8 +283,10 @@ public class TupleCacheInfo {
   /**
    * Pull in a child's TupleCacheInfo that can be exhaustively determined during planning.
    * Public interfaces may add additional info that is more dynamic, such as scan ranges.
+   * The "comment" is used for the hash trace element unless mergeChildHashTrace is true.
    */
-  private boolean mergeChildImpl(TupleCacheInfo child) {
+  private boolean mergeChildImpl(String comment, TupleCacheInfo child,
+      boolean mergeChildHashTrace) {
     Preconditions.checkState(!finalized_,
         "TupleCacheInfo is finalized and can't be modified");
     if (!child.isEligible()) {
@@ -268,11 +295,16 @@ public class TupleCacheInfo {
     } else {
       // The child is eligible, so incorporate its hash into our hasher.
       hasher_.putBytes(child.getHashString().getBytes());
-      // Also, aggregate its hash trace into ours.
-      // TODO: It might be more useful to have the hash trace just for this
-      // node. We could display each node's hash trace in explain plan,
-      // and each contribution would be clear.
-      hashTraceBuilder_.append(child.getHashTrace());
+      if (mergeChildHashTrace) {
+        // If mergeChildHashTrace=true, then we are incorporating a temporary
+        // TupleCacheInfo that doesn't correspond to an actual node in the plan.
+        // For that case, copy in all its hash trace elements as they are not
+        // displayed elsewhere.
+        hashTraces_.addAll(child.getHashTraces());
+      } else {
+        // Add a single entry for a direct child
+        hashTraces_.add(new HashTraceElement(comment, child.getHashString()));
+      }
 
       // Incorporate the child's tuple references. This is creating a new translation
       // of TupleIds, because it will be incorporating multiple children.
@@ -293,9 +325,9 @@ public class TupleCacheInfo {
 
   /**
    * All Thrift objects inherit from TBase, so this function can incorporate any Thrift
-   * object into the hash.
+   * object into the hash. The comment is used for hash trace debugging.
    */
-  public void hashThrift(TBase<?, ?> thriftObj) {
+  public void hashThrift(String comment, TBase<?, ?> thriftObj) {
     Preconditions.checkState(!finalized_,
         "TupleCacheInfo is finalized and can't be modified");
     try {
@@ -311,18 +343,18 @@ public class TupleCacheInfo {
     // Thrift's toString() function doesn't return null.
     String thriftString = thriftObj.toString();
     Preconditions.checkState(thriftString != null);
-    hashTraceBuilder_.append(thriftString);
+    hashTraces_.add(new HashTraceElement(comment, thriftString));
   }
 
   /**
    * Hash a regular string and incorporate it into the key
    */
-  public void hashString(String s) {
+  public void hashString(String comment, String s) {
     Preconditions.checkState(!finalized_,
         "TupleCacheInfo is finalized and can't be modified");
     Preconditions.checkState(s != null);
     hasher_.putUnencodedChars(s);
-    hashTraceBuilder_.append(s);
+    hashTraces_.add(new HashTraceElement(comment, s));
   }
 
   /**
@@ -360,7 +392,7 @@ public class TupleCacheInfo {
             (tupleDesc.getTable() != null && !(tupleDesc.getTable() instanceof FeView));
         TTupleDescriptor thriftTupleDesc =
             tupleDesc.toThrift(needs_table_id ? new Integer(1) : null, serialCtx);
-        hashThrift(thriftTupleDesc);
+        hashThrift("TupleDescriptor " + id, thriftTupleDesc);
       }
 
       // Go through the tuple's slots and add them. This matches the behavior of
@@ -379,7 +411,7 @@ public class TupleCacheInfo {
         if (incorporateIntoHash) {
            // Incorporate the SlotDescriptor into the hash
           TSlotDescriptor thriftSlotDesc = slotDesc.toThrift(serialCtx);
-          hashThrift(thriftSlotDesc);
+          hashThrift("SlotDescriptor " + slotDesc.getId(), thriftSlotDesc);
         }
       }
     }
@@ -397,7 +429,7 @@ public class TupleCacheInfo {
 
     // Right now, we only hash the database / table name.
     TTableName tblName = tbl.getTableName().toThrift();
-    hashThrift(tblName);
+    hashThrift("Table", tblName);
   }
 
   /**
@@ -452,7 +484,12 @@ public class TupleCacheInfo {
       builder.append(getHashString());
       builder.append("\n");
       builder.append("cache key hash trace: ");
-      builder.append(getHashTrace());
+      for (HashTraceElement elem : getHashTraces()) {
+        builder.append(elem.getComment());
+        builder.append(": ");
+        builder.append(elem.getHashTrace());
+        builder.append("\n");
+      }
       builder.append("\n");
     } else {
       builder.append("ineligibility reasons: ");

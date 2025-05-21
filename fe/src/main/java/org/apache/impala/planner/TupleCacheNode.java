@@ -42,7 +42,6 @@ import com.google.common.hash.HashCode;
 public class TupleCacheNode extends PlanNode {
 
   protected String compileTimeKey_;
-  protected String hashTrace_;
   protected boolean displayCorrectnessCheckingInfo_;
   protected boolean skipCorrectnessVerification_;
   protected final List<Integer> inputScanNodeIds_ = new ArrayList<Integer>();
@@ -57,7 +56,6 @@ public class TupleCacheNode extends PlanNode {
     TupleCacheInfo childCacheInfo = child.getTupleCacheInfo();
     Preconditions.checkState(childCacheInfo.isEligible());
     compileTimeKey_ = childCacheInfo.getHashString();
-    hashTrace_ = childCacheInfo.getHashTrace();
     // If there is variability due to a streaming agg, skip the correctness verification
     // for this location.
     skipCorrectnessVerification_ = childCacheInfo.getStreamingAggVariability();
@@ -125,16 +123,6 @@ public class TupleCacheNode extends PlanNode {
     if (displayCorrectnessCheckingInfo_) {
       output.append(detailPrefix + "skip correctness verification: " +
           skipCorrectnessVerification_ + "\n");
-    }
-
-    // For debuggability, always print the hash trace until the cache key calculation
-    // matures. Print trace in chunks to avoid excessive wrapping and padding in
-    // impala-shell. There are other explain lines at VERBOSE level that are
-    // over 100 chars long so we limit the key chunk length similarly here.
-    final int keyFormatWidth = 100;
-    for (int idx = 0; idx < hashTrace_.length(); idx += keyFormatWidth) {
-      int stop_idx = Math.min(hashTrace_.length(), idx + keyFormatWidth);
-      output.append(detailPrefix + "[" + hashTrace_.substring(idx, stop_idx) + "]\n");
     }
     List<String> input_scan_node_ids_strs =
         inputScanNodeIds_.stream().map(Object::toString).collect(Collectors.toList());

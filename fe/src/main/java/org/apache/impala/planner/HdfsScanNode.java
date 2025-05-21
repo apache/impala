@@ -2883,6 +2883,12 @@ public class HdfsScanNode extends ScanNode {
       // We should ignore empty partitions, so only include the information if there is
       // at least one scan range.
       if (hasScanRange) {
+        // Hash the partition name (which includes the partition keys and values)
+        // This is necessary for cases where two partitions point to the same
+        // directory and files. Without knowing the partition keys/values, the
+        // cache can't tell them apart.
+        info.hashString("Partition name", partition.getPartitionName());
+
         // Incorporate the storage descriptor. This contains several fields that can
         // impact correctness, including the escape character, separator character,
         // json binary format, etc.
@@ -2890,16 +2896,10 @@ public class HdfsScanNode extends ScanNode {
           partition.getInputFormatDescriptor().toThrift();
         // Zero the block size, as it is not relevant to reads.
         inputFormat.setBlockSize(0);
-        info.hashThrift(inputFormat);
-
-        // Hash the partition name (which includes the partition keys and values)
-        // This is necessary for cases where two partitions point to the same
-        // directory and files. Without knowing the partition keys/values, the
-        // cache can't tell them apart.
-        info.hashString(partition.getPartitionName());
+        info.hashThrift("Partition input format", inputFormat);
 
         // Hash the scan range information
-        info.hashThrift(spec);
+        info.hashThrift("Partition scan ranges", spec);
       }
     }
   }

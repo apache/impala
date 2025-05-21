@@ -29,6 +29,7 @@ import java.util.Set;
 
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.planner.TupleCacheInfo.HashTraceElement;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TQueryCtx;
@@ -522,7 +523,13 @@ public class TupleCacheTest extends PlannerTestBase {
   private List<String> getCacheHashTraces(List<PlanNode> cacheEligibleNodes) {
     List<String> cacheHashTraces = new ArrayList<String>();
     for (PlanNode node : cacheEligibleNodes) {
-      cacheHashTraces.add(node.getTupleCacheInfo().getHashTrace());
+      StringBuilder builder = new StringBuilder();
+      for (HashTraceElement elem : node.getTupleCacheInfo().getHashTraces()) {
+        // Use only the hash trace pieces as the comments are intended for human
+        // consumption and can be different
+        builder.append(elem.getHashTrace());
+      }
+      cacheHashTraces.add(builder.toString());
     }
     return cacheHashTraces;
   }
@@ -608,9 +615,11 @@ public class TupleCacheTest extends PlannerTestBase {
     Set<String> hashTraceIntersection = new HashSet(cacheHashTraces1);
     hashTraceIntersection.retainAll(cacheHashTraces2);
 
-    // The hash trace for a cache key should be a one-to-one thing, so
-    // any difference in keys should be a difference in hash traces.
-    assertEquals(keyIntersection.size(), hashTraceIntersection.size());
+    // Since the hash trace is defined as a single node's contribution,
+    // it can have additional matches higher in the plan that don't correspond
+    // to the same cache key. The number of single-node hash trace matches
+    // should be equal or greater than the number of cache key matches.
+    assertTrue(keyIntersection.size() <= hashTraceIntersection.size());
 
     if (keyIntersection.size() == 0 || hashTraceIntersection.size() == 0) {
       StringBuilder errorLog = new StringBuilder();
@@ -652,11 +661,13 @@ public class TupleCacheTest extends PlannerTestBase {
     Set<String> hashTraceIntersection = new HashSet(cacheHashTraces1);
     hashTraceIntersection.retainAll(cacheHashTraces2);
 
-    // The hash trace for a cache key should be a one-to-one thing, so
-    // any difference in keys should be a difference in hash traces.
-    assertEquals(keyIntersection.size(), hashTraceIntersection.size());
+    // Since the hash trace is defined as a single node's contribution,
+    // it can have additional matches higher in the plan that don't correspond
+    // to the same cache key. The number of single-node hash trace matches
+    // should be equal or greater than the number of cache key matches.
+    assertTrue(keyIntersection.size() <= hashTraceIntersection.size());
 
-    if (keyIntersection.size() != 0 || hashTraceIntersection.size() != 0) {
+    if (keyIntersection.size() != 0) {
       StringBuilder errorLog = new StringBuilder();
       errorLog.append("Expected different cache keys. Instead found:\n");
       printQueryNodesCacheInfo(query1, cacheEligibleNodes1, errorLog);
