@@ -41,7 +41,10 @@ from tests.verifiers.metric_verifier import MetricVerifier
 MEM_LIMIT_EXCEEDED_MSG = "Memory limit exceeded"
 MEM_LIMIT_TOO_LOW_FOR_RESERVATION = ("minimum memory reservation is greater than memory "
   "available to the query for buffer reservations")
-MEM_LIMIT_ERROR_MSGS = [MEM_LIMIT_EXCEEDED_MSG, MEM_LIMIT_TOO_LOW_FOR_RESERVATION]
+# IMPALA-11396: Error from parquet page index read if mem_limit is low.
+PARQUET_ROWS_SKIPPING = "Couldn't skip rows in column"
+MEM_LIMIT_ERROR_MSGS = [MEM_LIMIT_EXCEEDED_MSG, MEM_LIMIT_TOO_LOW_FOR_RESERVATION,
+                        PARQUET_ROWS_SKIPPING]
 
 
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
