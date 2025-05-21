@@ -1,0 +1,29 @@
+====
+---- QUERY
+select * from functional_parquet.iceberg_partitioned
+---- RUNTIME_PROFILE
+Iceberg Plan Metrics for Node 00:
+        Planning done without Iceberg: no Iceberg scan metrics available.
+====
+---- QUERY
+# Filtering on a partition column pushes the predicate down to Iceberg, so we have metrics.
+select * from functional_parquet.iceberg_partitioned where action='download'
+---- RUNTIME_PROFILE
+Iceberg Plan Metrics for Node 00:
+row_regex:.*total-planning-duration: .+
+result-data-files: 6
+result-delete-files: 0
+total-data-manifests: 1
+total-delete-manifests: 0
+scanned-data-manifests: 1
+skipped-data-manifests: 0
+row_regex:.*total-file-size-in-bytes: .+ \(\d+\)
+row_regex:.*total-delete-file-size-in-bytes: .+ \(\d+\)
+skipped-data-files: 14
+skipped-delete-files: 0
+scanned-delete-manifests: 0
+skipped-delete-manifests: 0
+indexed-delete-files: 0
+equality-delete-files: 0
+positional-delete-files: 0
+====

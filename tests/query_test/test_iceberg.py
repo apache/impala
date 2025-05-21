@@ -1493,33 +1493,8 @@ class TestIcebergTable(IcebergTestSuite):
     assert snapshots[0].get_parent_id() == snapshots[2].get_parent_id()
     assert snapshots[0].get_creation_time() < snapshots[2].get_creation_time()
 
-  def test_scan_metrics_in_profile(self, vector):
-    def get_latest_snapshot_id(fq_tbl_name):
-        query = ("select snapshot_id from {}.snapshots order by committed_at desc"
-            .format(fq_tbl_name))
-        res = self.execute_query(query)
-        return res.data[0]
-
-    ice_db = "functional_parquet"
-
-    no_deletes = "{}.{}".format(ice_db, "iceberg_v2_no_deletes")
-    no_deletes_snapshot_id = get_latest_snapshot_id(no_deletes)
-
-    pos_delete_all_rows = "{}.{}".format(ice_db, "iceberg_v2_positional_delete_all_rows")
-    pos_delete_all_rows_snapshot_id = get_latest_snapshot_id(pos_delete_all_rows)
-
-    not_all_data_files_have_delete_files = "{}.{}".format(
-        ice_db, "iceberg_v2_positional_not_all_data_files_have_delete_files")
-    not_all_data_files_have_delete_files_snapshot_id = get_latest_snapshot_id(
-        not_all_data_files_have_delete_files)
-
-    self.run_test_case('QueryTest/iceberg-scan-metrics', vector,
-        test_file_vars={
-            "NO_DELETES_SNAPTHOT_ID": no_deletes_snapshot_id,
-            "POS_DELETE_ALL_ROWS_SNAPSHOT_ID": pos_delete_all_rows_snapshot_id,
-            "NOT_ALL_DATA_FILES_HAVE_DELETE_FILES_SNAPSHOT_ID":
-                 not_all_data_files_have_delete_files_snapshot_id
-                       })
+  def test_scan_metrics_in_profile_basic(self, vector):
+    self.run_test_case('QueryTest/iceberg-scan-metrics-basic', vector)
 
 
 class TestIcebergV2Table(IcebergTestSuite):
@@ -1610,6 +1585,36 @@ class TestIcebergV2Table(IcebergTestSuite):
   def test_table_sampling_v2(self, vector):
     self.run_test_case('QueryTest/iceberg-tablesample-v2', vector,
         use_db="functional_parquet")
+
+  @SkipIfDockerizedCluster.internal_hostname
+  @SkipIf.hardcoded_uris
+  def test_scan_metrics_in_profile_with_deletes(self, vector):
+    def get_latest_snapshot_id(fq_tbl_name):
+        query = ("select snapshot_id from {}.snapshots order by committed_at desc"
+            .format(fq_tbl_name))
+        res = self.execute_query(query)
+        return res.data[0]
+
+    ice_db = "functional_parquet"
+
+    no_deletes = "{}.{}".format(ice_db, "iceberg_v2_no_deletes")
+    no_deletes_snapshot_id = get_latest_snapshot_id(no_deletes)
+
+    pos_delete_all_rows = "{}.{}".format(ice_db, "iceberg_v2_positional_delete_all_rows")
+    pos_delete_all_rows_snapshot_id = get_latest_snapshot_id(pos_delete_all_rows)
+
+    not_all_data_files_have_delete_files = "{}.{}".format(
+        ice_db, "iceberg_v2_positional_not_all_data_files_have_delete_files")
+    not_all_data_files_have_delete_files_snapshot_id = get_latest_snapshot_id(
+        not_all_data_files_have_delete_files)
+
+    self.run_test_case('QueryTest/iceberg-scan-metrics-with-deletes', vector,
+        test_file_vars={
+            "NO_DELETES_SNAPTHOT_ID": no_deletes_snapshot_id,
+            "POS_DELETE_ALL_ROWS_SNAPSHOT_ID": pos_delete_all_rows_snapshot_id,
+            "NOT_ALL_DATA_FILES_HAVE_DELETE_FILES_SNAPSHOT_ID":
+            not_all_data_files_have_delete_files_snapshot_id
+        })
 
   @SkipIf.hardcoded_uris
   def test_metadata_tables(self, vector, unique_database):
