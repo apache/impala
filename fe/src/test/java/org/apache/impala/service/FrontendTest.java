@@ -425,6 +425,8 @@ public class FrontendTest extends FrontendTestBase {
         db, Arrays.asList(db), Arrays.asList(db + ".foo"));
     TestCollectRequiredObjectsHelper("REFRESH mydb.foo PARTITION (p=1)",
         db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
+    TestCollectRequiredObjectsHelper("REFRESH mydb.foo PARTITION (p=1) PARTITION (p=2)",
+        db, Arrays.asList("mydb"), Arrays.asList("mydb.foo"));
     TestCollectRequiredObjectsHelper("REFRESH foo PARTITION (p=1)",
         db, Arrays.asList(db), Arrays.asList(db + ".foo"));
 

@@ -592,18 +592,18 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
         .format(unique_database, test_reload_table))
     EventProcessorUtils.wait_for_event_processing(self)
 
-    def check_self_events(query):
+    def check_self_events(query, num_events=1):
       tbls_refreshed_before, partitions_refreshed_before, \
           events_skipped_before = self._get_self_event_metrics()
       last_event_id = EventProcessorUtils.get_current_notification_id(self.hive_client)
       self.client.execute(query)
       # Check if there is a reload event fired after refresh query.
       events = EventProcessorUtils.get_next_notification(self.hive_client, last_event_id)
-      assert len(events) == 1
-      last_event = events[0]
-      assert last_event.dbName == unique_database
-      assert last_event.tableName == test_reload_table
-      assert last_event.eventType == "RELOAD"
+      for event in events:
+        assert event.dbName == unique_database
+        assert event.tableName == test_reload_table
+        assert event.eventType == "RELOAD"
+      assert len(events) == num_events
       EventProcessorUtils.wait_for_event_processing(self)
       tbls_refreshed_after, partitions_refreshed_after, \
           events_skipped_after = self._get_self_event_metrics()
@@ -612,6 +612,11 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     check_self_events("refresh {}.{} partition(year=2022)"
         .format(unique_database, test_reload_table))
     check_self_events("refresh {}.{}".format(unique_database, test_reload_table))
+    # Refresh multiple partitions. The last two are the same. Verify only two RELOAD
+    # events are generated.
+    check_self_events(
+        "refresh {}.{} partition(year=2022) partition(year=2023) partition(year=2023)"
+        .format(unique_database, test_reload_table), 2)
     EventProcessorUtils.wait_for_event_processing(self)
 
     if enable_sync_to_latest_event_on_ddls:

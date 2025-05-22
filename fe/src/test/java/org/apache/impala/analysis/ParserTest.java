@@ -3651,8 +3651,11 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("refresh Foo");
     ParsesOk("refresh Foo.S");
     ParsesOk("refresh Foo partition (col=2)");
+    ParsesOk("refresh Foo partition (col=2) partition (col=3)");
     ParsesOk("refresh Foo.S partition (col=2)");
     ParsesOk("refresh Foo.S partition (col1 = 2, col2 = 3)");
+    ParsesOk("refresh Foo.S partition (col1 = 2, col2 = 3) " +
+        "partition (col1 = 0, col2 = 0) partition (col1 = 1, col2 = 1)");
     ParsesOk("refresh functions Foo");
     ParsesOk("refresh authorization");
 
@@ -3664,6 +3667,7 @@ public class ParserTest extends FrontendTestBase {
     ParserError("refresh");
     ParserError("refresh Foo.S partition (col1 = 2, col2)");
     ParserError("refresh Foo.S partition ()");
+    ParserError("refresh Foo.S partition (col1 = 0), (col1 = 1)");
     ParserError("refresh functions Foo.S");
     ParserError("refresh authorization Foo");
   }

@@ -1891,6 +1891,8 @@ public class ToSqlTest extends FrontendTestBase {
   public void testRefresh() {
     testToSql("REFRESH functional.alltypes");
     testToSql("REFRESH functional.alltypes PARTITION (year=2009, month=1)");
+    testToSql("REFRESH functional.alltypes PARTITION (year=2009, month=1) " +
+        "PARTITION (year=2010, month=2)");
     testToSql("REFRESH FUNCTIONS functional");
     testToSql(createAnalysisCtx(createAuthorizationFactory()), "REFRESH AUTHORIZATION");
   }

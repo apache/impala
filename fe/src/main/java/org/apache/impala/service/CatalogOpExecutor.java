@@ -7158,12 +7158,14 @@ public class CatalogOpExecutor {
                   CatalogObject.ThriftObjectType.INVALIDATION :
                   CatalogObject.ThriftObjectType.FULL;
           if (isTableLoadedInCatalog) {
-            if (req.isSetPartition_spec()) {
+            if (req.isSetPartition_spec() || req.getPartition_spec_listSize() == 1) {
               Preconditions.checkArgument(!AcidUtils.isTransactionalTable(tbl));
+              List<TPartitionKeyValue> partitionSpec = req.isSetPartition_spec() ?
+                  req.getPartition_spec() : req.getPartition_spec_list().get(0);
               Reference<Boolean> wasPartitionRefreshed = new Reference<>(false);
               // TODO if the partition was not really refreshed because the partSpec
               // was wrong, do we still need to send back the table?
-              updatedThriftTable = catalog_.reloadPartition(tbl, req.getPartition_spec(),
+              updatedThriftTable = catalog_.reloadPartition(tbl, partitionSpec,
                   wasPartitionRefreshed, resultType, cmdString, catalogTimeline);
             } else {
               // TODO IMPALA-8809: Optimisation for partitioned tables:
@@ -7264,15 +7266,26 @@ public class CatalogOpExecutor {
    */
   private void fireReloadEventAndUpdateRefreshEventId(
       TResetMetadataRequest req, TableName tblName, Table tbl) {
-    List<String> partVals = null;
+    // Partition spec (List<TPartitionKeyValue>) for each partition
+    List<List<TPartitionKeyValue>> partSpecList = null;
+    // Partition values (List<String>) for each partition
+    List<List<String>> partValsList = null;
     if (req.isSetPartition_spec()) {
-      partVals = req.getPartition_spec().stream().
-          map(TPartitionKeyValue::getValue).collect(Collectors.toList());
+      partSpecList = Collections.singletonList(req.partition_spec);
+    } else if (req.isSetPartition_spec_list()) {
+      partSpecList = req.partition_spec_list;
+    }
+    if (partSpecList != null) {
+      partValsList = partSpecList.stream()
+          .map(ps -> ps.stream()
+              .map(TPartitionKeyValue::getValue)
+              .collect(Collectors.toList()))
+          .collect(Collectors.toList());
     }
     try {
       List<Long> eventIds = MetastoreShim.fireReloadEventHelper(
-          catalog_.getMetaStoreClient(), req.isIs_refresh(), partVals, tblName.getDb(),
-          tblName.getTbl(), Collections.emptyMap());
+          catalog_.getMetaStoreClient(), req.isIs_refresh(), partValsList,
+          tblName.getDb(), tblName.getTbl(), Collections.emptyMap());
       LOG.info("Fired {} RELOAD events for table {}: {}", eventIds.size(),
           tbl.getFullName(), StringUtils.join(",", eventIds));
       // Update the lastRefreshEventId accordingly
@@ -7283,19 +7296,21 @@ public class CatalogOpExecutor {
             tbl.getFullName());
         return;
       }
-      if (req.isSetPartition_spec()) {
-        HdfsTable hdfsTbl = (HdfsTable) tbl;
-        HdfsPartition partition = hdfsTbl
-            .getPartitionFromThriftPartitionSpec(req.getPartition_spec());
-        if (partition != null) {
-          HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
-          partBuilder.setLastRefreshEventId(eventIds.get(0));
-          hdfsTbl.updatePartition(partBuilder);
-        } else {
-          LOG.warn("Partition {} no longer exists in table {}. It might be " +
-              "dropped by a concurrent operation.",
-              FeCatalogUtils.getPartitionName(hdfsTbl, partVals),
-              hdfsTbl.getFullName());
+      if (partSpecList != null) {
+        for (int i = 0; i < partSpecList.size(); ++i) {
+          HdfsTable hdfsTbl = (HdfsTable) tbl;
+          HdfsPartition partition = hdfsTbl
+              .getPartitionFromThriftPartitionSpec(partSpecList.get(i));
+          if (partition != null) {
+            HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
+            partBuilder.setLastRefreshEventId(eventIds.get(0));
+            hdfsTbl.updatePartition(partBuilder);
+          } else {
+            LOG.warn("Partition {} no longer exists in table {}. It might be " +
+                    "dropped by a concurrent operation.",
+                FeCatalogUtils.getPartitionName(hdfsTbl, partValsList.get(i)),
+                hdfsTbl.getFullName());
+          }
         }
       } else {
         tbl.setLastRefreshEventId(eventIds.get(0));

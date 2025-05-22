@@ -524,15 +524,14 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
    * @param msClient Metastore client,
    * @param isRefresh if this flag is set to true then it is a refresh query, else it
    *                  is an invalidate metadata query.
-   * @param partVals The partition list corresponding to
-   *                                 the table, used by Apache Hive 3
+   * @param partValsList partition values (List<String>) for each partition
    * @param dbName
    * @param tableName
    * @return a list of eventIds for the reload events
    */
   @VisibleForTesting
   public static List<Long> fireReloadEventHelper(MetaStoreClient msClient,
-      boolean isRefresh, List<String> partVals, String dbName, String tableName,
+      boolean isRefresh, List<List<String>> partValsList, String dbName, String tableName,
       Map<String, String> selfEventParams) throws TException {
     Preconditions.checkNotNull(msClient);
     Preconditions.checkNotNull(dbName);
@@ -542,16 +541,32 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     FireEventRequest rqst = new FireEventRequest(true, data);
     rqst.setDbName(dbName);
     rqst.setTableName(tableName);
-    rqst.setPartitionVals(partVals);
     rqst.setTblParams(selfEventParams);
-    FireEventResponse response = msClient.getHiveClient().fireListenerEvent(rqst);
-    if (!response.isSetEventIds()) {
-      LOG.error("FireEventResponse does not have event ids set for table {}.{}. This "
-              + "may cause the table to unnecessarily be refreshed when the " +
-              "refresh/invalidate event is received.", dbName, tableName);
-      return Collections.emptyList();
+    if (partValsList == null || partValsList.isEmpty()) {
+      FireEventResponse response = msClient.getHiveClient().fireListenerEvent(rqst);
+      if (!response.isSetEventIds()) {
+        LOG.error("FireEventResponse does not have event ids set for table {}.{}. This "
+            + "may cause the table to unnecessarily be refreshed when the " +
+            "refresh/invalidate event is received.", dbName, tableName);
+        return Collections.emptyList();
+      }
+      return response.getEventIds();
     }
-    return response.getEventIds();
+    List<Long> eventIds = new ArrayList<>();
+    // TODO: Fire one event once HIVE-28967 is resolved.
+    for (List<String> partVals : partValsList) {
+      rqst.setPartitionVals(partVals);
+      FireEventResponse response = msClient.getHiveClient().fireListenerEvent(rqst);
+      if (!response.isSetEventIds()) {
+        LOG.error("FireEventResponse does not have event ids set for table {}.{} " +
+            "partition {}. This may cause the table to unnecessarily be refreshed " +
+            "when the refresh/invalidate event is received.",
+            dbName, tableName, partVals);
+        continue;
+      }
+      eventIds.addAll(response.getEventIds());
+    }
+    return eventIds;
   }
 
   /**

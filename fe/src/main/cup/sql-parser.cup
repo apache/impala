@@ -504,6 +504,8 @@ nonterminal PartitionSpec partition_spec;
 nonterminal PartitionSet opt_partition_set;
 // Required partition set
 nonterminal PartitionSet partition_set;
+// Optional partition spec list
+nonterminal List<PartitionSpec> partition_spec_list;
 nonterminal List<PartitionKeyValue> partition_clause;
 nonterminal List<PartitionKeyValue> static_partition_key_value_list;
 nonterminal List<PartitionKeyValue> partition_key_value_list;
@@ -845,8 +847,8 @@ reset_metadata_stmt ::=
   {: RESULT = ResetMetadataStmt.createInvalidateStmt(table); :}
   | KW_REFRESH table_name:table
   {: RESULT = ResetMetadataStmt.createRefreshTableStmt(table); :}
-  | KW_REFRESH table_name:table partition_spec:partition
-  {: RESULT = ResetMetadataStmt.createRefreshPartitionStmt(table, partition); :}
+  | KW_REFRESH table_name:table partition_spec_list:partitions
+  {: RESULT = ResetMetadataStmt.createRefreshPartitionsStmt(table, partitions); :}
   | KW_REFRESH KW_FUNCTIONS ident_or_unreserved:db
   {: RESULT = ResetMetadataStmt.createRefreshFunctionsStmt(db); :}
   | KW_REFRESH KW_AUTHORIZATION
@@ -2772,6 +2774,20 @@ opt_partition_spec ::=
   {: RESULT = partition_spec; :}
   | /* Empty */
   {: RESULT = null; :}
+  ;
+
+partition_spec_list ::=
+  partition_spec:item
+  {:
+    List<PartitionSpec> list = new ArrayList<>();
+    list.add(item);
+    RESULT = list;
+  :}
+  | partition_spec_list:list partition_spec:item
+  {:
+    list.add(item);
+    RESULT = list;
+  :}
   ;
 
 static_partition_key_value_list ::=

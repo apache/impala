@@ -435,7 +435,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
    */
   @VisibleForTesting
   public static List<Long> fireReloadEventHelper(MetaStoreClient msClient,
-      boolean isRefresh, List<String> partVals, String dbName, String tableName,
+      boolean isRefresh, List<List<String>> partVals, String dbName, String tableName,
       Map<String, String> selfEventParams) throws TException {
     throw new UnsupportedOperationException("Reload event is not supported.");
   }

@@ -2863,7 +2863,7 @@ public class CatalogServiceCatalog extends Catalog {
       CatalogObject.ThriftObjectType resultType, String reason, long eventId,
       boolean isSkipFileMetadataReload, EventSequence catalogTimeline)
       throws CatalogException {
-    LOG.info(String.format("Refreshing table metadata: %s", tbl.getFullName()));
+    LOG.info("Refreshing table metadata: {}", tbl.getFullName());
     Preconditions.checkState(!(tbl instanceof IncompleteTable));
     String dbName = tbl.getDb().getName();
     String tblName = tbl.getName();
@@ -2905,10 +2905,20 @@ public class CatalogServiceCatalog extends Catalog {
               dbName + "." + tblName, e);
         }
         if (tbl instanceof HdfsTable) {
+          Set<String> partitionsToUpdate = null;
+          if (request.getPartition_spec_listSize() > 0) {
+            // Convert to partition names and deduplicate partition specs.
+            Map<String, List<TPartitionKeyValue>> partName2PartSpec = new HashMap<>();
+            for (List<TPartitionKeyValue> partSpec : request.getPartition_spec_list()) {
+              partName2PartSpec.put(HdfsTable.constructPartitionName(partSpec), partSpec);
+            }
+            partitionsToUpdate = partName2PartSpec.keySet();
+            request.setPartition_spec_list(new ArrayList<>(partName2PartSpec.values()));
+          }
           ((HdfsTable) tbl)
               .load(true, msClient.getHiveClient(), msTbl, !isSkipFileMetadataReload,
                   /* loadTableSchema*/true, request.refresh_updated_hms_partitions,
-                  /* partitionsToUpdate*/null, request.debug_action,
+                  partitionsToUpdate, request.debug_action,
                   /*partitionToEventId*/null, reason, catalogTimeline);
         } else {
           tbl.load(true, msClient.getHiveClient(), msTbl, reason, catalogTimeline);
@@ -3505,8 +3515,8 @@ public class CatalogServiceCatalog extends Catalog {
       String reason, long newCatalogVersion, @Nullable HdfsPartition hdfsPartition,
       EventSequence catalogTimeline) throws CatalogException {
     Preconditions.checkState(hdfsTable.isWriteLockedByCurrentThread());
-    LOG.info(String.format("Refreshing partition metadata: %s %s (%s)",
-        hdfsTable.getFullName(), partitionName, reason));
+    LOG.info("Refreshing partition metadata: {} {} ({})",
+        hdfsTable.getFullName(), partitionName, reason);
     try (MetaStoreClient msClient = getMetaStoreClient(catalogTimeline)) {
       org.apache.hadoop.hive.metastore.api.Partition hmsPartition = null;
       try {
@@ -3522,9 +3532,9 @@ public class CatalogServiceCatalog extends Catalog {
           // non-existing partition was dropped from catalog, so we mark it as refreshed
           wasPartitionReloaded.setRef(true);
         } else {
-          LOG.info(String.format("Partition metadata for %s was not refreshed since "
+          LOG.info("Partition metadata for {} {} was not refreshed since "
                   + "it does not exist in metastore anymore",
-              hdfsTable.getFullName() + " " + partitionName));
+              hdfsTable.getFullName(), partitionName);
         }
         return hdfsTable.toTCatalogObject(resultType);
       } catch (Exception e) {
@@ -3540,8 +3550,8 @@ public class CatalogServiceCatalog extends Catalog {
     }
     hdfsTable.setCatalogVersion(newCatalogVersion);
     wasPartitionReloaded.setRef(true);
-    LOG.info(String.format("Refreshed partition metadata: %s %s",
-        hdfsTable.getFullName(), partitionName));
+    LOG.info("Refreshed partition metadata: {} {}", hdfsTable.getFullName(),
+        partitionName);
     return hdfsTable.toTCatalogObject(resultType);
   }
 

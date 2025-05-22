@@ -232,8 +232,11 @@ public class StmtMetadataLoaderTest {
     testNoLoad("refresh functions functional");
     testNoLoad("refresh authorization");
 
-    // This stmt requires the table to be loaded.
+    // These stmts require the table to be loaded.
     testLoadTables("refresh functional.alltypes partition (year=2009, month=1)", 1, 1,
+        new String[] {"default", "functional"}, new String[] {"functional.alltypes"});
+    testLoadTables("refresh functional.alltypes partition (year=2009, month=1) " +
+            "partition (year=2010, month=2)", 1, 1,
         new String[] {"default", "functional"}, new String[] {"functional.alltypes"});
   }
 

@@ -96,6 +96,10 @@ public class CatalogOpUtilTest {
     req.setPartition_spec(Collections.emptyList());
     assertEquals("REFRESH TABLE default.tbl PARTITIONS issued by Alice",
         CatalogOpUtil.getShortDescForReset(req));
+    req.unsetPartition_spec();
+    req.setPartition_spec_list(Collections.emptyList());
+    assertEquals("REFRESH TABLE default.tbl PARTITIONS issued by Alice",
+        CatalogOpUtil.getShortDescForReset(req));
   }
 
   @Test

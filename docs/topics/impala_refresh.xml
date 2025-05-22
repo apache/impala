@@ -67,7 +67,9 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
-<codeblock rev="IMPALA-1683">REFRESH [<varname>db_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>key_col1</varname>=<varname>val1</varname> [, <varname>key_col2</varname>=<varname>val2</varname>...])]</codeblock>
+<codeblock rev="IMPALA-1683">REFRESH [<varname>db_name</varname>.]<varname>table_name</varname>
+[PARTITION (<varname>key_col1</varname>=<varname>val1</varname> [, <varname>key_col2</varname>=<varname>val2</varname>...])
+  [PARTITION (<varname>key_col1</varname>=<varname>val3</varname> [, <varname>key_col2</varname>=<varname>val4</varname>...])...]</codeblock>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
@@ -115,7 +117,7 @@ under the License.
     <p conref="../shared/impala_common.xml#common/refresh_vs_invalidate"/>
 
     <p rev="IMPALA-1683">
-      <b>Refreshing a single partition:</b>
+      <b>Refreshing specific partitions:</b>
     </p>
 
     <p rev="IMPALA-1683">
@@ -123,6 +125,13 @@ under the License.
       can apply to a single partition at a time, rather than the whole table. Include the
       optional <codeph>PARTITION (<varname>partition_spec</varname>)</codeph> clause and specify
       values for each of the partition key columns.
+    </p>
+
+    <p>
+      In <keyword keyref="impala50_full"/> and higher, the <codeph>REFRESH</codeph> statement
+      can apply to multiple partitions at a time, rather than a single partition. Use the
+      optional <codeph>PARTITION (<varname>partition_spec</varname>)</codeph> clause for each
+      each of the partition.
     </p>
 
     <p>
@@ -164,6 +173,9 @@ refresh p2 partition (z=1, y=0)
 -- Incomplete partition spec causes an error.
 refresh p2 partition (y=0)
 ERROR: AnalysisException: Items in partition spec must exactly match the partition columns in the table definition: default.p2 (1 vs 2)
+
+-- Refresh multiple partitions.
+refresh p2 partition (y=0, z=3) partition (y=1, z=0) partition (y=1, z=2);
 ]]>
 </codeblock>
 

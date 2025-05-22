@@ -1498,7 +1498,11 @@ public class HdfsTable extends Table implements FeFsTable {
      * hive metastore.
      * @return true if partition does not exist in metastore, else false.
      */
-    public abstract boolean isRemoved(HdfsPartition hdfsPartition);
+    public boolean isRemoved(HdfsPartition hdfsPartition) {
+      return isRemoved(hdfsPartition.getPartitionName());
+    }
+
+    public abstract boolean isRemoved(String partName);
 
     /**
      * Loads any partitions which are known to metastore but not provided in
@@ -1566,9 +1570,14 @@ public class HdfsTable extends Table implements FeFsTable {
       loadTimeForFileMdNs_ += loadNewPartitions(partitionNames, addedPartitions);
       // If a list of modified partitions (old and new) is specified, don't reload file
       // metadata for the new ones as they have already been detected in HMS and have been
-      // reloaded by loadNewPartitions().
+      // reloaded by loadNewPartitions(). Also ignore partitions that don't exist in HMS.
       if (partitionsToUpdate_ != null) {
         partitionsToUpdate_.removeAll(addedPartitions);
+        int orgSize = partitionsToUpdate_.size();
+        if (partitionsToUpdate_.removeIf(this::isRemoved)) {
+          LOG.info("Ignored {} non-existing partitions of table {}",
+              orgSize - partitionsToUpdate_.size(), getFullName());
+        }
       }
       // Load file metadata. Until we have a notification mechanism for when a
       // file changes in hdfs, it is sometimes required to reload all the file
@@ -1638,8 +1647,8 @@ public class HdfsTable extends Table implements FeFsTable {
     }
 
     @Override
-    public boolean isRemoved(HdfsPartition hdfsPartition) {
-      return !msPartitions_.containsKey(hdfsPartition.getPartitionName());
+    public boolean isRemoved(String partName) {
+      return !msPartitions_.containsKey(partName);
     }
 
     /**
@@ -1732,8 +1741,8 @@ public class HdfsTable extends Table implements FeFsTable {
     }
 
     @Override
-    public boolean isRemoved(HdfsPartition hdfsPartition) {
-      return !partitionNamesFromHms_.contains(hdfsPartition.getPartitionName());
+    public boolean isRemoved(String partName) {
+      return !partitionNamesFromHms_.contains(partName);
     }
 
     @Override

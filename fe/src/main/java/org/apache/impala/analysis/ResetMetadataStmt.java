@@ -68,8 +68,8 @@ public class ResetMetadataStmt extends StatementBase implements SingleTableStmt 
   // database functions.
   private TableName tableName_;
 
-  // not null when refreshing a single partition
-  private final PartitionSpec partitionSpec_;
+  // not null when refreshing specified partitions
+  private final List<PartitionSpec> partitionSpecList_;
 
   // not null when refreshing functions in a database.
   private final String database_;
@@ -87,13 +87,15 @@ public class ResetMetadataStmt extends StatementBase implements SingleTableStmt 
   private String clientIp_;
 
   private ResetMetadataStmt(Action action, String db, TableName tableName,
-      PartitionSpec partitionSpec) {
+      List<PartitionSpec> partitionSpecList) {
     Preconditions.checkNotNull(action);
     action_ = action;
     database_ = db;
     tableName_ = tableName;
-    partitionSpec_ = partitionSpec;
-    if (partitionSpec_ != null) partitionSpec_.setTableName(tableName_);
+    partitionSpecList_ = partitionSpecList;
+    if (partitionSpecList_ != null) {
+      partitionSpecList_.forEach(p -> p.setTableName(tableName_));
+    }
   }
 
   public static ResetMetadataStmt createInvalidateStmt() {
@@ -111,10 +113,11 @@ public class ResetMetadataStmt extends StatementBase implements SingleTableStmt 
         Preconditions.checkNotNull(tableName), /*partition*/ null);
   }
 
-  public static ResetMetadataStmt createRefreshPartitionStmt(TableName tableName,
-      PartitionSpec partitionSpec) {
+  public static ResetMetadataStmt createRefreshPartitionsStmt(TableName tableName,
+      List<PartitionSpec> partitionSpecList) {
     return new ResetMetadataStmt(Action.REFRESH_PARTITION, /*db*/ null,
-        Preconditions.checkNotNull(tableName), Preconditions.checkNotNull(partitionSpec));
+        Preconditions.checkNotNull(tableName),
+        Preconditions.checkNotNull(partitionSpecList));
   }
 
   public static ResetMetadataStmt createRefreshFunctionsStmt(String db) {
@@ -132,8 +135,6 @@ public class ResetMetadataStmt extends StatementBase implements SingleTableStmt 
   @Override
   public TableName getTableName() { return tableName_; }
 
-  public PartitionSpec getPartitionSpec() { return partitionSpec_; }
-
   @VisibleForTesting
   protected Action getAction() { return action_; }
 
@@ -144,7 +145,7 @@ public class ResetMetadataStmt extends StatementBase implements SingleTableStmt 
 
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {
-    if (tableName_ != null && partitionSpec_ != null) {
+    if (tableName_ != null && partitionSpecList_ != null) {
       tblRefs.add(new TableRef(tableName_.toPath(), null));
     }
   }
@@ -172,20 +173,22 @@ public class ResetMetadataStmt extends StatementBase implements SingleTableStmt 
             throw new AnalysisException(Analyzer.TBL_DOES_NOT_EXIST_ERROR_MSG +
                 tableName_);
           }
-          if (partitionSpec_ != null) {
+          if (partitionSpecList_ != null) {
             try {
               // Get local table info without reaching out to HMS
               FeTable table = analyzer.getTable(dbName, tableName_.getTbl(),
                   /* must_exist */ true);
               if (AcidUtils.isTransactionalTable(table)) {
-                throw new AnalysisException("Refreshing a partition is not allowed on " +
+                throw new AnalysisException("Refreshing partitions is not allowed on " +
                     "transactional tables. Try to refresh the whole table instead.");
               }
             } catch (TableLoadingException e) {
               throw new AnalysisException(e);
             }
-            partitionSpec_.setPrivilegeRequirement(Privilege.ANY);
-            partitionSpec_.analyze(analyzer);
+            for (PartitionSpec ps : partitionSpecList_) {
+              ps.setPrivilegeRequirement(Privilege.ANY);
+              ps.analyze(analyzer);
+            }
           }
         } else {
           FeTable tbl = analyzer.getTableNoThrow(dbName, tableName_.getTbl());
@@ -244,8 +247,8 @@ public class ResetMetadataStmt extends StatementBase implements SingleTableStmt 
         result.append("REFRESH ").append(tableName_.toSql());
         break;
       case REFRESH_PARTITION:
-        result.append("REFRESH ").append(tableName_.toSql()).append(" ")
-            .append(partitionSpec_.toSql(options));
+        result.append("REFRESH ").append(tableName_.toSql());
+        partitionSpecList_.forEach(ps -> result.append(" ").append(ps.toSql(options)));
         break;
       case INVALIDATE_METADATA_ALL:
         result.append("INVALIDATE METADATA");
@@ -270,7 +273,11 @@ public class ResetMetadataStmt extends StatementBase implements SingleTableStmt 
     if (tableName_ != null) {
       params.setTable_name(new TTableName(tableName_.getDb(), tableName_.getTbl()));
     }
-    if (partitionSpec_ != null) params.setPartition_spec(partitionSpec_.toThrift());
+    if (partitionSpecList_ != null) {
+      for (PartitionSpec ps : partitionSpecList_) {
+        params.addToPartition_spec_list(ps.toThrift());
+      }
+    }
     if (database_ != null) params.setDb_name(database_);
     if (action_ == Action.REFRESH_AUTHORIZATION) {
       params.setAuthorization(true);

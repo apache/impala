@@ -4000,7 +4000,7 @@ public class MetastoreEventsProcessorTest {
       eventsProcessor_.processEvents();
       // Fire a reload event and process partition with empty values
       MetastoreShim.fireReloadEventHelper(catalog_.getMetaStoreClient(), true,
-          Arrays.asList("1"), TEST_DB_NAME, tblName, Collections.emptyMap());
+          partVals, TEST_DB_NAME, tblName, Collections.emptyMap());
       BackendConfig.INSTANCE.setDebugActions(DebugUtils.MOCK_EMPTY_PARTITION_VALUES);
       processEventsAndVerifyStatus(prevFlag);
       // insert partition event

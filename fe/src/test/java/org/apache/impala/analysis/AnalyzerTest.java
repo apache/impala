@@ -431,6 +431,10 @@ public class AnalyzerTest extends FrontendTestBase {
         "refresh functional.alltypessmall partition (year=2009, month=NULL)"),
         ResetMetadataStmt.Action.REFRESH_PARTITION);
     assertAction.accept(AnalyzesOk(
+            "refresh functional.alltypessmall partition (year=2009, month=1)" +
+                " partition (year=2010, month=2) partition (year=2010, month=4)"),
+        ResetMetadataStmt.Action.REFRESH_PARTITION);
+    assertAction.accept(AnalyzesOk(
         "refresh authorization", createAnalysisCtx(createAuthorizationFactory())),
         ResetMetadataStmt.Action.REFRESH_AUTHORIZATION);
 
@@ -456,6 +460,10 @@ public class AnalyzerTest extends FrontendTestBase {
         "refresh functional.alltypessmall partition (year=2009, month='foo')",
         "Value of partition spec (column=month) has incompatible type: 'STRING'. "
             + "Expected type: 'INT'");
+    AnalysisError("refresh functional.alltypessmall partition (year=2009)" +
+            " partition (month=1)",
+        "Items in partition spec must exactly match the partition columns in "
+            + "the table definition: functional.alltypessmall (1 vs 2)");
     AnalysisError("refresh functional.zipcode_incomes partition (year=2009, month=1)",
         "Table is not partitioned: functional.zipcode_incomes");
     AnalysisError(
@@ -636,10 +644,14 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalyzesOk("refresh functional.insert_only_transactional_table");
     AnalyzesOk("refresh functional_orc_def.full_transactional_table");
     AnalysisError("refresh functional.insert_only_transactional_table partition (j=1)",
-        "Refreshing a partition is not allowed on transactional tables. Try to refresh " +
+        "Refreshing partitions is not allowed on transactional tables. Try to refresh " +
         "the whole table instead.");
+    AnalysisError("refresh functional.insert_only_transactional_table partition (j=1) " +
+            "partition (j=2)",
+        "Refreshing partitions is not allowed on transactional tables. Try to refresh " +
+            "the whole table instead.");
     AnalysisError("refresh functional_orc_def.full_transactional_table partition (j=1)",
-        "Refreshing a partition is not allowed on transactional tables. Try to refresh " +
+        "Refreshing partitions is not allowed on transactional tables. Try to refresh " +
         "the whole table instead.");
   }
 

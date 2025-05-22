@@ -325,8 +325,9 @@ struct TResetMetadataRequest {
   // the entire catalog
   4: optional CatalogObjects.TTableName table_name
 
-  // If set, refreshes the specified partition, otherwise
-  // refreshes the whole table
+  // Deprecated - use partition_spec_list instead. Keeps this for compatibility.
+  // If set, refreshes the specified partition.
+  // Refreshes the whole table if both this and partition_spec_list are not set.
   5: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
 
   // If set, refreshes functions in the specified database.
@@ -344,6 +345,10 @@ struct TResetMetadataRequest {
 
   // debug_action is set from the query_option when available.
   10: optional string debug_action
+
+  // If set, refreshes the specified list of partitions
+  // Refreshes the whole table if both this and partition_spec are not set.
+  11: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_spec_list
 }
 
 // Response from TResetMetadataRequest

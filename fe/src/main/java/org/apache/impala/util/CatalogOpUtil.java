@@ -139,7 +139,9 @@ public class CatalogOpUtil {
       cmd += "DATABASE " + req.getDb_name();
     } else if (req.isSetTable_name()) {
       cmd += "TABLE " + TableName.fromThrift(req.getTable_name());
-      if (req.isSetPartition_spec()) cmd += " PARTITIONS";
+      if (req.isSetPartition_spec() || req.isSetPartition_spec_list()) {
+        cmd += " PARTITIONS";
+      }
     } else if (req.isAuthorization()) {
       cmd += "AUTHORIZATION";
     } else {
