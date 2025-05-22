@@ -302,6 +302,30 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     result = p2.get_result()
     assert "VIETNAM" in result.stdout
 
+  def test_live_progress_no_overlap(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Live progress not supported in strict hs2 mode.")
+    local_file = NamedTemporaryFile(delete=True)
+    # Sending both stdout and stderr to the same file simulates a terminal
+    # window that is displaying both stdout and stderr.
+    p = ImpalaShell(vector, stdout_file=local_file, stderr_file=local_file)
+    p.send_cmd("select count(*) from functional.alltypes a where id = sleep(10);")
+    result = p.get_result()
+    with open(local_file.name, "r") as fi:
+      # ANSI Escape code for up. live_progress uses this to overwrite content.
+      up = "\x1b[A"
+      result = fi.read()
+      # We don't want any up characters after we get the result. Up characters
+      # can cause the terminal to omit/overwrite pieces of the result output.
+      # Find the '| count(*) |' output, which is part of the result
+      count_star = "| count(*) |"
+      count_star_offset = result.find(count_star)
+      # There should be no up character after that offset
+      remainder = result[count_star_offset + len(count_star):]
+      up_found = remainder.find(up) != -1
+      # Use repr to keep the escape characters visible
+      assert not up_found, "Found up character after result: {0}".format(repr(result))
+
   def test_compute_stats_with_live_progress_options(self, vector, unique_database):
     """Test that setting LIVE_PROGRESS options won't cause COMPUTE STATS query fail"""
     if vector.get_value('strict_hs2_protocol'):

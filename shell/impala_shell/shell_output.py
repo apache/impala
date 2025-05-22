@@ -225,5 +225,6 @@ class OverwritingStdErrOutputStream(object):
     sys.stderr.write(self.UP * self.last_line_count)
     sys.stderr.write(self.last_clean_text)
     sys.stderr.write(self.UP * self.last_line_count)
+    sys.stderr.flush()
     self.last_line_count = 0
     self.last_clean_text = ""
