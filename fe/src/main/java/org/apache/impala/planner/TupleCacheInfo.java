@@ -130,6 +130,13 @@ public class TupleCacheInfo {
   //    to hash the scan ranges of input scan nodes to generate the key.
   private final List<HdfsScanNode> inputScanNodes_ = new ArrayList<HdfsScanNode>();
 
+  // This node has variable output due to a streaming aggregation. For example, a
+  // grouping aggregation doing a sum could return (a, 3) or (a, 2), (a, 1) or
+  // (a, 1), (a, 1), (a, 1). These all mean the same thing to the finalize stage.
+  // We need to know about it to disable automated correctness checking for locations
+  // with this variability.
+  private boolean streamingAggVariability_ = false;
+
   // These fields accumulate partial results until finalizeHash() is called.
   private Hasher hasher_ = Hashing.murmur3_128().newHasher();
 
@@ -155,6 +162,19 @@ public class TupleCacheInfo {
 
   public boolean isEligible() {
     return ineligibilityReasons_.isEmpty();
+  }
+
+  public void setStreamingAggVariability() {
+    Preconditions.checkState(!streamingAggVariability_);
+    streamingAggVariability_ = true;
+  }
+
+  public void clearStreamingAggVariability() {
+    streamingAggVariability_ = false;
+  }
+
+  public boolean getStreamingAggVariability() {
+    return streamingAggVariability_;
   }
 
   public String getHashString() {
@@ -288,6 +308,11 @@ public class TupleCacheInfo {
         // The content was already hashed by the children, so we only need the
         // id translation maps.
         registerTupleHelper(id, false);
+      }
+
+      // The variability transmits up the tree until the aggregation is finalized.
+      if (child.streamingAggVariability_) {
+        streamingAggVariability_ = true;
       }
       return true;
     }

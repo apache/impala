@@ -420,6 +420,25 @@ public class TupleCacheTest extends PlannerTestBase {
     }
   }
 
+  @Test
+  public void testSkipCorrectnessChecking() {
+    // Locations after a streaming aggregation before the finalize can have variability
+    // that correctness checking can't handle.
+    List<PlanNode> cacheEligibleNodes =
+      getCacheEligibleNodes(
+          "select int_col, count(*) from functional.alltypes group by int_col",
+          /* isDistributedPlan */ true);
+    // In this plan, there is a streaming aggregation that feeds into a partitioned
+    // exchange. The finalize phase is past that partitioned exchange. That means that
+    // the only eligible node marked with streaming agg variability is the initial
+    // streaming AggregationNode.
+    for (PlanNode node : cacheEligibleNodes) {
+      if (node instanceof AggregationNode) {
+        assertTrue(node.getTupleCacheInfo().getStreamingAggVariability());
+      }
+    }
+  }
+
   protected List<PlanNode> getCacheEligibleNodes(String query,
       boolean isDistributedPlan) {
     List<PlanFragment> plan = getPlan(query, isDistributedPlan);

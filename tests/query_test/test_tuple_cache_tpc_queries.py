@@ -33,7 +33,7 @@ def run_tuple_cache_test(self, vector, query, mtdop):
   # Use a long runtime filter wait time (1 minute) to ensure filters arrive before
   # generating the tuple cache for correctness check.
   if IS_TUPLE_CACHE_CORRECT_CHECK:
-    vector.get_value('exec_option')['runtime_filter_wait_time_ms'] = 60000
+    vector.get_value('exec_option')['runtime_filter_wait_time_ms'] = 600000
     vector.get_value('exec_option')['enable_tuple_cache_verification'] = True
   vector.get_value('exec_option')['mt_dop'] = mtdop
   # Run twice to test write and read the tuple cache.

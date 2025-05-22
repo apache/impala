@@ -821,6 +821,16 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
       }
       msg.agg_node.addToAggregators(taggregator);
     }
+    // Streaming aggregations can have variable output that is handled and undone
+    // by the finalize stage. For example, a grouping aggregation doing a sum could
+    // return (a, 3) or (a, 2), (a, 1) or (a, 1), (a, 1), (a, 1). Mark the node as
+    // variable, which disables automated correctness checking. Clear the mark at the
+    // finalize stage, as the finalize stage undoes the variability.
+    if (useStreamingPreagg_) {
+      serialCtx.setStreamingAggVariability();
+    } else if (needsFinalize_) {
+      serialCtx.clearStreamingAggVariability();
+    }
   }
 
   @Override

@@ -62,6 +62,12 @@ private:
   // This combination is unique for a given fragment instance.
   std::string combined_key_;
 
+  // This caching location should skip correctness verification. This can be true when a
+  // location has variability in its results that is tolerated by nodes higher in the
+  // plan (e.g. streaming aggregations can produce variable results that do not change
+  // the result out of the finalization phase).
+  bool skip_correctness_verification_;
+
   /// Number of results that were found in the tuple cache
   RuntimeProfile::Counter* num_hits_counter_ = nullptr;
   /// Number of results that were too large for the cache

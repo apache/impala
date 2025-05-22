@@ -43,9 +43,12 @@ public class TupleCacheNode extends PlanNode {
 
   protected String compileTimeKey_;
   protected String hashTrace_;
+  protected boolean displayCorrectnessCheckingInfo_;
+  protected boolean skipCorrectnessVerification_;
   protected final List<Integer> inputScanNodeIds_ = new ArrayList<Integer>();
 
-  public TupleCacheNode(PlanNodeId id, PlanNode child) {
+  public TupleCacheNode(PlanNodeId id, PlanNode child,
+      boolean displayCorrectnessCheckingInfo) {
     super(id, "TUPLE CACHE");
     addChild(child);
     cardinality_ = child.getCardinality();
@@ -55,6 +58,10 @@ public class TupleCacheNode extends PlanNode {
     Preconditions.checkState(childCacheInfo.isEligible());
     compileTimeKey_ = childCacheInfo.getHashString();
     hashTrace_ = childCacheInfo.getHashTrace();
+    // If there is variability due to a streaming agg, skip the correctness verification
+    // for this location.
+    skipCorrectnessVerification_ = childCacheInfo.getStreamingAggVariability();
+    displayCorrectnessCheckingInfo_ = displayCorrectnessCheckingInfo;
     for (HdfsScanNode scanNode : childCacheInfo.getInputScanNodes()) {
       // Inputs into the tuple cache need to use deterministic scan range assignment
       scanNode.setDeterministicScanRangeAssignment(true);
@@ -87,6 +94,7 @@ public class TupleCacheNode extends PlanNode {
     TTupleCacheNode tupleCacheNode = new TTupleCacheNode();
     tupleCacheNode.setCompile_time_key(compileTimeKey_);
     tupleCacheNode.setInput_scan_node_ids(inputScanNodeIds_);
+    tupleCacheNode.setSkip_correctness_verification(skipCorrectnessVerification_);
     msg.setTuple_cache_node(tupleCacheNode);
   }
 
@@ -113,6 +121,11 @@ public class TupleCacheNode extends PlanNode {
     StringBuilder output = new StringBuilder();
     output.append(String.format("%s%s:%s\n", prefix, id_.toString(), displayName_));
     output.append(detailPrefix + "cache key: " + compileTimeKey_ + "\n");
+    // Only display information about correctness verification if it is enabled
+    if (displayCorrectnessCheckingInfo_) {
+      output.append(detailPrefix + "skip correctness verification: " +
+          skipCorrectnessVerification_ + "\n");
+    }
 
     // For debuggability, always print the hash trace until the cache key calculation
     // matures. Print trace in chunks to avoid excessive wrapping and padding in

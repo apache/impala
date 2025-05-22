@@ -725,6 +725,9 @@ struct TTupleCacheNode {
   // into this node. The TupleCacheNode will hash the scan ranges for its fragment
   // at runtime.
   2: required list<i32> input_scan_node_ids;
+  // Skip correctness verification at this node. This can be true if the result at this
+  // location is variable in a way that does not impact correctness.
+  3: required bool skip_correctness_verification;
 }
 
 enum TMergeCaseType {

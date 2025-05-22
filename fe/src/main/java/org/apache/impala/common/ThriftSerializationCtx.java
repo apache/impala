@@ -140,4 +140,23 @@ public class ThriftSerializationCtx {
       tupleCacheInfo_.incorporateScans();
     }
   }
+
+  /**
+   * Mark this location as variable due a streaming aggregation.
+   */
+  public void setStreamingAggVariability() {
+    if (isTupleCache()) {
+      tupleCacheInfo_.setStreamingAggVariability();
+    }
+  }
+
+  /**
+   * Clear any mark indicating variability due to a streaming aggregation.
+   * It is safe to call this even if there is no existing variability.
+   */
+  public void clearStreamingAggVariability() {
+    if (isTupleCache()) {
+      tupleCacheInfo_.clearStreamingAggVariability();
+    }
+  }
 }

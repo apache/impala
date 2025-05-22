@@ -70,6 +70,8 @@ Status TupleCacheNode::Prepare(RuntimeState* state) {
   ComputeFragmentInstanceKey(state);
   combined_key_ = plan_node().tnode_->tuple_cache_node.compile_time_key + "_" +
       std::to_string(fragment_instance_key_);
+  skip_correctness_verification_ =
+      plan_node().tnode_->tuple_cache_node.skip_correctness_verification;
   runtime_profile()->AddInfoString("Combined Key", combined_key_);
 
   return Status::OK();
@@ -90,33 +92,38 @@ Status TupleCacheNode::Open(RuntimeState* state) {
   handle_ = tuple_cache_mgr->Lookup(combined_key_, true);
   if (tuple_cache_mgr->IsAvailableForRead(handle_)) {
     if (tuple_cache_mgr->DebugDumpEnabled() && TupleCacheVerificationEnabled(state)) {
-      // We need the original fragment id to construct the path for the reference debug
-      // cache file. If it's missing from the metadata, we return an error status
-      // immediately.
-      string org_fragment_id = tuple_cache_mgr->GetFragmentIdForTupleCache(combined_key_);
-      if (org_fragment_id.empty()) {
-        return Status(TErrorCode::TUPLE_CACHE_INCONSISTENCY,
-            Substitute("Metadata of tuple cache '$0' is missing for correctness check",
-                combined_key_));
+      // If the node is marked to skip correctness verification, we don't want to read
+      // from the cache as that would prevent its children from executing.
+      if (!skip_correctness_verification_) {
+        // We need the original fragment id to construct the path for the reference debug
+        // cache file. If it's missing from the metadata, we return an error status
+        // immediately.
+        string org_fragment_id =
+            tuple_cache_mgr->GetFragmentIdForTupleCache(combined_key_);
+        if (org_fragment_id.empty()) {
+          return Status(TErrorCode::TUPLE_CACHE_INCONSISTENCY,
+              Substitute("Metadata of tuple cache '$0' is missing for correctness check",
+                  combined_key_));
+        }
+        string ref_sub_dir;
+        string sub_dir;
+        string ref_file_path = GetDebugDumpPath(state, org_fragment_id, &ref_sub_dir);
+        string file_path = GetDebugDumpPath(state, string(), &sub_dir);
+        DCHECK_EQ(ref_sub_dir, sub_dir);
+        DCHECK(!ref_sub_dir.empty());
+        DCHECK(!ref_file_path.empty());
+        DCHECK(!file_path.empty());
+        // Create the subdirectory for the debug caches if needed.
+        RETURN_IF_ERROR(tuple_cache_mgr->CreateDebugDumpSubdir(ref_sub_dir));
+        // Open the writer for writing the tuple data from the cache entries to be
+        // the reference cache data.
+        debug_dump_text_writer_ref_ = make_unique<TupleTextFileWriter>(ref_file_path);
+        RETURN_IF_ERROR(debug_dump_text_writer_ref_->Open());
+        // Open the writer for writing the tuple data from children in GetNext() to
+        // compare with the reference debug cache file.
+        debug_dump_text_writer_ = make_unique<TupleTextFileWriter>(file_path);
+        RETURN_IF_ERROR(debug_dump_text_writer_->Open());
       }
-      string ref_sub_dir;
-      string sub_dir;
-      string ref_file_path = GetDebugDumpPath(state, org_fragment_id, &ref_sub_dir);
-      string file_path = GetDebugDumpPath(state, string(), &sub_dir);
-      DCHECK_EQ(ref_sub_dir, sub_dir);
-      DCHECK(!ref_sub_dir.empty());
-      DCHECK(!ref_file_path.empty());
-      DCHECK(!file_path.empty());
-      // Create the subdirectory for the debug caches if needed.
-      RETURN_IF_ERROR(tuple_cache_mgr->CreateDebugDumpSubdir(ref_sub_dir));
-      // Open the writer for writing the tuple data from the cache entries to be
-      // the reference cache data.
-      debug_dump_text_writer_ref_ = make_unique<TupleTextFileWriter>(ref_file_path);
-      RETURN_IF_ERROR(debug_dump_text_writer_ref_->Open());
-      // Open the writer for writing the tuple data from children in GetNext() to
-      // compare with the reference debug cache file.
-      debug_dump_text_writer_ = make_unique<TupleTextFileWriter>(file_path);
-      RETURN_IF_ERROR(debug_dump_text_writer_->Open());
     } else {
       reader_ = make_unique<TupleFileReader>(
           tuple_cache_mgr->GetPath(handle_), mem_tracker(), runtime_profile());

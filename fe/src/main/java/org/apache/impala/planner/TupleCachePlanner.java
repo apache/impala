@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import java.util.List;
 
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TQueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,8 +94,12 @@ public class TupleCachePlanner {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Adding TupleCacheNode above node " + node.getId().toString());
     }
+    // Get current query options
+    TQueryOptions queryOptions =
+      ctx_.getRootAnalyzer().getQueryCtx().client_request.getQuery_options();
     // Allocate TupleCacheNode
-    TupleCacheNode tupleCacheNode = new TupleCacheNode(ctx_.getNextNodeId(), node);
+    TupleCacheNode tupleCacheNode = new TupleCacheNode(ctx_.getNextNodeId(), node,
+         queryOptions.isEnable_tuple_cache_verification());
     tupleCacheNode.init(ctx_.getRootAnalyzer());
     PlanFragment curFragment = node.getFragment();
     if (node == curFragment.getPlanRoot()) {
