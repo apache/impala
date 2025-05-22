@@ -758,6 +758,11 @@ class ImpylaHS2Connection(ImpalaConnection):
       id = session_handle_to_session_id(cursor.session.handle)
     return "" if id is None else id
 
+  def session_id(self, operation_handle):
+    cursor = operation_handle.get_handle()
+    session_id = self.__get_session_id(cursor)
+    return session_id if session_id else str(cursor.session)
+
   def handle_id(self, operation_handle):
     query_id = self.get_query_id(operation_handle)
     return query_id if query_id else str(operation_handle)
