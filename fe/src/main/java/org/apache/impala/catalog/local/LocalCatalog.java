@@ -329,10 +329,10 @@ public class LocalCatalog implements FeCatalog {
     return metaProvider_.isReady();
   }
 
+  // Only used for testing.
   @Override
   public void setIsReady(boolean isReady) {
-    // No-op for local catalog.
-    // This appears to only be used in some tests.
+    metaProvider_.setIsReady(isReady);
   }
 
   public MetaProvider getMetaProvider() {

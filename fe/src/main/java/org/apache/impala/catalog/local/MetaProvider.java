@@ -75,6 +75,12 @@ public interface MetaProvider {
    */
   void waitForIsReady(long timeoutMs);
 
+  /**
+   * Force the MetaProvider into a particular readiness state.
+   * Used only by tests.
+   */
+  default void setIsReady(boolean isReady) { /* NOOP */}
+
   ImmutableList<String> loadDbList() throws TException;
 
   Database loadDb(String dbName) throws TException;

@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.SqlCastException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.CatalogObjectsConstants;
@@ -107,9 +108,11 @@ public class CatalogObjectToFromThriftTest {
 
         // Verify the partition access level is getting set properly. The alltypes_seq
         // table has two partitions that are read_only.
-        if (dbName.equals("functional_seq") && (
-            hdfsPart.getPartitionName().equals("year=2009/month=1") ||
-            hdfsPart.getPartitionName().equals("year=2009/month=3"))) {
+        // TAccessLevel is always READ_WRITE in minimal topic mode (see IMPALA-7539).
+        if (!BackendConfig.INSTANCE.isMinimalTopicMode()
+            && dbName.equals("functional_seq")
+            && (hdfsPart.getPartitionName().equals("year=2009/month=1")
+                || hdfsPart.getPartitionName().equals("year=2009/month=3"))) {
           Assert.assertEquals(TAccessLevel.READ_ONLY, hdfsPart.getAccessLevel());
         } else {
           Assert.assertEquals(TAccessLevel.READ_WRITE, hdfsPart.getAccessLevel());

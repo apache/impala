@@ -49,7 +49,7 @@ class InProcessImpalaServer {
   /// ports used by a concurrently running normal Impala daemon. The hostname is set to
   /// "localhost" and the ports are picked from the ephemeral port range and exposed as
   /// member variables. Internally this will call StartWithClientservers() and
-  /// SetCatalogInitialized(). The default values for statestore_host and statestore_port
+  /// SetCatalogIsReady(). The default values for statestore_host and statestore_port
   /// indicate that a statestore connection should not be used. These values are directly
   /// forwarded to the ExecEnv. Returns ok and sets *server on success. On failure returns
   /// an error. *server may or may not be set on error, but is always invalid to use.

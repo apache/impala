@@ -139,8 +139,10 @@ class TestCoordinators(CustomClusterTestSuite):
   def test_executor_only_lib_cache(self):
     """IMPALA-6670: checks that the lib-cache gets refreshed on executor-only nodes"""
 
-    self._start_impala_cluster([], cluster_size=3, num_coordinators=1,
-                               use_exclusive_coordinators=True)
+    self._start_impala_cluster(
+        ["--impalad_args=--use_local_catalog=false",
+         "--catalogd_args=--catalog_topic_mode=full"],
+        cluster_size=3, num_coordinators=1, use_exclusive_coordinators=True)
 
     db_name = 'TEST_EXEC_ONLY_CACHE'
 
@@ -236,6 +238,7 @@ class TestCoordinators(CustomClusterTestSuite):
 
       # Run the query. Expect the query fails due to mismatched libs at the
       # coordinator and one of the executors.
+      # This failure does not happen in local catalog mode.
       mismatch_query = (
           "select count(*) from functional.alltypes where "
           "`{0}`.mismatch_fn(string_col) = 'Old UDF'".format(db_name));

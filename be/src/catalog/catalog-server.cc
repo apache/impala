@@ -53,7 +53,7 @@ static const auto gt_0 = [](const char* name, int32_t val) {
 };
 
 DEFINE_int32(catalog_service_port, 26000, "port where the CatalogService is running");
-DEFINE_string(catalog_topic_mode, "full",
+DEFINE_string(catalog_topic_mode, "minimal",
     "The type of data that the catalog service will publish into the Catalog "
     "StateStore topic. Valid values are 'full', 'mixed', or 'minimal'.\n"
     "\n"

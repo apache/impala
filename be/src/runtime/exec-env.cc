@@ -106,7 +106,7 @@ DEFINE_int32(admission_control_slots, 0,
 DEFINE_string(codegen_cache_capacity, "1GB",
     "Specify the capacity of the codegen cache. If set to 0, codegen cache is disabled.");
 
-DEFINE_bool(use_local_catalog, false,
+DEFINE_bool(use_local_catalog, true,
     "Use the on-demand metadata feature in coordinators. If this is set, coordinators "
     "pull metadata as needed from catalogd and cache it locally. The cached metadata "
     "gets evicted automatically under memory pressure or after an expiration time.");

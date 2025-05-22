@@ -1094,7 +1094,12 @@ class MinimalHS2Connection(ImpalaConnection):
     raise NotImplementedError()
 
   def get_log(self, operation_handle):
-    return self.__get_operation(operation_handle).get_log()
+    self.log_handle(operation_handle, 'getting log for operation')
+    # HS2 includes non-error log messages that we need to filter out.
+    cursor = operation_handle.get_handle()
+    lines = [line for line in cursor.get_log().split('\n')
+             if not PROGRESS_LOG_RE.match(line)]
+    return '\n'.join(lines)
 
   def set_configuration_option(self, name, value, is_log_sql=True):
     # Only set the option if it's not already set to the same value.

@@ -356,9 +356,12 @@ class TestWebPage(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args="--catalog_client_rpc_timeout_ms=100 "
                  "--catalog_client_rpc_retry_interval_ms=10 "
-                 "--catalog_client_connection_num_retries=2")
+                 "--catalog_client_connection_num_retries=2 "
+                 "--use_local_catalog=false ",
+    catalogd_args="--catalog_topic_mode=full")
   def test_catalog_operations_with_rpc_retry(self):
-    """Test that catalog RPC retries are all shown in the /operations page"""
+    """Test that catalog RPC retries are all shown in the /operations page.
+    Timeout values in this test is specifically tailored for legacy catalog mode."""
     # Run a DESCRIBE to ensure the table is loaded. So the first RPC attempt will
     # time out in its real work. This triggers a PrioritizeLoad RPC which usually
     # finishes in 40ms. So 100ms for catalog RPC timeout is enough.

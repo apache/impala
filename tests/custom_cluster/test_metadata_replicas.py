@@ -24,8 +24,12 @@ from tests.util.hive_utils import HiveDbWrapper
 
 
 @SkipIfFS.hive
+@CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=false",
+    catalogd_args="--catalog_topic_mode=full")
 class TestMetadataReplicas(CustomClusterTestSuite):
-  """ Validates metadata content across catalogd and impalad coordinators."""
+  """ Validates metadata content across catalogd and impalad coordinators.
+  This test is only valid in legacy catalog mode. """
 
   @classmethod
   def setup_class(cls):

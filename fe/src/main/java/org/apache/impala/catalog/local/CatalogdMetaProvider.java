@@ -446,6 +446,15 @@ public class CatalogdMetaProvider implements MetaProvider {
     return lastSeenCatalogVersion_.get() > Catalog.INITIAL_CATALOG_VERSION;
   }
 
+  // Only used for testing.
+  @Override
+  public void setIsReady(boolean isReady) {
+    lastSeenCatalogVersion_.incrementAndGet();
+    synchronized (catalogReadyNotifier_) {
+      catalogReadyNotifier_.notifyAll();
+    }
+  }
+
   public void setAuthzChecker(
       AtomicReference<? extends AuthorizationChecker> authzChecker) {
     authzChecker_ = authzChecker;

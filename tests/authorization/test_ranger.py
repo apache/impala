@@ -55,14 +55,16 @@ ERROR_REVOKE = "User doesn't have necessary permission to revoke access"
 RANGER_AUTH = ("admin", "admin")
 RANGER_HOST = "http://localhost:6080"
 REST_HEADERS = {"Content-Type": "application/json", "Accept": "application/json"}
-IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
-               "--ranger_app_id=impala --authorization_provider=ranger"
-CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
-                "--ranger_app_id=impala --authorization_provider=ranger"
+LEGACY_CATALOG_IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+    "--ranger_app_id=impala --authorization_provider=ranger " \
+    "--use_local_catalog=false"
+LEGACY_CATALOG_CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+    "--ranger_app_id=impala --authorization_provider=ranger " \
+    "--catalog_topic_mode=full"
 
-LOCAL_CATALOG_IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
     "--ranger_app_id=impala --authorization_provider=ranger --use_local_catalog=true"
-LOCAL_CATALOG_CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
     "--ranger_app_id=impala --authorization_provider=ranger --catalog_topic_mode=minimal"
 
 LOG = logging.getLogger('impala_test_suite')
@@ -1569,8 +1571,8 @@ class TestRangerIndependent(TestRanger):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args=IMPALAD_ARGS,
-    catalogd_args=CATALOGD_ARGS + " --hms_event_polling_interval_s=5")
+    impalad_args=LEGACY_CATALOG_IMPALAD_ARGS,
+    catalogd_args=LEGACY_CATALOG_CATALOGD_ARGS + " --hms_event_polling_interval_s=5")
   def test_alter_owner_hms_event_sync(self, unique_name):
     """Test Impala queries that depends on database ownership changes in Hive.
        Use a longer polling interval to mimic lag in event processing."""
@@ -1645,6 +1647,8 @@ class TestRangerIndependent(TestRanger):
       # SHOW TABLES should fail since user is not the owner of this db
       self.execute_query_expect_failure(user_client, "show tables in " + test_db)
       change_db_owner_to_user()
+      # IMPALA-8937: In local catalog mode, table ownership info is not reloaded
+      # automatically, and this assert will fail.
       assert ["foo"] == self.all_table_names(user_client, test_db)
       reset_db_owner_to_admin()
     finally:
@@ -1652,18 +1656,18 @@ class TestRangerIndependent(TestRanger):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="{0} {1}".format(IMPALAD_ARGS,
+    impalad_args="{0} {1}".format(LEGACY_CATALOG_IMPALAD_ARGS,
                                   "--allow_catalog_cache_op_from_masked_users=true"),
-    catalogd_args=CATALOGD_ARGS,
+    catalogd_args=LEGACY_CATALOG_CATALOGD_ARGS,
     disable_log_buffering=True)
-  def test_allow_metadata_update(self, unique_name):
+  def test_allow_metadata_update_legacy_catalog(self, unique_name):
     self._test_allow_catalog_cache_op_from_masked_users(unique_name)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="{0} {1}".format(LOCAL_CATALOG_IMPALAD_ARGS,
+    impalad_args="{0} {1}".format(IMPALAD_ARGS,
                                   "--allow_catalog_cache_op_from_masked_users=true"),
-    catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS,
+    catalogd_args=CATALOGD_ARGS,
     disable_log_buffering=True)
   def test_allow_metadata_update_local_catalog(self, unique_name):
     self._test_allow_catalog_cache_op_from_masked_users(unique_name)
@@ -1774,8 +1778,8 @@ class TestRangerIndependent(TestRanger):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args=LOCAL_CATALOG_IMPALAD_ARGS,
-    catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS,
+    impalad_args=IMPALAD_ARGS,
+    catalogd_args=CATALOGD_ARGS,
     # We additionally set 'reset_ranger' to True, to reset all the policies in the
     # Ranger service, so even if there were roles before this test, they will be
     # deleted when this test runs. since the Ranger policies are reset before this
@@ -1787,8 +1791,8 @@ class TestRangerIndependent(TestRanger):
 
 
 @CustomClusterTestSuite.with_args(
-    impalad_args=IMPALAD_ARGS,
-    catalogd_args=CATALOGD_ARGS)
+    impalad_args=LEGACY_CATALOG_IMPALAD_ARGS,
+    catalogd_args=LEGACY_CATALOG_CATALOGD_ARGS)
 class TestRangerLegacyCatalog(TestRanger):
   """
   Tests for Apache Ranger integration with Apache Impala in legacy catalog mode.
@@ -1939,6 +1943,50 @@ class TestRangerLegacyCatalog(TestRanger):
           .format(unique_database))
       self.filesystem_client.delete_file_dir("{0}/{1}"
           .format(source_hdfs_dir, file_name))
+
+  @pytest.mark.execute_serially
+  def test_legacy_catalog_ownership(self):
+      self._test_ownership()
+
+  @pytest.mark.execute_serially
+  def test_grant_revoke_by_owner_legacy_catalog(self, unique_name):
+    self._test_grant_revoke_by_owner(unique_name)
+
+  @pytest.mark.execute_serially
+  def test_select_view_created_by_non_superuser_with_catalog_v1(self, unique_name):
+    self._test_select_view_created_by_non_superuser(unique_name)
+
+
+@CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS,
+    catalogd_args=CATALOGD_ARGS)
+class TestRangerLocalCatalog(TestRanger):
+  """
+  Tests for Apache Ranger integration with Apache Impala in local catalog mode.
+  Test methods shares common cluster.
+  """
+
+  @pytest.mark.execute_serially
+  def test_grant_revoke_with_local_catalog(self, unique_name):
+    """Tests grant/revoke with catalog v2 (local catalog)."""
+    self._test_grant_revoke(unique_name, [None, "invalidate metadata",
+                                          "refresh authorization"])
+
+  @pytest.mark.execute_serially
+  def test_local_catalog_ownership(self):
+      # getTableIfCached() in LocalCatalog loads a minimal incomplete table
+      # that does not include the ownership information. Hence show tables
+      # *never* show owned tables. TODO(bharathv): Fix in a follow up commit
+      pytest.xfail("getTableIfCached() faulty behavior, known issue")
+      self._test_ownership()
+
+  @pytest.mark.execute_serially
+  def test_grant_revoke_by_owner_local_catalog(self, unique_name):
+    self._test_grant_revoke_by_owner(unique_name)
+
+  @pytest.mark.execute_serially
+  def test_select_view_created_by_non_superuser_with_local_catalog(self, unique_name):
+    self._test_select_view_created_by_non_superuser(unique_name)
 
   @pytest.mark.execute_serially
   def test_grant_option(self, unique_name):
@@ -2097,14 +2145,6 @@ class TestRangerLegacyCatalog(TestRanger):
       admin_client.execute("revoke all on database {0} from user {1}"
                            .format(unique_db, user))
       admin_client.execute("drop database if exists {0} cascade".format(unique_db))
-
-  @pytest.mark.execute_serially
-  def test_legacy_catalog_ownership(self):
-      self._test_ownership()
-
-  @pytest.mark.execute_serially
-  def test_grant_revoke_by_owner_legacy_catalog(self, unique_name):
-    self._test_grant_revoke_by_owner(unique_name)
 
   @pytest.mark.execute_serially
   def test_unsupported_sql(self):
@@ -3071,42 +3111,6 @@ class TestRangerLegacyCatalog(TestRanger):
 
       for statement in cleanup_statements:
         admin_client.execute(statement)
-
-  @pytest.mark.execute_serially
-  def test_select_view_created_by_non_superuser_with_catalog_v1(self, unique_name):
-    self._test_select_view_created_by_non_superuser(unique_name)
-
-
-@CustomClusterTestSuite.with_args(
-    impalad_args=LOCAL_CATALOG_IMPALAD_ARGS,
-    catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS)
-class TestRangerLocalCatalog(TestRanger):
-  """
-  Tests for Apache Ranger integration with Apache Impala in local catalog mode.
-  Test methods shares common cluster.
-  """
-
-  @pytest.mark.execute_serially
-  def test_grant_revoke_with_local_catalog(self, unique_name):
-    """Tests grant/revoke with catalog v2 (local catalog)."""
-    self._test_grant_revoke(unique_name, [None, "invalidate metadata",
-                                          "refresh authorization"])
-
-  @pytest.mark.execute_serially
-  def test_local_catalog_ownership(self):
-      # getTableIfCached() in LocalCatalog loads a minimal incomplete table
-      # that does not include the ownership information. Hence show tables
-      # *never* show owned tables. TODO(bharathv): Fix in a follow up commit
-      pytest.xfail("getTableIfCached() faulty behavior, known issue")
-      self._test_ownership()
-
-  @pytest.mark.execute_serially
-  def test_grant_revoke_by_owner_local_catalog(self, unique_name):
-    self._test_grant_revoke_by_owner(unique_name)
-
-  @pytest.mark.execute_serially
-  def test_select_view_created_by_non_superuser_with_local_catalog(self, unique_name):
-    self._test_select_view_created_by_non_superuser(unique_name)
 
 
 class TestRangerColumnMaskingTpchNested(CustomClusterTestSuite):

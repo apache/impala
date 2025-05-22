@@ -427,12 +427,15 @@ class TestWorkloadManagementSQLDetailsCalcite(WorkloadManagementTestSuite):
     super(TestWorkloadManagementSQLDetailsCalcite, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(hs2_client_protocol_dimension())
 
-  @CustomClusterTestSuite.with_args(start_args="--use_calcite_planner=true",
-                                    cluster_size=1, workload_mgmt=True)
+  @CustomClusterTestSuite.with_args(
+      start_args="--use_calcite_planner=true",
+      impalad_args="--use_local_catalog=false",
+      catalogd_args="--catalog_topic_mode=full",
+      cluster_size=1, workload_mgmt=True)
   def test_tpcds_8_decimal(self, vector):
     """Runs the tpcds-decimal_v2-q8 query using the calcite planner and asserts the query
        completes successfully. See IMPALA-13505 for details on why this query in
-       particular is tested."""
+       particular is tested. Calcite planner does not work in local catalog mode yet."""
 
     client = self.get_client(vector.get_value("protocol"))
     assert client.execute("use tpcds").success

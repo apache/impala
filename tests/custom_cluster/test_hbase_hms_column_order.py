@@ -37,6 +37,7 @@ class TestHBaseHmsColumnOrder(CustomClusterTestSuite):
         v.get_value('table_format').file_format == 'hbase')
 
   @CustomClusterTestSuite.with_args(
+      impalad_args="--use_hms_column_order_for_hbase_tables=true",
       catalogd_args="--use_hms_column_order_for_hbase_tables=true")
-  def test_hbase_hms_column_order(self, vector, unique_database):
-    self.run_test_case('QueryTest/hbase-hms-column-order', vector, unique_database)
+  def test_hbase_hms_column_order(self, vector):
+    self.run_test_case('QueryTest/hbase-hms-column-order', vector)

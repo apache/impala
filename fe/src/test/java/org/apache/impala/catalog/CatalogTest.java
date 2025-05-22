@@ -57,6 +57,7 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TFunctionBinaryType;
@@ -367,7 +368,7 @@ public class CatalogTest {
         /*tblWasRemoved=*/new Reference<Boolean>(),
         /*dbWasAdded=*/new Reference<Boolean>(), NoOpEventSequence.INSTANCE);
 
-    HdfsTable table = (HdfsTable)catalog_.getOrLoadTable("functional", "AllTypes",
+    HdfsTable table = (HdfsTable)catalog_.getOrLoadTable("functional", "alltypes",
         "test", null);
     StorageStatistics opsCounts = stats.get(DFSOpsCountStatistics.NAME);
 
@@ -375,7 +376,9 @@ public class CatalogTest {
     // - one listLocatedStatus() per partition, to get the file info
     // - one listStatus() for the month=2010/ dir
     // - one listStatus() for the month=2009/ dir
-    long expectedCalls = table.getPartitionIds().size() + 2;
+    // If in minimal topic mode, the last two listStatus() are not made.
+    boolean isMinimalTopicMode = BackendConfig.INSTANCE.isMinimalTopicMode();
+    long expectedCalls = table.getPartitionIds().size() + (isMinimalTopicMode ? 0 : 2);
     // Due to HDFS-13747, the listStatus calls are incorrectly accounted as
     // op_list_located_status. So, we'll just add up the two to make our
     // assertion resilient to this bug.
@@ -383,8 +386,10 @@ public class CatalogTest {
         opsCounts.getLong(LIST_STATUS);
     assertEquals(expectedCalls, seenCalls);
 
-    // We expect only one getFileStatus call, for the top-level directory.
-    assertEquals(1L, (long)opsCounts.getLong(GET_FILE_STATUS));
+    long expectedGetFileStatus = isMinimalTopicMode ? 0L : 1L;
+    // If not in minimal topic mode, we expect only one getFileStatus call,
+    // for the top-level directory.
+    assertEquals(expectedGetFileStatus, (long)opsCounts.getLong(GET_FILE_STATUS));
 
     // None of the underlying files changed so we should not do any ops for the files.
     assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
@@ -393,8 +398,9 @@ public class CatalogTest {
     stats.reset();
     catalog_.reloadTable(table, "test", NoOpEventSequence.INSTANCE);
 
-    // Again, we expect only one getFileStatus call, for the top-level directory.
-    assertEquals(1L, (long)opsCounts.getLong(GET_FILE_STATUS));
+    // Again, we expect only one getFileStatus call if not in minimal topic mode,
+    // for the top-level directory.
+    assertEquals(expectedGetFileStatus, (long)opsCounts.getLong(GET_FILE_STATUS));
     // REFRESH calls listStatus on each of the partitions, but doesn't re-check
     // the permissions of the partition directories themselves.
     seenCalls = opsCounts.getLong(LIST_LOCATED_STATUS) +

@@ -661,6 +661,7 @@ public class JniFrontend {
 
   public void setCatalogIsReady() {
     Preconditions.checkNotNull(frontend_);
+    LOG.info("Forcing catalog to ready state for testing");
     frontend_.getCatalog().setIsReady(true);
   }
 

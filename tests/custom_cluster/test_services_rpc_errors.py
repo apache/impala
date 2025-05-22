@@ -70,33 +70,34 @@ class TestCatalogRpcErrors(CustomClusterTestSuite):
     """Validate that RPCs to the catalogd are retried by injecting a failure into the
     first RPC attempt for any catalogd RPC. Run a variety of queries that require
     catalogd interaction to ensure all RPCs are retried."""
+    log_pattern = "{0}.*Injected RPC error.*Debug Action: CATALOG_RPC_FIRST_ATTEMPT"
     # Validate create table queries.
     result = self.execute_query("create table {0}.tmp (col int)".format(unique_database))
     assert result.success
+    self.assert_impalad_log_contains("INFO", log_pattern.format(result.query_id), -1)
 
     # Validate insert queries.
     result = self.execute_query("insert into table {0}.tmp values (1)"
         .format(unique_database))
     assert result.success
+    self.assert_impalad_log_contains("INFO", log_pattern.format(result.query_id), -1)
 
     # Validate compute stats queries.
     result = self.execute_query("compute stats {0}.tmp".format(unique_database))
     assert result.success
+    self.assert_impalad_log_contains("INFO", log_pattern.format(result.query_id), -1)
 
     # Validate refresh table queries.
     result = self.execute_query("refresh {0}.tmp".format(unique_database))
     assert result.success
+    self.assert_impalad_log_contains("INFO", log_pattern.format(result.query_id), -1)
 
     # Validate drop table queries.
     result = self.execute_query("drop table {0}.tmp".format(unique_database))
     assert result.success
+    self.assert_impalad_log_contains("INFO", log_pattern.format(result.query_id), -1)
 
     # Validate select queries against pre-existing, but not-loaded tables.
     result = self.execute_query("select count(*) from functional_parquet.alltypes")
     assert result.success, str(result)
-
-    # The 6 queries above each should have triggered the DEBUG_ACTION, so assert that
-    # the DEBUG_ACTION was triggered 8 times (an extra 2 for the DROP and CREATE DATABASE
-    # queries needed to make the unique_database).
-    self.assert_impalad_log_contains("INFO",
-        "Injected RPC error.*Debug Action: CATALOG_RPC_FIRST_ATTEMPT", 8)
+    self.assert_impalad_log_contains("INFO", log_pattern.format(result.query_id), -1)

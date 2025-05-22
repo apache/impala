@@ -175,7 +175,8 @@ class TestQueryLive(CustomClusterTestSuite):
     insert_result = self.execute_query_expect_failure(self.client,
         'insert into sys.impala_query_live select * from sys.impala_query_live limit 1')
     assert 'UnsupportedOperationException: Cannot create data sink into table of type: '\
-        'org.apache.impala.catalog.SystemTable' in str(insert_result)
+        'org.apache.impala.catalog' in str(insert_result)
+    assert 'SystemTable' in str(insert_result)
 
     update_result = self.execute_query_expect_failure(self.client,
         'update sys.impala_query_live set query_id = ""')

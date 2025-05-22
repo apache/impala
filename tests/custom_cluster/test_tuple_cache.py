@@ -470,7 +470,10 @@ class TestTupleCacheSingle(TestTupleCacheBase):
     assert sorted(result1.data) == sorted(result2.data)
 
 
-@CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
+@CustomClusterTestSuite.with_args(
+    start_args=CACHE_START_ARGS,
+    impalad_args="--use_local_catalog=false",
+    catalogd_args="--catalog_topic_mode=full")
 class TestTupleCacheCluster(TestTupleCacheBase):
   """Tests Impala with 3 executors and mt_dop=1."""
 
@@ -482,6 +485,8 @@ class TestTupleCacheCluster(TestTupleCacheBase):
   def test_runtime_filters(self, vector, unique_database):
     """
     This tests that adding files to a table results in different runtime filter keys.
+    The last assertions after 'invaidate metadata' only meet if Impala cluster is in
+    legacy catalog mode.
     """
     self.client.set_configuration(vector.get_value('exec_option'))
     fq_table = "{0}.runtime_filters".format(unique_database)

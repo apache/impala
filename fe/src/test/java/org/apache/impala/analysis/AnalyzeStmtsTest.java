@@ -4008,13 +4008,19 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "functional_text_gzip.jointbl",
           "/test-warehouse/alltypes_text_gzip/year=2009/month=4", overwrite));
 
-      // Verify with a read-only table
-      AnalysisError(String.format("load data inpath '%s' into table " +
-          "functional_seq.alltypes partition(year=2009, month=3)",
-          "/test-warehouse/alltypes_seq/year=2009/month=5", overwrite),
-          "Unable to LOAD DATA into target table (functional_seq.alltypes) because " +
-          "Impala does not have WRITE access to HDFS location: " +
-          "hdfs://localhost:20500/test-warehouse/alltypes_seq/year=2009/month=3");
+      if (!BackendConfig.INSTANCE.isMinimalTopicMode()) {
+        // Verify with a read-only table.
+        // This test does not work in minimal topic mode because minimal topic mode
+        // always assumeReadWriteAccess=true (see IMPALA-7539).
+        String query =
+            String.format("load data inpath '%s' into table functional_seq.alltypes "
+                    + "partition(year=2009, month=3)",
+                "/test-warehouse/alltypes_seq/year=2009/month=5");
+        AnalysisError(query,
+            "Unable to LOAD DATA into target table (functional_seq.alltypes) because "
+                + "Impala does not have WRITE access to HDFS location: "
+                + "hdfs://localhost:20500/test-warehouse/alltypes_seq/year=2009/month=3");
+      }
     }
   }
 
@@ -4043,12 +4049,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       testInsertWithPermutation(qualifier);
     }
 
-    // Test INSERT into a table that Impala does not have WRITE access to.
-    AnalysisError("insert into functional_seq.alltypes partition(year, month)" +
-        "select * from functional.alltypes",
-        "Unable to INSERT into target table (functional_seq.alltypes) because Impala " +
-        "does not have WRITE access to HDFS location: " +
-        "hdfs://localhost:20500/test-warehouse/alltypes_seq");
+    if (!BackendConfig.INSTANCE.isMinimalTopicMode()) {
+      // Test INSERT into a table that Impala does not have WRITE access to.
+      // This test does not work in minimal topic mode because minimal topic mode
+      // always assumeReadWriteAccess=true (see IMPALA-7539).
+      AnalysisError("insert into functional_seq.alltypes partition(year, month)"
+              + "select * from functional.alltypes",
+          "Unable to INSERT into target table (functional_seq.alltypes) because Impala "
+              + "does not have WRITE access to HDFS location: "
+              + "hdfs://localhost:20500/test-warehouse/alltypes_seq");
+    }
 
     // Insert with a correlated inline view.
     AnalyzesOk("insert into table functional.alltypessmall " +
