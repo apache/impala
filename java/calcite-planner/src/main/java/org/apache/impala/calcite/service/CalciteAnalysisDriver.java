@@ -108,7 +108,7 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
       // Recall that parsedStmt_.getTablesInQuery(null) only contains TableName's in the
       // given query but not the underlying tables referenced by a regular view.
       CalciteMetadataHandler.populateCalciteSchema(reader_, ctx_.getCatalog(),
-          stmtTableCache_);
+          stmtTableCache_, analyzer_);
 
       typeFactory_ = new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
       sqlValidator_ = SqlValidatorUtil.newValidator(

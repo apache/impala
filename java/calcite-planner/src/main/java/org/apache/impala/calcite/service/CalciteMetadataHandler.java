@@ -33,11 +33,14 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.calcite.schema.CalciteDb;
 import org.apache.impala.calcite.schema.ImpalaCalciteCatalogReader;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
+import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
@@ -77,6 +80,8 @@ public class CalciteMetadataHandler implements CompilerStep {
   // may be needed by the CalciteTable object
   private final CalciteCatalogReader reader_;
 
+  private final Analyzer analyzer_;
+
   public CalciteMetadataHandler(SqlNode parsedNode,
       CalciteJniFrontend.QueryContext queryCtx) throws ImpalaException {
 
@@ -93,11 +98,13 @@ public class CalciteMetadataHandler implements CompilerStep {
     this.reader_ = createCalciteCatalogReader(stmtTableCache_,
         queryCtx.getTQueryCtx(), queryCtx.getCurrentDb());
 
+    this.analyzer_ = createAnalyzer(stmtTableCache_, queryCtx);
+
     // populate calcite schema.  This step needs to be done after the loader because the
     // schema needs to contain the columns in the table for validation, which cannot
     // be done when it's an IncompleteTable
     List<String> errorTables = populateCalciteSchema(reader_,
-        queryCtx.getFrontend().getCatalog(), stmtTableCache_);
+        queryCtx.getFrontend().getCatalog(), stmtTableCache_, analyzer_);
 
     tableVisitor.checkForComplexTable(stmtTableCache_, errorTables, queryCtx);
   }
@@ -125,8 +132,8 @@ public class CalciteMetadataHandler implements CompilerStep {
    * list of tables in the query that are not found in the database.
    */
   public static List<String> populateCalciteSchema(CalciteCatalogReader reader,
-      FeCatalog catalog, StmtMetadataLoader.StmtTableCache stmtTableCache)
-      throws ImpalaException {
+      FeCatalog catalog, StmtMetadataLoader.StmtTableCache stmtTableCache,
+      Analyzer analyzer) throws ImpalaException {
     List<String> notFoundTables = new ArrayList<>();
     CalciteSchema rootSchema = reader.getRootSchema();
     Map<String, CalciteDb.Builder> dbSchemas = new HashMap<>();
@@ -149,7 +156,7 @@ public class CalciteMetadataHandler implements CompilerStep {
       // first instance seen in the query.
       CalciteDb.Builder dbBuilder =
           dbSchemas.getOrDefault(tableName.getDb(), new CalciteDb.Builder(reader));
-      dbBuilder.addTable(tableName.getTbl().toLowerCase(), feTable);
+      dbBuilder.addTable(tableName.getTbl().toLowerCase(), feTable, analyzer);
       dbSchemas.put(tableName.getDb().toLowerCase(), dbBuilder);
     }
 
@@ -166,6 +173,18 @@ public class CalciteMetadataHandler implements CompilerStep {
 
   public CalciteCatalogReader getCalciteCatalogReader() {
     return reader_;
+  }
+
+  public Analyzer getAnalyzer() {
+    return analyzer_;
+  }
+
+  private Analyzer createAnalyzer(StmtMetadataLoader.StmtTableCache stmtTableCache,
+      CalciteJniFrontend.QueryContext queryCtx) throws ImpalaException {
+    // XXX: using NoopAuthorizationFactory, but this part of the code will
+    // eventually either be deprecated or only used in the test environment.
+    return new SimplifiedAnalyzer(stmtTableCache, queryCtx.getTQueryCtx(),
+        new NoopAuthorizationFactory(), null);
   }
 
   /**

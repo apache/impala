@@ -31,27 +31,27 @@ import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
+import org.apache.calcite.prepare.CalciteCatalogReader;
+import org.apache.calcite.prepare.PlannerImpl;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
-import org.apache.impala.calcite.operators.ImpalaConvertletTable;
-import org.apache.calcite.prepare.PlannerImpl;
-import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
-
-import org.apache.calcite.sql.validate.SqlValidator;
-import org.apache.calcite.prepare.CalciteCatalogReader;
+import org.apache.impala.calcite.operators.ImpalaConvertletTable;
+import org.apache.impala.calcite.schema.ImpalaRelMetadataProvider;
 
 import java.util.List;
 
@@ -88,6 +88,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
         RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
     viewExpander_ = createViewExpander(
         analysisResult.getSqlValidator().getCatalogReader().getRootSchema().plus());
+    cluster_.setMetadataProvider(ImpalaRelMetadataProvider.DEFAULT);
   }
 
   public CalciteRelNodeConverter(CalciteValidator validator) {
@@ -100,6 +101,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
         RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
     viewExpander_ = createViewExpander(validator.getCatalogReader()
         .getRootSchema().plus());
+    cluster_.setMetadataProvider(ImpalaRelMetadataProvider.DEFAULT);
   }
 
   private static RelOptTable.ViewExpander createViewExpander(SchemaPlus schemaPlus) {

@@ -39,6 +39,7 @@ import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.service.JniFrontend;
+import org.apache.impala.thrift.TClientRequest;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
@@ -265,6 +266,16 @@ public class CalciteJniFrontend extends JniFrontend {
       this.frontend_ = frontend;
       this.stmt_ = queryCtx_.getClient_request().getStmt();
       this.currentDb_ = queryCtx_.getSession().getDatabase();
+      this.timeline_ = new EventSequence("Frontend Timeline (Calcite Planner)");
+    }
+
+    public QueryContext(TQueryOptions options, Frontend frontend,
+        String stmt) throws ImpalaException {
+      this.queryCtx_ = new TQueryCtx();
+      this.queryCtx_.setClient_request(new TClientRequest("FeTests", options));
+      this.frontend_ = frontend;
+      this.stmt_ = stmt;
+      this.currentDb_ = "default";
       this.timeline_ = new EventSequence("Frontend Timeline (Calcite Planner)");
     }
 

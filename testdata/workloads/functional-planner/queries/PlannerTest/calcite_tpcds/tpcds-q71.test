@@ -63,13 +63,32 @@ PLAN-ROOT SINK
 |  in pipelines: 15(GETNEXT), 02(OPEN), 05(OPEN), 08(OPEN)
 |
 14:HASH JOIN [INNER JOIN]
+|  hash predicates: TIME_SK = tpcds_partitioned_parquet_snap.time_dim.t_time_sk
+|  fk/pk conjuncts: assumed fk/pk
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=13,14,16 row-size=539B cardinality=894.28M cost=391450496
+|  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 13(OPEN)
+|
+|--13:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
+|     HDFS partitions=1/1 files=1 size=1.31MB
+|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
+|     stored statistics:
+|       table: rows=86.40K size=1.31MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=86.40K
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
+|     mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
+|     tuple-ids=16 row-size=117B cardinality=22.33K cost=73531
+|     in pipelines: 13(GETNEXT)
+|
+12:HASH JOIN [INNER JOIN]
 |  hash predicates: SOLD_ITEM_SK = tpcds_partitioned_parquet_snap.item.i_item_sk
 |  fk/pk conjuncts: assumed fk/pk
 |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=13,14,16 row-size=539B cardinality=894.28M cost=391431790
-|  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 13(OPEN)
+|  tuple-ids=13,14 row-size=421B cardinality=894.28M cost=391431790
+|  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 11(OPEN)
 |
-|--13:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
+|--11:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: tpcds_partitioned_parquet_snap.item.i_manager_id = CAST(1 AS INT)
 |     stored statistics:
@@ -79,26 +98,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manager_id = CAST(1 AS INT)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manager_id = CAST(1 AS INT)
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|     tuple-ids=16 row-size=405B cardinality=3.63K cost=1365725
-|     in pipelines: 13(GETNEXT)
-|
-12:HASH JOIN [INNER JOIN]
-|  hash predicates: TIME_SK = tpcds_partitioned_parquet_snap.time_dim.t_time_sk
-|  fk/pk conjuncts: assumed fk/pk
-|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=13,14 row-size=133B cardinality=894.28M cost=391450496
-|  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 11(OPEN)
-|
-|--11:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
-|     HDFS partitions=1/1 files=1 size=1.31MB
-|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
-|     stored statistics:
-|       table: rows=86.40K size=1.31MB
-|       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
-|     mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
-|     tuple-ids=14 row-size=117B cardinality=22.33K cost=73531
+|     tuple-ids=14 row-size=405B cardinality=3.63K cost=1365725
 |     in pipelines: 11(GETNEXT)
 |
 00:UNION
@@ -260,29 +260,65 @@ max-parallelism=109 segment-costs=[7971000416, 3668617212] cpu-comparison-result
 |
 14:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=00
-|  hash predicates: SOLD_ITEM_SK = tpcds_partitioned_parquet_snap.item.i_item_sk
+|  hash predicates: TIME_SK = tpcds_partitioned_parquet_snap.time_dim.t_time_sk
 |  fk/pk conjuncts: assumed fk/pk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=13,14,16 row-size=539B cardinality=894.28M cost=391428163
 |  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 13(OPEN)
 |
 |--F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=54.86MB mem-reservation=52.25MB thread-reservation=1
+|  |  max-parallelism=10 segment-costs=[52013]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: tpcds_partitioned_parquet_snap.time_dim.t_time_sk
+|  |  mem-estimate=52.25MB mem-reservation=52.25MB spill-buffer=256.00KB thread-reservation=0 cost=22333
+|  |
+|  21:EXCHANGE [BROADCAST]
+|  |  mem-estimate=2.61MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=16 row-size=117B cardinality=22.33K cost=29680
+|  |  in pipelines: 13(GETNEXT)
+|  |
+|  F09:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.47MB mem-reservation=2.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[81077]
+|  13:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
+|     HDFS partitions=1/1 files=1 size=1.31MB
+|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
+|     stored statistics:
+|       table: rows=86.40K size=1.31MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=86.40K
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
+|     mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
+|     tuple-ids=16 row-size=117B cardinality=22.33K cost=73531
+|     in pipelines: 13(GETNEXT)
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=01
+|  hash predicates: SOLD_ITEM_SK = tpcds_partitioned_parquet_snap.item.i_item_sk
+|  fk/pk conjuncts: assumed fk/pk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=13,14 row-size=421B cardinality=894.28M cost=391428163
+|  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 11(OPEN)
+|
+|--F13:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=34.63MB mem-reservation=31.62MB thread-reservation=1
 |  |  max-parallelism=10 segment-costs=[8447]
 |  JOIN BUILD
-|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.item.i_item_sk
 |  |  mem-estimate=31.62MB mem-reservation=31.62MB spill-buffer=128.00KB thread-reservation=0 cost=3627
 |  |
-|  21:EXCHANGE [BROADCAST]
+|  20:EXCHANGE [BROADCAST]
 |  |  mem-estimate=3.00MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=16 row-size=405B cardinality=3.63K cost=4820
-|  |  in pipelines: 13(GETNEXT)
+|  |  tuple-ids=14 row-size=405B cardinality=3.63K cost=4820
+|  |  in pipelines: 11(GETNEXT)
 |  |
-|  F09:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+|  F08:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 |  Per-Instance Resources: mem-estimate=17.60MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=4 segment-costs=[1369774]
-|  13:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
+|  11:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: tpcds_partitioned_parquet_snap.item.i_manager_id = CAST(1 AS INT)
 |     stored statistics:
@@ -292,43 +328,7 @@ max-parallelism=109 segment-costs=[7971000416, 3668617212] cpu-comparison-result
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manager_id = CAST(1 AS INT)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manager_id = CAST(1 AS INT)
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|     tuple-ids=16 row-size=405B cardinality=3.63K cost=1365725
-|     in pipelines: 13(GETNEXT)
-|
-12:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash-table-id=01
-|  hash predicates: TIME_SK = tpcds_partitioned_parquet_snap.time_dim.t_time_sk
-|  fk/pk conjuncts: assumed fk/pk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=13,14 row-size=133B cardinality=894.28M cost=391428163
-|  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 11(OPEN)
-|
-|--F13:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=54.86MB mem-reservation=52.25MB thread-reservation=1
-|  |  max-parallelism=10 segment-costs=[52013]
-|  JOIN BUILD
-|  |  join-table-id=01 plan-id=02 cohort-id=01
-|  |  build expressions: tpcds_partitioned_parquet_snap.time_dim.t_time_sk
-|  |  mem-estimate=52.25MB mem-reservation=52.25MB spill-buffer=256.00KB thread-reservation=0 cost=22333
-|  |
-|  20:EXCHANGE [BROADCAST]
-|  |  mem-estimate=2.61MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=14 row-size=117B cardinality=22.33K cost=29680
-|  |  in pipelines: 11(GETNEXT)
-|  |
-|  F08:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.47MB mem-reservation=2.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[81077]
-|  11:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.31MB
-|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
-|     stored statistics:
-|       table: rows=86.40K size=1.31MB
-|       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
-|     mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
-|     tuple-ids=14 row-size=117B cardinality=22.33K cost=73531
+|     tuple-ids=14 row-size=405B cardinality=3.63K cost=1365725
 |     in pipelines: 11(GETNEXT)
 |
 00:UNION
@@ -541,29 +541,65 @@ max-parallelism=109 segment-costs=[7971000416, 3668617212] cpu-comparison-result
 |
 14:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=00
-|  hash predicates: SOLD_ITEM_SK = tpcds_partitioned_parquet_snap.item.i_item_sk
+|  hash predicates: TIME_SK = tpcds_partitioned_parquet_snap.time_dim.t_time_sk
 |  fk/pk conjuncts: assumed fk/pk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=13,14,16 row-size=539B cardinality=894.28M cost=391428163
 |  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 13(OPEN)
 |
 |--F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=54.86MB mem-reservation=52.25MB thread-reservation=1
+|  |  max-parallelism=10 segment-costs=[52013]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: tpcds_partitioned_parquet_snap.time_dim.t_time_sk
+|  |  mem-estimate=52.25MB mem-reservation=52.25MB spill-buffer=256.00KB thread-reservation=0 cost=22333
+|  |
+|  21:EXCHANGE [BROADCAST]
+|  |  mem-estimate=2.61MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=16 row-size=117B cardinality=22.33K cost=29680
+|  |  in pipelines: 13(GETNEXT)
+|  |
+|  F09:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.47MB mem-reservation=2.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[81077]
+|  13:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
+|     HDFS partitions=1/1 files=1 size=1.31MB
+|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
+|     stored statistics:
+|       table: rows=86.40K size=1.31MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=86.40K
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
+|     mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
+|     tuple-ids=16 row-size=117B cardinality=22.33K cost=73531
+|     in pipelines: 13(GETNEXT)
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=01
+|  hash predicates: SOLD_ITEM_SK = tpcds_partitioned_parquet_snap.item.i_item_sk
+|  fk/pk conjuncts: assumed fk/pk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=13,14 row-size=421B cardinality=894.28M cost=391428163
+|  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 11(OPEN)
+|
+|--F13:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=34.63MB mem-reservation=31.62MB thread-reservation=1
 |  |  max-parallelism=10 segment-costs=[8447]
 |  JOIN BUILD
-|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.item.i_item_sk
 |  |  mem-estimate=31.62MB mem-reservation=31.62MB spill-buffer=128.00KB thread-reservation=0 cost=3627
 |  |
-|  21:EXCHANGE [BROADCAST]
+|  20:EXCHANGE [BROADCAST]
 |  |  mem-estimate=3.00MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=16 row-size=405B cardinality=3.63K cost=4820
-|  |  in pipelines: 13(GETNEXT)
+|  |  tuple-ids=14 row-size=405B cardinality=3.63K cost=4820
+|  |  in pipelines: 11(GETNEXT)
 |  |
-|  F09:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+|  F08:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
 |  Per-Instance Resources: mem-estimate=17.60MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=4 segment-costs=[1369774]
-|  13:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
+|  11:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     predicates: tpcds_partitioned_parquet_snap.item.i_manager_id = CAST(1 AS INT)
 |     stored statistics:
@@ -573,43 +609,7 @@ max-parallelism=109 segment-costs=[7971000416, 3668617212] cpu-comparison-result
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manager_id = CAST(1 AS INT)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manager_id = CAST(1 AS INT)
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|     tuple-ids=16 row-size=405B cardinality=3.63K cost=1365725
-|     in pipelines: 13(GETNEXT)
-|
-12:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash-table-id=01
-|  hash predicates: TIME_SK = tpcds_partitioned_parquet_snap.time_dim.t_time_sk
-|  fk/pk conjuncts: assumed fk/pk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=13,14 row-size=133B cardinality=894.28M cost=391428163
-|  in pipelines: 02(GETNEXT), 05(GETNEXT), 08(GETNEXT), 11(OPEN)
-|
-|--F13:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=54.86MB mem-reservation=52.25MB thread-reservation=1
-|  |  max-parallelism=10 segment-costs=[52013]
-|  JOIN BUILD
-|  |  join-table-id=01 plan-id=02 cohort-id=01
-|  |  build expressions: tpcds_partitioned_parquet_snap.time_dim.t_time_sk
-|  |  mem-estimate=52.25MB mem-reservation=52.25MB spill-buffer=256.00KB thread-reservation=0 cost=22333
-|  |
-|  20:EXCHANGE [BROADCAST]
-|  |  mem-estimate=2.61MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=14 row-size=117B cardinality=22.33K cost=29680
-|  |  in pipelines: 11(GETNEXT)
-|  |
-|  F08:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.47MB mem-reservation=2.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[81077]
-|  11:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
-|     HDFS partitions=1/1 files=1 size=1.31MB
-|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
-|     stored statistics:
-|       table: rows=86.40K size=1.31MB
-|       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'breakfast' OR tpcds_partitioned_parquet_snap.time_dim.t_meal_time = 'dinner'
-|     mem-estimate=16.00MB mem-reservation=2.00MB thread-reservation=0
-|     tuple-ids=14 row-size=117B cardinality=22.33K cost=73531
+|     tuple-ids=14 row-size=405B cardinality=3.63K cost=1365725
 |     in pipelines: 11(GETNEXT)
 |
 00:UNION

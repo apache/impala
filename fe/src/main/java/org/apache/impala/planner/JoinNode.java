@@ -65,7 +65,7 @@ public abstract class JoinNode extends PlanNode {
 
   // Slop in percent allowed when comparing stats for the purpose of determining whether
   // an equi-join condition is a foreign/primary key join.
-  protected final static double FK_PK_MAX_STATS_DELTA_PERC = 0.05;
+  public final static double FK_PK_MAX_STATS_DELTA_PERC = 0.05;
 
   protected JoinOperator joinOp_;
 

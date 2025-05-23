@@ -50,13 +50,7 @@ public class CalcitePhysPlanCreator implements CompilerStep {
 
   public CalcitePhysPlanCreator(CalciteMetadataHandler mdHandler,
       CalciteJniFrontend.QueryContext queryCtx) throws ImpalaException {
-    // TODO: IMPALA-13011: Awkward call for authorization here. Authorization
-    // will be done at validation time, but this is needed here for the Analyzer
-    // instantiation.
-    AuthorizationFactory authzFactory =
-        AuthorizationUtil.authzFactoryFrom(BackendConfig.INSTANCE);
-    this.analyzer_ = new SimplifiedAnalyzer(mdHandler.getStmtTableCache(),
-        queryCtx.getTQueryCtx(), authzFactory, null);
+    this.analyzer_ = mdHandler.getAnalyzer();
     this.plannerContext_ =
         new PlannerContext(analyzer_, queryCtx.getTQueryCtx(), queryCtx.getTimeline());
 

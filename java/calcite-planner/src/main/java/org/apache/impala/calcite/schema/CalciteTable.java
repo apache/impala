@@ -58,6 +58,7 @@ import org.apache.impala.calcite.rel.util.ImpalaBaseTableRef;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.calcite.util.SimplifiedAnalyzer;
+import org.apache.impala.planner.HdfsEstimatedMissingTableStats;
 import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
@@ -65,6 +66,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.util.AcidUtils;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
@@ -83,12 +85,24 @@ public class CalciteTable extends RelOptAbstractTable
 
   private final List<String> qualifiedTableName_;
 
-  public CalciteTable(FeTable table, CalciteCatalogReader reader)
-      throws ImpalaException {
+  private final List<Column> columns_;
+
+  private final SimplifiedAnalyzer analyzer_;
+
+  private final HdfsEstimatedMissingTableStats estimatedMissingStats_;
+
+  public CalciteTable(FeTable table, CalciteCatalogReader reader,
+      Analyzer analyzer) throws ImpalaException {
     super(reader, table.getName(), buildColumnsForRelDataType(table));
     this.table_ = (HdfsTable) table;
     this.qualifiedTableName_ = table.getTableName().toPath();
+    this.columns_ = table.getColumnsInHiveOrder();
     this.impalaPositionMap_ = buildPositionMap();
+    this.analyzer_ = (SimplifiedAnalyzer) analyzer;
+    estimatedMissingStats_ = table_.getNumRows() < 0
+        ? new HdfsEstimatedMissingTableStats(analyzer.getQueryOptions(), table_,
+            table_.getPartitions(), -1)
+        : null;
 
     checkIfTableIsSupported(table);
   }
@@ -220,8 +234,23 @@ public class CalciteTable extends RelOptAbstractTable
 
   @Override
   public double getRowCount() {
-    return (double) table_.getNumRows();
+    if (table_.getNumRows() >= 0.0) {
+      return (double) table_.getNumRows();
+    }
+
+    Preconditions.checkNotNull(estimatedMissingStats_);
+    return estimatedMissingStats_.statsNumRows_;
   }
+
+  public List<Column> getColumns() {
+    return columns_;
+  }
+
+  public Column getColumn(int i) {
+    HdfsTable feFsTable = (HdfsTable) table_;
+    return columns_.get(i);
+  }
+
 
   /**
    * Returns a position map from Impala column numbers to Calcite

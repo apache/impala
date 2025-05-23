@@ -25,6 +25,7 @@ import org.apache.calcite.rel.type.RelDataTypeImpl;
 import org.apache.calcite.schema.Table;
 import org.apache.calcite.schema.impl.ViewTable;
 import org.apache.calcite.schema.impl.AbstractSchema;
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsTable;
@@ -60,11 +61,13 @@ public class CalciteDb extends AbstractSchema {
       this.reader_ = reader;
     }
 
-    public Builder addTable(String tableName, FeTable table) throws ImpalaException {
+    public Builder addTable(String tableName, FeTable table,
+        Analyzer analyzer) throws ImpalaException {
       if (tableMap_.containsKey(tableName)) return this;
 
       if (table instanceof HdfsTable) {
-          tableMap_.put(tableName.toLowerCase(), new CalciteTable(table, reader_));
+          tableMap_.put(tableName.toLowerCase(),
+              new CalciteTable(table, reader_, analyzer));
           return this;
       }
 
