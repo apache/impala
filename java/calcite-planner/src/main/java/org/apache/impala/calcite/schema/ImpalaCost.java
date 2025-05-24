@@ -14,28 +14,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.impala.calcite.schema;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptCostFactory;
 import org.apache.calcite.plan.RelOptUtil;
 
-import org.checkerframework.checker.nullness.qual.Nullable;
-
 import java.util.Objects;
 
 /**
- * <code>ImpalaCost</code> represents the cost of a plan node.
- *
- * <p>This class is immutable: none of the methods modify any member
- * variables.
+ * ImpalaCost: Cost model for Impala. A good chunk of this is copied from VolcanoCost,
+ * but the cost is calculated only using cpu and io.
  */
-class ImpalaCost implements RelOptCost {
+public class ImpalaCost implements RelOptCost {
   //~ Static fields/initializers ---------------------------------------------
 
   static final ImpalaCost INFINITY =
       new ImpalaCost(
-          Double.POSITIVE_INFINITY,
           Double.POSITIVE_INFINITY,
           Double.POSITIVE_INFINITY) {
         @Override public String toString() {
@@ -44,21 +40,21 @@ class ImpalaCost implements RelOptCost {
       };
 
   static final ImpalaCost HUGE =
-      new ImpalaCost(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE) {
+      new ImpalaCost(Double.MAX_VALUE, Double.MAX_VALUE) {
         @Override public String toString() {
           return "{huge}";
         }
       };
 
   static final ImpalaCost ZERO =
-      new ImpalaCost(0.0, 0.0, 0.0) {
+      new ImpalaCost(0.0, 0.0) {
         @Override public String toString() {
           return "{0}";
         }
       };
 
   static final ImpalaCost TINY =
-      new ImpalaCost(1.0, 1.0, 0.0) {
+      new ImpalaCost(1.0, 0.0) {
         @Override public String toString() {
           return "{tiny}";
         }
@@ -70,12 +66,10 @@ class ImpalaCost implements RelOptCost {
 
   final double cpu;
   final double io;
-  final double rowCount;
 
   //~ Constructors -----------------------------------------------------------
 
-  ImpalaCost(double rowCount, double cpu, double io) {
-    this.rowCount = rowCount;
+  ImpalaCost(double cpu, double io) {
     this.cpu = cpu;
     this.io = io;
   }
@@ -88,7 +82,6 @@ class ImpalaCost implements RelOptCost {
 
   @Override public boolean isInfinite() {
     return (this == INFINITY)
-        || (this.rowCount == Double.POSITIVE_INFINITY)
         || (this.cpu == Double.POSITIVE_INFINITY)
         || (this.io == Double.POSITIVE_INFINITY);
   }
@@ -98,43 +91,29 @@ class ImpalaCost implements RelOptCost {
   }
 
   @Override public boolean isLe(RelOptCost other) {
-    ImpalaCost that = (ImpalaCost) other;
-    if (true) {
-      return this == that
-          || this.rowCount <= that.rowCount;
-    }
-    return (this == that)
-        || ((this.rowCount <= that.rowCount)
-        && (this.cpu <= that.cpu)
-        && (this.io <= that.io));
+    return (this.cpu + this.io < other.getCpu() + other.getIo()) ||
+          ((this.cpu + this.io == other.getCpu() + other.getIo()));
   }
 
   @Override public boolean isLt(RelOptCost other) {
-    if (true) {
-      ImpalaCost that = (ImpalaCost) other;
-      return this.rowCount < that.rowCount;
-    }
     return isLe(other) && !equals(other);
   }
 
   @Override public double getRows() {
-    return rowCount;
+    return 1;
   }
 
   @Override public int hashCode() {
-    return Objects.hash(rowCount, cpu, io);
+    return Objects.hash(cpu, io);
   }
 
   @SuppressWarnings("NonOverridingEquals")
   @Override public boolean equals(RelOptCost other) {
-    return this == other
-        || other instanceof ImpalaCost
-        && (this.rowCount == ((ImpalaCost) other).rowCount)
-        && (this.cpu == ((ImpalaCost) other).cpu)
-        && (this.io == ((ImpalaCost) other).io);
+    return (this == other) ||
+            ((this.cpu + this.io == other.getCpu() + other.getIo()));
   }
 
-  @Override public boolean equals(@Nullable Object obj) {
+  @Override public boolean equals(Object obj) {
     if (obj instanceof ImpalaCost) {
       return equals((ImpalaCost) obj);
     }
@@ -146,10 +125,22 @@ class ImpalaCost implements RelOptCost {
       return false;
     }
     ImpalaCost that = (ImpalaCost) other;
-    return (this == that)
-        || ((Math.abs(this.rowCount - that.rowCount) < RelOptUtil.EPSILON)
-        && (Math.abs(this.cpu - that.cpu) < RelOptUtil.EPSILON)
-        && (Math.abs(this.io - that.io) < RelOptUtil.EPSILON));
+    // changed the epsilon value to be higher.  Without this, q17
+    // was producing a bad plan.  It should now pick
+    // ((store_sales, store_returns), catalog_sales)
+    // over
+    // ((catalog_sales, store_returns), store_sales)
+    // The problem was that store_returns does not have a PK/FK
+    // relationship with either table. It is a subset.  But the
+    // cardinality calculation doesn't understand this, so the
+    // number of join rows calculated is equal for both. The
+    // store_sales join produces waaaaay more rows.
+    // The join optimizer has a secondary way of determining join
+    // ordering if the cost is a tie, so if the cost is
+    // essentially the same, we'd prefer to use the tiebreaking method
+    // rather than this method.
+    return (this == other)
+      || Math.abs(1.0 - (this.cpu + this.io) / (other.getCpu() + other.getIo())) < .01;
   }
 
   @Override public RelOptCost minus(RelOptCost other) {
@@ -158,7 +149,6 @@ class ImpalaCost implements RelOptCost {
     }
     ImpalaCost that = (ImpalaCost) other;
     return new ImpalaCost(
-        this.rowCount - that.rowCount,
         this.cpu - that.cpu,
         this.io - that.io);
   }
@@ -167,7 +157,7 @@ class ImpalaCost implements RelOptCost {
     if (this == INFINITY) {
       return this;
     }
-    return new ImpalaCost(rowCount * factor, cpu * factor, io * factor);
+    return new ImpalaCost(cpu * factor, io * factor);
   }
 
   @Override public double divideBy(RelOptCost cost) {
@@ -176,13 +166,6 @@ class ImpalaCost implements RelOptCost {
     ImpalaCost that = (ImpalaCost) cost;
     double d = 1;
     double n = 0;
-    if ((this.rowCount != 0)
-        && !Double.isInfinite(this.rowCount)
-        && (that.rowCount != 0)
-        && !Double.isInfinite(that.rowCount)) {
-      d *= this.rowCount / that.rowCount;
-      ++n;
-    }
     if ((this.cpu != 0)
         && !Double.isInfinite(this.cpu)
         && (that.cpu != 0)
@@ -209,20 +192,19 @@ class ImpalaCost implements RelOptCost {
       return INFINITY;
     }
     return new ImpalaCost(
-        this.rowCount + that.rowCount,
         this.cpu + that.cpu,
         this.io + that.io);
   }
 
   @Override public String toString() {
-    return "{" + rowCount + " rows, " + cpu + " cpu, " + io + " io}";
+    return "{" + cpu + " cpu, " + io + " io}";
   }
 
   /** Implementation of {@link org.apache.calcite.plan.RelOptCostFactory}
    * that creates {@link org.apache.calcite.plan.volcano.ImpalaCost}s. */
   private static class Factory implements RelOptCostFactory {
-    @Override public RelOptCost makeCost(double dRows, double dCpu, double dIo) {
-      return new ImpalaCost(dRows, dCpu, dIo);
+    @Override public RelOptCost makeCost(double rowCount, double dCpu, double dIo) {
+      return new ImpalaCost(dCpu, dIo);
     }
 
     @Override public RelOptCost makeHugeCost() {

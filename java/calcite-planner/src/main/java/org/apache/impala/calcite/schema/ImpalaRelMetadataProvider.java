@@ -31,6 +31,7 @@ public class ImpalaRelMetadataProvider {
                   ImpalaRelMdDistinctRowCount.SOURCE,
                   ImpalaRelMdRowCount.SOURCE,
                   ImpalaRelMdSize.SOURCE,
+                  ImpalaRelMdNonCumulativeCost.SOURCE,
                   ImpalaRelMdSelectivity.SOURCE,
                   JaninoRelMetadataProvider.DEFAULT)));
 }

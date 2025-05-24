@@ -44,11 +44,11 @@ limit 100
 
 # end query 59 in stream 0 using template query59.tpl
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=131.02MB Threads=1
+Max Per-Host Resource Reservation: Memory=131.04MB Threads=1
 Per-Host Resource Estimates: Memory=2.10GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=2.10GB mem-reservation=131.02MB thread-reservation=1 runtime-filters-memory=8.00MB
-|  max-parallelism=1 segment-costs=[20807146710, 20807146710, 333891342137, 1000]
+|  Per-Instance Resources: mem-estimate=2.10GB mem-reservation=131.04MB thread-reservation=1 runtime-filters-memory=8.00MB
+|  max-parallelism=1 segment-costs=[20807146710, 20807146710, 684061333796, 1000]
 PLAN-ROOT SINK
 |  output exprs: s_store_name, s_store_id, tpcds_partitioned_parquet_snap.date_dim.d_week_seq, divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Sunday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Sunday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Monday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Monday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Tuesday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Tuesday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Wednesday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Wednesday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Thursday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Thursday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Friday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Friday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Saturday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Saturday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1000
@@ -56,7 +56,7 @@ PLAN-ROOT SINK
 17:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC NULLS LAST, s_store_id ASC NULLS LAST, tpcds_partitioned_parquet_snap.date_dim.d_week_seq ASC NULLS LAST
 |  mem-estimate=26.56KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=18 row-size=272B cardinality=100 cost=330751984635
+|  tuple-ids=18 row-size=272B cardinality=100 cost=677819547542
 |  in pipelines: 17(GETNEXT), 03(OPEN)
 |
 16:HASH JOIN [INNER JOIN]
@@ -64,7 +64,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: none
 |  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk, RF001[bloom] <- subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52), RF002[min_max] <- tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk
 |  mem-estimate=678.30MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4,5,7,9,15,16 row-size=336B cardinality=17.25G cost=3131930567
+|  tuple-ids=4,5,7,9,15,16 row-size=336B cardinality=34.35G cost=6231416885
 |  in pipelines: 03(GETNEXT), 13(OPEN)
 |
 |--15:HASH JOIN [INNER JOIN]
@@ -127,35 +127,35 @@ PLAN-ROOT SINK
 |     in pipelines: 10(GETNEXT)
 |
 09:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_partitioned_parquet_snap.store.s_store_id = tpcds_partitioned_parquet_snap.store_0.s_store_id
+|  fk/pk conjuncts: none
+|  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_store_id, RF005[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_store_id
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4,5,7,9 row-size=208B cardinality=9.50M cost=2945955
+|  in pipelines: 03(GETNEXT), 08(OPEN)
+|
+|--08:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
+|     HDFS partitions=1/1 files=1 size=119.76KB
+|     runtime filters: RF002[min_max] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk
+|     stored statistics:
+|       table: rows=1.35K size=119.76KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.35K
+|     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+|     tuple-ids=9 row-size=32B cardinality=1.35K cost=388
+|     in pipelines: 08(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
-|  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF005[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
+|  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF007[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,5,7,9 row-size=208B cardinality=4.77M cost=2090589
+|  tuple-ids=4,5,7 row-size=176B cardinality=4.77M cost=2089251
 |  in pipelines: 03(GETNEXT), 06(OPEN)
 |
-|--08:HASH JOIN [INNER JOIN]
-|  |  hash predicates: tpcds_partitioned_parquet_snap.store.s_store_id = tpcds_partitioned_parquet_snap.store_0.s_store_id
-|  |  fk/pk conjuncts: none
-|  |  runtime filters: RF010[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_store_id, RF011[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_store_id
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=7,9 row-size=80B cardinality=2.69K cost=2183
-|  |  in pipelines: 06(GETNEXT), 07(OPEN)
-|  |
-|  |--07:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
-|  |     HDFS partitions=1/1 files=1 size=119.76KB
-|  |     runtime filters: RF002[min_max] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk
-|  |     stored statistics:
-|  |       table: rows=1.35K size=119.76KB
-|  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1.35K
-|  |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
-|  |     tuple-ids=9 row-size=32B cardinality=1.35K cost=388
-|  |     in pipelines: 07(GETNEXT)
-|  |
-|  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
+|--06:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |     HDFS partitions=1/1 files=1 size=119.76KB
-|     runtime filters: RF011[min_max] -> tpcds_partitioned_parquet_snap.store.s_store_id, RF010[bloom] -> tpcds_partitioned_parquet_snap.store.s_store_id
+|     runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.store.s_store_id, RF004[bloom] -> tpcds_partitioned_parquet_snap.store.s_store_id
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -167,7 +167,7 @@ PLAN-ROOT SINK
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.date_dim.d_week_seq = tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
 |  fk/pk conjuncts: none
-|  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq, RF007[min_max] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
+|  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq, RF009[min_max] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=4,5 row-size=128B cardinality=4.77M cost=2654135
 |  in pipelines: 03(GETNEXT), 04(OPEN)
@@ -196,14 +196,14 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  runtime filters: RF010[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
 |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=0,2 row-size=39B cardinality=8.64G cost=3781772682
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
-|     runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF006[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF001[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
+|     runtime filters: RF009[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF008[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF001[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
@@ -214,7 +214,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
-   runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF008[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
+   runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF010[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1824/1824 rows=8.64G
@@ -224,11 +224,11 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=12B cardinality=8.64G cost=1492980801
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.50GB Threads=84
-Per-Host Resource Estimates: Memory=21.21GB
+Max Per-Host Resource Reservation: Memory=1.52GB Threads=84
+Per-Host Resource Estimates: Memory=21.23GB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=7.16MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[1079] cpu-comparison-result=273 [max(1 (self) vs 273 (sum children))]
+|  max-parallelism=1 segment-costs=[1079] cpu-comparison-result=284 [max(1 (self) vs 284 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: s_store_name, s_store_id, tpcds_partitioned_parquet_snap.date_dim.d_week_seq, divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Sunday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Sunday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Monday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Monday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Tuesday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Tuesday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Wednesday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Wednesday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Thursday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Thursday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Friday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Friday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Saturday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Saturday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1000
@@ -242,11 +242,11 @@ PLAN-ROOT SINK
 |
 F10:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_0.s_store_sk,tpcds_partitioned_parquet_snap.date_dim.d_week_seq)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=36.27MB mem-reservation=0B thread-reservation=1
-max-parallelism=33390 segment-costs=[333884764381, 743] cpu-comparison-result=273 [max(120 (self) vs 273 (sum children))]
+max-parallelism=68410 segment-costs=[684057383222, 743] cpu-comparison-result=284 [max(120 (self) vs 284 (sum children))]
 17:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC NULLS LAST, s_store_id ASC NULLS LAST, tpcds_partitioned_parquet_snap.date_dim.d_week_seq ASC NULLS LAST
 |  mem-estimate=26.56KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=18 row-size=272B cardinality=100 cost=330751984635
+|  tuple-ids=18 row-size=272B cardinality=100 cost=677819547542
 |  in pipelines: 17(GETNEXT), 20(OPEN)
 |
 16:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -254,12 +254,12 @@ max-parallelism=33390 segment-costs=[333884764381, 743] cpu-comparison-result=27
 |  hash predicates: tpcds_partitioned_parquet_snap.store_0.s_store_sk = tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk, tpcds_partitioned_parquet_snap.date_dim.d_week_seq = subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
 |  fk/pk conjuncts: none
 |  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=4,5,7,9,15,16 row-size=336B cardinality=17.25G cost=3127160402
+|  tuple-ids=4,5,7,9,15,16 row-size=336B cardinality=34.35G cost=6226646720
 |  in pipelines: 20(GETNEXT), 26(OPEN)
 |
 |--F12:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_0.s_store_sk,tpcds_partitioned_parquet_snap.date_dim.d_week_seq)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=35.11MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  max-parallelism=33390 segment-costs=[8284345] cpu-comparison-result=131 [max(120 (self) vs 131 (sum children))]
+|  |  max-parallelism=68410 segment-costs=[8284345] cpu-comparison-result=131 [max(120 (self) vs 131 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk, subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
@@ -386,78 +386,78 @@ max-parallelism=33390 segment-costs=[333884764381, 743] cpu-comparison-result=27
 |
 28:EXCHANGE [HASH(tpcds_partitioned_parquet_snap.store_0.s_store_sk,tpcds_partitioned_parquet_snap.date_dim.d_week_seq)]
 |  mem-estimate=36.24MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4,5,7,9 row-size=208B cardinality=4.77M cost=5619344
+|  tuple-ids=4,5,7,9 row-size=208B cardinality=9.50M cost=11188960
 |  in pipelines: 20(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.date_dim.d_week_seq,tpcds_partitioned_parquet_snap.store_sales.ss_store_sk)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=114.97MB mem-reservation=8.50MB thread-reservation=1
-max-parallelism=210 segment-costs=[2080481569, 78443632] cpu-comparison-result=142 [max(120 (self) vs 142 (sum children))]
+max-parallelism=210 segment-costs=[2080481569, 154444845] cpu-comparison-result=153 [max(120 (self) vs 153 (sum children))]
 09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=03
+|  hash predicates: tpcds_partitioned_parquet_snap.store.s_store_id = tpcds_partitioned_parquet_snap.store_0.s_store_id
+|  fk/pk conjuncts: none
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4,5,7,9 row-size=208B cardinality=9.50M cost=2944605
+|  in pipelines: 20(GETNEXT), 08(OPEN)
+|
+|--F15:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.date_dim.d_week_seq,tpcds_partitioned_parquet_snap.store_sales.ss_store_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.33MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[3140]
+|  JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: tpcds_partitioned_parquet_snap.store_0.s_store_id
+|  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_store_id, RF005[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_store_id
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
+|  |
+|  23:EXCHANGE [BROADCAST]
+|  |  mem-estimate=78.19KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=9 row-size=32B cardinality=1.35K cost=1790
+|  |  in pipelines: 08(GETNEXT)
+|  |
+|  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=16.14MB mem-reservation=16.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[533]
+|  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
+|     HDFS partitions=1/1 files=1 size=119.76KB
+|     runtime filters: RF002[min_max] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk
+|     stored statistics:
+|       table: rows=1.35K size=119.76KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.35K
+|     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+|     tuple-ids=9 row-size=32B cardinality=1.35K cost=388
+|     in pipelines: 08(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=04
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,5,7,9 row-size=208B cardinality=4.77M cost=2087901
+|  tuple-ids=4,5,7 row-size=176B cardinality=4.77M cost=2087901
 |  in pipelines: 20(GETNEXT), 06(OPEN)
 |
-|--F15:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.date_dim.d_week_seq,tpcds_partitioned_parquet_snap.store_sales.ss_store_sk)] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=24.54MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=10 segment-costs=[6258] cpu-comparison-result=11 [max(11 (self) vs 2 (sum children))]
+|--F16:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.date_dim.d_week_seq,tpcds_partitioned_parquet_snap.store_sales.ss_store_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.36MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[3140]
 |  JOIN BUILD
-|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.store.s_store_sk
-|  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF005[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
-|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=2688
+|  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF007[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
 |  |
-|  23:EXCHANGE [BROADCAST]
-|  |  mem-estimate=297.78KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=7,9 row-size=80B cardinality=2.69K cost=3570
+|  22:EXCHANGE [BROADCAST]
+|  |  mem-estimate=115.14KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=7 row-size=48B cardinality=1.35K cost=1790
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  Per-Instance Resources: mem-estimate=16.34MB mem-reservation=24.00KB thread-reservation=1
-|  max-parallelism=1 segment-costs=[1994]
-|  08:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash-table-id=04
-|  |  hash predicates: tpcds_partitioned_parquet_snap.store.s_store_id = tpcds_partitioned_parquet_snap.store_0.s_store_id
-|  |  fk/pk conjuncts: none
-|  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=7,9 row-size=80B cardinality=2.69K cost=833
-|  |  in pipelines: 06(GETNEXT), 07(OPEN)
-|  |
-|  |--F16:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Instance Resources: mem-estimate=3.01MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  |  max-parallelism=1 segment-costs=[1529]
-|  |  JOIN BUILD
-|  |  |  join-table-id=04 plan-id=05 cohort-id=03
-|  |  |  build expressions: tpcds_partitioned_parquet_snap.store_0.s_store_id
-|  |  |  runtime filters: RF010[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_store_id, RF011[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_store_id
-|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=1350
-|  |  |
-|  |  22:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=78.19KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=9 row-size=32B cardinality=1.35K cost=179
-|  |  |  in pipelines: 07(GETNEXT)
-|  |  |
-|  |  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  |  Per-Instance Resources: mem-estimate=16.14MB mem-reservation=16.00KB thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[533]
-|  |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=119.76KB
-|  |     runtime filters: RF002[min_max] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk
-|  |     stored statistics:
-|  |       table: rows=1.35K size=119.76KB
-|  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1.35K
-|  |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
-|  |     tuple-ids=9 row-size=32B cardinality=1.35K cost=388
-|  |     in pipelines: 07(GETNEXT)
-|  |
+|  Per-Instance Resources: mem-estimate=16.20MB mem-reservation=24.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[668]
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=119.76KB
-|     runtime filters: RF011[min_max] -> tpcds_partitioned_parquet_snap.store.s_store_id, RF010[bloom] -> tpcds_partitioned_parquet_snap.store.s_store_id
+|     runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.store.s_store_id, RF004[bloom] -> tpcds_partitioned_parquet_snap.store.s_store_id
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -480,7 +480,7 @@ max-parallelism=210 segment-costs=[2080481569, 78443632] cpu-comparison-result=1
 |  JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
-|  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq, RF007[min_max] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
+|  |  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq, RF009[min_max] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
 |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=7305
 |  |
 |  21:EXCHANGE [BROADCAST]
@@ -543,7 +543,7 @@ max-parallelism=1824 segment-costs=[24551817547, 6873846540] cpu-comparison-resu
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  |  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  |  runtime filters: RF010[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
 |  |  mem-estimate=57.00MB mem-reservation=57.00MB spill-buffer=256.00KB thread-reservation=0 cost=73049
 |  |
 |  18:EXCHANGE [BROADCAST]
@@ -557,7 +557,7 @@ max-parallelism=1824 segment-costs=[24551817547, 6873846540] cpu-comparison-resu
 |  max-parallelism=1 segment-costs=[22859]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
-|     runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF006[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF001[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
+|     runtime filters: RF009[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF008[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF001[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
@@ -568,7 +568,7 @@ max-parallelism=1824 segment-costs=[24551817547, 6873846540] cpu-comparison-resu
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
-   runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF008[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
+   runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF010[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1824/1824 rows=8.64G
@@ -578,11 +578,11 @@ max-parallelism=1824 segment-costs=[24551817547, 6873846540] cpu-comparison-resu
    tuple-ids=0 row-size=12B cardinality=8.64G cost=1492980801
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=1.50GB Threads=84
-Per-Host Resource Estimates: Memory=21.21GB
+Max Per-Host Resource Reservation: Memory=1.52GB Threads=84
+Per-Host Resource Estimates: Memory=21.23GB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=7.16MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[1079] cpu-comparison-result=273 [max(1 (self) vs 273 (sum children))]
+|  max-parallelism=1 segment-costs=[1079] cpu-comparison-result=284 [max(1 (self) vs 284 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: s_store_name, s_store_id, tpcds_partitioned_parquet_snap.date_dim.d_week_seq, divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Sunday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Sunday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Monday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Monday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Tuesday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Tuesday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Wednesday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Wednesday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Thursday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Thursday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Friday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Friday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END)), divide(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_day_name = 'Saturday' THEN tpcds_partitioned_parquet_snap.store_sales.ss_sales_price ELSE NULL END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim_1.d_day_name = 'Saturday' THEN tpcds_partitioned_parquet_snap.store_sales_0.ss_sales_price ELSE NULL END))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1000
@@ -596,11 +596,11 @@ PLAN-ROOT SINK
 |
 F10:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_0.s_store_sk,tpcds_partitioned_parquet_snap.date_dim.d_week_seq)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=36.27MB mem-reservation=0B thread-reservation=1
-max-parallelism=33390 segment-costs=[333884764381, 743] cpu-comparison-result=273 [max(120 (self) vs 273 (sum children))]
+max-parallelism=68410 segment-costs=[684057383222, 743] cpu-comparison-result=284 [max(120 (self) vs 284 (sum children))]
 17:TOP-N [LIMIT=100]
 |  order by: s_store_name ASC NULLS LAST, s_store_id ASC NULLS LAST, tpcds_partitioned_parquet_snap.date_dim.d_week_seq ASC NULLS LAST
 |  mem-estimate=26.56KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=18 row-size=272B cardinality=100 cost=330751984635
+|  tuple-ids=18 row-size=272B cardinality=100 cost=677819547542
 |  in pipelines: 17(GETNEXT), 20(OPEN)
 |
 16:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -608,12 +608,12 @@ max-parallelism=33390 segment-costs=[333884764381, 743] cpu-comparison-result=27
 |  hash predicates: tpcds_partitioned_parquet_snap.store_0.s_store_sk = tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk, tpcds_partitioned_parquet_snap.date_dim.d_week_seq = subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
 |  fk/pk conjuncts: none
 |  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=4,5,7,9,15,16 row-size=336B cardinality=17.25G cost=3127160402
+|  tuple-ids=4,5,7,9,15,16 row-size=336B cardinality=34.35G cost=6226646720
 |  in pipelines: 20(GETNEXT), 26(OPEN)
 |
 |--F12:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_0.s_store_sk,tpcds_partitioned_parquet_snap.date_dim.d_week_seq)] hosts=10 instances=120
 |  |  Per-Instance Resources: mem-estimate=35.11MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  max-parallelism=33390 segment-costs=[8284345] cpu-comparison-result=131 [max(120 (self) vs 131 (sum children))]
+|  |  max-parallelism=68410 segment-costs=[8284345] cpu-comparison-result=131 [max(120 (self) vs 131 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk, subtract(tpcds_partitioned_parquet_snap.date_dim_1.d_week_seq, 52)
@@ -740,78 +740,78 @@ max-parallelism=33390 segment-costs=[333884764381, 743] cpu-comparison-result=27
 |
 28:EXCHANGE [HASH(tpcds_partitioned_parquet_snap.store_0.s_store_sk,tpcds_partitioned_parquet_snap.date_dim.d_week_seq)]
 |  mem-estimate=36.24MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=4,5,7,9 row-size=208B cardinality=4.77M cost=5619344
+|  tuple-ids=4,5,7,9 row-size=208B cardinality=9.50M cost=11188960
 |  in pipelines: 20(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.date_dim.d_week_seq,tpcds_partitioned_parquet_snap.store_sales.ss_store_sk)] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=114.97MB mem-reservation=8.50MB thread-reservation=1
-max-parallelism=210 segment-costs=[2080481569, 78443632] cpu-comparison-result=142 [max(120 (self) vs 142 (sum children))]
+max-parallelism=210 segment-costs=[2080481569, 154444845] cpu-comparison-result=153 [max(120 (self) vs 153 (sum children))]
 09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=03
+|  hash predicates: tpcds_partitioned_parquet_snap.store.s_store_id = tpcds_partitioned_parquet_snap.store_0.s_store_id
+|  fk/pk conjuncts: none
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4,5,7,9 row-size=208B cardinality=9.50M cost=2944605
+|  in pipelines: 20(GETNEXT), 08(OPEN)
+|
+|--F15:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.date_dim.d_week_seq,tpcds_partitioned_parquet_snap.store_sales.ss_store_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.33MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[3140]
+|  JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: tpcds_partitioned_parquet_snap.store_0.s_store_id
+|  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_store_id, RF005[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_store_id
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
+|  |
+|  23:EXCHANGE [BROADCAST]
+|  |  mem-estimate=78.19KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=9 row-size=32B cardinality=1.35K cost=1790
+|  |  in pipelines: 08(GETNEXT)
+|  |
+|  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=16.14MB mem-reservation=16.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[533]
+|  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
+|     HDFS partitions=1/1 files=1 size=119.76KB
+|     runtime filters: RF002[min_max] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk
+|     stored statistics:
+|       table: rows=1.35K size=119.76KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.35K
+|     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+|     tuple-ids=9 row-size=32B cardinality=1.35K cost=388
+|     in pipelines: 08(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=04
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,5,7,9 row-size=208B cardinality=4.77M cost=2087901
+|  tuple-ids=4,5,7 row-size=176B cardinality=4.77M cost=2087901
 |  in pipelines: 20(GETNEXT), 06(OPEN)
 |
-|--F15:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.date_dim.d_week_seq,tpcds_partitioned_parquet_snap.store_sales.ss_store_sk)] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=24.54MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=10 segment-costs=[6258] cpu-comparison-result=11 [max(11 (self) vs 2 (sum children))]
+|--F16:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.date_dim.d_week_seq,tpcds_partitioned_parquet_snap.store_sales.ss_store_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.36MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[3140]
 |  JOIN BUILD
-|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.store.s_store_sk
-|  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF005[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
-|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=2688
+|  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF007[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
 |  |
-|  23:EXCHANGE [BROADCAST]
-|  |  mem-estimate=297.78KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=7,9 row-size=80B cardinality=2.69K cost=3570
+|  22:EXCHANGE [BROADCAST]
+|  |  mem-estimate=115.14KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=7 row-size=48B cardinality=1.35K cost=1790
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  Per-Instance Resources: mem-estimate=16.34MB mem-reservation=24.00KB thread-reservation=1
-|  max-parallelism=1 segment-costs=[1994]
-|  08:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash-table-id=04
-|  |  hash predicates: tpcds_partitioned_parquet_snap.store.s_store_id = tpcds_partitioned_parquet_snap.store_0.s_store_id
-|  |  fk/pk conjuncts: none
-|  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=7,9 row-size=80B cardinality=2.69K cost=833
-|  |  in pipelines: 06(GETNEXT), 07(OPEN)
-|  |
-|  |--F16:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Instance Resources: mem-estimate=3.01MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  |  max-parallelism=1 segment-costs=[1529]
-|  |  JOIN BUILD
-|  |  |  join-table-id=04 plan-id=05 cohort-id=03
-|  |  |  build expressions: tpcds_partitioned_parquet_snap.store_0.s_store_id
-|  |  |  runtime filters: RF010[bloom] <- tpcds_partitioned_parquet_snap.store_0.s_store_id, RF011[min_max] <- tpcds_partitioned_parquet_snap.store_0.s_store_id
-|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=1350
-|  |  |
-|  |  22:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=78.19KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=9 row-size=32B cardinality=1.35K cost=179
-|  |  |  in pipelines: 07(GETNEXT)
-|  |  |
-|  |  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  |  Per-Instance Resources: mem-estimate=16.14MB mem-reservation=16.00KB thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[533]
-|  |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
-|  |     HDFS partitions=1/1 files=1 size=119.76KB
-|  |     runtime filters: RF002[min_max] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_0.s_store_sk
-|  |     stored statistics:
-|  |       table: rows=1.35K size=119.76KB
-|  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=1.35K
-|  |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
-|  |     tuple-ids=9 row-size=32B cardinality=1.35K cost=388
-|  |     in pipelines: 07(GETNEXT)
-|  |
+|  Per-Instance Resources: mem-estimate=16.20MB mem-reservation=24.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[668]
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=119.76KB
-|     runtime filters: RF011[min_max] -> tpcds_partitioned_parquet_snap.store.s_store_id, RF010[bloom] -> tpcds_partitioned_parquet_snap.store.s_store_id
+|     runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.store.s_store_id, RF004[bloom] -> tpcds_partitioned_parquet_snap.store.s_store_id
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
@@ -834,7 +834,7 @@ max-parallelism=210 segment-costs=[2080481569, 78443632] cpu-comparison-result=1
 |  JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
-|  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq, RF007[min_max] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
+|  |  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq, RF009[min_max] <- tpcds_partitioned_parquet_snap.date_dim_0.d_week_seq
 |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=7305
 |  |
 |  21:EXCHANGE [BROADCAST]
@@ -897,7 +897,7 @@ max-parallelism=1824 segment-costs=[24551817547, 6873846540] cpu-comparison-resu
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  |  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  |  runtime filters: RF010[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
 |  |  mem-estimate=57.00MB mem-reservation=57.00MB spill-buffer=256.00KB thread-reservation=0 cost=73049
 |  |
 |  18:EXCHANGE [BROADCAST]
@@ -911,7 +911,7 @@ max-parallelism=1824 segment-costs=[24551817547, 6873846540] cpu-comparison-resu
 |  max-parallelism=1 segment-costs=[22859]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
-|     runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF006[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF001[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
+|     runtime filters: RF009[min_max] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF008[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq, RF001[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
@@ -922,7 +922,7 @@ max-parallelism=1824 segment-costs=[24551817547, 6873846540] cpu-comparison-resu
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
-   runtime filters: RF005[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF008[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
+   runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF010[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1824/1824 rows=8.64G
