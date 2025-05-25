@@ -256,7 +256,6 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, SessionState* sess
 Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     const TExecuteStatementReq execute_request, TQueryCtx* query_ctx) {
   query_ctx->client_request.stmt = execute_request.statement;
-  VLOG_QUERY << "TExecuteStatementReq: " << RedactedDebugString(execute_request);
   QueryOptionsMask set_query_options_mask;
   {
     shared_ptr<SessionState> session_state;

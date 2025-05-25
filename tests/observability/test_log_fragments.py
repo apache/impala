@@ -16,11 +16,10 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+import re
+
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfDockerizedCluster
-
-import re
-import time
 
 
 class TestLogFragments(ImpalaTestSuite):
@@ -37,24 +36,25 @@ class TestLogFragments(ImpalaTestSuite):
     """
     # This query produces more than one fragment when there
     # is more than one impalad running.
-    result = self.execute_query("select count(*) from functional.alltypes")
+    result = self.hs2_client.execute("select count(*) from functional.alltypes")
     query_id = re.search("id=([0-9a-f]+:[0-9a-f]+)",
         result.runtime_profile).groups()[0]
-    self.execute_query("select 1")
-    self.assert_impalad_log_contains('INFO', query_id +
-      "] Analysis and authorization finished.")
+    self.hs2_client.execute("select 1")
+    self.assert_impalad_log_contains(
+        'INFO', query_id + "] Analysis and authorization finished.")
     assert query_id.endswith("000")
     # Looks for a fragment instance that doesn't end with "0" to make sure instances
     # are getting propagated too.
-    self.assert_impalad_log_contains('INFO',
-        query_id[:-1] + "[1-9]" + "] Instance completed")
+    self.assert_impalad_log_contains(
+        'INFO', query_id[:-1] + "[1-9]" + "] Instance completed")
     # This log entry should exist (many times), but not be tagged
-    self.assert_impalad_log_contains('INFO',
-        "impala-beeswax-server.cc:[0-9]+\] query: Query", -1)
+    self.assert_impalad_log_contains(
+        'INFO', r"impala-hs2-server.cc:[0-9]+\] ExecuteStatement\(\): request", -1)
     # Check that the version with the query_id doesn't exist!
     try:
-      self.assert_impalad_log_contains('INFO',
-          "impala-beeswax-server.*" + query_id + "].*query: Query")
+      self.assert_impalad_log_contains(
+          'INFO',
+          r"impala-hs2-server.*" + query_id + r"].*ExecuteStatement\(\): request")
       raise Exception("query-id still attached to thread after query finished")
     except AssertionError:
       pass
