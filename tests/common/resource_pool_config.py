@@ -65,7 +65,7 @@ class ResourcePoolConfig(object):
     client.set_configuration_option('request_pool', pool_name)
     # set mem_limit to something above the proc limit so that the query always gets
     # rejected.
-    client.set_configuration_option('mem_limit', '10G')
+    client.set_configuration_option('mem_limit', '20G')
     metric_key = "admission-controller.{0}.root.{1}".format(metric_str, pool_name)
     start_time = time()
     while (time() - start_time < timeout):
@@ -76,6 +76,7 @@ class ResourcePoolConfig(object):
       if current_val == target_val:
         return
       sleep(0.1)
+    client.close()
     assert False, "Timed out waiting for {0} to reach {1}. Current: {2}".format(
       metric_key, target_val, current_val)
 
