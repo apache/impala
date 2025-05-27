@@ -397,8 +397,10 @@ def get_impala_shell_executable(vector):
   # use 'dev' as the default.
   impala_shell_executable, _ = get_dev_impala_shell_executable()
   return {
-    'dev': [impala_shell_executable],
-    'dev3': ['env', 'IMPALA_PYTHON_EXECUTABLE=python3', impala_shell_executable],
+    'dev': ['env', 'IMPALA_PYTHON_EXECUTABLE=python',
+            'IMPALA_SHELL_PYTHON_FALLBACK=false', impala_shell_executable],
+    'dev3': ['env', 'IMPALA_PYTHON_EXECUTABLE=python3',
+             'IMPALA_SHELL_PYTHON_FALLBACK=false', impala_shell_executable],
     'python2': [os.path.join(IMPALA_HOME, 'shell/build/python2_venv/bin/impala-shell')],
     'python3': [os.path.join(IMPALA_HOME, 'shell/build/python3_venv/bin/impala-shell')]
   }[vector.get_value_with_default('impala_shell', 'dev')]

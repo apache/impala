@@ -29,10 +29,36 @@ SHELL_HOME=${IMPALA_SHELL_HOME:-${SCRIPT_DIR}}
 # Set the envrionment's locale settings to allow for utf-8 compatibility
 export LC_CTYPE=${LC_CTYPE:-en_US.UTF-8}
 
-# Select python version; prefer 2, use 3 if 2's absent. Allow override with envvar
-PYTHON_EXE="${IMPALA_PYTHON_EXECUTABLE:-python}"
-if ! command -v "${PYTHON_EXE}" > /dev/null; then
-  PYTHON_EXE=python3
+# If the user specified IMPALA_PYTHON_EXECUTABLE and it exists, use it.
+# If it doesn't exist and IMPALA_SHELL_PYTHON_FALLBACK is false, exit with an error
+# message. Otherwise, fall back to the regular path. IMPALA_SHELL_PYTHON_FALLBACK
+# defaults to true to match historical behavior.
+IMPALA_SHELL_PYTHON_FALLBACK=${IMPALA_SHELL_PYTHON_FALLBACK:-true}
+PYTHON_EXE=""
+if [[ -n "${IMPALA_PYTHON_EXECUTABLE}" ]]; then
+  if command -v "${IMPALA_PYTHON_EXECUTABLE}" > /dev/null; then
+    PYTHON_EXE="${IMPALA_PYTHON_EXECUTABLE}"
+  elif ! ${IMPALA_SHELL_PYTHON_FALLBACK} ; then
+    echo "Couldn't find IMPALA_PYTHON_EXECUTABLE=${IMPALA_PYTHON_EXECUTABLE}."
+    exit 1
+  fi
+fi
+
+# If IMPALA_PYTHON_EXECUTABLE isn't specified or doesn't exist, try the regular
+# "python3" and "python" executables. Since Python 2 is deprecated, prefer "python3"
+# to "python" (though "python" may actually point to Python 3).
+if [[ -z "${PYTHON_EXE}" ]]; then
+  if command -v python3 > /dev/null; then
+    PYTHON_EXE=python3
+  elif command -v python > /dev/null; then
+    PYTHON_EXE=python
+  else
+    if [[ -n "${IMPALA_PYTHON_EXECUTABLE}" ]]; then
+      echo "Couldn't find IMPALA_PYTHON_EXECUTABLE=${IMPALA_PYTHON_EXECUTABLE}."
+    fi
+    echo "Couldn't find python3 or python on the PATH"
+    exit 1
+  fi
 fi
 
 # impala-shell is installed in /install_py${PYTHON_VERSION}
