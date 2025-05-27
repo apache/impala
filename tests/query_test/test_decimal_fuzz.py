@@ -44,7 +44,7 @@ class TestDecimalFuzz(ImpalaTestSuite):
 
     total_iterations = 10000
     batches = list(range(0, 10))
-    cls.iterations = total_iterations / len(batches)
+    cls.iterations = total_iterations // len(batches)
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension("test_batch", *batches))
     add_mandatory_exec_option(cls, 'decimal_v2', 'true')
     add_mandatory_exec_option(cls, 'long_polling_time_ms', 100)
