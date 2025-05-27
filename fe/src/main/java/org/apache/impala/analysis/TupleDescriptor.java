@@ -441,7 +441,7 @@ public class TupleDescriptor {
           nullIndicatorByte = nullIndicators.first;
           nullIndicatorBit = nullIndicators.second;
         }
-        if (d.getType().isCollectionType() && d.isMaterializedRecursively()) {
+        if (d.getType().isCollectionType() && d.shouldMaterializeRecursively()) {
           d.getItemTupleDesc().computeMemLayout();
         }
       }

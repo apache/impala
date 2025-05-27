@@ -108,7 +108,10 @@ under the License.
       </topicref>
       <topicref href="topics/impala_tinyint.xml"/>
       <topicref href="topics/impala_varchar.xml"/>
-      <topicref href="topics/impala_complex_types.xml"/>
+      <topicref href="topics/impala_complex_types.xml">
+        <topicref href="topics/impala_queryingarrays.xml"/>
+        <topicref href="topics/impala_unnest_views.xml"/>
+      </topicref>
     </topicref>
     <topicref href="topics/impala_literals.xml"/>
     <topicref href="topics/impala_operators.xml"/>
@@ -237,6 +240,7 @@ under the License.
         <topicref href="topics/impala_request_pool.xml"/>
         <topicref href="topics/impala_resource_trace_ratio.xml"/>
         <topicref rev="4.0.0" href="topics/impala_retry_failed_queries.xml"/>
+        <topicref rev="4.0.0" href="topics/impala_enabled_runtime_filter_types.xml"/>
         <topicref rev="2.5.0" href="topics/impala_runtime_bloom_filter_size.xml"/>
         <topicref rev="2.6.0" href="topics/impala_runtime_filter_max_size.xml"/>
         <topicref rev="2.6.0" href="topics/impala_runtime_filter_min_size.xml"/>

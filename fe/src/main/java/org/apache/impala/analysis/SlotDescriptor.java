@@ -66,7 +66,7 @@ public class SlotDescriptor {
   private boolean isMaterialized_ = false;
 
   // If true, then computeMemLayout() should be recursively called for itemTupleDesc_.
-  private boolean materializeRecursively_ = false;
+  private boolean shouldMaterializeRecursively_ = false;
 
   // if false, this slot cannot be NULL
   // Note: it is still possible that a SlotRef pointing to this descriptor could have a
@@ -139,15 +139,39 @@ public class SlotDescriptor {
     isMaterialized_ = value;
     LOG.trace("Mark slot(sid={}) of tuple(tid={}) as {}materialized",
         id_, parent_.getId(), isMaterialized_ ? "" : "non-");
-    if (materializeRecursively_) {
+    if (shouldMaterializeRecursively_) {
       Preconditions.checkState(itemTupleDesc_ != null);
       itemTupleDesc_.materializeSlots();
     }
   }
-  public boolean isMaterializedRecursively() { return materializeRecursively_; }
-  public void setIsMaterializedRecursively(boolean value) {
-    materializeRecursively_ = value;
+  public boolean shouldMaterializeRecursively() {
+    return shouldMaterializeRecursively_;
   }
+
+  public void setShouldMaterializeRecursively(boolean value) {
+    shouldMaterializeRecursively_ = value;
+  }
+
+  /**
+   * Returns true iff this SlotDescriptor and all its children (if any) are materialized,
+   * recursively.
+   * This is relevant in case of complex types, for example when only a subset of the
+   * fields of a struct is queried - in this case the queried fields are materialized, the
+   * other fields are not materialized, but the struct itself also needs to be marked as
+   * materialized because otherwise no memory layout can be calculated for the fields.
+   */
+  public boolean isFullyMaterialized() {
+    if (!isMaterialized()) return false;
+    if (itemTupleDesc_ != null) {
+      Preconditions.checkState(type_.isComplexType());
+      for (SlotDescriptor childSlotDesc : itemTupleDesc_.getSlots()) {
+        if (!childSlotDesc.isFullyMaterialized()) return false;
+      }
+    }
+
+    return true;
+  }
+
   public boolean getIsNullable() { return isNullable_; }
   public void setIsNullable(boolean value) { isNullable_ = value; }
   public int getByteSize() { return byteSize_; }
@@ -487,7 +511,7 @@ public class SlotDescriptor {
         .add("label", label_)
         .add("type", typeStr)
         .add("materialized", isMaterialized_)
-        .add("materializeRecursively", materializeRecursively_)
+        .add("shouldMaterializeRecursively", shouldMaterializeRecursively_)
         .add("byteSize", byteSize_)
         .add("byteOffset", byteOffset_)
         .add("nullable", isNullable_)

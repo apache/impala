@@ -214,10 +214,13 @@ public class JdbcDataSource implements ExternalDataSource {
       }
       if (!hasNext) eos_ = true;
     } else { // for count(*)
-      // Don't need to check batchSize_.
-      numRows = totalNumberOfRecords_ - currRow_;
-      currRow_ = totalNumberOfRecords_;
-      eos_ = true;
+      // Don't need to check batchSize_. But number of rows returned in a RowBatch can
+      // not exceed Integer.MAX_VALUE due to the restriction of RowBatch capacity in
+      // backend.
+      numRows = totalNumberOfRecords_ - currRow_ <= Integer.MAX_VALUE ?
+          totalNumberOfRecords_ - currRow_ : Integer.MAX_VALUE;
+      currRow_ += numRows;
+      eos_ = (currRow_ == totalNumberOfRecords_);
     }
     return new TGetNextResult(STATUS_OK).setEos(eos_)
         .setRows(new TRowBatch().setCols(cols).setNum_rows(numRows));

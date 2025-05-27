@@ -1792,7 +1792,7 @@ public class Analyzer {
 
     Preconditions.checkState(collTblRef.getCollectionExpr() instanceof SlotRef);
     SlotDescriptor desc = ((SlotRef) collTblRef.getCollectionExpr()).getDesc();
-    desc.setIsMaterializedRecursively(true);
+    desc.setShouldMaterializeRecursively(true);
 
     try (TupleStackGuard guard = new TupleStackGuard(desc.getItemTupleDesc())) {
       if (slotPath.destType().isArrayType()) {
