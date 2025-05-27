@@ -122,6 +122,18 @@ under the License.
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-metastore</artifactId>
       <version>${hive.version}</version>
+      <exclusions>
+        <exclusion>
+          <!-- Exclude ant and jetty dependencies -->
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <!-- Exclude leveldbjni-all, log4j, jetty dependencies -->
+          <groupId>org.apache.hive.shims</groupId>
+          <artifactId>hive-shims-0.23</artifactId>
+        </exclusion>
+      </exclusions>
    </dependency>
 
     <dependency>
@@ -571,6 +583,11 @@ under the License.
           <groupId>org.apache.hadoop</groupId>
           <artifactId>*</artifactId>
         </exclusion>
+        <!-- IMPALA-11673: spring-jcl conflicts with commons-logging -->
+        <exclusion>
+          <groupId>org.springframework</groupId>
+          <artifactId>spring-jcl</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -599,6 +616,20 @@ under the License.
         <exclusion>
           <groupId>org.apache.hive</groupId>
           <artifactId>hive-shims</artifactId>
+        </exclusion>
+        <exclusion>
+          <!-- Exclude ant and jetty dependencies -->
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-service</artifactId>
+        </exclusion>
+        <exclusion>
+          <!-- Exclude ant and jetty dependencies -->
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.ant</groupId>
+          <artifactId>ant</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
@@ -641,6 +672,11 @@ under the License.
         <exclusion>
           <groupId>com.cloudera</groupId>
           <artifactId>*</artifactId>
+        </exclusion>
+        <!-- IMPALA-11673: spring-jcl conflicts with commons-logging -->
+        <exclusion>
+          <groupId>org.springframework</groupId>
+          <artifactId>spring-jcl</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
