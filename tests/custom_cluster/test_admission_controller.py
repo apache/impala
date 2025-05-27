@@ -2613,7 +2613,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
           # try fetch and confirm from exception message that query was timed out.
           client.fetch(query, query_handle, discard_results=True)
           assert False
-        except (Exception, ImpalaHiveServer2Service) as e:
+        except Exception as e:
           assert 'expired due to client inactivity' in str(e)
       elif self.query_end_behavior == 'EOS':
         # Fetch all rows so we hit eos.
