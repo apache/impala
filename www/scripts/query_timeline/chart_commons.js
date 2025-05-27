@@ -46,7 +46,7 @@ export function generateTimesamples(timesamples_array, max_samples, extend) {
   const MAX_TRAVERSE_LEN = Math.min(max_samples.available, timesamples_array.length
       - ARRAY_VALUES_START_INDEX);
   for (let k = 0; k <= MAX_TRAVERSE_LEN; ++k) {
-    timesamples_array[k + 1] = (k * AVG_PERIOD);
+    timesamples_array[k + 1] = k * AVG_PERIOD;
   }
   if (maxts / 1e9 > timesamples_array[max_samples.available + 1]) {
     // extend by one additional point or correct the final point
@@ -91,7 +91,7 @@ export function clearTimeseriesValues(values_array, max_samples) {
 
 export function aggregateProfileTimeseries(parent_profile, aggregate_array,
     counters, max_samples) {
-  parent_profile.child_profiles.forEach((time_series_profiles) => {
+  parent_profile.child_profiles.forEach(time_series_profiles => {
     for (let i = 0; i < aggregate_array.length; ++i) {
       accumulateTimeseriesValues(aggregate_array[i],
           time_series_profiles.time_series_counters[counters[i][2]],
@@ -134,6 +134,6 @@ export function destroyChart(chart, chart_dom_obj) {
   return null;
 }
 
-if (typeof process !== "undefined" && process.env.NODE_ENV === 'test') {
+if (typeof process !== "undefined" && process.env.NODE_ENV === "test") {
   exportedForTest = {accumulateTimeseriesValues};
 }

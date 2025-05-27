@@ -24,23 +24,23 @@ describe("Test initializeFragmentMetrics", () => {
   test("Basic Test", () => {
     const parent_profile =
     {
-      "profile_name": "Coordinator Fragment F31",
-      "num_children": 1,
-      "child_profiles": [
+      "profile_name" : "Coordinator Fragment F31",
+      "num_children" : 1,
+      "child_profiles" : [
         {
-          "profile_name": "Instance fe45c9c56d1:efd1b2a70000 (host=host-1:27000)",
-          "time_series_counters": [{
-            "counter_name": "MemoryUsage",
-            "unit": "BYTES",
-            "num": 6,
-            "period": 500,
-            "data": "12288,12288,12288,12288,12288,12288"
+          "profile_name" : "Instance fe45c9c56d1:efd1b2a70000 (host=host-1:27000)",
+          "time_series_counters" : [{
+            "counter_name" : "MemoryUsage",
+            "unit" : "BYTES",
+            "num" : 6,
+            "period" : 500,
+            "data" : "12288,12288,12288,12288,12288,12288"
           }, {
-            "counter_name": "ThreadUsage",
-            "unit": "UNIT",
-            "num": 1,
-            "period": 500,
-            "data": "4"
+            "counter_name" : "ThreadUsage",
+            "unit" : "UNIT",
+            "num" : 1,
+            "period" : 500,
+            "data" : "4"
           }]
         }
       ]

@@ -23,7 +23,7 @@ import {host_utilization_chart, getUtilizationWrapperHeight}
     from "./host_utilization_diagram.js";
 import {fragment_metrics_chart, getFragmentMetricsWrapperHeight,
     updateFragmentMetricsChartOnClick} from "./fragment_metrics_diagram.js";
-import {showTooltip, hideTooltip} from "./chart_commons.js"
+import {showTooltip, hideTooltip} from "./chart_commons.js";
 import "./global_dom.js";
 
 export let exportedForTest;
@@ -31,8 +31,8 @@ export let exportedForTest;
 export let name_width;
 export let page_additional_height;
 
-const stroke_fill_colors = { black : "#000000", dark_grey : "#505050",
-    light_grey : "#F0F0F0", transperent : "rgba(0, 0, 0, 0)" };
+const stroke_fill_colors = {black : "#000000", dark_grey : "#505050",
+    light_grey : "#F0F0F0", transperent : "rgba(0, 0, 0, 0)"};
 const ROW_HEIGHT = 15;
 const INTEGER_PART_ESTIMATE = 4;
 const CHAR_WIDTH = 6;
@@ -44,12 +44,12 @@ let decimals_multiplier = Math.pow(10, 2);
 
 // #phases_header
 const phases = [
-  { color: "#C0C0FF", label: "Prepare" },
-  { color: "#E0E0E0", label: "Open" },
-  { color: "#FFFFC0", label: "Produce First Batch" },
-  { color: "#C0FFFF", label: "Send First Batch" },
-  { color: "#C0FFC0", label: "Process Remaining Batches" },
-  { color: "#FFC0C0", label: "Close" }
+  {color : "#C0C0FF", label : "Prepare"},
+  {color : "#E0E0E0", label : "Open"},
+  {color : "#FFFFC0", label : "Produce First Batch"},
+  {color : "#C0FFFF", label : "Send First Batch"},
+  {color : "#C0FFC0", label : "Process Remaining Batches"},
+  {color : "#FFC0C0", label : "Close"}
 ];
 
 // #fragment_diagram
@@ -158,7 +158,7 @@ function markMinMaxAvg(event) {
   let part;
   for (i = 0; i < event.ts_list.length; i++) {
     ts = event.ts_list[i];
-    k = ((ts - min) * BUCKET_SIZE / EVENT_SPAN_T) | 0;
+    k = (ts - min) * BUCKET_SIZE / EVENT_SPAN_T | 0;
     if (k >= BUCKET_SIZE) k = BUCKET_SIZE - 1;
     part = event.parts[k];
     if (ts < part.min) part.min = ts;
@@ -183,7 +183,7 @@ function attachBucketedPhaseTooltip(rect, part) {
   return rect;
 }
 
-function DrawBars(svg, rownum, row_height, events, xoffset, px_per_ns) {
+function DrawBars(svg, rownum_l, row_height, events, xoffset, px_per_ns) {
   // Structure of each 'events' element -
   // {
   //    no_bar : < Boolean value is set, if event is not to be rendered >
@@ -199,10 +199,10 @@ function DrawBars(svg, rownum, row_height, events, xoffset, px_per_ns) {
   const BAR_HEIGHT = row_height - 2;
   const LAST_E_INDEX = events.length - 1;
   const LAST_TS_INDEX = events[LAST_E_INDEX].ts_list.length - 1;
-  let plan_node = getSvgGroup();
+  const plan_node = getSvgGroup();
   plan_node.classList.add("plan_node");
   // coordinates start with (0,0) in the top-left corner
-  let y = rownum * row_height; // the y-position for the current phase rectangle
+  let y = rownum_l * row_height; // the y-position for the current phase rectangle
   const cp_y = y; // copy of y, used to bring y-position back to the top(initial value)
   let dx, dy; // dimensions of the current phase rectangle
   let bucketed = false;
@@ -211,14 +211,13 @@ function DrawBars(svg, rownum, row_height, events, xoffset, px_per_ns) {
     events.map(markMinMaxAvg);
     bucketed = true;
   } else {
-    events.map((ev) => {
+    events.map(ev => {
       ev.ts_list.sort((a, b) => a - b);
     });
   }
 
-  let i;
   let color_idx = LAST_E_INDEX;
-  for (i = 0; i <= LAST_E_INDEX; ++i) {
+  for (let i = 0; i <= LAST_E_INDEX; ++i) {
     if (events[i].no_bar) --color_idx;
   }
 
@@ -234,7 +233,7 @@ function DrawBars(svg, rownum, row_height, events, xoffset, px_per_ns) {
         for (j = 0; j < events[i].parts.length; j++) {
           part = events[i].parts[j]; // mantain a reference for reuse
           if (part.count > 0) {
-              dy = (part.count / events[i].ts_list.length) * BAR_HEIGHT;
+              dy = part.count / events[i].ts_list.length * BAR_HEIGHT;
           } else {
             // skip to the next iteration, if the current bucket has no timestamps
             continue;
@@ -269,7 +268,7 @@ function DrawBars(svg, rownum, row_height, events, xoffset, px_per_ns) {
     }
   }
 
-  y = rownum * row_height;
+  y = rownum_l * row_height;
   if (events[LAST_E_INDEX].no_bar === undefined) {
     // Plan node's top and bottom outlines
     let top_edge_ts, bottom_edge_ts;
@@ -294,7 +293,7 @@ async function renderPhases() {
   clearDOMChildren(phases_header);
   let color_idx = 0;
   const PHASE_WIDTH = Math.ceil(chart_width / phases.length);
-  phases.forEach((p) => {
+  phases.forEach(p => {
     let x = name_width + Math.ceil(chart_width * color_idx / phases.length);
     x = Math.min(x, diagram_width - PHASE_WIDTH);
 
@@ -302,8 +301,8 @@ async function renderPhases() {
         ROW_HEIGHT));
     phases_header.appendChild(getSvgRect(phases[color_idx++].color, x + 1, 1,
         PHASE_WIDTH - 2, ROW_HEIGHT - 2));
-    phases_header.appendChild(getSvgText(p.label, stroke_fill_colors.black, x + PHASE_WIDTH
-        / 2, (ROW_HEIGHT + 4) / 2 , ROW_HEIGHT, true,
+    phases_header.appendChild(getSvgText(p.label, stroke_fill_colors.black,
+        x + PHASE_WIDTH / 2, (ROW_HEIGHT + 4) / 2 , ROW_HEIGHT, true,
         Math.min(p.label.length * CHAR_WIDTH, PHASE_WIDTH / 1.5)));
   });
 }
@@ -320,20 +319,21 @@ async function renderFragmentDiagram() {
     if (!fragment.printed) {
       fragment.printed = true;
 
-      let pending_fragments = [];
-      let fevents = fragment.events;
+      const pending_fragments = [];
+      const fevents = fragment.events;
 
-      let frag_name = fragment.name.replace("Coordinator ", "").replace("Fragment ", "");
+      const frag_name = fragment.name.replace("Coordinator ", "").replace("Fragment ",
+          "");
 
       fragment_diagram.appendChild(getSvgText(frag_name, fragment.color, 1, text_y,
           ROW_HEIGHT, false));
 
       // Fragment/sender timing row
-      let fragment_svg_group = getSvgGroup();
+      const fragment_svg_group = getSvgGroup();
       DrawBars(fragment_svg_group, rownum_l, ROW_HEIGHT, fevents, name_width, PX_PER_NS);
 
       for (let i = 0; i < fragment.nodes.length; ++i) {
-        let node = fragment.nodes[i];
+        const node = fragment.nodes[i];
 
         if (node.events !== undefined) {
           // Plan node timing row
@@ -359,92 +359,92 @@ async function renderFragmentDiagram() {
           pending_children--;
         }
 
-        let label_x = frag_name_width + CHAR_WIDTH * pending_children;
-        let label_width = Math.min(CHAR_WIDTH * node.name.length,
-            name_width - label_x - 2);
+        const LABEL_X = frag_name_width + CHAR_WIDTH * pending_children;
+        const LABEL_WIDTH = Math.min(CHAR_WIDTH * node.name.length,
+            name_width - LABEL_X - 2);
         fragment_diagram.appendChild(getSvgText(node.name, fragment.color,
-            label_x, text_y, ROW_HEIGHT, false));
+            LABEL_X, text_y, ROW_HEIGHT, false));
 
         if (node.parent_node !== undefined) {
-          let y = ROW_HEIGHT * node.parent_node.rendering.rownum;
+          const Y = ROW_HEIGHT * node.parent_node.rendering.rownum;
           if (node.is_sender) {
-            let x = name_width + Math.min.apply(null, fevents[3].ts_list) * PX_PER_NS;
+            const X = name_width + Math.min.apply(null, fevents[3].ts_list) * PX_PER_NS;
             // Dotted horizontal connector to received rows
             fragment_diagram.appendChild(getSvgLine(fragment.color, name_width,
-                y + ROW_HEIGHT / 2 - 1, x, y + ROW_HEIGHT / 2 - 1, true));
+                Y + ROW_HEIGHT / 2 - 1, X, Y + ROW_HEIGHT / 2 - 1, true));
 
             // Dotted rectangle for received rows
-            let x2 = name_width + Math.max.apply(null, fevents[4].ts_list) * PX_PER_NS;
+            const X2 = name_width + Math.max.apply(null, fevents[4].ts_list) * PX_PER_NS;
             fragment_diagram.appendChild(getSvgRect(stroke_fill_colors.transperent,
-                x, y + 4, x2 - x, ROW_HEIGHT - 10, "2 2", fragment.color));
+                X, Y + 4, X2 - X, ROW_HEIGHT - 10, "2 2", fragment.color));
           }
 
           if (node.is_sender && node.parent_node.rendering.rownum !== rownum_l - 1) {
             // DAG edge on right side to distant sender
-            let x = name_width - (pending_senders) * CHAR_WIDTH - CHAR_WIDTH / 2;
+            const X = name_width - pending_senders * CHAR_WIDTH - CHAR_WIDTH / 2;
             fragment_diagram.appendChild(getSvgLine(fragment.color,
                 node.parent_node.rendering.label_end,
-                y + ROW_HEIGHT / 2, x , y + ROW_HEIGHT / 2, false));
-            fragment_diagram.appendChild(getSvgLine(fragment.color, x,
-                y + ROW_HEIGHT / 2, x, text_y - ROW_HEIGHT / 2 + 3, false));
-            fragment_diagram.appendChild(getSvgLine(fragment.color, x,
-                text_y - ROW_HEIGHT / 2 + 3, label_x + label_width,
+                Y + ROW_HEIGHT / 2, X , Y + ROW_HEIGHT / 2, false));
+            fragment_diagram.appendChild(getSvgLine(fragment.color, X,
+                Y + ROW_HEIGHT / 2, X, text_y - ROW_HEIGHT / 2 + 3, false));
+            fragment_diagram.appendChild(getSvgLine(fragment.color, X,
+                text_y - ROW_HEIGHT / 2 + 3, LABEL_X + LABEL_WIDTH,
                 text_y - ROW_HEIGHT / 2 + 3, false));
 
           } else {
             // DAG edge from parent to immediate child
-            let x = frag_name_width + (pending_children + 1) * CHAR_WIDTH -
+            const X = frag_name_width + (pending_children + 1) * CHAR_WIDTH -
                 CHAR_WIDTH / 2;
-            fragment_diagram.appendChild(getSvgLine(fragment.color, x, y +
-                ROW_HEIGHT - 3, x, text_y - ROW_HEIGHT + 6, false));
+            fragment_diagram.appendChild(getSvgLine(fragment.color, X, Y +
+                ROW_HEIGHT - 3, X, text_y - ROW_HEIGHT + 6, false));
           }
         }
-        node.rendering = { rownum: rownum_l, label_end: label_x + label_width };
+        node.rendering = {rownum : rownum_l, label_end : LABEL_X + LABEL_WIDTH};
         if (node.num_children) {
           // Scan (leaf) node
-          pending_children += (node.num_children - node.is_receiver);
+          pending_children += node.num_children - node.is_receiver;
         }
         text_y += ROW_HEIGHT;
         rownum_l++;
 
         if (node.is_receiver) {
           if (plan_order.checked) {
-            printFragment(fragments[node.sender_frag_index])
+            printFragment(fragments[node.sender_frag_index]);
           } else {
             pending_fragments.push(fragments[node.sender_frag_index]);
           }
         }
       }
       fragment_svg_group.id = fragment.name;
-      fragment_svg_group.addEventListener('click', updateFragmentMetricsChartOnClick);
+      fragment_svg_group.addEventListener("click", updateFragmentMetricsChartOnClick);
       fragment_diagram.appendChild(fragment_svg_group);
       // Visit sender fragments in reverse order to avoid dag edges crossing
       pending_fragments.reverse().forEach(printFragment);
     }
   });
-  fragments.forEach((fragment) => {
+  fragments.forEach(fragment => {
     fragment.printed = false;
   });
 }
 
 async function renderTimeticks() {
   clearDOMChildren(timeticks_footer);
-  let sec_per_tic = maxts / ntics / 1e9;
-  let px_per_tic = chart_width / ntics;
+  const SEC_PER_TIC = maxts / ntics / 1e9;
+  const PX_PER_TIC = chart_width / ntics;
   let x = name_width;
-  let y = 0;
-  let text_y = ROW_HEIGHT - 4;
+  const y = 0;
+  const text_y = ROW_HEIGHT - 4;
   let timetick_label;
   for (let i = 1; i <= ntics; ++i) {
-    timeticks_footer.appendChild(getSvgRect(stroke_fill_colors.black, x, y, px_per_tic,
+    timeticks_footer.appendChild(getSvgRect(stroke_fill_colors.black, x, y, PX_PER_TIC,
         ROW_HEIGHT));
     timeticks_footer.appendChild(getSvgRect(stroke_fill_colors.light_grey, x + 1,
-        y + 1, px_per_tic - 2, ROW_HEIGHT - 2));
-    timetick_label = (i * sec_per_tic).toFixed(decimals);
+        y + 1, PX_PER_TIC - 2, ROW_HEIGHT - 2));
+    timetick_label = (i * SEC_PER_TIC).toFixed(decimals);
     timeticks_footer.appendChild(getSvgText(timetick_label, stroke_fill_colors.black,
-        x + px_per_tic - timetick_label.length * CHAR_WIDTH + 2, text_y, ROW_HEIGHT,
+        x + PX_PER_TIC - timetick_label.length * CHAR_WIDTH + 2, text_y, ROW_HEIGHT,
         false));
-    x += px_per_tic;
+    x += PX_PER_TIC;
   }
 }
 
@@ -456,12 +456,12 @@ export function collectFragmentEventsFromProfile() {
   const receiver_nodes = [];
   let color_idx = 0;
   try {
-    // First pass: compute sizes
+    // First pass : compute sizes
     const execution_profile = profile.child_profiles[2];
     const EXECUTION_PROFILE_NAME = execution_profile.profile_name.split(" ").slice(0,2)
         .join(" ");
     console.assert(EXECUTION_PROFILE_NAME === "Execution Profile");
-    execution_profile.child_profiles.forEach((fp) => {
+    execution_profile.child_profiles.forEach(fp => {
 
       if (fp.child_profiles !== undefined &&
           fp.child_profiles[0].event_sequences !== undefined) {
@@ -478,7 +478,7 @@ export function collectFragmentEventsFromProfile() {
         }
         for (let instance = 1; instance < fp.child_profiles.length; ++instance) {
           if (fp.child_profiles[instance].event_sequences !== undefined) {
-            if (fp.child_profiles[instance].event_sequences[0].events.length ==
+            if (fp.child_profiles[instance].event_sequences[0].events.length ===
                 fevents.length) {
               for (let en = 0; en < fevents.length; ++en) {
                 if (fevents[en].no_bar) continue;
@@ -505,11 +505,11 @@ export function collectFragmentEventsFromProfile() {
         }
 
         const fragment = {
-          name: fp.profile_name,
-          events: fevents,
-          nodes: [ ],
-          color: fragment_colors[color_idx]
-        }
+          name : fp.profile_name,
+          events : fevents,
+          nodes : [ ],
+          color : fragment_colors[color_idx]
+        };
         // Pick a new color for each plan fragment
         color_idx = (color_idx + 1) % fragment_colors.length;
         set_maxts(Math.max(maxts, fevents[fevents.length - 1].timestamp));
@@ -521,35 +521,35 @@ export function collectFragmentEventsFromProfile() {
           if (pp.node_metadata === undefined) return;
           node_path.push(index);
           //  pp.profile_name : "AGGREGATION_NODE (id=52)"
-          let name_flds = pp.profile_name.split(/[()]/);
+          const name_flds = pp.profile_name.split(/[()]/);
           //  name_flds : ["AGGREGATION_NODE ", "id=52", ""]
-          let node_type = name_flds[0].trim();
-          //  node_type: "AGGREGATION_NODE"
-          let node_id = name_flds.length > 1 ?
+          const node_type = name_flds[0].trim();
+          //  node_type : "AGGREGATION_NODE"
+          const NODE_ID = name_flds.length > 1 ?
               parseInt(name_flds[1].split(/[=]/)[1]) : 0;
-          //  node_id: 52
+          //  node_id : 52
           node_name = pp.profile_name.replace("_NODE", "").replace("_", " ")
               .replace("KrpcDataStreamSender", "SENDER")
               .replace("Hash Join Builder", "JOIN BUILD")
               .replace("join node_", "");
           if (node_type.indexOf("SCAN_NODE") >= 0) {
-            let table_name = pp.info_strings.find(({ key }) => key === "Table Name")
+            const table_name = pp.info_strings.find(({key}) => key === "Table Name")
                 .value.split(/[.]/);
             node_name = node_name.replace("SCAN",
                 `SCAN [${table_name[table_name.length - 1]}]`);
           }
 
           const IS_RECEIVER = node_type === "EXCHANGE_NODE" ||
-              (node_type === "HASH_JOIN_NODE" && pp.num_children < 3);
+              node_type === "HASH_JOIN_NODE" && pp.num_children < 3;
 
-          const IS_SENDER = (node_type === "Hash Join Builder" ||
-                            node_type === "KrpcDataStreamSender");
+          const IS_SENDER = node_type === "Hash Join Builder" ||
+                            node_type === "KrpcDataStreamSender";
           let parent_node;
           if (node_type === "PLAN_ROOT_SINK") {}
           else if (pp.node_metadata.data_sink_id !== undefined) {
-            parent_node = receiver_nodes[node_id]; // Exchange sender dst
+            parent_node = receiver_nodes[NODE_ID]; // Exchange sender dst
           } else if (pp.node_metadata.join_build_id !== undefined) {
-            parent_node = receiver_nodes[node_id]; // Join sender dst
+            parent_node = receiver_nodes[NODE_ID]; // Join sender dst
           } else if (node_stack.length > 0) {
             parent_node = node_stack[node_stack.length - 1];
           } else if (all_nodes.length) {
@@ -573,25 +573,25 @@ export function collectFragmentEventsFromProfile() {
             }
           }
           let node = {
-              name: node_name,
-              type: node_type,
-              node_id: node_id,
-              num_children: 0,
-              child_index: 0,
-              metadata: pp.node_metadata,
-              parent_node: parent_node,
-              events: node_events,
-              path: node_path.slice(0),
-              is_receiver: IS_RECEIVER,
-              is_sender: IS_SENDER
-          }
+              name : node_name,
+              type : node_type,
+              node_id : NODE_ID,
+              num_children : 0,
+              child_index : 0,
+              metadata : pp.node_metadata,
+              parent_node : parent_node,
+              events : node_events,
+              path : node_path.slice(0),
+              is_receiver : IS_RECEIVER,
+              is_sender : IS_SENDER
+          };
 
           if (IS_SENDER) {
             node.parent_node.sender_frag_index = fragments.length;
           }
 
           if (IS_RECEIVER) {
-            receiver_nodes[node_id] = node;
+            receiver_nodes[NODE_ID] = node;
           }
 
           if (parent_node !== undefined) {
@@ -629,13 +629,16 @@ export function collectFragmentEventsFromProfile() {
             if (cp.event_sequences !== undefined) {
               if (node.events.length === cp.event_sequences[0].events.length) {
                 for (let en = 0; en < node.events.length; ++en) {
-                  node.events[en].ts_list.push(cp.event_sequences[0].events[en].timestamp);
+                  node.events[en].ts_list.push(
+                      cp.event_sequences[0].events[en].timestamp);
                 }
               } else {
                 let i = 0, en = 0;
-                while(i < node.events.length && en < cp.event_sequences[0].events.length) {
+                while(i < node.events.length && en < cp.event_sequences[0]
+                    .events.length) {
                   if (node.events[i].label === cp.event_sequences[0].events[en].label) {
-                    node.events[i].ts_list.push(cp.event_sequences[0].events[en].timestamp);
+                    node.events[i]
+                        .ts_list.push(cp.event_sequences[0].events[en].timestamp);
                     ++en; ++i;
                   } else {
                     ++i;
@@ -694,33 +697,35 @@ export function renderTimingDiagram() {
   }
 }
 
-fragment_diagram.addEventListener('mouseout', (e) => {
+fragment_diagram.addEventListener("mouseout", e => {
   hideTooltip(host_utilization_chart);
   hideTooltip(fragment_metrics_chart);
   removeChildIfExists(fragment_diagram, timestamp_gridline);
 });
 
-fragment_diagram.addEventListener('mousemove', (e) => {
-  if (e.clientX + scrollable_screen.scrollLeft >= name_width && e.clientX + scrollable_screen.scrollLeft <= name_width + chart_width){
+fragment_diagram.addEventListener("mousemove", e => {
+  if (e.clientX + scrollable_screen.scrollLeft >= name_width && e.clientX +
+      scrollable_screen.scrollLeft <= name_width + chart_width) {
     removeChildIfExists(fragment_diagram, timestamp_gridline);
-    timestamp_gridline = getSvgLine(stroke_fill_colors.black, e.clientX + scrollable_screen.scrollLeft, 0, e.clientX + scrollable_screen.scrollLeft,
+    timestamp_gridline = getSvgLine(stroke_fill_colors.black, e.clientX +
+        scrollable_screen.scrollLeft, 0, e.clientX + scrollable_screen.scrollLeft,
         parseInt(fragment_diagram.style.height), false);
     fragment_diagram.appendChild(timestamp_gridline);
-    const GRIDLINE_TIME = ((maxts * (e.clientX + scrollable_screen.scrollLeft - name_width) / chart_width) / 1e9);
+    const GRIDLINE_TIME = maxts * (e.clientX + scrollable_screen.scrollLeft
+        - name_width) / chart_width / 1e9;
     showTooltip(host_utilization_chart, GRIDLINE_TIME);
     showTooltip(fragment_metrics_chart, GRIDLINE_TIME);
     fragment_diagram_title.textContent = GRIDLINE_TIME.toFixed(decimals) + " s";
   } else {
     try {
       host_utilization_chart.tooltip.hide();
-    } catch (e) {
-    }
+    } catch (except) {}
     removeChildIfExists(fragment_diagram, timestamp_gridline);
     fragment_diagram_title.textContent = "";
   }
 });
 
-fragment_diagram.addEventListener('wheel', (e) => {
+fragment_diagram.addEventListener("wheel", e => {
   if (e.shiftKey) {
     const WINDOW_DIAGRAM_WIDTH = window.innerWidth - BORDER_STROKE_WIDTH;
     if (e.wheelDelta <= 0 && diagram_width <= WINDOW_DIAGRAM_WIDTH) return;
@@ -744,7 +749,7 @@ fragment_diagram.addEventListener('wheel', (e) => {
   }
 });
 
-timeticks_footer.addEventListener('wheel', (e) => {
+timeticks_footer.addEventListener("wheel", e => {
   if (e.shiftKey) {
     if (e.altKey) {
       if (e.wheelDelta <= 0) {
@@ -752,7 +757,7 @@ timeticks_footer.addEventListener('wheel', (e) => {
         set_decimals(decimals - 1);
         decimals_multiplier /= 10;
       } else {
-        const RENDERING_CONSTRAINT = CHAR_WIDTH * ((decimals + 1) + INTEGER_PART_ESTIMATE)
+        const RENDERING_CONSTRAINT = CHAR_WIDTH * (decimals + 1) + INTEGER_PART_ESTIMATE
             >= chart_width / ntics;
         if (RENDERING_CONSTRAINT) return;
         set_decimals(decimals + 1);
@@ -771,8 +776,8 @@ timeticks_footer.addEventListener('wheel', (e) => {
   }
 });
 
-plan_order.addEventListener('click', renderFragmentDiagram);
+plan_order.addEventListener("click", renderFragmentDiagram);
 
-if (typeof process !== "undefined" && process.env.NODE_ENV === 'test') {
+if (typeof process !== "undefined" && process.env.NODE_ENV === "test") {
   exportedForTest = {getSvgRect, getSvgLine, getSvgText, getSvgTitle, getSvgGroup};
 }

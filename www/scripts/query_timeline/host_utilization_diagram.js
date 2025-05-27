@@ -60,7 +60,8 @@ const max_samples_utilization = {
 let host_utilization_resize_factor = 0.2;
 
 const host_utilization_close_btn = document.getElementById("host_utilization_close_btn");
-const host_utilization_resize_bar = document.getElementById("host_utilization_resize_bar");
+const host_utilization_resize_bar = document.getElementById(
+    "host_utilization_resize_bar");
 
 function initializeUtilizationChart() {
   const axis_mappings = {};
@@ -71,7 +72,7 @@ function initializeUtilizationChart() {
     axis_mappings[read_write_metrics_counters[i][1]] = "y2";
   }
   const cpu_utilization_counter_group = new Array(cpu_utilization_counters.length);
-  for (let i = 0; i < cpu_utilization_counters.length; i++){
+  for (let i = 0; i < cpu_utilization_counters.length; i++) {
     cpu_utilization_counter_group[i] = cpu_utilization_counters[i][1];
   }
   host_utilization_diagram.style = null;
@@ -79,7 +80,7 @@ function initializeUtilizationChart() {
     bindto : "#host_utilization_diagram",
     data : {
       columns : [[UTILIZATION_TIMEAXIS_NAME, 0]],
-      axes: axis_mappings,
+      axes : axis_mappings,
       type : "area",
       groups : [ cpu_utilization_counter_group ],
       order : "asc",
@@ -98,19 +99,19 @@ function initializeUtilizationChart() {
           right : 0
         },
         tick : {
-          format : (x) => x.toFixed(decimals)
+          format : x => x.toFixed(decimals)
         }
       },
       y :
       {
         tick : {
-          format : (y) => y + '%'
+          format : y => y + "%"
         }
       },
       y2 :
       {
         tick : {
-          format : (y2) => `${getReadableSize(y2, 1)}/s`
+          format : y2 => `${getReadableSize(y2, 1)}/s`
         },
         show : true
       }
@@ -119,8 +120,8 @@ function initializeUtilizationChart() {
     }, tooltip : {
       format : {
         value : (value, ratio, id, index) => {
-          if (cpu_utilization_counter_group.includes(id)){
-            return value.toFixed(decimals) + '%';
+          if (cpu_utilization_counter_group.includes(id)) {
+            return value.toFixed(decimals) + "%";
           } else {
             return `${getReadableSize(value, decimals)}/s`;
           }
@@ -155,7 +156,7 @@ function initializeUtilizationMetrics(parent_profile, counters_y1, counters_y2,
     max_samples, timeaxis_name) {
   console.assert(parent_profile.profile_name === "Per Node Profiles");
   // user, sys, io and sampled timeticks
-  const cpu_nodes_usage_aggregate = new Array(counters_y1.length);
+  cpu_nodes_usage_aggregate = new Array(counters_y1.length);
   max_samples.available = 0;
   max_samples.period = 0;
   for (let i = 0; i < counters_y1.length; ++i) {
@@ -164,18 +165,20 @@ function initializeUtilizationMetrics(parent_profile, counters_y1, counters_y2,
     cpu_nodes_usage_aggregate[i][0] = counters_y1[i][1];
     cpu_nodes_usage_aggregate[i][1] = 0;
   }
-  const read_write_metrics_aggregate = new Array(counters_y2.length);
+  read_write_metrics_aggregate = new Array(counters_y2.length);
   for (let i = 0; i < counters_y2.length; ++i) {
     read_write_metrics_aggregate[i] = new Array(max_samples.allocated + 2)
         .fill(null);
     read_write_metrics_aggregate[i][0] = counters_y2[i][1];
     read_write_metrics_aggregate[i][1] = 0;
   }
-  const sampled_utilization_timeseries = new Array(max_samples.allocated + 2)
+  sampled_utilization_timeseries = new Array(max_samples.allocated + 2)
       .fill(null);
   sampled_utilization_timeseries[0] = timeaxis_name;
-  mapTimeseriesCounters(parent_profile.child_profiles[0].time_series_counters, counters_y1);
-  mapTimeseriesCounters(parent_profile.child_profiles[0].time_series_counters, counters_y2);
+  mapTimeseriesCounters(parent_profile.child_profiles[0].time_series_counters,
+      counters_y1);
+  mapTimeseriesCounters(parent_profile.child_profiles[0].time_series_counters,
+      counters_y2);
   return {cpu_nodes_usage_aggregate, read_write_metrics_aggregate,
       sampled_utilization_timeseries};
 }
@@ -216,7 +219,7 @@ export async function resizeUtilizationChart() {
 
 export function collectUtilizationFromProfile() {
   // do not collect metrics, in case host utilization is not visible
-  if (!host_utilization_visible){
+  if (!host_utilization_visible) {
     utilization_metrics_parse_successful = false;
     return;
   }
@@ -238,7 +241,7 @@ export function collectUtilizationFromProfile() {
     const impala_server_profile = profile.child_profiles[1];
     console.assert(impala_server_profile.profile_name === "ImpalaServer");
     // Update the plot, only when number of samples in SummaryStatsCounter is updated
-    if (impala_server_profile.summary_stats_counters[0].num_of_samples ==
+    if (impala_server_profile.summary_stats_counters[0].num_of_samples ===
         prev_utilization_num_samples) {
       utilization_metrics_parse_successful = true;
       return;
@@ -264,13 +267,13 @@ export function collectUtilizationFromProfile() {
       return;
     }
     // average the aggregated metrics
-    cpu_nodes_usage_aggregate.forEach((acc_usage) => {
+    cpu_nodes_usage_aggregate.forEach(acc_usage => {
       for (let i = ARRAY_VALUES_START_INDEX; i < max_samples_utilization.available
           + ARRAY_VALUES_START_INDEX; ++i) {
         acc_usage[i] = acc_usage[i] / (100 * per_node_profiles.child_profiles.length);
       }
     });
-    read_write_metrics_aggregate.forEach((acc_usage) => {
+    read_write_metrics_aggregate.forEach(acc_usage => {
       for (let i = ARRAY_VALUES_START_INDEX; i < max_samples_utilization.available
           + ARRAY_VALUES_START_INDEX; ++i) {
         acc_usage[i] = acc_usage[i] / per_node_profiles.child_profiles.length;
@@ -285,10 +288,10 @@ export function collectUtilizationFromProfile() {
           sampled_utilization_timeseries]
     });
     // clear utilization value and timestamp samples arrays
-    cpu_nodes_usage_aggregate.forEach((acc_usage) => {
+    cpu_nodes_usage_aggregate.forEach(acc_usage => {
       clearTimeseriesValues(acc_usage, max_samples_utilization);
     });
-    read_write_metrics_aggregate.forEach((acc_usage) => {
+    read_write_metrics_aggregate.forEach(acc_usage => {
       clearTimeseriesValues(acc_usage, max_samples_utilization);
     });
     prev_utilization_num_samples = profile.child_profiles[1].summary_stats_counters[0]
@@ -308,19 +311,18 @@ export function destroyUtilizationChart() {
   setTimingDiagramDimensions();
 }
 
-host_utilization_resize_bar.addEventListener('mousedown',
+host_utilization_resize_bar.addEventListener("mousedown",
     function dragResizeBarBegin(mousedown_e) {
-  host_utilization_resize_bar.removeEventListener('mousedown', dragResizeBarBegin);
-  document.body.addEventListener('mousemove', dragResizeBar);
-  document.body.addEventListener('mouseup', function dragResrizeBarEnd() {
-    document.body.removeEventListener('mouseup', dragResrizeBarEnd);
-    document.body.removeEventListener('mousemove', dragResizeBar);
-    host_utilization_resize_bar.addEventListener('mousedown', dragResizeBarBegin);
+  host_utilization_resize_bar.removeEventListener("mousedown", dragResizeBarBegin);
+  document.body.addEventListener("mousemove", dragResizeBar);
+  document.body.addEventListener("mouseup", function dragResrizeBarEnd() {
+    document.body.removeEventListener("mouseup", dragResrizeBarEnd);
+    document.body.removeEventListener("mousemove", dragResizeBar);
+    host_utilization_resize_bar.addEventListener("mousedown", dragResizeBarBegin);
   });
 });
 
-
-host_utilization_close_btn.addEventListener('click', (e) => {
+host_utilization_close_btn.addEventListener("click", e => {
   host_utilization_visible = false;
   destroyUtilizationChart();
 });
@@ -328,6 +330,6 @@ host_utilization_close_btn.addEventListener('click', (e) => {
 host_utilization_close_btn.style.height = `${DIAGRAM_CONTROLS_HEIGHT}px`;
 host_utilization_close_btn.style.fontSize = `${DIAGRAM_CONTROLS_HEIGHT / 2}px`;
 
-if (typeof process !== "undefined" && process.env.NODE_ENV === 'test') {
+if (typeof process !== "undefined" && process.env.NODE_ENV === "test") {
   exportedForTest = {initializeUtilizationMetrics};
 }

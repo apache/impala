@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import {describe, test, expect} from '@jest/globals';
-import {readFileSync} from 'node:fs';
+import {describe, test, expect} from "@jest/globals";
+import {readFileSync} from "node:fs";
 
 // JEST does not support workers, so "profileParseWorker.js" cannot be tested directly
 describe("Test Compression Library", () => {
@@ -26,10 +26,10 @@ describe("Test Compression Library", () => {
     const exampleJSONProfileText = readFileSync("../../../testdata/impala-profiles/"
         + "impala_profile_log_tpcds_compute_stats_extended.expected.pretty.json",
         {encoding : "utf-8"});
-    import("pako.min.js").then((pako) => {
-      pako = pako.default;
-      expect(pako.inflate(pako.deflate(exampleJSONProfileText, {level : 3}), {to : "string"}))
-          .toBe(exampleJSONProfileText);
+    import("pako.min.js").then(pako_pack => {
+      const pako = pako_pack.default;
+      expect(pako.inflate(pako.deflate(exampleJSONProfileText, {level : 3}),
+          {to : "string"})).toBe(exampleJSONProfileText);
     });
   });
 });

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import {describe, test, expect} from '@jest/globals';
+import {describe, test, expect} from "@jest/globals";
 import {exportedForTest} from "scripts/query_timeline/host_utilization_diagram.js";
 
 describe("Test initializeUtilizationMetrics", () => {
@@ -25,29 +25,29 @@ describe("Test initializeUtilizationMetrics", () => {
   test("Basic Test", () => {
     const parent_profile =
     {
-      "profile_name": "Per Node Profiles",
-      "num_children": 3,
-      "child_profiles": [
+      "profile_name" : "Per Node Profiles",
+      "num_children" : 3,
+      "child_profiles" : [
         {
-          "profile_name": "host-1:27000",
-          "time_series_counters": [{
-            "counter_name": "HostCpuUserPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "0,0,0,70,0,0,0,0,0,10"
+          "profile_name" : "host-1:27000",
+          "time_series_counters" : [{
+            "counter_name" : "HostCpuUserPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "0,0,0,70,0,0,0,0,0,10"
           }, {
-            "counter_name": "HostCpuSysPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuSysPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }, {
-            "counter_name": "HostNetworkRx",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostNetworkRx",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }]
         }
       ]

@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import {describe, test, expect} from '@jest/globals';
+import {describe, test, expect} from "@jest/globals";
 import {exportedForTest, generateTimesamples, clearTimeseriesValues,
     mapTimeseriesCounters, aggregateProfileTimeseries} from
-    'scripts/query_timeline/chart_commons.js';
+    "scripts/query_timeline/chart_commons.js";
 
 describe("Test mapTimeseriesCounters", () => {
   // Test whether the method correctly searches and maps indexes of counters based
@@ -26,29 +26,29 @@ describe("Test mapTimeseriesCounters", () => {
   test("Basic Test (Serial Order)", () => {
     const parent_profile =
     {
-      "profile_name": "Per Node Profiles",
-      "num_children": 3,
-      "child_profiles": [
+      "profile_name" : "Per Node Profiles",
+      "num_children" : 3,
+      "child_profiles" : [
         {
-          "profile_name": "host-1:27000",
-          "time_series_counters": [{
-            "counter_name": "HostCpuIoWaitPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "0,0,0,70,0,0,0,0,0,10"
+          "profile_name" : "host-1 :27000",
+          "time_series_counters" : [{
+            "counter_name" : "HostCpuIoWaitPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "0,0,0,70,0,0,0,0,0,10"
           }, {
-            "counter_name": "HostCpuSysPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuSysPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }, {
-            "counter_name": "HostCpuUserPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuUserPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }]
         }
       ]
@@ -68,29 +68,29 @@ describe("Test mapTimeseriesCounters", () => {
   test("Basic Test (Reverse Order)", () => {
     const parent_profile =
     {
-      "profile_name": "Per Node Profiles",
-      "num_children": 3,
-      "child_profiles": [
+      "profile_name" : "Per Node Profiles",
+      "num_children" : 3,
+      "child_profiles" : [
         {
-          "profile_name": "host-1:27000",
-          "time_series_counters": [{
-            "counter_name": "HostCpuUserPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "0,0,0,70,0,0,0,0,0,10"
+          "profile_name" : "host-1 :27000",
+          "time_series_counters" : [{
+            "counter_name" : "HostCpuUserPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "0,0,0,70,0,0,0,0,0,10"
           }, {
-            "counter_name": "HostCpuSysPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuSysPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }, {
-            "counter_name": "HostCpuIoWaitPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuIoWaitPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }]
         }
       ]
@@ -110,29 +110,29 @@ describe("Test mapTimeseriesCounters", () => {
   test("Edge Case (No such 'counter_name' within profile)", () => {
     const parent_profile =
     {
-      "profile_name": "Per Node Profiles",
-      "num_children": 3,
-      "child_profiles": [
+      "profile_name" : "Per Node Profiles",
+      "num_children" : 3,
+      "child_profiles" : [
         {
-          "profile_name": "host-1:27000",
-          "time_series_counters": [{
-            "counter_name": "HostCpuUserPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "0,0,0,70,0,0,0,0,0,10"
+          "profile_name" : "host-1 :27000",
+          "time_series_counters" : [{
+            "counter_name" : "HostCpuUserPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "0,0,0,70,0,0,0,0,0,10"
           }, {
-            "counter_name": "HostCpuSysPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuSysPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }, {
-            "counter_name": "HostCpuIoWaitPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuIoWaitPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }]
         }
       ]
@@ -165,9 +165,9 @@ describe("Test accumulateTimeseriesValues", () => {
     };
     const values_array = [DATA_TYPE, 0, 60, 100, 40, 38, 49, 61, 27];
     const time_series_counter = {
-      period: 100,
-      num: 2000,
-      data: "30, 100, 40"
+      period : 100,
+      num : 2000,
+      data : "30, 100, 40"
     };
 
     expect(accumulateTimeseriesValues(values_array, time_series_counter, max_samples))
@@ -192,9 +192,9 @@ describe("Test accumulateTimeseriesValues", () => {
     };
     const values_array = [DATA_TYPE, 0, 60, 100, 40, 38, 49, 61, 27];
     const time_series_counter = {
-      period: 200,
-      num: 300,
-      data: "30, 100, 40"
+      period : 200,
+      num : 300,
+      data : "30, 100, 40"
     };
 
     expect(accumulateTimeseriesValues(values_array, time_series_counter, max_samples))
@@ -220,9 +220,9 @@ describe("Test accumulateTimeseriesValues", () => {
     };
     const values_array = [DATA_TYPE, 0, 60, 100, 40, 38, 49, 61, 27];
     const time_series_counter = {
-      period: 100,
-      num: 300,
-      data: "30, 100, 40"
+      period : 100,
+      num : 300,
+      data : "30, 100, 40"
     };
 
     expect(accumulateTimeseriesValues(values_array, time_series_counter, max_samples))
@@ -247,9 +247,9 @@ describe("Test accumulateTimeseriesValues", () => {
     };
     const values_array = [DATA_TYPE, 0, 60, 100];
     const time_series_counter = {
-      period: 100,
-      num: 300,
-      data: "30, 100, 40"
+      period : 100,
+      num : 300,
+      data : "30, 100, 40"
     };
 
     expect(accumulateTimeseriesValues(values_array, time_series_counter, max_samples))
@@ -346,7 +346,8 @@ describe("Test clearTimeseriesValues", () => {
 
     expect(clearTimeseriesValues(values_array, max_samples)).toBe(undefined);
 
-    expect(values_array).toEqual([DATA_TYPE, 0, null, null, null, null, null, null, null]);
+    expect(values_array).toEqual([DATA_TYPE, 0, null, null, null, null, null, null,
+        null]);
   });
 });
 
@@ -355,73 +356,73 @@ describe("Test aggregateProfileTimeseries", () => {
   test("Basic Case", () => {
     const parent_profile =
     {
-      "profile_name": "Per Node Profiles",
-      "num_children": 3,
-      "child_profiles": [
+      "profile_name" : "Per Node Profiles",
+      "num_children" : 3,
+      "child_profiles" : [
         {
-          "profile_name": "host-1:27000",
-          "time_series_counters": [{
-            "counter_name": "HostCpuIoWaitPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "0,0,0,70,0,0,0,0,0,10"
+          "profile_name" : "host-1 :27000",
+          "time_series_counters" : [{
+            "counter_name" : "HostCpuIoWaitPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "0,0,0,70,0,0,0,0,0,10"
           }, {
-            "counter_name": "HostCpuSysPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuSysPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }, {
-            "counter_name": "HostCpuUserPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuUserPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }]
         },
         {
-          "profile_name": "host-1:27001",
-          "time_series_counters": [{
-              "counter_name": "HostCpuIoWaitPercentage",
-              "unit": "BASIS_POINTS",
-              "num": 59,
-              "period": 100,
-              "data": "0,0,0,70,0,0,0,0,0,10"
+          "profile_name" : "host-1 :27001",
+          "time_series_counters" : [{
+              "counter_name" : "HostCpuIoWaitPercentage",
+              "unit" : "BASIS_POINTS",
+              "num" : 59,
+              "period" : 100,
+              "data" : "0,0,0,70,0,0,0,0,0,10"
             }, {
-              "counter_name": "HostCpuSysPercentage",
-              "unit": "BASIS_POINTS",
-              "num": 59,
-              "period": 100,
-              "data": "312,679,445,440,301,301,312,125,125,437"
+              "counter_name" : "HostCpuSysPercentage",
+              "unit" : "BASIS_POINTS",
+              "num" : 59,
+              "period" : 100,
+              "data" : "312,679,445,440,301,301,312,125,125,437"
             }, {
-              "counter_name": "HostCpuUserPercentage",
-              "unit": "BASIS_POINTS",
-              "num": 59,
-              "period": 100,
-              "data": "312,679,445,440,301,301,312,125,125,437"
+              "counter_name" : "HostCpuUserPercentage",
+              "unit" : "BASIS_POINTS",
+              "num" : 59,
+              "period" : 100,
+              "data" : "312,679,445,440,301,301,312,125,125,437"
           }]
         },
         {
-          "profile_name": "host-1:27001",
-          "time_series_counters": [{
-            "counter_name": "HostCpuIoWaitPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "0,0,0,70,0,0,0,0,0,10"
+          "profile_name" : "host-1 :27001",
+          "time_series_counters" : [{
+            "counter_name" : "HostCpuIoWaitPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "0,0,0,70,0,0,0,0,0,10"
           }, {
-            "counter_name": "HostCpuSysPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuSysPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }, {
-            "counter_name": "HostCpuUserPercentage",
-            "unit": "BASIS_POINTS",
-            "num": 59,
-            "period": 100,
-            "data": "312,679,445,440,301,301,312,125,125,437"
+            "counter_name" : "HostCpuUserPercentage",
+            "unit" : "BASIS_POINTS",
+            "num" : 59,
+            "period" : 100,
+            "data" : "312,679,445,440,301,301,312,125,125,437"
           }]
         }
       ]
@@ -449,9 +450,9 @@ describe("Test aggregateProfileTimeseries", () => {
         max_samples)).toBe(undefined);
 
     expect(aggregate_array).toEqual([
-      ['avg io wait', 0, 0, 0, 0, 210, 0, 0, 0, 0, 0, 30],
-      ['avg sys', 0, 936, 2037, 1335,1320, 903, 903, 936, 375, 375, 1311],
-      ['avg user', 0, 936, 2037, 1335, 1320, 903, 903, 936, 375, 375, 1311]
+      ["avg io wait", 0, 0, 0, 0, 210, 0, 0, 0, 0, 0, 30],
+      ["avg sys", 0, 936, 2037, 1335,1320, 903, 903, 936, 375, 375, 1311],
+      ["avg user", 0, 936, 2037, 1335, 1320, 903, 903, 936, 375, 375, 1311]
     ]);
 
     expect(max_samples).toEqual({

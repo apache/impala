@@ -15,47 +15,49 @@
 // specific language governing permissions and limitations
 // under the License.
 
-function getReadableSize(value, precision = 2) {
-  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+function getReadableSize(value_p, precision = 2) {
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
   let current_unit = 0;
+  let value = value_p;
   while( value >= 1e3 ) {
     value = value / 1e3;
     ++current_unit;
   }
-  return value.toFixed(precision) + ' ' + units[current_unit];
+  return value.toFixed(precision) + " " + units[current_unit];
 }
 
 function getReadableTimeNS(value) {
     if (value >= 1000000000) {
-        return getReadableTimeMS(value / 1000000)
+        return getReadableTimeMS(value / 1000000);
     } else if (value >= 1000000) {
-        return (value / 1000000).toFixed(3) + "ms"
+        return (value / 1000000).toFixed(3) + "ms";
     } else if (value >= 1000) {
-        return (value / 1000).toFixed(3) + "us"
+        return (value / 1000).toFixed(3) + "us";
     } else {
-        return value + "ns"
+        return value + "ns";
     }
 }
 
-function getReadableTimeMS(value) {
+function getReadableTimeMS(value_p) {
     let hour = false;
     let minute = false;
     let second = false;
     let re = "";
+    let value = value_p;
     if (value >= 3600000) {
-        re += (Math.floor(value / 3600000) + "h");
+        re += Math.floor(value / 3600000) + "h";
         value = value % 3600000;
         hour = true;
     }
     if (value >= 60000) {
-        re += (Math.floor(value / 60000) + "m");
+        re += Math.floor(value / 60000) + "m";
         value = value % 60000;
         minute = true;
     }
     // if hour is true, the time is large enough and we should
     // ignore the remaining time on second level
     if (!hour && value >= 1000) {
-        re += (Math.floor(value / 1000) + "s");
+        re += Math.floor(value / 1000) + "s";
         value = value % 1000;
         second = true;
     }
@@ -65,7 +67,7 @@ function getReadableTimeMS(value) {
                 value = "0" + value;
             }
         }
-        re += (value + "ms")
+        re += value + "ms";
     }
     return re;
 }
@@ -77,7 +79,7 @@ function getReadableTimeMS(value) {
  */
 function renderSize(data, type, row) {
     // If display or filter data is requested, format the data
-    if (type === 'display' || type === 'filter') {
+    if (type === "display" || type === "filter") {
         return getReadableSize(data);
     }
     return data;
@@ -90,7 +92,7 @@ function renderSize(data, type, row) {
  */
 function renderTime(data, type, row) {
     // If display or filter data is requested, format the data
-    if (type === 'display' || type === 'filter') {
+    if (type === "display" || type === "filter") {
         return getReadableTimeNS(data);
     }
     return data;
@@ -106,4 +108,5 @@ function getQueryID() {
   if (query_id) {
     return query_id.substring(0, query_id.indexOf("&"));
   }
+  return undefined;
 }

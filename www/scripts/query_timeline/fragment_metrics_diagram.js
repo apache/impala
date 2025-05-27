@@ -16,7 +16,7 @@
 // under the License.
 
 import {name_width, page_additional_height, setTimingDiagramDimensions}
-    from "./fragment_diagram.js"
+    from "./fragment_diagram.js";
 import {profile, diagram_width, DIAGRAM_MIN_HEIGHT, MARGIN_CHART_END, resizeVerticalAll,
     decimals} from "./global_members.js";
 import {aggregateProfileTimeseries, generateTimesamples, clearTimeseriesValues,
@@ -33,7 +33,7 @@ export let fragment_metrics_chart = null;
 const fragment_id_selections = new Map();
 const fragment_metrics_counters = [
   ["MemoryUsage", "memory usage", 0],
-  ["ThreadUsage", "thread usage", 0]
+  ["ThreadUsage","thread usage", 0]
 ];
 const max_samples_fragment_metrics = {
   allocated : 1000,
@@ -76,19 +76,19 @@ function initializeFragmentMetricsChart() {
           right : 0
         },
         tick : {
-          format : (x) => x.toFixed(decimals)
+          format : x => x.toFixed(decimals)
         }
       },
       y :
       {
         tick : {
-          format : (y) => getReadableSize(y, 1)
+          format : y => getReadableSize(y, 1)
         }
       },
       y2 :
       {
         tick : {
-          format : (y2) => (y2 === Math.floor(y2) ? y2 : "")
+          format : y2 => y2 === Math.floor(y2) ? y2 : ""
         },
         show : true
       }
@@ -97,7 +97,7 @@ function initializeFragmentMetricsChart() {
     }, tooltip : {
       format : {
         value : (value, ratio, id, index) => {
-          if (id.includes("memory usage")){
+          if (id.includes("memory usage")) {
             return getReadableSize(value, decimals);
           } else {
             return value + " Thread(s)";
@@ -118,8 +118,8 @@ function initializeFragmentMetricsChart() {
 
 function dragResizeBar(mousemove_e) {
   if (mousemove_e.target.classList[0] === "c3-event-rect") return;
-  const NEXT_HEIGHT = getFragmentMetricsHeight() + (fragment_metrics_resize_bar.offsetTop -
-      mousemove_e.clientY);
+  const NEXT_HEIGHT = getFragmentMetricsHeight() + (
+      fragment_metrics_resize_bar.offsetTop - mousemove_e.clientY);
   if (NEXT_HEIGHT >= DIAGRAM_MIN_HEIGHT &&
       window.innerHeight - NEXT_HEIGHT - DIAGRAM_CONTROLS_HEIGHT >=
       page_additional_height + getUtilizationWrapperHeight() + DIAGRAM_MIN_HEIGHT) {
@@ -132,13 +132,13 @@ function initializeFragmentMetrics(parent_profile, counters, max_samples, timeax
   // user, sys, io and sampled timeticks
   max_samples.available = 0;
   max_samples.period = 0;
-  const fragment_metrics_aggregate = new Array(counters.length);
+  fragment_metrics_aggregate = new Array(counters.length);
   for (let i = 0; i < counters.length; ++i) {
     fragment_metrics_aggregate[i] = new Array(max_samples.allocated + 3)
         .fill(null);
     fragment_metrics_aggregate[i][1] = 0;
   }
-  const sampled_fragment_metrics_timeseries = new Array(max_samples.allocated + 3)
+  sampled_fragment_metrics_timeseries = new Array(max_samples.allocated + 3)
       .fill(null);
   sampled_fragment_metrics_timeseries[0] = timeaxis_name;
   mapTimeseriesCounters(parent_profile.child_profiles[0].time_series_counters, counters);
@@ -177,7 +177,7 @@ export function collectFragmentMetricsFromProfile() {
     const profile_fragments = profile.child_profiles[2].child_profiles;
 
     // for all the fragments selected in the execution profile
-    profile_fragments.every((fragment_profile) => {
+    profile_fragments.every(fragment_profile => {
       // initialize the collection arrays for subsequent collections
       // arrays are overwritten without further re-allocation to reduce memory usage
       if(fragment_id_selections.has(fragment_profile.profile_name)) {
@@ -223,7 +223,7 @@ export function collectFragmentMetricsFromProfile() {
           axes : axes_mappings
         });
         // clear utilization value and timestamp samples arrays
-        fragment_metrics_aggregate.forEach((acc_usage) => {
+        fragment_metrics_aggregate.forEach(acc_usage => {
           clearTimeseriesValues(acc_usage, max_samples_fragment_metrics);
         });
       }
@@ -255,7 +255,7 @@ export function updateFragmentMetricsChartOnClick(click_event) {
   const SELECTED_FRAGMENT_ID = click_event.target.parentElement.parentElement.id;
   fragment_id_selections.delete(SELECTED_FRAGMENT_ID);
   if (fragment_metrics_chart !== null) {
-    const DID_UNLOAD = fragment_metrics_chart.internal.getTargets().every((target) => {
+    const DID_UNLOAD = fragment_metrics_chart.internal.getTargets().every(target => {
       if (target.id.includes(SELECTED_FRAGMENT_ID)) {
         const unload_ids = new Array(fragment_metrics_counters.length);
         for (let i = 0; i < fragment_metrics_counters.length; i++) {
@@ -293,22 +293,22 @@ export function closeFragmentMetricsChart() {
   setTimingDiagramDimensions();
 }
 
-fragment_metrics_resize_bar.addEventListener('mousedown',
+fragment_metrics_resize_bar.addEventListener("mousedown",
     function dragResizeBarBegin(mousedown_e) {
-  fragment_metrics_resize_bar.removeEventListener('mousedown', dragResizeBarBegin);
-  document.body.addEventListener('mousemove', dragResizeBar);
-  document.body.addEventListener('mouseup', function dragResrizeBarEnd() {
-    document.body.removeEventListener('mouseup', dragResrizeBarEnd);
-    document.body.removeEventListener('mousemove', dragResizeBar);
-    fragment_metrics_resize_bar.addEventListener('mousedown', dragResizeBarBegin);
+  fragment_metrics_resize_bar.removeEventListener("mousedown", dragResizeBarBegin);
+  document.body.addEventListener("mousemove", dragResizeBar);
+  document.body.addEventListener("mouseup", function dragResrizeBarEnd() {
+    document.body.removeEventListener("mouseup", dragResrizeBarEnd);
+    document.body.removeEventListener("mousemove", dragResizeBar);
+    fragment_metrics_resize_bar.addEventListener("mousedown", dragResizeBarBegin);
   });
 });
 
-fragment_metrics_close_btn.addEventListener('click', closeFragmentMetricsChart);
+fragment_metrics_close_btn.addEventListener("click", closeFragmentMetricsChart);
 
 fragment_metrics_close_btn.style.height = `${DIAGRAM_CONTROLS_HEIGHT}px`;
 fragment_metrics_close_btn.style.fontSize = `${DIAGRAM_CONTROLS_HEIGHT / 2}px`;
 
-if (typeof process !== "undefined" && process.env.NODE_ENV === 'test') {
+if (typeof process !== "undefined" && process.env.NODE_ENV === "test") {
   exportedForTest = {initializeFragmentMetrics};
 }
