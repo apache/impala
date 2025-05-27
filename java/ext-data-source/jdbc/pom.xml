@@ -23,7 +23,7 @@
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-data-source</artifactId>
-    <version>4.4.1.3.3.6.1-SNAPSHOT</version>
+    <version>4.4.1.3.3.6.2-1</version>
   </parent>
   <artifactId>impala-data-source-jdbc</artifactId>
   <name>Apache Impala External Data Source JDBC Library</name>

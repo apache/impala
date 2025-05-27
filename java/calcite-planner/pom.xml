@@ -22,12 +22,12 @@ under the License.
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-parent</artifactId>
-    <version>4.4.1.3.3.6.1-SNAPSHOT</version>
+    <version>4.4.1.3.3.6.2-1</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>calcite-planner</artifactId>
-  <version>4.4.1.3.3.6.1-SNAPSHOT</version>
+  <version>4.4.1.3.3.6.2-1</version>
   <packaging>jar</packaging>
 
   <name>calcite-planner</name>
@@ -36,7 +36,7 @@ under the License.
     <dependency>
       <groupId>org.apache.impala</groupId>
       <artifactId>impala-frontend</artifactId>
-      <version>4.4.1.3.3.6.1-SNAPSHOT</version>
+      <version>4.4.1.3.3.6.2-1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.calcite</groupId>
