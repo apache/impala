@@ -74,13 +74,17 @@ public class NodeCreationUtils {
   }
 
   public static NodeWithExprs createUnionPlanNode(PlanNodeId nodeId,
-      Analyzer analyzer, RelDataType rowType, List<NodeWithExprs> childrenPlanNodes
-      ) throws ImpalaException {
+      Analyzer analyzer, RelDataType rowType, List<NodeWithExprs> childrenPlanNodes,
+      boolean unionAll) throws ImpalaException {
     TupleDescriptorFactory tupleDescFactory =
         new TupleDescriptorFactory("union", rowType);
     TupleDescriptor tupleDesc = tupleDescFactory.create(analyzer);
     // The outputexprs are the SlotRef exprs passed to the parent node.
     List<Expr> outputExprs = createOutputExprs(tupleDesc.getSlots());
+
+    if (unionAll) {
+      registerUnionValueTransfers(analyzer, outputExprs, childrenPlanNodes);
+    }
 
     UnionNode unionNode = new ImpalaUnionNode(nodeId, tupleDesc.getId(), outputExprs,
         childrenPlanNodes);
@@ -111,5 +115,34 @@ public class NodeCreationUtils {
           context.ctx_.getRootAnalyzer(), planNode,
           context.ctx_.getNextNodeId(), rexBuilder)
       : planNode;
+  }
+
+  /**
+   * Register the union value transfers which allows runtime filter generators
+   * to be applied to equivalent values under union nodes.
+   *
+   * The output expression node of the Union is treated as equivalent to all
+   * the children nodes. The equivalent call within the original Impala planner
+   * that registers the value transfer is located in SetOperationStmt.createMetadata
+   */
+  private static void registerUnionValueTransfers(Analyzer analyzer,
+      List<Expr> outputExprs, List<NodeWithExprs> childrenPlanNodes) {
+    for (NodeWithExprs nodeWithExprs : childrenPlanNodes) {
+      Preconditions.checkState(outputExprs.size() == nodeWithExprs.outputExprs_.size());
+    }
+
+    for (int i = 0; i < outputExprs.size(); ++i) {
+      SlotRef unionExpr = outputExprs.get(i).unwrapSlotRef(false);
+      if (unionExpr == null) {
+        continue;
+      }
+      for (NodeWithExprs nodeWithExprs : childrenPlanNodes) {
+        SlotRef inputExpr = nodeWithExprs.outputExprs_.get(i).unwrapSlotRef(false);
+        if (inputExpr == null) {
+          continue;
+        }
+        analyzer.registerValueTransfer(unionExpr.getSlotId(), inputExpr.getSlotId());
+      }
+    }
   }
 }

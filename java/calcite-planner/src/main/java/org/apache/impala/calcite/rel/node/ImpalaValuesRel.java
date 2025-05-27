@@ -75,7 +75,7 @@ public class ImpalaValuesRel extends Values
     List<NodeWithExprs> nodeWithExprsList = getValuesExprs(context);
 
     NodeWithExprs retNode = NodeCreationUtils.createUnionPlanNode(nodeId,
-        context.ctx_.getRootAnalyzer(), rowType, nodeWithExprsList);
+        context.ctx_.getRootAnalyzer(), rowType, nodeWithExprsList, false);
 
     // If there is a filter condition, a SelectNode will get added on top
     // of the retNode.
