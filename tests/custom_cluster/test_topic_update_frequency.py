@@ -17,10 +17,11 @@ import pytest
 import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfFS
+from tests.common.skip import SkipIfFS, SkipIfExploration
 
 
 @SkipIfFS.variable_listing_times
+@SkipIfExploration.is_not_exhaustive()
 class TestTopicUpdateFrequency(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially

@@ -21,11 +21,13 @@ import os
 
 from impala_thrift_gen.SystemTables.ttypes import TQueryTableColumn
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfExploration
 from tests.common.test_dimensions import hs2_client_protocol_dimension
 from tests.common.wm_test_suite import WorkloadManagementTestSuite
 from tests.util.workload_management import assert_csv_col, QUERY_TBL_LOG
 
 
+@SkipIfExploration.is_not_exhaustive()
 @CustomClusterTestSuite.with_args(
   cluster_size=1, disable_log_buffering=True, workload_mgmt=True,
   impalad_args="--query_log_max_queued=1")
@@ -416,6 +418,7 @@ class TestWorkloadManagementSQLDetails(WorkloadManagementTestSuite):
         "functional")
 
 
+@SkipIfExploration.is_not_exhaustive()
 class TestWorkloadManagementSQLDetailsCalcite(WorkloadManagementTestSuite):
   """Variant of TestWorkloadManagementSQLDetails using calcite planner."""
 

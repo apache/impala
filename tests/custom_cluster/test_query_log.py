@@ -33,6 +33,7 @@ from tests.common.cluster_config import impalad_admission_ctrl_config_args
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_connection import FINISHED
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
+from tests.common.skip import SkipIfExploration
 from tests.common.test_dimensions import hs2_client_protocol_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.common.wm_test_suite import WorkloadManagementTestSuite
@@ -57,6 +58,7 @@ class TestQueryLogTableBasic(WorkloadManagementTestSuite):
   MAX_SQL_PLAN_LEN = 2000
   LOG_DIR_MAX_WRITES = 'max_attempts_exceeded'
 
+  @SkipIfExploration.is_not_exhaustive()
   @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_max_select "
                                                  "--query_log_max_sql_length={0} "
                                                  "--query_log_max_plan_length={0}"
@@ -94,6 +96,7 @@ class TestQueryLogTableBasic(WorkloadManagementTestSuite):
     assert len(data[1]) == self.MAX_SQL_PLAN_LEN - data[1].count("\n") - 1, \
         "incorrect plan length"
 
+  @SkipIfExploration.is_not_exhaustive()
   @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_max_select",
                                     workload_mgmt=True,
                                     disable_log_buffering=True)
@@ -127,6 +130,7 @@ class TestQueryLogTableBasic(WorkloadManagementTestSuite):
     # Newline characters are not counted by Impala's length function.
     assert len(data[1]) == 16777216 - data[1].count("\n") - 1
 
+  @SkipIfExploration.is_not_exhaustive()
   @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_hist_1 "
                                                  "--query_log_size=0 "
                                                  "--query_log_size_in_bytes=0",
@@ -245,6 +249,7 @@ class TestQueryLogTableBasic(WorkloadManagementTestSuite):
     assert impalad.service.get_metric_value(
       "impala-server.completed-queries.written") == 0
 
+  @SkipIfExploration.is_not_exhaustive()
   @CustomClusterTestSuite.with_args(cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     workload_mgmt=True,
@@ -270,6 +275,7 @@ class TestQueryLogTableBasic(WorkloadManagementTestSuite):
     finally:
       client2.close()
 
+  @SkipIfExploration.is_not_exhaustive()
   @CustomClusterTestSuite.with_args(cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     workload_mgmt=True,
@@ -314,6 +320,7 @@ class TestQueryLogTableBasic(WorkloadManagementTestSuite):
     assert_query(QUERY_TBL_LOG, client, raw_profile=result.runtime_profile)
 
 
+@SkipIfExploration.is_not_exhaustive()
 class TestQueryLogOtherTable(WorkloadManagementTestSuite):
   """Tests to assert that query_log_table_name works with non-default value."""
 
@@ -1122,6 +1129,7 @@ class TestQueryLogTableFlush(CustomClusterTestSuite):
                                      r'gather_time="\S+" exec_time="\S+" query_id="{}"'
                                      .format(QUERY_TBL_LOG, self.insert_query_id))
 
+  @SkipIfExploration.is_not_exhaustive()
   @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=9999 "
                                                  "--shutdown_grace_period_s=0 "
                                                  "--shutdown_deadline_s=15 "
@@ -1164,6 +1172,7 @@ class TestQueryLogTableFlush(CustomClusterTestSuite):
 
       assert retry(func=assert_func, max_attempts=5, sleep_time_s=3)
 
+  @SkipIfExploration.is_not_exhaustive()
   @CustomClusterTestSuite.with_args(impalad_args="--query_log_write_interval_s=9999 "
                                                  "--shutdown_grace_period_s=0 "
                                                  "--query_log_shutdown_timeout_s=3 "

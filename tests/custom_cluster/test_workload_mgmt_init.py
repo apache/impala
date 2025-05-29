@@ -26,6 +26,7 @@ from tests.common.custom_cluster_test_suite import (
     CustomClusterTestSuite,
     WORKLOAD_MGMT_IMPALAD_FLAGS,
 )
+from tests.common.skip import SkipIfExploration
 from tests.common.test_dimensions import hs2_client_protocol_dimension
 from tests.common.test_vector import HS2
 from tests.util.workload_management import (
@@ -43,6 +44,7 @@ QUERY_TBL_ALL = "{},{}".format(QUERY_TBL_LOG_NAME, QUERY_TBL_LIVE_NAME)
 LATEST_SCHEMA = "1.2.0"
 
 
+@SkipIfExploration.is_not_exhaustive()
 class TestWorkloadManagementInitBase(CustomClusterTestSuite):
 
   """Defines common setup and methods for all workload management init tests.

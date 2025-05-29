@@ -29,6 +29,7 @@ from tests.common.environ import (ImpalaTestClusterProperties,
                                   HIVE_MAJOR_VERSION,
                                   IS_APACHE_HIVE, IS_TEST_JDK,
                                   IS_TUPLE_CACHE)
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.kudu_test_suite import get_kudu_master_flag
 from tests.util.filesystem_utils import (
     IS_ABFS,
@@ -46,6 +47,7 @@ from tests.util.filesystem_utils import (
     SECONDARY_FILESYSTEM)
 
 IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
+EXPLORATION_STRATEGY_EXHAUSTIVE = 'exhaustive'
 
 
 class SkipIfFS:
@@ -272,3 +274,14 @@ class SkipIfApacheHive():
   data_connector_not_supported = pytest.mark.skipif(
       IS_APACHE_HIVE and HIVE_MAJOR_VERSION <= 3,
       reason="Apache Hive 3.1 or older version do not support DataConnector")
+
+
+class SkipIfExploration:
+  """Exposes decorators as methods so that tests can be skipped based on exploration
+     strategy"""
+
+  @classmethod
+  def is_not_exhaustive(cls, skip_msg='runs only in exhaustive'):
+    return pytest.mark.skipif(
+        ImpalaTestSuite.exploration_strategy() != EXPLORATION_STRATEGY_EXHAUSTIVE,
+        reason=skip_msg)
