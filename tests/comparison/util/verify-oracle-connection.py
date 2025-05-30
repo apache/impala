@@ -1,4 +1,4 @@
-#!/usr/bin/env impala-python
+#!/usr/bin/env impala-python3
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -18,7 +18,7 @@
 # under the License.
 
 # This is a script that allows a tester to test his Oracle setup and cx_Oracle
-# installation within his impala-python environment. It's meant to be super simple.  The
+# installation within his impala-python3 environment. It's meant to be super simple.  The
 # emphasis here is on a cx_Oracle connection and cursor with no other distractions, even
 # command line option parsing/handling. Modify the constants below and run:
 #

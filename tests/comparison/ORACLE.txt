@@ -61,13 +61,13 @@ package dependencies:
 Ubuntu 14.04.2 LTS
 libaio1
 
-3. Ensure impala-python is working. It may be enough to simply run:
+3. Ensure impala-python3 is working. It may be enough to simply run:
 
-   $ impala-python
+   $ impala-python3
 
    Getting it working is out of scope of this document.
 
-4. Run these commands to install cx_Oracle into the impala-python
+4. Run these commands to install cx_Oracle into the impala-python3
    virtual environment:
 
    $ source "${IMPALA_HOME}"/infra/python/env-gcc${IMPALA_GCC_VERSION}/bin/activate

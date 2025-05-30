@@ -19,7 +19,7 @@ from __future__ import absolute_import, division, print_function
 import pytest
 
 from tests.comparison import cli_options
-from tests.comparison.cluster import CmCluster, MiniCluster
+from tests.comparison.cluster import MiniCluster
 
 
 __cluster = None
@@ -27,20 +27,12 @@ __cluster = None
 def pytest_addoption(parser):
   if not hasattr(parser, "add_argument"):
     parser.add_argument = parser.addoption
-  cli_options.add_cm_options(parser)
 
 
 @pytest.fixture
 def cluster(request):
   global __cluster
   if not __cluster:
-    cm_host = get_option_value(request, "cm_host")
-    if cm_host:
-      __cluster = CmCluster(cm_host, port=get_option_value(request, "cm_port"),
-          user=get_option_value(request, "cm_user"),
-          password=get_option_value(request, "cm_password"),
-          cluster_name=get_option_value(request, "cm_cluster_name"))
-    else:
       __cluster = MiniCluster()
   return __cluster
 

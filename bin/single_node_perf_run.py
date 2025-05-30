@@ -1,4 +1,4 @@
-#!/usr/bin/env impala-python
+#!/usr/bin/env impala-python3
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -210,7 +210,7 @@ def generate_profile_file(name, hash, base_dir):
 
   Writes the runtime profiles back in a simple text file in the same directory.
   """
-  with open(name) as fid:
+  with open(name, 'rb') as fid:
     data = json.loads(fid.read().decode("utf-8", "ignore"))
     with open(os.path.join(base_dir, hash + "_profile.txt"), "w+") as out:
       # For each query

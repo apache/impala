@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -94,7 +93,7 @@ def get_version():
     if os.getenv('BUILD_VERSION') is not None:
       package_version = os.getenv('BUILD_VERSION')
     else:
-      version_match = re.search('\d+\.\d+\.\d+', impala_build_version.get_version())
+      version_match = re.search(r'\d+\.\d+\.\d+', impala_build_version.get_version())
       if version_match is None:
         sys.exit('Unable to acquire Impala version.')
       package_version = version_match.group(0)
@@ -102,7 +101,7 @@ def get_version():
     # packages can be marked as alpha, beta, or rc RELEASE_TYPE
     release_type = os.getenv('RELEASE_TYPE')
     if release_type:
-      if not re.match('(a|b|rc)\d+?', release_type):
+      if not re.match(r'(a|b|rc)\d+?', release_type):
         msg = """\
             RELEASE_TYPE \'{0}\' does not conform to any PEP-440 release format:
 

@@ -75,7 +75,8 @@ add_custom_target(shell_impala_build_version
   COMMAND "${CMAKE_SOURCE_DIR}/shell/gen_impala_build_version.sh"
 )
 
-add_custom_target(shell_pypi_package DEPENDS gen-deps shell_impala_build_version impala_python
+add_custom_target(shell_pypi_package
+  DEPENDS gen-deps shell_impala_build_version impala_python3
   COMMAND "${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
 )
 
@@ -88,7 +89,8 @@ set(SHELL_TEST_PKG
   "${CMAKE_SOURCE_DIR}/shell/build/dist/impala_shell-${PKG_VERSION}.tar.gz")
 get_filename_component(SHELL_TEST_PKG_DIR "${SHELL_TEST_PKG}" DIRECTORY)
 # Generates SHELL_TEST_PKG
-add_custom_target(shell_pypi_test_package DEPENDS gen-deps shell_impala_build_version impala_python
+add_custom_target(shell_pypi_test_package
+  DEPENDS gen-deps shell_impala_build_version impala_python3
   COMMAND env BUILD_VERSION=${PKG_VERSION} OFFICIAL=true DIST_DIR="${SHELL_TEST_PKG_DIR}"
     "${CMAKE_SOURCE_DIR}/shell/packaging/make_python_package.sh"
 )

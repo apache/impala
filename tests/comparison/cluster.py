@@ -48,13 +48,6 @@ try:
 except ImportError:
   from urlparse import urlparse
 
-try:
-  from cm_api.api_client import ApiResource as CmApiResource
-except ImportError:
-  # If the cm_api module is not available, we will not be able to use Cloudera Manager.
-  # This is fine for local testing.
-  pass
-
 from tests.comparison.db_connection import HiveConnection, ImpalaConnection
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.errors import Timeout
@@ -69,9 +62,6 @@ DEFAULT_HIVE_USER = 'hive'
 DEFAULT_HIVE_PASSWORD = 'hive'
 
 DEFAULT_TIMEOUT = 300
-
-CM_CLEAR_PORT = 7180
-CM_TLS_PORT = 7183
 
 
 class Cluster(with_metaclass(ABCMeta, object)):
@@ -252,129 +242,6 @@ class MiniHiveCluster(MiniCluster):
 
   def _get_other_conf_dir(self):
     return os.environ["HIVE_CONF_DIR"]
-
-
-class CmCluster(Cluster):
-
-  def __init__(self, host_name, port=None, user="admin", password="admin",
-               cluster_name=None, ssh_user=None, ssh_port=None, ssh_key_file=None,
-               use_tls=False):
-    # Initialize strptime() to workaround https://bugs.python.org/issue7980. Apparently
-    # something in the CM API uses strptime().
-    strptime("2015", "%Y")
-
-    Cluster.__init__(self)
-    # IMPALA-5455: If the caller doesn't specify port, default it based on use_tls
-    if port is None:
-      if use_tls:
-        port = CM_TLS_PORT
-      else:
-        port = CM_CLEAR_PORT
-    self.cm = CmApiResource(host_name, server_port=port, username=user, password=password,
-                            use_tls=use_tls)
-    clusters = self.cm.get_all_clusters()
-    if not clusters:
-      raise Exception("No clusters found in CM at %s" % host_name)
-    if cluster_name:
-      clusters_by_name = dict((c.name, c) for c in clusters)
-      if cluster_name not in clusters_by_name:
-        raise Exception(("No clusters named %s found in CM at %s."
-            "Available clusters are %s.")
-            % (cluster_name, host_name, ", ".join(sorted(clusters_by_name.keys()))))
-      self.cm_cluster = clusters_by_name[cluster_name]
-    else:
-      if len(clusters) > 1:
-        raise Exception(("Too many clusters found in CM at %s;"
-            " a cluster name must be provided")
-            % host_name)
-      self.cm_cluster = clusters[-1]
-
-    self.ssh_user = ssh_user
-    self.ssh_port = ssh_port
-    self.ssh_key_file = ssh_key_file
-    self._ssh_client_lock = Lock()
-    self._ssh_clients_by_host_name = defaultdict(list)
-
-  def shell(self, cmd, host_name, timeout_secs=DEFAULT_TIMEOUT):
-    with self._ssh_client(host_name) as client:
-      return client.shell(cmd, timeout_secs=timeout_secs)
-
-  @contextmanager
-  def _ssh_client(self, host_name):
-    """Returns an SSH client for use in a 'with' block. When the 'with' context exits,
-       the client will be kept for reuse.
-    """
-    with self._ssh_client_lock:
-      clients = self._ssh_clients_by_host_name[host_name]
-      if clients:
-        client = clients.pop()
-      else:
-        # IMPALA-7460: Insulate this import away from the global context so as to avoid
-        # requiring Paramiko unless it's absolutely needed.
-        from tests.util.ssh_util import SshClient
-        LOG.debug("Creating new SSH client for %s", host_name)
-        client = SshClient()
-        client.connect(host_name, username=self.ssh_user, key_filename=self.ssh_key_file)
-    error_occurred = False
-    try:
-      yield client
-    except Exception:
-      error_occurred = True
-      raise
-    finally:
-      if not error_occurred:
-        with self._ssh_client_lock:
-          self._ssh_clients_by_host_name[host_name].append(client)
-
-  def _init_local_hadoop_conf_dir(self):
-    self._local_hadoop_conf_dir = mkdtemp(prefix='impala_mini_hive_cluster_')
-    data = BytesIO(self.cm.get("/clusters/%s/services/%s/clientConfig"
-      % (self.cm_cluster.name, self._find_service("HIVE").name)))
-    zip_file = ZipFile(data)
-    for name in zip_file.namelist():
-      if name.endswith("/"):
-        continue
-      extract_path = os.path.join(self._local_hadoop_conf_dir, os.path.basename(name))
-      with open(extract_path, "w") as conf_file:
-        conf_file.write(zip_file.open(name).read())
-
-  def _find_service(self, service_type):
-    """Find a service by its CM API service type. An exception will be raised if no
-       service is found or multiple services are found. See the CM API documentation for
-       more details about the service type.
-    """
-    services = [s for s in self.cm_cluster.get_all_services() if s.type == service_type]
-    if not services:
-      raise Exception("No service of type %s found in cluster %s"
-          % (service_type, self.cm_cluster.name))
-    if len(services) > 1:
-      raise Exception("Found %s services in cluster %s; only one is expected."
-        % len(services, self.cm_cluster.name))
-    return services[0]
-
-  def _find_role(self, role_type, service_type):
-    """Find a role by its CM API role and service type. An exception will be raised if
-       no roles are found. See the CM API documentation for more details about the
-       service and role types.
-    """
-    service = self._find_service(service_type)
-    roles = service.get_roles_by_type(role_type)
-    if not roles:
-      raise Exception("No roles of type %s found in service %s"
-          % (role_type, service.name))
-    return roles[0]
-
-  def _init_hdfs(self):
-    self._hdfs = Hdfs(self, "hdfs")
-
-  def _init_hive(self):
-    hs2 = self._find_role("HIVESERVER2", "HIVE")
-    host = self.cm.get_host(hs2.hostRef.hostId)
-    config = hs2.get_config(view="full")["hs2_thrift_address_port"]
-    self._hive = Hive(self, str(host.hostname), int(config.value or config.default))
-
-  def _init_impala(self):
-    self._impala = CmImpala(self, self._find_service("IMPALA"))
 
 
 class Service(object):
@@ -646,23 +513,6 @@ class Impala(Service):
     raise NotImplementedError()
 
 
-class CmImpala(Impala):
-
-  def __init__(self, cluster, cm_api):
-    super(CmImpala, self).__init__(cluster,
-      [CmImpalad(i) for i in cm_api.get_roles_by_type("IMPALAD")])
-    self._api = cm_api
-
-  def restart(self):
-    LOG.info("Restarting Impala")
-    command = self._api.restart()
-    command = command.wait(timeout=(60 * 15))
-    if command.active:
-      raise Timeout("Timeout waiting for Impala to restart")
-    if not command.success:
-      raise Exception("Failed to restart Impala: %s" % command.resultMessage)
-
-
 class Impalad(with_metaclass(ABCMeta, object)):
 
   def __init__(self):
@@ -724,7 +574,7 @@ class Impalad(with_metaclass(ABCMeta, object)):
           echo Could not find a running impalad >&2
           exit 1
         fi
-        cat /proc/$PID/cmdline""").split(b"\0")[0]
+        cat /proc/$PID/cmdline""").split("\0")[0]
 
   def find_last_crash_message(self, start_time):
     """Returns a string with various info (backtrace and log messages) if any is found."""
@@ -884,52 +734,3 @@ class MiniClusterImpalad(Impalad):
 
   def find_core_dump_dir(self):
     raise NotImplementedError()
-
-
-class CmImpalad(Impalad):
-
-  def __init__(self, cm_api):
-    super(CmImpalad, self).__init__()
-    self._api = cm_api
-    self._host_name = None
-    self._hs2_port = None
-    self._web_ui_port = None
-
-  @property
-  def host_name(self):
-    if not self._host_name:
-      self._host_name = str(self.cluster.cm.get_host(self._api.hostRef.hostId).hostname)
-    return self._host_name
-
-  @property
-  def hs2_port(self):
-    if not self._hs2_port:
-      self._hs2_port = self._get_cm_config("hs2_port", value_type=int)
-    return self._hs2_port
-
-  @property
-  def web_ui_port(self):
-    if not self._web_ui_port:
-      self._web_ui_port = self._get_cm_config("impalad_webserver_port", value_type=int)
-    return self._web_ui_port
-
-  def find_pid(self):
-    # Get the oldest pid. In a keberized cluster, occasionally two pids could be
-    # found if -o isn't used. Presumably the second pid is the kerberos ticket
-    # renewer.
-    pid = self.shell("pgrep -o impalad || true")
-    if pid:
-      return int(pid)
-
-  def find_process_mem_mb_limit(self):
-    return self._get_cm_config("impalad_memory_limit", value_type=int) // 1024 ** 2
-
-  def find_core_dump_dir(self):
-    return self._get_cm_config("core_dump_dir")
-
-  def _get_cm_config(self, config, value_type=None):
-    config = self._api.get_config(view="full")[config]
-    value = config.value or config.default
-    if value_type:
-      return value_type(value)
-    return value

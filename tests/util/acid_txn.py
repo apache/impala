@@ -56,8 +56,8 @@ hostname = 'localhost'
 # Utility class for interacting with Hive ACID transactions.
 # It's basically a facade, i.e. it provides a simplified interface for HMS.
 #
-# You can also use it interactively from impala-python, e.g.:
-# $> impala-python
+# You can also use it interactively from impala-python3, e.g.:
+# $> impala-python3
 # >>> from tests.util.acid_txn import AcidTxn
 # >>> at = AcidTxn()
 # >>> at.get_open_txns()

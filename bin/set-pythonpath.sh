@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Sets up the python path for impala-python. This is needed because tests and other
+# Sets up the python path for impala-python3. This is needed because tests and other
 # utility scripts depend on some modules external to infra/python/env-*.
 # TODO: we should try to reduce our reliance on PYTHONPATH if possible.
 #

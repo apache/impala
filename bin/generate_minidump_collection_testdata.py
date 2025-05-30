@@ -1,4 +1,4 @@
-#!/usr/bin/env impala-python
+#!/usr/bin/env impala-python3
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -95,7 +95,7 @@ def generate_conf_files():
       f.write(CONFIG_FILE.format(options.log_dir, options.minidump_dir))
 
 def random_bytes(num):
-  return ''.join(chr(random.randint(0, 255)) for _ in range(num))
+  return bytearray(random.getrandbits(8) for _ in range(num))
 
 def write_minidump(common_data, timestamp, target_dir):
   '''Generate and write the minidump into the target_dir. atime and mtime of the minidump

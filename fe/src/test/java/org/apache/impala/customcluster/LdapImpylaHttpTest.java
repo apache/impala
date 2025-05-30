@@ -147,7 +147,7 @@ public class LdapImpylaHttpTest {
     long failedBasicAuthBefore =
         (long) client_.getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-basic-auth-failure");
-    String[] noAuthCmd = {"impala-python", helper_, "--query", query_};
+    String[] noAuthCmd = {"impala-python3", helper_, "--query", query_};
     RunShellCommand.Run(
         noAuthCmd, /*shouldSucceed*/ false, "", "HTTP code 401: Unauthorized");
     // Check that there is no authentication attempt.
@@ -196,7 +196,7 @@ public class LdapImpylaHttpTest {
 
   private String[] buildCommand(String user, String password, String httpPath,
       String cookieNames) {
-    List<String> command = Lists.newArrayList(Arrays.asList("impala-python", helper_,
+    List<String> command = Lists.newArrayList(Arrays.asList("impala-python3", helper_,
         "--user", user, "--password", password, "--query", query_));
     if (httpPath != null) command.addAll(Arrays.asList("--http_path", httpPath));
     if (cookieNames != null) {
@@ -216,7 +216,7 @@ public class LdapImpylaHttpTest {
     String errTemplate = "User '%s' is not authorized to delegate to '%s'";
 
     // Run with an invalid proxy user.
-    //String[] command = {"impala-python", helper_, "--user", testUser2_, "--password",
+    //String[] command = {"impala-python3", helper_, "--user", testUser2_, "--password",
     //    testPassword2_, "--http_path=/?doAs=" + delegateUser_, "--query", query};
     String[] cmd =
         buildCommand(testUser2_, testPassword2_, "/?doAs=" + delegateUser_, null);
@@ -230,7 +230,8 @@ public class LdapImpylaHttpTest {
 
     // 'doAs' parameter that cannot be decoded.
     cmd = buildCommand(testUser_, testPassword_, "/?doAs=%", null);
-    RunShellCommand.Run(cmd, /*shouldSucceed*/ false, "", "httplib.BadStatusLine");
+    RunShellCommand.Run(cmd, /*shouldSucceed*/ false, "",
+        "http.client.RemoteDisconnected");
 
     // Successfully delegate.
     cmd = buildCommand(testUser_, testPassword_, "/?doAs=" + delegateUser_, null);

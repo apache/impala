@@ -17,9 +17,6 @@
 
 # Python2-only requirements
 
-cm-api == 10.0.0
-  # Already available as part of python on Linux.
-  readline == 6.2.4.1; sys_platform == 'darwin'
 flake8 == 3.9.2
   mccabe == 0.6.1
   pycodestyle == 2.7.0

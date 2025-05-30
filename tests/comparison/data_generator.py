@@ -1,4 +1,4 @@
-#!/usr/bin/env impala-python
+#!/usr/bin/env impala-python3
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -223,7 +223,7 @@ class DbPopulator(object):
       reducer_count += (table_data_generator.row_count
           // estimate_rows_per_reducer(table_data_generator, MB_PER_REDUCER)) + 1
       mapper_input_data.append(serialize(table_data_generator))
-    hdfs.write(mapper_input_file, data='\n'.join(mapper_input_data))
+    hdfs.write(mapper_input_file, data=b'\n'.join(mapper_input_data))
 
     files = ['common.py', 'db_types.py', 'data_generator_mapred_common.py',
         'data_generator_mapper.py', 'data_generator_reducer.py',

@@ -290,7 +290,7 @@ function load-data {
   LOG_FILE=${IMPALA_DATA_LOADING_LOGS_DIR}/${LOG_BASENAME}
   echo "$LOAD_MSG. Logging to ${LOG_FILE}"
   # Use unbuffered logging by executing with -u
-  if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}; then
+  if ! impala-python3 -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}; then
     echo Error loading data. The end of the log file is:
     tail -n 50 $LOG_FILE
     return 1
@@ -321,7 +321,7 @@ function load-aux-workloads {
   # Load all the auxiliary workloads (if any exist)
   if [ -d ${IMPALA_AUX_WORKLOAD_DIR} ] && [ -d ${IMPALA_AUX_DATASET_DIR} ]; then
     echo Loading auxiliary workloads. Logging to $LOG_FILE.
-    if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py --workloads all\
+    if ! impala-python3 -u ${IMPALA_HOME}/bin/load-data.py --workloads all\
         --impalad=${IMPALAD}\
         --hive_hs2_hostport=${HS2_HOST_PORT}\
         --hdfs_namenode=${HDFS_NN}\

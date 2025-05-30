@@ -24,7 +24,7 @@
 '''
 
 from __future__ import absolute_import, division, print_function
-from base import range
+from builtins import range
 import base64
 import pickle
 from io import BytesIO
@@ -71,8 +71,9 @@ class TextTableDataGenerator(object):
           # has a terminator. Impala and Hive accept this format with the option
           # 'ROW FORMAT DELIMITED'.
           self.output_file.write(b"\x01")
-        self.output_file.write(str(col_val_buffers[col_idx][val_buffer_idx]))
-      self.output_file.write("\n")
+        self.output_file.write(
+            str(col_val_buffers[col_idx][val_buffer_idx]).encode('utf-8'))
+      self.output_file.write("\n".encode('utf-8'))
 
   def _create_val_generator(self, val_type):
     val_generator = RandomValGenerator().create_val_generator(val_type)

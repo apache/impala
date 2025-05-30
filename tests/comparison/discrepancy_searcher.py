@@ -1,4 +1,4 @@
-#!/usr/bin/env impala-python
+#!/usr/bin/env impala-python3
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one

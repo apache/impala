@@ -491,7 +491,7 @@ ssh localhost whoami
 # listening on localhost. See also HDFS-13797. To reproduce this, the following
 # snippet may be useful:
 #
-#  $impala-python
+#  $impala-python3
 #  >>> import logging
 #  >>> logging.basicConfig(level=logging.DEBUG)
 #  >>> logging.getLogger("requests.packages.urllib3").setLevel(logging.DEBUG)

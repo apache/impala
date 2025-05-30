@@ -1,4 +1,4 @@
-#!/usr/bin/env impala-python
+#!/usr/bin/env impala-python3
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -220,7 +220,7 @@ def run_dataset_preload(dataset):
   dataset_preload_script = os.path.join(DATASET_DIR, dataset, "preload")
   if os.path.exists(dataset_preload_script):
     LOG.info("Running preload script for " + dataset)
-    if options.scale_factor > 1:
+    if options.scale_factor != "" and int(options.scale_factor) > 1:
       dataset_preload_script += " " + str(options.scale_factor)
     exec_cmd(dataset_preload_script, error_msg="Error executing preload script for " + dataset,
         exit_on_error=True)
@@ -250,8 +250,8 @@ def get_dataset_for_workload(workload):
   if not os.path.isfile(dimension_file_name):
     LOG.error('Dimension file not found: ' + dimension_file_name)
     sys.exit(1)
-  with open(dimension_file_name, 'rb') as input_file:
-    match = re.search('dataset:\s*([\w\-\.]+)', input_file.read())
+  with open(dimension_file_name, 'r') as input_file:
+    match = re.search(r'dataset:\s*([\w\-\.]+)', input_file.read())
     if match:
       return match.group(1)
     else:

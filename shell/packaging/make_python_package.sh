@@ -65,7 +65,7 @@ create_distributable_python_package() {
   pushd "${PACKAGE_DIR}"
   echo "Building package..."
   PACKAGE_TYPE="${PACKAGE_TYPE:-}" OFFICIAL="${OFFICIAL:-}" \
-    impala-python setup.py sdist --dist-dir "${DIST_DIR}"
+    impala-python3 setup.py sdist --dist-dir "${DIST_DIR}"
   popd
 
   if [[ "${NO_CLEAN_DIST}" != "true" ]]; then

@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# This uses system python to avoid a dependency on impala-python,
+#!/usr/bin/env python3
+# This uses system python to avoid a dependency on impala-python3,
 # because this runs during the build.
 #
 # Licensed to the Apache Software Foundation (ASF) under one

@@ -4,7 +4,7 @@ To install new packages:
    the package needs a C/C++ compiler to build . You should specify the version number
    using the "foo == x.y.z" notation so future upgrades can be done automatically.
 2) Run deps/download_requirements, it will download the package to the deps dir.
-3) Run the "impala-python" command, this should detect that requirements.txt changed and
+3) Run the "impala-python3" command, this should detect that requirements.txt changed and
    automatically rebuild the virtualenv.
 4) Now in the python prompt, you should be able to import the new module.
 

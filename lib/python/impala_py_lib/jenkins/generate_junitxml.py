@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -50,7 +50,7 @@ class JunitReport(object):
   Log files are timestamped, so they will not overwrite previous files containing
   output of the same step.
 
-  For use from within a python script (must be invoked with impala-python), an
+  For use from within a python script (must be invoked with impala-python3), an
   example might look like:
 
   >>> from impala_py_lib.jenkins.generate_junitxml import JunitReport
