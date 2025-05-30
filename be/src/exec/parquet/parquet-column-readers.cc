@@ -393,6 +393,11 @@ Status ScalarColumnReader<bool, parquet::Type::BOOLEAN, true>::InitDataDecoder(
 template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
 bool ScalarColumnReader<InternalType, PARQUET_TYPE,
     MATERIALIZED>::SkipEncodedValuesInPage(int64_t num_values) {
+  // Return true if this is a counting column before decoding any value.
+  if (!MATERIALIZED) {
+    DCHECK_EQ(slot_desc_, nullptr);
+    return true;
+  }
   if (bool_decoder_) {
     return bool_decoder_->SkipValues(num_values);
   }

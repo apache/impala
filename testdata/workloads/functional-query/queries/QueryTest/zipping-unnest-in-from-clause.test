@@ -286,6 +286,8 @@ INT
 ====
 ---- QUERY
 # Similar as above but there is a where clause on a non-array field.
+# When PARQUET_LATE_MATERIALIZATION_THRESHOLD > 0, it tests if we skip rows
+# correctly for a counting column.
 select id from complextypes_arrays t, unnest(t.arr1) where id = 7;
 ---- RESULTS
 7

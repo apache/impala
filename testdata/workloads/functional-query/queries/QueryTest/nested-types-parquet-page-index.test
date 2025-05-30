@@ -749,3 +749,26 @@ group by l_shipmode, o_orderpriority
 ---- TYPES
 STRING, STRING, BIGINT
 ====
+---- QUERY
+# Test if page filtering works for counting columns when late materialization
+# is disabled.
+set PARQUET_LATE_MATERIALIZATION_THRESHOLD = -1;
+select d_38 from nested_decimals n, n.arr where d_38 > 7;
+---- RESULTS
+8
+8
+8
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Test if page filtering works for counting columns when late materialization
+# is enabled (the default).
+set PARQUET_LATE_MATERIALIZATION_THRESHOLD = "";
+select d_38 from nested_decimals n, n.arr where d_38 > 7;
+---- RESULTS
+8
+8
+8
+---- TYPES
+DECIMAL

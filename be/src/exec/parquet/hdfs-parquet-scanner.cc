@@ -2976,7 +2976,7 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
     // handled in ProcessFooter()), or no materialized columns appear in this file
     // (e.g. due to schema evolution, or if there's only a position slot). Create a single
     // column reader that we will use to count the number of tuples we should output. We
-    // will not read any values from this reader.
+    // will not read or skip any values from this reader.
     ParquetColumnReader* reader;
     RETURN_IF_ERROR(CreateCountingReader(
         tuple_desc.tuple_path(), schema_resolver, &reader));
