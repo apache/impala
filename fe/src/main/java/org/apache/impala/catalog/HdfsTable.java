@@ -2847,6 +2847,11 @@ public class HdfsTable extends Table implements FeFsTable {
           || HdfsPartition.comparePartitionKeyValues(
           oldPartition.getPartitionValues(), partBuilder.getPartitionValues()) == 0);
       if (oldPartition != null) {
+        // check and skip
+        boolean partitionUnChanged = partBuilder.equalsToOriginal(oldPartition);
+        LOG.trace("Partition {} {}", oldPartition.getName(),
+            partitionUnChanged ? "unchanged" : "changed");
+        if (partitionUnChanged) continue;
         partBuilder.setPrevId(oldPartition.getId());
         partBuilder.setFileDescriptors(oldPartition);
         partBuilder.setCreateEventId(oldPartition.getCreateEventId());
