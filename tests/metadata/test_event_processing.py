@@ -35,7 +35,6 @@ PROCESSING_TIMEOUT_S = 10
 LOG = logging.getLogger(__name__)
 
 @SkipIfFS.hive
-@SkipIfCatalogV2.hms_event_polling_disabled()
 class TestEventProcessing(ImpalaTestSuite):
   """This class contains tests that exercise the event processing mechanism in the
   catalog."""
@@ -314,7 +313,6 @@ class TestEventProcessing(ImpalaTestSuite):
 
 
 @SkipIfFS.hive
-@SkipIfCatalogV2.hms_event_polling_disabled()
 class TestEventSyncWaiting(ImpalaTestSuite):
   """Verify query option sync_hms_events_wait_time_s should protect the query by
      waiting until Impala sync the HMS changes."""

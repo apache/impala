@@ -26,7 +26,7 @@ from tests.util.acid_txn import AcidTxn
 from tests.util.event_processor_utils import EventProcessorUtils
 
 
-@SkipIfCatalogV2.hms_event_polling_disabled()
+@SkipIfFS.hive
 class TestEventProcessingError(CustomClusterTestSuite):
   """
   Tests for verify event processor not going into error state whenever there are
