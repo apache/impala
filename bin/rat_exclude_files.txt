@@ -137,6 +137,7 @@ testdata/AllTypesErrorNoNulls/*.txt
 *.avsc
 *.parq
 *.parquet
+testdata/charcodec/*
 testdata/cluster/hive/*.diff
 testdata/cluster/node_templates/cdh5/etc/hadoop/conf/*.xml.tmpl
 testdata/cluster/node_templates/common/etc/kudu/*.conf.tmpl

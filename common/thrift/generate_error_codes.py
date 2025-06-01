@@ -500,7 +500,9 @@ error_codes = (
    "cache entry ($0 bytes)"),
 
   ("TUPLE_CACHE_OUTSTANDING_WRITE_LIMIT_EXCEEDED", 163, "Outstanding tuple cache writes "
-   "exceeded the limit ($0 bytes)")
+   "exceeded the limit ($0 bytes)"),
+
+  ("CHARSET_CONVERSION_ERROR", 164, "Error during buffer conversion: $0")
 )
 
 import sys

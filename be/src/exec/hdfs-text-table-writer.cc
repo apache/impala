@@ -28,6 +28,7 @@
 #include "util/coding-util.h"
 #include "util/hdfs-util.h"
 #include "util/runtime-profile-counters.h"
+#include "util/char-codec.h"
 
 #include <hdfs.h>
 #include <stdlib.h>
@@ -52,8 +53,16 @@ HdfsTextTableWriter::HdfsTextTableWriter(TableSinkBase* parent,
   rowbatch_stringstream_.precision(RawValue::ASCII_PRECISION);
 }
 
+HdfsTextTableWriter::~HdfsTextTableWriter() {}
+
 Status HdfsTextTableWriter::Init() {
   parent_->mem_tracker()->Consume(flush_size_);
+
+  const auto& encoding = output_->partition_descriptor->encoding_value();
+  if (!encoding.empty() && encoding != "UTF-8") {
+    encoder_.reset(new CharCodec(nullptr, encoding));
+  }
+
   return Status::OK();
 }
 
@@ -147,7 +156,13 @@ Status HdfsTextTableWriter::InitNewFile() {
 }
 
 Status HdfsTextTableWriter::Flush() {
-  string rowbatch_string = rowbatch_stringstream_.str();
+  string rowbatch_string;
+  if (encoder_) {
+    RETURN_IF_ERROR(encoder_->EncodeBuffer(
+        rowbatch_stringstream_.str(), &rowbatch_string));
+  } else {
+    rowbatch_string = rowbatch_stringstream_.str();
+  }
   rowbatch_stringstream_.str(string());
   const uint8_t* data =
       reinterpret_cast<const uint8_t*>(rowbatch_string.data());

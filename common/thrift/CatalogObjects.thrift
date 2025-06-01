@@ -365,6 +365,7 @@ struct THdfsStorageDescriptor {
   7: required THdfsFileFormat fileFormat
   8: required i32 blockSize
   9: optional TJsonBinaryFormat jsonBinaryFormat
+  10: optional string encodingValue
 }
 
 // Represents an HDFS partition

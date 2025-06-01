@@ -1063,6 +1063,64 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Cannot ALTER TABLE SET on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes set tblproperties('a'='b')",
         "ALTER TABLE SET not currently supported on HBase tables.");
+
+    // serialization.encoding
+    AnalyzesOk("alter table functional.alltypes set serdeproperties(" +
+        "'serialization.encoding'='GBK')");
+    AnalyzesOk("alter table functional.text_dollar_hash_pipe set serdeproperties(" +
+        "'serialization.encoding'='GBK')");
+    AnalyzesOk("alter table functional.alltypes partition(year=2010, month=12) " +
+        "set serdeproperties('serialization.encoding'='GBK')");
+    String tmpTableName =
+        QueryStringBuilder.createTmpTableName("functional", "tmp_table");
+    AnalyzesOk("create table " + tmpTableName + " (id int) with serdeproperties(" +
+        "'serialization.encoding'='GBK')");
+
+    String [] unsupportedFileFormatDbs =
+      {"functional_parquet", "functional_rc", "functional_avro"};
+    for (String format: unsupportedFileFormatDbs) {
+      AnalysisError("alter table " + format + ".alltypes set serdeproperties(" +
+          "'serialization.encoding'='GBK')", "Property 'serialization.encoding' is " +
+          "only supported on TEXT file format");
+    }
+    String[] unsupportedFileFormats = {
+        "parquet", "rcfile", "avro", "iceberg"};
+    for (String format: unsupportedFileFormats) {
+      AnalysisError("create table " + tmpTableName + " (id int) with serdeproperties(" +
+          "'serialization.encoding'='GBK') stored as " + format,
+          "Property 'serialization.encoding' is only supported on TEXT file format");
+    }
+
+    AnalysisError("alter table functional_kudu.alltypes set serdeproperties( " +
+        "'serialization.encoding'='GBK')", "Property 'serialization.encoding' is only " +
+        "supported on HDFS tables");
+    AnalysisError("alter table functional.alltypesmixedformat partition(year=2009) " +
+        "set serdeproperties('serialization.encoding'='GBK')", "Property " +
+        "'serialization.encoding' is only supported on TEXT file format");
+    AnalysisError("create table " + tmpTableName +
+        " (id int, primary key (id)) with serdeproperties(" +
+        "'serialization.encoding'='GBK') stored as kudu " +
+        "tblproperties('kudu.master_addresses'='localhost')",
+        "Property 'serialization.encoding' is only supported on TEXT file format");
+
+    AnalysisError("alter table functional.alltypes set serdeproperties(" +
+        "'serialization.encoding'='UTF-16')",
+        "Property 'serialization.encoding' only supports encodings in which line " +
+        "delimiter is compatible with ASCII.");
+    AnalysisError("alter table functional.alltypes partition(year=2010, month=12) " +
+        "set serdeproperties('serialization.encoding'='UTF-16')",
+        "Property 'serialization.encoding' only supports encodings in which line " +
+        "delimiter is compatible with ASCII.");
+    AnalysisError("alter table functional.alltypes set serdeproperties(" +
+        "'serialization.encoding'='NonexistentEncoding')",
+        "Unsupported encoding: NonexistentEncoding.");
+    AnalysisError("create table " + tmpTableName + " (id int) with serdeproperties(" +
+        "'serialization.encoding'='UTF-16')",
+        "Property 'serialization.encoding' only supports encodings in which line " +
+        "delimiter is compatible with ASCII.");
+    AnalysisError("create table " + tmpTableName + " (id int) with serdeproperties(" +
+        "'serialization.encoding'='NonexistentEncoding')",
+        "Unsupported encoding: NonexistentEncoding.");
   }
 
   @Test

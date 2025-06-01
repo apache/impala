@@ -45,7 +45,7 @@ class TupleRow;
 /// Columnar formats have multiple streams per context object.
 /// This class handles stitching data split across IO buffers and providing
 /// some basic parsing utilities.
-/// This class it *not* thread safe. It is designed to have a single scanner thread
+/// This class is *not* thread safe. It is designed to have a single scanner thread
 /// reading from it.
 //
 /// Each scanner context maps to a single hdfs split.  There are three threads that
@@ -192,7 +192,7 @@ class ScannerContext {
     bool SkipBytes(int64_t length, Status* status) WARN_UNUSED_RESULT;
 
     /// Read length bytes into the supplied buffer.  The returned buffer is owned
-    /// by this object The memory is owned by and should not be modified. The contents
+    /// by this object. The memory is owned by and should not be modified. The contents
     /// of the buffer are invalidated after subsequent calls to GetBytes()/ReadBytes().
     /// Returns true on success, otherwise returns false and sets 'status' to
     /// indicate the error.

@@ -37,6 +37,7 @@ class RuntimeState;
 class StringValue;
 class TupleDescriptor;
 class TupleRow;
+class CharCodec;
 
 /// The writer consumes all rows passed to it and writes the evaluated output_exprs_
 /// as delimited text into Hdfs files.
@@ -47,7 +48,7 @@ class HdfsTextTableWriter : public HdfsTableWriter {
       const HdfsPartitionDescriptor* partition,
       const HdfsTableDescriptor* table_desc);
 
-  ~HdfsTextTableWriter() { }
+  ~HdfsTextTableWriter();
 
   virtual Status Init();
   virtual Status Finalize();
@@ -87,6 +88,9 @@ class HdfsTextTableWriter : public HdfsTableWriter {
   /// Stringstream to buffer output.  The stream is cleared between HDFS
   /// Write calls to allow for the internal buffers to be reused.
   std::stringstream rowbatch_stringstream_;
+
+  /// For non-utf8 text files
+  std::unique_ptr<CharCodec> encoder_;
 };
 
 }

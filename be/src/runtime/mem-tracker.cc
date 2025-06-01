@@ -571,4 +571,23 @@ bool MemTracker::GcMemory(int64_t max_consumption) {
   }
   return curr_consumption > max_consumption;
 }
+
+Status ScopedMemTracker::TryConsume(int64_t size) {
+  DCHECK(tracker_ != nullptr);
+  if (tracker_->TryConsume(size)) {
+    size_ += size;
+  } else {
+    Status status = tracker_->MemLimitExceeded(
+        nullptr, "Failed to allocate memory required by DecodeBuffer", size);
+    tracker_ = nullptr;
+    return status;
+  }
+  return Status::OK();
+}
+
+ScopedMemTracker::~ScopedMemTracker() {
+  if (tracker_ != nullptr && size_ > 0) {
+    tracker_->Release(size_);
+  }
+}
 }

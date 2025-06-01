@@ -44,6 +44,7 @@ set(UTIL_SRCS
   bit-packing.cc
   bit-util.cc
   bloom-filter.cc
+  char-codec.cc
   cgroup-util.cc
   coding-util.cc
   codec.cc

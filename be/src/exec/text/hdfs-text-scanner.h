@@ -29,6 +29,7 @@ template<bool>
 class DelimitedTextParser;
 class ScannerContext;
 struct HdfsFileDesc;
+class CharCodec;
 
 /// HdfsScanner implementation that understands text-formatted records.
 /// Uses SSE instructions, if available, for performance.
@@ -175,7 +176,8 @@ class HdfsTextScanner : public HdfsScanner {
   /// decompression functions DecompressFileToBuffer()/DecompressStreamToBuffer().
   /// If applicable, attaches decompression buffers from previous calls that might still
   /// be referenced by returned batches to 'pool'. If 'pool' is nullptr the buffers are
-  /// freed instead.
+  /// freed instead. In case of decoding calls decoder_->DecodeBuffer() which overwrites
+  /// the byte_buffer_ptr_ with decoded data on data_buffer_pool_.
   ///
   /// Subclasses can override this function to implement different behaviour.
   /// TODO: IMPALA-6146: rethink this interface - having subclasses modify member
@@ -223,7 +225,7 @@ class HdfsTextScanner : public HdfsScanner {
   /// Mem pool for boundary_row_, boundary_column_, partial_tuple_ and any variable length
   /// data that is pointed at by the partial tuple.  Does not hold any tuple data
   /// of returned batches, because the data is always deep-copied into the output batch.
-  boost::scoped_ptr<MemPool> boundary_pool_;
+  std::unique_ptr<MemPool> boundary_pool_;
 
   /// Helper string for dealing with input rows that span file blocks.  We keep track of
   /// a whole line that spans file blocks to be able to report the line as erroneous in
@@ -239,7 +241,7 @@ class HdfsTextScanner : public HdfsScanner {
   int slot_idx_;
 
   /// Helper class for picking fields and rows from delimited text.
-  boost::scoped_ptr<DelimitedTextParser<true>> delimited_text_parser_;
+  std::unique_ptr<DelimitedTextParser<true>> delimited_text_parser_;
 
   /// Return field locations from the Delimited Text Parser.
   std::vector<FieldLocation> field_locations_;
@@ -265,6 +267,13 @@ class HdfsTextScanner : public HdfsScanner {
 
   /// Time parsing text files
   RuntimeProfile::Counter* parse_delimiter_timer_;
+
+  /// For non-utf8 text files
+  std::unique_ptr<CharCodec> decoder_;
+
+  /// Time spent decoding bytes
+  RuntimeProfile::Counter* decode_timer_;
+
 };
 
 }

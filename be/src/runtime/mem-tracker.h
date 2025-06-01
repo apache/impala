@@ -619,4 +619,17 @@ class MemTrackerAllocator : public Alloc {
 typedef MemTrackerAllocator<char> CharMemTrackerAllocator;
 typedef std::basic_string<char, std::char_traits<char>, CharMemTrackerAllocator>
     TrackedString;
+
+// Auxiliary class to track memory consumption for a scope of code.
+class ScopedMemTracker {
+ public:
+  ScopedMemTracker(MemTracker* tracker) : tracker_(tracker), size_(0) {}
+  ~ScopedMemTracker();
+
+  Status TryConsume(int64_t size);
+
+ private:
+  MemTracker* tracker_ = nullptr;
+  int64_t size_;
+};
 }

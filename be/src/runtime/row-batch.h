@@ -510,7 +510,7 @@ class RowBatch {
   /// The memory ownership depends on whether legacy joins and aggs are enabled.
   ///
   /// Memory is malloc'd and owned by RowBatch and is freed upon its destruction. This is
-  /// more performant that allocating the pointers from 'tuple_data_pool_' especially
+  /// more performant than allocating the pointers from 'tuple_data_pool_' especially
   /// with SubplanNodes in the ExecNode tree because the tuple pointers are not
   /// transferred and do not have to be re-created in every Reset().
   const int tuple_ptrs_size_;

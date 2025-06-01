@@ -55,6 +55,7 @@
 #include "util/error-util.h"
 #include "util/runtime-profile-counters.h"
 #include "util/stopwatch.h"
+#include "util/char-codec.h"
 
 #include "common/names.h"
 
@@ -248,6 +249,12 @@ Status HdfsTextScanner::InitNewRange() {
   text_converter_.reset(new TextConverter(hdfs_partition->escape_char(),
       scan_node_->hdfs_table()->null_column_value(), true,
       state_->strict_mode()));
+
+  const auto& encoding = hdfs_partition->encoding_value();
+  if (!encoding.empty() && encoding != "UTF-8") {
+    decoder_.reset(new CharCodec(data_buffer_pool_.get(), encoding,
+        hdfs_partition->line_delim(), scan_node_->tuple_desc()->string_slots().empty()));
+  }
 
   RETURN_IF_ERROR(ResetScanner());
   scan_state_ = SCAN_RANGE_INITIALIZED;
@@ -535,6 +542,12 @@ Status HdfsTextScanner::FillByteBuffer(MemPool* pool, bool* eosr, int num_bytes)
     *eosr = byte_buffer_read_size_ == 0 ? true : stream_->eosr();
   }
 
+  if (decoder_.get() != nullptr) {
+    SCOPED_TIMER(decode_timer_);
+    RETURN_IF_ERROR(decoder_->DecodeBuffer(reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
+        &byte_buffer_read_size_, pool, *eosr, decompressor_.get() != nullptr, context_));
+  }
+
   byte_buffer_end_ = byte_buffer_ptr_ + byte_buffer_read_size_;
   return Status::OK();
 }
@@ -658,6 +671,7 @@ Status HdfsTextScanner::Open(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Open(context));
 
   parse_delimiter_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DelimiterParseTime");
+  decode_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecodingTime");
 
   // Allocate the scratch space for two pass parsing.  The most fields we can go
   // through in one parse pass is the batch size (tuples) * the number of fields per tuple
@@ -731,7 +745,8 @@ int HdfsTextScanner::WriteFields(int num_fields, int num_tuples, MemPool* pool,
   if (num_tuples > 0) {
     // Need to copy out strings if they may reference the original I/O buffer.
     const bool copy_strings = !string_slot_offsets_.empty() &&
-        stream_->file_desc()->file_compression == THdfsCompression::NONE;
+        stream_->file_desc()->file_compression == THdfsCompression::NONE &&
+        decoder_.get() == nullptr;
     int max_added_tuples = (scan_node_->limit() == -1) ?
         num_tuples :
         scan_node_->limit() - scan_node_->rows_returned_shared();

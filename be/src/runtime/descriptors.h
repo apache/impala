@@ -399,6 +399,7 @@ class HdfsPartitionDescriptor {
   char escape_char() const { return escape_char_; }
   THdfsFileFormat::type file_format() const { return file_format_; }
   int block_size() const { return block_size_; }
+  const std::string& encoding_value() const { return encoding_value_; }
   const std::string& location() const { return location_; }
   int64_t id() const { return id_; }
   TJsonBinaryFormat::type json_binary_format() const { return json_binary_format_; }
@@ -419,6 +420,7 @@ class HdfsPartitionDescriptor {
   char collection_delim_;
   char escape_char_;
   int block_size_;
+  std::string encoding_value_;
   // TODO: use the same representation as the Catalog does, in which common prefixes are
   // stripped.
   std::string location_;

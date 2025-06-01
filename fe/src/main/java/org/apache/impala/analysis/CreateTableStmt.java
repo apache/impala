@@ -17,18 +17,21 @@
 
 package org.apache.impala.analysis;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.RowFormat;
@@ -321,6 +324,8 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
        computeLineageGraph(analyzer);
     }
+
+    analyzeSerializationEncoding();
   }
 
   /**
@@ -930,5 +935,44 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
   private boolean isExternalWithNoPurge() {
     return isExternal() && !Boolean.parseBoolean(getTblProperties().get(
       Table.TBL_PROP_EXTERNAL_TABLE_PURGE));
+  }
+
+  /**
+   * Analyzes the 'serialization.encoding' property in 'SerdeProperties' to check if its
+   * line delimiter is compatible with ASCII, since multi-byte line delimiters are not
+   * supported.
+   */
+  public void analyzeSerializationEncoding()
+        throws AnalysisException {
+    if (!getSerdeProperties().containsKey(serdeConstants.SERIALIZATION_ENCODING)) {
+      return;
+    }
+
+    if (getFileFormat() != THdfsFileFormat.TEXT) {
+      throw new AnalysisException(String.format("Property 'serialization.encoding' is "
+              + "only supported on TEXT file format. Conflicting "
+              + "table/format: %1$s / %2$s",
+          tableDef_.getTblName().toString(), getFileFormat().name()));
+    }
+
+    String encoding = getSerdeProperties().get(serdeConstants.SERIALIZATION_ENCODING);
+    if (!Charset.isSupported(encoding)) {
+      throw new AnalysisException("Unsupported encoding: " + encoding + ".");
+    }
+
+    byte lineDelimiter = getRowFormat() == null ?
+        (byte) HdfsStorageDescriptor.DEFAULT_LINE_DELIM :
+        // assuming RowFormat analysis filtered out multi-byte line delimiters
+        (byte) getRowFormat().getLineDelimiter().charAt(0);
+
+    Charset charset = Charset.forName(encoding);
+    if (!AlterTableSetTblProperties.isLineDelimiterSameAsAscii(lineDelimiter, charset)) {
+      throw new AnalysisException(
+          String.format("Property 'serialization.encoding' only supports "
+                  + "encodings in which line delimiter is compatible with ASCII. "
+                  + "Conflicting table: %1$s. "
+                  + "Please refer to IMPALA-10319 for more info.",
+              tableDef_.getTblName().toString()));
+    }
   }
 }
