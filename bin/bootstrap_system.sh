@@ -368,10 +368,11 @@ redhat sudo yum install -y ccache
 redhat sudo yum clean all
 
 # Download Maven since the packaged version is pretty old.
+: ${IMPALA_TOOLCHAIN_HOST:=native-toolchain.s3.amazonaws.com}
 MVN_VERSION="3.9.8"
 if [ ! -d "/usr/local/apache-maven-${MVN_VERSION}" ]; then
   sudo wget -nv \
-    "https://archive.apache.org/dist/maven/maven-3/${MVN_VERSION}/binaries/apache-maven-${MVN_VERSION}-bin.tar.gz"
+    "https://${IMPALA_TOOLCHAIN_HOST}/maven/apache-maven-${MVN_VERSION}-bin.tar.gz"
   sha512sum -c - <<< "7d171def9b85846bf757a2cec94b7529371068a0670df14682447224e57983528e97a6d1b850327e4ca02b139abaab7fcb93c4315119e6f0ffb3f0cbc0d0b9a2 apache-maven-${MVN_VERSION}-bin.tar.gz"
   sudo tar -C /usr/local -xzf "apache-maven-${MVN_VERSION}-bin.tar.gz"
   # Ensure that Impala's preferred version is installed locally,
