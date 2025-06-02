@@ -950,7 +950,7 @@ public class PlannerTestBase extends FrontendTestBase {
 
   protected void runPlannerTestFile(String testFile, String dbName, TQueryOptions options,
         Set<PlannerTestOption> testOptions) {
-    String fileName = testDir_.resolve(testFile + ".test").toString();
+    String fileName = getTestDir().resolve(testFile + ".test").toString();
     if (options == null) {
       options = defaultQueryOptions();
     } else {
@@ -1036,5 +1036,9 @@ public class PlannerTestBase extends FrontendTestBase {
     StatsJsonParser statsParser = new StatsJsonParser(fileName);
     statsParser.parseFile();
     return statsParser.getDbStatsMap();
+  }
+
+  protected java.nio.file.Path getTestDir() {
+    return testDir_;
   }
 }

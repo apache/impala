@@ -119,7 +119,24 @@ public class AnalyticPlanner {
             Expr.listToSql(analyticConjs, ToSqlOptions.SHOW_IMPLICIT_CASTS));
     }
 
-    List<PartitionLimit> perPartitionLimits = inferPartitionLimits(analyticConjs);
+    List<PartitionLimit> perPartitionLimits =
+        inferPartitionLimits(analyzer_, analyticConjs);
+
+    PlanNode newRoot = createSingleNodePlan(root, groupingExprs, inputPartitionExprs,
+      tupleIsNullPreds, perPartitionLimits);
+
+    List<Expr> substAnalyticConjs =
+        Expr.substituteList(analyticConjs, newRoot.getOutputSmap(), analyzer_, false);
+    overrideSelectivityPushedLimits(analyticConjs, perPartitionLimits,
+            substAnalyticConjs);
+    return newRoot.addConjunctsToNode(ctx_, analyzer_, tids, substAnalyticConjs);
+  }
+
+  public PlanNode createSingleNodePlan(PlanNode root,
+      List<Expr> groupingExprs, List<Expr> inputPartitionExprs,
+      List<TupleIsNullPredicate> tupleIsNullPreds,
+      List<PartitionLimit> perPartitionLimits) throws ImpalaException {
+
     List<WindowGroup> windowGroups = collectWindowGroups();
     for (int i = 0; i < windowGroups.size(); ++i) {
       windowGroups.get(i).init(analyzer_, "wg-" + i);
@@ -151,12 +168,7 @@ public class AnalyticPlanner {
             firstSortGroup ? tupleIsNullPreds : emptyPreds);
       }
     }
-
-    List<Expr> substAnalyticConjs =
-        Expr.substituteList(analyticConjs, root.getOutputSmap(), analyzer_, false);
-    overrideSelectivityPushedLimits(analyticConjs, perPartitionLimits,
-            substAnalyticConjs);
-    return root.addConjunctsToNode(ctx_, analyzer_, tids, substAnalyticConjs);
+    return root;
   }
 
   /**
@@ -187,7 +199,7 @@ public class AnalyticPlanner {
   private void overrideSelectivityPushedLimits(List<Expr> analyticConjs,
           List<PartitionLimit> perPartitionLimits, List<Expr> substAnalyticConjs) {
     for (PartitionLimit limit : perPartitionLimits) {
-      if (limit.pushed && limit.isLessThan) {
+      if (limit.shouldOverrideSelectivity()) {
         int idx = analyticConjs.indexOf(limit.conjunct);
         if (idx >= 0) {
           substAnalyticConjs.set(idx,
@@ -882,7 +894,7 @@ public class AnalyticPlanner {
     return partitionGroups;
   }
 
-  private static class PartitionLimit {
+  public static class PartitionLimit {
     public PartitionLimit(Expr conjunct, AnalyticExpr analyticExpr, long limit,
             boolean includeTies, boolean isLessThan) {
       this.conjunct = conjunct;
@@ -919,14 +931,19 @@ public class AnalyticPlanner {
     public void markPushed() {
       this.pushed = true;
     }
+
+    public boolean shouldOverrideSelectivity() {
+      return pushed && isLessThan && conjunct != null;
+    }
   }
 
   /**
    * Extract per-partition limits from 'conjuncts'.
    */
-  private List<PartitionLimit> inferPartitionLimits(List<Expr> conjuncts) {
+  public static List<PartitionLimit> inferPartitionLimits(Analyzer analyzer,
+      List<Expr> conjuncts) {
     List<PartitionLimit> result = new ArrayList<>();
-    if (analyzer_.getQueryOptions().analytic_rank_pushdown_threshold <= 0) return result;
+    if (analyzer.getQueryOptions().analytic_rank_pushdown_threshold <= 0) return result;
     for (Expr conj : conjuncts) {
       if (!(Expr.IS_BINARY_PREDICATE.apply(conj))) continue;
       BinaryPredicate pred = (BinaryPredicate) conj;

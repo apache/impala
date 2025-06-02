@@ -20,6 +20,7 @@ package org.apache.impala.calcite.coercenodes;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
@@ -104,6 +105,12 @@ public class CoerceOperandShuttle extends RexShuttle {
 
     // recursively call all embedded RexCalls first
     RexCall castedOperandsCall = (RexCall) super.visitCall(call);
+
+    // For parquet statistics predicates to be used, the input ref needs to be
+    // on the left side of a comparison operator and any extraneous casts need
+    // to be removed.
+    castedOperandsCall = (RexCall) normalizeCompareOperator(castedOperandsCall);
+
 
     // need to 'flatten' before putting it back into a filter or else some
     // tpcds queries will fail in the junit tests because of an assert statement
@@ -230,6 +237,23 @@ public class CoerceOperandShuttle extends RexShuttle {
     }
 
     return retType;
+  }
+
+  private RexNode normalizeCompareOperator(RexCall call) {
+    if (!SqlKind.BINARY_COMPARISON.contains(call.getKind())) {
+      return call;
+    }
+
+    RexNode leftOperand = call.getOperands().get(0);
+    RexNode rightOperand = call.getOperands().get(1);
+
+    if (RexUtil.containsInputRef(leftOperand) ||
+        !RexUtil.containsInputRef(rightOperand)) {
+      return call;
+    }
+
+    return rexBuilder.makeCall(call.getType(), call.getOperator().reverse(),
+        Lists.newArrayList(rightOperand, leftOperand));
   }
 
   private boolean isCastingNeeded(RexCall rexCall) {

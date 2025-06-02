@@ -38,6 +38,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.planner.PlannerContext;
 import org.apache.impala.planner.PlanNode;
+import org.apache.impala.planner.SingleNodePlanner;
 import org.apache.impala.planner.SortNode;
 
 import java.math.BigDecimal;
@@ -50,10 +51,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * ImpalaSortRel
- *
- * IMPALA-13172: Optimizations for tryConvertToTopN needed. This should probably
- * be made rule based and done in the optimization phase, but keeping track
- * here because the Impala code was in the SortNode.
  */
 public class ImpalaSortRel extends Sort
     implements ImpalaPlanRel {
@@ -105,6 +102,8 @@ public class ImpalaSortRel extends Sort
     // a sort or top-n node..just set the limit on the child
     if (fieldCollations.size() == 0) {
       validateUnorderedLimit(context.filterCondition_, limit_, offset_);
+      SingleNodePlanner.checkAndApplyLimitPushdown(inputNodeWithExprs.planNode_, null,
+          limit_, context.ctx_.getRootAnalyzer(), context.ctx_);
       // Mutating an existing object here. Either we should pass in a context into
       // all PlanNodes containing the limit so the PlanNode constructor can set the
       // limit, or leave the code here to mutate.
@@ -136,6 +135,11 @@ public class ImpalaSortRel extends Sort
 
     sortInfo.materializeRequiredSlots(context.ctx_.getRootAnalyzer(),
         new ExprSubstitutionMap());
+
+    if (limit_ != -1 && offset_ == 0) {
+      SingleNodePlanner.checkAndApplyLimitPushdown(inputNodeWithExprs.planNode_, sortInfo,
+          limit_, context.ctx_.getRootAnalyzer(), context.ctx_);
+    }
 
     // Call a specific implementation of createSortNode(). In the future, we could
     // try to leverage Impala's SingleNodePlanner.createSortNode()
@@ -218,7 +222,7 @@ public class ImpalaSortRel extends Sort
       SortInfo sortInfo, long limit, long offset, boolean hasLimit
       ) throws ImpalaException {
 
-    if (!hasLimit) {
+    if (!hasLimit || planCtx.getQueryOptions().isDisable_outermost_topn()) {
       return SortNode.createTotalSortNode(planCtx.getNextNodeId(), root, sortInfo,
           offset);
     }

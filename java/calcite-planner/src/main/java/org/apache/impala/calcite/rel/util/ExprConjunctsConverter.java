@@ -79,7 +79,7 @@ public class ExprConjunctsConverter {
    * will have all 3 clauses on the first level), so we do not
    * need to recursively search for clauses.
    */
-  private static List<RexNode> getAndConjuncts(RexNode conjunct) {
+  public static List<RexNode> getAndConjuncts(RexNode conjunct) {
     if (conjunct == null) {
       return ImmutableList.of();
     }

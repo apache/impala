@@ -18,6 +18,7 @@
 package org.apache.impala.calcite.rel.node;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -69,18 +70,24 @@ import org.apache.impala.calcite.functions.RexLiteralConverter;
 import org.apache.impala.calcite.rel.util.CreateExprVisitor;
 import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
+import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.planner.AnalyticPlanner;
+import org.apache.impala.planner.AnalyticPlanner.PartitionLimit;
 import org.apache.impala.planner.PlannerContext;
 import org.apache.impala.planner.PlanNode;
+import org.apache.impala.planner.PlanNodeId;
 import org.apache.impala.planner.SelectNode;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,7 +98,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- *
+ * ImpalaAnalyticRel. Calcite RelNode which maps to an AnalyticEval node and
+ * which creates all the necessary Plan nodes associated with it.
  */
 public class ImpalaAnalyticRel extends Project
     implements ImpalaPlanRel {
@@ -115,7 +123,7 @@ public class ImpalaAnalyticRel extends Project
   }
 
   /**
-   * Convert the Project RelNode with analytic exprs into a Impala Plan Nodes.
+   * Convert the Project RelNode with analytic exprs into Impala Plan Nodes.
    */
   @Override
   public NodeWithExprs getPlanNode(ParentPlanRelContext context) throws ImpalaException {
@@ -123,27 +131,33 @@ public class ImpalaAnalyticRel extends Project
     List<RexNode> projects = getProjects();
     NodeWithExprs inputNodeWithExprs = getChildPlanNode(context, projects);
     ImpalaPlanRel inputRel = (ImpalaPlanRel) getInput(0);
+    SimplifiedAnalyzer simplifiedAnalyzer =
+        (SimplifiedAnalyzer) context.ctx_.getRootAnalyzer();
 
+    // Get Info about all the Projects in the Calcite Project RelNode.
+    AllProjectInfo allProjectInfo = createAllProjectInfo(getProjects(), context.ctx_,
+        inputRel, inputNodeWithExprs.outputExprs_);
+    // There should be one element in the projectInfos_ array for each project in
+    // the original Project RelNode
+    Preconditions.checkState(getProjects().size() == allProjectInfo.projectInfos_.size());
 
-    // retrieve list of all analytic expressions
-    List<RexOver> overExprs = gatherRexOver(projects);
-
-    // get the GroupedAnalyticExpr objects. A GroupedAnalyticExpr object will
-    // contain a unique analytic expr and all the RexOver objects which are
-    // equivalent to the unique analytic expr.
-    List<GroupedAnalyticExpr> groupAnalyticExprs = getGroupedAnalyticExprs(
-        overExprs, context.ctx_, inputRel, inputNodeWithExprs.outputExprs_);
-
-    List<AnalyticExpr> analyticExprs = new ArrayList<>();
-    for (GroupedAnalyticExpr g : groupAnalyticExprs) {
-      analyticExprs.add(g.analyticExpr);
-    }
-
+    // Create Impala Analytic planner objects.
     AnalyticInfo analyticInfo =
-        AnalyticInfo.create(analyticExprs, context.ctx_.getRootAnalyzer());
+        AnalyticInfo.create(allProjectInfo.analyticExprs_, simplifiedAnalyzer);
     AnalyticPlanner analyticPlanner =
-        new AnalyticPlanner(analyticInfo, context.ctx_.getRootAnalyzer(), context.ctx_);
+        new AnalyticPlanner(analyticInfo, simplifiedAnalyzer, context.ctx_);
 
+    // Create a SlotRef for each analytic expression created by the AnalyticInfo.
+    Map<AnalyticExpr, SlotRef> analyticExprSlotRefMap =
+        createAnalyticExprSlotRefMap(allProjectInfo.analyticExprs_, analyticInfo);
+
+    // Retrieve the "perPartitionLimits" used for a potential top-N optimization
+    List<PartitionLimit> perPartitionLimits = getPerPartitionLimits(
+        context.filterCondition_, allProjectInfo, analyticExprSlotRefMap,
+        simplifiedAnalyzer);
+
+    // Pass in all the expressions from the input node wrapped with a
+    // TupleIsNullPredicate.
     // TODO: IMPALA-12961.  strip out null exprs which can exist when the tablescan does
     // not output all of its columns.
     List<Expr> nonNullExprs = inputNodeWithExprs.outputExprs_.stream()
@@ -152,26 +166,33 @@ public class ImpalaAnalyticRel extends Project
         TupleIsNullPredicate.getUniqueBoundTupleIsNullPredicates(nonNullExprs,
             inputNodeWithExprs.planNode_.getTupleIds());
 
+    // Create the plan node
+    // One difference with the original Impala planner.  The original Impala planner
+    // calls a different outer AnalyticPlanner.createSingleNodePlan which also
+    // returns the Select node on top of the Analytic Node. The Calcite planner plan
+    // node here will be of type AnalyticEvalNode. If a SelectNode is needed because
+    // there is a filter condition, it will be created
     PlanNode planNode = analyticPlanner.createSingleNodePlan(
         inputNodeWithExprs.planNode_, Collections.emptyList(), new ArrayList<>(),
-        tupleIsNullPreds);
+        tupleIsNullPreds, perPartitionLimits);
 
-    // Get a mapping of all expressions to its corresponding Impala Expr object. The
-    // non-analytic expressions will have a RexInputRef type RexNode, while the
-    // analytic expressions will have the RexOver type RexNode.
+    // Get a mapping of all project columns to its corresponding Impala Expr object. The
+    // non-analytic expressions will have a RexInputRef type RexNode which are simply
+    // pass-through projects. The analytic expressions in the project will be of type
+    // RexOver.
     Map<RexNode, Expr> mapping = createRexNodeExprMapping(inputRel, planNode, projects,
-        inputNodeWithExprs.outputExprs_, groupAnalyticExprs, context.ctx_, analyticInfo);
+        inputNodeWithExprs.outputExprs_, allProjectInfo.projectInfos_, context.ctx_,
+        analyticExprSlotRefMap);
 
-    List<Expr> outputExprs =
-        getOutputExprs(mapping, projects, context.ctx_.getRootAnalyzer());
+    List<Expr> outputExprs = getOutputExprs(mapping, projects, simplifiedAnalyzer);
 
     NodeWithExprs retNode =
         new NodeWithExprs(planNode, outputExprs, getRowType().getFieldNames());
 
-    // If there is a filter condition, a SelectNode will get added on top
-    // of the retNode.
-    return NodeCreationUtils.wrapInSelectNodeIfNeeded(context, retNode,
-        getCluster().getRexBuilder());
+    RexBuilder rexBuilder = getCluster().getRexBuilder();
+    return context.filterCondition_ != null
+       ? createSelectNode(context, retNode, rexBuilder, perPartitionLimits)
+       : retNode;
   }
 
   private NodeWithExprs getChildPlanNode(ParentPlanRelContext context,
@@ -185,16 +206,29 @@ public class ImpalaAnalyticRel extends Project
   }
 
   /**
+   * Returns true if the given filter condition only contains input expressions
+   * referencing a rank expression.
+   */
+  private boolean hasOnlyRankSlotRefInputExprs(RexNode filterCondition,
+      Set<Integer> rankProjects) {
+    Set<Integer> inputReferences =
+        getInputReferences(ImmutableList.of(filterCondition));
+    return inputReferences.size() == 1 &&
+        rankProjects.containsAll(inputReferences);
+  }
+
+  /**
    * Generates the AnalyticExpr object from the RexOver and the input plan node
    * expressions.
    */
-  private AnalyticExpr getAnalyticExpr(RexOver rexOver, PlannerContext ctx,
+  private AnalyticExpr createAnalyticExpr(RexBuilder rexBuilder,
+      RexOver rexOver, PlannerContext ctx,
       ImpalaPlanRel inputRel, List<Expr> inputExprs) throws ImpalaException {
     final RexWindow rexWindow = rexOver.getWindow();
     // First parameter is the function call
     Function fn = getFunction(rexOver);
     Type impalaRetType = ImpalaTypeConverter.createImpalaType(rexOver.getType());
-    CreateExprVisitor visitor = new CreateExprVisitor(getCluster().getRexBuilder(),
+    CreateExprVisitor visitor = new CreateExprVisitor(rexBuilder,
         inputExprs, ctx.getRootAnalyzer());
 
     List<Expr> operands = CreateExprVisitor.getExprs(visitor, rexOver.operands);
@@ -216,9 +250,15 @@ public class ImpalaAnalyticRel extends Project
     if (rexWindow.orderKeys != null) {
       for (RexFieldCollation ok : rexWindow.orderKeys) {
         Expr orderByExpr = CreateExprVisitor.getExpr(visitor, ok.left);
+        // Logic here:
+        // If ascending, nulls first is true only when it explicitly contains nulls first.
+        //
+        // If descending, nulls first is true if it explicitly contains nulls first
+        //   or it is blank (does not contain nulls last).
         boolean nullsFirst = ok.getDirection() == RelFieldCollation.Direction.ASCENDING
             ? ok.right.contains(SqlKind.NULLS_FIRST)
-            : !ok.right.contains(SqlKind.NULLS_FIRST);
+            : ok.right.contains(SqlKind.NULLS_FIRST)
+                || !ok.right.contains(SqlKind.NULLS_LAST);
         OrderByElement orderByElement = new OrderByElement(orderByExpr,
             ok.getDirection() == RelFieldCollation.Direction.ASCENDING,
             nullsFirst);
@@ -281,13 +321,30 @@ public class ImpalaAnalyticRel extends Project
     }
   }
 
+  /**
+   * Generate a SlotRef for each AnalyticExpr and place in a hash map.
+   */
+  Map<AnalyticExpr, SlotRef> createAnalyticExprSlotRefMap(List<AnalyticExpr> exprs,
+      AnalyticInfo analyticInfo) {
+    Preconditions.checkState(
+        exprs.size() == analyticInfo.getOutputTupleDesc().getSlots().size());
+    Map<AnalyticExpr, SlotRef> result = new HashMap<>();
+    for (int i = 0; i < exprs.size(); ++i) {
+      AnalyticExpr expr = exprs.get(i);
+      SlotDescriptor slotDesc =
+          analyticInfo.getOutputTupleDesc().getSlots().get(i);
+      SlotRef newSlotRef = new SlotRef(slotDesc);
+      result.put(expr, newSlotRef);
+    }
+    return result;
+  }
+
   private List<Expr> getOutputExprs(Map<RexNode, Expr> mapping,
       List<RexNode> projects, Analyzer analyzer) throws ImpalaException {
 
     AnalyticRexVisitor visitor = new AnalyticRexVisitor(mapping,
         getCluster().getRexBuilder(), analyzer);
 
-    Map<Integer, Expr> projectExprs = new LinkedHashMap<>();
     List<Expr> outputExprs = new ArrayList<>();
     // Walk through all the projects and grab the already created Expr object that exists
     // in the "mapping" variable.
@@ -325,49 +382,17 @@ public class ImpalaAnalyticRel extends Project
   }
 
   /**
-   * Get the analytic Expr objects from the RexOver objects in the Project.
-   * Impala does not allow duplicate analytic expressions. So if two different
-   * RexOvers create the same AnalyticExpr object, they get grouped together in
-   * one GroupedAnalyticExpr object.
+   * Create a mapping from the Projects for this RelNode to the output Expr
+   * objects that exist within the newly created Plan Node.
    */
-  private List<GroupedAnalyticExpr> getGroupedAnalyticExprs(List<RexOver> overExprs,
-      PlannerContext ctx, ImpalaPlanRel inputRel,
-      List<Expr> inputExprs) throws ImpalaException {
-    List<AnalyticExpr> analyticExprs = new ArrayList<>();
-    List<List<RexOver>> overExprsList = new ArrayList<>();
-    for (RexOver over : overExprs) {
-      AnalyticExpr analyticExpr =
-          getAnalyticExpr(over, ctx, inputRel, inputExprs);
-      // check if we've seen this analytic expression before.
-      int index = analyticExprs.indexOf(analyticExpr);
-      if (index == -1) {
-        analyticExprs.add(analyticExpr);
-        overExprsList.add(Lists.newArrayList(over));
-      } else {
-        overExprsList.get(index).add(over);
-      }
-    }
-    // The total number of unique analytic expressions should match the number
-    // of RexOver expression lists created.
-    Preconditions.checkState(analyticExprs.size() == overExprsList.size());
-
-    // Create the GroupedAnalyticExprs from the corresponding lists
-    List<GroupedAnalyticExpr> groupedAnalyticExprs = new ArrayList<>();
-    for (int i = 0; i < analyticExprs.size(); ++i) {
-      groupedAnalyticExprs.add(
-          new GroupedAnalyticExpr(analyticExprs.get(i), overExprsList.get(i)));
-    }
-    return groupedAnalyticExprs;
-  }
-
   private Map<RexNode, Expr> createRexNodeExprMapping(ImpalaPlanRel inputRel,
       PlanNode planNode, List<RexNode> projects, List<Expr> inputExprs,
-      List<GroupedAnalyticExpr> groupAnalyticExprs,
-      PlannerContext ctx, AnalyticInfo analyticInfo) {
+      List<ProjectInfo> projectInfos,
+      PlannerContext ctx, Map<AnalyticExpr, SlotRef> analyticExprSlotRefMap) {
+    Map<RexNode, Expr> mapping = new LinkedHashMap<>();
+
     // Gather mappings from nodes created by analytic planner
     ExprSubstitutionMap outputExprMap = planNode.getOutputSmap();
-    // We populate the outputs from the expressions
-    Map<RexNode, Expr> mapping = new LinkedHashMap<>();
 
     // All the input references are going to get marked as a RexInputRef and
     // will be mapped to its given expression's position number
@@ -378,14 +403,11 @@ public class ImpalaAnalyticRel extends Project
       mapping.put(RexInputRef.of(pos, getInput(0).getRowType().getFieldList()), e);
     }
 
-    // Create a new SlotRef for analytic expressions.
-    for (int i = 0; i < groupAnalyticExprs.size(); i++) {
-      GroupedAnalyticExpr g = groupAnalyticExprs.get(i);
-      SlotDescriptor slotDesc =
-          analyticInfo.getOutputTupleDesc().getSlots().get(i);
-      SlotRef logicalOutputSlot = new SlotRef(slotDesc);
-      for (RexOver over : g.overExprsList) {
-        mapping.put(over, outputExprMap.get(logicalOutputSlot));
+    // Retrieve the new SlotRef for analytic expressions.
+    for (ProjectInfo projectInfo : projectInfos) {
+      for (int i = 0; i < projectInfo.rexOvers_.size(); ++i) {
+        Expr analyticExpr = analyticExprSlotRefMap.get(projectInfo.analyticExprs_.get(i));
+        mapping.put(projectInfo.rexOvers_.get(i), outputExprMap.get(analyticExpr));
       }
     }
 
@@ -398,13 +420,206 @@ public class ImpalaAnalyticRel extends Project
     return shuttle.inputPosReferenced;
   }
 
-  private static class GroupedAnalyticExpr {
-    public final AnalyticExpr analyticExpr;
-    public final List<RexOver> overExprsList;
+  /**
+   * Generate the AllProjectInfo structure (see internal class for details)
+   */
+  private AllProjectInfo createAllProjectInfo(List<RexNode> projects, PlannerContext ctx,
+      ImpalaPlanRel inputRel, List<Expr> inputExprs) throws ImpalaException {
 
-    public GroupedAnalyticExpr(AnalyticExpr analyticExpr, List<RexOver> overExprsList) {
-      this.analyticExpr = analyticExpr;
-      this.overExprsList = overExprsList;
+    RexBuilder rexBuilder = getCluster().getRexBuilder();
+    List<ProjectInfo> projectInfos = new ArrayList<>();
+    // AnalyticExpr must be unique within Impala's AnalyticPlanner. There can be two
+    // RexOver projects that generate the same AnalyticExpr.
+    LinkedHashSet<AnalyticExpr> uniqueAnalyticExprs = new LinkedHashSet<>();
+
+    Set<Integer> rankProjects = new HashSet<>();
+
+    // For loop generates a new ProjectInfo object for every Project RexNode column.
+    for (int projectNum = 0; projectNum < projects.size(); ++projectNum) {
+      RexNode project = projects.get(projectNum);
+      List<RexOver> overs = gatherRexOver(ImmutableList.of(project));
+      List<AnalyticExpr> projectAnalyticExprs = new ArrayList<>();
+      for (RexOver over : overs) {
+        AnalyticExpr analyticExpr =
+            createAnalyticExpr(rexBuilder, over, ctx, inputRel, inputExprs);
+        if (!uniqueAnalyticExprs.contains(analyticExpr)) {
+          uniqueAnalyticExprs.add(analyticExpr);
+        }
+        projectAnalyticExprs.add(analyticExpr);
+      }
+      projectInfos.add(new ProjectInfo(project, overs, projectAnalyticExprs));
+      if (project.getKind() == SqlKind.RANK ||
+          project.getKind().equals(SqlKind.ROW_NUMBER)) {
+        rankProjects.add(projectNum);
+      }
+    }
+    return new AllProjectInfo(projectInfos, new ArrayList<>(uniqueAnalyticExprs),
+        rankProjects);
+  }
+
+  /**
+   * Retrieve the list of Partition Limits. This is specifically used for the top-n
+   * optimization feature.
+   */
+  private List<PartitionLimit> getPerPartitionLimits(RexNode filterCondition,
+        AllProjectInfo allProjectInfo,  Map<AnalyticExpr, SlotRef> analyticExprSlotRefMap,
+        Analyzer analyzer) throws ImpalaException {
+    // top-n optimization feature only works when there is a filter.
+    if (filterCondition == null) {
+      return ImmutableList.of();
+    }
+
+    List<Expr> rankConjuncts = new ArrayList<>();
+    // Retrieve a list which contains an element for every project but
+    // only contains a non-null Expr if the Project is of type RANK
+    // or ROW_NUMBER
+    List<Expr> rankSlotRefExprs = allProjectInfo.projectInfos_.stream()
+        .map(e -> e.rankExpr_)
+        .map(e -> analyticExprSlotRefMap.get(e))
+        .collect(Collectors.toList());
+    Preconditions.checkState(getProjects().size() == rankSlotRefExprs.size());
+
+    // Break up the filter condition into its individual and elements
+    List<RexNode> andConjuncts = ExprConjunctsConverter.getAndConjuncts(filterCondition);
+    for (RexNode andConjunct : andConjuncts) {
+      // We only want the filter conjuncts that contain a reference to the Rank project
+      // e.g. 'rnk <= 5' where rnk is an alias to an analytic expr containing rank.
+      if (hasOnlyRankSlotRefInputExprs(andConjunct, allProjectInfo.rankProjects_)) {
+        // convert the RexNode filter condition into an Impala Expr that can be
+        // understood by the Analytic Planner
+        ExprConjunctsConverter converter = new ExprConjunctsConverter(
+            andConjunct, rankSlotRefExprs, getCluster().getRexBuilder(),
+            analyzer);
+        rankConjuncts.addAll(converter.getImpalaConjuncts());
+      }
+    }
+    return AnalyticPlanner.inferPartitionLimits(analyzer, rankConjuncts);
+  }
+
+  /**
+   * Create a Select Node when there is a filter on top of this Project.
+   */
+  public NodeWithExprs createSelectNode(ParentPlanRelContext context,
+      NodeWithExprs nodeWithExprs, RexBuilder rexBuilder,
+      List<PartitionLimit> perPartitionLimits) throws ImpalaException {
+    Analyzer analyzer = context.ctx_.getRootAnalyzer();
+    PlanNodeId nodeId = context.ctx_.getNextNodeId();
+    ExprConjunctsConverter converter = new ExprConjunctsConverter(
+        context.filterCondition_, nodeWithExprs.outputExprs_, rexBuilder, analyzer);
+    List<Expr> filterConjuncts = converter.getImpalaConjuncts();
+
+    // For top-n optimization: If criteria is met, the filter conjunct gets its
+    // selectivity overridden.
+    filterConjuncts = overrideSelectivity(filterConjuncts, perPartitionLimits,
+        nodeWithExprs.planNode_, analyzer);
+
+    SelectNode selectNode =
+        SelectNode.createFromCalcite(nodeId, nodeWithExprs.planNode_, filterConjuncts);
+    selectNode.init(analyzer);
+    return new NodeWithExprs(selectNode, nodeWithExprs);
+  }
+
+  /**
+   * Override the selectivity on certain filtered conjuncts if needed.
+   * The perPartitionLimits contain conjuncts that are used in top-n optimization
+   * if it has been applied. This method returns the adjusted filtered conjuncts
+   * with the potentially modified selectivity.
+   */
+  private List<Expr> overrideSelectivity(List<Expr> filterConjuncts,
+      List<PartitionLimit> perPartitionLimits, PlanNode planNode, Analyzer analyzer) {
+
+    ExprSubstitutionMap outputExprMap = planNode.getOutputSmap();
+    // iterate through the partitions and retrieve the Expr conjuncts that were used
+    // in the top-n optimization. The ExprSubstitutionMap is used since the
+    // PartitionLimit contains the input Expr before the Expr node was created
+    // and gets substituted with the Expr that is output from the AnalyticEval node.
+    // is output from the AnalyticEval node.
+    List<Expr> overrideSelectivityInputConjuncts = perPartitionLimits.stream()
+        .filter(p -> p.shouldOverrideSelectivity())
+        .map(p -> p.conjunct)
+        .map(p -> p.substitute(outputExprMap, analyzer, false))
+        .collect(Collectors.toList());
+
+    // If there are no top-n optimizations applied, return the original unmodified
+    // list.
+    if (overrideSelectivityInputConjuncts.size() == 0) {
+      return filterConjuncts;
+    }
+
+    // return the modified conjuncts (which are modified in the
+    // overrideSelectivityIfNecessary method).
+    return filterConjuncts.stream()
+        .map(f -> overrideSelectivityIfNecessary(f, overrideSelectivityInputConjuncts))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Given a filter conjunct and a list of conjuncts to override: If the filter conjunct
+   * is contained in the list, return a modified conjunct. Otherwise return the original
+   * conjunct.
+   */
+  public Expr overrideSelectivityIfNecessary(Expr filterConj,
+      List<Expr> overrideConjuncts) {
+    for (Expr overrideConjunct : overrideConjuncts) {
+      if (overrideConjunct.equals(filterConj)) {
+        return filterConj.cloneAndOverrideSelectivity(1.0);
+      }
+    }
+    return filterConj;
+  }
+
+  public boolean isOverrideSelectivityConj(PartitionLimit limit) {
+    return limit.isPushed() && limit.isLessThan && limit.conjunct != null;
+  }
+
+  /**
+   * AllProjectInfo contains all the information about the Project RelNode, relating
+   * newly created Impala objects to each Project RexNode.
+   */
+  private static class AllProjectInfo {
+    // Array of Project RexNodes and its related information. There is one ProjectInfo
+    // member for each RexNode in the Project RelNode.
+    private final List<ProjectInfo> projectInfos_;
+    // List of unique Impala AnalyticExpr objects to be passed into AnalyticInfo.
+    private final List<AnalyticExpr> analyticExprs_;
+
+    // list of all rank/row number expressions needed for TopN optimization.
+    private final Set<Integer> rankProjects_;
+
+    public AllProjectInfo(List<ProjectInfo> projectInfos,
+        List<AnalyticExpr> analyticExprs, Set<Integer> rankProjects) {
+      projectInfos_ = projectInfos;
+      analyticExprs_ = analyticExprs;
+      rankProjects_ = rankProjects;
+    }
+  }
+
+  /**
+   * ProjectInfo contains all Impala information related to a single Project RexNode
+   * column in the Project RelNode
+   */
+  private static class ProjectInfo {
+    // The Project RexNode.
+    public final RexNode project_;
+    // All the RexOver objects within the RexNode.
+    public final List<RexOver> rexOvers_;
+    // All the Impala Analytic expressions, 1:1 with the RexOver objects.
+    public final List<AnalyticExpr> analyticExprs_;
+    // Special member variable that is only non-null if the rexOvers_.get(0) is
+    // specifically a SqlKind.RANK node or SqlKind.ROW_NUMBER.
+    public final AnalyticExpr rankExpr_;
+
+    public ProjectInfo(RexNode project, List<RexOver> rexOvers,
+        List<AnalyticExpr> analyticExprs) {
+      project_ = project;
+      Preconditions.checkState(rexOvers.size() == analyticExprs.size());
+      rexOvers_ = ImmutableList.copyOf(rexOvers);
+      analyticExprs_ = ImmutableList.copyOf(analyticExprs);
+
+      SqlKind kind = project.getKind();
+      rankExpr_ = kind == SqlKind.RANK || kind == SqlKind.ROW_NUMBER
+          ? analyticExprs.get(0)
+          : null;
     }
   }
 

@@ -368,7 +368,7 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
    * For certain qualifying conditions, we can push a limit from the top level
    * sort down to the sort associated with an AnalyticEval node.
    */
-  private static void checkAndApplyLimitPushdown(PlanNode root, SortInfo sortInfo,
+  public static void checkAndApplyLimitPushdown(PlanNode root, SortInfo sortInfo,
     long limit, Analyzer analyzer, PlannerContext planCtx) {
     LimitPushdownInfo pushdownLimit = null;
     AnalyticEvalNode analyticNode = null;
