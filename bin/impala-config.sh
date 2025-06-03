@@ -294,13 +294,13 @@ export CDP_MAVEN_REPOSITORY=\
 export CDP_AVRO_JAVA_VERSION=1.11.3
 export CDP_HADOOP_VERSION=3.3.6.3.3.6.2-1
 export CDP_HBASE_VERSION=2.6.2.3.3.6.2-1
-export CDP_HIVE_VERSION=4.0.0.3.3.6.2-1
-export CDP_ICEBERG_VERSION=1.3.1.7.3.0.0-128
+export CDP_HIVE_VERSION=4.0.1.3.3.6.2-1
+export CDP_ICEBERG_VERSION=1.3.1
 export CDP_KNOX_VERSION=2.0.0.3.3.6.2-1
 export CDP_OZONE_VERSION=1.4.1.3.3.6.2-1
 export CDP_PARQUET_VERSION=1.13.1
 export CDP_RANGER_VERSION=2.5.0.3.3.6.2-1
-export CDP_TEZ_VERSION=0.10.3.3.3.6.2-1
+export CDP_TEZ_VERSION=0.10.4.3.3.6.2-1
 
 # Ref: https://infra.apache.org/release-download-pages.html#closer
 : ${APACHE_MIRROR:="https://www.apache.org/dyn/closer.cgi"}
