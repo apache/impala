@@ -30,6 +30,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -49,6 +50,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -408,6 +411,7 @@ public class CatalogOpExecutor {
   private final AuthorizationConfig authzConfig_;
   private final AuthorizationManager authzManager_;
   private final HiveJavaFunctionFactory hiveJavaFuncFactory_;
+  private final ExecutorService icebergExecutorService_;
 
   // A singleton monitoring class that keeps track of the catalog operations.
   private final CatalogOperationTracker catalogOpTracker_ =
@@ -425,6 +429,10 @@ public class CatalogOpExecutor {
     authzConfig_ = Preconditions.checkNotNull(authzConfig);
     authzManager_ = Preconditions.checkNotNull(authzManager);
     hiveJavaFuncFactory_ = Preconditions.checkNotNull(hiveJavaFuncFactory);
+    icebergExecutorService_ =
+        Executors.newFixedThreadPool(BackendConfig.INSTANCE.icebergCatalogNumThreads(),
+                new ThreadFactoryBuilder().setNameFormat("IcebergCatalogThread-%d")
+                .build());
   }
 
   public CatalogServiceCatalog getCatalog() { return catalog_; }
@@ -1611,8 +1619,9 @@ public class CatalogOpExecutor {
             addSummary(response, rollbackSummary);
           } else if (setExecuteParams.isSetExpire_snapshots_params()) {
             String expireSummary =
-                IcebergCatalogOpExecutor.alterTableExecuteExpireSnapshots(
-                    iceTxn, setExecuteParams.getExpire_snapshots_params());
+                IcebergCatalogOpExecutor.alterTableExecuteExpireSnapshots(iceTxn,
+                    setExecuteParams.getExpire_snapshots_params(),
+                    icebergExecutorService_);
             addSummary(response, expireSummary);
           } else {
             // Cannot happen, but throw just in case.

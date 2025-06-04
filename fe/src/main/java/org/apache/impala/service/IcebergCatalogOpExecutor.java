@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.BaseTable;
@@ -211,11 +212,12 @@ public class IcebergCatalogOpExecutor {
    * TableProperties.MIN_SNAPSHOTS_TO_KEEP table property manages how many snapshots
    * should be retained even when all snapshots are selected by expireOlderThan().
    */
-  public static String alterTableExecuteExpireSnapshots(
-      Transaction txn, TAlterTableExecuteExpireSnapshotsParams params) {
+  public static String alterTableExecuteExpireSnapshots(Transaction txn,
+      TAlterTableExecuteExpireSnapshotsParams params, ExecutorService executors) {
     ExpireSnapshots expireApi = txn.expireSnapshots();
     Preconditions.checkState(params.isSetOlder_than_millis());
     expireApi.expireOlderThan(params.older_than_millis);
+    expireApi.executeDeleteWith(executors);
     expireApi.commit();
     return "Snapshots have been expired.";
   }

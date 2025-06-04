@@ -339,4 +339,6 @@ struct TBackendGflags {
   153: required i32 max_outstanding_events_on_executors
 
   154: required bool consolidate_grant_revoke_requests
+
+  155: required i32 iceberg_catalog_num_threads
 }

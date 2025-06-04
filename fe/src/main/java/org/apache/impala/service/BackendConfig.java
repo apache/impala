@@ -577,4 +577,8 @@ public class BackendConfig {
   public boolean consolidateGrantRevokeRequests() {
     return backendCfg_.consolidate_grant_revoke_requests;
   }
+
+  public int icebergCatalogNumThreads() {
+    return backendCfg_.iceberg_catalog_num_threads;
+  }
 }

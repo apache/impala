@@ -92,9 +92,9 @@ class TestIcebergTable(IcebergTestSuite):
         ts_0 = datetime.datetime.now()
         insert_q = "insert into {0} values (1)".format(tbl_name)
         ts_1 = self.execute_query_ts(impalad_client, insert_q)
-        time.sleep(5)
+        time.sleep(1)
         impalad_client.execute(insert_q)
-        time.sleep(5)
+        time.sleep(1)
         ts_2 = self.execute_query_ts(impalad_client, insert_q)
         impalad_client.execute(insert_q)
 
@@ -472,9 +472,9 @@ class TestIcebergTable(IcebergTestSuite):
           .format(tbl_name))
       insert_q = "insert into {0} values (1)".format(tbl_name)
       ts_1 = self.execute_query_ts(impalad_client, insert_q)
-      time.sleep(5)
+      time.sleep(1)
       ts_2 = self.execute_query_ts(impalad_client, insert_q)
-      time.sleep(5)
+      time.sleep(1)
       ts_3 = self.execute_query_ts(impalad_client, insert_q)
       # Describe history without predicate
       data = impalad_client.execute("DESCRIBE HISTORY {0}".format(tbl_name))

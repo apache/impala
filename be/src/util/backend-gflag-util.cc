@@ -293,6 +293,10 @@ DEFINE_int64_hidden(data_stream_sender_buffer_size_used_by_planner, -1,
     "With default -1 the planner uses the old logic that is different"
     "than how the backend actually works (see IMPALA-12594)");
 
+DEFINE_int32(iceberg_catalog_num_threads, 16,
+    "Maximum number of threads to use for Iceberg catalog operations. These threads are "
+    "shared among concurrent Iceberg catalog operation (ie., ExpireSnapshot).");
+
 using strings::Substitute;
 
 namespace impala {
@@ -308,7 +312,7 @@ static bool ValidatePositiveDouble(const char* flagname, double value) {
   return false;
 }
 
-static bool ValidateMinProcessingPerThread(const char* flagname, int64_t value) {
+static bool ValidatePositiveInt64(const char* flagname, int64_t value) {
   if (0 < value) {
     return true;
   }
@@ -317,9 +321,14 @@ static bool ValidateMinProcessingPerThread(const char* flagname, int64_t value) 
   return false;
 }
 
+static bool ValidatePositiveInt32(const char* flagname, int32_t value) {
+  return ValidatePositiveInt64(flagname, value);
+}
+
 DEFINE_validator(query_cpu_count_divisor, &ValidatePositiveDouble);
-DEFINE_validator(min_processing_per_thread, &ValidateMinProcessingPerThread);
+DEFINE_validator(min_processing_per_thread, &ValidatePositiveInt64);
 DEFINE_validator(query_cpu_root_factor, &ValidatePositiveDouble);
+DEFINE_validator(iceberg_catalog_num_threads, &ValidatePositiveInt32);
 
 Status GetConfigFromCommand(const string& flag_cmd, string& result) {
   result.clear();
@@ -534,6 +543,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_max_outstanding_events_on_executors(
       FLAGS_max_outstanding_events_on_executors);
   cfg.__set_consolidate_grant_revoke_requests(FLAGS_consolidate_grant_revoke_requests);
+  cfg.__set_iceberg_catalog_num_threads(FLAGS_iceberg_catalog_num_threads);
   return Status::OK();
 }
 
