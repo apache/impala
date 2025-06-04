@@ -27,8 +27,11 @@ import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.rules.CoreRules;
+import org.apache.calcite.rel.rules.JoinProjectTransposeRule;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlExplainFormat;
@@ -41,6 +44,7 @@ import org.apache.impala.calcite.rel.node.ConvertToImpalaRelRules;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.calcite.rules.CombineValuesNodesRule;
 import org.apache.impala.calcite.rules.ExtractLiteralAgg;
+import org.apache.impala.calcite.rules.ImpalaJoinProjectTransposeRule;
 import org.apache.impala.calcite.rules.ImpalaMinusToDistinctRule;
 import org.apache.impala.calcite.rules.RewriteRexOverRule;
 import org.apache.impala.calcite.util.LogUtil;
@@ -66,6 +70,25 @@ public class CalciteOptimizer implements CompilerStep {
   private final SqlValidator validator_;
 
   private final EventSequence timeline_;
+
+  JoinProjectTransposeRule.Config JOIN_PROJECT_LEFT =
+      JoinProjectTransposeRule.Config.LEFT_OUTER
+          .withOperandSupplier(b0 ->
+              b0.operand(LogicalJoin.class).inputs(
+                  b1 -> b1.operand(LogicalProject.class).inputs(
+                  b2 -> b2.operand(LogicalJoin.class).anyInputs())))
+          .withDescription("JoinProjectTransposeRule(Project-Other)")
+          .as(JoinProjectTransposeRule.Config.class);
+
+  JoinProjectTransposeRule.Config JOIN_PROJECT_RIGHT =
+      JoinProjectTransposeRule.Config.RIGHT_OUTER
+          .withOperandSupplier(b0 ->
+                b0.operand(LogicalJoin.class).inputs(
+                    b1 -> b1.operand(RelNode.class).anyInputs(),
+                    b2 -> b2.operand(LogicalProject.class).inputs(
+                        b3 -> b3.operand(LogicalJoin.class).anyInputs())))
+            .withDescription("JoinProjectTransposeRule(Other-Project)")
+            .as(JoinProjectTransposeRule.Config.class);
 
   public CalciteOptimizer(CalciteAnalysisResult analysisResult,
       EventSequence timeline) {
@@ -202,18 +225,10 @@ public class CalciteOptimizer implements CompilerStep {
   private RelNode runJoinProgram(RelNode plan) throws ImpalaException {
 
     HepProgramBuilder builder = new HepProgramBuilder();
-
-    builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
-
-    builder.addRuleCollection(ImmutableList.of(
-        CoreRules.SEMI_JOIN_PROJECT_TRANSPOSE,
-        CoreRules.JOIN_PROJECT_BOTH_TRANSPOSE_INCLUDE_OUTER,
-        CoreRules.PROJECT_MERGE
-        ));
-
     // has to be in a separate program or else there is an infinite loop
     builder.addRuleInstance(CoreRules.JOIN_PUSH_TRANSITIVE_PREDICATES);
 
+    // XXX: add comment about project
     // Merge the filter nodes into the Join. Also include
     // The filter/project transpose in case the Filter
     // exists above the Project in the RelNode so it can
@@ -221,8 +236,11 @@ public class CalciteOptimizer implements CompilerStep {
     // joins next to each other if possible for the join
     // optimization step.
     builder.addRuleCollection(ImmutableList.of(
-        CoreRules.FILTER_INTO_JOIN,
-        CoreRules.FILTER_PROJECT_TRANSPOSE
+        ImpalaJoinProjectTransposeRule.LEFT_OUTER,
+        ImpalaJoinProjectTransposeRule.RIGHT_OUTER,
+        CoreRules.FILTER_PROJECT_TRANSPOSE,
+        CoreRules.PROJECT_MERGE,
+        CoreRules.FILTER_INTO_JOIN
         ));
 
     // Join rules work in a two step process.  The first step
