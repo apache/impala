@@ -321,7 +321,7 @@ do
 
     # Run Calcite FE tests
     pushd ${IMPALA_HOME}/java/calcite-planner
-    if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test ; then
+    if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test install ; then
       TEST_RET_CODE=1
     fi
     popd
