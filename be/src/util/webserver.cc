@@ -738,9 +738,11 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   if (!authenticated && use_cookies_) {
     const char* cookie_header = sq_get_header(connection, "Cookie");
     string username;
+    string auth_mech;
     if (cookie_header != nullptr) {
       Status cookie_status =
-          AuthenticateCookie(hash_, cookie_header, &username, &cookie_rand_value);
+          AuthenticateCookie(hash_, cookie_header, &username, &auth_mech,
+              &cookie_rand_value);
       if (cookie_status.ok()) {
         authenticated = true;
         cookie_authenticated = true;
@@ -760,7 +762,8 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     // as browsers automatically include HTPASSWD credentials in requests, so add and use
     // cookies to avoid requiring the custom header.
     authenticated = true;
-    AddCookie(request_info->remote_user, &response_headers, &cookie_rand_value);
+    AddCookie(request_info->remote_user, &response_headers, HTTP_AUTH_MECH_HTPASSWD,
+        &cookie_rand_value);
   }
 
   // Connections originating from trusted domains should not require authentication.
@@ -788,7 +791,8 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
       if (TrustedDomainCheck(origin, connection, request_info)) {
         total_trusted_domain_check_success_->Increment(1);
         authenticated = true;
-        AddCookie(request_info->remote_user, &response_headers, &cookie_rand_value);
+        AddCookie(request_info->remote_user, &response_headers,
+            HTTP_AUTH_MECH_TRUSTED_DOMAIN, &cookie_rand_value);
       }
     }
   }
@@ -801,7 +805,8 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
       if (GetUsernameFromAuthHeader(connection, request_info, err_msg)) {
         total_trusted_auth_header_check_success_->Increment(1);
         authenticated = true;
-        AddCookie(request_info->remote_user, &response_headers, &cookie_rand_value);
+        AddCookie(request_info->remote_user, &response_headers,
+            HTTP_AUTH_MECH_TRUSTED_HEADER, &cookie_rand_value);
       } else {
         LOG(ERROR) << "Found trusted auth header but " << err_msg;
       }
@@ -814,7 +819,8 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
           HandleSpnego(connection, request_info, &response_headers);
       if (spnego_result == SQ_CONTINUE_HANDLING) {
         // Spnego negotiation was successful.
-        AddCookie(request_info->remote_user, &response_headers, &cookie_rand_value);
+        AddCookie(request_info->remote_user, &response_headers,
+            HTTP_AUTH_MECH_SPNEGO, &cookie_rand_value);
       } else {
         // Spnego negotiation is incomplete or failed, stop processing the request.
         return spnego_result;
@@ -825,7 +831,8 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
       if (basic_status.ok()) {
         // Basic auth was successful.
         total_basic_auth_success_->Increment(1);
-        AddCookie(request_info->remote_user, &response_headers, &cookie_rand_value);
+        AddCookie(request_info->remote_user, &response_headers,
+            HTTP_AUTH_MECH_LDAP, &cookie_rand_value);
       } else {
         total_basic_auth_failure_->Increment(1);
         if (!sq_get_header(connection, "Authorization")) {
@@ -1158,7 +1165,7 @@ Status Webserver::HandleBasic(struct sq_connection* connection,
 }
 
 void Webserver::AddCookie(const char* user, vector<string>* response_headers,
-    string* cookie_rand_value) {
+    const string& authMech, string* cookie_rand_value) {
   if (use_cookies_) {
     // If cookie auth failed and we generated a 'delete cookie' header, remove it.
     auto eq = [](const string& header) { return header.rfind("Set-Cookie", 0) == 0; };
@@ -1168,7 +1175,7 @@ void Webserver::AddCookie(const char* user, vector<string>* response_headers,
     }
     // Generate a cookie to return.
     response_headers->push_back(Substitute("Set-Cookie: $0",
-        GenerateCookie(user, hash_, cookie_rand_value)));
+        GenerateCookie(user, hash_, authMech, cookie_rand_value)));
   }
 }
 

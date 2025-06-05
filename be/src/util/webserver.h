@@ -221,7 +221,8 @@ class Webserver {
 
   // Adds a 'Set-Cookie' header to 'response_headers', if cookie support is enabled.
   // Returns the random value portion of the cookie in 'rand' for use in CSRF prevention.
-  void AddCookie(const char* user, vector<string>* response_headers, string* rand);
+  void AddCookie(const char* user, vector<string>* response_headers,
+      const string& authMech, string* rand);
 
   // Get username from Authorization header.
   bool GetUsernameFromAuthHeader(struct sq_connection* connection,

@@ -460,20 +460,37 @@ public:
   const filesystem::path& path() { return path_; }
   string token() {
     const char* rand_key = "&r=";
+    const char* auth_mech_key = "&a=";
     string rand, line;
     ifstream cookie_file(path_.string());
     while (cookie_file) {
       getline(cookie_file, line);
       size_t rand_idx = line.rfind(rand_key);
-      if (rand_idx != string::npos) {
-        // Relies on the random value being the last element in the cookie.
-        rand = line.substr(rand_idx + strlen(rand_key));
+      size_t auth_mech_idx = line.rfind(auth_mech_key);
+      if (rand_idx != string::npos && auth_mech_idx != string::npos) {
+        // Relies on the random value being followed by auth mech in the cookie.
+        size_t rand_val_idx = rand_idx + strlen(rand_key);
+        rand = line.substr(rand_val_idx, auth_mech_idx - rand_val_idx);
         break;
       }
     }
     return rand;
   }
-
+  string auth_mech() {
+    const char* auth_mech_key = "&a=";
+    string authmech, line;
+    ifstream cookie_file(path_.string());
+    while (cookie_file) {
+      getline(cookie_file, line);
+      size_t auth_mech_idx = line.rfind(auth_mech_key);
+      if (auth_mech_idx != string::npos) {
+        // Relies on auth mech being the last element in the cookie.
+        authmech = line.substr(auth_mech_idx + strlen(auth_mech_key));
+        break;
+      }
+    }
+    return authmech;
+  }
 private:
   const filesystem::path dir_, path_;
 };
@@ -531,6 +548,8 @@ TEST(Webserver, TestGetWithSpnego) {
     // curl does not do the initial attempt without authentication, so there is no
     // additional failed auth attempt.
     CheckAuthMetrics(&metrics, 1, (curl_7_64_or_above ? 1 : 2), 1, 0);
+    // Validate authentication mechanism stored in the cookie
+    ASSERT_EQ(cookie.auth_mech(), "SPNEGO");
 
     webserver.Stop();
     MetricGroup metrics2("webserver-test");
@@ -578,6 +597,8 @@ TEST(Webserver, TestPostWithSpnego) {
     CookieJar cookie;
     // GET with SPNEGO succeeds and returns a cookie.
     ASSERT_EQ(system(curl("--negotiate -u : -c " + cookie.path().string()).c_str()), 0);
+    // Validate authentication mechanism stored in the cookie.
+    ASSERT_EQ(cookie.auth_mech(), "SPNEGO");
     // Verify we got a cookie and can read the random token.
     string token = cookie.token();
     ASSERT_FALSE(token.empty());
@@ -629,13 +650,14 @@ TEST(Webserver, StartWithPasswordFileTest) {
     // GET with user and password succeeds and returns a cookie.
     ASSERT_EQ(system(curl(Substitute("--digest -u test:test -c $0",
         cookie.path().string())).c_str()), 0);
+    // Validate authentication mechanism stored in the cookie
+    ASSERT_EQ(cookie.auth_mech(), "HTPASSWD");
     // Verify we got a cookie and can read the random token.
     string token = cookie.token();
     ASSERT_FALSE(token.empty());
     // Post with the cookie fails due to CSRF protection.
     ASSERT_EQ(curl_status_code(Substitute("--digest -u test:test -b $0 -d ''",
         cookie.path().string()).c_str()), "403");
-
     // Include the cookie's random token as csrf_token and request should succeed.
     ASSERT_EQ(system(curl(Substitute("--digest -u test:test -b $0 -d 'csrf_token=$1'",
         cookie.path().string(), token)).c_str()), 0);

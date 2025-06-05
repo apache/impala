@@ -53,6 +53,10 @@ class KerberosKdcEnvironment extends ExternalResource {
     this.testFolder = testFolder;
   }
 
+  public String getTestFolderPath() throws IOException {
+    return testFolder.getRoot().getCanonicalPath();
+  }
+
   @Override
   protected void before() throws Throwable {
     testFolder.create();

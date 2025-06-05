@@ -662,9 +662,18 @@ static int SaslGetPath(void* context, const char** path) {
 bool CookieAuth(ThriftServer::ConnectionContext* connection_context,
     const AuthenticationHash& hash, const std::string& cookie_header) {
   string username;
-  Status cookie_status = AuthenticateCookie(hash, cookie_header, &username);
+  string authMech;
+  Status cookie_status = AuthenticateCookie(hash, cookie_header, &username, &authMech);
   if (cookie_status.ok()) {
     connection_context->username = username;
+    if (authMech == HTTP_AUTH_MECH_SPNEGO) {
+      connection_context->kerberos_user_principal = username;
+      connection_context->kerberos_user_short =
+          GetShortUsernameFromKerberosPrincipal(username);
+      VLOG(2) << "Connection authenticated with "
+              << "short username \"" << connection_context->kerberos_user_short << "\" "
+              << "parsed from principal \"" << username << "\" ";
+    }
     return true;
   }
 
@@ -723,7 +732,9 @@ static bool TrustedDomainCheck(ThriftServer::ConnectionContext* connection_conte
   }
   // Create a cookie to return.
   connection_context->return_headers.push_back(
-      Substitute("Set-Cookie: $0", GenerateCookie(connection_context->username, hash)));
+      Substitute("Set-Cookie: $0",
+          GenerateCookie(connection_context->username, hash,
+              HTTP_AUTH_MECH_TRUSTED_DOMAIN)));
   return true;
 }
 
@@ -734,7 +745,9 @@ static bool HandleTrustedAuthHeader(ThriftServer::ConnectionContext* connection_
   }
   // Create a cookie to return.
   connection_context->return_headers.push_back(
-      Substitute("Set-Cookie: $0", GenerateCookie(connection_context->username, hash)));
+      Substitute("Set-Cookie: $0",
+          GenerateCookie(connection_context->username, hash,
+              HTTP_AUTH_MECH_TRUSTED_HEADER)));
   return true;
 }
 
@@ -755,7 +768,8 @@ bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
     connection_context->username = username;
     // Create a cookie to return.
     connection_context->return_headers.push_back(
-        Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
+        Substitute("Set-Cookie: $0",
+            GenerateCookie(username, hash, HTTP_AUTH_MECH_LDAP)));
     if (!FLAGS_test_cookie.empty()) {
       connection_context->return_headers.push_back(
           Substitute("Set-Cookie: $0", FLAGS_test_cookie));
@@ -803,7 +817,7 @@ error_description=\"$0 \"", status.GetDetail()));
 
   // Create a cookie to return.
   connection_context->return_headers.push_back(
-      Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
+      Substitute("Set-Cookie: $0", GenerateCookie(username, hash, HTTP_AUTH_MECH_JWT)));
   return true;
 }
 
@@ -845,7 +859,7 @@ error_description=\"$0 \"", status.GetDetail()));
 
   // Create a cookie to return.
   connection_context->return_headers.push_back(
-      Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
+      Substitute("Set-Cookie: $0", GenerateCookie(username, hash, HTTP_AUTH_MECH_OAUTH)));
   return true;
 }
 
@@ -913,7 +927,8 @@ bool NegotiateAuth(ThriftServer::ConnectionContext* connection_context,
         connection_context->kerberos_user_short = short_user;
         // Create a cookie to return.
         connection_context->return_headers.push_back(
-            Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
+            Substitute("Set-Cookie: $0",
+                GenerateCookie(username, hash, HTTP_AUTH_MECH_SPNEGO)));
       }
     }
   } else {
@@ -1035,7 +1050,7 @@ bool ValidateSaml2Bearer(ThriftServer::ConnectionContext* connection_context,
   connection_context->username = username;
   // Create a cookie to return.
   connection_context->return_headers.push_back(
-      Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
+      Substitute("Set-Cookie: $0", GenerateCookie(username, hash, HTTP_AUTH_MECH_SAML)));
   return true;
 }
 

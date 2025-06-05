@@ -51,6 +51,7 @@ static const string COOKIE_SEPARATOR = "&";
 static const string USERNAME_KEY = "u=";
 static const string TIMESTAMP_KEY = "t=";
 static const string RAND_KEY = "r=";
+static const string AUTH_MECH_KEY = "a=";
 
 // Cookies generated and processed by the HTTP server will be of the form:
 // COOKIE_NAME=<cookie>
@@ -68,7 +69,7 @@ static const int MAX_COOKIES_TO_CHECK = 5;
 
 Status AuthenticateCookie(
     const AuthenticationHash& hash, const string& cookie_header,
-    string* username, string* rand) {
+    string* username, string* authMech, string* rand) {
   // The 'Cookie' header allows sending multiple name/value pairs separated by ';'.
   vector<string> cookies = strings::Split(cookie_header, ";");
   if (cookies.size() > MAX_COOKIES_TO_CHECK) {
@@ -107,9 +108,9 @@ Status AuthenticateCookie(
       return Status("The signature is incorrect.");
     }
 
-    // Split the cookie value into username, timestamp, and random number.
+    // Split the cookie value into username, timestamp, random number and auth mechanism.
     vector<string> cookie_value_split = Split(cookie_value, COOKIE_SEPARATOR);
-    if (cookie_value_split.size() != 3) {
+    if (cookie_value_split.size() != 4) {
       return Status("The cookie value has an invalid format.");
     }
     string timestamp;
@@ -133,6 +134,9 @@ Status AuthenticateCookie(
           return Status("The cookie rand value has an invalid format.");
         }
       }
+      if (!TryStripPrefixString(cookie_value_split[3], AUTH_MECH_KEY, authMech)) {
+        return Status("The cookie authMech value has an invalid format.");
+      }
       // We've successfully authenticated.
       return Status::OK();
     } else {
@@ -144,7 +148,7 @@ Status AuthenticateCookie(
 }
 
 string GenerateCookie(const string& username, const AuthenticationHash& hash,
-    std::string* srand) {
+    const std::string& authMech, std::string* srand) {
   // Its okay to use rand() here even though its a weak RNG because being able to guess
   // the random numbers generated won't help an attacker. The important thing is that
   // we're using a strong RNG to create the key and a strong HMAC function.
@@ -154,7 +158,8 @@ string GenerateCookie(const string& username, const AuthenticationHash& hash,
     *srand = cookie_rand_s;
   }
   string cookie_value = StrCat(USERNAME_KEY, username, COOKIE_SEPARATOR, TIMESTAMP_KEY,
-      MonotonicMillis(), COOKIE_SEPARATOR, RAND_KEY, cookie_rand_s);
+      MonotonicMillis(), COOKIE_SEPARATOR, RAND_KEY, cookie_rand_s, COOKIE_SEPARATOR,
+      AUTH_MECH_KEY, authMech);
   uint8_t signature[AuthenticationHash::HashLen()];
   Status compute_status =
       hash.Compute(reinterpret_cast<const uint8_t*>(cookie_value.data()),

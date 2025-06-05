@@ -23,17 +23,30 @@ namespace impala {
 
 class AuthenticationHash;
 
+// HTTP Auth Mechanisms used for generating Auth Cookies
+inline const std::string HTTP_AUTH_MECH_HTPASSWD = "HTPASSWD";
+inline const std::string HTTP_AUTH_MECH_LDAP = "LDAP";
+inline const std::string HTTP_AUTH_MECH_TRUSTED_DOMAIN = "TRUSTED_DOMAIN";
+inline const std::string HTTP_AUTH_MECH_TRUSTED_HEADER = "TRUSTED_HEADER";
+inline const std::string HTTP_AUTH_MECH_SPNEGO = "SPNEGO";
+inline const std::string HTTP_AUTH_MECH_SAML = "SAML";
+inline const std::string HTTP_AUTH_MECH_JWT = "JWT";
+inline const std::string HTTP_AUTH_MECH_OAUTH = "OAUTH";
+
 // Takes a single 'key=value' pair from a 'Cookie' header and attempts to verify its
 // signature with 'hash'. If verification is successful and the cookie is still valid,
-// sets 'username' and 'rand' (if specified) to the corresponding values and returns OK.
+// sets 'username', 'authMech' and 'rand' (if specified) to the corresponding values
+// and returns OK.
 Status AuthenticateCookie(
     const AuthenticationHash& hash, const std::string& cookie_header,
-    std::string* username, std::string* rand = nullptr);
+    std::string* username, std::string* authMech, std::string* rand = nullptr);
 
-// Generates and returns a cookie containing the username set on 'connection_context' and
-// a signature generated with 'hash'. If specified, sets 'rand' to the 'r=' cookie value.
+// Generates and returns a cookie containing the username set on 'connection_context',
+// a signature generated with 'hash' and the authentication mechanism used for
+// authenticating the given user with username. If specified, sets 'rand' to the 'r='
+// cookie value.
 std::string GenerateCookie(const std::string& username, const AuthenticationHash& hash,
-    std::string* rand = nullptr);
+    const std::string& authMech, std::string* rand = nullptr);
 
 // Returns a empty cookie. Returned in a 'Set-Cookie' when cookie auth fails to indicate
 // to the client that the cookie should be deleted.
