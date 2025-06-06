@@ -408,7 +408,8 @@ echo ">>> Configuring system"
 function setup_postgresql() {
   echo ">>> Configuring postgresql. This can fail if postgres is already initialized"
 
-  redhat notindocker sudo service postgresql initdb
+  # initdb can fail if it was run before on this host - ignore this error
+  redhat notindocker sudo service postgresql initdb || true
   redhat notindocker sudo service postgresql stop
   redhat indocker sudo -u postgres PGDATA=/var/lib/pgsql/data pg_ctl init
   ubuntu sudo service postgresql stop
@@ -552,4 +553,4 @@ else
 fi
 
 setup_postgresql
-# Be careful about adding code after postgres initialization, as it may fail and exit!
+# Be careful about adding code after postgres initialization, it may fail (IMPALA-13802).
