@@ -168,8 +168,6 @@ function start-impala {
   # Disable strict datafile location checks for Iceberg tables
   DATAFILE_LOCATION_CHECK="-iceberg_allow_datafiles_in_table_location_only=false"
   START_CLUSTER_ARGS_INT+=("--catalogd_args=$DATAFILE_LOCATION_CHECK")
-  # No need to wait for min num table.
-  START_CLUSTER_ARGS_INT+=("--wait_num_table=-1")
   if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
     START_CLUSTER_ARGS_INT+=("--impalad_args=--abort_on_config_error=false -s 1")
   else

@@ -204,8 +204,7 @@ class ImpalaCluster(object):
         client.close()
     return n
 
-  def wait_until_ready(self, expected_num_impalads=1, expected_num_ready_impalads=None,
-                       wait_num_table=-1):
+  def wait_until_ready(self, expected_num_impalads=1, expected_num_ready_impalads=None):
     """Waits for this 'cluster' to be ready to submit queries.
 
       A cluster is deemed "ready" if:
@@ -250,10 +249,7 @@ class ImpalaCluster(object):
         continue
       if flags.get('stress_catalog_init_delay_ms', '0') != '0':
         continue
-      if flags.get('use_local_catalog', 'false') != 'false':
-        wait_num_table = -1
-      impalad.wait_for_coordinator_services(sleep_interval, check_processes_still_running,
-                                            wait_num_table=wait_num_table)
+      impalad.wait_for_coordinator_services(sleep_interval, check_processes_still_running)
       # Decrease sleep_interval after first coordinator ready as the others are also
       # likely to be (nearly) ready.
       sleep_interval = 0.2
@@ -648,8 +644,7 @@ class ImpaladProcess(BaseImpalaProcess):
       early_abort_fn()
       sleep(sleep_interval)
 
-  def wait_for_coordinator_services(self, sleep_interval, early_abort_fn,
-                                    wait_num_table=-1):
+  def wait_for_coordinator_services(self, sleep_interval, early_abort_fn):
     """Waits for client ports to be opened. Assumes that the webservice ports are open."""
     start_time = time.time()
     LOG.info(
@@ -660,21 +655,18 @@ class ImpaladProcess(BaseImpalaProcess):
       beeswax_port_is_open = self.service.beeswax_port_is_open()
       hs2_port_is_open = self.service.hs2_port_is_open()
       hs2_http_port_is_open = self.service.hs2_http_port_is_open()
-      # Fetch the number of catalog objects.
-      num_dbs, num_tbls = self.service.get_metric_values(
-          ["catalog.num-databases", "catalog.num-tables"])
-      if (beeswax_port_is_open and hs2_port_is_open and hs2_http_port_is_open
-          and num_tbls >= wait_num_table):
+      if beeswax_port_is_open and hs2_port_is_open and hs2_http_port_is_open:
         return
       early_abort_fn()
-      # The coordinator is likely to wait for the catalog update.
-      LOG.info(("Client services not ready. Waiting for catalog cache: "
-          "({num_dbs} DBs / {num_tbls} tables / wait_num_table={wait_num_table}). "
-          "Trying again ...").format(
-              num_dbs=num_dbs,
-              num_tbls=num_tbls,
-              wait_num_table=wait_num_table))
-      sleep(sleep_interval)
+      # The coordinator is likely waiting for the catalog update. Display currently
+      # known catalog version to show progress.
+      metric_check_time = time.time()
+      catalog_version = self.service.get_metric_value("catalog.curr-version")
+      LOG.info(("Client services not ready. Might be waiting for catalog topic update: "
+          "(catalog.curr-version={catalog_version}). Trying again ...").format(
+              catalog_version=catalog_version))
+      # Include metric_check_time in sleep_interval.
+      sleep(max(0, sleep_interval - (time.time() - metric_check_time)))
 
     raise RuntimeError(
         "Unable to open client ports within {num_seconds} seconds.".format(
