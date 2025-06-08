@@ -2156,6 +2156,10 @@ class TestIcebergV2Table(IcebergTestSuite):
       files_result = check_output(["hdfs", "dfs", "-ls", table_location])
       assert "Found 1 items" in files_result
 
+  def test_predicate_push_down_hint(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-predicate-push-down-hint', vector,
+                       use_db=unique_database)
+
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
 # of the test coverage is in TestIcebergV2Table.test_read_position_deletes but since it

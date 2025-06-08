@@ -164,6 +164,9 @@ public class IcebergScanPlanner {
 
   private final InMemoryMetricsReporter metricsReporter_ = new InMemoryMetricsReporter();
 
+  // Predicates on columns in this set are always pushed down to Iceberg.
+  private final Set<String> columnsWithPushDownHint_ = new HashSet<>();
+
   public IcebergScanPlanner(Analyzer analyzer, PlannerContext ctx,
       TableRef iceTblRef, List<Expr> conjuncts, MultiAggregateInfo aggInfo)
       throws ImpalaException {
@@ -174,6 +177,8 @@ public class IcebergScanPlanner {
     tblRef_ = iceTblRef;
     conjuncts_ = conjuncts;
     aggInfo_ = aggInfo;
+
+    initPushDownHint();
     extractIcebergConjuncts();
     snapshotId_ = IcebergUtil.getSnapshotId(getIceTable(), tblRef_.getTimeTravelSpec());
   }
@@ -845,7 +850,7 @@ public class IcebergScanPlanner {
    * please refer: https://iceberg.apache.org/spec/#scan-planning
    */
   private void extractIcebergConjuncts() throws ImpalaException {
-    boolean isPartitionColumnIncluded = false;
+    boolean pushDownToIceberg = false;
     Map<SlotId, SlotDescriptor> idToSlotDesc = new HashMap<>();
     // Track identity conjuncts by their index in conjuncts_.
     // The array values are initialized to false.
@@ -855,14 +860,17 @@ public class IcebergScanPlanner {
     }
     for (int i = 0; i < conjuncts_.size(); i++) {
       Expr expr = conjuncts_.get(i);
-      if (isPartitionColumnIncluded(expr, idToSlotDesc)) {
-        isPartitionColumnIncluded = true;
-        if (isIdentityPartitionIncluded(expr, idToSlotDesc)) {
+      List<IcebergColumn> cols = getColumnsInExpr(expr, idToSlotDesc);
+      if (isPartitionColumnIncluded(cols, idToSlotDesc)) {
+        pushDownToIceberg = true;
+        if (isIdentityPartitionIncluded(cols, idToSlotDesc)) {
           identityConjunctIndex[i] = true;
         }
+      } else if (hasPushDownHint(cols, idToSlotDesc)) {
+        pushDownToIceberg = true;
       }
     }
-    if (!isPartitionColumnIncluded) {
+    if (!pushDownToIceberg) {
       // No partition conjuncts, i.e. every conjunct is non-identity conjunct.
       nonIdentityConjuncts_ = conjuncts_;
       return;
@@ -879,27 +887,43 @@ public class IcebergScanPlanner {
     }
   }
 
-  private boolean isPartitionColumnIncluded(Expr expr,
+  private boolean isPartitionColumnIncluded(List<IcebergColumn> cols,
       Map<SlotId, SlotDescriptor> idToSlotDesc) {
-    return hasPartitionTransformType(expr, idToSlotDesc,
+    return hasPartitionTransformType(cols, idToSlotDesc,
         transformType -> transformType != TIcebergPartitionTransformType.VOID);
   }
 
-  private boolean isIdentityPartitionIncluded(Expr expr,
-      Map<SlotId, SlotDescriptor> idToSlotDesc) {
-    return hasPartitionTransformType(expr, idToSlotDesc,
-        transformType -> transformType == TIcebergPartitionTransformType.IDENTITY);
+  private void initPushDownHint() {
+    String HINT_KEY = "impala.iceberg.push_down_hint";
+    String hint =
+        tblRef_.getDesc().getTable().getMetaStoreTable().getParameters().get(HINT_KEY);
+    if (hint != null) {
+      for (String col: hint.split(",")) {
+        columnsWithPushDownHint_.add(col.toLowerCase());
+      }
+    }
   }
 
-  private boolean hasPartitionTransformType(Expr expr,
-      Map<SlotId, SlotDescriptor> idToSlotDesc,
-      Predicate<TIcebergPartitionTransformType> pred) {
-    List<TupleId> tupleIds = Lists.newArrayList();
+  private boolean hasPushDownHint(List<IcebergColumn> cols,
+      Map<SlotId, SlotDescriptor> idToSlotDesc) {
+    for (IcebergColumn col: cols) {
+      // TODO: what to do if some cols in the pred are in the hint, some are not?
+      // TODO: numerical values could be considered as field id instead of col name
+      // column names are already in lower case
+      if (columnsWithPushDownHint_.contains(col.getName())) return true;
+    }
+    return false;
+  }
+
+  private List<IcebergColumn> getColumnsInExpr(Expr expr,
+      Map<SlotId, SlotDescriptor> idToSlotDesc) {
+    List<IcebergColumn> result = Lists.newArrayList();
     List<SlotId> slotIds = Lists.newArrayList();
+    List<TupleId> tupleIds = Lists.newArrayList();
     expr.getIds(tupleIds, slotIds);
 
-    if (tupleIds.size() != 1) return false;
-    if (!tupleIds.get(0).equals(tblRef_.getDesc().getId())) return false;
+    if (tupleIds.size() != 1) return result;
+    if (!tupleIds.get(0).equals(tblRef_.getDesc().getId())) return result;
 
     for (SlotId sId : slotIds) {
       SlotDescriptor slotDesc = idToSlotDesc.get(sId);
@@ -908,11 +932,30 @@ public class IcebergScanPlanner {
       if (col == null) continue;
       Preconditions.checkState(col instanceof IcebergColumn);
       IcebergColumn iceCol = (IcebergColumn)col;
+      result.add(iceCol);
+    }
+    return result;
+  }
+
+  private boolean isIdentityPartitionIncluded(List<IcebergColumn> cols,
+      Map<SlotId, SlotDescriptor> idToSlotDesc) {
+    return hasPartitionTransformType(cols, idToSlotDesc,
+        transformType -> transformType == TIcebergPartitionTransformType.IDENTITY);
+  }
+
+  private boolean hasPartitionTransformType(List<IcebergColumn> cols,
+      Map<SlotId, SlotDescriptor> idToSlotDesc,
+      Predicate<TIcebergPartitionTransformType> pred) {
+    for (IcebergColumn iceCol : cols) {
       TIcebergPartitionTransformType transformType =
           IcebergUtil.getPartitionTransformType(
               iceCol,
               getIceTable().getDefaultPartitionSpec());
       if (pred.test(transformType)) {
+        // TODO: the semantics of the function are not clear - shouldn't
+        // it only return true if ALL cols in the expr have the given
+        // partition type? Compound predicates with OR can have multiple
+        // columns.
         return true;
       }
     }

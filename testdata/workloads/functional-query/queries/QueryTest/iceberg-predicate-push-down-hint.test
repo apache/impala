@@ -1,0 +1,36 @@
+====
+---- QUERY
+# File not filtered during planning as there is no predicate on partition column.
+create table t (a int, b int, c int) stored as iceberg;
+insert into t values (1, 1, 1);
+select count(*) from t where a = 0;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
+---- QUERY
+# File filtered during planning if there is a predicate on a column in hint.
+alter table t set tblproperties ("impala.iceberg.push_down_hint"="a,b");
+select count(*) from t where a = 0;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+====
+---- QUERY
+# File not filtered during planning if there are predicates only on columns not in hint.
+select count(*) from t where c = 0;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 1
+====
