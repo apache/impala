@@ -24,6 +24,7 @@ import logging
 import os
 import re
 import signal
+import subprocess
 import sys
 import threading
 from time import sleep, time
@@ -2173,6 +2174,82 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     self.client.cancel(handle1)
     self.client.close_query(handle1)
     self.client.wait_for_impala_state(handle2, RUNNING, timeout_s)
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--vmodule admission-controller=3 --default_pool_max_requests=1 ",
+      disable_log_buffering=True)
+  def test_coord_not_registered_in_ac(self):
+    """Regression test for IMPALA-12057. Verifies that no excessive logs are
+    generated when a query is queued in the  admission controller and the coordinator
+    hosting the admitted query goes down. Prior to IMPALA-12057, such a scenario could
+    cause excessive logging during dequeue attempts. After the fix, such logging should
+    no longer occur and the queued query should be rejected."""
+    # Query designed to run for a few minutes.
+    query = "select count(*) from functional.alltypes where int_col = sleep(10000)"
+    timeout_s = 10
+    keys = [
+      "admission-controller.total-admitted.default-pool",
+      "admission-controller.total-queued.default-pool",
+      "admission-controller.total-dequeued.default-pool",
+      "admission-controller.total-rejected.default-pool",
+    ]
+
+    def get_ac_metrics(service, keys, default=0):
+      return service.get_metric_values(keys, [default] * len(keys))
+    for i in range(1, 4):
+      handle1 = self.client.execute_async(query)
+      # Make sure the first query has been admitted.
+      self.client.wait_for_impala_state(handle1, RUNNING, timeout_s)
+
+      # Run another query. This query should be queued because only 1 query is allowed in
+      # the default pool.
+      handle2 = self.client.execute_async(query)
+      self._wait_for_change_to_profile(handle2, "Admission result: Queued")
+      # Kill the first coordinator.
+      all_coords = self.cluster.get_all_coordinators()
+      all_coords[0].kill()
+      # Wait briefly to allow the potential excessive logging to occur.
+      sleep(3)
+      self.assert_log_contains(self.get_ac_log_name(), 'INFO',
+          "Coordinator not registered with the statestore", expected_count=0)
+      # Verify the metrics.
+      cur_admission_metrics = get_ac_metrics(self.cluster.admissiond.service, keys)
+      assert cur_admission_metrics == [i, i, i, i]
+      all_coords[0].start()
+    self.assert_log_contains_multiline(self.get_ac_log_name(), 'INFO',
+        "The coordinator no longer exists")
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  def test_retained_removed_coords_size(self):
+    # Use a flag value below the hard cap (1000). Expect the value to be accepted.
+    self._start_impala_cluster([
+      '--impalad_args=--vmodule admission-controller=3',
+      '--impalad_args=--cluster_membership_retained_removed_coords=10',
+      'disable_log_buffering=True'])
+    self.assert_log_contains(self.get_ac_log_name(), 'INFO',
+      "Using cluster membership removed coords size 10", expected_count=1)
+
+    # Use invalid values. Expect the cluster to fail to start.
+    try:
+      self._start_impala_cluster([
+        '--impalad_args=--vmodule admission-controller=3',
+        '--impalad_args=--cluster_membership_retained_removed_coords=10000',
+        'disable_log_buffering=True'])
+      self.fail("Expected CalledProcessError was not raised.")
+    except subprocess.CalledProcessError as e:
+      assert "cluster_membership_retained_removed_coords" in str(e)
+
+    try:
+      self._start_impala_cluster([
+        '--impalad_args=--vmodule admission-controller=3',
+        '--impalad_args=--cluster_membership_retained_removed_coords=0',
+        'disable_log_buffering=True'])
+      self.fail("Expected CalledProcessError was not raised.")
+    except subprocess.CalledProcessError as e:
+      assert "cluster_membership_retained_removed_coords" in str(e)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially

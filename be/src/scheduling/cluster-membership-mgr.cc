@@ -32,6 +32,7 @@
 DECLARE_int32(num_expected_executors);
 DECLARE_string(expected_executor_group_sets);
 DECLARE_string(cluster_membership_topic_id);
+DECLARE_int32(cluster_membership_retained_removed_coords);
 
 namespace {
 using namespace impala;
@@ -88,12 +89,13 @@ static const string TOTAL_BACKENDS_KEY_FORMAT(
 const string ClusterMembershipMgr::EMPTY_GROUP_NAME(
     "empty group (using coordinator only)");
 
-ClusterMembershipMgr::ClusterMembershipMgr(
-    string local_backend_id, StatestoreSubscriber* subscriber, MetricGroup* metrics)
+ClusterMembershipMgr::ClusterMembershipMgr(string local_backend_id,
+    StatestoreSubscriber* subscriber, MetricGroup* metrics, bool is_admissiond)
   : empty_exec_group_(EMPTY_GROUP_NAME),
     current_membership_(std::make_shared<const Snapshot>()),
     statestore_subscriber_(subscriber),
-    local_backend_id_(move(local_backend_id)) {
+    local_backend_id_(move(local_backend_id)),
+    is_admissiond_(is_admissiond) {
   if (FLAGS_cluster_membership_topic_id.empty()) {
     membership_topic_name_ = Statestore::IMPALA_MEMBERSHIP_TOPIC;
   } else {
@@ -109,6 +111,8 @@ ClusterMembershipMgr::ClusterMembershipMgr(
   RegisterUpdateCallbackFn([this](const ClusterMembershipMgr::SnapshotPtr& snapshot) {
     this->UpdateMetrics(snapshot);
   });
+  LOG(INFO) << "Using cluster membership removed coords size "
+            << FLAGS_cluster_membership_retained_removed_coords;
 }
 
 void ClusterMembershipMgr::InitMetrics(MetricGroup* metrics) {
@@ -190,15 +194,39 @@ vector<TNetworkAddress> ClusterMembershipMgr::Snapshot::GetCoordinatorAddresses(
   return coordinators;
 }
 
+static inline void _markCoordinatorAsRemoved(
+    const std::shared_ptr<ClusterMembershipMgr::Snapshot>& state,
+    const BackendDescriptorPB& be, const BackendDescriptorPB& desc) {
+  string backend_id_str = PrintId(be.backend_id());
+  if (state->removed_coordinators_map.find(backend_id_str)
+      != state->removed_coordinators_map.end()) {
+    return;
+  }
+  state->removed_coordinators_map[backend_id_str] =
+      NetworkAddressPBToString(desc.address());
+  state->removed_coordinators_order.push_back(backend_id_str);
+  DCHECK(FLAGS_cluster_membership_retained_removed_coords > 0);
+  if (state->removed_coordinators_map.size()
+      > FLAGS_cluster_membership_retained_removed_coords) {
+    const string& oldest = state->removed_coordinators_order.front();
+    state->removed_coordinators_map.erase(oldest);
+    state->removed_coordinators_order.pop_front();
+  }
+}
+
 static inline void _removeCoordIfExists(
     const std::shared_ptr<ClusterMembershipMgr::Snapshot>& state,
-    const BackendDescriptorPB& be) {
-
+    const BackendDescriptorPB& be, bool is_admissiond) {
   // The BackendDescriptorPB may be incomplete. Use the backend id to retrieve the actual
   // backend descriptor so the backend can be removed.
   const BackendDescriptorPB* actual_be =
       state->all_coordinators.LookUpBackendDesc(be.backend_id());
   if (actual_be != nullptr) {
+    if (is_admissiond) {
+      // If global admission control is enabled, we also need to track information
+      // about the removed coordinator to prevent potential issues.
+      _markCoordinatorAsRemoved(state, be, *actual_be);
+    }
     state->all_coordinators.RemoveExecutor(*actual_be);
   }
 }
@@ -306,7 +334,7 @@ void ClusterMembershipMgr::UpdateMembership(
 
         // If a coordinator is not shutdown gracefully, then it will be deleted here.
         if (be_desc.is_coordinator()) {
-          _removeCoordIfExists(new_state, be_desc);
+          _removeCoordIfExists(new_state, be_desc, is_admissiond_);
         }
 
         // Note: be_desc is a reference to item.key, thus this erase must come at the end
@@ -381,7 +409,7 @@ void ClusterMembershipMgr::UpdateMembership(
         }
 
         if (existing.is_coordinator()) {
-          _removeCoordIfExists(new_state, be_desc);
+          _removeCoordIfExists(new_state, be_desc, is_admissiond_);
         }
       }
       existing = be_desc;
@@ -445,7 +473,7 @@ void ClusterMembershipMgr::UpdateMembership(
 
     // Add ourself to the list of all coordinators.
     if (is_active_coordinator(*local_be_desc.get())) {
-      _removeCoordIfExists(new_state, *local_be_desc);
+      _removeCoordIfExists(new_state, *local_be_desc, is_admissiond_);
       new_state->all_coordinators.AddExecutor(*local_be_desc);
     }
 

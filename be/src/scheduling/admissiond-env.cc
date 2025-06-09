@@ -26,6 +26,7 @@
 #include "scheduling/scheduler.h"
 #include "service/impala-http-handler.h"
 #include "util/default-path-handlers.h"
+#include "util/gflag-validator-util.h"
 #include "util/mem-info.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
@@ -35,6 +36,15 @@
 
 DEFINE_int32(
     admission_service_port, 29500, "The port where the admission control service runs");
+DEFINE_int32(cluster_membership_retained_removed_coords, 1000,
+    "Max number of removed coordinators to track. Oldest entry is evicted when full.");
+DEFINE_validator(
+    cluster_membership_retained_removed_coords, [](const char* name, const int val) {
+      if (val > 0 && val <= 1000) return true;
+      LOG(ERROR) << "Flag '" << name
+                 << "' must be greater than 0 and less than or equal to 1000.";
+      return false;
+    });
 
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
@@ -74,8 +84,9 @@ AdmissiondEnv::AdmissiondEnv()
       TStatestoreSubscriberType::ADMISSIOND));
 
   scheduler_.reset(new Scheduler(metrics, request_pool_service()));
-  cluster_membership_mgr_.reset(new ClusterMembershipMgr(
-      PrintId(DaemonEnv::GetInstance()->backend_id()), subscriber(), metrics));
+  cluster_membership_mgr_.reset(
+      new ClusterMembershipMgr(PrintId(DaemonEnv::GetInstance()->backend_id()),
+          subscriber(), metrics, true /* is_admissiond */));
   admission_controller_.reset(new AdmissionController(cluster_membership_mgr(),
       subscriber(), request_pool_service(), metrics, scheduler(), pool_mem_trackers(),
       admission_service_addr));

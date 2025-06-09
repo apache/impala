@@ -40,6 +40,7 @@ DECLARE_int32(statestore_max_missed_heartbeats);
 DECLARE_int32(statestore_heartbeat_frequency_ms);
 DECLARE_int32(num_expected_executors);
 DECLARE_string(expected_executor_group_sets);
+DECLARE_int32(cluster_membership_retained_removed_coords);
 
 namespace impala {
 
@@ -169,6 +170,16 @@ class ClusterMembershipMgrTest : public testing::Test {
     }
   }
 
+  /// Sends a single topic item in a delta to the specific backend.
+  void SendDeltaTo(Backend* be, const TTopicItem& item) {
+    StatestoreSubscriber::TopicDeltaMap topic_delta_map;
+    TTopicDelta& delta = topic_delta_map[Statestore::IMPALA_MEMBERSHIP_TOPIC];
+    delta.is_delta = true;
+    delta.topic_entries.push_back(item);
+    vector<TTopicDelta> unused;
+    be->cmm->UpdateMembership(topic_delta_map, &unused);
+  }
+
   /// Creates a new backend and adds it to the list of offline backends. If idx is
   /// omitted, the current number of backends will be used as the new index.
   Backend* CreateBackend(int idx = -1) {
@@ -184,11 +195,11 @@ class ClusterMembershipMgrTest : public testing::Test {
   /// Creates a new ClusterMembershipMgr for a backend and moves the backend from
   /// 'offline_' to 'starting_'. Callers must handle invalidated iterators after calling
   /// this method.
-  void CreateCMM(Backend* be) {
+  void CreateCMM(Backend* be, bool is_admissiond = false) {
     ASSERT_TRUE(IsInVector(be, offline_));
     be->metric_group = make_unique<MetricGroup>("test");
     be->cmm = make_unique<ClusterMembershipMgr>(
-        PrintId(be->backend_id), nullptr, be->metric_group.get());
+        PrintId(be->backend_id), nullptr, be->metric_group.get(), is_admissiond);
     RemoveFromVector(be, &offline_);
     starting_.push_back(be);
   }
@@ -261,6 +272,102 @@ class ClusterMembershipMgrTest : public testing::Test {
     if (is_quiescing) RemoveFromVector(be, &quiescing_);
   }
 
+  /// Helper function for removed coordinator tests.
+  /// If same_backend_id is true, each loop uses the same backend_id.
+  void RemovedCoordinatorTestHelper(bool same_backend_id) {
+    Backend* base = CreateBackend(9999);
+    CreateCMM(base, true /* is_admissiond */);
+    Poll(base);
+
+    int be_port = 10000;
+    Backend* b = CreateBackend(be_port);
+    BackendDescriptorPB be = *b->desc;
+    be.set_is_coordinator(true);
+    string static_be_id;
+    be.SerializeToString(&static_be_id);
+    string be_str = static_be_id;
+
+    for (int i = 0; i < 10; ++i) {
+      if (!same_backend_id && i > 0) {
+        b = CreateBackend(be_port + i);
+        be = *b->desc;
+        be.set_is_coordinator(true);
+        be.SerializeToString(&be_str);
+      }
+
+      // Add the coordinator backend
+      TTopicItem add_item;
+      add_item.key = PrintId(be.backend_id());
+      add_item.value = be_str;
+      add_item.deleted = false;
+      SendDeltaTo(base, add_item);
+
+      // Now delete it
+      TTopicItem delete_item;
+      delete_item.key = PrintId(be.backend_id());
+      delete_item.deleted = true;
+      SendDeltaTo(base, delete_item);
+    }
+
+    auto snap = base->cmm->GetSnapshot();
+    EXPECT_EQ(0, snap->current_backends.size());
+
+    if (same_backend_id) {
+      EXPECT_EQ(1, snap->removed_coordinators_map.size());
+      EXPECT_EQ(1, snap->removed_coordinators_order.size());
+    } else {
+      EXPECT_EQ(10, snap->removed_coordinators_map.size());
+      EXPECT_EQ(10, snap->removed_coordinators_order.size());
+    }
+  }
+
+  /// Helper function for removed coordinator eviction tests.
+  void TestRemovedCoordinatorListEviction(int expected_max_size) {
+    Backend* base = CreateBackend(9999);
+    CreateCMM(base, true /* is_admissiond */);
+    Poll(base);
+
+    const int num_backends = expected_max_size + 1;
+    string first_id, middle_id, last_id;
+
+    for (int i = 0; i < num_backends; ++i) {
+      Backend* b = CreateBackend(10000 + i);
+      BackendDescriptorPB be = *b->desc;
+      be.set_is_coordinator(true);
+      std::string be_str;
+      be.SerializeToString(&be_str);
+
+      // Add backend
+      TTopicItem add_item;
+      add_item.key = PrintId(be.backend_id());
+      add_item.value = be_str;
+      add_item.deleted = false;
+      SendDeltaTo(base, add_item);
+
+      if (i == 0)
+        first_id = add_item.key;
+      else if (i == expected_max_size / 2)
+        middle_id = add_item.key;
+      else if (i == num_backends - 1)
+        last_id = add_item.key;
+
+      // Then delete it
+      TTopicItem delete_item;
+      delete_item.key = add_item.key;
+      delete_item.deleted = true;
+      SendDeltaTo(base, delete_item);
+    }
+
+    auto snap = base->cmm->GetSnapshot();
+    EXPECT_EQ(expected_max_size, snap->removed_coordinators_map.size());
+    EXPECT_EQ(expected_max_size, snap->removed_coordinators_order.size());
+
+    EXPECT_EQ(0, snap->removed_coordinators_map.count(first_id))
+        << "Oldest coordinator should be evicted when list exceeds " << expected_max_size;
+    EXPECT_EQ(1, snap->removed_coordinators_map.count(middle_id));
+    EXPECT_EQ(1, snap->removed_coordinators_map.count(last_id));
+  }
+
   mt19937 rng_;
 
   int RandomInt(int max) {
@@ -303,6 +410,29 @@ void _assertCoords(
   }
 }
 
+/// This test verifies that repeatedly adding and removing the same coordinator
+/// backend does not result in duplicate entries in the removed coordinators map.
+TEST_F(ClusterMembershipMgrTest, RemovedCoordinatorListRepeat) {
+  RemovedCoordinatorTestHelper(/*same_backend_id=*/true);
+}
+
+/// This test verifies that adding and removing different coordinator backends
+/// results in multiple unique entries in the removed coordinators map.
+TEST_F(ClusterMembershipMgrTest, RemovedCoordinatorListDifferentIds) {
+  RemovedCoordinatorTestHelper(/*same_backend_id=*/false);
+}
+
+/// These tests verify that the removed coordinator map, when configured with varying
+/// maximum sizes, correctly evicts the oldest entry following a FIFO policy.
+TEST_F(ClusterMembershipMgrTest, RemovedCoordEvictionWithDefault) {
+  TestRemovedCoordinatorListEviction(/*expected_max_size=*/1000);
+}
+
+TEST_F(ClusterMembershipMgrTest, RemovedCoordEvictionWithLimit100) {
+  FLAGS_cluster_membership_retained_removed_coords = 100;
+  TestRemovedCoordinatorListEviction(/*expected_max_size=*/100);
+}
+
 /// This test takes two instances of the ClusterMembershipMgr through a common lifecycle.
 /// It also serves as an example for how to craft statestore messages and pass them to
 /// UpdateMembership().
@@ -312,8 +442,8 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
 
   MetricGroup tmp_metrics1("test-metrics1");
   MetricGroup tmp_metrics2("test-metrics2");
-  ClusterMembershipMgr cmm1(b1->address().hostname(), nullptr, &tmp_metrics1);
-  ClusterMembershipMgr cmm2(b2->address().hostname(), nullptr, &tmp_metrics2);
+  ClusterMembershipMgr cmm1(b1->address().hostname(), nullptr, &tmp_metrics1, true);
+  ClusterMembershipMgr cmm2(b2->address().hostname(), nullptr, &tmp_metrics2, true);
 
   const Statestore::TopicId topic_id = Statestore::IMPALA_MEMBERSHIP_TOPIC;
   StatestoreSubscriber::TopicDeltaMap topic_delta_map = {{topic_id, TTopicDelta()}};
@@ -390,10 +520,15 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
   ss_topic_delta->topic_entries[0].deleted = true;
   cmm2.UpdateMembership(topic_delta_map, &returned_topic_deltas);
   ASSERT_EQ(0, returned_topic_deltas.size());
-  ASSERT_EQ(1, cmm2.GetSnapshot()->current_backends.size());
+  auto snap = cmm2.GetSnapshot();
+  string b1_id = PrintId(b1->backend_id());
+  ASSERT_EQ(1, snap->current_backends.size());
   ASSERT_EQ(1, GetDefaultGroupSize(cmm2));
   _assertCoords(cmm1, {"host_1", "host_2"});
   _assertCoords(cmm2, {"host_2"});
+  ASSERT_EQ(1, snap->removed_coordinators_map.size());
+  ASSERT_TRUE(snap->removed_coordinators_map.count(b1_id));
+  ASSERT_EQ(b1_id, snap->removed_coordinators_order.front());
 }
 
 TEST_F(ClusterMembershipMgrTest, IsBlacklisted) {

@@ -260,6 +260,8 @@ const string REASON_THREAD_RESERVATION_AGG_LIMIT_EXCEEDED =
 const string REASON_SCHEDULER_ERROR = "Error during scheduling: $0";
 const string REASON_COORDINATOR_NOT_FOUND =
     "Coordinator not registered with the statestore.";
+const string REASON_COORDINATOR_REMOVED_PREFIX = "The coordinator no longer exists: ";
+const string REASON_COORDINATOR_REMOVED = REASON_COORDINATOR_REMOVED_PREFIX + "$0";
 const string REASON_NO_EXECUTOR_GROUPS =
     "Waiting for executors to start. Only DDL queries and queries scheduled only on the "
     "coordinator (either NUM_NODES set to 1 or when small query optimization is "
@@ -1836,7 +1838,8 @@ void AdmissionController::ReleaseQuery(const UniqueIdPB& query_id,
       }
       if (to_release.size() > 0) {
         LOG(INFO) << "ReleaseQuery for " << query_id << " called with "
-                  << to_release.size() << "unreleased backends. Releasing automatically.";
+                  << to_release.size()
+                  << " unreleased backends. Releasing automatically.";
         ReleaseQueryBackendsLocked(query_id, coord_id, to_release);
       }
     }
@@ -2238,14 +2241,21 @@ Status AdmissionController::ComputeGroupScheduleStates(
   output_schedules->clear();
 
   // Queries may arrive before we've gotten a statestore update containing the descriptor
-  // for their coordinator, in which case we queue the query until it arrives. It's also
-  // possible (though very unlikely) that the coordinator was removed from the cluster
-  // membership after submitting this query for admission. Currently, in this case the
-  // query will remain queued until it times out, but we can consider detecting failed
-  // coordinators and cleaning up their queued queries.
+  // for their coordinator, in which case we queue the query until it arrives. Currently,
+  // in this case the query will remain queued until it times out.
+  // There's also a case where the coordinator was removed from the cluster after the
+  // query was submitted, in this case, we mark it as COORDINATOR_REMOVED to avoid
+  // indefinite queuing and improve cleanup.
   auto it = membership_snapshot->current_backends.find(PrintId(request.coord_id));
   if (it == membership_snapshot->current_backends.end()) {
-    queue_node->not_admitted_reason = REASON_COORDINATOR_NOT_FOUND;
+    auto rm_it =
+        membership_snapshot->removed_coordinators_map.find(PrintId(request.coord_id));
+    if (rm_it == membership_snapshot->removed_coordinators_map.end()) {
+      queue_node->not_admitted_reason = REASON_COORDINATOR_NOT_FOUND;
+    } else {
+      queue_node->not_admitted_reason =
+          Substitute(REASON_COORDINATOR_REMOVED, rm_it->second);
+    }
     LOG(WARNING) << queue_node->not_admitted_reason;
     return Status::OK();
   }
@@ -2326,6 +2336,10 @@ static inline string PrintScheduleStateMemInfo(ScheduleState* state) {
       MemLimitSourcePB_Name(state->coord_backend_mem_to_admit_source()));
 }
 
+static inline bool IsReasonCoordinatorRemoved(const string& reason) {
+  return reason.rfind(REASON_COORDINATOR_REMOVED_PREFIX, 0) == 0;
+}
+
 bool AdmissionController::FindGroupToAdmitOrReject(
     ClusterMembershipMgr::SnapshotPtr& membership_snapshot,
     const TPoolConfig& pool_config, const TPoolConfig& root_cfg, bool admit_from_queue,
@@ -2349,6 +2363,7 @@ bool AdmissionController::FindGroupToAdmitOrReject(
   }
   if (queue_node->group_states.empty()) {
     DCHECK(!queue_node->not_admitted_reason.empty());
+    if (IsReasonCoordinatorRemoved(queue_node->not_admitted_reason)) return false;
     return true;
   }
 
@@ -2575,11 +2590,14 @@ void AdmissionController::TryDequeue() {
       --max_to_dequeue;
       VLOG(3) << "Dequeueing from stats for pool " << pool_name;
       stats->Dequeue(false);
+      const UniqueIdPB& query_id = queue_node->admission_request.query_id;
       if (is_rejected) {
         AdmissionOutcome outcome =
             queue_node->admit_outcome->Set(AdmissionOutcome::REJECTED);
         if (outcome == AdmissionOutcome::REJECTED) {
           stats->metrics()->total_rejected->Increment(1);
+          VLOG_QUERY << "Rejected, query id=" << PrintId(query_id)
+                     << " reason: " << queue_node->not_admitted_reason;
           return; // next query
         } else {
           DCHECK_ENUM_EQ(outcome, AdmissionOutcome::CANCELLED);
@@ -2588,7 +2606,6 @@ void AdmissionController::TryDequeue() {
       }
       DCHECK(is_cancelled || queue_node->admitted_schedule != nullptr);
 
-      const UniqueIdPB& query_id = queue_node->admission_request.query_id;
       if (!is_cancelled) {
         VLOG_QUERY << "Admitting from queue: query=" << PrintId(query_id);
         AdmissionOutcome outcome =

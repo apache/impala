@@ -75,6 +75,9 @@ class ClusterMembershipMgr {
   /// Maps backend IDs to backend descriptors.
   typedef std::unordered_map<std::string, BackendDescriptorPB> BackendIdMap;
 
+  /// Maps backend IDs to backend addresses.
+  typedef std::unordered_map<std::string, std::string> BackendIdAddrMap;
+
   /// Maps executor group names to executor groups.
   typedef std::unordered_map<std::string, ExecutorGroup> ExecutorGroups;
 
@@ -113,6 +116,15 @@ class ClusterMembershipMgr {
     // Executor group of all non-quiescing coordinators in the cluster. Set during the
     // SetState() function.
     ExecutorGroup all_coordinators;
+    // Map from unique backend ID to backend address for coordinators that were
+    // removed from the cluster membership. This helps identify recently removed
+    // coordinators and is used to reject queries destined for those coordinators to
+    // prevent hanging or routing issues.
+    BackendIdAddrMap removed_coordinators_map;
+    // Tracks the insertion order of entries in 'removed_coordinators_map' to implement
+    // FIFO eviction. When the number of removed coordinators exceeds the maximum allowed
+    // size (MAX_REMOVED_COORD_SIZE), the oldest entry (front of the list) is evicted.
+    std::list<std::string> removed_coordinators_order;
   };
 
   /// An immutable shared membership snapshot.
@@ -130,7 +142,7 @@ class ClusterMembershipMgr {
   typedef std::function<void(const SnapshotPtr&)> UpdateCallbackFn;
 
   ClusterMembershipMgr(std::string local_backend_id, StatestoreSubscriber* subscriber,
-      MetricGroup* metrics);
+      MetricGroup* metrics, bool is_admissiond = false);
 
   /// Initializes instances of this class. This only sets up the statestore subscription.
   /// Callbacks to the local ImpalaServer and Frontend must be registered in separate
@@ -279,6 +291,9 @@ class ClusterMembershipMgr {
   /// incoming backend descriptors and to register this backend with the statestore. Not
   /// protected by a lock - only used in the statestore thread.
   std::string local_backend_id_;
+
+  /// If true, the cluster membership manager is in an admissiond process.
+  bool is_admissiond_;
 
   /// Callbacks that provide external dependencies.
   BackendDescriptorPtrFn local_be_desc_fn_;
