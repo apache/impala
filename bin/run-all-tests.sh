@@ -307,6 +307,17 @@ do
       TEST_RET_CODE=1
     fi
 
+    pushd ${IMPALA_HOME}/java/calcite-planner
+    # Install Calcite FE jar
+    "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae install -DskipTests
+    if [[ "${TARGET_FILESYSTEM}" != "s3" ]]; then
+      # Run Calcite FE tests
+      if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test install ; then
+        TEST_RET_CODE=1
+      fi
+    fi
+    popd
+
     # Run the FE custom cluster tests only if not running against S3
     if [[ "${TARGET_FILESYSTEM}" != "s3" ]]; then
       MVN_ARGS=$MVN_ARGS_TEMP
@@ -316,13 +327,6 @@ do
       fi
       # Restart the minicluster after running the FE custom cluster tests.
       start_impala_cluster
-    fi
-    popd
-
-    # Run Calcite FE tests
-    pushd ${IMPALA_HOME}/java/calcite-planner
-    if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test install ; then
-      TEST_RET_CODE=1
     fi
     popd
 
