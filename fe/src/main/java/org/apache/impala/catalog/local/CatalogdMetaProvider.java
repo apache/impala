@@ -485,8 +485,8 @@ public class CatalogdMetaProvider implements MetaProvider {
       case DATA_SOURCE_NOT_FOUND:
         invalidateCacheForObject(req.object_desc);
         throw new InconsistentMetadataFetchException(resp.lookup_status,
-            String.format("Fetching %s failed: %s. Could not find %s",
-                req.object_desc.type, resp.lookup_status, req.object_desc));
+            String.format("Fetching %s failed: %s for %s", req.object_desc.type,
+                resp.lookup_status, req.object_desc));
       default: break;
     }
     Preconditions.checkState(resp.lookup_status == CatalogLookupStatus.OK);

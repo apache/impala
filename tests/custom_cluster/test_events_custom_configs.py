@@ -658,8 +658,18 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
 
   @CustomClusterTestSuite.with_args(
-    catalogd_args="--enable_reload_events=true")
-  def test_reload_events_with_transient_partitions(self, unique_database):
+      impalad_args="--use_local_catalog=false",
+      catalogd_args="--catalog_topic_mode=full --enable_reload_events=true")
+  def test_reload_events_with_transient_partitions_legacy_catalog(self, unique_database):
+    self.run_test_reload_events_with_transient_partitions(unique_database)
+
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true",
+      catalogd_args="--catalog_topic_mode=minimal --enable_reload_events=true")
+  def test_reload_events_with_transient_partitions_local_catalog(self, unique_database):
+    self.run_test_reload_events_with_transient_partitions(unique_database)
+
+  def run_test_reload_events_with_transient_partitions(self, unique_database):
     tbl = unique_database + ".tbl"
     create_stmt = "create table {} (i int) partitioned by(p int)".format(tbl)
     add_part_stmt = "alter table {} add if not exists partition(p=0)".format(tbl)
@@ -676,9 +686,10 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       self.execute_query(drop_part_stmt)
       refresh_state = self.client.wait_for_any_impala_state(
         refresh_handle, end_states, 10)
-      assert refresh_state == FINISHED, \
-          "REFRESH state: {}. Error log: {}".format(
-            refresh_state, self.client.get_log(refresh_handle))
+      is_finished = (refresh_state == FINISHED)
+      error_log = None if is_finished else self.client.get_log(refresh_handle)
+      self.client.close_query(refresh_handle)
+      assert is_finished, "REFRESH is error. Error log: {}".format(error_log)
       self.execute_query(add_part_stmt)
       refresh_handle = self.client.execute_async(refresh_stmt)
 
@@ -1630,6 +1641,7 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       assert curr_drop_table_metric == prev_drop_table_metric + 1
       assert curr_create_table_metric == prev_create_table_metric + 1
 
+
 @SkipIfFS.hive
 class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):
   """This class contains tests that exercise the event processing mechanism in the
@@ -1662,6 +1674,7 @@ class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):
   def test_self_events_with_impala_hierarchical(self, vector, unique_database):
     self._run_self_events_test(unique_database, vector.get_value('exec_option'),
                                use_impala=True)
+
 
 @SkipIfFS.hive
 class TestEventSyncFailures(TestEventProcessingCustomConfigsBase):

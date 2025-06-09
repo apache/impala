@@ -7243,6 +7243,12 @@ public class CatalogOpExecutor {
         }
         addDbToCatalogUpdate(addedDb, req.header.want_minimal_response, resp.getResult());
       }
+      // Here, we are sending an old snapshot if the table is modified again
+      // in fireReloadEventAndUpdateRefreshEventId(). This is OK since the old snapshot
+      // works as the new one in coordinator side. To be specific:
+      // - in local catalog mode, only the table name is used to evict stale cache items.
+      // - in the legacy catalog mode, the old snapshot has the same partition metadata
+      //   and file metadata.
       resp.getResult().setVersion(updatedThriftTable.getCatalog_version());
     } else if (req.isAuthorization()) {
       AuthorizationDelta authzDelta = catalog_.refreshAuthorization(false);
@@ -7305,7 +7311,10 @@ public class CatalogOpExecutor {
             tbl.getFullName());
         return;
       }
+
+      // tbl lock is held at this point.
       if (partSpecList != null) {
+        boolean partitionChanged = false;
         for (int i = 0; i < partSpecList.size(); ++i) {
           HdfsTable hdfsTbl = (HdfsTable) tbl;
           HdfsPartition partition = hdfsTbl
@@ -7313,13 +7322,17 @@ public class CatalogOpExecutor {
           if (partition != null) {
             HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
             partBuilder.setLastRefreshEventId(eventIds.get(0));
-            hdfsTbl.updatePartition(partBuilder);
+            partitionChanged |= hdfsTbl.updatePartition(partBuilder);
           } else {
             LOG.warn("Partition {} no longer exists in table {}. It might be " +
                     "dropped by a concurrent operation.",
                 FeCatalogUtils.getPartitionName(hdfsTbl, partValsList.get(i)),
                 hdfsTbl.getFullName());
           }
+        }
+        if (partitionChanged) {
+          // Set catalog version of the table to a new one.
+          tbl.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
         }
       } else {
         tbl.setLastRefreshEventId(eventIds.get(0));

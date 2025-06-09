@@ -1026,12 +1026,15 @@ public class HdfsTable extends Table implements FeFsTable {
     }
   }
 
-  public void updatePartitions(List<HdfsPartition.Builder> partBuilders)
+  public boolean updatePartitions(List<HdfsPartition.Builder> partBuilders)
       throws CatalogException {
-    for (HdfsPartition.Builder p : partBuilders) updatePartition(p);
+    boolean partitionChanged = false;
+    for (HdfsPartition.Builder p : partBuilders) partitionChanged |= updatePartition(p);
+    return partitionChanged;
   }
 
-  public void updatePartition(HdfsPartition.Builder partBuilder) throws CatalogException {
+  public boolean updatePartition(HdfsPartition.Builder partBuilder)
+      throws CatalogException {
     HdfsPartition oldPartition = partBuilder.getOldInstance();
     Preconditions.checkNotNull(oldPartition,
         "Old partition instance should exist for updates");
@@ -1042,11 +1045,12 @@ public class HdfsTable extends Table implements FeFsTable {
     boolean partitionNotChanged = partBuilder.equalsToOriginal(oldPartition);
     LOG.trace("Partition {} {}", oldPartition.getName(),
         partitionNotChanged ? "changed" : "unchanged");
-    if (partitionNotChanged) return;
+    if (partitionNotChanged) return false;
     HdfsPartition newPartition = partBuilder.build();
     // Partition is reloaded and hence cache directives are not dropped.
     dropPartition(oldPartition, false);
     addPartition(newPartition);
+    return true;
   }
 
   /**
@@ -2290,10 +2294,25 @@ public class HdfsTable extends Table implements FeFsTable {
     }
 
     Collection<Long> partIds = req.table_info_selector.partition_ids;
-    if (partIds == null && wantPartitionInfo) {
-      // Caller specified at least one piece of partition info but didn't specify
-      // any partition IDs. That means they want the info for all partitions.
-      partIds = partitionMap_.keySet();
+    Collection<HdfsPartition> requestedPartitions = null;
+    if (wantPartitionInfo) {
+      if (partIds == null) {
+        // Caller specified at least one piece of partition info but didn't specify
+        // any partition IDs. That means they want the info for all partitions.
+        requestedPartitions = partitionMap_.values();
+      } else {
+        requestedPartitions = Lists.newArrayListWithCapacity(partIds.size());
+        for (long partId : partIds) {
+          HdfsPartition part = partitionMap_.get(partId);
+          if (part == null) {
+            LOG.warn(String.format(
+                "Missing partition ID: %s, Table: %s", partId, getFullName()));
+            return new TGetPartialCatalogObjectResponse().setLookup_status(
+                CatalogLookupStatus.PARTITION_NOT_FOUND);
+          }
+          requestedPartitions.add(part);
+        }
+      }
     }
 
     ValidWriteIdList reqWriteIdList = req.table_info_selector.valid_write_ids == null ?
@@ -2303,16 +2322,10 @@ public class HdfsTable extends Table implements FeFsTable {
     Counter hits = metrics_.getCounter(FILEMETADATA_CACHE_HIT_METRIC);
     int numFilesFiltered = 0;
     int numFilesCollected = 0;
-    if (partIds != null) {
-      resp.table_info.partitions = Lists.newArrayListWithCapacity(partIds.size());
-      for (long partId : partIds) {
-        HdfsPartition part = partitionMap_.get(partId);
-        if (part == null) {
-          LOG.warn(String.format("Missing partition ID: %s, Table: %s", partId,
-              getFullName()));
-          return new TGetPartialCatalogObjectResponse().setLookup_status(
-              CatalogLookupStatus.PARTITION_NOT_FOUND);
-        }
+    if (requestedPartitions != null) {
+      resp.table_info.partitions =
+          Lists.newArrayListWithCapacity(requestedPartitions.size());
+      for (HdfsPartition part : requestedPartitions) {
         Pair<TPartialPartitionInfo, Integer> partInfoStatus =
             part.getPartialPartitionInfo(req, reqWriteIdList);
         if (partInfoStatus.second != null) {
