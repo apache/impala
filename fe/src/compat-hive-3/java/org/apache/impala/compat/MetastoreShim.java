@@ -108,7 +108,8 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.TableNotLoadedException;
 import org.apache.impala.catalog.TableWriteId;
-import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreEventContext;
+import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
@@ -897,6 +898,36 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   }
 
   /**
+   * Write info for a table
+   */
+  private static class AcidTableWriteInfo {
+    private final Table table_;
+    private final List<Long> writeIds_ = new ArrayList<>();
+    private final List<Partition> partitions_ = new ArrayList<>();
+
+    private AcidTableWriteInfo(Table table) {
+      table_ = table;
+    }
+
+    private void appendWriteIdAndPartition(Long writeId, Partition partition) {
+      writeIds_.add(writeId);
+      partitions_.add(partition);
+    }
+
+    private Table getTable() {
+      return table_;
+    }
+
+    private List<Long> getWriteIdList() {
+      return writeIds_;
+    }
+
+    private List<Partition> getPartitionList() {
+      return partitions_;
+    }
+  }
+
+  /**
    * Metastore event handler for COMMIT_TXN events. Handles commit event for transactional
    * tables.
    */
@@ -990,9 +1021,8 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
         List<WriteEventInfo> writeEventInfoList) throws Exception {
       List<Long> writeIds = writeEventInfoList.stream().map(WriteEventInfo::getWriteId)
           .collect(Collectors.toList());
-      List<Partition> parts = new ArrayList<>();
       // To load partitions together for the same table, indexes are grouped by table name
-      Map<TableName, Pair<Table, List<Integer>>> tableNameToIdxs = new HashMap<>();
+      Map<TableName, AcidTableWriteInfo> tableNameToWriteInfos = new HashMap<>();
       for (int i = 0; i < writeIds.size(); i++) {
         Table tbl = (Table) MessageBuilder.getTObj(
             writeEventInfoList.get(i).getTableObj(), Table.class);
@@ -1008,24 +1038,19 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
         if (writeEventInfoList.get(i).getPartitionObj() != null) {
           partition = (Partition) MessageBuilder.getTObj(
               writeEventInfoList.get(i).getPartitionObj(), Partition.class);
+          Preconditions.checkNotNull(partition);
         }
-        parts.add(partition);
-        Pair<Table, List<Integer>> pair = tableNameToIdxs.computeIfAbsent(tableName,
-            k -> new Pair<>(tbl, new ArrayList<>()));
-        pair.getSecond().add(i);
+        AcidTableWriteInfo writeInfo = tableNameToWriteInfos.computeIfAbsent(tableName,
+            k -> new AcidTableWriteInfo(tbl));
+        writeInfo.appendWriteIdAndPartition(writeIds.get(i), partition);
         tableNames_.add(tableName.toString());
       }
-      for (Map.Entry<TableName, Pair<Table, List<Integer>>> entry :
-          tableNameToIdxs.entrySet()) {
-        Table tbl = entry.getValue().getFirst();
-        List<Long> writeIdsForTable = entry.getValue().getSecond().stream()
-            .map(i -> writeIds.get(i)).collect(Collectors.toList());
-        List<Partition> partsForTable = entry.getValue().getSecond().stream()
-            .map(i -> parts.get(i)).collect(Collectors.toList());
+      for (AcidTableWriteInfo writeInfo : tableNameToWriteInfos.values()) {
+        Table tbl = writeInfo.getTable();
         addCommittedWriteIdsAndReload(getCatalogOpExecutor(), tbl.getDbName(),
             tbl.getTableName(), tbl.getPartitionKeysSize() > 0,
-            MetaStoreUtils.isMaterializedViewTable(tbl), writeIdsForTable, partsForTable,
-            getEventId(), getMetrics());
+            MetaStoreUtils.isMaterializedViewTable(tbl), writeInfo.getWriteIdList(),
+            writeInfo.getPartitionList(), getEventId(), getMetrics());
       }
     }
 
@@ -1083,8 +1108,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   /**
    * Pseudo commit transaction event handles commit processing for a table
    */
-  public static class PseudoCommitTxnEvent extends MetastoreTableEvent
-      implements DerivedMetastoreEvent {
+  public static class PseudoCommitTxnEvent extends DerivedMetastoreTableEvent {
     private final long txnId_;
     private final boolean isPartitioned_;
     private final boolean isMaterializedView_;
@@ -1092,12 +1116,12 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     private final List<Long> writeIdsInEvent_;
     private final List<Partition> partitions_;
 
-    PseudoCommitTxnEvent(CommitTxnEvent actualEvent, String dbName, String tableName,
-        boolean isPartitioned, boolean isMaterializedView, List<Long> writeIdsInCatalog,
-        List<Long> writeIdsInEvent, List<Partition> partitions) {
-      super(actualEvent.getCatalogOpExecutor(), actualEvent.getMetrics(),
-          actualEvent.getEvent());
-      txnId_ = actualEvent.txnId_;
+    PseudoCommitTxnEvent(DerivedMetastoreEventContext context, String dbName,
+        String tableName, boolean isPartitioned, boolean isMaterializedView,
+        List<Long> writeIdsInCatalog, List<Long> writeIdsInEvent,
+        List<Partition> partitions) {
+      super(context);
+      txnId_ = ((CommitTxnEvent) context.getActualEvent()).txnId_;
       writeIdsInCatalog_ = writeIdsInCatalog;
       writeIdsInEvent_ = writeIdsInEvent;
       partitions_ = partitions;
@@ -1109,7 +1133,14 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
 
     @Override
     protected boolean isEventProcessingDisabled() {
-      return false;
+      org.apache.impala.catalog.Table tbl = catalog_.getTableNoThrow(dbName_, tblName_);
+      if (tbl != null && tbl.getCreateEventId() < getEventId()) {
+        msTbl_ = tbl.getMetaStoreTable();
+      }
+      if (msTbl_ == null) {
+        return false;
+      }
+      return super.isEventProcessingDisabled();
     }
 
     @Override
@@ -1176,51 +1207,61 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     }
     try {
       // Build table name to write id indices mapping from the HMS event
-      List<Partition> parts = new ArrayList<>();
-      Map<TableName, Pair<Table, List<Integer>>> tableNameToIdxs = new HashMap<>();
+      Map<TableName, AcidTableWriteInfo> tableNameToWriteInfos = new HashMap<>();
+      int derivedEventCount = 0;
+      DerivedMetastoreEventContext context = new DerivedMetastoreEventContext(event);
       if (writeEventInfoList != null && !writeEventInfoList.isEmpty()) {
         List<Long> writeIds = writeEventInfoList.stream().map(WriteEventInfo::getWriteId)
             .collect(Collectors.toList());
         for (int i = 0; i < writeIds.size(); i++) {
           Table tbl = (Table) MessageBuilder.getTObj(
               writeEventInfoList.get(i).getTableObj(), Table.class);
+          if (event.getCatalogOpExecutor().getCatalog().isHmsEventSyncDisabled(tbl)) {
+            LOG.debug("Not adding write ids to table {}.{} for event {} " +
+                    "since table/db level flag {} is set to true",
+                tbl.getDbName(), tbl.getTableName(), event.getEventId(),
+                MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
+            continue;
+          }
           TableName tableName = new TableName(tbl.getDbName(), tbl.getTableName());
           Partition partition = null;
           if (writeEventInfoList.get(i).getPartitionObj() != null) {
             partition = (Partition) MessageBuilder.getTObj(
                 writeEventInfoList.get(i).getPartitionObj(), Partition.class);
+            Preconditions.checkNotNull(partition);
           }
-          parts.add(partition);
-          Pair<Table, List<Integer>> pair = tableNameToIdxs.computeIfAbsent(tableName,
-              k -> new Pair<>(tbl, new ArrayList<>()));
-          pair.getSecond().add(i);
+          AcidTableWriteInfo writeInfo = tableNameToWriteInfos.computeIfAbsent(tableName,
+              k -> new AcidTableWriteInfo(tbl));
+          writeInfo.appendWriteIdAndPartition(writeIds.get(i), partition);
         }
         // Form list of PseudoCommitTxnEvent
-        List<Long> finalWriteIds = writeIds;
-        for (Map.Entry<TableName, Pair<Table, List<Integer>>> entry :
-            tableNameToIdxs.entrySet()) {
+        for (Map.Entry<TableName, AcidTableWriteInfo> entry :
+            tableNameToWriteInfos.entrySet()) {
           List<Long> writeIdsInCatalog = tableNameToWriteIds.remove(entry.getKey());
-          Table tbl = entry.getValue().getFirst();
+          AcidTableWriteInfo writeInfo = entry.getValue();
+          Table tbl = writeInfo.getTable();
           pseudoEvents.add(
-              new PseudoCommitTxnEvent(event, tbl.getDbName(), tbl.getTableName(),
+              new PseudoCommitTxnEvent(context, tbl.getDbName(), tbl.getTableName(),
                   tbl.getPartitionKeysSize() > 0,
                   MetaStoreUtils.isMaterializedViewTable(tbl), writeIdsInCatalog,
-                  entry.getValue().getSecond().stream().map(i -> finalWriteIds.get(i))
-                      .collect(Collectors.toList()),
-                  entry.getValue().getSecond().stream().map(i -> parts.get(i))
-                      .collect(Collectors.toList())));
+                  writeInfo.getWriteIdList(), writeInfo.getPartitionList()));
+          derivedEventCount++;
         }
       }
       for (Map.Entry<TableName, List<Long>> entry : tableNameToWriteIds.entrySet()) {
-        Table tbl = event.getCatalogOpExecutor().getCatalog()
-            .getTable(entry.getKey().getDb(), entry.getKey().getTbl())
-            .getMetaStoreTable();
-        pseudoEvents.add(
-            new PseudoCommitTxnEvent(event, tbl.getDbName(), tbl.getTableName(),
-                tbl.getPartitionKeysSize() > 0,
-                MetaStoreUtils.isMaterializedViewTable(tbl), entry.getValue(),
-                Collections.emptyList(), Collections.emptyList()));
+        org.apache.impala.catalog.Table table = event.getCatalogOpExecutor().getCatalog()
+            .getTableNoThrow(entry.getKey().getDb(), entry.getKey().getTbl());
+        if (table != null && table.getMetaStoreTable() != null) {
+          Table tbl = table.getMetaStoreTable();
+          pseudoEvents.add(
+              new PseudoCommitTxnEvent(context, tbl.getDbName(), tbl.getTableName(),
+                  tbl.getPartitionKeysSize() > 0,
+                  MetaStoreUtils.isMaterializedViewTable(tbl), entry.getValue(),
+                  Collections.emptyList(), Collections.emptyList()));
+          derivedEventCount++;
+        }
       }
+      context.setDerivedEventsCount(derivedEventCount);
     } catch (Exception e) {
       throw new MetastoreNotificationNeedsInvalidateException(String.format(
           "Failed to form PseudoCommitTxnEvent for txn %d. Event processing cannot " +

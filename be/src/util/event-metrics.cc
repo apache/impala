@@ -66,6 +66,10 @@ string MetastoreEventMetrics::LAST_SYNCED_EVENT_ID_METRIC_NAME =
     "events-processor.last-synced-event-id";
 string MetastoreEventMetrics::LAST_SYNCED_EVENT_TIME_METRIC_NAME =
     "events-processor.last-synced-event-time";
+string MetastoreEventMetrics::GREATEST_SYNCED_EVENT_ID_METRIC_NAME =
+    "events-processor.greatest-synced-event-id";
+string MetastoreEventMetrics::GREATEST_SYNCED_EVENT_TIME_METRIC_NAME =
+    "events-processor.greatest-synced-event-time";
 string MetastoreEventMetrics::LATEST_EVENT_ID_METRIC_NAME =
     "events-processor.latest-event-id";
 string MetastoreEventMetrics::LATEST_EVENT_TIME_METRIC_NAME =
@@ -98,6 +102,8 @@ DoubleGauge* MetastoreEventMetrics::EVENTS_RECEIVED_5MIN_RATE = nullptr;
 DoubleGauge* MetastoreEventMetrics::EVENTS_RECEIVED_15MIN_RATE = nullptr;
 IntCounter* MetastoreEventMetrics::LAST_SYNCED_EVENT_ID = nullptr;
 IntCounter* MetastoreEventMetrics::LAST_SYNCED_EVENT_TIME = nullptr;
+IntCounter* MetastoreEventMetrics::GREATEST_SYNCED_EVENT_ID = nullptr;
+IntCounter* MetastoreEventMetrics::GREATEST_SYNCED_EVENT_TIME = nullptr;
 IntCounter* MetastoreEventMetrics::LATEST_EVENT_ID = nullptr;
 IntCounter* MetastoreEventMetrics::LATEST_EVENT_TIME = nullptr;
 IntCounter* MetastoreEventMetrics::PENDING_EVENTS = nullptr;
@@ -150,6 +156,10 @@ void MetastoreEventMetrics::InitMetastoreEventMetrics(MetricGroup* metric_group)
       event_metrics->AddCounter(LAST_SYNCED_EVENT_ID_METRIC_NAME, 0);
   LAST_SYNCED_EVENT_TIME =
       event_metrics->AddCounter(LAST_SYNCED_EVENT_TIME_METRIC_NAME, 0);
+  GREATEST_SYNCED_EVENT_ID =
+      event_metrics->AddCounter(GREATEST_SYNCED_EVENT_ID_METRIC_NAME, 0);
+  GREATEST_SYNCED_EVENT_TIME =
+      event_metrics->AddCounter(GREATEST_SYNCED_EVENT_TIME_METRIC_NAME, 0);
   LATEST_EVENT_ID =
       event_metrics->AddCounter(LATEST_EVENT_ID_METRIC_NAME, 0);
   LATEST_EVENT_TIME =
@@ -219,33 +229,38 @@ void MetastoreEventMetrics::refresh(TEventProcessorMetrics* response) {
   if (response->__isset.last_synced_event_time) {
     LAST_SYNCED_EVENT_TIME->SetValue(response->last_synced_event_time);
   }
+  if (response->__isset.greatest_synced_event_id) {
+    GREATEST_SYNCED_EVENT_ID->SetValue(response->greatest_synced_event_id);
+  }
+  if (response->__isset.greatest_synced_event_time) {
+    GREATEST_SYNCED_EVENT_TIME->SetValue(response->greatest_synced_event_time);
+  }
   if (response->__isset.latest_event_id) {
     LATEST_EVENT_ID->SetValue(response->latest_event_id);
   }
   if (response->__isset.latest_event_time) {
     LATEST_EVENT_TIME->SetValue(response->latest_event_time);
   }
+  // last_synced_event_time and greatest_synced_event_time are same when
+  // hierarchical event processing is not enabled. So, using
+  // greatest_synced_event_time instead of last_synced_event_time so that same
+  // code works with and without hierarchical event processing enabled.
   // last_synced_event_time is 0 at the startup until we have synced any events.
-  if (response->__isset.latest_event_time && response->__isset.last_synced_event_time
-      && response->last_synced_event_time > 0) {
+  if (response->__isset.latest_event_time
+      && response->__isset.greatest_synced_event_time
+      && response->greatest_synced_event_time > 0) {
     // latest_event_time and last_synced_event_time are updated by different threads.
     // It's possible that latest_event_time is stale and smaller than
     // last_synced_event_time. Set the lag to 0 in this case.
-    if (response->latest_event_time <= response->last_synced_event_time) {
+    if (response->latest_event_time <= response->greatest_synced_event_time) {
       LAG_TIME->SetValue(0);
     } else {
-      LAG_TIME->SetValue(response->latest_event_time - response->last_synced_event_time);
+      LAG_TIME->SetValue(
+        response->latest_event_time - response->greatest_synced_event_time);
     }
   }
-  if (response->__isset.latest_event_id && response->__isset.last_synced_event_id) {
-    // Same as above, latest_event_id and last_synced_event_id are updated by different
-    // threads. Set the value to 0 if latest_event_id is stale.
-    if (response->latest_event_id <= response->last_synced_event_id) {
-      PENDING_EVENTS->SetValue(0);
-    } else {
-      PENDING_EVENTS->SetValue(
-          response->latest_event_id - response->last_synced_event_id);
-    }
+  if (response->__isset.pending_event_count) {
+    PENDING_EVENTS->SetValue(response->pending_event_count);
   }
   if (response->__isset.outstanding_event_count) {
     OUTSTANDING_EVENT_COUNT->SetValue(response->outstanding_event_count);

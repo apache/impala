@@ -162,16 +162,17 @@ public class EventExecutorServiceTest {
     }
   }
 
-  private void insertIntoTransactionalTable(MetaStoreClient msClient, Table table,
-      List<String> partVal, long txnId, long writeId) throws TException, IOException {
+  private void insertIntoTransactionalTable(MetaStoreClient msClient, String dbName,
+      String tableName, List<String> partVal, long txnId, long writeId) throws TException,
+      IOException {
+    org.apache.hadoop.hive.metastore.api.Table table = msClient.getHiveClient().getTable(
+        dbName, tableName);
     Partition partition = null;
     if (!CollectionUtils.isEmpty(partVal)) {
-      partition = msClient.getHiveClient().getPartition(table.getDb().getName(),
-          table.getName(), partVal);
+      partition = msClient.getHiveClient().getPartition(dbName, tableName, partVal);
     }
     MetastoreApiTestUtils.simulateInsertIntoTransactionalTableFromFS(
-        catalog_.getMetaStoreClient(), table.getMetaStoreTable(), partition, 1, txnId,
-        writeId);
+        catalog_.getMetaStoreClient(), table, partition, 1, txnId, writeId);
   }
 
   private void alterTableRename(String dbName, String tblName, String newDbName,
@@ -240,8 +241,7 @@ public class EventExecutorServiceTest {
    */
   @Test
   public void testAssignAndUnAssignExecutors() throws Exception {
-    EventExecutorService eventExecutorService = new EventExecutorService(eventsProcessor_,
-        2, 3);
+    EventExecutorService eventExecutorService = createEventExecutorService(2, 3);
     List<DbEventExecutor> dbEventExecutorList =
         eventExecutorService.getDbEventExecutors();
     assertEquals(2, dbEventExecutorList.size());
@@ -252,8 +252,6 @@ public class EventExecutorServiceTest {
     TableEventExecutor tableExecutor1 = dbExecutor1.getTableEventExecutors().get(0);
     TableEventExecutor tableExecutor2 = dbExecutor1.getTableEventExecutors().get(1);
     TableEventExecutor tableExecutor3 = dbExecutor2.getTableEventExecutors().get(0);
-    eventExecutorService.start();
-    eventsProcessor_.setEventExecutorService(eventExecutorService);
     assertEquals(0, dbExecutor1.getDbCount());
     assertEquals(0, dbExecutor2.getDbCount());
     assertEquals(0, tableExecutor1.getTableCount());
@@ -319,12 +317,7 @@ public class EventExecutorServiceTest {
     shutDownEventExecutorService(eventExecutorService);
   }
 
-  /**
-   * Tests clear executors
-   * @throws Exception
-   */
-  @Test
-  public void testClearExecutors() throws Exception {
+  private void clearOrShutEventExecutorService(boolean isShutDown) throws Exception {
     EventExecutorService eventExecutorService = new EventExecutorService(eventsProcessor_,
         2, 2);
     List<DbEventExecutor> dbEventExecutorList =
@@ -336,7 +329,9 @@ public class EventExecutorServiceTest {
     assertEquals(2, dbExecutor2.getTableEventExecutors().size());
     TableEventExecutor tableExecutor1 = dbExecutor1.getTableEventExecutors().get(0);
     TableEventExecutor tableExecutor2 = dbExecutor1.getTableEventExecutors().get(1);
-    eventExecutorService.start();
+    TableEventExecutor tableExecutor3 = dbExecutor2.getTableEventExecutors().get(0);
+    TableEventExecutor tableExecutor4 = dbExecutor2.getTableEventExecutors().get(1);
+    eventExecutorService.setStatus(EventExecutorService.EventExecutorStatus.ACTIVE);
     createDatabase(DB_NAME1);
     createDatabase(DB_NAME2);
     for (int i = 0; i < 10; i++) {
@@ -349,12 +344,37 @@ public class EventExecutorServiceTest {
     for (MetastoreEvent event : metastoreEvents) {
       eventExecutorService.dispatch(event);
     }
-    eventExecutorService.clear();
+    for (DbEventExecutor executor : dbEventExecutorList) {
+      executor.process();
+    }
+    assertEquals(1, dbExecutor1.getDbCount());
+    assertEquals(1, dbExecutor2.getDbCount());
+    assertEquals(5, tableExecutor1.getTableCount());
+    assertEquals(5, tableExecutor2.getTableCount());
+    assertEquals(5, tableExecutor3.getTableCount());
+    assertEquals(5, tableExecutor4.getTableCount());
+    if (isShutDown) {
+      eventExecutorService.shutdown(false);
+    } else {
+      eventExecutorService.clear();
+    }
     assertEquals(0, dbExecutor1.getDbCount());
+    assertEquals(0, dbExecutor2.getDbCount());
     assertEquals(0, dbExecutor1.getOutstandingEventCount());
     assertEquals(0, tableExecutor1.getTableCount());
     assertEquals(0, tableExecutor2.getTableCount());
-    eventExecutorService.shutdown(true);
+    assertEquals(0, tableExecutor3.getTableCount());
+    assertEquals(0, tableExecutor4.getTableCount());
+    if (!isShutDown) eventExecutorService.shutdown(true);
+  }
+
+  /**
+   * Tests clear executors
+   * @throws Exception
+   */
+  @Test
+  public void testClearExecutors() throws Exception {
+    clearOrShutEventExecutorService(false);
   }
 
   /**
@@ -363,35 +383,7 @@ public class EventExecutorServiceTest {
    */
   @Test
   public void testForceShutdownExecutors() throws Exception {
-    EventExecutorService eventExecutorService = new EventExecutorService(eventsProcessor_,
-        2, 2);
-    List<DbEventExecutor> dbEventExecutorList =
-        eventExecutorService.getDbEventExecutors();
-    assertEquals(2, dbEventExecutorList.size());
-    DbEventExecutor dbExecutor1 = dbEventExecutorList.get(0);
-    DbEventExecutor dbExecutor2 = dbEventExecutorList.get(1);
-    assertEquals(2, dbExecutor1.getTableEventExecutors().size());
-    assertEquals(2, dbExecutor2.getTableEventExecutors().size());
-    TableEventExecutor tableExecutor1 = dbExecutor1.getTableEventExecutors().get(0);
-    TableEventExecutor tableExecutor2 = dbExecutor1.getTableEventExecutors().get(1);
-    eventExecutorService.start();
-    createDatabase(DB_NAME1);
-    createDatabase(DB_NAME2);
-    for (int i = 0; i < 10; i++) {
-      createTable(DB_NAME1, "t"+i);
-      createTable(DB_NAME2, "t"+i);
-    }
-    List<MetastoreEvent> metastoreEvents = eventsProcessor_.getEventsFactory()
-        .getFilteredEvents(eventsProcessor_.getNextMetastoreEvents(),
-            eventsProcessor_.getMetrics());
-    for (MetastoreEvent event : metastoreEvents) {
-      eventExecutorService.dispatch(event);
-    }
-    eventExecutorService.shutdown(false);
-    assertEquals(0, dbExecutor1.getDbCount());
-    assertEquals(0, dbExecutor1.getOutstandingEventCount());
-    assertEquals(0, tableExecutor1.getTableCount());
-    assertEquals(0, tableExecutor2.getTableCount());
+    clearOrShutEventExecutorService(true);
   }
 
   private void renameTableTest(String srcDbName, String srcTableName, String targetDbName,
@@ -589,7 +581,7 @@ public class EventExecutorServiceTest {
       txnId = MetastoreShim.openTransaction(msClient.getHiveClient());
       writeId = MetastoreShim.allocateTableWriteId(msClient.getHiveClient(), txnId,
           DB_NAME1, t1);
-      insertIntoTransactionalTable(msClient, t1Table, null, txnId, writeId);
+      insertIntoTransactionalTable(msClient, DB_NAME1, t1, null, txnId, writeId);
       MetastoreShim.commitTransaction(msClient.getHiveClient(), txnId);
       eventsProcessor_.processEvents();
       ValidWriteIdList writeIdList = t1Table.getValidWriteIds();
@@ -599,8 +591,10 @@ public class EventExecutorServiceTest {
       txnId = MetastoreShim.openTransaction(msClient.getHiveClient());
       writeId = MetastoreShim.allocateTableWriteId(msClient.getHiveClient(), txnId,
           DB_NAME1, t2);
-      insertIntoTransactionalTable(msClient, t2Table, Arrays.asList("1"), txnId, writeId);
-      insertIntoTransactionalTable(msClient, t2Table, Arrays.asList("2"), txnId, writeId);
+      insertIntoTransactionalTable(msClient, DB_NAME1, t2, Arrays.asList("1"), txnId,
+          writeId);
+      insertIntoTransactionalTable(msClient, DB_NAME1, t2, Arrays.asList("2"), txnId,
+          writeId);
       MetastoreShim.commitTransaction(msClient.getHiveClient(), txnId);
       eventsProcessor_.processEvents();
       writeIdList = t2Table.getValidWriteIds();
@@ -610,14 +604,14 @@ public class EventExecutorServiceTest {
       txnId = MetastoreShim.openTransaction(msClient.getHiveClient());
       long writeId1 = MetastoreShim.allocateTableWriteId(msClient.getHiveClient(), txnId,
           DB_NAME1, t1);
-      insertIntoTransactionalTable(msClient, t1Table, null, txnId, writeId1);
+      insertIntoTransactionalTable(msClient, DB_NAME1, t1, null, txnId, writeId1);
       long writeId2 = MetastoreShim.allocateTableWriteId(msClient.getHiveClient(), txnId,
           DB_NAME1, t2);
-      insertIntoTransactionalTable(msClient, t2Table, Arrays.asList("2"), txnId,
+      insertIntoTransactionalTable(msClient, DB_NAME1, t2, Arrays.asList("2"), txnId,
           writeId2);
       long writeId3 = MetastoreShim.allocateTableWriteId(msClient.getHiveClient(), txnId,
           DB_NAME2, t3);
-      insertIntoTransactionalTable(msClient, t3Table, Arrays.asList("3"), txnId,
+      insertIntoTransactionalTable(msClient, DB_NAME2, t3, Arrays.asList("3"), txnId,
           writeId3);
       if (abortTxn) {
         MetastoreShim.abortTransaction(msClient.getHiveClient(), txnId);
@@ -770,7 +764,7 @@ public class EventExecutorServiceTest {
       eventExecutorService.dispatch(event);
     }
     processEventsSynchronously(eventExecutorService);
-    eventExecutorService.setStatus(EventExecutorService.EventExecutorStatus.STOPPED);
+    eventExecutorService.shutdown(true);
     // Skips all the events i.e., create database events(DB_NAME1 and DB_NAME2), create
     // table event(DB_NAME1.t1), alter database event for DB_NAME1, rename table from
     // DB_NAME1.t1 to DB_NAME2.t2 event, drop database event for DB_NAME1, drop table
@@ -788,4 +782,135 @@ public class EventExecutorServiceTest {
     assertEquals(tablesRemovedMetric,
         metrics.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLES_REMOVED).getCount());
   }
+
+  /**
+   * Tests greatest synced event id
+   * @throws Exception
+   */
+  @Test
+  public void testGreatestSyncedEvent() throws Exception {
+    EventExecutorService eventExecutorService = createEventExecutorService(1, 1);
+    assertEquals(0, eventExecutorService.getOutstandingEventCount());
+    long lastSyncedEventId = eventsProcessor_.getLastSyncedEventId();
+    assertEquals(lastSyncedEventId, eventExecutorService.getGreatestSyncedEventId());
+    assertEquals(eventsProcessor_.getLastSyncedEventTime(),
+        eventExecutorService.getGreatestSyncedEventTime());
+    createDatabase(DB_NAME1);
+    createTable(DB_NAME1, "t1");
+    eventsProcessor_.processEvents();
+    Table table = catalog_.getOrLoadTable(DB_NAME1, "t1", "test", null);
+    assertTrue("Table should have been loaded.", table instanceof HdfsTable);
+    assertEquals(lastSyncedEventId + 2, eventsProcessor_.getLastSyncedEventId());
+    assertEquals(eventsProcessor_.getLastSyncedEventId(),
+        eventExecutorService.getGreatestSyncedEventId());
+    assertEquals(eventsProcessor_.getLastSyncedEventTime(),
+        eventExecutorService.getGreatestSyncedEventTime());
+    shutDownEventExecutorService(eventExecutorService);
+  }
+
+  /**
+   * Tests in-progress and processed event logs
+   * @throws Exception
+   */
+  @Test
+  public void testEventLogs() throws Exception {
+    EventExecutorService eventExecutorService = new EventExecutorService(eventsProcessor_,
+        2, 1);
+    eventExecutorService.setStatus(EventExecutorService.EventExecutorStatus.ACTIVE);
+    long lastSyncedEventId = eventsProcessor_.getLastSyncedEventId();
+    createDatabase(DB_NAME1);
+    String t1 = "t1";
+    String t2 = "t2";
+    createTransactionalTable(DB_NAME1, t1, false);
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      // Commit a transaction on t1
+      long txnId = MetastoreShim.openTransaction(msClient.getHiveClient());
+      long writeId = MetastoreShim.allocateTableWriteId(msClient.getHiveClient(), txnId,
+          DB_NAME1, t1);
+      MetastoreShim.commitTransaction(msClient.getHiveClient(), txnId);
+    }
+    createDatabase(DB_NAME2);
+    createTable(DB_NAME2, t2);
+    // Order of metastore events(6) generated are:
+    // create db1, create table t1, alloc write id for t1, commit txn for t1, create db2,
+    // create table t2
+    // Note: open txn event is generated before alloc write id for t1 event. But it is not
+    // fetched from HMS by default
+    List<MetastoreEvent> metastoreEvents = eventsProcessor_.getEventsFactory()
+        .getFilteredEvents(eventsProcessor_.getNextMetastoreEvents(),
+            eventsProcessor_.getMetrics());
+    assertEquals(6, metastoreEvents.size());
+    assertEquals(0, eventExecutorService.getInProgressLog().size());
+    assertEquals(1, eventExecutorService.getProcessedLog().size());
+    assertEquals(lastSyncedEventId, eventExecutorService.getGreatestSyncedEventId());
+    assertEquals(0, eventExecutorService.getPendingEventCount(lastSyncedEventId));
+
+    long lastEventId = metastoreEvents.get(5).getEventId();
+    assertEquals(7, eventExecutorService.getPendingEventCount(lastEventId));
+
+    for (MetastoreEvent event : metastoreEvents) {
+      eventExecutorService.dispatch(event);
+    }
+    assertEquals(6, eventExecutorService.getInProgressLog().size());
+    assertEquals(1, eventExecutorService.getProcessedLog().size());
+    assertEquals(lastSyncedEventId, eventExecutorService.getGreatestSyncedEventId());
+    // Pending event count till last(6th) event
+    assertEquals(6, eventExecutorService.getPendingEventCount(lastEventId));
+    // Pending event count if 100 more events are to process beyond last event
+    assertEquals(6 + 100, eventExecutorService.getPendingEventCount(lastEventId + 100));
+
+    // Remove the 5th event
+    eventExecutorService.removeFromInProgressLog(metastoreEvents.get(4).getEventId());
+    assertEquals(5, eventExecutorService.getInProgressLog().size());
+    assertEquals(2, eventExecutorService.getProcessedLog().size());
+    // Greatest synced event id shouldn't change
+    assertEquals(lastSyncedEventId, eventExecutorService.getGreatestSyncedEventId());
+    // Pending event count till last(6th) event
+    assertEquals(5, eventExecutorService.getPendingEventCount(lastEventId));
+    // Pending event count till 5th event
+    assertEquals(4, eventExecutorService.getPendingEventCount(
+        metastoreEvents.get(4).getEventId()));
+    // Pending event count if 100 more events are to process beyond last event
+    assertEquals(5 + 100, eventExecutorService.getPendingEventCount(lastEventId + 100));
+
+    // Remove the 1st event
+    eventExecutorService.removeFromInProgressLog(metastoreEvents.get(0).getEventId());
+    assertEquals(4, eventExecutorService.getInProgressLog().size());
+    assertEquals(2, eventExecutorService.getProcessedLog().size());
+    // Greatest synced event id should become the 1st event's id
+    lastSyncedEventId = metastoreEvents.get(0).getEventId();
+    assertEquals(lastSyncedEventId, eventExecutorService.getGreatestSyncedEventId());
+    assertEquals(4, eventExecutorService.getPendingEventCount(lastEventId));
+
+    // Remove the 2nd event
+    eventExecutorService.removeFromInProgressLog(metastoreEvents.get(1).getEventId());
+    assertEquals(3, eventExecutorService.getInProgressLog().size());
+    assertEquals(2, eventExecutorService.getProcessedLog().size());
+    // Greatest synced event id should become the 2nd event's id
+    lastSyncedEventId = metastoreEvents.get(1).getEventId();
+    assertEquals(lastSyncedEventId, eventExecutorService.getGreatestSyncedEventId());
+    assertEquals(3, eventExecutorService.getPendingEventCount(lastEventId));
+
+    // Remove the 3rd event
+    eventExecutorService.removeFromInProgressLog(metastoreEvents.get(2).getEventId());
+    assertEquals(1, eventExecutorService.getInProgressLog().size());
+    assertEquals(1, eventExecutorService.getProcessedLog().size());
+    // Since 3rd event is followed by delimiter event(4th event), both events are
+    // considered as processed and 5th event is already processed. So prune process log
+    // discards 3rd and 4th event and retains just 5th event. So Greatest synced event id
+    // should become the 5th event's id.
+    lastSyncedEventId = metastoreEvents.get(4).getEventId();
+    assertEquals(lastSyncedEventId, eventExecutorService.getGreatestSyncedEventId());
+    assertEquals(1, eventExecutorService.getPendingEventCount(lastEventId));
+
+    // Remove the 6th event
+    eventExecutorService.removeFromInProgressLog(lastEventId);
+    assertEquals(0, eventExecutorService.getInProgressLog().size());
+    assertEquals(1, eventExecutorService.getProcessedLog().size());
+    // Greatest synced event id should become the 6th event's id since all the events are
+    // processed
+    assertEquals(lastEventId, eventExecutorService.getGreatestSyncedEventId());
+    assertEquals(0, eventExecutorService.getPendingEventCount(lastEventId));
+  }
+
 }

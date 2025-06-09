@@ -24,8 +24,8 @@ import com.google.common.base.Preconditions;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreEventContext;
+import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreTableEvent;
 import org.apache.impala.common.Reference;
@@ -36,14 +36,15 @@ import static org.apache.impala.catalog.Table.TBL_EVENTS_PROCESS_DURATION;
 
 /**
  * An instance of this class is used to synchronize the source and target TableProcessors
- * to process rename table event. It holds the reference to alter table event,
- * pseudo-event(either drop or create table) and the combined processing state of the
- * pseudo-events.
+ * to process rename table event. It holds the reference to alter table event through
+ * context, pseudo-event(either drop or create table) and the combined processing state
+ * of the pseudo-events.
  * <p>
  * When alter table event for rename is seen at the event dispatcher, two instances of
  * this class are created. One instance is with a drop table pseudo-event and the other
  * is with a create table pseudo-event. Both instances have the same reference to
- * processing state and actual alter table event. These events are dispatched to
+ * processing state i.e., {@link RenameEventState} and
+ * context i.e., {@link DerivedMetastoreEventContext}. These events are dispatched to
  * appropriate DbEventExecutor.
  * <p>
  * When a TableProcessor's event processing encounter an instance of
@@ -57,11 +58,7 @@ import static org.apache.impala.catalog.Table.TBL_EVENTS_PROCESS_DURATION;
  *
  * @see org.apache.impala.catalog.events.TableEventExecutor.TableProcessor
  */
-public class RenameTableBarrierEvent extends MetastoreTableEvent
-    implements DerivedMetastoreEvent {
-  // alter table event with rename true
-  private final AlterTableEvent actualEvent_;
-
+public class RenameTableBarrierEvent extends DerivedMetastoreTableEvent {
   // Drop table or Create table event
   private final MetastoreTableEvent pseudoEvent_;
 
@@ -140,17 +137,15 @@ public class RenameTableBarrierEvent extends MetastoreTableEvent
     }
   }
 
-  RenameTableBarrierEvent(AlterTableEvent actualEvent,
+  RenameTableBarrierEvent(DerivedMetastoreEventContext context,
       MetastoreTableEvent pseudoEvent, RenameEventState state) {
-    super(pseudoEvent.catalogOpExecutor_, pseudoEvent.metrics_, pseudoEvent.event_);
-    Preconditions.checkArgument(actualEvent != null);
+    super(context, pseudoEvent.event_);
     Preconditions.checkArgument(state != null);
     Preconditions.checkArgument(
         pseudoEvent.getEventType() == MetastoreEventType.DROP_TABLE ||
         pseudoEvent.getEventType() == MetastoreEventType.CREATE_TABLE);
-    actualEvent_ = actualEvent;
     pseudoEvent_ = pseudoEvent;
-    this.state_ = state;
+    state_ = state;
   }
 
   /**
@@ -159,9 +154,7 @@ public class RenameTableBarrierEvent extends MetastoreTableEvent
    * @return True if the event can be processed. False otherwise
    */
   boolean canProcess() {
-    if (getEventType() == MetastoreEventType.DROP_TABLE) {
-      return !state_.isDropProcessed();
-    }
+    if (getEventType() == MetastoreEventType.DROP_TABLE) return !state_.isDropProcessed();
     return state_.isDropProcessed() && !state_.isCreateProcessed();
   }
 
@@ -170,7 +163,7 @@ public class RenameTableBarrierEvent extends MetastoreTableEvent
     if (state_.isSkipped()) {
       // Update the skipped metrics if both events are skipped
       metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
-      actualEvent_.debugLog("Incremented skipped metric to {}",
+      getActualEvent().debugLog("Incremented skipped metric to {}",
           metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount());
     }
     if (state_.isProcessed()) {
@@ -186,7 +179,7 @@ public class RenameTableBarrierEvent extends MetastoreTableEvent
   @Override
   public void processIfEnabled() throws CatalogException {
     Preconditions.checkState(canProcess());
-    if (actualEvent_.isEventProcessingDisabled()) {
+    if (getActualEvent().isEventProcessingDisabled()) {
       updateStatus(true);
       return;
     }
@@ -196,9 +189,7 @@ public class RenameTableBarrierEvent extends MetastoreTableEvent
           DebugUtils.EVENT_PROCESSING_DELAY);
     }
     process();
-    if (state_.isProcessed()) {
-      actualEvent_.injectErrorIfNeeded();
-    }
+    if (state_.isProcessed()) getActualEvent().injectErrorIfNeeded();
   }
 
   @Override
@@ -206,9 +197,7 @@ public class RenameTableBarrierEvent extends MetastoreTableEvent
     Timer.Context context = null;
     Db db = catalog_.getDb(getDbName());
     Table table = null;
-    if (db != null) {
-      table = db.getTable(getTableName());
-    }
+    if (db != null) table = db.getTable(getTableName());
     if (table != null) {
       context = table.getMetrics().getTimer(TBL_EVENTS_PROCESS_DURATION).time();
     }
@@ -219,7 +208,7 @@ public class RenameTableBarrierEvent extends MetastoreTableEvent
         if (table != null && catalogOpExecutor_.removeTableIfNotAddedLater(getEventId(),
             getDbName(), getTableName(), new Reference<>())) {
           skipped = false;
-          actualEvent_.infoLog("Successfully removed table {}", fqTableName);
+          getActualEvent().infoLog("Successfully removed table {}", fqTableName);
           metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLES_REMOVED).inc();
         }
       } else {
@@ -227,14 +216,12 @@ public class RenameTableBarrierEvent extends MetastoreTableEvent
         if (db != null && catalogOpExecutor_.addTableIfNotRemovedLater(getEventId(),
             pseudoEvent_.getTable())) {
           skipped = false;
-          actualEvent_.infoLog("Successfully added table {}", fqTableName);
+          getActualEvent().infoLog("Successfully added table {}", fqTableName);
           metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLES_ADDED).inc();
         }
       }
     } finally {
-      if (context != null) {
-        context.stop();
-      }
+      if (context != null) context.stop();
     }
     updateStatus(skipped);
   }
@@ -270,6 +257,6 @@ public class RenameTableBarrierEvent extends MetastoreTableEvent
 
   @Override
   public String getEventDesc() {
-    return actualEvent_.getEventDesc() + " pseudo-event " + getEventType();
+    return getActualEvent().getEventDesc() + " pseudo-event " + getEventType();
   }
 }

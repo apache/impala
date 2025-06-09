@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreDatabaseEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 
 /**
  * An instance of this class is used to synchronize all the TableProcessors to process
@@ -41,12 +40,12 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
  * indicates that to DbProcessor event processing with {@link DbBarrierEvent#proceed()}
  * and do not process any further events beyond it. On subsequent event processing
  * schedules, TableProcessor's event processing determines whether database event is
- * processed on DbProcessor with {@link DbBarrierEvent#isProcessed()}.
+ * processed on DbProcessor with {@link DbBarrierEvent#isAllDerivedEventsProcessed()}.
  * <p>
  * Once all the TableProcessors indicate DbProcessor event processing, DbProcessor
  * process the DbBarrierEvent and marks it as processed. And the TableProcessors detects
- * the event status with {@link DbBarrierEvent#isProcessed()}. Henceforth, all the
- * TableProcessors continue to process their table events independently.
+ * the event status with {@link DbBarrierEvent#isAllDerivedEventsProcessed()}. Henceforth,
+ * all the TableProcessors continue to process their table events independently.
  *
  * @see org.apache.impala.catalog.events.DbEventExecutor.DbProcessor
  * @see org.apache.impala.catalog.events.TableEventExecutor.TableProcessor
@@ -74,10 +73,6 @@ public class DbBarrierEvent extends MetastoreDatabaseEvent
   public void processIfEnabled() throws CatalogException, MetastoreNotificationException {
     Preconditions.checkState(expectedProceedCount_.get() == 0);
     actualEvent_.processIfEnabled();
-    if (getEventType() == MetastoreEventType.DROP_DATABASE) {
-      catalog_.getMetastoreEventProcessor().getDeleteEventLog().removeEvent(getEventId());
-    }
-    isProcessed_ = true;
   }
 
   @Override
@@ -95,19 +90,11 @@ public class DbBarrierEvent extends MetastoreDatabaseEvent
    * <p>
    * TableProcessor invokes it when this event is seen during event processing. And
    * waits for DbProcessor to process the event. TableProcessor determines whether
-   * the event is processed at DbProcessor using {@link DbBarrierEvent#isProcessed()}
-   * method.
+   * the event is processed at DbProcessor using
+   * {@link DbBarrierEvent#isAllDerivedEventsProcessed()} method.
    */
   void proceed() {
     decrExpectedProceedCount();
-  }
-
-  /**
-   * Used to determine if this event is processed on DbProcessor.
-   * @return True if the event is processed. False otherwise
-   */
-  boolean isProcessed() {
-    return isProcessed_;
   }
 
   /**
@@ -135,5 +122,32 @@ public class DbBarrierEvent extends MetastoreDatabaseEvent
   private void decrExpectedProceedCount() {
     int value = expectedProceedCount_.decrementAndGet();
     debugLog("Number of table processors expected to process the event: {}", value);
+  }
+
+  /**
+   * Gets the actual metastore event
+   * @return Actual metastore event
+   */
+  @Override
+  public MetastoreEvents.MetastoreEvent getActualEvent() {
+    return actualEvent_;
+  }
+
+  /**
+   * Marks the event as processed.
+   */
+  @Override
+  public void markProcessed() {
+    Preconditions.checkState(expectedProceedCount_.get() == 0);
+    isProcessed_ = true;
+  }
+
+  /**
+   * Determines whether the event is processed on DbProcessor.
+   * @return True if the event is processed. False otherwise
+   */
+  @Override
+  public boolean isAllDerivedEventsProcessed() {
+    return isProcessed_;
   }
 }

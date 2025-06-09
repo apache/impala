@@ -73,9 +73,9 @@ import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Hive3MetastoreShimBase;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreEventContext;
+import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.IgnoredEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreTableEvent;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.MetaDataFilter;
 import org.apache.impala.catalog.events.MetastoreNotificationException;
 import org.apache.impala.catalog.events.SelfEventContext;
@@ -650,13 +650,11 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
    * dummy implementation class defined in this file becomes actual implementation. Need
    * to change when CommitTxnEvent implementation is supported with IMPALA-13285.
    */
-  public static class PseudoCommitTxnEvent extends MetastoreTableEvent
-      implements DerivedMetastoreEvent {
-    PseudoCommitTxnEvent(CommitTxnEvent actualEvent, String dbName, String tableName,
-        boolean isPartitioned, boolean isMaterializedView, List<Long> writeIds,
-        List<Partition> partitions) {
-      super(actualEvent.getCatalogOpExecutor(), actualEvent.getMetrics(),
-          actualEvent.getEvent());
+  public static class PseudoCommitTxnEvent extends DerivedMetastoreTableEvent {
+    PseudoCommitTxnEvent(DerivedMetastoreEventContext context, String dbName,
+        String tableName, boolean isPartitioned, boolean isMaterializedView,
+        List<Long> writeIds, List<Partition> partitions) {
+      super(context);
       throw new UnsupportedOperationException("PseudoCommitTxnEvent is not supported.");
     }
 

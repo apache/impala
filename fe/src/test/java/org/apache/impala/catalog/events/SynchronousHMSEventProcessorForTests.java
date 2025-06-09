@@ -70,6 +70,12 @@ public class SynchronousHMSEventProcessorForTests extends MetastoreEventsProcess
         MetastoreEventsProcessor.LAST_SYNCED_EVENT_TIME).getValue();
     long latestEventTime = (Long) metrics.getGauge(
         MetastoreEventsProcessor.LATEST_EVENT_TIME).getValue();
+    long greatestSyncedEventId = (Long) metrics.getGauge(
+        MetastoreEventsProcessor.GREATEST_SYNCED_EVENT_ID).getValue();
+    long greatestSyncedEventTime = (Long) metrics.getGauge(
+        MetastoreEventsProcessor.GREATEST_SYNCED_EVENT_TIME).getValue();
+    Assert.assertEquals(greatestSyncedEventId, lastSyncedEventId);
+    Assert.assertEquals(greatestSyncedEventTime, lastSyncedEventTime);
     if (lastSyncedEventId == latestEventId) {
       Assert.assertEquals("Incorrect last synced event time for event " + latestEventId,
           latestEventTime, lastSyncedEventTime);

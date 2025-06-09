@@ -3626,7 +3626,7 @@
     "key": "events-processor.events-received-15min-rate"
   },
   {
-    "description": "Last metastore event id that the catalog server processed and synced to",
+    "description": "It is the id of the latest metastore event such that all events with id less than or equal to the latest metastore event are definitely processed and synced",
     "contexts": [
       "CATALOGSERVER"
     ],
@@ -3636,7 +3636,7 @@
     "key" : "events-processor.last-synced-event-id"
   },
   {
-    "description": "Last metastore event time that the catalog server processed and synced to",
+    "description": "It is the time of the latest metastore event such that all events with id less than or equal to the latest metastore event are definitely processed and synced",
     "contexts": [
       "CATALOGSERVER"
     ],
@@ -3644,6 +3644,26 @@
     "units": "NONE",
     "kind" : "COUNTER",
     "key" : "events-processor.last-synced-event-time"
+  },
+  {
+    "description": "Greatest synced event id is the id of the latest metastore event such that all events with id less than or equal to the latest metastore event are definitely processed and synced. It is same as last-synced-event-id",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Greatest Synced Event Id",
+    "units": "NONE",
+    "kind" : "COUNTER",
+    "key" : "events-processor.greatest-synced-event-id"
+  },
+  {
+    "description": "Greatest synced event time is the time of the latest metastore event such that all events with id less than or equal to the latest metastore event are definitely processed and synced. It is same as last-synced-event-time",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Greatest Synced Event Time",
+    "units": "NONE",
+    "kind" : "COUNTER",
+    "key" : "events-processor.greatest-synced-event-time"
   },
   {
     "description": "Latest event id in Hive metastore",
@@ -3666,7 +3686,7 @@
     "key" : "events-processor.latest-event-time"
   },
   {
-    "description": "Number of pending events to be synced, i.e. the difference between latest-event-id and last-synced-event-id",
+    "description": "Number of pending events to be synced till the latest-event-id",
     "contexts": [
       "CATALOGSERVER"
     ],
@@ -3676,7 +3696,7 @@
     "key" : "events-processor.pending-events"
   },
   {
-    "description": "Lag time of the event processing, i.e. the difference between latest-event-time and last-synced-event-time",
+    "description": "Lag time of the event processing, i.e. the difference between latest-event-time and greatest-synced-event-time",
     "contexts": [
       "CATALOGSERVER"
     ],

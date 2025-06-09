@@ -74,6 +74,11 @@ public class NoOpEventProcessor implements ExternalEventsProcessor {
   }
 
   @Override
+  public void pauseGracefully() {
+    // no-op
+  }
+
+  @Override
   public void start(long fromEventId) {
     // no-op
   }

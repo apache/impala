@@ -2488,8 +2488,6 @@ public class CatalogServiceCatalog extends Catalog {
     // pause the event processing since the cache is anyways being cleared
     metastoreEventProcessor_.pause();
     metastoreEventProcessor_.clear();
-    // Clear delete event log
-    metastoreEventProcessor_.getDeleteEventLog().garbageCollect(currentEventId);
     // Update the HDFS cache pools
     try {
       // We want only 'true' HDFS filesystems to poll the HDFS cache (i.e not S3,
@@ -4173,7 +4171,7 @@ public class CatalogServiceCatalog extends Catalog {
     MetastoreEventsProcessor ep = (MetastoreEventsProcessor) metastoreEventProcessor_;
     StringBuilder info = new StringBuilder();
     if (cmdType == MetastoreEventsProcessor.EventProcessorCmdType.PAUSE) {
-      ep.pause();
+      ep.pauseGracefully();
     } else if (cmdType == MetastoreEventsProcessor.EventProcessorCmdType.START) {
       if (!startEventProcessorHelper(params, ep, resp, info)) {
         // 'resp' is updated in startEventProcessorHelper() for errors.
@@ -4182,7 +4180,7 @@ public class CatalogServiceCatalog extends Catalog {
     }
     info.append(String.format("EventProcessor status: %s. LastSyncedEventId: %d. " +
         "LatestEventId: %d.",
-        ep.getStatus(), ep.getLastSyncedEventId(), ep.getLatestEventId()));
+        ep.getStatus(), ep.getGreatestSyncedEventId(), ep.getLatestEventId()));
     resp.setStatus(new TStatus(TErrorCode.OK, Collections.emptyList()));
     resp.setInfo(info.toString());
     return resp;
@@ -4193,7 +4191,7 @@ public class CatalogServiceCatalog extends Catalog {
       StringBuilder warnings) {
     if (!params.isSetEvent_id()) {
       if (ep.getStatus() != EventProcessorStatus.ACTIVE) {
-        ep.start(ep.getLastSyncedEventId());
+        ep.start(ep.getGreatestSyncedEventId());
       }
       return true;
     }

@@ -276,6 +276,10 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static final String LAST_SYNCED_ID_METRIC = "last-synced-event-id";
   // last synced event time
   public static final String LAST_SYNCED_EVENT_TIME = "last-synced-event-time";
+  // Greatest synced event id
+  public static final String GREATEST_SYNCED_EVENT_ID = "greatest-synced-event-id";
+  // Greatest synced event time
+  public static final String GREATEST_SYNCED_EVENT_TIME = "greatest-synced-event-time";
   // latest event id in Hive metastore
   public static final String LATEST_EVENT_ID = "latest-event-id";
   // event time of the latest event in Hive metastore
@@ -802,10 +806,14 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     metrics_.addGauge(LAST_SYNCED_ID_METRIC, (Gauge<Long>) lastSyncedEventId_::get);
     metrics_.addGauge(LAST_SYNCED_EVENT_TIME,
         (Gauge<Long>) lastSyncedEventTimeSecs_::get);
+    metrics_.addGauge(GREATEST_SYNCED_EVENT_ID,
+        (Gauge<Long>) this::getGreatestSyncedEventId);
+    metrics_.addGauge(GREATEST_SYNCED_EVENT_TIME,
+        (Gauge<Long>) this::getGreatestSyncedEventTime);
     metrics_.addGauge(LATEST_EVENT_ID, (Gauge<Long>) latestEventId_::get);
     metrics_.addGauge(LATEST_EVENT_TIME, (Gauge<Long>) latestEventTimeSecs_::get);
     metrics_.addGauge(EVENT_PROCESSING_DELAY,
-        (Gauge<Long>) () -> latestEventTimeSecs_.get() - lastSyncedEventTimeSecs_.get());
+        (Gauge<Long>) () -> latestEventTimeSecs_.get() - getGreatestSyncedEventTime());
     metrics_.addCounter(NUMBER_OF_TABLE_REFRESHES);
     metrics_.addCounter(NUMBER_OF_PARTITION_REFRESHES);
     metrics_.addCounter(NUMBER_OF_TABLES_ADDED);
@@ -867,6 +875,15 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    */
   public EventProcessorStatus getStatus() {
     return eventProcessorStatus_;
+  }
+
+  /**
+   * Whether metastore event can be processed in current status.
+   * @return True if event can be processed. False Otherwise.
+   */
+  public boolean canProcessEventInCurrentStatus() {
+    return (eventProcessorStatus_ == EventProcessorStatus.ACTIVE) ||
+        (eventProcessorStatus_ == EventProcessorStatus.PAUSED);
   }
 
   /**
@@ -934,6 +951,58 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   }
 
   /**
+   * Gets the current value of lastSyncedEventTimeSecs.
+   * @return
+   */
+  public long getLastSyncedEventTime() {
+    return lastSyncedEventTimeSecs_.get();
+  }
+
+  /**
+   * Gets the greatest synced event id. Greatest synced event is the latest event such
+   * that all events with id less than or equal to the latest event are definitely synced.
+   * When hierarchical event processing is not enabled, it is the same as the last synced
+   * event id.
+   * @return Event id of the greatest synced event
+   */
+  public long getGreatestSyncedEventId() {
+    if (isHierarchicalEventProcessingEnabled()) {
+      return eventExecutorService_.getGreatestSyncedEventId();
+    }
+    return getLastSyncedEventId();
+  }
+
+  /**
+   * Gets the greatest synced event time. Greatest synced event is the latest event such
+   * that all events with id less than or equal to the latest event are definitely synced.
+   * When hierarchical event processing is not enabled, it is the same as the last synced
+   * event time.
+   * @return Time of the greatest synced event
+   */
+  public long getGreatestSyncedEventTime() {
+    if (isHierarchicalEventProcessingEnabled()) {
+      return eventExecutorService_.getGreatestSyncedEventTime();
+    }
+    return getLastSyncedEventTime();
+  }
+
+  /**
+   * Calculates the number of metastore events that are pending synchronization up to the
+   * specified {@code latestEventId}.
+   * @param latestEventId Latest event id available on HMS
+   * @return Number of events that need to be synchronized. Returns 0 if all events up to
+   *         {@code latestEventId} have already been synchronized.
+   */
+  public long getPendingEventCount(long latestEventId) {
+    if (isHierarchicalEventProcessingEnabled()) {
+      return eventExecutorService_.getPendingEventCount(latestEventId);
+    }
+    long lastSyncedEventId = lastSyncedEventId_.get();
+    if (latestEventId <= lastSyncedEventId) return 0;
+    return latestEventId - lastSyncedEventId;
+  }
+
+  /**
    * Returns the current value of latestEventId_. This method is not thread-safe and
    * only to be used for testing purposes
    */
@@ -970,8 +1039,64 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       return;
     }
     updateStatus(EventProcessorStatus.PAUSED);
-    LOG.info(String.format("Event processing is paused. Last synced event id is %d",
-        lastSyncedEventId_.get()));
+    LOG.info("Event processing is paused. {} synced event id is {}",
+        isHierarchicalEventProcessingEnabled() ? "Greatest" : "Last",
+        getGreatestSyncedEventId());
+  }
+
+  /**
+   * Gracefully pauses the event processor by setting its status to
+   * <code>EventProcessorStatus.PAUSED</code>.
+   * <p>
+   * Ensures that all currently fetched events from HMS are processed before the processor
+   * is fully paused.
+   * No new events will be fetched for processing while the processor remains in the
+   * paused state.
+   */
+  @Override
+  public void pauseGracefully() {
+    pause();
+    LOG.info("Process already fetched events if any");
+    if (isHierarchicalEventProcessingEnabled()) {
+      ensureEventsProcessedInHierarchicalMode(3600000);
+    } else {
+      boolean isNeedWait = isCurrentFilteredEventsExist();
+      while (isNeedWait) {
+        Uninterruptibles.sleepUninterruptibly(5, TimeUnit.MILLISECONDS);
+        isNeedWait = isCurrentFilteredEventsExist();
+      }
+    }
+    LOG.info("Event processing is paused. Greatest synced event id is {}",
+        getGreatestSyncedEventId());
+  }
+
+  /**
+   * Determines whether current filtered metastore events exists.
+   * @return
+   */
+  public synchronized boolean isCurrentFilteredEventsExist() {
+    return currentFilteredEvents_ != null && !currentFilteredEvents_.isEmpty();
+  }
+
+  /**
+   * Resets the current filtered metastore events.
+   */
+  public synchronized void resetCurrentFilteredEvents() {
+    currentFilteredEvents_ = null;
+  }
+
+  /**
+   * Populates the current filtered metastore events from the given HMS notification
+   * events.
+   * @param events List of NotificationEvent
+   * @throws MetastoreNotificationException
+   */
+  public synchronized void populateCurrentFilteredEvents(List<NotificationEvent> events)
+      throws MetastoreNotificationException {
+    currentFilteredEvents_ = Collections.emptyList();
+    // Do not create metastore events for this batch of HMS events if status is not active
+    if (eventProcessorStatus_ != EventProcessorStatus.ACTIVE) return;
+    currentFilteredEvents_ = metastoreEventFactory_.getFilteredEvents(events, metrics_);
   }
 
   /**
@@ -1043,7 +1168,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public synchronized void start(long fromEventId) {
     Preconditions.checkArgument(fromEventId >= 0);
     EventProcessorStatus currentStatus = eventProcessorStatus_;
-    long prevLastSyncedEventId = lastSyncedEventId_.get();
+    long prevLastSyncedEventId = getGreatestSyncedEventId();
     if (currentStatus == EventProcessorStatus.ACTIVE) {
       // if events processor is already active, we should make sure that the
       // start event id provided is not behind the lastSyncedEventId. This could happen
@@ -1056,8 +1181,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     // Clear the error message of the last failure and reset the progress info
     eventProcessorErrorMsg_ = null;
     resetProgressInfo();
+    // Clear delete event log
+    deleteEventLog_.garbageCollect(fromEventId);
     lastSyncedEventId_.set(fromEventId);
     lastSyncedEventTimeSecs_.set(getEventTimeFromHMS(fromEventId));
+    if (isHierarchicalEventProcessingEnabled()) eventExecutorService_.start();
     updateStatus(EventProcessorStatus.ACTIVE);
     LOG.info(String.format(
         "Metastore event processing restarted. Last synced event id was updated "
@@ -1229,9 +1357,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       List<NotificationEvent> events = getNextMetastoreEvents(currentEventId);
       processEvents(currentEventId, events);
     } catch (Exception ex) {
-      handleEventProcessException(ex);
+      handleEventProcessException(ex, currentEvent_);
     } finally {
       if (isHierarchicalEventProcessingEnabled()) {
+        // Do maintenance cleanup to remove idle DbProcessors if any, regardless of
+        // exception occurrence or not.
         eventExecutorService_.cleanup();
       }
     }
@@ -1246,8 +1376,9 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * MetastoreNotificationFetchException, since event processor and event executor
    * service will continue to process events once the HMS is UP again.
    * @param ex Exception in event processing
+   * @param event HMS Notification event when the exception occurred
    */
-  public void handleEventProcessException(Exception ex) {
+  public void handleEventProcessException(Exception ex, NotificationEvent event) {
     if (ex instanceof MetastoreNotificationFetchException) {
       // No need to change the EventProcessor state to error since we want the
       // EventProcessor to continue getting new events after HMS is back up.
@@ -1267,9 +1398,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       updateStatus(EventProcessorStatus.ERROR);
       String msg = "Unexpected exception received while processing event";
       LOG.error(msg, ex);
-      eventProcessorErrorMsg_ = LocalDateTime.now().toString() + '\n' + msg + '\n' +
-          ExceptionUtils.getStackTrace(ex);
-      dumpEventInfoToLog(currentEvent_);
+      dumpEventInfoToLog(event, LocalDateTime.now().toString() + '\n' + msg +
+          '\n' + ExceptionUtils.getStackTrace(ex));
       tryAutoGlobalInvalidateOnFailure();
     }
   }
@@ -1316,25 +1446,19 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       NotificationEvent event = getEventFromHMS(msClient, currentEventId);
       // Events could be empty if they are just cleaned up.
       if (event == null) return;
-      long lastSyncedEventId = lastSyncedEventId_.get();
-      long lastSyncedEventTime = lastSyncedEventTimeSecs_.get();
+      long lastSyncedEventId = getGreatestSyncedEventId();
+      long lastSyncedEventTime = getGreatestSyncedEventTime();
       long currentEventTime = event.getEventTime();
       latestEventId_.set(currentEventId);
       latestEventTimeSecs_.set(currentEventTime);
-      LOG.info("Latest event in HMS: id={}, time={}. Last synced event: id={}, time={}.",
-          currentEventId, currentEventTime, lastSyncedEventId, lastSyncedEventTime);
+      LOG.info("Latest event in HMS: id={}, time={}. {} synced event: id={}, time={}.",
+          currentEventId, currentEventTime,
+          isHierarchicalEventProcessingEnabled() ? "Greatest" : "Last",
+          lastSyncedEventId, lastSyncedEventTime);
       if (currentEventTime > lastSyncedEventTime) {
-        // TODO: Need to redefine the lag in the hierarchical processing mode.
-        // Hierarchical mode currently have a mechanism to check the total number of
-        // outstanding events at the moment so that memory usage pressure on catalogd
-        // can be controlled when event processing becomes slow i.e., iff outstanding
-        // event count exceeds max_outstanding_events_on_executors configured value. And
-        // lastSyncedEventTimeSecs_ accounts only for event dispatch time in hierarchical
-        // mode.
-        LOG.warn("Lag: {}. {} events pending to be {}.",
+        LOG.warn("Lag: {}. Approximately {} events pending to be processed.",
             PrintUtils.printTimeMs((currentEventTime - lastSyncedEventTime) * 1000),
-            currentEventId - lastSyncedEventId,
-            isHierarchicalEventProcessingEnabled() ? "dispatched" : "processed");
+            getPendingEventCount(currentEventId));
       }
     } catch (Exception e) {
       LOG.error("Unable to update current notification event id. Last value: {}",
@@ -1351,10 +1475,14 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     TEventProcessorMetrics eventProcessorMetrics = new TEventProcessorMetrics();
     EventProcessorStatus currentStatus = getStatus();
     eventProcessorMetrics.setStatus(currentStatus.toString());
-    eventProcessorMetrics.setLast_synced_event_id(getLastSyncedEventId());
+    eventProcessorMetrics.setLast_synced_event_id(getGreatestSyncedEventId());
+    eventProcessorMetrics.setGreatest_synced_event_id(getGreatestSyncedEventId());
     if (currentStatus != EventProcessorStatus.ACTIVE) return eventProcessorMetrics;
     // The following counters are only updated when event-processor is active.
-    eventProcessorMetrics.setLast_synced_event_time(lastSyncedEventTimeSecs_.get());
+    eventProcessorMetrics.setLast_synced_event_time(getGreatestSyncedEventTime());
+    eventProcessorMetrics.setGreatest_synced_event_time(getGreatestSyncedEventTime());
+    eventProcessorMetrics.setPending_event_count(
+        getPendingEventCount(latestEventId_.get()));
     eventProcessorMetrics.setLatest_event_id(latestEventId_.get());
     eventProcessorMetrics.setLatest_event_time(latestEventTimeSecs_.get());
 
@@ -1417,8 +1545,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       summaryResponse.setError_msg(eventProcessorErrorMsg_);
     }
     TEventBatchProgressInfo progressInfo = new TEventBatchProgressInfo();
-    progressInfo.last_synced_event_id = lastSyncedEventId_.get();
-    progressInfo.last_synced_event_time_s = lastSyncedEventTimeSecs_.get();
+    progressInfo.last_synced_event_id = getGreatestSyncedEventId();
+    progressInfo.last_synced_event_time_s = getGreatestSyncedEventTime();
     progressInfo.latest_event_id = latestEventId_.get();
     progressInfo.latest_event_time_s = latestEventTimeSecs_.get();
     if (req.get_latest_event_from_hms) {
@@ -1468,7 +1596,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     currentEvent_ = null;
     currentEventBatch_ = null;
     currentFilteredEvent_ = null;
-    currentFilteredEvents_ = null;
+    resetCurrentFilteredEvents();
     currentBatchStartTimeMs_ = 0;
     currentEventStartTimeMs_ = 0;
     currentEventIndex_ = 0;
@@ -1485,14 +1613,19 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   protected void processEvents(long currentEventId, List<NotificationEvent> events)
       throws MetastoreNotificationException {
     currentEventBatch_ = events;
+    boolean isHierarchical = isHierarchicalEventProcessingEnabled();
     // update the events received metric before returning
     metrics_.getMeter(EVENTS_RECEIVED_METRIC).mark(events.size());
     if (events.isEmpty()) {
       if (lastSyncedEventId_.get() < currentEventId) {
         // Possible to receive empty list due to event skip list in notification event
         // request. Update the last synced event id with current event id on metastore
+        long currentEventTime = getEventTimeFromHMS(currentEventId);
         lastSyncedEventId_.set(currentEventId);
-        lastSyncedEventTimeSecs_.set(getEventTimeFromHMS(currentEventId));
+        lastSyncedEventTimeSecs_.set(currentEventTime);
+        if (isHierarchical) {
+          eventExecutorService_.addToProcessedLog(currentEventId, currentEventTime);
+        }
       }
       return;
     }
@@ -1501,22 +1634,23 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     currentBatchStartTimeMs_ = System.currentTimeMillis();
     Map<MetastoreEvent, Long> eventProcessingTime = new HashMap<>();
     try {
-      currentFilteredEvents_ =
-          metastoreEventFactory_.getFilteredEvents(events, metrics_);
+      populateCurrentFilteredEvents(events);
       if (currentFilteredEvents_.isEmpty()) {
         NotificationEvent e = events.get(events.size() - 1);
         lastSyncedEventId_.set(e.getEventId());
         lastSyncedEventTimeSecs_.set(e.getEventTime());
+        if (isHierarchical) {
+          eventExecutorService_.addToProcessedLog(e.getEventId(), e.getEventTime());
+        }
         resetProgressInfo();
         return;
       }
-      boolean isHierarchical = isHierarchicalEventProcessingEnabled();
       for (MetastoreEvent event : currentFilteredEvents_) {
         // synchronizing each event processing reduces the scope of the lock so the a
         // potential reset() during event processing is not blocked for longer than
         // necessary
         synchronized (this) {
-          if (eventProcessorStatus_ != EventProcessorStatus.ACTIVE) {
+          if (!canProcessEventInCurrentStatus()) {
             break;
           }
           currentEvent_ = event.metastoreNotificationEvent_;
@@ -1570,10 +1704,6 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
 
   private void logEventMetrics(Map<MetastoreEvent, Long> eventProcessingTime,
       long elapsedNs) {
-    // TODO: eventProcessingTime here is more relevant in sequential processing mode. But,
-    //  in case of hierarchical processing mode, these are the times taken at dispatcher
-    //  thread alone for each event. Need to have another mechanism to capture the actual
-    //  event processing time in hierarchical processing mode.
     boolean isHierarchical = isHierarchicalEventProcessingEnabled();
     LOG.info("Time elapsed in {} event batch: {}",
         isHierarchical ? "dispatching" : "processing",
@@ -1623,11 +1753,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     eventProcessorStatus_ = toStatus;
   }
 
-  private void dumpEventInfoToLog(NotificationEvent event) {
+  private void dumpEventInfoToLog(NotificationEvent event, String errorMessage) {
     if (event == null) {
       String error = "Notification event is null";
       LOG.error(error);
-      eventProcessorErrorMsg_ += '\n' + error;
+      eventProcessorErrorMsg_ = errorMessage + '\n' + error;
       return;
     }
     StringBuilder msg =
@@ -1641,7 +1771,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     msg.append("Event message: ").append(event.getMessage()).append("\n");
     String msgStr = msg.toString();
     LOG.error(msgStr);
-    eventProcessorErrorMsg_ += '\n' + msgStr;
+    eventProcessorErrorMsg_ = errorMessage + '\n' + msgStr;
   }
 
   /**
@@ -1760,8 +1890,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     TStatus res = new TStatus();
     // Only waits when event-processor is in ACTIVE/PAUSED states. PAUSED states happen
     // at startup or when global invalidate is running, so it's ok to wait for.
-    if (!EventProcessorStatus.ACTIVE.equals(eventProcessorStatus_)
-        && !EventProcessorStatus.PAUSED.equals(eventProcessorStatus_)) {
+    if (!canProcessEventInCurrentStatus()) {
       res.setStatus_code(TErrorCode.GENERAL);
       res.addToError_msgs(
           "Current state of HMS event processor is " + eventProcessorStatus_);
@@ -1784,7 +1913,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
           latestEventId, e);
       waitForEventId = latestEventId;
     }
-    long lastSyncedEventId = getLastSyncedEventId();
+    long lastSyncedEventId = getGreatestSyncedEventId();
     long startMs = System.currentTimeMillis();
     long sleepIntervalMs = Math.min(timeoutMs, hmsEventSyncSleepIntervalMs_);
     // Avoid too many log entries if the waiting interval is smaller than 500ms.
@@ -1797,9 +1926,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
             lastSyncedEventId, waitForEventId);
       }
       Uninterruptibles.sleepUninterruptibly(sleepIntervalMs, TimeUnit.MILLISECONDS);
-      lastSyncedEventId = getLastSyncedEventId();
-      if (!EventProcessorStatus.ACTIVE.equals(eventProcessorStatus_)
-          && !EventProcessorStatus.PAUSED.equals(eventProcessorStatus_)) {
+      lastSyncedEventId = getGreatestSyncedEventId();
+      if (!canProcessEventInCurrentStatus()) {
         res.setStatus_code(TErrorCode.GENERAL);
         res.addToError_msgs(
             "Current state of HMS event processor is " + eventProcessorStatus_);
@@ -1828,7 +1956,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     // requiredEventId starts from the last synced event id. While checking pending
     // events of a target, we just fetch events after requiredEventId, since events
     // before it are decided to be waited for.
-    long requiredEventId = getLastSyncedEventId();
+    long requiredEventId = getGreatestSyncedEventId();
     if (req.want_db_list) {
       return getMinRequiredEventIdForDbList(requiredEventId);
     }

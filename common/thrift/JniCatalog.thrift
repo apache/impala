@@ -991,6 +991,16 @@ struct TEventProcessorMetrics {
 
   // Outstanding event count to process on executors
   22: optional i64 outstanding_event_count
+
+  // Number of metastore events that are pending synchronization up to and including
+  // the latest_event_id
+  23: optional i64 pending_event_count
+
+  // Greatest synced event id
+  24: optional i64 greatest_synced_event_id
+
+  // Greatest synced event time
+  25: optional i64 greatest_synced_event_time
 }
 
 struct TCatalogHmsCacheApiMetrics {

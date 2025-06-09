@@ -53,6 +53,12 @@ public interface ExternalEventsProcessor {
   void pause();
 
   /**
+   * Gracefully Pauses the event processing. Use <code>start(fromEventId)</code> method
+   * below to restart the event processing
+   */
+  void pauseGracefully();
+
+  /**
    * Starts the event processing from the given eventId. This method can be used to jump
    * ahead in the event processing under certain cases where it is okay skip certain
    * events

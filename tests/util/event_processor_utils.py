@@ -57,10 +57,9 @@ class EventProcessorUtils(object):
     while True:
       t = time.time()
       current_synced_id = EventProcessorUtils.get_last_synced_event_id()
-      outstanding_events = EventProcessorUtils.get_outstanding_event_count()
-      if current_synced_id >= target_event_id and outstanding_events == 0:
-        LOG.debug("Metric last-synced-event-id has reached the desired value: %d, "
-                  + "outstanding events: %d", target_event_id, outstanding_events)
+      if current_synced_id >= target_event_id:
+        LOG.debug("Metric last-synced-event-id has reached the desired value: %d",
+                  target_event_id)
         break
       status = EventProcessorUtils.get_event_processor_status()
       if status not in status_list:
@@ -79,8 +78,7 @@ class EventProcessorUtils(object):
       if made_progress:
         LOG.debug(
           "Metric last-synced-event-id has been increased to %d but has not yet "
-          + "reached the desired value: %d, outstanding events: %d", current_synced_id,
-          target_event_id, outstanding_events)
+          + "reached the desired value: %d", current_synced_id, target_event_id)
         last_synced_id = current_synced_id
         last_synced_time = t
       time.sleep(0.1)
@@ -153,10 +151,15 @@ class EventProcessorUtils(object):
 
   @staticmethod
   def get_last_synced_event_id():
-    """Returns the last_synced_event_id."""
+    """Returns the greatest event id such that all the events with id less than or
+    equal to this event id are definitely synced. When hierarchical event processing is
+    enabled, greatest-synced-event-id returns the value. When hierarchical event
+    processing is disabled, greatest-synced-event-id and last-synced-event-id have same
+    value. So we can always return greatest-synced-event-id irrespective of hierarchical
+    event processing flag."""
     metrics = EventProcessorUtils.get_event_processor_metrics()
-    assert 'last-synced-event-id' in metrics.keys()
-    return int(metrics['last-synced-event-id'])
+    assert 'greatest-synced-event-id' in metrics.keys()
+    return int(metrics['greatest-synced-event-id'])
 
   @staticmethod
   def get_num_skipped_events():
@@ -173,13 +176,6 @@ class EventProcessorUtils(object):
     metrics = EventProcessorUtils.get_event_processor_metrics()
     assert 'status' in metrics.keys()
     return metrics['status']
-
-  @staticmethod
-  def get_outstanding_event_count():
-    """Returns the outstanding event count"""
-    metrics = EventProcessorUtils.get_event_processor_metrics()
-    assert 'outstanding-event-count' in metrics.keys()
-    return int(metrics['outstanding-event-count'])
 
   @staticmethod
   def get_current_notification_id(hive_client):

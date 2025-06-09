@@ -79,6 +79,12 @@ class MetastoreEventMetrics {
   /// Last metastore event time that the catalog server synced to.
   static IntCounter* LAST_SYNCED_EVENT_TIME;
 
+  /// Greatest synced event id
+  static IntCounter* GREATEST_SYNCED_EVENT_ID;
+
+  /// Greatest synced event time
+  static IntCounter* GREATEST_SYNCED_EVENT_TIME;
+
   /// Latest metastore event id
   static IntCounter* LATEST_EVENT_ID;
 
@@ -153,6 +159,12 @@ class MetastoreEventMetrics {
 
   /// Metric name for the outstanding event count
   static std::string OUTSTANDING_EVENT_COUNT_METRIC_NAME;
+
+  /// Metric name for greatest synced event id
+  static std::string GREATEST_SYNCED_EVENT_ID_METRIC_NAME;
+
+  /// Metric name for greatest synced event time
+  static std::string GREATEST_SYNCED_EVENT_TIME_METRIC_NAME;
 };
 
 } // namespace impala

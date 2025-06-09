@@ -30,10 +30,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.impala.catalog.events.MetastoreEvents.DropTableEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
-import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.util.ClassUtil;
 import org.apache.impala.util.ThreadNameAnnotator;
@@ -104,11 +104,24 @@ public class TableEventExecutor {
     /**
      * Indicates whether TableProcessor is terminating. Events are processed only when
      * isTerminating_ is false.
-     * Event processing {@link TableProcessor#process()} and deletion
-     * {@link TableEventExecutor#deleteTableProcessor(String)} are invoked from different
-     * threads. {@link TableEventExecutor#deleteTableProcessor(String)} acquires
-     * processorLock_ to immediately set isTerminating_ to true, thereby preventing any
-     * further event processing.
+     * <p>
+     * TableProcessor event queueing {@link TableProcessor#enqueue(MetastoreEvent)} and
+     * processing {@link TableProcessor#process()} are invoked from different threads.
+     * {@link TableProcessor#enqueue(MetastoreEvent)} acquires processorLock_ to
+     * atomically update the event queue, increment outstanding event count so that
+     * {@link TableProcessor#process()} gets the consistent view of them together.
+     * <p>
+     * TableProcessor deletion {@link TableEventExecutor#deleteTableProcessor(String)}
+     * and processing {@link TableProcessor#process()} are invoked from different threads.
+     * {@link TableEventExecutor#deleteTableProcessor(String)} acquires processorLock_ to
+     * immediately set isTerminating_ to true, thereby preventing any further event
+     * processing in {@link TableProcessor#process()}.
+     * <p>
+     * TableProcessor event queueing {@link TableProcessor#enqueue(MetastoreEvent)}
+     * and deletion {@link TableEventExecutor#deleteTableProcessor(String)} are invoked
+     * from DbProcessor in same thread(upon TableProcessor idle timeout) or in different
+     * threads(forcibly clear). But their invocation is mutually exclusive because
+     * DbProcessor protects with its processorLock_.
      * <p>
      * {@link TableProcessor#process()} acquires processorLock_ in following cases:
      * <ul>
@@ -122,10 +135,6 @@ public class TableEventExecutor {
      * {@link DbEventExecutor#clear()} or {@link DbEventExecutor#stop()} is invoked,
      * all associated DbProcessors are forcibly cleared and removed. During that process,
      * each DbProcessor also forcefully deletes its TableProcessors.
-     * <p>
-     * Lock contention is unlikely at the most frequent call site (i.e., within
-     * {@link TableProcessor#process()}, since lock acquired in deleteTableProcessor() is
-     * held only once.
      */
     private final Object processorLock_ = new Object();
     private volatile boolean isTerminating_ = false;
@@ -159,15 +168,22 @@ public class TableEventExecutor {
     }
 
     /**
+     * Gets Metastore event processor
+     * @return
+     */
+    private MetastoreEventsProcessor getEventProcessor() {
+      return tableEventExecutor_.eventProcessor_;
+    }
+
+    /**
      * Queue the event to the TableProcessor for processing.
      * @param event
      */
     void enqueue(MetastoreEvent event) {
-      if (tableEventExecutor_.eventProcessor_.getStatus() !=
-          EventProcessorStatus.ACTIVE) {
+      MetastoreEventsProcessor eventProcessor = getEventProcessor();
+      if (!eventProcessor.canProcessEventInCurrentStatus()) {
         event.warnLog("Event is not queued to executor: {} since status is {}",
-            tableEventExecutor_.name_,
-            tableEventExecutor_.eventProcessor_.getStatus());
+            tableEventExecutor_.name_, eventProcessor.getStatus());
         return;
       }
       lastEventQueuedTime_ = System.currentTimeMillis();
@@ -176,8 +192,11 @@ public class TableEventExecutor {
       } else if (event.getEventType() == MetastoreEventType.DROP_TABLE) {
         skipEventId_.set(event.getEventId());
       }
-      events_.offer(event);
-      tableEventExecutor_.incrOutstandingEventCount();
+      synchronized (processorLock_) {
+        Preconditions.checkState(!isTerminating());
+        events_.offer(event);
+        tableEventExecutor_.incrOutstandingEventCount();
+      }
       event.debugLog("Enqueued for table: {} on executor: {}", fqTableName_,
           tableEventExecutor_.name_);
     }
@@ -210,13 +229,10 @@ public class TableEventExecutor {
     /**
      * Skip the metastore event from processing if possible.
      * @param event Metastore event
-     * @param dropTableEventId Drop table event id if drop table event or rename table
-     *                         barrier with drop table event is queued for processing.
-     *                         Else -1.
      * @return True if event is skipped. Else false.
      */
-    private boolean skipEventIfPossible(MetastoreEvent event, long dropTableEventId) {
-      if (event.getEventId() >= dropTableEventId || event instanceof DbBarrierEvent ||
+    private boolean skipEventIfPossible(MetastoreEvent event) {
+      if (event.getEventId() >= skipEventId_.get() || event instanceof DbBarrierEvent ||
           event instanceof RenameTableBarrierEvent) {
         return false;
       }
@@ -228,70 +244,110 @@ public class TableEventExecutor {
     }
 
     /**
-     * Process the events on the TableProcessor. It is invoked from TableEventExecutor's
-     * thread periodically to process events for the TableProcessor.
+     * Method invoked after processing the metastore event.
+     * @param event Metastore event
+     */
+    private void postProcessEvent(MetastoreEvent event) {
+      if (event instanceof DbBarrierEvent) return;
+      lastProcessedEventId_ = event.getEventId();
+      MetastoreEventsProcessor eventProcessor = getEventProcessor();
+      boolean removeFromInProgressLog = true;
+      if (event instanceof DerivedMetastoreTableEvent) {
+        DerivedMetastoreTableEvent derivedEvent = (DerivedMetastoreTableEvent) event;
+        derivedEvent.markProcessed();
+        removeFromInProgressLog = derivedEvent.isAllDerivedEventsProcessed();
+      }
+      if (removeFromInProgressLog) {
+        eventProcessor.getEventExecutorService()
+            .removeFromInProgressLog(event.getEventId());
+      }
+      if (event.isDropEvent()) {
+        eventProcessor.getDeleteEventLog().removeEvent(event.getEventId());
+      }
+    }
+
+    /**
+     * Process the given metastore event.
+     * @param event Metastore event
+     * @return True if event is processed. False otherwise
      * @throws Exception
      */
-    private void process() throws Exception {
-      MetastoreEvent event;
-      String annotation = "Processing %s for table: " + fqTableName_;
-      long skipEventId = skipEventId_.get();
-      while ((event = events_.peek()) != null) {
-        if (isTerminating()) return;
-        if (tableEventExecutor_.eventProcessor_.getStatus() !=
-            EventProcessorStatus.ACTIVE) {
-          LOG.warn("Event processing is skipped for executor: {} since status is {}",
-              tableEventExecutor_.name_, tableEventExecutor_.eventProcessor_.getStatus());
-          return;
-        }
-        boolean isRenameTableBarrier = event instanceof RenameTableBarrierEvent;
-        if (isRenameTableBarrier && !((RenameTableBarrierEvent) event).canProcess()) {
-          event.traceLog("Rename table barrier waiting for table: {}", fqTableName_);
-          return;
-        }
-        boolean isDbEvent = event instanceof DbBarrierEvent;
-        if (isDbEvent && event.getEventId() != lastProcessedEventId_) {
-          // Indicate the processing has reached this event
-          ((DbBarrierEvent) event).proceed();
-          lastProcessedEventId_ = event.getEventId();
-        }
-        if (!skipEventIfPossible(event, skipEventId)) {
-          if (isDbEvent) {
-            if (!((DbBarrierEvent) event).isProcessed()) {
-              // Waiting for the db event to be processed
-              event.traceLog("DB barrier waiting for table: {}", fqTableName_);
-              return;
-            }
-          } else {
-            try (ThreadNameAnnotator tna = new ThreadNameAnnotator(
-                String.format(annotation, event.getEventDesc()))) {
-              event.processIfEnabled();
-            } catch (Exception processingEx) {
-              try {
-                if (!event.onFailure(processingEx)) {
-                  throw processingEx;
-                }
-              } catch (Exception onFailureEx) {
-                event.errorLog("Failed to handle event processing failure for table: {}",
-                    fqTableName_, onFailureEx);
-                throw processingEx;
-              }
+    private boolean processEvent(MetastoreEvent event) throws Exception {
+      if (isTerminating()) return false;
+      MetastoreEventsProcessor eventProcessor = getEventProcessor();
+      if (!eventProcessor.canProcessEventInCurrentStatus()) {
+        LOG.warn("Event processing is skipped for executor: {} since status is {}",
+            tableEventExecutor_.name_, eventProcessor.getStatus());
+        return false;
+      }
+      boolean isRenameTableBarrier = event instanceof RenameTableBarrierEvent;
+      if (isRenameTableBarrier && !((RenameTableBarrierEvent) event).canProcess()) {
+        event.traceLog("Rename table barrier waiting for table: {}", fqTableName_);
+        return false;
+      }
+      boolean isDbEvent = event instanceof DbBarrierEvent;
+      if (isDbEvent && event.getEventId() != lastProcessedEventId_) {
+        // Indicate the processing has reached this event
+        ((DbBarrierEvent) event).proceed();
+        lastProcessedEventId_ = event.getEventId();
+      }
+      if (!skipEventIfPossible(event)) {
+        if (isDbEvent) {
+          if (!((DbBarrierEvent) event).isAllDerivedEventsProcessed()) {
+            // Waiting for the db event to be processed
+            event.traceLog("DB barrier waiting for table: {}", fqTableName_);
+            return false;
+          }
+        } else {
+          try (ThreadNameAnnotator tna = new ThreadNameAnnotator(
+              String.format("Processing %s for table: %s", event.getEventDesc(),
+                  fqTableName_))) {
+            long processingStartTime = System.currentTimeMillis();
+            event.processIfEnabled();
+            event.infoLog("Scheduling delay: {}, Process time: {}",
+                PrintUtils.printTimeMs(processingStartTime - event.getDispatchTime()),
+                PrintUtils.printTimeMs(System.currentTimeMillis() - processingStartTime));
+          } catch (Exception processingEx) {
+            try {
+              if (!event.onFailure(processingEx)) throw processingEx;
+            } catch (Exception onFailureEx) {
+              event.errorLog("Failed to handle event processing failure for table: {}",
+                  fqTableName_, onFailureEx);
+              throw processingEx;
             }
           }
         }
-        lastProcessedEventId_ = event.getEventId();
-        event.infoLog("Processed for table: {},", fqTableName_);
-        if (event.isDropEvent()) {
-          tableEventExecutor_.eventProcessor_.getDeleteEventLog()
-              .removeEvent(event.getEventId());
-        }
-        synchronized (processorLock_) {
-          if (isTerminating()) return;
-          Preconditions.checkState(events_.poll() == event);
-          tableEventExecutor_.decrOutstandingEventCount(1);
+      }
+      return true;
+    }
+
+    /**
+     * Process the events on the TableProcessor. It is invoked from TableEventExecutor's
+     * thread periodically to process events for the TableProcessor.
+     * @throws EventProcessException
+     */
+    private void process() throws EventProcessException {
+      MetastoreEvent event;
+      while ((event = events_.peek()) != null) {
+        try {
+          boolean isProcessed = processEvent(event);
+          if (!isProcessed) return;
+          postProcessEvent(event);
+          synchronized (processorLock_) {
+            if (isTerminating()) return;
+            Preconditions.checkState(events_.poll() == event);
+            tableEventExecutor_.decrOutstandingEventCount(1);
+          }
+        } catch (Exception e) {
+          // Throwing EventProcessException triggers global invalidates metadata without
+          // user intervention iff invalidate_global_metadata_on_event_processing_failure
+          // flag is true. Otherwise, user has to explicitly issue invalidate metadata.
+          // Invalidate metadata resets catalog instance that clears EventExecutorService.
+          // And EventExecutorService inherently clears all DbEventExecutor and
+          // TableEventExecutor thereby removing all DbProcessors and TableProcessors.
+          throw new EventProcessException(event.getEvent(), e);
         }
       }
-      skipEventId_.compareAndSet(skipEventId, -1);
     }
   }
 
@@ -414,7 +470,6 @@ public class TableEventExecutor {
       // other places if isTerminating_ becomes true.
       decrOutstandingEventCount(tableProcessor.events_.size());
       tableProcessor.events_.clear();
-      tableProcessor.skipEventId_.set(-1);
     }
   }
 
@@ -426,13 +481,12 @@ public class TableEventExecutor {
     try {
       for (Map.Entry<String, TableProcessor> entry : tableProcessors_.entrySet()) {
         TableProcessor tableProcessor = entry.getValue();
-        if (eventProcessor_.getStatus() != EventProcessorStatus.ACTIVE) {
-          break;
-        }
+        if (!eventProcessor_.canProcessEventInCurrentStatus()) break;
         tableProcessor.process();
       }
-    } catch (Exception e) {
-      eventProcessor_.handleEventProcessException(e);
+    } catch (EventProcessException e) {
+      LOG.error("Exception occurred for executor: {}", name_);
+      eventProcessor_.handleEventProcessException(e.getException(), e.getEvent());
     }
   }
 }

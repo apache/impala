@@ -2058,6 +2058,7 @@ public class MetastoreEventsProcessorTest {
       assertNotNull(summaryResponse);
       // Last synced id must be set even when event processor is not active.
       assertTrue(response.isSetLast_synced_event_id());
+      assertTrue(response.isSetGreatest_synced_event_id());
     } finally {
       // reset the state of event process once the test completes
       eventsProcessor_.start();

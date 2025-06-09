@@ -178,7 +178,7 @@ public abstract class Catalog implements AutoCloseable {
    * Returns the Table object for the given dbName/tableName or null if the database or
    * table does not exist.
    */
-  public Table getTableNoThrow(String dbName, String tableName) {
+  public @Nullable Table getTableNoThrow(String dbName, String tableName) {
     Db db = getDb(dbName);
     if (db == null) return null;
     return db.getTable(tableName);
@@ -220,7 +220,7 @@ public abstract class Catalog implements AutoCloseable {
    * Removes a table from the catalog and returns the table that was removed, or null
    * if the table/database does not exist.
    */
-  public Table removeTable(TTableName tableName) {
+  public @Nullable Table removeTable(TTableName tableName) {
     // Remove the old table name from the cache and add the new table.
     Db db = getDb(tableName.getDb_name());
     if (db == null) return null;
@@ -344,7 +344,7 @@ public abstract class Catalog implements AutoCloseable {
    * ordered by argument precision (e.g. double is preferred over float) and then by
    * alphabetical order of argument type name, to guarantee deterministic results.
    */
-  public Function getFunction(Function desc, Function.CompareMode mode) {
+  public @Nullable Function getFunction(Function desc, Function.CompareMode mode) {
     Db db = getDb(desc.dbName());
     if (db == null) return null;
     return db.getFunction(desc, mode);
@@ -355,7 +355,7 @@ public abstract class Catalog implements AutoCloseable {
    * the Function object that was removed if the function existed, otherwise returns
    * null.
    */
-  public Function removeFunction(Function desc) {
+  public @Nullable Function removeFunction(Function desc) {
     Db db = getDb(desc.dbName());
     if (db == null) return null;
     return db.removeFunction(desc);
