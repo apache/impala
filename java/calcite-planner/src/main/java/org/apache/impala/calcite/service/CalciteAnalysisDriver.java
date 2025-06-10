@@ -43,6 +43,7 @@ import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
 import org.apache.impala.calcite.schema.ImpalaCalciteCatalogReader;
+import org.apache.impala.calcite.type.ImpalaTypeCoercionFactory;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.calcite.validate.ImpalaConformance;
@@ -119,6 +120,8 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
               // without this)
               .withIdentifierExpansion(true)
               .withConformance(ImpalaConformance.INSTANCE)
+              .withTypeCoercionEnabled(true)
+              .withTypeCoercionFactory(new ImpalaTypeCoercionFactory())
               );
       validatedNode_ = sqlValidator_.validate(parsedStmt_.getParsedSqlNode());
       return new CalciteAnalysisResult(this);

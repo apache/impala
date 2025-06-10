@@ -1066,4 +1066,14 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 select ds_hll_sketch(smallint_col) from functional_parquet.alltypessmall;
 ---- CATCH
 Cannot infer return type for DS_HLL_SKETCH; operand types: [SMALLINT]
+=====
+---- QUERY
+# This test case ensures that the TypeCoercion code is in place, which gets kicked
+# in with the "in" clause
+select count(*) from functional.alltypesagg
+where 10.1 not in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col)
+---- RESULTS
+8990
+---- TYPES
+bigint
 ====
