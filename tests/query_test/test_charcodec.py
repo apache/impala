@@ -223,9 +223,7 @@ class TestCharCodecGen(ImpalaTestSuite):
       part_url = os.path.join(
           self._get_table_location("{0}.{1}".format(db, tbl_name), vector),
           "part={}".format(i))
-      part_dir = part_url[part_url.index("/test-warehouse"):]
-      self.filesystem_client.make_dir(part_dir)
-      self.filesystem_client.copy_from_local(file_paths[i], part_dir)
+      self.filesystem_client.copy_from_local(file_paths[i], part_url)
     self.execute_query("""REFRESH {}.{}""".format(db, tbl_name))
     return tbl_name
 
@@ -309,9 +307,7 @@ class TestCharCodecGenMixed(ImpalaTestSuite):
       part_url = os.path.join(
           self._get_table_location("{0}.{1}".format(db, tbl_name), vector),
           "part={}".format(i))
-      part_dir = part_url[part_url.index("/test-warehouse"):]
-      self.filesystem_client.make_dir(part_dir)
-      self.filesystem_client.copy_from_local(file_paths[i], part_dir)
+      self.filesystem_client.copy_from_local(file_paths[i], part_url)
     self.execute_query("""REFRESH {}.{}""".format(db, tbl_name))
     return tbl_name
 
