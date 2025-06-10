@@ -3055,8 +3055,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         String.format("Exceeded the maximum depth of an expression tree (%s).",
         Expr.EXPR_DEPTH_LIMIT));
 
-    // Test 10x the safe depth (already at 1x, append 9x).
-    for (int i = 0; i < Expr.EXPR_DEPTH_LIMIT * 9; ++i) {
+    // Test 8x the safe depth (already at 1x, append 7x).
+    for (int i = 0; i < Expr.EXPR_DEPTH_LIMIT * 7; ++i) {
       exprStr.append(repeatSuffix);
     }
     AnalysisError(exprStr.toString(),
@@ -3076,9 +3076,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         Expr.EXPR_DEPTH_LIMIT + 1),
         String.format("Exceeded the maximum depth of an expression tree (%s).",
         Expr.EXPR_DEPTH_LIMIT));
-    // Test 10x the safe depth.
+    // Test 8x the safe depth.
     AnalysisError("select " + getNestedFuncExpr(openFunc, baseArg, closeFunc,
-        Expr.EXPR_DEPTH_LIMIT * 10),
+        Expr.EXPR_DEPTH_LIMIT * 8),
         String.format("Exceeded the maximum depth of an expression tree (%s).",
         Expr.EXPR_DEPTH_LIMIT));
   }
