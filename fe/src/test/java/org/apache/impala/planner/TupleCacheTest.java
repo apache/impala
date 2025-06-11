@@ -169,11 +169,15 @@ public class TupleCacheTest extends PlannerTestBase {
         /* isDistributedPlan */ true);
     // For single node plan, there are no exchanges and everything is eligible.
     verifyAllEligible(innerJoinAgg, /* isDistributedPlan */ false);
-    // Both scans are cached, but aggregate is not because it's above a union. Limit only
-    // applies to aggregate above exchange, which is obviously not cached.
+    // The scans and union are eligible. The aggregate is not because in a single
+    // node plan, the limit attaches to the aggregate. More sophisticated logic could
+    // detect that the limit is not binding as count(*) returns only a single row.
     String unionAgg = "select count(*) from (select * from functional.alltypes " +
         "union all select * from functional.alltypessmall) t limit 10";
-    verifyNIdenticalCacheKeys(unionAgg, unionAgg, 2);
+    verifyNIdenticalCacheKeys(unionAgg, unionAgg, 3, /* isDistributedPlan */ false);
+    // With a distributed plan, the limit attaches to the aggregate finalize, so the
+    // initial aggregate is eligible in addition to the union and two scans.
+    verifyNIdenticalCacheKeys(unionAgg, unionAgg, 4, /* isDistributedPlan */ true);
     // Only scan is cached, as aggregates are above an exchange and TOP-N.
     String groupConcatGroupAgg = "select day, group_concat(distinct string_col) " +
         "from (select * from functional.alltypesagg where id % 100 = day order by id " +
@@ -182,6 +186,25 @@ public class TupleCacheTest extends PlannerTestBase {
     // Only scan is cached, appx_median disables caching on aggregate.
     String appxMedianAgg = "select appx_median(tinyint_col) from functional.alltypesagg";
     verifyNIdenticalCacheKeys(appxMedianAgg, appxMedianAgg, 1);
+  }
+
+  @Test
+  public void testUnions() {
+    String select_alltypes_id = "select id from functional.alltypes";
+    String select_alltypessmall_id = "select id from functional.alltypessmall";
+    verifyAllEligible(select_alltypes_id + " union all " + select_alltypessmall_id,
+        /*isDistributedPlan*/ false);
+    verifyAllEligible("select count(*) from (select * from functional.alltypes " +
+        "union all select * from functional.alltypessmall) t",
+        /*isDistributedPlan*/ false);
+    // A union distinct has an aggregate above the union to deduplicate the results.
+    // The whole thing is supported now.
+    verifyAllEligible(select_alltypes_id + " union distinct " + select_alltypessmall_id,
+        /*isDistributedPlan*/ false);
+    // The order of the union matters to the key above the union.
+    verifyOverlappingCacheKeys(
+        select_alltypes_id + " union all " + select_alltypessmall_id,
+        select_alltypessmall_id + " union all " + select_alltypes_id);
   }
 
   /**
@@ -330,6 +353,13 @@ public class TupleCacheTest extends PlannerTestBase {
         "select straight_join probe.id from functional.alltypes probe, (select " +
         "build1.id from functional.alltypes build1) build where probe.id = build.id " +
         "and probe.bool_col = true and probe.int_col = 100");
+
+    // This has a union on the build side. This adds an extra filter on the probe side and
+    // changes the slot ids, but that does not change the cache keys for the build-side.
+    String join_union_build = "select straight_join u.id from functional.alltypes t, " +
+      "(select id from functional.alltypessmall union all " +
+      "select id from functional.alltypestiny) u where t.id = u.id";
+    verifyOverlappingCacheKeys(join_union_build, join_union_build + " and t.int_col = 1");
   }
 
   @Test

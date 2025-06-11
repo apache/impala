@@ -27,6 +27,7 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
+import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
@@ -351,14 +352,19 @@ public class UnionNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
+    Preconditions.checkState(false, "Unexpected use of old toThrift() signature.");
+  }
+
+  @Override
+  protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
     Preconditions.checkState(materializedResultExprLists_.size() == children_.size());
     List<List<TExpr>> texprLists = new ArrayList<>();
     for (List<Expr> exprList: materializedResultExprLists_) {
-      texprLists.add(Expr.treesToThrift(exprList));
+      texprLists.add(Expr.treesToThrift(exprList, serialCtx));
     }
     List<List<TExpr>> constTexprLists = new ArrayList<>();
     for (List<Expr> constTexprList: materializedConstExprLists_) {
-      constTexprLists.add(Expr.treesToThrift(constTexprList));
+      constTexprLists.add(Expr.treesToThrift(constTexprList, serialCtx));
     }
     Preconditions.checkState(firstMaterializedChildIdx_ <= children_.size());
     msg.union_node = new TUnionNode(
@@ -412,4 +418,10 @@ public class UnionNode extends PlanNode {
       }
     }
   }
+
+  @Override
+  public boolean isTupleCachingImplemented() { return true; }
+
+  @Override
+  public boolean omitTupleCache() { return true; }
 }
