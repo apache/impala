@@ -222,6 +222,12 @@ public class FunctionResolver {
 
     if (fn == null) {
       LOG.debug("Failed to find function " + lowercaseName);
+      return null;
+    }
+
+    if (fn.isUnsupported()) {
+      LOG.info("Function " + lowercaseName + " is not supported for given type.");
+      return null;
     }
 
     return fn;

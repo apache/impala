@@ -1060,3 +1060,10 @@ select * from functional.alltypes_hive_view where id = 0;
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
+---- QUERY
+# should fail at analysis time, not runtime
+# IMPALA-14199: We can improve on this error message
+select ds_hll_sketch(smallint_col) from functional_parquet.alltypessmall;
+---- CATCH
+Cannot infer return type for DS_HLL_SKETCH; operand types: [SMALLINT]
+====
