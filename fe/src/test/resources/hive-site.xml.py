@@ -186,7 +186,12 @@ if HIVE_MAJOR_VERSION >= 3:
    'hive.parquet.date.proleptic.gregorian': 'true',
    'hive.parquet.date.proleptic.gregorian.default': 'true',
    'orc.proleptic.gregorian': 'true',
-   'orc.proleptic.gregorian.default': 'true'
+   'orc.proleptic.gregorian.default': 'true',
+
+   # Disable auto compaction of Hive Metastore after HIVE-28662 to prevent Hive from
+   # automatically compacting files associated with ACID tables, which could make some
+   # test cases non-deterministic, e.g., those in acid.test.
+   'hive.compactor.initiator.on': 'false'
   })
 else:
   CONFIG.update({
