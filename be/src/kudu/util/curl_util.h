@@ -56,6 +56,14 @@ class EasyCurl {
                   faststring* dst,
                   const std::vector<std::string>& headers = {});
 
+  // Same as above, but with failover support. If the connection to the first
+  // URL in the vector fails or times out, it attempts to connect to the next
+  // one in the list. It stops at the first successful attempt and returns the
+  // result.
+  Status FetchURL(const std::vector<std::string>& urls,
+                  faststring* dst,
+                  const std::vector<std::string>& headers = {});
+
   // Issue an HTTP POST to the given URL with the given data.
   // Returns results in 'dst' as above.
   // The optional param 'headers' holds additional headers.
@@ -65,16 +73,19 @@ class EasyCurl {
                    faststring* dst,
                    const std::vector<std::string>& headers = {});
 
+  // Same as above, but with failover support. If the connection to the first
+  // URL in the vector fails or times out, it attempts to connect to the next
+  // one in the list. It stops at the first successful attempt and returns the
+  // result.
+  Status PostToURL(const std::vector<std::string>& urls,
+                   const std::string& post_data,
+                   faststring* dst,
+                   const std::vector<std::string>& headers = {});
+
   // Set whether to verify the server's SSL certificate in the case of an HTTPS
   // connection.
   void set_verify_peer(bool verify) {
     verify_peer_ = verify;
-  }
-
- // Sets a file path for a PEM bundle of certificates to trust when making a request over
- // HTTPS.  Can be either CA certificates or the actual server certificate.
-  void set_ca_certificates(const std::string& ca_certificates) {
-    ca_certificates_ = ca_certificates;
   }
 
   void set_return_headers(bool v) {
@@ -147,6 +158,15 @@ class EasyCurl {
                    faststring* dst,
                    const std::vector<std::string>& headers = {});
 
+  // Same as above, but with failover support. If the connection to the first
+  // URL in the vector fails or times out, it attempts to connect to the next
+  // one in the list. It stops at the first successful attempt and returns the
+  // result.
+  Status DoRequest(const std::vector<std::string>& url,
+                   const std::string* post_data,
+                   faststring* dst,
+                   const std::vector<std::string>& headers = {});
+
   CURL* curl_;
 
   std::string custom_method_;
@@ -155,10 +175,6 @@ class EasyCurl {
 
   // Whether to verify the server certificate.
   bool verify_peer_ = true;
-
-  // File path to a pem encoded bundle of certs to trust when calling to a server
-  // over https
-  std::string ca_certificates_;
 
   // Whether to return the HTTP headers with the response.
   bool return_headers_ = false;

@@ -57,16 +57,23 @@ void HandleCommonFlags();
 // logging will write to stderr.
 void ValidateFlags();
 
+// Check for unsafe and experimental flags, and run all group flag validators.
+// Returns 'true' if all checks pass and no inconsistencies are detected,
+// 'false' otherwise.
+bool AreFlagsConsistent();
+
 enum class EscapeMode {
   HTML,
   NONE
 };
 
+enum class Selection { NONDEFAULT, ALL };
+
 // Stick the flags into a string. If redaction is enabled, the values of
 // flags tagged as sensitive will be redacted. Otherwise, the values
 // will be written to the string as-is. The values will be HTML escaped
 // if EscapeMode is HTML.
-std::string CommandlineFlagsIntoString(EscapeMode mode);
+std::string CommandlineFlagsIntoString(EscapeMode mode, Selection selection);
 
 typedef std::unordered_map<std::string, google::CommandLineFlagInfo> GFlagsMap;
 

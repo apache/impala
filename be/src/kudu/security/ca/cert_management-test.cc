@@ -18,11 +18,11 @@
 #include "kudu/security/ca/cert_management.h"
 
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
@@ -113,7 +113,7 @@ TEST_F(CertManagementTest, RequestGeneratorBasics) {
   ASSERT_OK(key.ToString(&key_str, DataFormat::PEM));
   // Check for non-supported number of bits for the key.
   Status s = GeneratePrivateKey(7, &key);
-  ASSERT_TRUE(s.IsRuntimeError());
+  ASSERT_TRUE(s.IsRuntimeError()) << s.ToString();
 }
 
 // Check that CertSigner behaves in a predictable way if given non-matching

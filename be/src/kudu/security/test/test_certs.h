@@ -46,11 +46,6 @@ extern const char kCaExpiredPublicKey[];
 // Certificate with multiple DNS hostnames in the SAN field.
 extern const char kCertDnsHostnamesInSan[];
 
-// Valid root CA certificate that uses RSASSA-PSS signature (PEM format)
-extern const char kCaRsassaPssCert[];
-// The private key for the certificate using RSASSA-PSS
-extern const char kCaRsassaPssPrivateKey[];
-
 extern const char kDataTiny[];
 extern const char kSignatureTinySHA512[];
 
@@ -86,6 +81,13 @@ Status CreateTestSSLCertWithChainSignedByRoot(const std::string& dir,
                                               std::string* cert_file,
                                               std::string* key_file,
                                               std::string* ca_cert_file);
+
+// Same as the CreateTestSSLCertWithPlainKey() except that the 'ca_cert_file' contains
+// an expired certificate.
+Status CreateTestSSLExpiredCertWithChainSignedByRoot(const std::string& dir,
+                                              std::string* cert_file,
+                                              std::string* key_file,
+                                              std::string* expired_ca_cert_file);
 
 } // namespace security
 } // namespace kudu

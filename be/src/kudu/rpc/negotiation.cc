@@ -23,11 +23,11 @@
 #include <cerrno>
 #include <ctime>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <utility>
 
-#include <boost/optional/optional.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
@@ -43,6 +43,7 @@
 #include "kudu/rpc/server_negotiation.h"
 #include "kudu/rpc/user_credentials.h"
 #include "kudu/security/tls_context.h"
+#include "kudu/security/token.pb.h"
 #include "kudu/util/errno.h"
 #include "kudu/util/flag_tags.h"
 #include "kudu/util/logging.h"
@@ -86,6 +87,7 @@ const char* AuthenticationTypeToString(AuthenticationType t) {
     case AuthenticationType::SASL: return "SASL"; break;
     case AuthenticationType::TOKEN: return "TOKEN"; break;
     case AuthenticationType::CERTIFICATE: return "CERTIFICATE"; break;
+    case AuthenticationType::JWT: return "JWT"; break;
   }
   return "<cannot reach here>";
 }
@@ -172,10 +174,12 @@ static Status DoClientNegotiation(Connection* conn,
   const auto* messenger = conn->reactor_thread()->reactor()->messenger();
   // Prefer secondary credentials (such as authn token) if permitted by policy.
   const auto authn_token = (conn->credentials_policy() == CredentialsPolicy::PRIMARY_CREDENTIALS)
-      ? boost::none : messenger->authn_token();
+      ? std::nullopt : messenger->authn_token();
+  const auto jwt = messenger->jwt();
   ClientNegotiation client_negotiation(conn->release_socket(),
                                        &messenger->tls_context(),
                                        authn_token,
+                                       messenger->jwt(),
                                        encryption,
                                        encrypt_loopback,
                                        messenger->sasl_proto_name());
@@ -200,9 +204,10 @@ static Status DoClientNegotiation(Connection* conn,
 
       if (authentication == RpcAuthentication::REQUIRED &&
           !authn_token &&
-          !messenger->tls_context().has_signed_cert()) {
+          !messenger->tls_context().has_signed_cert() &&
+          !jwt) {
         return Status::InvalidArgument(
-            "Kerberos, token, or PKI certificate credentials must be provided in order to "
+            "Kerberos, token, JWT, or PKI certificate credentials must be provided in order to "
             "require authentication for a client");
       }
     }
@@ -228,8 +233,13 @@ static Status DoClientNegotiation(Connection* conn,
 
   // Sanity check: if no authn token was supplied as user credentials,
   // the negotiated authentication type cannot be AuthenticationType::TOKEN.
-  DCHECK(!(authn_token == boost::none &&
+  DCHECK(!(!authn_token &&
            client_negotiation.negotiated_authn() == AuthenticationType::TOKEN));
+
+  // Sanity check: if no JWT token was supplied as user credentials,
+  // the negotiated authentication type cannot be AuthenticationType::JWT.
+  DCHECK(!(!jwt &&
+           client_negotiation.negotiated_authn() == AuthenticationType::JWT));
 
   return Status::OK();
 }
@@ -240,7 +250,7 @@ static Status DoServerNegotiation(Connection* conn,
                                   RpcEncryption encryption,
                                   bool encrypt_loopback,
                                   const MonoTime& deadline) {
-  const auto* messenger = conn->reactor_thread()->reactor()->messenger();
+  auto* messenger = conn->reactor_thread()->reactor()->messenger();
   if (authentication == RpcAuthentication::REQUIRED &&
       messenger->keytab_file().empty() &&
       !messenger->tls_context().is_external_cert()) {
@@ -259,6 +269,7 @@ static Status DoServerNegotiation(Connection* conn,
   ServerNegotiation server_negotiation(conn->release_socket(),
                                        &messenger->tls_context(),
                                        &messenger->token_verifier(),
+                                       messenger->mutable_jwt_verifier(),
                                        encryption,
                                        encrypt_loopback,
                                        messenger->sasl_proto_name());

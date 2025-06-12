@@ -20,7 +20,7 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
-#include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -28,11 +28,6 @@
 #include "kudu/util/openssl_util.h"
 
 typedef struct X509_name_st X509_NAME;
-
-namespace boost {
-template <class T>
-class optional;
-}
 
 namespace kudu {
 
@@ -68,20 +63,14 @@ class Cert : public RawDataWrapper<STACK_OF(X509)> {
   std::vector<std::string> Hostnames() const;
 
   // Return the 'userId' extension of the end-user cert, if set.
-  boost::optional<std::string> UserId() const;
+  std::optional<std::string> UserId() const;
 
   // Return the Kerberos principal encoded in the end-user certificate, if set.
-  boost::optional<std::string> KuduKerberosPrincipal() const;
+  std::optional<std::string> KuduKerberosPrincipal() const;
 
   // Check whether the specified private key matches the end-user certificate.
   // Return Status::OK() if key match the end-user certificate.
   Status CheckKeyMatch(const PrivateKey& key) const WARN_UNUSED_RESULT;
-
-  // Determine the digest (hash) algorithm used in the signature of the certificate
-  // as needed to implement RFC 5929. If the hash algorithm can be determined,
-  // return the NID in digest_nid_out and return Status::OK(). Otherwise, return
-  // an error.
-  Status GetSignatureHashAlgorithm(int* digest_nid_out) const WARN_UNUSED_RESULT;
 
   // Returns the 'tls-server-end-point' channel bindings for the end-user certificate as
   // specified in RFC 5929.

@@ -28,11 +28,11 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <ostream>
 #include <random>
 #include <string>
 
-#include <boost/optional/optional.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
@@ -73,16 +73,21 @@ DEFINE_bool(use_system_auth_to_local, kDefaultSystemAuthToLocal,
             "'kudu/foo.example.com@EXAMPLE' will map to 'kudu'.");
 TAG_FLAG(use_system_auth_to_local, advanced);
 
-// Defined in Impala in common/global-flags.cc
-DECLARE_string(principal);
+DEFINE_string(principal, "kudu/_HOST",
+              "Kerberos principal that this daemon will log in as. The special token "
+              "_HOST will be replaced with the FQDN of the local host.");
 TAG_FLAG(principal, advanced);
 TAG_FLAG(principal, stable);
 
-// Defined in Impala in common/global-flags.cc
-DECLARE_string(keytab_file);
+DEFINE_string(keytab_file, "",
+              "Path to the Kerberos Keytab file for this server. Specifying a "
+              "keytab file will cause the server to kinit, and enable Kerberos "
+              "to be used to authenticate RPC connections.");
 TAG_FLAG(keytab_file, stable);
 
 using std::mt19937;
+using std::nullopt;
+using std::optional;
 using std::random_device;
 using std::string;
 using std::uniform_int_distribution;
@@ -460,13 +465,17 @@ Status GetConfiguredPrincipal(const string& in_principal, string* out_principal)
   return Status::OK();
 }
 
-boost::optional<string> GetLoggedInPrincipalFromKeytab() {
-  if (!g_kinit_ctx) return boost::none;
+optional<string> GetLoggedInPrincipalFromKeytab() {
+  if (!g_kinit_ctx) {
+    return nullopt;
+  }
   return g_kinit_ctx->principal_str();
 }
 
-boost::optional<string> GetLoggedInUsernameFromKeytab() {
-  if (!g_kinit_ctx) return boost::none;
+optional<string> GetLoggedInUsernameFromKeytab() {
+  if (!g_kinit_ctx) {
+    return nullopt;
+  }
   return g_kinit_ctx->username_str();
 }
 

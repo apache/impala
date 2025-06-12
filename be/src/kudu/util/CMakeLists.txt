@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Target including all protobuf-generated code.
-add_custom_target(kudu-util-proto-deps)
-
 #######################################
 # block_bloom_filter_proto
 #######################################
@@ -31,8 +28,6 @@ ADD_EXPORTABLE_LIBRARY(block_bloom_filter_proto
   SRCS ${BLOCK_BLOOM_FILTER_PROTO_SRCS}
   DEPS hash_proto pb_util_proto protobuf
   NONLINK_DEPS ${BLOCK_BLOOM_FILTER_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${BLOCK_BLOOM_FILTER_PROTO_TGTS})
 
 #######################################
 # util_compression_proto
@@ -48,10 +43,6 @@ ADD_EXPORTABLE_LIBRARY(util_compression_proto
   DEPS protobuf
   NONLINK_DEPS ${UTIL_COMPRESSION_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${UTIL_COMPRESSION_PROTO_TGTS})
-
-add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
-
 #######################################
 # hash_proto
 #######################################
@@ -65,8 +56,6 @@ ADD_EXPORTABLE_LIBRARY(hash_proto
   SRCS ${HASH_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${HASH_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${HASH_PROTO_TGTS})
 
 #######################################
 # histogram_proto
@@ -82,8 +71,6 @@ ADD_EXPORTABLE_LIBRARY(histogram_proto
   DEPS protobuf
   NONLINK_DEPS ${HISTOGRAM_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${HISTOGRAM_PROTO_TGTS})
-
 #######################################
 # maintenance_manager_proto
 #######################################
@@ -97,8 +84,6 @@ ADD_EXPORTABLE_LIBRARY(maintenance_manager_proto
   SRCS ${MAINTENANCE_MANAGER_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${MAINTENANCE_MANAGER_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${MAINTENANCE_MANAGER_PROTO_TGTS})
 
 #######################################
 # mem_tracker_proto
@@ -114,8 +99,6 @@ ADD_EXPORTABLE_LIBRARY(mem_tracker_proto
   DEPS protobuf
   NONLINK_DEPS ${MEM_TRACKER_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${MEM_TRACKER_PROTO_TGTS})
-
 #######################################
 # pb_util_proto
 #######################################
@@ -130,8 +113,6 @@ ADD_EXPORTABLE_LIBRARY(pb_util_proto
   DEPS protobuf
   NONLINK_DEPS ${PB_UTIL_PROTO_TGTS})
 
-add_dependencies(kudu-util-proto-deps ${PB_UTIL_PROTO_TGTS})
-
 #######################################
 # version_info_proto
 #######################################
@@ -145,8 +126,6 @@ ADD_EXPORTABLE_LIBRARY(version_info_proto
   SRCS ${VERSION_INFO_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${VERSION_INFO_PROTO_TGTS})
-
-add_dependencies(kudu-util-proto-deps ${VERSION_INFO_PROTO_TGTS})
 
 ############################################################
 # Version stamp
@@ -186,7 +165,7 @@ set(UTIL_SRCS
   block_bloom_filter.cc
   bloom_filter.cc
   cache.cc
-  #char_util.cc
+  char_util.cc
   coding.cc
   condition_variable.cc
   cow_object.cc
@@ -202,7 +181,7 @@ set(UTIL_SRCS
   errno.cc
   faststring.cc
   fault_injection.cc
-  #file_cache.cc
+  file_cache.cc
   file_cache_metrics.cc
   flags.cc
   flag_tags.cc
@@ -226,7 +205,7 @@ set(UTIL_SRCS
   memory/overwrite.cc
   mem_tracker.cc
   metrics.cc
-  #minidump.cc
+  minidump.cc
   monotime.cc
   mutex.cc
   net/dns_resolver.cc
@@ -242,6 +221,7 @@ set(UTIL_SRCS
   pb_util.cc
   pb_util-internal.cc
   process_memory.cc
+  prometheus_writer.cc
   random_util.cc
   rolling_log.cc
   rw_mutex.cc
@@ -255,7 +235,6 @@ set(UTIL_SRCS
   string_case.cc
   striped64.cc
   subprocess.cc
-  test_graph.cc
   test_util_prod.cc
   thread.cc
   threadlocal.cc
@@ -266,15 +245,17 @@ set(UTIL_SRCS
   trace_metrics.cc
   user.cc
   url-coding.cc
-  # Remove from compilation, as it depends on generated method calls. Replaced by
-  # kudu_version.cc in Impala's common library.
-  #version_info.cc
+  version_info.cc
   version_util.cc
   web_callback_registry.cc
   website_util.cc
-  #yamlreader.cc
+  yamlreader.cc
   zlib.cc
 )
+
+if(NOT NO_TESTS)
+  set(UTIL_SRCS ${UTIL_SRCS} test_graph.cc)
+endif()
 
 # overwrite.cc contains a single function which would be a hot spot in
 # debug builds. It's separated into a separate file so it can be
@@ -282,9 +263,11 @@ set(UTIL_SRCS
 set_source_files_properties(memory/overwrite.cc PROPERTIES COMPILE_FLAGS "-O3")
 
 # Detect AVX2 support
-set(AVX2_CMD "echo | ${CMAKE_CXX_COMPILER} -mavx2 -dM -E - | awk '$2 == \"__AVX2__\" { print $3 }'")
 execute_process(
-  COMMAND bash -c ${AVX2_CMD}
+  COMMAND echo
+  COMMAND ${CMAKE_CXX_COMPILER} -mavx2 -dM -E -
+  COMMAND awk "$2 == \"__AVX2__\" { print $3 }"
+  ERROR_QUIET
   OUTPUT_VARIABLE AVX2_SUPPORT
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -319,7 +302,7 @@ set(UTIL_LIBS
   openssl_crypto
   openssl_ssl
   version_info_proto
-  #yaml
+  yaml
   zlib)
 
 if(NOT APPLE)
@@ -362,7 +345,7 @@ ADD_EXPORTABLE_LIBRARY(kudu_util_compression
 # Define LZ4_DISABLE_DEPRECATE_WARNINGS to mute warnings like:
 # "'int LZ4_compress(const char*, char*, int)' is deprecated".
 target_compile_definitions(kudu_util_compression PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
-#target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
+target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
 
 #######################################
 # kudu_curl_util
@@ -378,11 +361,45 @@ target_link_libraries(kudu_curl_util
 #######################################
 # kudu_cloud_util
 #######################################
-#add_library(kudu_cloud_util
-#  cloud/instance_detector.cc
-#  cloud/instance_metadata.cc)
-#target_link_libraries(kudu_cloud_util
-#  kudu_curl_util)
+add_library(kudu_cloud_util
+  cloud/instance_detector.cc
+  cloud/instance_metadata.cc)
+target_link_libraries(kudu_cloud_util
+  kudu_curl_util)
+
+#######################################
+# kudu_jwt_util
+#######################################
+add_library(kudu_jwt_util jwt-util.cc)
+target_link_libraries(kudu_jwt_util
+  gutil
+  security
+  kudu_curl_util
+  kudu_util)
+
+#######################################
+# mini_oidc
+#######################################
+# The mini_oidc is used only for tests.
+if (KUDU_CLI_TEST_TOOL_ENABLED)
+  add_library(mini_oidc mini_oidc.cc)
+  target_link_libraries(mini_oidc
+    server_process
+    gutil
+    kudu_test_util
+    kudu_util
+    jwt_test_certs)
+endif()
+
+#######################################
+# jwt_test_certs
+#######################################
+# The jwt_test_certs is used only for tests.
+if (KUDU_CLI_TEST_TOOL_ENABLED)
+  add_library(jwt_test_certs jwt_test_certs.cc)
+  target_link_libraries(jwt_test_certs
+    kudu_jwt_util)
+endif()
 
 # See the comment in sanitizer_options.cc for details on this library's usage.
 # The top-level CMakeLists sets a ${SANITIZER_OPTIONS_OVERRIDE} variable which
@@ -391,9 +408,9 @@ target_link_libraries(kudu_curl_util
 #######################################
 # sanitizer_options
 #######################################
-add_library(sanitizer_options STATIC sanitizer_options.cc)
-target_link_libraries(sanitizer_options gutil)
 if ("${KUDU_USE_ASAN}" OR "${KUDU_USE_TSAN}" OR "${KUDU_USE_UBSAN}")
+  add_library(sanitizer_options STATIC sanitizer_options.cc)
+  target_link_libraries(sanitizer_options gutil)
   # By default the sanitizers use addr2line utility to symbolize reports.
   # llvm-symbolizer is faster, consumes less memory and produces much better reports.
   # We set KUDU_EXTERNAL_SYMBOLIZER_PATH which is used in sanitizer_options.cc
@@ -408,19 +425,26 @@ if ("${KUDU_USE_ASAN}" OR "${KUDU_USE_TSAN}" OR "${KUDU_USE_UBSAN}")
 endif()
 
 #######################################
-# kudu_test_util
+# protoc-gen-insertions
 #######################################
 
-# Used by mini-cluster, so must be built even when NO_TESTS=0.
-add_library(kudu_test_util
-  test_util.cc)
-target_link_libraries(kudu_test_util
-  gflags
-  glog
-  # Impala doesn't have gmock in its toolchain
-  #gmock
-  gtest
-  kudu_util)
+add_executable(protoc-gen-insertions protoc-gen-insertions.cc)
+target_link_libraries(protoc-gen-insertions gutil protobuf protoc ${KUDU_BASE_LIBS})
+
+#######################################
+# kudu_test_util
+#######################################
+# The kudu_test_util is used only for tests.
+if (KUDU_CLI_TEST_TOOL_ENABLED)
+  add_library(kudu_test_util
+    test_util.cc)
+  target_link_libraries(kudu_test_util
+    gflags
+    glog
+    gmock
+    gtest
+    kudu_util)
+endif()
 
 #######################################
 # kudu_test_main
@@ -443,13 +467,6 @@ if(NOT NO_TESTS)
       rt)
   endif()
 endif()
-
-#######################################
-# protoc-gen-insertions
-#######################################
-
-add_executable(protoc-gen-insertions protoc-gen-insertions.cc)
-target_link_libraries(protoc-gen-insertions gutil glog gflags protoc protobuf ${KUDU_BASE_LIBS})
 
 #######################################
 # Unit tests
@@ -530,6 +547,7 @@ ADD_KUDU_TEST(once-test)
 ADD_KUDU_TEST(os-util-test)
 ADD_KUDU_TEST(path_util-test)
 ADD_KUDU_TEST(process_memory-test RUN_SERIAL true)
+ADD_KUDU_TEST(pstack_watcher-test)
 ADD_KUDU_TEST(random-test)
 ADD_KUDU_TEST(random_util-test)
 ADD_KUDU_TEST(rle-test)
@@ -559,22 +577,22 @@ ADD_KUDU_TEST(yamlreader-test)
 
 if (NOT APPLE)
   ADD_KUDU_TEST(minidump-test)
-  ADD_KUDU_TEST(pstack_watcher-test)
 endif()
 
 #######################################
 # jsonwriter_test_proto
 #######################################
-
-PROTOBUF_GENERATE_CPP(
-  JSONWRITER_TEST_PROTO_SRCS JSONWRITER_TEST_PROTO_HDRS JSONWRITER_TEST_PROTO_TGTS
-  SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..
-  BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../..
-  PROTO_FILES jsonwriter_test.proto)
-add_library(jsonwriter_test_proto ${JSONWRITER_TEST_PROTO_SRCS} ${JSONWRITER_TEST_PROTO_HDRS})
-target_link_libraries(jsonwriter_test_proto
-  pb_util_proto
-  protobuf)
+if(NOT NO_TESTS)
+  PROTOBUF_GENERATE_CPP(
+    JSONWRITER_TEST_PROTO_SRCS JSONWRITER_TEST_PROTO_HDRS JSONWRITER_TEST_PROTO_TGTS
+    SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../..
+    PROTO_FILES jsonwriter_test.proto)
+  add_library(jsonwriter_test_proto ${JSONWRITER_TEST_PROTO_SRCS} ${JSONWRITER_TEST_PROTO_HDRS})
+  target_link_libraries(jsonwriter_test_proto
+    pb_util_proto
+    protobuf)
+endif()
 
 #######################################
 # jsonwriter-test
@@ -589,22 +607,23 @@ endif()
 #######################################
 # pb_util_test_proto
 #######################################
-
-PROTOBUF_GENERATE_CPP(
-  PROTO_CONTAINER_TEST_PROTO_SRCS PROTO_CONTAINER_TEST_PROTO_HDRS PROTO_CONTAINER_TEST_PROTO_TGTS
-  SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..
-  BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../..
-  PROTO_FILES
-    proto_container_test.proto
-    proto_container_test2.proto
-    proto_container_test3.proto
-    pb_util_test.proto)
-add_library(pb_util_test_proto
-  ${PROTO_CONTAINER_TEST_PROTO_SRCS}
-  ${PROTO_CONTAINER_TEST_PROTO_HDRS})
-target_link_libraries(pb_util_test_proto
-  pb_util_proto
-  protobuf)
+if(NOT NO_TESTS)
+  PROTOBUF_GENERATE_CPP(
+    PROTO_CONTAINER_TEST_PROTO_SRCS PROTO_CONTAINER_TEST_PROTO_HDRS PROTO_CONTAINER_TEST_PROTO_TGTS
+    SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..
+    BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../..
+    PROTO_FILES
+      proto_container_test.proto
+      proto_container_test2.proto
+      proto_container_test3.proto
+      pb_util_test.proto)
+  add_library(pb_util_test_proto
+    ${PROTO_CONTAINER_TEST_PROTO_SRCS}
+    ${PROTO_CONTAINER_TEST_PROTO_HDRS})
+  target_link_libraries(pb_util_test_proto
+    pb_util_proto
+    protobuf)
+endif()
 
 #######################################
 # pb_util-test
@@ -636,10 +655,21 @@ if(NOT NO_TESTS)
 endif()
 
 #######################################
+# jwt-util-test
+#######################################
+ADD_KUDU_TEST(jwt-util-test)
+if(NOT NO_TESTS)
+  target_link_libraries(jwt-util-test
+    mini_oidc
+    server_process
+    jwt_test_certs)
+endif()
+
+#######################################
 # instance_detector-test
 #######################################
-#ADD_KUDU_TEST(cloud/instance_detector-test)
-#if(NOT NO_TESTS)
-#  target_link_libraries(instance_detector-test
-#    kudu_cloud_util)
-#endif()
+ADD_KUDU_TEST(cloud/instance_detector-test)
+if(NOT NO_TESTS)
+  target_link_libraries(instance_detector-test
+    kudu_cloud_util)
+endif()

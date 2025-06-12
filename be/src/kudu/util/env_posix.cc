@@ -22,16 +22,15 @@
 #include <algorithm>
 #include <cerrno>
 #include <climits>
-#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <functional>
-#include <map>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <type_traits>
@@ -89,6 +88,7 @@
 
 using base::subtle::Atomic64;
 using base::subtle::Barrier_AtomicIncrement;
+using kudu::security::ssl_make_unique;
 using std::accumulate;
 using std::string;
 using std::unique_ptr;
@@ -204,9 +204,9 @@ TAG_FLAG(env_inject_lock_failure_globs, hidden);
 
 DEFINE_bool(encrypt_data_at_rest, false,
             "Whether sensitive files should be encrypted on the file system.");
-TAG_FLAG(encrypt_data_at_rest, hidden);
 DEFINE_int32(encryption_key_length, 128, "Encryption key length.");
-TAG_FLAG(encryption_key_length, hidden);
+TAG_FLAG(encryption_key_length, advanced);
+
 DEFINE_validator(encryption_key_length,
                  [](const char* /*n*/, int32 v) { return v == 128 || v == 192 || v == 256; });
 
@@ -223,10 +223,15 @@ const uint8_t kEncryptionHeaderSize = 64;
 
 const char* const kEncryptionHeaderMagic = "kuduenc";
 
-using evp_ctx_unique_ptr = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
+namespace security {
+
+template<> struct SslTypeTraits<EVP_CIPHER_CTX> {
+  static constexpr auto kFreeFunc = &EVP_CIPHER_CTX_free;
+};
+
+} // namespace security
 
 namespace {
-
 
 struct FreeDeleter {
   inline void operator()(void* ptr) const {
@@ -268,15 +273,6 @@ enum class EncryptionAlgorithm {
 struct EncryptionHeader {
   EncryptionAlgorithm algorithm;
   uint8_t key[32];
-};
-
-// KUDU-3316: This is the key temporarily used for all encrypion. Obviously,
-// this is not secure and MUST be removed and replaced with real keys once the
-// key infra is in place.
-// TODO(abukor): delete this.
-const struct EncryptionHeader kDummyEncryptionKey = {
-  EncryptionAlgorithm::AES128ECB,
-  {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 42},
 };
 
 const EVP_CIPHER* GetEVPCipher(EncryptionAlgorithm algorithm) {
@@ -462,12 +458,18 @@ Status DoEncryptV(const EncryptionHeader* eh,
   InlineBigEndianEncodeFixed64(&iv[0], 0);
   InlineBigEndianEncodeFixed64(&iv[8], offset / kEncryptionBlockSize);
 
-  evp_ctx_unique_ptr ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
-
-  OPENSSL_RET_NOT_OK(EVP_EncryptInit_ex(ctx.get(), GetEVPCipher(eh->algorithm),
-                                        nullptr, eh->key, iv),
+  const auto* cipher = GetEVPCipher(eh->algorithm);
+  if (!cipher) {
+    return Status::RuntimeError(
+        StringPrintf("no cipher for algorithm 0x%02x", eh->algorithm));
+  }
+  auto ctx = ssl_make_unique(EVP_CIPHER_CTX_new());
+  OPENSSL_RET_IF_NULL(ctx, "failed to create cipher context");
+  OPENSSL_RET_NOT_OK(EVP_EncryptInit_ex(ctx.get(), cipher, nullptr, eh->key, iv),
                      "Failed to initialize encryption");
-  size_t offset_mod = offset % kEncryptionBlockSize;
+  OPENSSL_RET_NOT_OK(EVP_CIPHER_CTX_set_padding(ctx.get(), 0),
+                     "failed to disable padding");
+  const size_t offset_mod = offset % kEncryptionBlockSize;
   if (offset_mod) {
     unsigned char scratch_clear[kEncryptionBlockSize];
     unsigned char scratch_cipher[kEncryptionBlockSize];
@@ -479,10 +481,6 @@ Status DoEncryptV(const EncryptionHeader* eh,
   }
   for (auto i = 0; i < cleartext.size(); ++i) {
     int out_length;
-    // Normally, EVP_EncryptFinal_ex() would be needed after the last chunk of
-    // data encrypted with EVP_EncryptUpdate(). In Kudu, we only use AES-CTR
-    // which requires no padding or authentication tags, so
-    // EVP_EncryptFinal_ex() doesn't actually add anything.
     OPENSSL_RET_NOT_OK(EVP_EncryptUpdate(ctx.get(),
                                          ciphertext[i].mutable_data(),
                                          &out_length,
@@ -492,6 +490,13 @@ Status DoEncryptV(const EncryptionHeader* eh,
     DCHECK_EQ(out_length, cleartext[i].size());
     DCHECK_LE(out_length, ciphertext[i].size());
   }
+  // EVP_EncryptFinal_ex() would be needed after the last chunk of data
+  // encrypted with EVP_EncryptUpdate() when padding is enabled. However,
+  // the logic above assumes no padding, and it is turned off explicitly
+  // for the cipher context above.
+  //
+  // TODO(aserbin): maybe, call EVP_EncryptFinal_ex() in DEBUG mode to make sure
+  //                no data remains in a partial block?
   return Status::OK();
 }
 
@@ -502,11 +507,18 @@ Status DoDecryptV(const EncryptionHeader* eh, uint64_t offset, ArrayView<Slice> 
   InlineBigEndianEncodeFixed64(&iv[0], 0);
   InlineBigEndianEncodeFixed64(&iv[8], offset / kEncryptionBlockSize);
 
-  evp_ctx_unique_ptr ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
-  OPENSSL_RET_NOT_OK(EVP_DecryptInit_ex(ctx.get(), GetEVPCipher(eh->algorithm),
-                                        nullptr, eh->key, iv),
+  const auto* cipher = GetEVPCipher(eh->algorithm);
+  if (!cipher) {
+    return Status::RuntimeError(
+        StringPrintf("no cipher for algorithm 0x%02x", eh->algorithm));
+  }
+  auto ctx = ssl_make_unique(EVP_CIPHER_CTX_new());
+  OPENSSL_RET_IF_NULL(ctx, "failed to create cipher context");
+  OPENSSL_RET_NOT_OK(EVP_DecryptInit_ex(ctx.get(), cipher, nullptr, eh->key, iv),
                      "Failed to initialize decryption");
-  size_t offset_mod = offset % kEncryptionBlockSize;
+  OPENSSL_RET_NOT_OK(EVP_CIPHER_CTX_set_padding(ctx.get(), 0),
+                     "failed to disable padding");
+  const size_t offset_mod = offset % kEncryptionBlockSize;
   if (offset_mod) {
     unsigned char scratch_clear[kEncryptionBlockSize];
     unsigned char scratch_cipher[kEncryptionBlockSize];
@@ -524,8 +536,6 @@ Status DoDecryptV(const EncryptionHeader* eh, uint64_t offset, ArrayView<Slice> 
     int in_length = ciphertext_slice.size();
     if (!in_length || IsAllZeros(ciphertext_slice)) continue;
     int out_length;
-    // We don't call EVP_DecryptFinal_ex() after EVP_DecryptUpdate() for the
-    // same reason we don't call EVP_EncryptFinal_ex().
     OPENSSL_RET_NOT_OK(EVP_DecryptUpdate(ctx.get(),
                                          data[i].mutable_data(),
                                          &out_length,
@@ -533,6 +543,11 @@ Status DoDecryptV(const EncryptionHeader* eh, uint64_t offset, ArrayView<Slice> 
                                          in_length),
                        "Failed to decrypt data");
   }
+  // We don't call EVP_DecryptFinal_ex() after EVP_DecryptUpdate() for the
+  // same reason we don't call EVP_EncryptFinal_ex() in DoEncryptV().
+  //
+  // TODO(aserbin): maybe, call EVP_DecryptFinal_ex() in DEBUG mode to make sure
+  //                no data remains in a partial block?
   return Status::OK();
 }
 
@@ -761,7 +776,8 @@ Status GenerateHeader(EncryptionHeader* eh) {
   return Status::OK();
 }
 
-Status WriteEncryptionHeader(int fd, const string& filename, const EncryptionHeader& eh) {
+Status WriteEncryptionHeader(int fd, const string& filename, const EncryptionHeader& server_key,
+                             const EncryptionHeader& eh) {
   vector<Slice> headerv = { kEncryptionHeaderMagic };
   uint32_t key_size;
   uint8_t algorithm[1];
@@ -790,7 +806,7 @@ Status WriteEncryptionHeader(int fd, const string& filename, const EncryptionHea
   Slice efk(encrypted_file_key, key_size);
   vector<Slice> clear = {file_key};
   vector<Slice> cipher = {efk};
-  RETURN_NOT_OK(DoEncryptV(&kDummyEncryptionKey, 0, clear, cipher));
+  RETURN_NOT_OK(DoEncryptV(&server_key, 0, clear, cipher));
 
   // Add the encrypted file key and trailing zeros to the header.
   headerv.emplace_back(efk);
@@ -819,7 +835,8 @@ Status DoIsOnXfsFilesystem(const string& path, bool* result) {
   return Status::OK();
 }
 
-Status ReadEncryptionHeader(int fd, const string& filename, EncryptionHeader* eh) {
+Status ReadEncryptionHeader(int fd, const string& filename, const EncryptionHeader& server_key,
+                            EncryptionHeader* eh) {
   char magic[7];
   uint8_t algorithm[1];
   char file_key[32];
@@ -847,7 +864,7 @@ Status ReadEncryptionHeader(int fd, const string& filename, EncryptionHeader* eh
   // the file. The actual key size can be used when storing the key in memory.
   // See WriteEncryptionHeader for more info.
   vector<Slice> v = {Slice(file_key, (key_size + 15) & -16)};
-  RETURN_NOT_OK(DoDecryptV(&kDummyEncryptionKey, 0, v));
+  RETURN_NOT_OK(DoDecryptV(&server_key, 0, v));
   memcpy(&eh->key, file_key, key_size);
   return Status::OK();
 }
@@ -1509,11 +1526,15 @@ class PosixFileLock : public FileLock {
   int fd_;
 };
 
+static Env* default_env;
+
 class PosixEnv : public Env {
  public:
   ~PosixEnv() {
-    fprintf(stderr, "Destroying Env::Default()\n");
-    exit(1);
+    if (this == default_env) {
+      fprintf(stderr, "Destroying Env::Default()\n");
+      exit(1);
+    }
   }
 
   virtual Status NewSequentialFile(const string& fname,
@@ -1535,12 +1556,25 @@ class PosixEnv : public Env {
     bool encrypted = opts.is_sensitive && IsEncryptionEnabled();
     EncryptionHeader header;
     if (encrypted) {
+      auto cleanup = MakeScopedCleanup([&]() {
+        fclose(f);
+      });
+
+      DCHECK(server_key_);
       int fd;
       RETURN_NOT_OK(DoOpen(fname, OpenMode::MUST_EXIST, &fd));
-      RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, &header));
+
+      auto fd_cleanup = MakeScopedCleanup([&]() {
+          DoClose(fd);
+      });
+
+      RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, *server_key_, &header));
       if (fseek(f, kEncryptionHeaderSize, SEEK_CUR)) {
         return IOError(fname, errno);
       }
+
+      cleanup.cancel();
+      fd_cleanup.cancel();
     }
     result->reset(new PosixSequentialFile(fname, encrypted, f, header));
     return Status::OK();
@@ -1565,7 +1599,8 @@ class PosixEnv : public Env {
     EncryptionHeader header;
     bool encrypted = opts.is_sensitive && IsEncryptionEnabled();
     if (encrypted) {
-      RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, &header));
+      DCHECK(server_key_);
+      RETURN_NOT_OK_EVAL(ReadEncryptionHeader(fd, fname, *server_key_, &header), DoClose(fd));
     }
     result->reset(new PosixRandomAccessFile(fname, fd,
                   encrypted, header));
@@ -1583,7 +1618,12 @@ class PosixEnv : public Env {
     TRACE_EVENT1("io", "PosixEnv::NewWritableFile", "path", fname);
     int fd;
     RETURN_NOT_OK(DoOpen(fname, opts.mode, &fd));
-    return InstantiateNewWritableFile(fname, fd, opts, result);
+    auto cleanup = MakeScopedCleanup([&]() {
+      DoClose(fd);
+    });
+    RETURN_NOT_OK(InstantiateNewWritableFile(fname, fd, opts, result));
+    cleanup.cancel();
+    return Status::OK();
   }
 
   virtual Status NewTempWritableFile(const WritableFileOptions& opts,
@@ -1594,8 +1634,12 @@ class PosixEnv : public Env {
     int fd = 0;
     string tmp_filename;
     RETURN_NOT_OK(MkTmpFile(name_template, &fd, &tmp_filename));
+    auto cleanup = MakeScopedCleanup([&]() {
+      DoClose(fd);
+    });
     RETURN_NOT_OK(InstantiateNewWritableFile(tmp_filename, fd, opts, result));
     created_filename->swap(tmp_filename);
+    cleanup.cancel();
     return Status::OK();
   }
 
@@ -1620,12 +1664,17 @@ class PosixEnv : public Env {
     RETURN_NOT_OK(DoOpen(fname, opts.mode, &fd));
     EncryptionHeader eh;
     if (encrypt) {
+      auto cleanup = MakeScopedCleanup([&]() {
+        DoClose(fd);
+      });
+      DCHECK(server_key_);
       if (size >= kEncryptionHeaderSize) {
-        RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, &eh));
+        RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, *server_key_, &eh));
       } else {
         RETURN_NOT_OK(GenerateHeader(&eh));
-        RETURN_NOT_OK(WriteEncryptionHeader(fd, fname, eh));
+        RETURN_NOT_OK(WriteEncryptionHeader(fd, fname, *server_key_, eh));
       }
+      cleanup.cancel();
     }
     result->reset(new PosixRWFile(fname, fd, opts.sync_on_close,
                                   encrypt, eh));
@@ -1640,8 +1689,13 @@ class PosixEnv : public Env {
     bool encrypt = opts.is_sensitive && IsEncryptionEnabled();
     EncryptionHeader eh;
     if (encrypt) {
+      auto cleanup = MakeScopedCleanup([&]() {
+        DoClose(fd);
+      });
+      DCHECK(server_key_);
       RETURN_NOT_OK(GenerateHeader(&eh));
-      RETURN_NOT_OK(WriteEncryptionHeader(fd, *created_filename, eh));
+      RETURN_NOT_OK(WriteEncryptionHeader(fd, *created_filename, *server_key_, eh));
+      cleanup.cancel();
     }
     res->reset(new PosixRWFile(*created_filename, fd, opts.sync_on_close,
                                encrypt, eh));
@@ -2262,6 +2316,25 @@ class PosixEnv : public Env {
 
   bool IsEncryptionEnabled() const override { return FLAGS_encrypt_data_at_rest; }
 
+  void SetEncryptionKey(const uint8_t* server_key, size_t key_size) override {
+    EncryptionHeader eh;
+    switch (key_size) {
+      case 128:
+        eh.algorithm = EncryptionAlgorithm::AES128ECB;
+        break;
+      case 192:
+        eh.algorithm = EncryptionAlgorithm::AES192ECB;
+        break;
+      case 256:
+        eh.algorithm = EncryptionAlgorithm::AES256ECB;
+        break;
+      default:
+        LOG(FATAL) << "Illegal key size: " << key_size;
+    }
+    memcpy(eh.key, server_key, key_size / 8);
+    server_key_ = eh;
+  }
+
  private:
   // unique_ptr Deleter implementation for fts_close
   struct FtsCloser {
@@ -2310,12 +2383,13 @@ class PosixEnv : public Env {
     bool encrypt = opts.is_sensitive && IsEncryptionEnabled();
     EncryptionHeader eh;
     if (encrypt) {
+      DCHECK(server_key_);
       if (file_size < kEncryptionHeaderSize) {
         RETURN_NOT_OK(GenerateHeader(&eh));
-        RETURN_NOT_OK(WriteEncryptionHeader(fd, fname, eh));
+        RETURN_NOT_OK(WriteEncryptionHeader(fd, fname, *server_key_, eh));
         file_size = kEncryptionHeaderSize;
       } else {
-        RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, &eh));
+        RETURN_NOT_OK(ReadEncryptionHeader(fd, fname, *server_key_, &eh));
       }
     }
     result->reset(new PosixWritableFile(fname, fd, file_size, opts.sync_on_close,
@@ -2366,17 +2440,22 @@ class PosixEnv : public Env {
     }
     return Status::OK();
   }
+
+  std::optional<EncryptionHeader> server_key_;
 };
 
 }  // namespace
 
 static pthread_once_t once = PTHREAD_ONCE_INIT;
-static Env* default_env;
 static void InitDefaultEnv() { default_env = new PosixEnv; }
 
 Env* Env::Default() {
   pthread_once(&once, InitDefaultEnv);
   return default_env;
+}
+
+unique_ptr<Env> Env::NewEnv() {
+  return unique_ptr<Env>(new PosixEnv());
 }
 
 std::ostream& operator<<(std::ostream& o, Env::ResourceLimitType t) {

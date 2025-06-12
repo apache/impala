@@ -76,6 +76,11 @@ class Env {
   // The result of Default() belongs to kudu and must never be deleted.
   static Env* Default();
 
+  // Return a new Env instance of the same type as the default
+  // environment.  Unlike the default env, this is not owned by Kudu, and
+  // must be destroyed when not used anymore.
+  static std::unique_ptr<Env> NewEnv();
+
   // Create a brand new sequentially-readable file with the specified name.
   // On success, stores a pointer to the new file in *result and returns OK.
   // On failure stores NULL in *result and returns non-OK.  If the file does
@@ -385,6 +390,9 @@ class Env {
 
   virtual bool IsEncryptionEnabled() const = 0;
 
+  // Set the raw server encryption key. The key size is in bits.
+  virtual void SetEncryptionKey(const uint8_t* key, size_t key_size) = 0;
+
  private:
   DISALLOW_COPY_AND_ASSIGN(Env);
 };
@@ -415,6 +423,10 @@ class Fifo : public File {
   // Returns the read fd, set when opened for reads. The fifo must have been
   // opened for reads before calling.
   virtual int read_fd() const = 0;
+
+  // Initializes the default environment with encryption enabled using the
+  // given AES key.
+  static Status InitializeEncryptedEnv(int key_size, uint8_t* server_key);
 
   // Returns the write fd, set when opened for writes. The fifo must have been
   // opened for writes before calling.

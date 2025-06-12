@@ -20,12 +20,12 @@
 #include <sasl/sasl.h>
 
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
 #include <glog/logging.h>
 
 #include "kudu/gutil/port.h"
@@ -42,6 +42,7 @@
 
 namespace kudu {
 
+class JwtVerifier;
 class Sockaddr;
 class faststring;
 
@@ -65,6 +66,7 @@ class ServerNegotiation {
   ServerNegotiation(std::unique_ptr<Socket> socket,
                     const security::TlsContext* tls_context,
                     const security::TokenVerifier* token_verifier,
+                    JwtVerifier* jwt_verifier,
                     security::RpcEncryption encryption,
                     bool encrypt_loopback,
                     std::string sasl_proto_name);
@@ -192,6 +194,8 @@ class ServerNegotiation {
   // 'recv_buf' allows a receive buffer to be reused.
   Status AuthenticateByToken(faststring* recv_buf) WARN_UNUSED_RESULT;
 
+  Status AuthenticateByJwt(faststring* recv_buf) WARN_UNUSED_RESULT;
+
   // Authenticate the client using the client's TLS certificate. Populates the
   // 'authenticated_user_' field with the certificate's subject.
   Status AuthenticateByCertificate() WARN_UNUSED_RESULT;
@@ -223,7 +227,7 @@ class ServerNegotiation {
   std::vector<sasl_callback_t> callbacks_;
   std::unique_ptr<sasl_conn_t, SaslDeleter> sasl_conn_;
   SaslHelper helper_;
-  boost::optional<std::string> nonce_;
+  std::optional<std::string> nonce_;
 
   // TLS state.
   const security::TlsContext* tls_context_;
@@ -234,6 +238,7 @@ class ServerNegotiation {
 
   // TSK state.
   const security::TokenVerifier* token_verifier_;
+  JwtVerifier* jwt_verifier_;
 
   // The set of features supported by the client and server. Filled in during negotiation.
   std::set<RpcFeatureFlag> client_features_;

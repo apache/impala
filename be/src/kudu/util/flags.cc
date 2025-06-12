@@ -81,8 +81,9 @@ DEFINE_bool(dump_metrics_xml, false,
 TAG_FLAG(dump_metrics_xml, hidden);
 
 #ifdef TCMALLOC_ENABLED
-// Defined in Impala in common/global-flags.cc
-DECLARE_bool(enable_process_lifetime_heap_profiling);
+DEFINE_bool(enable_process_lifetime_heap_profiling, false, "Enables heap "
+    "profiling for the lifetime of the process. Profile output will be stored in the "
+    "directory specified by -heap_profile_path.");
 TAG_FLAG(enable_process_lifetime_heap_profiling, stable);
 TAG_FLAG(enable_process_lifetime_heap_profiling, advanced);
 
@@ -436,6 +437,16 @@ void CheckFlagsAllowed() {
   }
 }
 
+bool CheckCustomValidators() {
+  const auto& validators(GetFlagValidators());
+  for (const auto& e : validators) {
+    if (!e.second()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Run 'late phase' custom validators: these can be run only when all flags are
 // already parsed and individually validated.
 void RunCustomValidators() {
@@ -542,24 +553,19 @@ void ValidateFlags() {
   RunCustomValidators();
 }
 
-string CommandlineFlagsIntoString(EscapeMode mode) {
-  string ret_value;
-  vector<CommandLineFlagInfo> flags;
-  GetAllFlags(&flags);
-
-  for (const auto& f : flags) {
-    ret_value += "--";
-    if (mode == EscapeMode::HTML) {
-      ret_value += EscapeForHtmlToString(f.name);
-    } else if (mode == EscapeMode::NONE) {
-      ret_value += f.name;
-    }
-    ret_value += "=";
-    ret_value += CheckFlagAndRedact(f, mode);
-    ret_value += "\n";
+bool AreFlagsConsistent() {
+  if (CheckFlagsAndWarn("unsafe", FLAGS_unlock_unsafe_flags)) {
+    return false;
   }
-  return ret_value;
+  if (CheckFlagsAndWarn("experimental", FLAGS_unlock_experimental_flags)) {
+    return false;
+  }
+  if (CheckCustomValidators()) {
+    return false;
+  }
+  return true;
 }
+
 
 vector<CommandLineFlagInfo> GetNonDefaultFlagsHelper() {
   vector<CommandLineFlagInfo> all_flags;
@@ -640,6 +646,32 @@ bool GetBooleanEnvironmentVariable(const char* env_var_name) {
   LOG(FATAL) << Substitute("$0: invalid value for environment variable $0",
                            e, env_var_name);
   return false;  // unreachable
+}
+
+string CommandlineFlagsIntoString(EscapeMode mode, Selection selection) {
+  string ret_value;
+  vector<CommandLineFlagInfo> flags;
+  switch (selection) {
+    case Selection::ALL:
+      GetAllFlags(&flags);
+      break;
+    case Selection::NONDEFAULT:
+      flags = GetNonDefaultFlagsHelper();
+      break;
+  }
+
+  for (const auto& f : flags) {
+    ret_value += "--";
+    if (mode == EscapeMode::HTML) {
+      ret_value += EscapeForHtmlToString(f.name);
+    } else if (mode == EscapeMode::NONE) {
+      ret_value += f.name;
+    }
+    ret_value += "=";
+    ret_value += CheckFlagAndRedact(f, mode);
+    ret_value += "\n";
+  }
+  return ret_value;
 }
 
 } // namespace kudu

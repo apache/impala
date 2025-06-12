@@ -80,6 +80,7 @@ DECLARE_int32(env_inject_short_read_bytes);
 DECLARE_int32(env_inject_short_write_bytes);
 DECLARE_int32(encryption_key_length);
 DECLARE_string(env_inject_eio_globs);
+DECLARE_string(encryption_server_key);
 
 namespace kudu {
 
@@ -684,14 +685,14 @@ INSTANTIATE_TEST_SUITE_P(ResourceLimitTypes,
 TEST_P(ResourceLimitTypeTest, TestIncreaseLimit) {
   // Increase the resource limit. It should either increase or remain the same.
   Env::ResourceLimitType t = GetParam();
-  int64_t limit_before = env_->GetResourceLimit(t);
+  uint64_t limit_before = env_->GetResourceLimit(t);
   env_->IncreaseResourceLimit(t);
-  int64_t limit_after = env_->GetResourceLimit(t);
+  uint64_t limit_after = env_->GetResourceLimit(t);
   ASSERT_GE(limit_after, limit_before);
 
   // Try again. It should definitely be the same now.
   env_->IncreaseResourceLimit(t);
-  int64_t limit_after_again = env_->GetResourceLimit(t);
+  uint64_t limit_after_again = env_->GetResourceLimit(t);
   ASSERT_EQ(limit_after, limit_after_again);
 }
 
@@ -1254,7 +1255,7 @@ TEST_F(TestEnv, TestCreateFifo) {
 class TestEncryptedEnv : public TestEnv, public ::testing::WithParamInterface<int> {
  public:
   void SetUp() override {
-    FLAGS_encrypt_data_at_rest = true;
+    SetEncryptionFlags(true);
     FLAGS_encryption_key_length = GetParam();
   }
 };
@@ -1262,7 +1263,6 @@ class TestEncryptedEnv : public TestEnv, public ::testing::WithParamInterface<in
 INSTANTIATE_TEST_SUITE_P(TestEncryption, TestEncryptedEnv, ::testing::Values(128, 192, 256));
 
 TEST_P(TestEncryptedEnv, TestEncryption) {
-  FLAGS_encrypt_data_at_rest = true;
   const string kFile = JoinPathSegments(test_dir_, "encrypted_file");
   unique_ptr<RWFile> rw;
   RWFileOptions opts;
@@ -1292,8 +1292,8 @@ TEST_P(TestEncryptedEnv, TestEncryption) {
 
   // Reading back from the RWFile should succeed
   ASSERT_OK(rw->ReadV(env_->GetEncryptionHeaderSize() + 13, results));
-  ASSERT_EQ(result1, "This text");
-  ASSERT_EQ(result2, " is slightly longer");
+  ASSERT_EQ("This text", result1);
+  ASSERT_EQ(" is slightly longer", result2);
 
   ASSERT_OK(rw->Close());
 
@@ -1316,8 +1316,8 @@ TEST_P(TestEncryptedEnv, TestEncryption) {
 
   ASSERT_OK(seq_file->Read(&result1));
   ASSERT_OK(seq_file->Read(&result2));
-  ASSERT_EQ(result1, "Hello wor");
-  ASSERT_EQ(result2, "ld! This text is sl");
+  ASSERT_EQ("Hello wor", result1);
+  ASSERT_EQ("ld! This text is sl", result2);
 
   // Check if the file can be read into a RandomAccessFile if treated properly
   // as an encrypted file.

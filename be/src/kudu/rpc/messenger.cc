@@ -22,6 +22,7 @@
 #include <mutex>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include <glog/logging.h>
@@ -33,7 +34,7 @@
 #include "kudu/rpc/acceptor_pool.h"
 #include "kudu/rpc/connection_id.h"
 #include "kudu/rpc/inbound_call.h"
-#include "kudu/rpc/outbound_call.h"
+#include "kudu/rpc/outbound_call.h" // IWYU pragma: keep
 #include "kudu/rpc/reactor.h"
 #include "kudu/rpc/remote_method.h"
 #include "kudu/rpc/rpc_header.pb.h"
@@ -93,6 +94,9 @@ Status MessengerBuilder::Build(shared_ptr<Messenger>* msgr) {
   // Note: can't use make_shared() as it doesn't support custom deleters.
   shared_ptr<Messenger> new_msgr(new Messenger(*this),
                                  std::mem_fn(&Messenger::AllExternalReferencesDropped));
+  if (jwt_verifier_) {
+    new_msgr->jwt_verifier_ = std::move(jwt_verifier_);
+  }
   RETURN_NOT_OK(ParseTriState("--rpc_authentication",
                               rpc_authentication_,
                               &new_msgr->authentication_));
@@ -319,6 +323,7 @@ Messenger::Messenger(const MessengerBuilder &bld)
                                             bld.rpc_tls_min_protocol_,
                                             bld.rpc_tls_excluded_protocols_)),
       token_verifier_(new security::TokenVerifier),
+      jwt_verifier_(nullptr),
       rpcz_store_(new RpczStore),
       metric_entity_(bld.metric_entity_),
       rpc_negotiation_timeout_ms_(bld.rpc_negotiation_timeout_ms_),

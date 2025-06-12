@@ -19,9 +19,6 @@
 # The top-level CMakeLists sets a ${KRB5_REALM_OVERRIDE} variable which should
 # be linked first into all Kudu binaries.
 
-# Target including all protobuf-generated code.
-add_custom_target(kudu-security-proto-deps)
-
 ##############################
 # krb5_realm_override
 ##############################
@@ -31,8 +28,6 @@ target_link_libraries(krb5_realm_override glog)
 if(NOT APPLE)
   target_link_libraries(krb5_realm_override dl)
 endif()
-
-add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
 
 ##############################
 # token_proto
@@ -49,7 +44,6 @@ ADD_EXPORTABLE_LIBRARY(token_proto
   DEPS ${TOKEN_PROTO_LIBS}
   NONLINK_DEPS ${TOKEN_PROTO_TGTS})
 
-add_dependencies(kudu-security-proto-deps ${TOKEN_PROTO_TGTS})
 
 ##############################
 # security
@@ -101,27 +95,20 @@ ADD_EXPORTABLE_LIBRARY(security
   SRCS ${SECURITY_SRCS}
   DEPS ${SECURITY_LIBS})
 
-# Since Kudu tests are explicitly disabled, we want to expose some of their sources
-# to Impala using another variable.
-set(SECURITY_TEST_SRCS_FOR_IMPALA test/mini_kdc.cc)
-add_library(security-test-for-impala ${SECURITY_TEST_SRCS_FOR_IMPALA})
-target_link_libraries(security-test-for-impala
-  gutil
-  kudu_test_util
-  kudu_util
-  security)
-
 ##############################
 # mini_kdc
 ##############################
 
-set(MINI_KDC_SRCS test/mini_kdc.cc)
+# The mini_kdc is used only for tests.
+if (KUDU_CLI_TEST_TOOL_ENABLED)
+  set(MINI_KDC_SRCS test/mini_kdc.cc)
 
-add_library(mini_kdc ${MINI_KDC_SRCS})
-target_link_libraries(mini_kdc
-  gutil
-  kudu_test_util
-  kudu_util)
+  add_library(mini_kdc ${MINI_KDC_SRCS})
+  target_link_libraries(mini_kdc
+    gutil
+    kudu_test_util
+    kudu_util)
+endif()
 
 ##############################
 # security_test_util
@@ -139,18 +126,21 @@ if (NOT NO_TESTS)
     kudu_test_util
     kudu_util
     security)
-
-  # Tests
-  SET_KUDU_TEST_LINK_LIBS(
-    mini_kdc
-    security
-    security_test_util)
-
-  ADD_KUDU_TEST(ca/cert_management-test)
-  ADD_KUDU_TEST(cert-test)
-  ADD_KUDU_TEST(crypto-test)
-  ADD_KUDU_TEST(test/mini_kdc-test)
-  ADD_KUDU_TEST(tls_handshake-test)
-  ADD_KUDU_TEST(tls_socket-test PROCESSORS 2)
-  ADD_KUDU_TEST(token-test)
 endif()
+
+#########################################
+# Unit tests
+#########################################
+
+SET_KUDU_TEST_LINK_LIBS(
+  mini_kdc
+  security
+  security_test_util)
+
+ADD_KUDU_TEST(ca/cert_management-test)
+ADD_KUDU_TEST(cert-test)
+ADD_KUDU_TEST(crypto-test)
+ADD_KUDU_TEST(test/mini_kdc-test)
+ADD_KUDU_TEST(tls_handshake-test)
+ADD_KUDU_TEST(tls_socket-test PROCESSORS 2)
+ADD_KUDU_TEST(token-test)

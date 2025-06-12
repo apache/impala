@@ -28,23 +28,22 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <ostream>
 #include <string>
 
-#include <boost/optional/optional.hpp>
 #include <glog/logging.h>
 
-#include "kudu/gutil/port.h"
-#include "kudu/gutil/strings/substitute.h"
 #include "kudu/gutil/macros.h"
 #include "kudu/security/crypto.h"
 #include "kudu/util/openssl_util.h"
 #include "kudu/util/openssl_util_bio.h"
 #include "kudu/util/status.h"
 
+using std::nullopt;
+using std::optional;
 using std::string;
 using std::vector;
-using strings::Substitute;
 
 namespace kudu {
 namespace security {
@@ -60,6 +59,7 @@ string X509NameToString(X509_NAME* name) {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
   CHECK(name);
   auto bio = ssl_make_unique(BIO_new(BIO_s_mem()));
+  OPENSSL_CHECK(bio, "could not create memory BIO");
   OPENSSL_CHECK_OK(X509_NAME_print_ex(bio.get(), name, 0, XN_FLAG_ONELINE));
 
   BUF_MEM* membuf;
@@ -111,12 +111,14 @@ string Cert::IssuerName() const {
   return X509NameToString(X509_get_issuer_name(GetTopOfChainX509()));
 }
 
-boost::optional<string> Cert::UserId() const {
+optional<string> Cert::UserId() const {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
   X509_NAME* name = X509_get_subject_name(GetTopOfChainX509());
   char buf[1024];
   int len = X509_NAME_get_text_by_NID(name, NID_userId, buf, arraysize(buf));
-  if (len < 0) return boost::none;
+  if (len < 0) {
+    return nullopt;
+  }
   return string(buf, len);
 }
 
@@ -142,10 +144,12 @@ vector<string> Cert::Hostnames() const {
   return result;
 }
 
-boost::optional<string> Cert::KuduKerberosPrincipal() const {
+optional<string> Cert::KuduKerberosPrincipal() const {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
   int idx = X509_get_ext_by_NID(GetTopOfChainX509(), GetKuduKerberosPrincipalOidNid(), -1);
-  if (idx < 0) return boost::none;
+  if (idx < 0) {
+    return nullopt;
+  }
   X509_EXTENSION* ext = X509_get_ext(GetTopOfChainX509(), idx);
   ASN1_OCTET_STRING* octet_str = X509_EXTENSION_get_data(ext);
   const unsigned char* octet_str_data = octet_str->data;
@@ -154,7 +158,7 @@ boost::optional<string> Cert::KuduKerberosPrincipal() const {
   if (ASN1_get_object(&octet_str_data, &len, &tag, &xclass, octet_str->length) != 0 ||
       tag != V_ASN1_UTF8STRING) {
     LOG(DFATAL) << "invalid extension value in cert " << SubjectName();
-    return boost::none;
+    return nullopt;
   }
 
   return string(reinterpret_cast<const char*>(octet_str_data), len);
@@ -167,7 +171,7 @@ Status Cert::CheckKeyMatch(const PrivateKey& key) const {
   return Status::OK();
 }
 
-Status Cert::GetSignatureHashAlgorithm(int* digest_nid_out) const {
+Status Cert::GetServerEndPointChannelBindings(string* channel_bindings) const {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
   // Find the signature type of the certificate. This corresponds to the digest
   // (hash) algorithm, and the public key type which signed the cert.
@@ -182,22 +186,9 @@ Status Cert::GetSignatureHashAlgorithm(int* digest_nid_out) const {
 #endif
 
   // Retrieve the digest algorithm type.
-  //
-  // Prefer OpenSSL 1.1.1's X509_get_signature_info when available, as it has extra
-  // handling to determine the hash algorithm for signature types that store the hash
-  // algorithm separately (e.g. RSASSA-PSS).
   int digest_nid;
-#if OPENSSL_VERSION_NUMBER >= 0x10101000L
-  X509_get_signature_info(GetTopOfChainX509(), &digest_nid, nullptr, nullptr, nullptr);
-#else
-  // Return a better error message for RSASSA-PSS, because we know that
-  // OBJ_find_sigid_algs() won't handle it properly.
-  if (PREDICT_FALSE(signature_nid == NID_rsassaPss)) {
-    return Status::NotSupported("Server certificate uses an RSASSA-PSS signature. "
-        "RSASSA-PSS signatures are not supported for OpenSSL < 1.1.1");
-  }
-  OBJ_find_sigid_algs(signature_nid, &digest_nid, nullptr);
-#endif
+  int public_key_nid;
+  OBJ_find_sigid_algs(signature_nid, &digest_nid, &public_key_nid);
 
   // RFC 5929: if the certificate's signatureAlgorithm uses no hash functions or
   // uses multiple hash functions, then this channel binding type's channel
@@ -206,24 +197,9 @@ Status Cert::GetSignatureHashAlgorithm(int* digest_nid_out) const {
   //
   // TODO(dan): can the multiple hash function scenario actually happen? What
   // does OBJ_find_sigid_algs do in that scenario?
-  if (PREDICT_FALSE(digest_nid == NID_undef)) {
-    std::string signature_type(OBJ_nid2ln(signature_nid));
-    return Status::NotSupported(Substitute(
-        "server certificate using '$0' signature algorithm has no signature "
-        "digest (hash) algorithm", signature_type));
+  if (digest_nid == NID_undef) {
+    return Status::NotSupported("server certificate has no signature digest (hash) algorithm");
   }
-
-  *digest_nid_out = digest_nid;
-  return Status::OK();
-}
-
-Status Cert::GetServerEndPointChannelBindings(string* channel_bindings) const {
-  SCOPED_OPENSSL_NO_PENDING_ERRORS;
-
-  // Get the hash algorithm used for the signature
-  int digest_nid;
-  RETURN_NOT_OK(GetSignatureHashAlgorithm(&digest_nid));
-  DCHECK_NE(digest_nid, NID_undef);
 
   // RFC 5929: if the certificate's signatureAlgorithm uses a single hash
   // function, and that hash function is either MD5 [RFC1321] or SHA-1
@@ -238,7 +214,9 @@ Status Cert::GetServerEndPointChannelBindings(string* channel_bindings) const {
   // Create a digest BIO. All data written to the BIO will be sent through the
   // digest (hash) function. The digest BIO requires a null BIO to writethrough to.
   auto null_bio = ssl_make_unique(BIO_new(BIO_s_null()));
+  OPENSSL_RET_IF_NULL(null_bio, "could not create null BIO");
   auto md_bio = ssl_make_unique(BIO_new(BIO_f_md()));
+  OPENSSL_RET_IF_NULL(md_bio, "could not create message digest BIO");
   OPENSSL_RET_NOT_OK(BIO_set_md(md_bio.get(), md), "failed to set digest for BIO");
   BIO_push(md_bio.get(), null_bio.get());
 

@@ -94,7 +94,7 @@ class HostPort {
   // Takes a vector of HostPort objects and returns a comma separated
   // string containing of "host:port" pairs. This method is the
   // "inverse" of ParseStrings().
-  static std::string ToCommaSeparatedString(const std::vector<HostPort>& host_ports);
+  static std::string ToCommaSeparatedString(const std::vector<HostPort>& hostports);
 
   // Returns true if addr is within 127.0.0.0/8 range.
   static bool IsLoopback(uint32_t addr);
@@ -189,6 +189,15 @@ Status GetFQDN(std::string* hostname);
 // If the hostname resolves to multiple addresses, returns the first in the
 // list and logs a message in verbose mode.
 Status SockaddrFromHostPort(const HostPort& host_port, Sockaddr* addr);
+
+// Returns true if the specified address 'addr' matches at least one of the
+// addresses in 'ref_addresses'. The 'addr' itself must not be an address with
+// wildcard port, but any of the addresses in 'ref_addresses' may, where both
+// the address wildcard (i.e. 0.0.0.0) and port wildcard (i.e. port 0)
+// are supported. All the addresses must be in IP notation, not UNIX socket
+// or anything else, otherwise function returns false regardless of inputs.
+// Only IPv4 addresses are supported since Sockaddr doesn't support IPv6 yet.
+bool IsAddrOneOf(const Sockaddr& addr, const std::vector<Sockaddr>& ref_addresses);
 
 // Converts the given list of Sockaddrs into a list of HostPorts that can be
 // accessed from other machines, i.e. wildcards are replaced with the FQDN, the

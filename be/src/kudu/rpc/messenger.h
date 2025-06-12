@@ -20,12 +20,12 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
 #include <gtest/gtest_prod.h>
 
 #include "kudu/gutil/macros.h"
@@ -42,6 +42,7 @@
 
 namespace kudu {
 
+class JwtVerifier;
 class Socket;
 class ThreadPool;
 
@@ -83,6 +84,12 @@ class MessengerBuilder {
   static const int64_t kRpcNegotiationTimeoutMs;
 
   explicit MessengerBuilder(std::string name);
+
+  MessengerBuilder& set_jwt_verifier(
+      std::shared_ptr<JwtVerifier> jwt_verifier) {
+    jwt_verifier_ = std::move(jwt_verifier);
+    return *this;
+  }
 
   // Set the length of time we will keep a TCP connection will alive with no traffic.
   MessengerBuilder& set_connection_keepalive_time(const MonoDelta& keepalive) {
@@ -276,6 +283,7 @@ class MessengerBuilder {
   std::string rpc_ca_certificate_file_;
   std::string rpc_private_key_password_cmd_;
   std::string keytab_file_;
+  std::shared_ptr<JwtVerifier> jwt_verifier_;
   bool enable_inbound_tls_;
   bool reuseport_;
 };
@@ -376,13 +384,24 @@ class Messenger {
     return token_verifier_;
   }
 
-  boost::optional<security::SignedTokenPB> authn_token() const {
+  JwtVerifier* mutable_jwt_verifier() { return jwt_verifier_.get(); }
+
+  std::optional<security::SignedTokenPB> authn_token() const {
     std::lock_guard<simple_spinlock> l(authn_token_lock_);
     return authn_token_;
   }
   void set_authn_token(const security::SignedTokenPB& token) {
     std::lock_guard<simple_spinlock> l(authn_token_lock_);
     authn_token_ = token;
+  }
+
+  std::optional<security::JwtRawPB> jwt() const {
+    std::lock_guard<simple_spinlock> l(authn_token_lock_);
+    return jwt_;
+  }
+  void set_jwt(const security::JwtRawPB& token) {
+    std::lock_guard<simple_spinlock> l(authn_token_lock_);
+    jwt_ = token;
   }
 
   security::RpcAuthentication authentication() const { return authentication_; }
@@ -502,10 +521,12 @@ class Messenger {
 
   // A TokenVerifier, which can verify client provided authentication tokens.
   std::shared_ptr<security::TokenVerifier> token_verifier_;
+  std::shared_ptr<JwtVerifier> jwt_verifier_;
 
   // An optional token, which can be used to authenticate to a server.
   mutable simple_spinlock authn_token_lock_;
-  boost::optional<security::SignedTokenPB> authn_token_;
+  std::optional<security::SignedTokenPB> authn_token_;
+  std::optional<security::JwtRawPB> jwt_;
 
   std::unique_ptr<RpczStore> rpcz_store_;
 

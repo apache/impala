@@ -21,12 +21,12 @@
 
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
 #include <glog/logging.h>
 
 #include "kudu/gutil/port.h"
@@ -36,6 +36,7 @@
 #include "kudu/rpc/sasl_helper.h"
 #include "kudu/security/security_flags.h"
 #include "kudu/security/tls_handshake.h"
+#include "kudu/security/token.pb.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/socket.h"
 #include "kudu/util/status.h"
@@ -46,7 +47,6 @@ class Slice;
 class faststring;
 
 namespace security {
-class SignedTokenPB;
 class TlsContext;
 }
 
@@ -64,7 +64,8 @@ class ClientNegotiation {
   // The provided TlsContext must outlive this negotiation instance.
   ClientNegotiation(std::unique_ptr<Socket> socket,
                     const security::TlsContext* tls_context,
-                    boost::optional<security::SignedTokenPB> authn_token,
+                    std::optional<security::SignedTokenPB> authn_token,
+                    std::optional<security::JwtRawPB> jwt,
                     security::RpcEncryption encryption,
                     bool encrypt_loopback,
                     std::string sasl_proto_name);
@@ -186,6 +187,9 @@ class ClientNegotiation {
   Status AuthenticateByToken(faststring* recv_buf,
                              std::unique_ptr<ErrorStatusPB> *rpc_error) WARN_UNUSED_RESULT;
 
+  Status AuthenticateByJwt(faststring* recv_buf,
+                           std::unique_ptr<ErrorStatusPB>* rpc_error) WARN_UNUSED_RESULT;
+
   // Send an SASL_INITIATE message to the server.
   // Returns:
   //  Status::OK if the SASL_SUCCESS message is expected next.
@@ -223,7 +227,7 @@ class ClientNegotiation {
   std::vector<sasl_callback_t> callbacks_;
   std::unique_ptr<sasl_conn_t, SaslDeleter> sasl_conn_;
   SaslHelper helper_;
-  boost::optional<std::string> nonce_;
+  std::optional<std::string> nonce_;
 
   // TLS state.
   const security::TlsContext* tls_context_;
@@ -233,7 +237,8 @@ class ClientNegotiation {
   bool encrypt_loopback_;
 
   // TSK state.
-  boost::optional<security::SignedTokenPB> authn_token_;
+  std::optional<security::SignedTokenPB> authn_token_;
+  std::optional<security::JwtRawPB> jwt_;
 
   // Authentication state.
   std::string plain_auth_user_;

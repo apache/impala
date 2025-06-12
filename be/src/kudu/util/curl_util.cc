@@ -19,22 +19,32 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <mutex>
 #include <ostream>
 #include <string>
 #include <vector>
 
 #include <curl/curl.h>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "kudu/gutil/strings/substitute.h"
+#include "kudu/util/env.h"
 #include "kudu/util/faststring.h"
+#include "kudu/util/flag_validators.h"
 #include "kudu/util/openssl_util.h"
 #include "kudu/util/scoped_cleanup.h"
+#include "kudu/util/slice.h"
 
 using std::string;
 using std::vector;
 using strings::Substitute;
+
+DEFINE_string(trusted_certificate_file, "",
+              "Path to a file that contains certificate(s) (in PEM format) "
+              "to trust when Kudu establishes a TLS-protected connection "
+              "to HTTP/HTTPS server (e.g., KMS service, JWKS server, etc.)");
 
 namespace kudu {
 
@@ -55,6 +65,43 @@ inline Status TranslateError(CURLcode code, const char* errbuf) {
   }
   return Status::NetworkError("curl error", err_msg);
 }
+
+bool ValidateTrustedCertFile() {
+  const auto& fpath = FLAGS_trusted_certificate_file;
+  if (fpath.empty()) {
+    // No validation is needed.
+    return true;
+  }
+
+  // Make sure the file in question does exist, is readable, and non-empty.
+  // There might be extra verification to load the certificate(s) from the file,
+  // but since cURL could have some particular requirements on the contents
+  // of the file, let's skip that extra validation step and defer to the time
+  // when cURL loads the file on its own. Also, the validators might run
+  // at the time when the OpenSSL-based crypto runtime context isn't yet
+  // initialized, so it's safer to defer to TlsContext::Init() where the
+  // initialization is done in a proper way.
+  std::unique_ptr<RandomAccessFile> raf;
+  if (auto s = Env::Default()->NewRandomAccessFile(fpath, &raf); !s.ok()) {
+    LOG(ERROR) << Substitute("could not open file for reading: $0", s.ToString());
+    return false;
+  }
+  // Read just a single byte to make sure that the file is readable.
+  uint8_t scratch[1];
+  Slice data(scratch, sizeof(scratch));
+  if (auto s = raf->Read(0, data); !s.ok()) {
+    LOG(ERROR) << Substitute("could not read from file '$0': $1",
+                             fpath, s.ToString());
+    return false;
+  }
+  return true;
+}
+
+// The validator uses Env API, so it's necessary to use GROUP_FLAG_VALIDATOR()
+// instead of regular gflag's DEFINE_validator() macro to allow for custom
+// behavior of PosixEnv per settings of various flags defined in env_posix.cc.
+GROUP_FLAG_VALIDATOR(validate_trusted_certificate_file,
+                     ValidateTrustedCertFile);
 
 extern "C" {
 size_t WriteCallback(void* buffer, size_t size, size_t nmemb, void* user_ptr) {
@@ -86,8 +133,11 @@ EasyCurl::EasyCurl()
   curl_ = curl_easy_init();
   CHECK(curl_) << "Could not init curl";
 
-  // Ensure the curl error buffer is large enough.
+  // Set the error buffer to enhance error messages with more details, when
+  // available.
   static_assert(kErrBufSize >= CURL_ERROR_SIZE, "kErrBufSize is too small");
+  const auto code = curl_easy_setopt(curl_, CURLOPT_ERRORBUFFER, errbuf_);
+  CHECK_EQ(CURLE_OK, code);
 }
 
 EasyCurl::~EasyCurl() {
@@ -99,11 +149,39 @@ Status EasyCurl::FetchURL(const string& url, faststring* dst,
   return DoRequest(url, nullptr, dst, headers);
 }
 
+Status EasyCurl::FetchURL(const vector<string>& urls, faststring* dst,
+                          const vector<string>& headers) {
+  return DoRequest(urls, nullptr, dst, headers);
+}
+
 Status EasyCurl::PostToURL(const string& url,
                            const string& post_data,
                            faststring* dst,
                            const vector<string>& headers) {
   return DoRequest(url, &post_data, dst, headers);
+}
+
+Status EasyCurl::PostToURL(const vector<string>& urls,
+                           const string& post_data,
+                           faststring* dst,
+                           const vector<string>& headers) {
+  return DoRequest(urls, &post_data, dst, headers);
+}
+
+Status EasyCurl::DoRequest(const vector<string>& urls,
+                           const string* post_data,
+                           faststring* dst,
+                           const vector<string>& headers) {
+  DCHECK(!urls.empty());
+  Status s;
+  for (const auto& url : urls) {
+    s = DoRequest(url, post_data, dst, headers);
+    if (s.IsNetworkError() || s.IsTimedOut()) {
+      continue;
+    }
+    break;
+  }
+  return s;
 }
 
 Status EasyCurl::DoRequest(const string& url,
@@ -112,27 +190,15 @@ Status EasyCurl::DoRequest(const string& url,
                            const vector<string>& headers) {
   CHECK_NOTNULL(dst)->clear();
 
-  // Reset all options to default values to ensure settings do not leak
-  // across calls.
-  curl_easy_reset(curl_);
-
-  // Set the error buffer to enhance error messages with more details, when
-  // available.
-  CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_ERRORBUFFER, errbuf_));
-
   // Mark the error buffer as cleared.
   errbuf_[0] = 0;
 
-  if (verify_peer_) {
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 2));
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 1));
-  } else {
+  if (!verify_peer_) {
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 0));
     CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 0));
-  }
-
-  if (!ca_certificates_.empty()) {
-    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_CAINFO, ca_certificates_.c_str()));
+  } else if (!FLAGS_trusted_certificate_file.empty()) {
+    CURL_RETURN_NOT_OK(curl_easy_setopt(curl_, CURLOPT_CAINFO,
+                                        FLAGS_trusted_certificate_file.c_str()));
   }
 
   switch (auth_type_) {

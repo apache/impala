@@ -17,6 +17,7 @@
 #include "kudu/util/metrics.h"
 
 #include <iostream>
+#include <tuple>
 #include <utility>
 
 #include <gflags/gflags.h>
@@ -48,6 +49,7 @@ using std::string;
 using std::unordered_set;
 using std::vector;
 using strings::Substitute;
+using strings::SubstituteAndAppend;
 
 template<typename Collection>
 void WriteMetricsToJson(JsonWriter* writer,
@@ -66,6 +68,16 @@ void WriteMetricsToJson(JsonWriter* writer,
     }
   }
   writer->EndArray();
+}
+
+void WriteMetricsPrometheus(PrometheusWriter* writer,
+                            const MetricEntity::MetricMap& metrics,
+                            const string& prefix) {
+  for (const auto& [name, val] : metrics) {
+    WARN_NOT_OK(val->WriteAsPrometheus(writer, prefix),
+                Substitute("unable to write '$0' ($1) in Prometheus format",
+                           name, val->prototype()->description()));
+  }
 }
 
 void WriteToJson(JsonWriter* writer,
@@ -392,6 +404,51 @@ Status MetricEntity::WriteAsJson(JsonWriter* writer, const MetricJsonOptions& op
   return Status::OK();
 }
 
+Status MetricEntity::WriteAsPrometheus(PrometheusWriter* writer) const {
+  static const string kIdMaster = "kudu.master";
+  static const string kIdTabletServer = "kudu.tabletserver";
+
+  if (strcmp(prototype_->name(), "server") != 0) {
+    // Only server-level metrics are emitted in Prometheus format as of now,
+    // non-server metric entities are currently silently skipped.
+    //
+    // TODO(KUDU-3563): output tablet-level metrics in Prometheus format as well
+    return Status::OK();
+  }
+
+  // Empty filters result in getting all the metrics for this MetricEntity.
+  //
+  // TODO(aserbin): instead of hard-coding, pass MetricFilters as a parameter
+  MetricFilters filters;
+  filters.entity_level = "debug";
+
+  MetricMap metrics;
+  AttributeMap attrs;
+  const auto s = GetMetricsAndAttrs(filters, &metrics, &attrs);
+  if (s.IsNotFound()) {
+    // Status::NotFound is returned when this entity has been filtered, treat it
+    // as OK, and skip printing it.
+    return Status::OK();
+  }
+  RETURN_NOT_OK(s);
+
+  if (id_ == kIdMaster) {
+    // Prefix all master metrics with 'kudu_master_'.
+    static const string kMasterPrefix = "kudu_master_";
+    WriteMetricsPrometheus(writer, metrics, kMasterPrefix);
+    return Status::OK();
+  }
+  if (id_ == kIdTabletServer) {
+    // Prefix all tablet server metrics with 'kudu_tserver_'.
+    static const string kTabletServerPrefix = "kudu_tserver_";
+    WriteMetricsPrometheus(writer, metrics, kTabletServerPrefix);
+    return Status::OK();
+  }
+
+  return Status::NotSupported(
+      Substitute("$0: unexpected server-level metric entity", id_));
+}
+
 Status MetricEntity::CollectTo(MergedEntityMetrics* collections,
                                const MetricFilters& filters,
                                const MetricMergeRules& merge_rules) const {
@@ -540,6 +597,22 @@ Status MetricRegistry::WriteAsJson(JsonWriter* writer, const MetricJsonOptions& 
   return Status::OK();
 }
 
+Status MetricRegistry::WriteAsPrometheus(PrometheusWriter* writer) const {
+  EntityMap entities;
+  {
+    std::lock_guard<simple_spinlock> l(lock_);
+    entities = entities_;
+  }
+  for (const auto& e : entities) {
+    WARN_NOT_OK(e.second->WriteAsPrometheus(writer),
+                Substitute("Failed to write entity $0 as Prometheus", e.second->id()));
+  }
+
+  entities.clear(); // necessary to deref metrics we just dumped before doing retirement scan.
+  const_cast<MetricRegistry*>(this)->RetireOldMetrics();
+  return Status::OK();
+}
+
 void MetricRegistry::RetireOldMetrics() {
   std::lock_guard<simple_spinlock> l(lock_);
   for (auto it = entities_.begin(); it != entities_.end();) {
@@ -674,6 +747,22 @@ void MetricPrototype::WriteFields(JsonWriter* writer,
   }
 }
 
+void MetricPrototype::WriteHelpAndType(PrometheusWriter* writer,
+                                       const string& prefix) const {
+  static constexpr const char* const kSummary = "summary";
+
+  // The way how HdrHistogram-backed stats are presented in Kudu metrics
+  // corresponds to a 'summary' metric in Prometheus, not a 'histogram' one [1].
+  //
+  // [1] https://prometheus.io/docs/concepts/metric_types/#summary
+  const auto m_type = type();
+  const char* const metric_type_str =
+      m_type == MetricType::kHistogram ? kSummary : MetricType::Name(m_type);
+  writer->WriteEntry(Substitute("# HELP $0$1 $2\n# TYPE $3$4 $5\n",
+                                prefix, name(), description(),
+                                prefix, name(), metric_type_str));
+}
+
 //
 // FunctionGaugeDetacher
 //
@@ -751,6 +840,13 @@ Status Gauge::WriteAsJson(JsonWriter* writer,
   return Status::OK();
 }
 
+Status Gauge::WriteAsPrometheus(PrometheusWriter* writer, const string& prefix) const {
+  prototype_->WriteHelpAndType(writer, prefix);
+  WriteValue(writer, prefix);
+
+  return Status::OK();
+}
+
 //
 // StringGauge
 //
@@ -822,6 +918,24 @@ void StringGauge::WriteValue(JsonWriter* writer) const {
   writer->String(value());
 }
 
+// A string gauge's value can be anything, but Prometheus does not support
+// non-numeric values for gauges with exception of {+,-}Inf and NaN
+// (see https://prometheus.io/docs/instrumenting/exposition_formats/).
+// DCHECK() is added to make sure this method is not called from anywhere,
+// but overriding it is necessary since Gauge::WriteValue() is a pure virtual one.
+// An alternative could be defining a empty implementation for Gauge::WriteValue()
+// virtual method and not adding this empty override here.
+void StringGauge::WriteValue(PrometheusWriter* writer, const std::string& prefix) const {
+  DCHECK(false);
+}
+
+Status StringGauge::WriteAsPrometheus(PrometheusWriter* /*writer*/,
+                                      const std::string& /*prefix*/) const {
+  // Prometheus doesn't support string gauges.
+  // This function ensures that output written to Prometheus is empty.
+  return Status::OK();
+}
+
 //
 // MeanGauge
 //
@@ -883,6 +997,22 @@ void MeanGauge::WriteValue(JsonWriter* writer) const {
   writer->Double(total_count());
 }
 
+void MeanGauge::WriteValue(PrometheusWriter* writer, const string& prefix) const {
+  static constexpr const char* const kFmt = "$0$1$2{unit_type=\"$3\"} $4\n";
+
+  const char* const name = prototype_->name();
+  DCHECK(name);
+  const char* const unit = MetricUnit::Name(prototype_->unit());
+  DCHECK(unit);
+
+  string out;
+  SubstituteAndAppend(&out, kFmt, prefix, name, "", unit, value());
+  SubstituteAndAppend(&out, kFmt, prefix, name, "_count", unit, total_count());
+  SubstituteAndAppend(&out, kFmt, prefix, name, "_sum", unit, total_sum());
+
+  writer->WriteEntry(out);
+}
+
 //
 // Counter
 //
@@ -918,6 +1048,13 @@ Status Counter::WriteAsJson(JsonWriter* writer,
   writer->Int64(value());
 
   writer->EndObject();
+  return Status::OK();
+}
+
+Status Counter::WriteAsPrometheus(PrometheusWriter* writer, const string& prefix) const {
+  prototype_->WriteHelpAndType(writer, prefix);
+  writer->WriteEntry(Substitute("$0$1{unit_type=\"$2\"} $3\n", prefix, prototype_->name(),
+                                MetricUnit::Name(prototype_->unit()), value()));
   return Status::OK();
 }
 
@@ -974,6 +1111,45 @@ Status Histogram::WriteAsJson(JsonWriter* writer,
   HistogramSnapshotPB snapshot;
   RETURN_NOT_OK(GetHistogramSnapshotPB(&snapshot, opts));
   writer->Protobuf(snapshot);
+  return Status::OK();
+}
+
+Status Histogram::WriteAsPrometheus(PrometheusWriter* writer,
+                                    const string& prefix) const {
+  static constexpr struct QuantileInfo {
+    const char* const tag;
+    const double quantile;
+  } kQuantiles[] = {
+    { "0.75",   75.0  },
+    { "0.95",   95.0  },
+    { "0.99",   99.0  },
+    { "0.999",  99.9  },
+    { "0.9999", 99.99 },
+  };
+  static constexpr const char* const kFmt =
+      "$0$1{unit_type=\"$2\", quantile=\"$3\"} $4\n";
+
+  const char* const name = prototype_->name();
+  DCHECK(name);
+  const char* const unit = MetricUnit::Name(prototype_->unit());
+  DCHECK(unit);
+
+  // A snapshot is taken to have more consistent statistics while generating
+  // the output.
+  const HdrHistogram h(*histogram_);
+  string out;
+  SubstituteAndAppend(&out, kFmt, prefix, name, unit, "0", h.MinValue());
+  for (const auto& [tag, q] : kQuantiles) {
+    SubstituteAndAppend(&out, kFmt, prefix, name, unit, tag, h.ValueAtPercentile(q));
+  }
+  SubstituteAndAppend(&out, kFmt, prefix, name, unit, "1", h.MaxValue());
+
+  SubstituteAndAppend(&out, "$0$1_sum $2\n", prefix, name, h.TotalSum());
+  SubstituteAndAppend(&out, "$0$1_count $2\n", prefix, name, h.TotalCount());
+
+  prototype_->WriteHelpAndType(writer, prefix);
+  writer->WriteEntry(out);
+
   return Status::OK();
 }
 

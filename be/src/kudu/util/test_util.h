@@ -73,6 +73,9 @@ class KuduTest : public ::testing::Test {
   // variables so that we don't pick up the user's credentials.
   static void OverrideKrb5Environment();
 
+  // Returns the encryption key, IV, and version used by the test.
+  static void GetEncryptionKey(std::string* key, std::string* iv, std::string* version);
+
  protected:
   // Returns absolute path based on a unit test-specific work directory, given
   // a relative path. Useful for writing test files that should be deleted after
@@ -84,6 +87,9 @@ class KuduTest : public ::testing::Test {
   // Reset flags on every test. Allocated on the heap so it can be destroyed
   // (and the flags reset) before test_dir_ is deleted.
   std::unique_ptr<google::FlagSaver> flag_saver_;
+
+  // Sets the flags to enable encryption if 'enable_encryption' is true.
+  void SetEncryptionFlags(bool enable_encryption);
 
   std::string test_dir_;
 };
@@ -173,6 +179,18 @@ Status WaitForTcpBind(pid_t pid, uint16_t* port,
 Status WaitForUdpBind(pid_t pid, uint16_t* port,
                       const std::vector<std::string>& addresses,
                       MonoDelta timeout) WARN_UNUSED_RESULT;
+
+// Similar to WaitForTcpBind(), but when port is known beforehand
+// and the PID doesn't matter.
+Status WaitForTcpBindAtPort(const std::vector<std::string>& addresses,
+                            uint16_t port,
+                            MonoDelta timeout) WARN_UNUSED_RESULT;
+
+// Similar to WaitForUdpBind(), but when port is known beforehand
+// and the PID doesn't matter.
+Status WaitForUdpBindAtPort(const std::vector<std::string>& addresses,
+                            uint16_t port,
+                            MonoDelta timeout) WARN_UNUSED_RESULT;
 
 // Find the home directory of a Java-style application, e.g. JAVA_HOME or
 // HADOOP_HOME.

@@ -64,14 +64,6 @@ class WebCallbackRegistry {
 
     // In the case of a POST, the posted data.
     std::string post_data;
-
-    // The socket address of the requester, <host>:<port>.
-    // Define this variable for IMPALA-9182.
-    std::string source_socket;
-
-    // Authenticated user, or 'anonymous' if no auth used
-    // Define this variable for IMPALA-10779.
-    std::string source_user = "anonymous";
   };
 
   // A response to an HTTP request whose body is rendered by template.
@@ -94,7 +86,8 @@ class WebCallbackRegistry {
     // Additional headers added to the HTTP response.
     ArgumentMap response_headers;
 
-    // The fully-rendered HTML response body.
+    // The fully-rendered HTML response body or a binary blob in case of
+    // responses with 'application/octet-stream' Content-Type.
     std::ostringstream output;
   };
 
@@ -131,6 +124,15 @@ class WebCallbackRegistry {
                                               const PrerenderedPathHandlerCallback& callback,
                                               bool is_styled,
                                               bool is_on_nav_bar) = 0;
+
+  // Register a callback for a URL path that returns binary data, a.k.a. octet
+  // stream. Such a path is not supposed to be exposed on the navigation bar
+  // of the Web UI, and the data is sent as-is with the HTTP response with no
+  // rendering assumed.
+  virtual void RegisterBinaryDataPathHandler(
+      const std::string& path,
+      const std::string& alias,
+      const PrerenderedPathHandlerCallback& callback) = 0;
 
   // Returns true if 'req' was proxied via Knox, false otherwise.
   static bool IsProxiedViaKnox(const WebRequest& req);

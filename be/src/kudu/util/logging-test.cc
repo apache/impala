@@ -28,7 +28,7 @@
 #include <vector>
 
 #include <glog/logging.h>
-#include <gmock/gmock-matchers.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "kudu/gutil/strings/substitute.h"
@@ -108,7 +108,7 @@ class CountingLogger : public google::base::Logger {
   void Write(bool force_flush,
              time_t /*timestamp*/,
              const char* /*message*/,
-             int /*message_len*/) override {
+             size_t /*message_len*/) override {
     message_count_++;
     if (force_flush) {
       Flush();
@@ -222,9 +222,9 @@ TEST(LoggingTest, TestRedactionIllustrateUsage) {
   ASSERT_EQ("public=abc, private=def", KUDU_DISABLE_REDACTION(SomeComplexStringify("abc", "def")));
 
   // Or we can execute an entire scope with redaction disabled.
-  KUDU_DISABLE_REDACTION({
+  KUDU_DISABLE_REDACTION(({
     ASSERT_EQ("public=abc, private=def", SomeComplexStringify("abc", "def"));
-  });
+  }));
 }
 
 

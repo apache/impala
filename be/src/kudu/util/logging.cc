@@ -49,8 +49,9 @@
 #include "kudu/util/signal.h"
 #include "kudu/util/status.h"
 
-// Defined in Impala.
-DECLARE_string(log_filename);
+DEFINE_string(log_filename, "",
+    "Prefix of log filename - "
+    "full path is <log_dir>/<log_filename>.[INFO|WARN|ERROR|FATAL]");
 TAG_FLAG(log_filename, stable);
 
 DEFINE_bool(log_async, true,
@@ -63,8 +64,9 @@ DEFINE_int32(log_async_buffer_bytes_per_level, 2 * 1024 * 1024,
              "level. Only relevant when --log_async is enabled.");
 TAG_FLAG(log_async_buffer_bytes_per_level, hidden);
 
-// Defined in Impala.
-DECLARE_int32(max_log_files);
+DEFINE_int32(max_log_files, 10,
+    "Maximum number of log files to retain per severity level. The most recent "
+    "log files are retained. If set to 0, all log files are retained.");
 TAG_FLAG(max_log_files, runtime);
 TAG_FLAG(max_log_files, stable);
 
@@ -201,10 +203,9 @@ void FailureWriterWithCoverage(const char* data, size_t size) {
 // ensure that we flush coverage even on crashes.
 //
 // NOTE: this is only used in coverage builds!
-// NOTE: __attribute__((noreturn)) is needed for Clang builds.
-__attribute__((noreturn)) void FlushCoverageAndAbort() {
+void FlushCoverageAndAbort() {
   FlushCoverageOnExit();
-  abort();
+  exit(1);
 }
 } // anonymous namespace
 
@@ -255,7 +256,8 @@ void InitGoogleLoggingSafe(const char* arg) {
     // This allows us to handle both LOG(FATAL) and unintended crashes like
     // SEGVs.
     google::InstallFailureWriter(FailureWriterWithCoverage);
-    google::InstallFailureFunction(FlushCoverageAndAbort);
+    google::InstallFailureFunction(
+            reinterpret_cast<google::logging_fail_func_t>(FlushCoverageAndAbort));
   }
 
   // Needs to be done after InitGoogleLogging
@@ -275,8 +277,7 @@ void InitGoogleLoggingSafe(const char* arg) {
   IgnoreSigPipe();
 
   // For minidump support. Must be called before logging threads started.
-  // Disabled by Impala, which does not link Kudu's minidump library.
-  //CHECK_OK(BlockSigUSR1());
+  CHECK_OK(BlockSigUSR1());
 
   if (FLAGS_log_async) {
     EnableAsyncLogging();
@@ -349,11 +350,11 @@ void GetFullLogFilename(google::LogSeverity severity, string* filename) {
 
 std::string FormatTimestampForLog(MicrosecondsInt64 micros_since_epoch) {
   time_t secs_since_epoch = micros_since_epoch / 1000000;
-  int usecs = micros_since_epoch % 1000000;
+  size_t usecs = micros_since_epoch % 1000000;
   struct tm tm_time;
   localtime_r(&secs_since_epoch, &tm_time);
 
-  return StringPrintf("%02d%02d %02d:%02d:%02d.%06d",
+  return StringPrintf("%02d%02d %02d:%02d:%02d.%06ld",
                       1 + tm_time.tm_mon,
                       tm_time.tm_mday,
                       tm_time.tm_hour,
@@ -407,7 +408,7 @@ ostream& operator<<(ostream &os, const PRIVATE_ThrottleMsg& /*unused*/) {
 #endif
   CHECK(log && log == log->self())
       << "You must not use COUNTER with non-glog ostream";
-  int ctr = log->ctr();
+  size_t ctr = log->ctr();
   if (ctr > 0) {
     os << " [suppressed " << ctr << " similar messages]";
   }

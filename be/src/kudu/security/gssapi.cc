@@ -23,14 +23,18 @@
 
 #include <glog/logging.h>
 
-#include "common/global-flags.h"
 #include "kudu/gutil/strings/escaping.h"
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/status.h"
 
-DECLARE_string(spnego_keytab_file);
-
 using std::string;
+
+#if defined(__APPLE__)
+// Almost all functions in the krb5 API are marked as deprecated in favor
+// of GSS.framework in macOS.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif // #if defined(__APPLE__)
 
 namespace kudu {
 namespace gssapi {
@@ -127,10 +131,6 @@ Status SpnegoStep(const string& in_token_b64,
   size_t real_token_size = token.size();
   token.resize(real_token_size + 256);
 
-  if (!FLAGS_spnego_keytab_file.empty()) {
-    krb5_gss_register_acceptor_identity(FLAGS_spnego_keytab_file.c_str());
-  }
-
   gss_buffer_desc input_token {real_token_size, const_cast<char*>(token.data())};
 
   gss_ctx_id_t ctx = GSS_C_NO_CONTEXT;
@@ -169,3 +169,7 @@ Status SpnegoStep(const string& in_token_b64,
 
 } // namespace gssapi
 } // namespace kudu
+
+#if defined(__APPLE__)
+#pragma GCC diagnostic pop
+#endif // #if defined(__APPLE__)

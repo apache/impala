@@ -29,7 +29,7 @@
 #include <set>
 #include <string>
 
-#include <gflags/gflags_declare.h>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "kudu/gutil/basictypes.h"
@@ -117,7 +117,8 @@ static Status StatusFromRpcError(const ErrorStatusPB& error) {
 
 ClientNegotiation::ClientNegotiation(unique_ptr<Socket> socket,
                                      const security::TlsContext* tls_context,
-                                     boost::optional<security::SignedTokenPB> authn_token,
+                                     std::optional<security::SignedTokenPB> authn_token,
+                                     std::optional<security::JwtRawPB> jwt,
                                      RpcEncryption encryption,
                                      bool encrypt_loopback,
                                      std::string sasl_proto_name)
@@ -129,6 +130,7 @@ ClientNegotiation::ClientNegotiation(unique_ptr<Socket> socket,
       tls_negotiated_(false),
       encrypt_loopback_(encrypt_loopback),
       authn_token_(std::move(authn_token)),
+      jwt_(std::move(jwt)),
       psecret_(nullptr, std::free),
       negotiated_authn_(AuthenticationType::INVALID),
       negotiated_mech_(SaslMechanism::INVALID),
@@ -188,7 +190,6 @@ Status ClientNegotiation::Negotiate(unique_ptr<ErrorStatusPB>* rpc_error) {
   }
 
   // Step 3: if both ends support TLS, do a TLS handshake.
-  // TODO(KUDU-1921): allow the client to require TLS.
   if (encryption_ != RpcEncryption::DISABLED &&
       ContainsKey(server_features_, TLS)) {
     RETURN_NOT_OK(tls_context_->InitiateHandshake(&tls_handshake_));
@@ -223,6 +224,9 @@ Status ClientNegotiation::Negotiate(unique_ptr<ErrorStatusPB>* rpc_error) {
       break;
     case AuthenticationType::TOKEN:
       RETURN_NOT_OK(AuthenticateByToken(&recv_buf, rpc_error));
+      break;
+    case AuthenticationType::JWT:
+      RETURN_NOT_OK(AuthenticateByJwt(&recv_buf, rpc_error));
       break;
     case AuthenticationType::CERTIFICATE:
       // The TLS handshake has already authenticated the server.
@@ -348,6 +352,32 @@ Status ClientNegotiation::SendNegotiate() {
     // reliably on clients?
     msg.add_authn_types()->mutable_token();
   }
+  if (jwt_) {
+    if (tls_context_->has_trusted_cert()) {
+      msg.add_authn_types()->mutable_jwt();
+    } else {
+      // The client isn't sending its JWT to a server whose authenticity
+      // it cannot verify, otherwise its authn credentials might be stolen
+      // by an impostor. So, even if the client has a JWT to use, it does not
+      // advertise its JWT-based authentication capability when it doesn't trust
+      // the server's TLS certificate.
+      string server_addr_str;
+      {
+        Sockaddr server_addr;
+        if (auto s = socket_->GetPeerAddress(&server_addr); !s.ok()) {
+          LOG(WARNING) << "could not deduce server's address from socket info";
+        } else {
+          server_addr_str = server_addr.ToString();
+        }
+      }
+      const string& server_info = server_addr_str.empty()
+          ? "server" : Substitute("server at $0", server_addr_str);
+      LOG(WARNING) << Substitute(
+          "the client has a JWT but it isn't advertising its JWT-based authn "
+          "capability since it doesn't trust the certificate of the $0",
+          server_info);
+    }
+  }
 
   if (PREDICT_FALSE(msg.authn_types().empty())) {
     return Status::NotAuthorized("client is not configured with an authentication type");
@@ -400,6 +430,13 @@ Status ClientNegotiation::HandleNegotiate(const NegotiatePB& response) {
         }
         negotiated_authn_ = AuthenticationType::TOKEN;
         return Status::OK();
+      case AuthenticationTypePB::kJwt:
+        if (!jwt_) {
+          return Status::RuntimeError(
+              "server chose JWT authentication, but client has no JWT");
+        }
+        negotiated_authn_ = AuthenticationType::JWT;
+        return Status::OK();
       case AuthenticationTypePB::kCertificate:
         if (!tls_context_->has_signed_cert()) {
           return Status::RuntimeError(
@@ -430,8 +467,6 @@ Status ClientNegotiation::HandleNegotiate(const NegotiatePB& response) {
   // The preference list in order of most to least preferred:
   //  * GSSAPI
   //  * PLAIN
-  //
-  // TODO(KUDU-1921): allow the client to require authentication.
   if (ContainsKey(client_mechs, SaslMechanism::GSSAPI) &&
       ContainsKey(server_mechs, SaslMechanism::GSSAPI)) {
     // Check that the client has local Kerberos credentials, and if not fall
@@ -541,11 +576,31 @@ Status ClientNegotiation::AuthenticateBySasl(faststring* recv_buf,
   return HandleSaslSuccess(success);
 }
 
+Status ClientNegotiation::AuthenticateByJwt(faststring* recv_buf,
+                                            unique_ptr<ErrorStatusPB>* rpc_error) {
+  NegotiatePB pb;
+  pb.set_step(NegotiatePB::JWT_EXCHANGE);
+  *pb.mutable_jwt_raw() = std::move(*jwt_);
+  RETURN_NOT_OK(SendNegotiatePB(pb));
+  pb.Clear();
+  RETURN_NOT_OK(RecvNegotiatePB(&pb, recv_buf, rpc_error));
+  if (pb.step() != NegotiatePB::JWT_EXCHANGE) {
+    return Status::NotAuthorized("expected JWT_EXCHANGE step",
+                                 NegotiatePB::NegotiateStep_Name(pb.step()));
+  }
+  return Status::OK();
+}
+
 Status ClientNegotiation::AuthenticateByToken(faststring* recv_buf,
                                               unique_ptr<ErrorStatusPB>* rpc_error) {
   // Sanity check that TLS has been negotiated. Sending the token on an
   // unencrypted channel is a big no-no.
-  CHECK(tls_negotiated_);
+  if (PREDICT_FALSE(!tls_negotiated_)) {
+    constexpr const char* const kErrMsg =
+        "received authn token over an unencrypted channel";
+    LOG(DFATAL) << kErrMsg;
+    return Status::IllegalState(kErrMsg);
+  }
 
   // Send the token to the server.
   NegotiatePB pb;

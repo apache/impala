@@ -35,7 +35,7 @@ TEST(ObjectIdGeneratorTest, TestCanoicalizeUuid) {
   Status s = gen.Canonicalize("not_a_uuid", &canonicalized);
   {
     SCOPED_TRACE(s.ToString());
-    ASSERT_TRUE(s.IsInvalidArgument());
+    ASSERT_TRUE(s.IsInvalidArgument()) << s.ToString();
     ASSERT_STR_CONTAINS(s.ToString(), "invalid uuid");
   }
   ASSERT_OK(gen.Canonicalize(
@@ -47,6 +47,17 @@ TEST(ObjectIdGeneratorTest, TestCanoicalizeUuid) {
   ASSERT_OK(gen.Canonicalize(
       "0123456789AbCdEf0123456789aBcDeF", &canonicalized));
   ASSERT_EQ(kExpectedCanonicalized, canonicalized);
+}
+
+TEST(ObjectIdGeneratorTest, TestNextOf) {
+  const string uuid_prefix_31_bits = "0123456789abcdef0123456789abcde";
+  const string single_postfix = "0123456789abcdef";
+  for (char ch : single_postfix) {
+    string uuid = uuid_prefix_31_bits + ch;
+    ASSERT_LT(uuid, ObjectIdGenerator::NextOf(uuid));
+    ASSERT_EQ(uuid_prefix_31_bits + static_cast<char>(ch + 1),
+              ObjectIdGenerator::NextOf(uuid));
+  }
 }
 
 } // namespace kudu

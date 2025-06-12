@@ -21,6 +21,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <thread>
@@ -28,13 +29,16 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/gutil/strings/util.h"
+#include "kudu/util/countdown_latch.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/slice.h"
 #include "kudu/util/status.h"
+#include "kudu/util/thread.h"
 #include "kudu/util/test_macros.h"
 #include "kudu/util/test_util.h"
 
@@ -122,28 +126,35 @@ class SocketTest : public KuduTest {
 
   void DoTestServerDisconnects(bool accept, const std::string &message) {
     NO_FATALS(BindAndListen("0.0.0.0:0"));
-    std::thread t([&]{
+
+    CountDownLatch latch(1);
+    scoped_refptr<kudu::Thread> t;
+    Status status = kudu::Thread::Create("pool", "worker", ([&]{
       if (accept) {
         Sockaddr new_addr;
         Socket sock;
         CHECK_OK(listener_.Accept(&sock, &new_addr, 0));
         CHECK_OK(sock.Close());
       } else {
-        SleepFor(MonoDelta::FromMilliseconds(200));
+        while (!latch.WaitFor(MonoDelta::FromMilliseconds(10))) {}
         CHECK_OK(listener_.Close());
+      }
+    }), &t);
+    ASSERT_OK(status);
+    SCOPED_CLEANUP({
+      latch.CountDown();
+      if (t) {
+        t->Join();
       }
     });
 
     Socket client = ConnectToListeningServer();
     int n;
     std::unique_ptr<uint8_t[]> buf(new uint8_t[kEchoChunkSize]);
-    Status s = client.Recv(buf.get(), kEchoChunkSize, &n);
+    const auto s = client.Recv(buf.get(), kEchoChunkSize, &n);
 
-    ASSERT_TRUE(!s.ok());
-    ASSERT_TRUE(s.IsNetworkError());
+    ASSERT_TRUE(s.IsNetworkError()) << s.ToString();
     ASSERT_STR_MATCHES(s.message().ToString(), message);
-
-    t.join();
   }
 
   void DoUnixSocketTest(const string& path) {
@@ -166,6 +177,7 @@ class SocketTest : public KuduTest {
               MonoTime::Now() + MonoDelta::FromSeconds(10)));
           CHECK_OK(sock.Close());
         });
+    auto cleanup = MakeScopedCleanup([&] { t.join(); });
 
     Socket client = ConnectToListeningServer();
 
@@ -178,7 +190,9 @@ class SocketTest : public KuduTest {
     char buf[kData.size()];
     ASSERT_OK(client.BlockingRecv(reinterpret_cast<uint8_t*>(buf), kData.size(), &n,
                                   MonoTime::Now() + MonoDelta::FromSeconds(5)));
+    cleanup.cancel();
     t.join();
+
     ASSERT_OK(client.Close());
 
     ASSERT_EQ(n, kData.size());

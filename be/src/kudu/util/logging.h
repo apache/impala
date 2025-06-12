@@ -17,6 +17,7 @@
 #ifndef KUDU_UTIL_LOGGING_H
 #define KUDU_UTIL_LOGGING_H
 
+#include <cstddef>
 #include <iosfwd>
 #include <string>
 
@@ -324,7 +325,7 @@ class LogThrottler {
     ANNOTATE_BENIGN_RACE_SIZED(this, sizeof(*this), "OK to be sloppy with log throttling");
   }
 
-  bool ShouldLog(int n_secs, const char* tag, int* num_suppressed) {
+  bool ShouldLog(size_t n_secs, const char* tag, int* num_suppressed) {
     MicrosecondsInt64 ts = GetMonoTimeMicros();
 
     // When we switch tags, we should not show the "suppressed" messages, because

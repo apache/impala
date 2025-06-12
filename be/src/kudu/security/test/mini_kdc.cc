@@ -19,13 +19,11 @@
 
 #include <csignal>
 #include <cstdlib>
-
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include <boost/optional/optional.hpp>
 #include <glog/logging.h>
 
 #include "kudu/gutil/map-util.h"
@@ -40,7 +38,6 @@
 #include "kudu/util/subprocess.h"
 #include "kudu/util/test_util.h"
 
-using boost::none;
 using std::map;
 using std::string;
 using std::unique_ptr;
@@ -65,9 +62,7 @@ MiniKdc::MiniKdc(MiniKdcOptions options)
     options_.realm = "KRBTEST.COM";
   }
   if (options_.data_root.empty()) {
-    // We hardcode "/tmp" here since the original function which initializes a random test
-    // directory (GetTestDataDirectory()), depends on gmock.
-    options_.data_root = JoinPathSegments("/tmp", "krb5kdc");
+    options_.data_root = JoinPathSegments(GetTestDataDirectory(), "krb5kdc");
   }
   if (options_.ticket_lifetime.empty()) {
     options_.ticket_lifetime = "24h";
@@ -110,6 +105,8 @@ Status GetBinaryPath(const string& binary, string* path) {
   static const vector<string> kCommonLocations = {
     "/usr/local/opt/krb5/sbin", // Homebrew
     "/usr/local/opt/krb5/bin", // Homebrew
+    "/opt/homebrew/opt/krb5/sbin", // Homebrew arm
+    "/opt/homebrew/opt/krb5/bin", // Homebrew arm
     "/opt/local/sbin", // Macports
     "/opt/local/bin", // Macports
     "/usr/lib/mit/sbin", // SLES

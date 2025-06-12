@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -27,7 +28,6 @@
 #include <utility>
 
 #include <boost/intrusive/list.hpp>
-#include <boost/optional/optional.hpp>
 #include <ev++.h>
 #include <glog/logging.h>
 
@@ -141,7 +141,10 @@ class Connection : public RefCountedThreadSafe<Connection> {
   void CancelOutboundCall(const std::shared_ptr<OutboundCall> &call);
 
   // The address of the remote end of the connection.
-  const Sockaddr &remote() const { return remote_; }
+  const Sockaddr& remote() const { return remote_; }
+
+  // The address of the local end of the connection.
+  Status GetLocalAddress(Sockaddr* addr) const;
 
   // Set the user credentials for an outbound connection.
   void set_outbound_connection_id(ConnectionId conn_id) {
@@ -335,7 +338,7 @@ class Connection : public RefCountedThreadSafe<Connection> {
 
   // The ConnectionId that serves as a key into the client connection map
   // within this reactor. Only set in the case of outbound connections.
-  boost::optional<ConnectionId> outbound_connection_id_;
+  std::optional<ConnectionId> outbound_connection_id_;
 
   // The authenticated remote user (if this is an inbound connection on the server).
   RemoteUser remote_user_;
