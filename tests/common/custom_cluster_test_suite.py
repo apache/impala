@@ -80,6 +80,7 @@ DISABLE_LOG_BUFFERING = 'disable_log_buffering'
 # paths to stderr.
 LOG_SYMLINKS = 'log_symlinks'
 WORKLOAD_MGMT = 'workload_mgmt'
+FORCE_RESTART = 'force_restart'
 
 # Args that accept additional formatting to supply temporary dir path.
 ACCEPT_FORMATTING = set([IMPALAD_ARGS, CATALOGD_ARGS, IMPALA_LOG_DIR])
@@ -98,6 +99,7 @@ WORKLOAD_MGMT_IMPALAD_FLAGS = (
   '--enable_workload_mgmt=true --query_log_write_interval_s=1 '
   '--shutdown_grace_period_s=0 --shutdown_deadline_s=60 ')
 
+PREVIOUS_CMD_STR = ""
 
 class CustomClusterTestSuite(ImpalaTestSuite):
   """Runs tests with a custom Impala cluster. There are two modes:
@@ -156,7 +158,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       impalad_timeout_s=None, expect_cores=None, reset_ranger=False,
       tmp_dir_placeholders=[],
       expect_startup_fail=False, disable_log_buffering=False, log_symlinks=False,
-      workload_mgmt=False):
+      workload_mgmt=False, force_restart=False):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     args = dict()
@@ -200,6 +202,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       args[LOG_SYMLINKS] = True
     if workload_mgmt:
       args[WORKLOAD_MGMT] = True
+    if force_restart:
+      args[FORCE_RESTART] = True
 
     def merge_args(args_first, args_last):
       result = args_first.copy()
@@ -334,6 +338,14 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       kwargs[STATESTORED_TIMEOUT_S] = args[STATESTORED_TIMEOUT_S]
     if IMPALAD_TIMEOUT_S in args:
       kwargs[IMPALAD_TIMEOUT_S] = args[IMPALAD_TIMEOUT_S]
+    if FORCE_RESTART in args:
+      kwargs[FORCE_RESTART] = args[FORCE_RESTART]
+      if args[FORCE_RESTART] is True:
+        LOG.warning("Test uses force_restart=True to avoid restarting the cluster. "
+                    "Test reorganization/assertion rewrite is needed")
+    else:
+      # Default to False to ensure that the cluster is not restarted for every test.
+      kwargs[FORCE_RESTART] = False
 
     if args.get(EXPECT_CORES, False):
       # Make a note of any core files that already exist
@@ -535,7 +547,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                             impalad_timeout_s=60,
                             ignore_pid_on_log_rotation=False,
                             wait_for_backends=True,
-                            log_symlinks=False):
+                            log_symlinks=False,
+                            force_restart=True):
     cls.impala_log_dir = impala_log_dir
     # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
     # certain custom startup arguments work and we want to keep them independent of dev
@@ -575,8 +588,24 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     options.append("--impalad_args=--default_query_options={0}".format(
         ','.join(["{0}={1}".format(k, v) for k, v in default_query_option_kvs])))
 
-    LOG.info("Starting cluster with command: %s" %
-        " ".join(pipes.quote(arg) for arg in cmd + options))
+    cmd_str = " ".join(pipes.quote(arg) for arg in cmd + options)
+
+    # If the cluster is already started, we don't need to start it again, unless
+    # force_restart is set to True. NOTE: reordering tests into classes with class-level
+    # 'with_args' decorators is a more preferable way to avoid restarting the cluster.
+    global PREVIOUS_CMD_STR
+    if PREVIOUS_CMD_STR == cmd_str and not force_restart:
+        LOG.info("Reusing existing cluster with command: %s" % cmd_str)
+        cls.cluster = ImpalaCluster.get_e2e_test_cluster()
+        try:
+          cls._verify_cluster(expected_num_impalads, options, wait_for_backends,
+                              expected_subscribers, 5, 5)
+          return
+        except Exception as e:
+          LOG.info("Failed to reuse running cluster: %s" % e)
+          pass
+
+    LOG.info("Starting cluster with command: %s" % cmd_str)
     try:
       check_call(cmd + options, close_fds=True)
     finally:
@@ -585,6 +614,19 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
       # Failure tests expect cluster to be initialised even if start-impala-cluster fails.
       cls.cluster = ImpalaCluster.get_e2e_test_cluster()
+
+    PREVIOUS_CMD_STR = cmd_str
+
+    cls._verify_cluster(expected_num_impalads, options, wait_for_backends,
+                        expected_subscribers, statestored_timeout_s, impalad_timeout_s)
+
+  @classmethod
+  def _verify_cluster(cls, expected_num_impalads, options, wait_for_backends,
+                   expected_subscribers, statestored_timeout_s, impalad_timeout_s):
+    """
+    Verifies the cluster by checking the number of live subscribers and backends.
+    Raises exception if verification fails.
+    """
     statestored = cls.cluster.statestored
     if statestored is None:
       raise Exception("statestored was not found")

@@ -969,7 +969,8 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
           deadline=COORD_SHUTDOWN_FAST_DEADLINE_S,
           query_cancel_period=COORD_SHUTDOWN_QUERY_CANCEL_PERIOD_S,
           hostname=socket.gethostname()),
-      default_query_options=[("num_scanner_threads", "1")])
+      default_query_options=[("num_scanner_threads", "1")],
+      force_restart=True)
   def test_shutdown_coordinator_and_executor_cancel_query(self):
     """Test that shuts down the executor and coordinator, the slow query should
     be cancelled before the deadline is reached."""

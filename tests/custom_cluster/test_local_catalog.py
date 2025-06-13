@@ -579,7 +579,8 @@ class TestLocalCatalogObservability(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
-      catalogd_args="--catalog_topic_mode=minimal")
+      catalogd_args="--catalog_topic_mode=minimal",
+      force_restart=True)
   def test_lightweight_rpc_metrics(self):
     """Verify catalogd client cache for lightweight RPCs is used correctly"""
     # Fetching the db and table list should be lightweight requests

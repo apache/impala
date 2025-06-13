@@ -612,40 +612,47 @@ class TestKuduTransaction(TestKuduTransactionBase):
 
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock()
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_kudu_txn_succeed(self, unique_database):
     self._test_kudu_txn_succeed(unique_database)
 
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock()
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_kudu_txn_not_implemented(self, unique_database):
     self._test_kudu_txn_not_implemented(unique_database)
 
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock()
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_kudu_txn_abort_dup_key(self, unique_database):
     self._test_kudu_txn_abort_dup_key(unique_database, True,
         self._duplicate_key_error)
 
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock()
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_kudu_txn_ctas(self, unique_database):
     self._test_kudu_txn_ctas(unique_database, True, self._duplicate_key_error)
 
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_kudu_txn_abort_row_batch(self, unique_database):
     self._test_kudu_txn_abort_row_batch(unique_database)
 
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_kudu_txn_abort_partial_rows(self, unique_database):
     self._test_kudu_txn_abort_partial_rows(unique_database)
 
   @pytest.mark.execute_serially
   @SkipIfKudu.no_hybrid_clock()
   @SkipIfBuildType.not_dev_build
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_kudu_txn_abort_partition_lock(self, unique_database):
     self._test_kudu_txn_abort_partition_lock(unique_database)
 

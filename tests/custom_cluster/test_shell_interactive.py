@@ -124,6 +124,7 @@ class TestShellInteractive(CustomClusterTestSuite):
     proc.expect("00:SCAN HDFS\w*| 3\w*| 3")
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_query_retries_show_profiles(self):
     """Tests transparent query retries via impala-shell. Validates that the output of the
     impala-shell when the '-p' option is specified prints out both the original and

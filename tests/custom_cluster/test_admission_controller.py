@@ -2808,7 +2808,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=MAX_NUM_CONCURRENT_QUERIES,
         max_queued=MAX_NUM_QUEUED_QUERIES, pool_max_mem=-1, queue_wait_timeout_ms=600000),
-      statestored_args=_STATESTORED_ARGS)
+      statestored_args=_STATESTORED_ARGS, force_restart=True)
   def test_admission_controller_with_flags(self, vector):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
@@ -2825,7 +2825,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     impalad_args=impalad_admission_ctrl_config_args(
       fs_allocation_file="fair-scheduler-test2.xml",
       llama_site_file="llama-site-test2.xml"),
-    statestored_args=_STATESTORED_ARGS)
+    statestored_args=_STATESTORED_ARGS, force_restart=True)
   def test_admission_controller_with_configs(self, vector):
     self.pool_name = 'root.queueB'
     vector.set_exec_option('request_pool', self.pool_name)
@@ -2836,7 +2836,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     impalad_args=impalad_admission_ctrl_config_args(
       fs_allocation_file="fair-scheduler-test2.xml",
       llama_site_file="llama-site-test2.xml"),
-    statestored_args=_STATESTORED_ARGS)
+    statestored_args=_STATESTORED_ARGS, force_restart=True)
   def test_admission_controller_with_quota_configs(self, vector):
     """Run a workload with a variety of outcomes in a pool that has user quotas
     configured. Note the user quotas will not prevent any queries from running, but this
@@ -2866,7 +2866,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         max_requests=MAX_NUM_CONCURRENT_QUERIES * 30, max_queued=MAX_NUM_QUEUED_QUERIES,
         pool_max_mem=MEM_TEST_LIMIT, proc_mem_limit=MEM_TEST_LIMIT,
         queue_wait_timeout_ms=600000),
-      statestored_args=_STATESTORED_ARGS)
+      statestored_args=_STATESTORED_ARGS, force_restart=True)
   def test_mem_limit(self, vector):
     # Impala may set the proc mem limit lower than we think depending on the overcommit
     # settings of the OS. It should be fine to continue anyway.

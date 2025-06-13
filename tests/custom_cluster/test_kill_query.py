@@ -53,6 +53,7 @@ class TestKillQuery(CustomClusterTestSuite):
       )
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_another_coordinator_unreachable(self):
     """
     A coordinator other than the one of the query to kill is unreachable.

@@ -279,7 +279,8 @@ class TestQueryLogTableBasic(WorkloadManagementTestSuite):
   @CustomClusterTestSuite.with_args(cluster_size=3,
                                     num_exclusive_coordinators=2,
                                     workload_mgmt=True,
-                                    disable_log_buffering=True)
+                                    disable_log_buffering=True,
+                                    force_restart=True)
   def test_dedicated_coordinator_with_mt_dop(self, vector):
     """Asserts the values written to the query log table match the values from the
        query profile when dedicated coordinators are used along with an MT_DOP setting
@@ -671,7 +672,8 @@ class TestQueryLogTableAll(WorkloadManagementTestSuite):
 
   @CustomClusterTestSuite.with_args(impalad_args="--cluster_id=test_query_hist_2",
                                     workload_mgmt=True,
-                                    disable_log_buffering=True)
+                                    disable_log_buffering=True,
+                                    force_restart=True)
   def test_invalid_query(self, vector):
     """Asserts correct values are written to the completed queries table for a failed
        query. The query profile is used as the source of expected values."""
@@ -792,7 +794,8 @@ class TestQueryLogTableAll(WorkloadManagementTestSuite):
         "impala-server.completed-queries.failure") == 0
 
   @CustomClusterTestSuite.with_args(workload_mgmt=True,
-                                    disable_log_buffering=True)
+                                    disable_log_buffering=True,
+                                    force_restart=True)
   def test_sql_injection_attempts(self, vector):
     client = self.get_client(vector.get_value('protocol'))
     impalad = self.cluster.get_first_impalad()

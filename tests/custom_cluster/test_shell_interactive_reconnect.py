@@ -35,6 +35,7 @@ NUM_QUERIES = 'impala-server.num-queries'
 class TestShellInteractiveReconnect(CustomClusterTestSuite):
   """ Check if interactive shell is using the current DB after reconnecting """
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_manual_reconnect(self):
     # Iterate over test vector within test function to avoid restarting cluster.
     for vector in\
@@ -50,6 +51,7 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
       assert "alltypesaggmultifilesnopart" in result.stdout, result.stdout
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_auto_reconnect(self):
     impalad = ImpaladService(socket.getfqdn())
 

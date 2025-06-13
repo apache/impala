@@ -58,7 +58,8 @@ class TestKrpcMetrics(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args('-datastream_service_queue_mem_limit=1B \
-                                     -datastream_service_num_svc_threads=1')
+                                     -datastream_service_num_svc_threads=1',
+                                     force_restart=True)
   def test_krpc_queue_overflow_metrics(self, vector):
     """Test that rejected RPCs show up on the /metrics debug web page.
     """

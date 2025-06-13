@@ -202,7 +202,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      statestored_args="-statestore_heartbeat_frequency_ms=1000")
+      statestored_args="-statestore_heartbeat_frequency_ms=1000", force_restart=True)
   def test_kill_impalad_expect_retries(self):
     """Similar to 'test_kill_impalad_expect_retry' except it runs multiple queries in
     parallel and then kills an impalad. Several of the code comments in
@@ -526,6 +526,7 @@ class TestQueryRetries(CustomClusterTestSuite):
              "fetched some rows" % self.client.handle_id(handle) in str(e)
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_spooling_all_results_for_retries(self):
     """Test retryable queries with spool_all_results_for_retries=true will spool all
     results when results spooling is enabled."""
@@ -558,6 +559,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.client.close_query(handle)
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_query_retry_in_spooling(self):
     """Test retryable queries with results spooling enabled and
     spool_all_results_for_retries=true can be safely retried for failures that happen when
@@ -583,6 +585,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.client.close_query(handle)
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_retried_query_not_spooling_all_results(self):
     """Test retried query can return results immediately even when results spooling and
     spool_all_results_for_retries are enabled in the original query."""
