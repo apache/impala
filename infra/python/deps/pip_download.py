@@ -102,7 +102,7 @@ def get_package_info(pkg_name, pkg_version, is_canceled=None):
   pkg_info = subprocess.check_output(
       ["wget", "-q", "-O", "-", url], universal_newlines=True)
   regex = r'<a .*?href=\".*?packages/(.*?)#(.*?)=(.*?)\".*?>(.*?)<\/a>'
-  for match in re.finditer(regex, pkg_info):
+  for match in re.finditer(regex, pkg_info, flags=re.DOTALL):
     path = match.group(1)
     hash_algorithm = match.group(2)
     digest = match.group(3)
