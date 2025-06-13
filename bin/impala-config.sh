@@ -1073,12 +1073,11 @@ export AUX_CLASSPATH=""
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true
 
-# Add the jars so hive can create hbase tables.
-export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-common-${IMPALA_HBASE_VERSION}.jar"
-export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-client-${IMPALA_HBASE_VERSION}.jar"
-export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-server-${IMPALA_HBASE_VERSION}.jar"
-export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-protocol-${IMPALA_HBASE_VERSION}.jar"
-export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-hadoop-compat-${IMPALA_HBASE_VERSION}.jar"
+# Add jars to Hive's AUX_CLASSPATH as needed.
+# Newer Hive version already have hbase-shaded-mapreduce in it's library.
+# This commented line is left here as an example.
+# export AUX_CLASSPATH="$AUX_CLASSPATH:\
+# $HBASE_HOME/lib/shaded-clients/hbase-shaded-mapreduce-${IMPALA_HBASE_VERSION}.jar"
 
 export HBASE_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 # Suppress Ozone deprecation warning
