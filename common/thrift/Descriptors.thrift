@@ -52,6 +52,12 @@ struct TSlotDescriptor {
   9: required i32 slotIdx
   10: required CatalogObjects.TVirtualColumnType virtual_col_type =
       CatalogObjects.TVirtualColumnType.NONE
+  // The path includes column / field names materialized by a scan. This is set for
+  // producing the tuple cache key, because the names of columns / fields determine
+  // behavior when resolving Parquet columns/fields by name. This information is
+  // provided by other structures for the executor, so it only needs to be set for
+  // the tuple cache.
+  11: optional string path
 }
 
 struct TColumnDescriptor {

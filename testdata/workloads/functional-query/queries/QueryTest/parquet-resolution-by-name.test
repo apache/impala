@@ -36,6 +36,19 @@ string
 'NULL'
 ====
 ---- QUERY
+# This test case is added specifically for tuple caching. This query is symmetric
+# to the "select a, b" query above, so it tests that the tuple cache key contains
+# enough information to distinguish the different columns.
+set parquet_fallback_schema_resolution="NAME";
+select new_a, b from resolution_by_name_test;
+---- TYPES
+string,string
+---- RESULTS
+'NULL','bbbbbbb'
+'NULL','dddd'
+'NULL','f'
+====
+---- QUERY
 # Can still resolve by ordinal
 set parquet_fallback_schema_resolution="POSITION";
 select b, new_a from resolution_by_name_test;

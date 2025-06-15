@@ -399,6 +399,11 @@ class TestTupleCacheSingle(TestTupleCacheBase):
     assert result_agg.success
     assertCounterOrder(result_agg.runtime_profile, NUM_HITS, [1, 0])
 
+  def test_parquet_resolution_by_name(self, vector, unique_database):
+    """Verify that parquet_fallback_schema_resolution=NAME works with tuple caching"""
+    self.run_test_case('QueryTest/parquet-resolution-by-name', vector,
+                       use_db=unique_database)
+
 
 @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
 class TestTupleCacheCluster(TestTupleCacheBase):

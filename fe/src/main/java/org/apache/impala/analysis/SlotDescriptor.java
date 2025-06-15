@@ -478,6 +478,19 @@ public class SlotDescriptor {
         serialCtx.translateTupleId(parent_.getId()).asInt(), type_.toThrift(),
         materializedPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
         slotIdx_, getVirtualColumnType());
+    // The path contains information about the column/field materialized by the scan.
+    // This information is needed for the tuple caching key, because the names of
+    // the columns / fields determine the runtime behavior when resolving Parquet
+    // columns by name (i.e. a table with column X is different from a table with column
+    // Y even if it points to the same files). This information is provided to the
+    // executor in other ways, so this is only necessary when constructing the tuple
+    // caching key.
+    if (serialCtx.isTupleCache() && path_ != null) {
+      // When path_ is non-null, label_ is a representation of the path as a single
+      // string. label_ can still be set when the path_ is null, but that content is
+      // not interesting to the tuple cache.
+      result.setPath(label_);
+    }
     if (itemTupleDesc_ != null) {
       // Check for recursive or otherwise invalid item tuple descriptors. Since we assign
       // tuple ids globally in increasing order, the id of an item tuple descriptor must
