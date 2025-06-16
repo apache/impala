@@ -21,6 +21,7 @@ from __future__ import absolute_import, division, print_function
 import os
 
 HIVE_MAJOR_VERSION = int(os.environ['IMPALA_HIVE_VERSION'][0])
+USE_APACHE_HIVE = os.environ['USE_APACHE_HIVE']
 KERBERIZE = os.environ.get('IMPALA_KERBERIZE') == 'true'
 VARIANT = os.environ.get('HIVE_VARIANT')
 IMPALA_JAVA_TOOL_OPTIONS=os.environ.get("IMPALA_JAVA_TOOL_OPTIONS")
@@ -227,8 +228,18 @@ CONFIG.update({
   'datanucleus.connectionPool.maxPoolSize': 20,
   'javax.jdo.option.ConnectionUserName': 'hiveuser',
   'javax.jdo.option.ConnectionPassword': 'password',
-  'hikaricp.connectionTimeout': 60000,
 })
+# Before HIVE-19486 (in Apache Hive 4 and CDP Hive versions), Hikari CP configs are prefixed with "hikari.*".
+# After HIVE-19486, the prefix is "hikaricp.*".
+if USE_APACHE_HIVE and HIVE_MAJOR_VERSION == 3:
+  CONFIG.update({
+    'hikari.connectionTimeout': 60000,
+  })
+else:
+  CONFIG.update({
+    'hikaricp.connectionTimeout': 60000,
+  })
+
 if db_type == 'postgres':
   CONFIG.update({
    'javax.jdo.option.ConnectionDriverName': 'org.postgresql.Driver',
