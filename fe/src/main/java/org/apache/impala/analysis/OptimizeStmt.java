@@ -42,6 +42,7 @@ import org.apache.impala.util.IcebergUtil;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -239,7 +240,7 @@ public class OptimizeStmt extends DmlStatementBase {
     IcebergContentFileStore selectedFiles =
         new IcebergContentFileStore(iceTable.getIcebergApiTable(),
             iceTable.getContentFileStore().getDataFilesWithoutDeletes(),
-            selectedContentFiles);
+            selectedContentFiles, new HashMap<>());
     return selectedFiles.getDataFilesWithoutDeletes();
   }
 

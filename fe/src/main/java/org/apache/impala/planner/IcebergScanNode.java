@@ -20,11 +20,11 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
+import org.apache.iceberg.Snapshot;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.MultiAggregateInfo;
@@ -46,7 +46,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Scan of a single iceberg table.
@@ -58,6 +57,12 @@ public class IcebergScanNode extends HdfsScanNode {
   // partitioned tables, so partition range scans are scheduled more evenly.
   // See IMPALA-12765 for details.
   private List<IcebergFileDescriptor> fileDescs_;
+
+  // Number of actual partitions in the table, inferred from file metadata.
+  // We treat Iceberg tables as unpartitioned HDFS tables, so instead of storing the file
+  // descriptors per partition in the partition map in FeFsTable, we keep track of
+  // the partition values and file descriptors separately in IcebergContentFileStore.
+  private int numIcebergPartitions_;
 
   // Indicates that the files in 'fileDescs_' are sorted.
   private boolean filesAreSorted_ = false;
@@ -83,13 +88,15 @@ public class IcebergScanNode extends HdfsScanNode {
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<IcebergFileDescriptor> fileDescs,
+      int numPartitions,
       List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, long snapshotId) {
-    this(id, tblRef, conjuncts, aggInfo, fileDescs, nonIdentityConjuncts,
+    this(id, tblRef, conjuncts, aggInfo, fileDescs, numPartitions, nonIdentityConjuncts,
         skippedConjuncts, null, snapshotId);
   }
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<IcebergFileDescriptor> fileDescs,
+      int numPartitions,
       List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, PlanNodeId deleteId,
       long snapshotId) {
     super(id, tblRef.getDesc(), conjuncts,
@@ -99,6 +106,7 @@ public class IcebergScanNode extends HdfsScanNode {
     Preconditions.checkState(partitions_.size() == 1);
 
     fileDescs_ = fileDescs;
+    numIcebergPartitions_ = numPartitions;
     if (((FeIcebergTable)tblRef.getTable()).isPartitioned()) {
       // Let's order the file descriptors for better scheduling.
       // See IMPALA-12765 for details.
@@ -219,6 +227,32 @@ public class IcebergScanNode extends HdfsScanNode {
     if (deleteFileScanNodeId != null) {
       msg.hdfs_scan_node.setDeleteFileScanNodeId(deleteFileScanNodeId.asInt());
     }
+  }
+
+  @Override
+  protected long getNumSelectedPartitions(long partsPerFs) {
+    BitSet selectedPartitions = new BitSet(numIcebergPartitions_);
+    for (FileDescriptor fd : fileDescs_) {
+      selectedPartitions.set(
+          ((IcebergFileDescriptor)fd).getFbFileMetadata().icebergMetadata().partId());
+    }
+    return selectedPartitions.cardinality();
+  }
+
+  // Returns the number of partitions in the current snapshot, cached by catalog after
+  // loading. In case of time travel, the number of all partitions is not available
+  // in the old snapshot, therefore this info is omitted from the explain string.
+  @Override
+  protected String getNumPartitionString(FeFsTable table) {
+    Preconditions.checkState(table instanceof FeIcebergTable);
+    Snapshot currentSnapshot =
+        ((FeIcebergTable) table).getIcebergApiTable().currentSnapshot();
+    if (currentSnapshot != null) {
+      if (snapshotId_ != currentSnapshot.snapshotId()) {
+        return "unknown";
+      }
+    }
+    return Integer.toString(numIcebergPartitions_);
   }
 
   @Override

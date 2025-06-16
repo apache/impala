@@ -4,8 +4,8 @@ using functional_parquet.iceberg_partitioned source
 on target.i = source.id
 when not matched then insert values (source.id, source.user)
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=1.98MB Threads=3
-Per-Host Resource Estimates: Memory=98MB
+Max Per-Host Resource Reservation: Memory=2.00MB Threads=3
+Per-Host Resource Estimates: Memory=130MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.iceberg_partitioned, functional_parquet.iceberg_v2_no_deletes
 Analyzed query: SELECT /* +straight_join */ CAST(CAST(CAST(TupleIsNull(0) AS
@@ -26,7 +26,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |  |  result expressions: source.id, source.`user`
 |  |  type: INSERT
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0N,1N,2 row-size=60B cardinality=23
+|  tuple-ids=0N,1N,2 row-size=80B cardinality=23
 |  in pipelines: 00(GETNEXT)
 |
 02:HASH JOIN [FULL OUTER JOIN]
@@ -37,7 +37,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     stored statistics:
 |       table: rows=20 size=22.90KB
@@ -54,12 +54,12 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
      table: rows=3 size=625B
      columns missing stats: i, s
    extrapolated-rows=disabled max-scan-range-rows=3
-   mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
-   tuple-ids=0 row-size=16B cardinality=3
+   mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=3
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.98MB Threads=5
-Per-Host Resource Estimates: Memory=98MB
+Max Per-Host Resource Reservation: Memory=2.00MB Threads=5
+Per-Host Resource Estimates: Memory=130MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.iceberg_partitioned, functional_parquet.iceberg_v2_no_deletes
 Analyzed query: SELECT /* +straight_join */ CAST(CAST(CAST(TupleIsNull(0) AS
@@ -73,21 +73,21 @@ F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=1.97MB mem-reservation=1.94MB thread-reservation=1
 WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |  output exprs: target.i, target.s
-|  mem-estimate=1.35KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=1.80KB mem-reservation=0B thread-reservation=0
 |
 03:MERGE
 |  CASE 0: NOT MATCHED BY TARGET
 |  |  result expressions: source.id, source.`user`
 |  |  type: INSERT
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0N,1N,2 row-size=60B cardinality=23
+|  tuple-ids=0N,1N,2 row-size=80B cardinality=23
 |  in pipelines: 00(GETNEXT)
 |
 02:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash predicates: target.i = source.id
 |  fk/pk conjuncts: assumed fk/pk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0N,1N row-size=60B cardinality=23
+|  tuple-ids=0N,1N row-size=80B cardinality=23
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--05:EXCHANGE [HASH(source.id)]
@@ -98,7 +98,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  Per-Host Resources: mem-estimate=64.19MB mem-reservation=32.00KB thread-reservation=2
 |  01:SCAN HDFS [functional_parquet.iceberg_partitioned source, RANDOM]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     stored statistics:
 |       table: rows=20 size=22.90KB
@@ -110,11 +110,11 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |
 04:EXCHANGE [HASH(target.i)]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0 row-size=16B cardinality=3
+|  tuple-ids=0 row-size=36B cardinality=3
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Host Resources: mem-estimate=32.08MB mem-reservation=16.00KB thread-reservation=2
+Per-Host Resources: mem-estimate=64.16MB mem-reservation=32.00KB thread-reservation=2
 00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes target, RANDOM]
    HDFS partitions=1/1 files=1 size=625B
    Iceberg snapshot id: 728158873687794725
@@ -122,8 +122,8 @@ Per-Host Resources: mem-estimate=32.08MB mem-reservation=16.00KB thread-reservat
      table: rows=3 size=625B
      columns missing stats: i, s
    extrapolated-rows=disabled max-scan-range-rows=3
-   mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
-   tuple-ids=0 row-size=16B cardinality=3
+   mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=3
    in pipelines: 00(GETNEXT)
 ====
 # Merge into an unpartitioned Iceberg table with multiple insert cases
@@ -134,8 +134,8 @@ when not matched and id < 10 then insert values (cast(source.id + 10 as int) , s
 when not matched and id < 20 then insert values (cast(source.id + 20 as int), source.user)
 when not matched then insert values (source.id, source.user)
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=1.98MB Threads=3
-Per-Host Resource Estimates: Memory=98MB
+Max Per-Host Resource Reservation: Memory=2.00MB Threads=3
+Per-Host Resource Estimates: Memory=130MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.iceberg_partitioned, functional_parquet.iceberg_v2_no_deletes
 Analyzed query: SELECT /* +straight_join */ CAST(CAST(CAST(TupleIsNull(0) AS
@@ -146,10 +146,10 @@ functional_parquet.iceberg_v2_no_deletes target FULL OUTER JOIN
 functional_parquet.iceberg_partitioned source ON target.i = source.id
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=97.94MB mem-reservation=1.98MB thread-reservation=3
+|  Per-Host Resources: mem-estimate=129.94MB mem-reservation=2.00MB thread-reservation=3
 WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |  output exprs: target.i, target.s
-|  mem-estimate=1.35KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=1.80KB mem-reservation=0B thread-reservation=0
 |
 03:MERGE
 |  CASE 0: NOT MATCHED BY TARGET
@@ -164,18 +164,18 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |  |  result expressions: source.id, source.`user`
 |  |  type: INSERT
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0N,1N,2 row-size=60B cardinality=23
+|  tuple-ids=0N,1N,2 row-size=80B cardinality=23
 |  in pipelines: 00(GETNEXT)
 |
 02:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: target.i = source.id
 |  fk/pk conjuncts: assumed fk/pk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0N,1N row-size=60B cardinality=23
+|  tuple-ids=0N,1N row-size=80B cardinality=23
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     stored statistics:
 |       table: rows=20 size=22.90KB
@@ -192,12 +192,12 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
      table: rows=3 size=625B
      columns missing stats: i, s
    extrapolated-rows=disabled max-scan-range-rows=3
-   mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
-   tuple-ids=0 row-size=16B cardinality=3
+   mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=3
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.98MB Threads=5
-Per-Host Resource Estimates: Memory=98MB
+Max Per-Host Resource Reservation: Memory=2.00MB Threads=5
+Per-Host Resource Estimates: Memory=130MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.iceberg_partitioned, functional_parquet.iceberg_v2_no_deletes
 Analyzed query: SELECT /* +straight_join */ CAST(CAST(CAST(TupleIsNull(0) AS
@@ -211,7 +211,7 @@ F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=1.97MB mem-reservation=1.94MB thread-reservation=1
 WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |  output exprs: target.i, target.s
-|  mem-estimate=1.35KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=1.80KB mem-reservation=0B thread-reservation=0
 |
 03:MERGE
 |  CASE 0: NOT MATCHED BY TARGET
@@ -226,14 +226,14 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |  |  result expressions: source.id, source.`user`
 |  |  type: INSERT
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0N,1N,2 row-size=60B cardinality=23
+|  tuple-ids=0N,1N,2 row-size=80B cardinality=23
 |  in pipelines: 00(GETNEXT)
 |
 02:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash predicates: target.i = source.id
 |  fk/pk conjuncts: assumed fk/pk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0N,1N row-size=60B cardinality=23
+|  tuple-ids=0N,1N row-size=80B cardinality=23
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--05:EXCHANGE [HASH(source.id)]
@@ -244,7 +244,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  Per-Host Resources: mem-estimate=64.19MB mem-reservation=32.00KB thread-reservation=2
 |  01:SCAN HDFS [functional_parquet.iceberg_partitioned source, RANDOM]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     stored statistics:
 |       table: rows=20 size=22.90KB
@@ -256,11 +256,11 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |
 04:EXCHANGE [HASH(target.i)]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0 row-size=16B cardinality=3
+|  tuple-ids=0 row-size=36B cardinality=3
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Host Resources: mem-estimate=32.08MB mem-reservation=16.00KB thread-reservation=2
+Per-Host Resources: mem-estimate=64.16MB mem-reservation=32.00KB thread-reservation=2
 00:SCAN HDFS [functional_parquet.iceberg_v2_no_deletes target, RANDOM]
    HDFS partitions=1/1 files=1 size=625B
    Iceberg snapshot id: 728158873687794725
@@ -268,8 +268,8 @@ Per-Host Resources: mem-estimate=32.08MB mem-reservation=16.00KB thread-reservat
      table: rows=3 size=625B
      columns missing stats: i, s
    extrapolated-rows=disabled max-scan-range-rows=3
-   mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
-   tuple-ids=0 row-size=16B cardinality=3
+   mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
+   tuple-ids=0 row-size=36B cardinality=3
    in pipelines: 00(GETNEXT)
 ====
 # Merge into a partitioned Iceberg table with multiple insert cases
@@ -279,8 +279,8 @@ on target.i = source.i
 when not matched and source.i < 20 then insert values (source.ts, source.s, source.i, source.j)
 when not matched then insert *
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=13.98MB Threads=3
-Per-Host Resource Estimates: Memory=162MB
+Max Per-Host Resource Reservation: Memory=14.00MB Threads=3
+Per-Host Resource Estimates: Memory=194MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.iceberg_partition_transforms_zorder
 Analyzed query: SELECT /* +straight_join */ CAST(CAST(CAST(TupleIsNull(0) AS
@@ -294,16 +294,16 @@ functional_parquet.iceberg_partition_transforms_zorder) source ON target.i =
 source.i
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=161.94MB mem-reservation=13.98MB thread-reservation=3
+|  Per-Host Resources: mem-estimate=193.94MB mem-reservation=14.00MB thread-reservation=3
 WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE=false, PARTITION-KEYS=(year(target.ts),iceberg_bucket_transform(target.s, 5))]
 |  output exprs: ts, s, i, j
-|  mem-estimate=122B mem-reservation=0B thread-reservation=0
+|  mem-estimate=162B mem-reservation=0B thread-reservation=0
 |
 04:SORT
 |  order by: LEXICAL: year(target.ts) ASC NULLS LAST, iceberg_bucket_transform(target.s, 5) ASC NULLS LAST, ZORDER: i, j
 |  materialized: year(target.ts), iceberg_bucket_transform(target.s, 5)
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=6 row-size=61B cardinality=2
+|  tuple-ids=6 row-size=81B cardinality=2
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 03:MERGE
@@ -315,19 +315,19 @@ WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE
 |  |  result expressions: ts, s, CAST(CAST(i AS BIGINT) + CAST(10 AS BIGINT) AS INT), j
 |  |  type: INSERT
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0N,1N,3 row-size=88B cardinality=2
+|  tuple-ids=0N,1N,3 row-size=108B cardinality=2
 |  in pipelines: 00(GETNEXT)
 |
 02:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: target.i = CAST(i + 10 AS INT)
 |  fk/pk conjuncts: assumed fk/pk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0N,1N row-size=88B cardinality=2
+|  tuple-ids=0N,1N row-size=108B cardinality=2
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder]
 |     HDFS partitions=1/1 files=1 size=1.08KB
-|     Iceberg snapshot id: 7739113163707801067
+|     Iceberg snapshot id: 2888221093496088725
 |     stored statistics:
 |       table: rows=1 size=1.08KB
 |       columns: unavailable
@@ -338,12 +338,12 @@ WRITE TO HDFS [functional_parquet.iceberg_partition_transforms_zorder, OVERWRITE
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder target]
    HDFS partitions=1/1 files=1 size=1.08KB
-   Iceberg snapshot id: 7739113163707801067
+   Iceberg snapshot id: 2888221093496088725
    stored statistics:
      table: rows=1 size=1.08KB
      columns missing stats: ts, s, i, j
    extrapolated-rows=disabled max-scan-range-rows=1
-   mem-estimate=96.00MB mem-reservation=48.00KB thread-reservation=1
-   tuple-ids=0 row-size=52B cardinality=1
+   mem-estimate=128.00MB mem-reservation=64.00KB thread-reservation=1
+   tuple-ids=0 row-size=72B cardinality=1
    in pipelines: 00(GETNEXT)
 ====

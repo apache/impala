@@ -581,10 +581,10 @@ public class IcebergMetaProvider implements MetaProvider {
       GroupedContentFiles groupedFiles = new GroupedContentFiles(scan.planFiles());
       IcebergFileMetadataLoader iceFml = new IcebergFileMetadataLoader(
           apiTable, Collections.emptyList(), hostIndex, groupedFiles,
-          false);
+          new ArrayList<>(), false);
       iceFml.load();
-      IcebergContentFileStore contentFileStore = new IcebergContentFileStore(
-          apiTable, iceFml.getLoadedIcebergFds(), groupedFiles);
+      IcebergContentFileStore contentFileStore = new IcebergContentFileStore(apiTable,
+          iceFml.getLoadedIcebergFds(), groupedFiles, iceFml.getIcebergPartitions());
       return contentFileStore.toThrift();
     } catch (Exception e) {
       throw new IllegalStateException(

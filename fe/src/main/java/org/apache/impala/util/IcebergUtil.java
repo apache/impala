@@ -116,6 +116,7 @@ import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
+import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
@@ -1060,15 +1061,34 @@ public class IcebergUtil {
     return ret;
   }
 
+  public static TIcebergPartition createIcebergPartitionInfo(
+      Table iceApiTbl, ContentFile cf) {
+    TIcebergPartition partInfo = new TIcebergPartition(cf.specId(), new ArrayList<>());
+    PartitionSpec spec = iceApiTbl.specs().get(cf.specId());
+    Preconditions.checkState(spec.fields().size() == cf.partition().size());
+    List<String> partitionKeys = new ArrayList<>();
+    for (int i = 0; i < spec.fields().size(); ++i) {
+      Object partValue = cf.partition().get(i, Object.class);
+      if (partValue != null) {
+        partitionKeys.add(partValue.toString());
+      } else {
+        partitionKeys.add("NULL");
+      }
+    }
+    partInfo.setPartition_values(partitionKeys);
+    return partInfo;
+  }
+
   /**
    * Extracts metadata from Iceberg data file object 'cf'. Such metadata is the file
    * format of the data file, also the partition information the data file belongs.
    * It creates a flatbuffer so it can be passed between machines and processes without
    * further de/serialization.
    */
-  public static FbFileMetadata createIcebergMetadata(Table iceApiTbl, ContentFile cf) {
+  public static FbFileMetadata createIcebergMetadata(
+      Table iceApiTbl, ContentFile cf, int partId) {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-    int iceOffset = createIcebergMetadata(iceApiTbl, fbb, cf);
+    int iceOffset = createIcebergMetadata(iceApiTbl, fbb, cf, partId);
     fbb.finish(FbFileMetadata.createFbFileMetadata(fbb, iceOffset));
     ByteBuffer bb = fbb.dataBuffer().slice();
     ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
@@ -1077,7 +1097,7 @@ public class IcebergUtil {
   }
 
   private static int createIcebergMetadata(Table iceApiTbl, FlatBufferBuilder fbb,
-      ContentFile cf) {
+      ContentFile cf, int partId) {
     int partKeysOffset = -1;
     PartitionSpec spec = iceApiTbl.specs().get(cf.specId());
     if (spec != null && !spec.fields().isEmpty()) {
@@ -1117,7 +1137,7 @@ public class IcebergUtil {
     if (eqFieldIdsOffset != -1) {
       FbIcebergMetadata.addEqualityFieldIds(fbb, eqFieldIdsOffset);
     }
-
+    FbIcebergMetadata.addPartId(fbb, partId);
     return FbIcebergMetadata.endFbIcebergMetadata(fbb);
   }
 

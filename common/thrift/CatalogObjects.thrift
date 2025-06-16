@@ -641,6 +641,11 @@ struct TIcebergPartitionSpec {
   2: optional list<TIcebergPartitionField> partition_fields
 }
 
+struct TIcebergPartition {
+  1: required i32 spec_id
+  2: required list<string> partition_values
+}
+
 struct TIcebergPartitionStats {
   1: required i64 num_files;
   2: required i64 num_rows;
@@ -657,6 +662,7 @@ struct TIcebergContentFileStore {
   6: optional bool has_orc
   7: optional bool has_parquet
   8: optional list<string> missing_files
+  9: optional list<TIcebergPartition> partitions
 }
 
 // Represents a drop partition request for Iceberg tables

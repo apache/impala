@@ -6,7 +6,7 @@ select user from iceberg_partitioned where action = "download" and user = "Lisa"
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
-   HDFS partitions=1/1 files=6 size=6.97KB
+   HDFS partitions=1/3 files=6 size=6.97KB
    predicates: `user` = 'Lisa', action = 'download'
    Iceberg snapshot id: 8270633197658268308
    row-size=24B cardinality=1
@@ -18,7 +18,7 @@ select * from iceberg_partitioned where action = "download";
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
-   HDFS partitions=1/1 files=6 size=6.97KB
+   HDFS partitions=1/3 files=6 size=6.97KB
    Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: action = 'download'
    row-size=44B cardinality=6
@@ -28,7 +28,7 @@ select * from iceberg_partitioned where action = "download" and event_time < "20
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
-   HDFS partitions=1/1 files=6 size=6.97KB
+   HDFS partitions=1/3 files=6 size=6.97KB
    Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: action = 'download', event_time < TIMESTAMP '2022-01-01 00:00:00'
    row-size=44B cardinality=1

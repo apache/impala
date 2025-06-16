@@ -71,7 +71,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERW
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     stored statistics:
 |       table: rows=10 size=9.47KB
@@ -82,7 +82,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, OVERW
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    Iceberg snapshot id: 8885697082976537578
    stored statistics:
      table: rows=20 size=12.95KB
@@ -125,7 +125,7 @@ Per-Host Resources: mem-estimate=96.53MB mem-reservation=48.22KB thread-reservat
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  Per-Host Resources: mem-estimate=34.44MB mem-reservation=16.00KB thread-reservation=2
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete, RANDOM]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     stored statistics:
 |       table: rows=10 size=9.47KB
@@ -136,7 +136,7 @@ Per-Host Resources: mem-estimate=96.53MB mem-reservation=48.22KB thread-reservat
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes, RANDOM]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    Iceberg snapshot id: 8885697082976537578
    stored statistics:
      table: rows=20 size=12.95KB

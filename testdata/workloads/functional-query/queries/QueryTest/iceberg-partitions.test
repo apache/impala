@@ -1,0 +1,107 @@
+====
+---- QUERY
+CREATE TABLE ice_num_partitions (
+  id INT,
+  name STRING,
+  value DOUBLE,
+  ts TIMESTAMP,
+  active BOOLEAN
+)
+stored by iceberg
+TBLPROPERTIES ('format-version'='2');
+====
+---- QUERY
+INSERT INTO ice_num_partitions VALUES
+(1, 'Alice', 10.5, '2023-01-15 10:00:00', TRUE),
+(2, 'Bob', 20.0, '2023-01-15 11:00:00', FALSE),
+(3, 'Charlie', 30.2, '2023-01-16 12:00:00', TRUE);
+====
+---- QUERY
+SELECT id, name, value, ts, active FROM ice_num_partitions ORDER BY id;
+---- TYPES
+INT, STRING, DOUBLE, TIMESTAMP, BOOLEAN
+---- RESULTS
+1,'Alice',10.5,2023-01-15 10:00:00,true
+2,'Bob',20.0,2023-01-15 11:00:00,false
+3,'Charlie',30.2,2023-01-16 12:00:00,true
+---- RUNTIME_PROFILE
+row_regex: .* partitions=1/1 files=1 size=.*B
+====
+---- QUERY
+ALTER TABLE ice_num_partitions SET PARTITION SPEC(year(ts), bucket(4, id));
+====
+---- QUERY
+INSERT INTO ice_num_partitions VALUES
+(4, 'David', 40.8, '2024-02-20 13:00:00', FALSE),
+(5, 'Eve', 50.1, '2024-03-01 14:00:00', TRUE),
+(6, 'Frank', 60.9, '2024-02-20 15:00:00', TRUE);
+====
+---- QUERY
+SELECT * FROM ice_num_partitions;
+---- RUNTIME_PROFILE
+row_regex: .* partitions=4/4 files=4 size=.*B
+====
+---- QUERY
+SELECT id, name FROM ice_num_partitions where ts between '2024-02-20 12:00:00' and '2024-02-20 18:00:00';
+---- TYPES
+INT, STRING
+---- RESULTS
+6,'Frank'
+4,'David'
+---- RUNTIME_PROFILE
+row_regex: .* partitions=2/4 files=2 size=.*B
+====
+---- QUERY
+ALTER TABLE ice_num_partitions SET PARTITION SPEC(void(ts), bucket(4, id));
+====
+---- QUERY
+INSERT INTO ice_num_partitions VALUES
+(7, 'Grace', 70.3, '2025-04-05 16:00:00', FALSE),
+(8, 'Heidi', 80.6, '2025-04-10 17:00:00', TRUE);
+SELECT * FROM ice_num_partitions;
+---- RUNTIME_PROFILE
+row_regex: .* partitions=5/5 files=5 size=.*B
+====
+---- QUERY
+ALTER TABLE ice_num_partitions DROP PARTITION(bucket(4, id)=1);
+---- RESULTS
+'Dropped 1 partition(s)'
+---- TYPES
+string
+====
+---- QUERY
+# Test that the dropped partition is not in the results.
+SELECT id, name, value, ts, active FROM ice_num_partitions ORDER BY id;
+---- TYPES
+INT, STRING, DOUBLE, TIMESTAMP, BOOLEAN
+---- RESULTS
+1,'Alice',10.5,2023-01-15 10:00:00,true
+2,'Bob',20.0,2023-01-15 11:00:00,false
+3,'Charlie',30.2,2023-01-16 12:00:00,true
+4,'David',40.8,2024-02-20 13:00:00,false
+5,'Eve',50.1,2024-03-01 14:00:00,true
+7,'Grace',70.3,2025-04-05 16:00:00,false
+8,'Heidi',80.6,2025-04-10 17:00:00,true
+---- RUNTIME_PROFILE
+row_regex: .* partitions=4/4 files=4 size=.*B
+====
+---- QUERY
+show partitions ice_num_partitions;
+---- TYPES
+STRING, BIGINT, BIGINT
+---- RESULTS
+'{"id_bucket_4":"3","ts_null":null}',2,1
+'{"ts_year":"54","id_bucket_4":"2"}',1,1
+'{"ts_year":"54","id_bucket_4":"3"}',1,1
+'{}',3,1
+====
+---- QUERY
+# The 'ts' column was removed from the partition spec, so no partitions can be pruned based on the predicate.
+SELECT id, name FROM ice_num_partitions where ts between '2024-02-20 13:00:00' and '2024-02-20 18:00:00';
+---- TYPES
+INT, STRING
+---- RESULTS
+4,'David'
+---- RUNTIME_PROFILE
+row_regex: .* partitions=4/4 files=4 size=.*B
+====

@@ -154,12 +154,12 @@ MULTI DATA SINK
 |  row-size=80B cardinality=1
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    predicates: id IS DISTINCT FROM length(action)
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=2
@@ -180,12 +180,12 @@ MULTI DATA SINK
 |--03:EXCHANGE [DIRECTED]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    predicates: id IS DISTINCT FROM length(action)
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=2
@@ -204,12 +204,12 @@ MULTI DATA SINK
 |  row-size=80B cardinality=1
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    predicates: id IS DISTINCT FROM length(action), `user` LIKE 'impala'
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=2
@@ -230,12 +230,12 @@ MULTI DATA SINK
 |--03:EXCHANGE [DIRECTED]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    predicates: id IS DISTINCT FROM length(action), `user` LIKE 'impala'
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=2
@@ -254,12 +254,12 @@ MULTI DATA SINK
 |  row-size=80B cardinality=1
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
-|     HDFS partitions=1/1 files=1 size=3.15KB
+|     HDFS partitions=1/3 files=1 size=3.15KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=3
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
-   HDFS partitions=1/1 files=1 size=1.15KB
+   HDFS partitions=1/3 files=1 size=1.15KB
    predicates: id IS DISTINCT FROM 5
    Iceberg snapshot id: 8885697082976537578
    skipped Iceberg predicates: action = 'click'
@@ -279,12 +279,12 @@ MULTI DATA SINK
 |--03:EXCHANGE [DIRECTED]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 functional_parquet.iceberg_v2_partitioned_position_deletes-position-delete]
-|     HDFS partitions=1/1 files=1 size=3.15KB
+|     HDFS partitions=1/3 files=1 size=3.15KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=3
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes]
-   HDFS partitions=1/1 files=1 size=1.15KB
+   HDFS partitions=1/3 files=1 size=1.15KB
    predicates: id IS DISTINCT FROM 5
    Iceberg snapshot id: 8885697082976537578
    skipped Iceberg predicates: action = 'click'
@@ -332,12 +332,12 @@ MULTI DATA SINK
 |  row-size=80B cardinality=10
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    runtime filters: RF000 -> target.id
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
@@ -390,12 +390,12 @@ MULTI DATA SINK
 |--09:EXCHANGE [DIRECTED]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    runtime filters: RF000 -> target.id
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
@@ -454,7 +454,7 @@ MULTI DATA SINK
 |     row-size=72B cardinality=1
 |
 01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-   HDFS partitions=1/1 files=20 size=22.90KB
+   HDFS partitions=3/3 files=20 size=22.90KB
    runtime filters: RF000 -> source.id
    Iceberg snapshot id: 8270633197658268308
    row-size=16B cardinality=20
@@ -483,7 +483,7 @@ MULTI DATA SINK
 |     row-size=72B cardinality=1
 |
 01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-   HDFS partitions=1/1 files=20 size=22.90KB
+   HDFS partitions=3/3 files=20 size=22.90KB
    runtime filters: RF000 -> source.id
    Iceberg snapshot id: 8270633197658268308
    row-size=16B cardinality=20
@@ -512,7 +512,7 @@ MULTI DATA SINK
 |     row-size=72B cardinality=1
 |
 01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-   HDFS partitions=1/1 files=20 size=22.90KB
+   HDFS partitions=3/3 files=20 size=22.90KB
    runtime filters: RF000 -> source.id
    Iceberg snapshot id: 8270633197658268308
    row-size=16B cardinality=20
@@ -541,7 +541,7 @@ MULTI DATA SINK
 |     row-size=72B cardinality=1
 |
 01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-   HDFS partitions=1/1 files=20 size=22.90KB
+   HDFS partitions=3/3 files=20 size=22.90KB
    runtime filters: RF000 -> source.id
    Iceberg snapshot id: 8270633197658268308
    row-size=16B cardinality=20

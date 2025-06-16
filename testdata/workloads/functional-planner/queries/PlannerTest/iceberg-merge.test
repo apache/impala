@@ -18,7 +18,7 @@ BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-
 |  row-size=80B cardinality=3
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     row-size=44B cardinality=20
 |
@@ -44,7 +44,7 @@ BUFFERED DELETE FROM ICEBERG [functional_parquet.iceberg_v2_no_deletes-POSITION-
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     row-size=44B cardinality=20
 |
@@ -73,7 +73,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |  row-size=80B cardinality=23
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     row-size=44B cardinality=20
 |
@@ -97,7 +97,7 @@ WRITE TO HDFS [functional_parquet.iceberg_v2_no_deletes, OVERWRITE=false]
 |--05:EXCHANGE [HASH(source.id)]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     row-size=44B cardinality=20
 |
@@ -130,7 +130,7 @@ MERGE SINK
 |  row-size=80B cardinality=3
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     row-size=44B cardinality=20
 |
@@ -158,7 +158,7 @@ MERGE SINK
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     row-size=44B cardinality=20
 |
@@ -202,12 +202,12 @@ MERGE SINK
 |  row-size=80B cardinality=10
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    runtime filters: RF000 -> target.id
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
@@ -248,12 +248,12 @@ MERGE SINK
 |--06:EXCHANGE [DIRECTED]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    runtime filters: RF000 -> target.id
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
@@ -291,7 +291,7 @@ MERGE SINK
 00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder target]
    HDFS partitions=1/1 files=1 size=1.08KB
    runtime filters: RF000 -> target.i
-   Iceberg snapshot id: 1652763117401970330
+   Iceberg snapshot id: 2888221093496088725
    row-size=72B cardinality=1
 ---- DISTRIBUTEDPLAN
 MERGE SINK
@@ -323,7 +323,7 @@ MERGE SINK
 00:SCAN HDFS [functional_parquet.iceberg_partition_transforms_zorder target]
    HDFS partitions=1/1 files=1 size=1.08KB
    runtime filters: RF000 -> target.i
-   Iceberg snapshot id: 1652763117401970330
+   Iceberg snapshot id: 2888221093496088725
    row-size=72B cardinality=1
 ====
 # Merge into a partitioned Iceberg table using multiple WHEN MATCHED/NOT MATCHED clauses
@@ -379,12 +379,12 @@ MERGE SINK
 |  row-size=80B cardinality=10
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
 ---- DISTRIBUTEDPLAN
@@ -439,12 +439,12 @@ MERGE SINK
 |--06:EXCHANGE [DIRECTED]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
 ====
@@ -486,12 +486,12 @@ MERGE SINK
 |  row-size=80B cardinality=10
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    runtime filters: RF000 -> target.id
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
@@ -542,12 +542,12 @@ MERGE SINK
 |--07:EXCHANGE [DIRECTED]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    runtime filters: RF000 -> target.id
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
@@ -581,13 +581,13 @@ MERGE SINK
 |  row-size=120B cardinality=14.62K
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     row-size=44B cardinality=20
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_evolution target]
-   HDFS partitions=1/1 files=1460 size=2.49MB
-   Iceberg snapshot id: 547864005421580562
+   HDFS partitions=1460/1460 files=1460 size=2.49MB
+   Iceberg snapshot id: 8092015949657061222
    row-size=76B cardinality=14.60K
 ---- DISTRIBUTEDPLAN
 MERGE SINK
@@ -616,15 +616,15 @@ MERGE SINK
 |--05:EXCHANGE [HASH(source.id)]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_partitioned source]
-|     HDFS partitions=1/1 files=20 size=22.90KB
+|     HDFS partitions=3/3 files=20 size=22.90KB
 |     Iceberg snapshot id: 8270633197658268308
 |     row-size=44B cardinality=20
 |
 04:EXCHANGE [HASH(target.id)]
 |
 00:SCAN HDFS [functional_parquet.iceberg_partition_evolution target]
-   HDFS partitions=1/1 files=1460 size=2.49MB
-   Iceberg snapshot id: 547864005421580562
+   HDFS partitions=1460/1460 files=1460 size=2.49MB
+   Iceberg snapshot id: 8092015949657061222
    row-size=76B cardinality=14.60K
 ====
 # Merge into a partitioned Iceberg table using multiple merge cases and a using table with partition evolution as source
@@ -656,20 +656,20 @@ MERGE SINK
 |  row-size=120B cardinality=14.61K
 |
 |--03:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
-|     HDFS partitions=1/1 files=1460 size=2.49MB
-|     Iceberg snapshot id: 547864005421580562
+|     HDFS partitions=1460/1460 files=1460 size=2.49MB
+|     Iceberg snapshot id: 8092015949657061222
 |     row-size=40B cardinality=14.60K
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=80B cardinality=10
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
 ---- DISTRIBUTEDPLAN
@@ -699,8 +699,8 @@ MERGE SINK
 |--08:EXCHANGE [HASH(functional_parquet.iceberg_partition_evolution.id)]
 |  |
 |  03:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
-|     HDFS partitions=1/1 files=1460 size=2.49MB
-|     Iceberg snapshot id: 547864005421580562
+|     HDFS partitions=1460/1460 files=1460 size=2.49MB
+|     Iceberg snapshot id: 8092015949657061222
 |     row-size=40B cardinality=14.60K
 |
 07:EXCHANGE [HASH(target.id)]
@@ -711,12 +711,12 @@ MERGE SINK
 |--06:EXCHANGE [DIRECTED]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
 ====
@@ -759,20 +759,20 @@ MERGE SINK
 |  row-size=120B cardinality=14.61K
 |
 |--03:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
-|     HDFS partitions=1/1 files=1460 size=2.49MB
-|     Iceberg snapshot id: 547864005421580562
+|     HDFS partitions=1460/1460 files=1460 size=2.49MB
+|     Iceberg snapshot id: 8092015949657061222
 |     row-size=40B cardinality=14.60K
 |
 02:DELETE EVENTS ICEBERG DELETE [ICEBERG DELETE JOIN]
 |  row-size=80B cardinality=10
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
 ---- DISTRIBUTEDPLAN
@@ -810,8 +810,8 @@ MERGE SINK
 |--08:EXCHANGE [HASH(functional_parquet.iceberg_partition_evolution.id)]
 |  |
 |  03:SCAN HDFS [functional_parquet.iceberg_partition_evolution]
-|     HDFS partitions=1/1 files=1460 size=2.49MB
-|     Iceberg snapshot id: 547864005421580562
+|     HDFS partitions=1460/1460 files=1460 size=2.49MB
+|     Iceberg snapshot id: 8092015949657061222
 |     row-size=40B cardinality=14.60K
 |
 07:EXCHANGE [HASH(target.id)]
@@ -822,12 +822,12 @@ MERGE SINK
 |--06:EXCHANGE [DIRECTED]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
 ====
@@ -906,12 +906,12 @@ MERGE SINK
 |  row-size=80B cardinality=10
 |
 |--01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
 ---- DISTRIBUTEDPLAN
@@ -984,7 +984,7 @@ MERGE SINK
 |  |  |    group by: id, NULL, NULL, b.tinyint_col, b.string_col
 |  |  |  Class 3
 |  |  |    group by: NULL, NULL, NULL, b.tinyint_col, b.string_col
-|  |  |  row-size=92B cardinality=28
+|  |  |  row-size=92B cardinality=32
 |  |  |
 |  |  04:SCAN HDFS [functional.alltypestiny b]
 |  |     HDFS partitions=4/4 files=4 size=460B
@@ -1004,12 +1004,12 @@ MERGE SINK
 |--11:EXCHANGE [DIRECTED]
 |  |
 |  01:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes-POSITION-DELETE-01 target-position-delete]
-|     HDFS partitions=1/1 files=3 size=9.47KB
+|     HDFS partitions=3/3 files=3 size=9.47KB
 |     Iceberg snapshot id: 8885697082976537578
 |     row-size=204B cardinality=10
 |
 00:SCAN HDFS [functional_parquet.iceberg_v2_partitioned_position_deletes target]
-   HDFS partitions=1/1 files=3 size=3.48KB
+   HDFS partitions=3/3 files=3 size=3.48KB
    Iceberg snapshot id: 8885697082976537578
    row-size=80B cardinality=20
 ====

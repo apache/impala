@@ -54,7 +54,7 @@ PLAN-ROOT SINK
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
-   HDFS partitions=1/1 files=10 size=11.46KB
+   HDFS partitions=3/3 files=10 size=11.46KB
    Iceberg snapshot id: 8270633197658268308
    stored statistics:
      table: rows=20 size=22.90KB
@@ -76,7 +76,7 @@ PLAN-ROOT SINK
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [functional_parquet.iceberg_partitioned]
-   HDFS partitions=1/1 files=4 size=4.57KB
+   HDFS partitions=1/3 files=4 size=4.57KB
    predicates: id > CAST(0 AS INT)
    Iceberg snapshot id: 8270633197658268308
    skipped Iceberg predicates: action = 'click'

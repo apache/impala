@@ -2231,6 +2231,19 @@ class TestIcebergV2Table(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-predicate-push-down-hint', vector,
                        use_db=unique_database)
 
+  def test_partitions(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-partitions', vector, unique_database)
+    tbl_name = unique_database + ".ice_num_partitions"
+    snapshots = get_snapshots(self.client, tbl_name, expected_result_size=4)
+    second_snapshot = snapshots[1]
+    time_travel_data = self.execute_query(
+        "SELECT * FROM {0} for system_version as of {1};".format(
+            tbl_name, second_snapshot.get_snapshot_id()))
+    assert "partitions=4/unknown" in time_travel_data.runtime_profile
+    selective_time_travel_data = self.execute_query(
+        "SELECT * FROM {0} for system_version as of {1} WHERE id < 5;".format(
+            tbl_name, second_snapshot.get_snapshot_id()))
+    assert "partitions=2/unknown" in selective_time_travel_data.runtime_profile
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
 # of the test coverage is in TestIcebergV2Table.test_read_position_deletes but since it

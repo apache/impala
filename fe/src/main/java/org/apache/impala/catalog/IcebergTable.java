@@ -526,11 +526,12 @@ public class IcebergTable extends Table implements FeIcebergTable {
           icebergApiTable_,
           fileStore_ == null ? Collections.emptyList() : fileStore_.getAllFiles(),
           getHostIndex(), Preconditions.checkNotNull(icebergFiles),
+          fileStore_ == null ? Collections.emptyList() : fileStore_.getPartitionList(),
           Utils.requiresDataFilesInTableLocation(this));
       loader.load();
       catalogTimeline.markEvent("Loaded Iceberg file descriptors");
-      fileStore_ = new IcebergContentFileStore(
-          icebergApiTable_, loader.getLoadedIcebergFds(), icebergFiles);
+      fileStore_ = new IcebergContentFileStore(icebergApiTable_,
+          loader.getLoadedIcebergFds(), icebergFiles, loader.getIcebergPartitions());
       partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
 
       setAvroSchema(msClient, msTable_, fileStore_, catalogTimeline);

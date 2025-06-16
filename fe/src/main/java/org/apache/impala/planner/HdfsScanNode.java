@@ -1945,48 +1945,7 @@ public class HdfsScanNode extends ScanNode {
         // This is in testing mode.
         testTableSize = desc_.getTable().getTTableStats().total_file_bytes;
       }
-      String partMetaTemplate = "partitions=%d/%d files=%d size=%s\n";
-      String erasureCodeTemplate = "erasure coded: files=%d size=%s\n";
-      if (!numPartitionsPerFs_.isEmpty()) {
-        // The table is partitioned; print a line for each filesystem we are reading
-        // partitions from
-        for (Map.Entry<FileSystemUtil.FsType, Long> partsPerFs :
-            numPartitionsPerFs_.entrySet()) {
-          FileSystemUtil.FsType fsType = partsPerFs.getKey();
-          output.append(detailPrefix);
-          output.append(fsType).append(" ");
-          long bytesToDisplay = totalBytesPerFs_.get(fsType);
-          if (testTableSize > -1) {
-            bytesToDisplay = (long) ((double) partsPerFs.getValue()
-                / table.getPartitions().size() * testTableSize);
-          }
-          output.append(String.format(partMetaTemplate, partsPerFs.getValue(),
-              table.getPartitions().size(), totalFilesPerFs_.get(fsType),
-              PrintUtils.printBytes(bytesToDisplay)));
-
-          // Report the total number of erasure coded files and total bytes, if any.
-          if (totalFilesPerFsEC_.containsKey(fsType)) {
-            long totalNumECFiles = totalFilesPerFsEC_.get(fsType);
-            long totalECSize = totalBytesPerFsEC_.get(fsType);
-            output.append(String.format("%s", detailPrefix))
-                .append(String.format(erasureCodeTemplate, totalNumECFiles,
-                    PrintUtils.printBytes(totalECSize)));
-          }
-        }
-      } else if (tbl_.getNumClusteringCols() == 0) {
-        // There are no partitions so we use the FsType of the base table. No report
-        // on EC related info.
-        output.append(detailPrefix);
-        output.append(table.getFsType()).append(" ");
-        output.append(String.format(partMetaTemplate, 1, table.getPartitions().size(),
-            0, PrintUtils.printBytes(0)));
-      } else {
-        // The table is partitioned, but no partitions are selected; in this case we
-        // exclude the FsType completely. No report on EC related info.
-        output.append(detailPrefix);
-        output.append(String.format(partMetaTemplate, 0, table.getPartitions().size(),
-            0, PrintUtils.printBytes(0)));
-      }
+      getPartitionExplainString(output, detailPrefix, table, testTableSize);
 
       // Add information about whether this uses deterministic scan range scheduling
       // To avoid polluting the explain output, only add this if mt_dop>0 and
@@ -2066,6 +2025,65 @@ public class HdfsScanNode extends ScanNode {
           .append("\n");
     }
     return output.toString();
+  }
+
+  protected void getPartitionExplainString(StringBuilder output,
+      String detailPrefix, FeFsTable table, long testTableSize) {
+    String partMetaTemplate = "partitions=%d/%s files=%d size=%s\n";
+    String erasureCodeTemplate = "erasure coded: files=%d size=%s\n";
+    if (!numPartitionsPerFs_.isEmpty()) {
+      // The table is partitioned; print a line for each filesystem we are reading
+      // partitions from
+      for (Map.Entry<FileSystemUtil.FsType, Long> partsPerFs :
+          numPartitionsPerFs_.entrySet()) {
+        FileSystemUtil.FsType fsType = partsPerFs.getKey();
+        output.append(detailPrefix);
+        output.append(fsType).append(" ");
+        long bytesToDisplay = totalBytesPerFs_.get(fsType);
+        if (testTableSize > -1) {
+          bytesToDisplay = (long) ((double) partsPerFs.getValue()
+              / getNumPartitions(table) * testTableSize);
+        }
+        output.append(String.format(
+            partMetaTemplate, getNumSelectedPartitions(partsPerFs.getValue()),
+            getNumPartitionString(table), totalFilesPerFs_.get(fsType),
+            PrintUtils.printBytes(bytesToDisplay)));
+
+        // Report the total number of erasure coded files and total bytes, if any.
+        if (totalFilesPerFsEC_.containsKey(fsType)) {
+          long totalNumECFiles = totalFilesPerFsEC_.get(fsType);
+          long totalECSize = totalBytesPerFsEC_.get(fsType);
+          output.append(String.format("%s", detailPrefix))
+              .append(String.format(erasureCodeTemplate, totalNumECFiles,
+                  PrintUtils.printBytes(totalECSize)));
+        }
+      }
+    } else if (tbl_.getNumClusteringCols() == 0) {
+      // There are no partitions so we use the FsType of the base table. No report
+      // on EC related info.
+      output.append(detailPrefix);
+      output.append(table.getFsType()).append(" ");
+      output.append(String.format(partMetaTemplate, 1, getNumPartitionString(table),
+          0, PrintUtils.printBytes(0)));
+    } else {
+      // The table is partitioned, but no partitions are selected; in this case we
+      // exclude the FsType completely. No report on EC related info.
+      output.append(detailPrefix);
+      output.append(String.format(partMetaTemplate, 0, getNumPartitionString(table),
+          0, PrintUtils.printBytes(0)));
+    }
+  }
+
+  protected long getNumSelectedPartitions(long partsPerFs) {
+    return partsPerFs;
+  }
+
+  protected int getNumPartitions(FeFsTable table) {
+    return table.getPartitions().size();
+  }
+
+  protected String getNumPartitionString(FeFsTable table) {
+    return Integer.toString(getNumPartitions(table));
   }
 
   // Overriding this function can be used to add extra information to the explain string
