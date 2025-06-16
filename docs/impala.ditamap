@@ -158,6 +158,7 @@ under the License.
       <topicref href="topics/impala_grant.xml"/>
       <topicref href="topics/impala_insert.xml"/>
       <topicref href="topics/impala_invalidate_metadata.xml"/>
+      <topicref href="topics/impala_kill_query.xml"/>
       <topicref href="topics/impala_load_data.xml"/>
       <topicref href="topics/impala_merge.xml"/>
       <topicref href="topics/impala_refresh.xml"/>
