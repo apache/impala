@@ -340,6 +340,14 @@ public class IcebergScanPlanner {
     joinNode.setId(ctx_.getNextNodeId());
     joinNode.init(analyzer_);
     joinNode.setIsDeleteRowsJoin();
+
+    // The output of this node only contains the tuple corresponding to 'dataScanNode',
+    // not that of 'deleteScanNode'. Conjuncts above this node, e.g. in another join, will
+    // only reference that tuple, so we should only include the table ref of
+    // 'dataScanNode' here.
+    // See IMPALA-14154.
+    joinNode.setTblRefIds(dataScanNode.getTblRefIds());
+
     return joinNode;
   }
 

@@ -575,3 +575,24 @@ bigint
 aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 1
 ====
+---- QUERY
+# Regression test for IMPALA-14154.
+# To reproduce the bug, we need a table where there is no data file without a delete file.
+# The metadata table query ensures that.
+select content from functional_parquet.iceberg_v2_delete_positional.`files`;
+---- RESULTS
+0
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Regression test for IMPALA-14154.
+select `data`
+from functional_parquet.iceberg_v2_delete_positional
+where `data` not in (select min(`data`) from functional_parquet.iceberg_v2_delete_positional);
+---- RESULTS
+'c'
+---- TYPES
+STRING
+====
