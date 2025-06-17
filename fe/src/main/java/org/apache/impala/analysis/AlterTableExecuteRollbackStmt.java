@@ -74,7 +74,7 @@ public class AlterTableExecuteRollbackStmt extends AlterTableExecuteStmt {
 
     if (!fnParamValue_.isConstant()) {
       throw new AnalysisException(
-          USAGE + " <expression> must be a constant expression: EXECUTE " + toSql());
+          USAGE + " <expression> must be a constant expression: " + fnCallExpr_.toSql());
     }
     if ((fnParamValue_ instanceof LiteralExpr)
         && (fnParamValue_.getType().isIntegerType())) {
@@ -104,7 +104,7 @@ public class AlterTableExecuteRollbackStmt extends AlterTableExecuteStmt {
       } else {
         throw new AnalysisException(USAGE
             + " <expression> must be an integer type or a timestamp, but is '"
-            + fnParamValue_.getType() + "': EXECUTE " + toSql());
+            + fnParamValue_.getType() + "': " + fnCallExpr_.toSql());
       }
     }
   }
@@ -123,11 +123,6 @@ public class AlterTableExecuteRollbackStmt extends AlterTableExecuteStmt {
       return timestampExpr;
     }
     return null;
-  }
-
-  @Override
-  public String toSql(ToSqlOptions options) {
-    return fnCallExpr_.toSql();
   }
 
   @Override

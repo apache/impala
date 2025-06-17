@@ -461,6 +461,74 @@ class TestIcebergTable(IcebergTestSuite):
       assert expected_text in str(output)
     return output
 
+  def test_execute_remove_orphan_files(self, unique_database):
+    tbl_name = 'tbl_with_orphan_files'
+    db_tbl = unique_database + ".tbl_with_orphan_files"
+    with self.create_impala_client() as impalad_client:
+      impalad_client.execute("create table {0} (i int) stored as iceberg"
+          .format(db_tbl))
+      insert_q = "insert into {0} values ({1})"
+      self.execute_query_expect_success(impalad_client, insert_q.format(db_tbl, 1))
+      self.execute_query_expect_success(impalad_client, insert_q.format(db_tbl, 2))
+      self.execute_query_expect_success(impalad_client, insert_q.format(db_tbl, 3))
+      result = impalad_client.execute('select i from {} order by i'.format(db_tbl))
+      assert result.data == ['1', '2', '3']
+
+      # Add some junk files to data and metadata dir.
+      DATA_PATH = "/test-warehouse/{0}.db/{1}/data/".format(
+          unique_database, tbl_name)
+      METADATA_PATH = "/test-warehouse/{0}.db/{1}/metadata/".format(
+          unique_database, tbl_name)
+      SRC_DIR = os.path.join(
+          os.environ['IMPALA_HOME'],
+          "testdata/data/iceberg_test/iceberg_mixed_file_format_test/{0}/{1}")
+
+      # Copy first set of junk files.
+      file_parq1 = "00000-0-data-gfurnstahl_20220906113044_157fc172-f5d3-4c70-8653-" \
+          "fff150b6136a-job_16619542960420_0002-1-00001.parquet"
+      file_avro1 = "055baf62-de6d-4583-bf21-f187f9482343-m0.avro"
+      self.filesystem_client.copy_from_local(
+          SRC_DIR.format('data', file_parq1), DATA_PATH)
+      self.filesystem_client.copy_from_local(
+          SRC_DIR.format('metadata', file_avro1), METADATA_PATH)
+      assert self.filesystem_client.exists(DATA_PATH + file_parq1)
+      assert self.filesystem_client.exists(METADATA_PATH + file_avro1)
+      # Keep current time.
+      result = impalad_client.execute('select cast(now() as string)')
+      cp1_time = result.data[0]
+      time.sleep(1)
+
+      # Copy second set of junk files.
+      file_parq2 = "00000-0-data-gfurnstahl_20220906114830_907f72c7-36ac-4135-8315-" \
+          "27ff880faff0-job_16619542960420_0004-1-00001.parquet"
+      file_avro2 = "871d1473-8566-46c0-a530-a2256b3f396f-m0.avro"
+      self.filesystem_client.copy_from_local(
+          SRC_DIR.format('data', file_parq2), DATA_PATH)
+      self.filesystem_client.copy_from_local(
+          SRC_DIR.format('metadata', file_avro2), METADATA_PATH)
+      assert self.filesystem_client.exists(DATA_PATH + file_parq2)
+      assert self.filesystem_client.exists(METADATA_PATH + file_avro2)
+
+      # Execute REMOVE_ORPHAN_FILES at specific timestamp.
+      result = impalad_client.execute(
+          "ALTER TABLE {0} EXECUTE REMOVE_ORPHAN_FILES('{1}')".format(db_tbl, cp1_time))
+      assert result.data[0] == 'Remove orphan files executed.'
+      assert not self.filesystem_client.exists(DATA_PATH + file_parq1)
+      assert not self.filesystem_client.exists(METADATA_PATH + file_parq1)
+      assert self.filesystem_client.exists(DATA_PATH + file_parq2)
+      assert self.filesystem_client.exists(METADATA_PATH + file_avro2)
+
+      # Execute REMOVE_ORPHAN_FILES at now().
+      result = impalad_client.execute(
+          "ALTER TABLE {0} EXECUTE REMOVE_ORPHAN_FILES(now())".format(db_tbl))
+      assert result.data[0] == 'Remove orphan files executed.'
+      assert not self.filesystem_client.exists(DATA_PATH + file_parq2)
+      assert not self.filesystem_client.exists(METADATA_PATH + file_parq2)
+
+      # Assert table still queryable.
+      result = impalad_client.execute('select i from {} order by i'.format(db_tbl))
+      assert result.data == ['1', '2', '3']
+
   def test_describe_history_params(self, unique_database):
     tbl_name = unique_database + ".describe_history"
 

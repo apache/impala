@@ -44,6 +44,17 @@ public class AlterTableExecuteStmt extends AlterTableStmt {
   @Override
   public String getOperation() { return "EXECUTE"; }
 
+  @Override
+  public String toSql(ToSqlOptions options) {
+    StringBuilder sb = new StringBuilder("ALTER TABLE ")
+                           .append(getDb())
+                           .append(".")
+                           .append(getTbl())
+                           .append(" EXECUTE ")
+                           .append(fnCallExpr_.toSql(options));
+    return sb.toString();
+  }
+
   /**
    * Return an instance of a subclass of AlterTableExecuteStmt that can analyze the
    * execute statement for the function call expression in 'expr'.
@@ -57,11 +68,14 @@ public class AlterTableExecuteStmt extends AlterTableStmt {
       case "EXPIRE_SNAPSHOTS":
         return new AlterTableExecuteExpireSnapshotsStmt(tableName, fnCallExpr);
       case "ROLLBACK": return new AlterTableExecuteRollbackStmt(tableName, fnCallExpr);
+      case "REMOVE_ORPHAN_FILES":
+        return new AlterTableExecuteRemoveOrphanFilesStmt(tableName, fnCallExpr);
       default:
         throw new AnalysisException(String.format("'%s' is not supported by ALTER "
                 + "TABLE <table> EXECUTE. Supported operations are: "
                 + "EXPIRE_SNAPSHOTS(<expression>), "
-                + "ROLLBACK(<expression>).",
+                + "ROLLBACK(<expression>), "
+                + "REMOVE_ORPHAN_FILES(<expression>).",
             functionNameOrig));
     }
   }
@@ -71,10 +85,11 @@ public class AlterTableExecuteStmt extends AlterTableStmt {
     // fnCallExpr_ analyzed here manually, because it is not an actual function but a
     // catalog operation.
     String fnName = fnCallExpr_.getFnName().toString();
-    Preconditions.checkState(
-        StringUtils.equalsAnyIgnoreCase(fnName, "EXPIRE_SNAPSHOTS", "ROLLBACK"));
+    Preconditions.checkState(StringUtils.equalsAnyIgnoreCase(
+        fnName, "EXPIRE_SNAPSHOTS", "ROLLBACK", "REMOVE_ORPHAN_FILES"));
     if (fnCallExpr_.getParams().size() != 1) {
-      throw new AnalysisException(usage + " must have one parameter: " + toSql());
+      throw new AnalysisException(
+          usage + " must have one parameter: " + fnCallExpr_.toSql());
     }
     fnParamValue_ = fnCallExpr_.getParams().exprs().get(0);
   }

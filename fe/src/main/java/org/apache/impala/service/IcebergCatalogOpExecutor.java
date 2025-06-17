@@ -49,6 +49,8 @@ import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.Term;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.impala.analysis.IcebergPartitionSpec;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
@@ -57,11 +59,13 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKe
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
+import org.apache.impala.catalog.iceberg.ImpalaIcebergDeleteOrphanFiles;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergColumnStats;
 import org.apache.impala.fb.FbIcebergDataFile;
 import org.apache.impala.thrift.TAlterTableDropPartitionParams;
 import org.apache.impala.thrift.TAlterTableExecuteExpireSnapshotsParams;
+import org.apache.impala.thrift.TAlterTableExecuteRemoveOrphanFilesParams;
 import org.apache.impala.thrift.TAlterTableExecuteRollbackParams;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -248,6 +252,20 @@ public class IcebergCatalogOpExecutor {
     // Commit the update.
     manageSnapshots.commit();
     return "Rollback executed.";
+  }
+
+  /**
+   * Executes an ALTER TABLE EXECUTE REMOVE_ORPHAN_FILES.
+   */
+  public static String alterTableExecuteRemoveOrphanFiles(FeIcebergTable tbl,
+      TAlterTableExecuteRemoveOrphanFilesParams params, ExecutorService executors)
+      throws CatalogException {
+    ImpalaIcebergDeleteOrphanFiles deleteOrphan =
+        new ImpalaIcebergDeleteOrphanFiles(FeFsTable.CONF, tbl.getIcebergApiTable())
+            .olderThan(params.older_than_millis)
+            .executeDeleteWith(executors);
+    deleteOrphan.execute();
+    return "Remove orphan files executed.";
   }
 
   /**

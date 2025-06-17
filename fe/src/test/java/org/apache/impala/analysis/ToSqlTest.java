@@ -584,6 +584,28 @@ public class ToSqlTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterTableExecute() throws AnalysisException {
+    testToSql(
+        "alter table iceberg_partitioned "
+        + "execute rollback('2022-01-04 10:00:00')",
+        "functional_parquet",
+        "ALTER TABLE functional_parquet.iceberg_partitioned "
+        + "EXECUTE rollback('2022-01-04 10:00:00')");
+    testToSql(
+        "alter table iceberg_partitioned "
+        + "execute expire_snapshots('2022-01-04 10:00:00')",
+        "functional_parquet",
+        "ALTER TABLE functional_parquet.iceberg_partitioned "
+        + "EXECUTE expire_snapshots('2022-01-04 10:00:00')");
+    testToSql(
+        "alter table iceberg_partitioned "
+        + "execute remove_orphan_files('2022-01-04 10:00:00')",
+        "functional_parquet",
+        "ALTER TABLE functional_parquet.iceberg_partitioned "
+        + "EXECUTE remove_orphan_files('2022-01-04 10:00:00')");
+  }
+
+  @Test
   public void TestStructFields() throws AnalysisException {
     String[] tables = new String[] { "allcomplextypes", };
     String[] columns = new String[] { "id", "int_struct_col.f1",

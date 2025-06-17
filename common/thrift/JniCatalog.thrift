@@ -444,6 +444,11 @@ struct TAlterTableExecuteRollbackParams {
   3: optional i64 snapshot_id
 }
 
+// Parameters for ALTER TABLE EXECUTE REMOVE_ORPHAN_FILES operations.
+struct TAlterTableExecuteRemoveOrphanFilesParams {
+  1: required i64 older_than_millis
+}
+
 // Parameters for ALTER TABLE EXECUTE ... operations.
 struct TAlterTableExecuteParams {
   // Parameters for ALTER TABLE EXECUTE EXPIRE_SNAPSHOTS
@@ -451,6 +456,9 @@ struct TAlterTableExecuteParams {
 
   // Parameters for ALTER TABLE EXECUTE ROLLBACK
   2: optional TAlterTableExecuteRollbackParams execute_rollback_params
+
+  // Parameters for ALTER TABLE EXECUTE REMOVE_ORPHAN_FILES
+  3: optional TAlterTableExecuteRemoveOrphanFilesParams remove_orphan_files_params
 }
 
 // Parameters for all ALTER TABLE commands.

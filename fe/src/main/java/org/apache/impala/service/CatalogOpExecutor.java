@@ -1583,6 +1583,21 @@ public class CatalogOpExecutor {
       EventSequence catalogTimeline, InProgressTableModification modification)
       throws ImpalaException {
     Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
+
+    // Some operation does not require Iceberg transaction and HMS update.
+    if (params.getAlter_type() == TAlterTableType.EXECUTE) {
+      Preconditions.checkState(params.isSetSet_execute_params());
+      TAlterTableExecuteParams setExecuteParams = params.getSet_execute_params();
+      if (setExecuteParams.isSetRemove_orphan_files_params()) {
+        String removeOrphanSummary =
+            IcebergCatalogOpExecutor.alterTableExecuteRemoveOrphanFiles(tbl,
+                setExecuteParams.getRemove_orphan_files_params(),
+                icebergExecutorService_);
+        addSummary(response, removeOrphanSummary);
+        return false;
+      }
+    }
+
     boolean needsToUpdateHms = !IcebergUtil.isHiveCatalog(tbl.getMetaStoreTable());
     try {
       org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(tbl);
@@ -1623,6 +1638,10 @@ public class CatalogOpExecutor {
                     setExecuteParams.getExpire_snapshots_params(),
                     icebergExecutorService_);
             addSummary(response, expireSummary);
+          } else if (setExecuteParams.isSetRemove_orphan_files_params()) {
+            throw new IllegalStateException(
+                "Alter table execute REMOVE_ORPHAN_FILES should not use "
+                + "Iceberg Transaction.");
           } else {
             // Cannot happen, but throw just in case.
             throw new IllegalStateException(

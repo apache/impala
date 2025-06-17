@@ -4559,13 +4559,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "rollback('2022-01-04 10:00:00');",
        "ALTER TABLE EXECUTE ROLLBACK is only supported for Iceberg tables: " +
            "functional.alltypes");
-    AnalysisError("alter table functional_parquet.iceberg_partitioned execute " +
-        "rollback(id);", "EXECUTE ROLLBACK(<expression>): " +
-        "<expression> must be a constant expression: EXECUTE rollback(id)");
-    AnalysisError("alter table functional_parquet.iceberg_partitioned execute " +
-        "rollback(3.14);", "EXECUTE ROLLBACK(<expression>): <expression> " +
-        "must be an integer type or a timestamp, but is 'DECIMAL(3,2)': " +
-        "EXECUTE rollback(3.14)");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute "
+            + "rollback(id);",
+        "EXECUTE ROLLBACK(<expression>): "
+            + "<expression> must be a constant expression: rollback(id)");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute "
+            + "rollback(3.14);",
+        "EXECUTE ROLLBACK(<expression>): <expression> "
+            + "must be an integer type or a timestamp, but is 'DECIMAL(3,2)': "
+            + "rollback(3.14)");
     AnalysisError("alter table functional_parquet.iceberg_partitioned execute " +
         "rollback('2021-02-32 15:52:45');", "An invalid TIMESTAMP expression has been " +
         "given to EXECUTE ROLLBACK(<expression>): the expression " +
@@ -4581,6 +4583,55 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "rollback('1111');", "An invalid TIMESTAMP expression has been " +
         "given to EXECUTE ROLLBACK(<expression>): the expression " +
         "'1111' cannot be converted to a TIMESTAMP");
+  }
+
+  @Test
+  public void TestAlterExecuteRemoveOrphanFilesSnapshots() {
+    AnalyzesOk("alter table functional_parquet.iceberg_partitioned execute "
+        + "remove_orphan_files(now());");
+    AnalyzesOk("alter table functional_parquet.iceberg_partitioned execute "
+        + "remove_orphan_files(now() - interval 20 years);");
+    AnalyzesOk("alter table functional_parquet.iceberg_partitioned execute "
+        + "remove_orphan_files('2022-01-04 10:00:00');");
+
+    // Negative tests
+    AnalysisError("alter table nodb.alltypes execute "
+            + "remove_orphan_files('2022-01-04 10:00:00');",
+        "Could not resolve table reference: 'nodb.alltypes'");
+    AnalysisError("alter table functional.alltypes execute "
+            + "remove_orphan_files('2022-01-04 10:00:00');",
+        "ALTER TABLE EXECUTE REMOVE_ORPHAN_FILES is only supported for Iceberg tables: "
+            + "functional.alltypes");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute "
+            + "remove_orphan_files();",
+        "EXECUTE REMOVE_ORPHAN_FILES(<expression>): must have one parameter");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute "
+            + "remove_orphan_files(id);",
+        "EXECUTE REMOVE_ORPHAN_FILES(<expression>): "
+            + "<expression> must be a constant expression: remove_orphan_files(id)");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute "
+            + "remove_orphan_files(3.14);",
+        "EXECUTE REMOVE_ORPHAN_FILES(<expression>): <expression> "
+            + "must be a timestamp, but is 'DECIMAL(3,2)': "
+            + "remove_orphan_files(3.14)");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute "
+            + "remove_orphan_files('2021-02-32 15:52:45');",
+        "An invalid TIMESTAMP expression has been "
+            + "given to EXECUTE REMOVE_ORPHAN_FILES(<expression>): the expression "
+            + "'2021-02-32 15:52:45' cannot be converted to a TIMESTAMP");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute "
+            + "remove_orphan_files('the beginning');",
+        "An invalid TIMESTAMP expression has been "
+            + "given to EXECUTE REMOVE_ORPHAN_FILES(<expression>): the expression "
+            + "'the beginning' cannot be converted to a TIMESTAMP");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute "
+            + "remove_orphan_files(1111,2222);",
+        "EXECUTE REMOVE_ORPHAN_FILES(<expression>): must have one parameter");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute "
+            + "remove_orphan_files('1111');",
+        "An invalid TIMESTAMP expression has been "
+            + "given to EXECUTE REMOVE_ORPHAN_FILES(<expression>): the expression "
+            + "'1111' cannot be converted to a TIMESTAMP");
   }
 
   private static String buildLongOwnerName() {

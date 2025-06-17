@@ -57,11 +57,6 @@ public class AlterTableExecuteExpireSnapshotsStmt extends AlterTableExecuteStmt 
   }
 
   @Override
-  public String toSql(ToSqlOptions options) {
-    return fnCallExpr_.toSql();
-  }
-
-  @Override
   public TAlterTableParams toThrift() {
     TAlterTableParams params = super.toThrift();
     params.setAlter_type(TAlterTableType.EXECUTE);
@@ -78,7 +73,8 @@ public class AlterTableExecuteExpireSnapshotsStmt extends AlterTableExecuteStmt 
     Preconditions.checkNotNull(fnParamValue_);
     fnParamValue_.analyze(analyzer);
     if (!fnParamValue_.isConstant()) {
-      throw new AnalysisException(USAGE + " must be a constant expression: " + toSql());
+      throw new AnalysisException(
+          USAGE + " must be a constant expression: " + fnCallExpr_.toSql());
     }
     if (fnParamValue_.getType().isStringType()) {
       fnParamValue_ = new CastExpr(Type.TIMESTAMP, fnParamValue_);
