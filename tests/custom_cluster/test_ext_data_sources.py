@@ -212,6 +212,32 @@ class TestHivePostgresJdbcTables(CustomClusterTestSuite):
         "hive.sql.table" = "country"
     );
 
+    DROP TABLE IF EXISTS {0}.quoted_col;
+    CREATE EXTERNAL TABLE {0}.quoted_col
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        `freeze`      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "POSTGRES",
+        "hive.sql.jdbc.driver" = "org.postgresql.Driver",
+        "hive.sql.jdbc.url" = "jdbc:postgresql://localhost:5432/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password" = "password",
+        "hive.sql.table" = "quoted_col"
+    );
+
     DROP TABLE IF EXISTS {0}.country_keystore_postgres;
     CREATE EXTERNAL TABLE {0}.country_keystore_postgres
     (
@@ -252,7 +278,7 @@ class TestHivePostgresJdbcTables(CustomClusterTestSuite):
     self.client.execute("DESCRIBE {0}.country_postgres".format(unique_database))
     self.client.execute("DESCRIBE {0}.country_keystore_postgres".format(unique_database))
 
-  # Select statements are verified in hive-jdbc-postgres-tables.test.
+    # Select statements are verified in hive-jdbc-postgres-tables.test.
     self.run_test_case('QueryTest/hive-jdbc-postgres-tables', vector,
                        use_db=unique_database)
 
@@ -335,6 +361,32 @@ class TestMySqlExtJdbcTables(CustomClusterTestSuite):
         "hive.sql.dbcp.username" = "hiveuser",
         "hive.sql.dbcp.password" = "password",
         "hive.sql.table" = "country"
+    );
+
+    DROP TABLE IF EXISTS {0}.quoted_col;
+    CREATE EXTERNAL TABLE {0}.quoted_col
+    (
+        id INT,
+        name STRING,
+        bool_col BOOLEAN,
+        tinyint_col     SMALLINT,
+        smallint_col    SMALLINT,
+        int_col         INT,
+        bigint_col      BIGINT,
+        float_col       FLOAT,
+        double_col      DOUBLE,
+        date_col        DATE,
+        `freeze`      STRING,
+        timestamp_col   TIMESTAMP
+    )
+    STORED BY 'org.apache.hive.storage.jdbc.JdbcStorageHandler'
+    TBLPROPERTIES (
+        "hive.sql.database.type" = "MYSQL",
+        "hive.sql.jdbc.driver" = "com.mysql.cj.jdbc.Driver",
+        "hive.sql.jdbc.url" = "jdbc:mysql://localhost:3306/functional",
+        "hive.sql.dbcp.username" = "hiveuser",
+        "hive.sql.dbcp.password" = "password",
+        "hive.sql.table" = "quoted_col"
     );
 
     DROP TABLE IF EXISTS {0}.country_keystore_mysql;

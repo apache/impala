@@ -129,3 +129,23 @@ TBLPROPERTIES (
 "dbcp.username"="hiveuser",
 "dbcp.password"="password",
 "table"="test_strategy");
+
+DROP TABLE IF EXISTS quoted_impala;
+CREATE EXTERNAL TABLE IF NOT EXISTS quoted_impala (
+  strategy_id INT,
+  name STRING,
+  referrer STRING,
+  landing STRING,
+  priority INT,
+  `freeze` STRING,
+  last_modified timestamp,
+  PRIMARY KEY (strategy_id) )
+STORED BY JDBC
+TBLPROPERTIES (
+"database.type"="POSTGRES",
+"jdbc.url"="jdbc:postgresql://localhost:5432/functional",
+"jdbc.driver"="org.postgresql.Driver",
+"driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+"dbcp.username"="hiveuser",
+"dbcp.password"="password",
+"table"="test_strategy");

@@ -173,6 +173,38 @@ __EOT__
 docker exec -i mysql mysql -uroot -psecret functional < \
   /tmp/jdbc_country.sql
 
+# Create quoted_col table
+cat > /tmp/quoted_col.sql << '__EOT__'
+DROP TABLE IF EXISTS quoted_col;
+CREATE TABLE quoted_col
+(
+  id int,
+  name varchar(20),
+  bool_col BOOLEAN,
+  tinyint_col     SMALLINT,
+  smallint_col    SMALLINT,
+  int_col         INT,
+  bigint_col      BIGINT,
+  float_col       FLOAT,
+  double_col      DOUBLE,
+  date_col        DATE,
+  `freeze`        VARCHAR(10),
+  timestamp_col   TIMESTAMP
+);
+INSERT INTO quoted_col (id, name, bool_col, tinyint_col, smallint_col, int_col,
+bigint_col, float_col, double_col, date_col, `freeze`, timestamp_col)
+VALUES
+(1, 'India', TRUE, 10, 100, 1000, 10000, 1.1, 1.11, '2024-01-01',
+  'IN', '2024-01-01 10:00:00'),
+(2, 'Russia', FALSE, 20, 200, 2000, 20000, 2.2, 2.22, '2024-02-01',
+  'RU', '2024-02-01 11:00:00'),
+(3, 'USA', TRUE, 30, 300, 3000, 30000, 3.3, 3.33, '2024-03-01',
+  'US', '2024-03-01 12:00:00');
+__EOT__
+
+docker exec -i mysql mysql -uroot -psecret functional < \
+  /tmp/quoted_col.sql
+
 # Load data to jdbc table
 cat ${IMPALA_HOME}/testdata/target/AllTypes/* > /tmp/mysql_jdbc_alltypes.csv
 docker cp /tmp/mysql_jdbc_alltypes.csv mysql:/tmp

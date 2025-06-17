@@ -307,10 +307,22 @@ public class JdbcDataSource implements ExternalDataSource {
     if (schema_.getColsSize() == 0) {
       project = "*";
     } else {
-      project =
-          schema_.getCols().stream().map(
-              TColumnDesc::getName).map(
-              name -> columnMapping.getOrDefault(name, name))
+      String driverClass = JdbcStorageConfigManager.getConfigValue(
+          JdbcStorageConfig.JDBC_DRIVER_CLASS, tableConfig_);
+      final String quoteChar;
+      if (driverClass != null && (driverClass.toLowerCase().contains("impala") ||
+          driverClass.toLowerCase().contains("hive") ||
+          driverClass.toLowerCase().contains("mysql"))) {
+        quoteChar = "`";
+      } else {
+        quoteChar = "\"";
+      }
+
+      project = schema_.getCols().stream()
+              .map(TColumnDesc::getName)
+              .map(name -> columnMapping.containsKey(name)
+                      ? columnMapping.get(name)
+                      : quoteChar + name + quoteChar)
               .collect(Collectors.joining(", "));
     }
     sb.append(project);
