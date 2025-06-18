@@ -54,6 +54,54 @@ let db;
 
 const supported_tabs = ["Query", "Timeline", "Text plan", "Profile"];
 
+function formatNanoseconds(ns) {
+  const NS_IN_US = 1_000;
+  const NS_IN_MS = 1_000_000;
+  const NS_IN_SEC = 1_000_000_000;
+  const NS_IN_MIN = 60 * NS_IN_SEC;
+  const NS_IN_HOUR = 60 * NS_IN_MIN;
+
+  let remaining = ns;
+  const parts = [];
+
+  const hours = Math.floor(remaining / NS_IN_HOUR);
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+    remaining %= NS_IN_HOUR;
+  }
+
+  const minutes = Math.floor(remaining / NS_IN_MIN);
+  if (minutes > 0) {
+    parts.push(`${minutes}m`);
+    remaining %= NS_IN_MIN;
+  }
+
+  const seconds = Math.floor(remaining / NS_IN_SEC);
+  if (parts.length < 2 && seconds > 0) {
+    parts.push(`${seconds}s`);
+    remaining %= NS_IN_SEC;
+  }
+
+  const milliseconds = Math.floor(remaining / NS_IN_MS);
+  if (parts.length < 2 && milliseconds > 0) {
+    parts.push(`${milliseconds}ms`);
+    remaining %= NS_IN_MS;
+  }
+
+  const microseconds = Math.floor(remaining / NS_IN_US);
+  if (parts.length < 2 && microseconds > 0) {
+    parts.push(`${microseconds}us`);
+    remaining %= NS_IN_US;
+  }
+
+  if (parts.length < 2 && remaining > 0) {
+    parts.push(`${remaining}ns`);
+  }
+
+  // If input was 0 ns
+  return parts.length ? parts.join('') : '0ns';
+}
+
 function profileToString(profile, indent="") {
   let info_strings = "";
   if (profile.info_strings) {
@@ -68,7 +116,7 @@ function profileToString(profile, indent="") {
       event_sequences = `${event_sequences}${indent}    Offset: ${eventSeq.offset}\n`;
       event_sequences = `${event_sequences}${indent}    Events:\n`;
       eventSeq.events.forEach(event => {
-        event_sequences = `${event_sequences}${indent}      ${event.label}: ${new Date(event.timestamp).toISOString()}\n`;
+        event_sequences = `${event_sequences}${indent}      ${event.label}: ${formatNanoseconds(event.timestamp)}\n`;
       });
     });
   }
@@ -98,7 +146,7 @@ if (window.location.search.includes("imported")) {
   if (alert_message) {
     alert_message.remove();
   }
-  const nav_links = document.getElementsByClassName("nav nav-tabs")[0];
+  let nav_links = document.getElementsByClassName("nav nav-tabs")[0];
   nav_links = nav_links.getElementsByClassName("nav-link");
   for (let i = 0; i < nav_links.length;) {
     if (supported_tabs.includes(nav_links[i].textContent)) {

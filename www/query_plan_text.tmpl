@@ -39,7 +39,7 @@ if (window.location.search.includes("imported")) {
   if (alert_message) {
     alert_message.remove();
   }
-  const nav_links = document.getElementsByClassName("nav nav-tabs")[0];
+  let nav_links = document.getElementsByClassName("nav nav-tabs")[0];
   nav_links = nav_links.getElementsByClassName("nav-link");
   for (let i = 0; i < nav_links.length;) {
     if (supported_tabs.includes(nav_links[i].textContent)) {
