@@ -27,6 +27,8 @@ namespace impala {
 class TupleFileReader;
 class TupleFileWriter;
 class TupleTextFileWriter;
+class HdfsFileSplitPB;
+class HdfsPartitionDescriptor;
 
 class TupleCachePlanNode : public PlanNode {
  public:
@@ -85,8 +87,16 @@ private:
 
   void ReleaseResult();
 
+  // Hash the relevant attributes from an HdfsPartitionDescriptor using the specified
+  // seed.
+  uint32_t HashHdfsPartitionDescriptor(const HdfsPartitionDescriptor* partition_desc,
+      uint32_t seed);
+
+  // Hash the relevant attributes from an HdfsFileSplit using the specified seed.
+  uint32_t HashHdfsFileSplit(const HdfsFileSplitPB& split, uint32_t seed);
+
   // Construct the fragment instance part of the cache key by hashing information about
-  // inputs to this fragment (e.g. scan ranges).
+  // inputs to this fragment (e.g. scan ranges and partition settings).
   void ComputeFragmentInstanceKey(const RuntimeState *state);
 
   /// Reader/Writer for caching

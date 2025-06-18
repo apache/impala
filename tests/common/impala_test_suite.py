@@ -1320,12 +1320,17 @@ class ImpalaTestSuite(BaseTestSuite):
     assert abs(a - b) / float(max(abs(a), abs(b))) <= diff_perc
 
   def _get_table_location(self, table_name, vector):
-    """ Returns the HDFS location of the table.
-    This method changes self.client to point to the dabatase described by 'vector'."""
-    db_name = self.get_db_name_from_format(vector.get_table_format())
-    self.__change_client_database(self.client, db_name=db_name)
+    """ Returns the HDFS location of the table. If the table is not fully qualified,
+    this uses the database from the vector."""
+    is_fully_qualified = table_name.find(".") != -1
+    if is_fully_qualified:
+      fq_table_name = table_name
+    else:
+      db_name = self.get_db_name_from_format(vector.get_table_format())
+      fq_table_name = "{0}.{1}".format(db_name, table_name)
+
     result = self.execute_query_using_client(self.client,
-        "describe formatted %s" % table_name, vector)
+        "describe formatted %s" % fq_table_name, vector)
     for row in result.data:
       if 'Location:' in row:
         return row.split('\t')[1]

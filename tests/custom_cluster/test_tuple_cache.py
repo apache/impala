@@ -404,6 +404,42 @@ class TestTupleCacheSingle(TestTupleCacheBase):
     self.run_test_case('QueryTest/parquet-resolution-by-name', vector,
                        use_db=unique_database)
 
+  def test_partition_information(self, vector):
+    """Verify that partition information is incorporated into the runtime cache key"""
+    self.client.set_configuration(vector.get_value('exec_option'))
+
+    # scale_db.num_partitions_1234_blocks_per_partition_1 is an exotic table where all
+    # the partitions point to the same filesystem location. A single file is read many
+    # times for different partitions. It is not possible to tell the partitions apart
+    # by the file path, so this verifies that the partition information is being included
+    # properly.
+    query_template = \
+        "select i, j from scale_db.num_partitions_1234_blocks_per_partition_1 where j={0}"
+    # Run against the j=1 partition
+    result1 = self.execute_query(query_template.format(1))
+    assert result1.success
+    assertCounters(result1.runtime_profile, 0, 0, 0)
+    assert len(result1.data) == 1
+    assert result1.data[0].split("\t") == ["1", "1"]
+
+    # Run against the j=2 partition. There should not be a cache hit, because they are
+    # running against different partitions. This only works if the runtime key
+    # incorporates the partition information.
+    result2 = self.execute_query(query_template.format(2))
+    assert result2.success
+    assertCounters(result2.runtime_profile, 0, 0, 0)
+    assert len(result2.data) == 1
+    assert result2.data[0].split("\t") == ["1", "2"]
+
+  def test_json_binary_format(self, vector, unique_database):
+    """This is identical to test_scanners.py's TestBinaryType::test_json_binary_format.
+       That test modifies a table's serde properties to change the json binary format.
+       The tuple cache detects that by including the partition's storage descriptor
+       information. This fails if that doesn't happen."""
+    test_tbl = unique_database + '.binary_tbl'
+    self.clone_table('functional_json.binary_tbl', test_tbl, False, vector)
+    self.run_test_case('QueryTest/json-binary-format', vector, unique_database)
+
 
 @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)
 class TestTupleCacheCluster(TestTupleCacheBase):

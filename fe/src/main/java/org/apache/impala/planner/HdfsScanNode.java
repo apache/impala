@@ -84,6 +84,7 @@ import org.apache.impala.thrift.TFileSplitGeneratorSpec;
 import org.apache.impala.thrift.TJsonBinaryFormat;
 import org.apache.impala.thrift.THdfsFileSplit;
 import org.apache.impala.thrift.THdfsScanNode;
+import org.apache.impala.thrift.THdfsStorageDescriptor;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TOverlapPredicateDesc;
 import org.apache.impala.thrift.TPlanNode;
@@ -2827,5 +2828,79 @@ public class HdfsScanNode extends ScanNode {
       }
     }
     return ndvMult;
+  }
+
+  // Incorporate the details from this scan node into the supplied TupleCacheInfo. This
+  // is used when an entire scan node needs to be incorporated into a tuple cache key
+  // (e.g. for the build side of a join). This iterates over the partitions, hashing
+  // the partition information (storage descriptor and partition keys/values) as well as
+  // the associated scan ranges.
+  public void incorporateScansIntoTupleCache(TupleCacheInfo info) {
+    TScanRangeSpec orig = getScanRangeSpecs();
+
+    // Sort the partitions so it is consistent over time (the partition name is built
+    // from the partition column values).
+    List<FeFsPartition> sortedPartitions = new ArrayList<>(getSampledOrRawPartitions());
+    sortedPartitions.sort(
+        (p1, p2) -> p1.getPartitionName().compareTo(p2.getPartitionName()));
+    for (FeFsPartition partition : sortedPartitions) {
+      TScanRangeSpec spec = new TScanRangeSpec();
+      boolean hasScanRange = false;
+      if (orig.isSetConcrete_ranges()) {
+        for (TScanRangeLocationList origLocList: orig.concrete_ranges) {
+          if (origLocList.scan_range.hdfs_file_split.partition_id != partition.getId()) {
+            continue;
+          }
+          hasScanRange = true;
+          // We only need the TScanRange, which provides the file segment info.
+          TScanRangeLocationList locList = new TScanRangeLocationList();
+          TScanRange scanRange = origLocList.scan_range.deepCopy();
+          if (scanRange.isSetHdfs_file_split()) {
+            // Zero out partition_id, it's not stable.
+            scanRange.hdfs_file_split.partition_id = 0;
+          }
+          locList.setScan_range(scanRange);
+          spec.addToConcrete_ranges(locList);
+        }
+        if (hasScanRange) {
+          // Reloaded partitions may have a different order. Sort for stability.
+          spec.concrete_ranges.sort(null);
+        }
+      }
+      if (orig.isSetSplit_specs()) {
+        for (TFileSplitGeneratorSpec origSplitSpec: orig.split_specs) {
+          if (origSplitSpec.partition_id != partition.getId()) continue;
+          hasScanRange = true;
+          TFileSplitGeneratorSpec splitSpec = origSplitSpec.deepCopy();
+          // Zero out partition_id, it's not stable.
+          splitSpec.partition_id = 0;
+          spec.addToSplit_specs(splitSpec);
+        }
+        // Reloaded partitions may have a different order. Sort for stability.
+        spec.split_specs.sort(null);
+      }
+
+      // We should ignore empty partitions, so only include the information if there is
+      // at least one scan range.
+      if (hasScanRange) {
+        // Incorporate the storage descriptor. This contains several fields that can
+        // impact correctness, including the escape character, separator character,
+        // json binary format, etc.
+        THdfsStorageDescriptor inputFormat =
+          partition.getInputFormatDescriptor().toThrift();
+        // Zero the block size, as it is not relevant to reads.
+        inputFormat.setBlockSize(0);
+        info.hashThrift(inputFormat);
+
+        // Hash the partition name (which includes the partition keys and values)
+        // This is necessary for cases where two partitions point to the same
+        // directory and files. Without knowing the partition keys/values, the
+        // cache can't tell them apart.
+        info.hashString(partition.getPartitionName());
+
+        // Hash the scan range information
+        info.hashThrift(spec);
+      }
+    }
   }
 }

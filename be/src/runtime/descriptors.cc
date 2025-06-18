@@ -35,6 +35,7 @@
 #include "gen-cpp/PlanNodes_types.h"
 #include "rpc/thrift-util.h"
 #include "runtime/runtime-state.h"
+#include "util/hash-util.h"
 
 #include "common/names.h"
 
@@ -208,6 +209,15 @@ string TableDescriptor::DebugString() const {
   return out.str();
 }
 
+static uint32_t HashPartitionKeyExprs(const vector<TExpr>& partition_key_exprs) {
+  stringstream stream;
+  for (const TExpr& texpr : partition_key_exprs) {
+    stream << texpr;
+  }
+  string s = stream.str();
+  return HashUtil::Hash(s.data(), s.length(), 0);
+}
+
 HdfsPartitionDescriptor::HdfsPartitionDescriptor(
     const THdfsTable& thrift_table, const THdfsPartition& thrift_partition)
   : id_(thrift_partition.id),
@@ -222,6 +232,7 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(
   json_binary_format_ = sd.jsonBinaryFormat;
   encoding_value_ = sd.__isset.encodingValue ? sd.encodingValue : "";
   DecompressLocation(thrift_table, thrift_partition, &location_);
+  partition_key_expr_hash_ = HashPartitionKeyExprs(thrift_partition_key_exprs_);
 }
 
 string HdfsPartitionDescriptor::DebugString() const {

@@ -436,6 +436,18 @@ public class TupleCacheTest extends PlannerTestBase {
     verifyJoinNodesEligible(
         "select * from functional_parquet.iceberg_v2_positional_delete_all_rows", 1,
         /* isDistributedPlan */ true);
+
+    // When incorporating the scan range information from the build side of the
+    // join, we need to also incorporate information about the partitions involved.
+    // scale_db.num_partitions_1234_blocks_per_partition_1 is an exotic table where
+    // all the partitions point to the same file. If we don't incorporate partition
+    // information, then it can't tell apart queries against different partitions.
+    String incorporatePartitionSqlTemplate =
+        "select straight_join build.j, probe.id from functional.alltypes probe, " +
+        "scale_db.num_partitions_1234_blocks_per_partition_1 build " +
+        "where probe.id = build.i and build.j = %s";
+    verifyOverlappingCacheKeys(String.format(incorporatePartitionSqlTemplate, 1),
+        String.format(incorporatePartitionSqlTemplate, 2));
   }
 
   @Test

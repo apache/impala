@@ -403,6 +403,7 @@ class HdfsPartitionDescriptor {
   const std::string& location() const { return location_; }
   int64_t id() const { return id_; }
   TJsonBinaryFormat::type json_binary_format() const { return json_binary_format_; }
+  uint32_t partition_key_expr_hash() const { return partition_key_expr_hash_; }
   std::string DebugString() const;
 
   /// It is safe to call the returned expr evaluators concurrently from multiple
@@ -425,12 +426,15 @@ class HdfsPartitionDescriptor {
   // stripped.
   std::string location_;
   int64_t id_;
+  uint32_t partition_key_expr_hash_;
 
   /// List of literal (and therefore constant) expressions for each partition key. Their
   /// order corresponds to the first num_clustering_cols of the parent table.
   /// The Prepare()/Open()/Close() cycle is controlled by the containing descriptor table
   /// because the same partition descriptor may be used by multiple exec nodes with
   /// different lifetimes.
+  /// WARNING: This is only valid for a brief time and is left dangling. It can't be
+  /// exposed publicly.
   const std::vector<TExpr>& thrift_partition_key_exprs_;
 
   /// These evaluators are safe to be shared by all fragment instances as all expressions

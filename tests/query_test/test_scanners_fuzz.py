@@ -108,18 +108,22 @@ class TestScannersFuzzing(ImpalaTestSuite):
     src_db = QueryTestSectionReader.get_db_name(table_format)
 
     if table_format.file_format not in ['parquet', 'orc']: pytest.skip()
+    # For historical reasons, this test ran against the wrong database and was
+    # running against the uncorrupted table. Now that this is corrected, it frequently
+    # crashes Impala. Until that is fixed in IMPALA-14219, we need to xfail this test.
+    pytest.xfail("IMPALA-14219: this test can crash Impala")
     # Additional queries to scan the nested values.
     custom_queries = [
       "select count(*) from ("
       "  select distinct t.id, a.pos as apos, a.item as aitem, aa.pos, aa.item, "
       "    m.key as mkey, m.value as mvalue, ma.key, ma.value, t.nested_struct.* "
-      "  from complextypestbl t, t.int_array a, t.int_array_array.item aa, "
+      "  from {db}.{table} t, t.int_array a, t.int_array_array.item aa, "
       "    t.int_map m, t.int_map_array.item ma) q",
 
       "select count(*) from ("
       "  select t.id, t.nested_struct.a, b.pos as bpos, b.item as bitem, i.e, i.f, m.key,"
       "    arr.pos, arr.item "
-      "  from complextypestbl t, t.nested_struct.b, t.nested_struct.c.d.item i,"
+      "  from {db}.{table} t, t.nested_struct.b, t.nested_struct.c.d.item i,"
       "    t.nested_struct.g m, m.value.h.i arr) q",
     ]
     self.run_fuzz_test(vector, src_db, table_name, unique_database, table_name, 10,
@@ -158,12 +162,16 @@ class TestScannersFuzzing(ImpalaTestSuite):
   def test_fuzz_parquet_v2(self, vector, unique_database):
     table_format = vector.get_value('table_format')
     if table_format.file_format != 'parquet': pytest.skip()
+    # For historical reasons, this test ran against the wrong database and was
+    # running against the uncorrupted table. Now that this is corrected, it frequently
+    # crashes Impala. Until that is fixed in IMPALA-14219, we need to xfail this test.
+    pytest.xfail("IMPALA-14219: this test can crash Impala")
 
     tables = ["alltypesagg_parquet_v2_uncompressed", "alltypesagg_parquet_v2_snappy"]
     for table_name in tables:
       custom_queries = [
         "select avg(float_col), avg(double_col), avg(timestamp_col)"
-        "  from %s where bool_col;" % table_name
+        "  from {db}.{table} where bool_col;"
       ]
       self.run_fuzz_test(vector, "functional_parquet", table_name, unique_database,
                       table_name, 10, custom_queries)
@@ -172,7 +180,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
               "complextypestbl_parquet_v2_snappy"]
     for table_name in tables:
       custom_queries = [
-        "select int_array from %s;" % table_name
+        "select int_array from {db}.{table};"
       ]
       self.run_fuzz_test(vector, "functional_parquet", table_name, unique_database,
                   table_name, 10, custom_queries)
@@ -188,6 +196,8 @@ class TestScannersFuzzing(ImpalaTestSuite):
     SCANNER_FUZZ_SEED can be set in the environment to reproduce the result (assuming that
     input files are the same).
     SCANNER_FUZZ_KEEP_FILES can be set in the environment to keep the generated files.
+    custom_queries can specify additional queries to run. References to '{db}' and
+    '{table}' in the custom queries are replaced with the fuzz db and table.
     """
     # Create and seed a new random number generator for reproducibility.
     rng = random.Random()
@@ -246,11 +256,11 @@ class TestScannersFuzzing(ImpalaTestSuite):
     # Also execute a count(*) that materializes no columns, since different code
     # paths are exercised.
     queries = [
-        'select count(*) from (select distinct * from {0}.{1}) q'.format(
-            fuzz_db, fuzz_table),
-        'select count(*) from {0}.{1} q'.format(fuzz_db, fuzz_table)]
+        'select count(*) from (select distinct * from {db}.{table}) q'.format(
+            db=fuzz_db, table=fuzz_table),
+        'select count(*) from {db}.{table} q'.format(db=fuzz_db, table=fuzz_table)]
     if custom_queries is not None:
-      queries = queries + [s.format(fuzz_db, fuzz_table) for s in custom_queries]
+      queries = queries + [s.format(db=fuzz_db, table=fuzz_table) for s in custom_queries]
 
     for query, batch_size, disable_codegen in \
         itertools.product(queries, self.BATCH_SIZES, self.DISABLE_CODEGEN_VALUES):

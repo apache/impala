@@ -248,34 +248,7 @@ public class TupleCacheInfo {
     // filename, mtime, size, and offset. Others like partition_id may change after
     // reloading metadata.
     for (HdfsScanNode scanNode: inputScanNodes_) {
-      TScanRangeSpec orig = scanNode.getScanRangeSpecs();
-      TScanRangeSpec spec = new TScanRangeSpec();
-      if (orig.isSetConcrete_ranges()) {
-        for (TScanRangeLocationList origLocList: orig.concrete_ranges) {
-          // We only need the TScanRange, which provides the file segment info.
-          TScanRangeLocationList locList = new TScanRangeLocationList();
-          TScanRange scanRange = origLocList.scan_range.deepCopy();
-          if (scanRange.isSetHdfs_file_split()) {
-            // Zero out partition_id, it's not stable.
-            scanRange.hdfs_file_split.partition_id = 0;
-          }
-          locList.setScan_range(scanRange);
-          spec.addToConcrete_ranges(locList);
-        }
-        // Reloaded partitions may have a different order. Sort for stability.
-        spec.concrete_ranges.sort(null);
-      }
-      if (orig.isSetSplit_specs()) {
-        for (TFileSplitGeneratorSpec origSplitSpec: orig.split_specs) {
-          TFileSplitGeneratorSpec splitSpec = origSplitSpec.deepCopy();
-          // Zero out partition_id, it's not stable.
-          splitSpec.partition_id = 0;
-          spec.addToSplit_specs(splitSpec);
-        }
-        // Reloaded partitions may have a different order. Sort for stability.
-        spec.split_specs.sort(null);
-      }
-      hashThrift(spec);
+      scanNode.incorporateScansIntoTupleCache(this);
     }
     // The scan ranges have been incorporated into the key and are no longer needed
     // at runtime.
@@ -339,6 +312,17 @@ public class TupleCacheInfo {
     String thriftString = thriftObj.toString();
     Preconditions.checkState(thriftString != null);
     hashTraceBuilder_.append(thriftString);
+  }
+
+  /**
+   * Hash a regular string and incorporate it into the key
+   */
+  public void hashString(String s) {
+    Preconditions.checkState(!finalized_,
+        "TupleCacheInfo is finalized and can't be modified");
+    Preconditions.checkState(s != null);
+    hasher_.putUnencodedChars(s);
+    hashTraceBuilder_.append(s);
   }
 
   /**

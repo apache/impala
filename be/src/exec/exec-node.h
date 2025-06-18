@@ -285,7 +285,7 @@ class ExecNode {
 
   int id() const { return id_; }
   TPlanNodeType::type type() const { return type_; }
-  const PlanNode& plan_node() { return plan_node_; }
+  const PlanNode& plan_node() const { return plan_node_; }
 
   /// Returns a unique label for this ExecNode of the form "PLAN_NODE_TYPE(id=[int])",
   /// for example, EXCHANGE_NODE (id=2).

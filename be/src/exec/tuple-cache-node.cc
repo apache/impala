@@ -18,6 +18,7 @@
 #include <gflags/gflags.h>
 
 #include "exec/exec-node-util.h"
+#include "exec/hdfs-scan-node-base.h"
 #include "exec/tuple-cache-node.h"
 #include "exec/tuple-file-reader.h"
 #include "exec/tuple-file-writer.h"
@@ -432,37 +433,102 @@ void TupleCacheNode::DebugString(int indentation_level, stringstream* out) const
   *out << ")";
 }
 
+// This hashes all the fields of the HdfsPartitionDescriptor, except:
+// 1. block_size: Only used for writing, so it doesn't matter for reading
+// 2. location: The location is hashed as part of the scan range
+// 3. id: The partition id is not stable over time
+// As a substitute for the "id", this uses the partition key expr hash, which
+// is a stable identifier for the partition.
+uint32_t TupleCacheNode::HashHdfsPartitionDescriptor(
+    const HdfsPartitionDescriptor* partition_desc, uint32_t seed) {
+  uint32_t hash = seed;
+  char line_delim = partition_desc->line_delim();
+  hash = HashUtil::Hash(&line_delim, sizeof(line_delim), hash);
+  char field_delim = partition_desc->field_delim();
+  hash = HashUtil::Hash(&field_delim, sizeof(field_delim), hash);
+  char collection_delim = partition_desc->collection_delim();
+  hash = HashUtil::Hash(&collection_delim, sizeof(collection_delim), hash);
+  char escape_char = partition_desc->escape_char();
+  hash = HashUtil::Hash(&escape_char, sizeof(escape_char), hash);
+  std::string file_format = to_string(partition_desc->file_format());
+  hash = HashUtil::Hash(file_format.data(), file_format.length(), hash);
+  hash = HashUtil::Hash(partition_desc->encoding_value().data(),
+      partition_desc->encoding_value().length(), hash);
+  std::string json_binary_format = to_string(partition_desc->json_binary_format());
+  hash = HashUtil::Hash(json_binary_format.data(), json_binary_format.length(), hash);
+  uint32_t partition_key_expr_hash = partition_desc->partition_key_expr_hash();
+  hash = HashUtil::Hash(&partition_key_expr_hash, sizeof(partition_key_expr_hash), hash);
+  return hash;
+}
+
+uint32_t TupleCacheNode::HashHdfsFileSplit(const HdfsFileSplitPB& split, uint32_t seed) {
+  uint32_t hash = seed;
+  if (split.has_relative_path() && !split.relative_path().empty()) {
+    hash = HashUtil::Hash(
+        split.relative_path().data(), split.relative_path().length(), hash);
+    DCHECK(split.has_partition_path_hash());
+    int32_t partition_path_hash = split.partition_path_hash();
+    hash = HashUtil::Hash(&partition_path_hash, sizeof(partition_path_hash), hash);
+  } else if (split.has_absolute_path() && !split.absolute_path().empty()) {
+    hash = HashUtil::Hash(
+        split.absolute_path().data(), split.absolute_path().length(), hash);
+  } else {
+    DCHECK("Either relative_path or absolute_path must be set");
+  }
+  DCHECK(split.has_offset());
+  int64_t offset = split.offset();
+  hash = HashUtil::Hash(&offset, sizeof(offset), hash);
+  DCHECK(split.has_length());
+  int64_t length = split.length();
+  hash = HashUtil::Hash(&length, sizeof(length), hash);
+  DCHECK(split.has_mtime());
+  int64_t mtime = split.mtime();
+  hash = HashUtil::Hash(&mtime, sizeof(mtime), hash);
+  return hash;
+}
+
 void TupleCacheNode::ComputeFragmentInstanceKey(const RuntimeState* state) {
   const PlanFragmentInstanceCtxPB& ctx = state->instance_ctx_pb();
   uint32_t hash = 0;
+  // Collect the HdfsScanNodes below this point. The HdfsScanNodes have information about
+  // the partitions that we need to include in the fragment instance key. Some locations
+  // may have a large number of scan nodes below them, so construct a map from the node
+  // id to the HdfsScanNodeBase.
+  vector<ExecNode*> scan_nodes;
+  CollectNodes(TPlanNodeType::HDFS_SCAN_NODE, &scan_nodes);
+  unordered_map<int, const HdfsScanNodeBase*> id_to_scan_node_map;
+  for (const ExecNode* exec_node : scan_nodes) {
+    const HdfsScanNodeBase* scan_node =
+        static_cast<const HdfsScanNodeBase*>(exec_node);
+    int node_id = exec_node->plan_node().tnode_->node_id;
+    DCHECK(id_to_scan_node_map.find(node_id) == id_to_scan_node_map.end())
+        << "Duplicate scan node id: " << node_id;
+    id_to_scan_node_map[node_id] = scan_node;
+  }
   for (int32_t node_id : plan_node().tnode_->tuple_cache_node.input_scan_node_ids) {
+    const HdfsTableDescriptor* hdfs_table = id_to_scan_node_map[node_id]->hdfs_table();
+    DCHECK(hdfs_table != nullptr);
     auto ranges = ctx.per_node_scan_ranges().find(node_id);
     if (ranges == ctx.per_node_scan_ranges().end()) continue;
     for (const ScanRangeParamsPB& params : ranges->second.scan_ranges()) {
       // This only supports HDFS right now
       DCHECK(params.scan_range().has_hdfs_file_split());
       const HdfsFileSplitPB& split = params.scan_range().hdfs_file_split();
-      if (split.has_relative_path() && !split.relative_path().empty()) {
-        hash = HashUtil::Hash(
-            split.relative_path().data(), split.relative_path().length(), hash);
-        DCHECK(split.has_partition_path_hash());
-        int32_t partition_path_hash = split.partition_path_hash();
-        hash = HashUtil::Hash(&partition_path_hash, sizeof(partition_path_hash), hash);
-      } else if (split.has_absolute_path() && !split.absolute_path().empty()) {
-        hash = HashUtil::Hash(
-            split.absolute_path().data(), split.absolute_path().length(), hash);
+      // Information on the partition can influence how files are processed. For example,
+      // for text files, the delimiter can be specified on the partition level. There
+      // are several such attributes. We need to incorporate the partition information
+      // into the hash for each file split.
+      const HdfsPartitionDescriptor* partition_desc =
+          hdfs_table->GetPartition(split.partition_id());
+      DCHECK(partition_desc != nullptr);
+      if (partition_desc != nullptr) {
+        hash = HashHdfsPartitionDescriptor(partition_desc, hash);
       } else {
-        DCHECK("Either relative_path or absolute_path must be set");
+        LOG(WARNING) << "Partition id " << split.partition_id()
+                     << " not found in table " << hdfs_table->fully_qualified_name()
+                     << " split filename: " << split.relative_path();
       }
-      DCHECK(split.has_offset());
-      int64_t offset = split.offset();
-      hash = HashUtil::Hash(&offset, sizeof(offset), hash);
-      DCHECK(split.has_length());
-      int64_t length = split.length();
-      hash = HashUtil::Hash(&length, sizeof(length), hash);
-      DCHECK(split.has_mtime());
-      int64_t mtime = split.mtime();
-      hash = HashUtil::Hash(&mtime, sizeof(mtime), hash);
+      hash = HashHdfsFileSplit(split, hash);
     }
   }
   fragment_instance_key_ = hash;
