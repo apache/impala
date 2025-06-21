@@ -78,6 +78,7 @@ BUILD_TSAN=0
 BUILD_TSAN_FULL=0
 BUILD_DEBUG_NOOPT=0
 BUILD_SHARED_LIBS=0
+UDF_DEVEL=0
 # Export MAKE_CMD so it is visible in scripts that invoke make, e.g. copy-udfs-udas.sh
 export MAKE_CMD=make
 
@@ -208,6 +209,9 @@ do
     -package)
       GEN_PACKAGE=1
       ;;
+    -udf_devel_package)
+      UDF_DEVEL=1
+      ;;
     -help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
       echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
@@ -263,6 +267,7 @@ do
       echo "[-ninja] : Use ninja instead of make"
       echo "[-cmake_only] : Generate makefiles only, instead of doing a full build"
       echo "[-package] : Generate a package for deployment."
+      echo "[-udf_devel_package] : Generate UDF development package."
       echo "-----------------------------------------------------------------------------
 Examples of common tasks:
 
@@ -294,7 +299,10 @@ Examples of common tasks:
   ./buildall.sh -testdata -format
 
   # Build and upgrade metastore schema to latest.
-  ./buildall.sh -upgrade_metastore_db"
+  ./buildall.sh -upgrade_metastore_db
+
+  # Build and generate UDF development package.
+  ./buildall.sh -release_and_debug -notests -udf_devel_package"
       exit 1
       ;;
     esac
@@ -724,4 +732,9 @@ if [[ ${NEEDS_RE_SOURCE_NOTE} -eq 1 ]]; then
   echo
   echo "   . \"${IMPALA_HOME}/bin/impala-config.sh\""
   echo
+fi
+
+if [[ ${UDF_DEVEL} -eq 1 ]]; then
+  echo "Building ImpalaUdf-retail & ImpalaUdf-debug RPM via make_impala_udf_retail_rpm.sh"
+  "${IMPALA_HOME}/bin/make-impala-udf-devel-rpm.sh"
 fi
