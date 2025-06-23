@@ -79,6 +79,8 @@ private:
   RuntimeProfile::Counter* num_backpressure_halted_counter_ = nullptr;
   /// Number of results that skip the cache due to a tombstone
   RuntimeProfile::Counter* num_skipped_counter_ = nullptr;
+  /// Number of results that are running correctness verification
+  RuntimeProfile::Counter* num_correctness_verification_counter_ = nullptr;
 
   /// Whether any RowBatch from a cache file has been returned to a caller
   /// It is possible to recover from an error reading a cache file if no

@@ -58,6 +58,11 @@ struct TSlotDescriptor {
   // provided by other structures for the executor, so it only needs to be set for
   // the tuple cache.
   11: optional string path
+  // If this is in a struct, this is the index of the field within that struct. This
+  // corresponds to the final entry in the absolute path. The materialized path is
+  // sometimes truncated, so it may not contain this information. This value is not
+  // interesting if this slot is not inside a struct.
+  12: optional i32 structFieldIdx
 }
 
 struct TColumnDescriptor {

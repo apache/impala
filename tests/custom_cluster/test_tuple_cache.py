@@ -31,10 +31,12 @@ from tests.util.parse_util import (
     match_memory_estimate, parse_mem_to_mb, match_cache_key)
 
 TABLE_LAYOUT = 'name STRING, age INT, address STRING'
-CACHE_START_ARGS = "--tuple_cache_dir=/tmp --log_level=2"
+CACHE_START_ARGS = \
+  "--tuple_cache_dir=/tmp --tuple_cache_debug_dump_dir=/tmp --log_level=2"
 NUM_HITS = 'NumTupleCacheHits'
 NUM_HALTED = 'NumTupleCacheHalted'
 NUM_SKIPPED = 'NumTupleCacheSkipped'
+NUM_CORRECTNESS_VERIFICATION = 'NumTupleCacheCorrectnessVerification'
 # Indenation used for TUPLE_CACHE_NODE in specific fragments (not averaged fragment).
 NODE_INDENT = '           - '
 
@@ -439,6 +441,33 @@ class TestTupleCacheSingle(TestTupleCacheBase):
     test_tbl = unique_database + '.binary_tbl'
     self.clone_table('functional_json.binary_tbl', test_tbl, False, vector)
     self.run_test_case('QueryTest/json-binary-format', vector, unique_database)
+
+  def test_complex_types_verification(self, vector):
+    """Run with correctness verification and check that it works with a query that
+       selects complex types."""
+    # We use custom query options to turn on verification. We also need to use
+    # expand_complex_types=true so that * includes columns with complex types
+    custom_options = dict(vector.get_value('exec_option'))
+    custom_options['enable_tuple_cache_verification'] = 'true'
+    custom_options['expand_complex_types'] = 'true'
+
+    # functional_parquet.complextypestbl has multiple columns with different types
+    # of complex types. e.g. nested_struct is a struct with multiple nested fields.
+    query = "select * from functional_parquet.complextypestbl"
+    result1 = self.execute_query(query, query_options=custom_options)
+    assert result1.success
+    assertCounters(result1.runtime_profile, 0, 0, 0)
+
+    # The second run is when correctness verification kicks in and tests the printing
+    # logic.
+    result2 = self.execute_query(query, query_options=custom_options)
+    assert result2.success
+    # The regular counters see this as skip
+    assertCounters(result2.runtime_profile, 0, 0, 1)
+    assertCounter(result2.runtime_profile, NUM_CORRECTNESS_VERIFICATION, 1, 1)
+    # Order by is currently not supported with complex types results, so sort the results
+    # before comparing them.
+    assert sorted(result1.data) == sorted(result2.data)
 
 
 @CustomClusterTestSuite.with_args(start_args=CACHE_START_ARGS)

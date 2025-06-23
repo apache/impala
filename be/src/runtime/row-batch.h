@@ -161,10 +161,17 @@ class RowBatch {
   }
 
   TupleRow* ALWAYS_INLINE GetRow(int row_idx) {
-    DCHECK(tuple_ptrs_ != NULL);
+    DCHECK(tuple_ptrs_ != nullptr);
     DCHECK_GE(row_idx, 0);
     DCHECK_LT(row_idx, capacity_);
     return reinterpret_cast<TupleRow*>(tuple_ptrs_ + row_idx * num_tuples_per_row_);
+  }
+
+  const TupleRow* ALWAYS_INLINE GetRow(int row_idx) const {
+    DCHECK(tuple_ptrs_ != nullptr);
+    DCHECK_GE(row_idx, 0);
+    DCHECK_LT(row_idx, capacity_);
+    return reinterpret_cast<const TupleRow*>(tuple_ptrs_ + row_idx * num_tuples_per_row_);
   }
 
   /// An iterator for going through a row batch, starting at 'row_idx'.

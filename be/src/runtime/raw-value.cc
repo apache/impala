@@ -122,9 +122,6 @@ void RawValue::PrintValue(const void* value, const ColumnType& type, int scale,
     case TYPE_DATE:
       *str = reinterpret_cast<const DateValue*>(value)->ToString();
       return;
-    case TYPE_FIXED_UDA_INTERMEDIATE:
-      *str = "Intermediate UDA step, no value printed";
-      return;
     default:
       break;
   }
@@ -512,6 +509,15 @@ void RawValue::PrintValue(
     case TYPE_DATE: {
       if (quote_val) *stream << "\"";
       *stream << *reinterpret_cast<const DateValue*>(value);
+      if (quote_val) *stream << "\"";
+    } break;
+    case TYPE_FIXED_UDA_INTERMEDIATE: {
+      // This is always a binary type, so escape invalid unicode characters to make it
+      // printable.
+      string intermed_str(reinterpret_cast<const char*>(value), type.len);
+      intermed_str = strings::Utf8SafeCEscape(intermed_str);
+      if (quote_val) *stream << "\"";
+      stream->write(intermed_str.c_str(), intermed_str.size());
       if (quote_val) *stream << "\"";
     } break;
     default: DCHECK(false) << "Unknown type: " << type;

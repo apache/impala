@@ -491,6 +491,15 @@ public class SlotDescriptor {
       // not interesting to the tuple cache.
       result.setPath(label_);
     }
+    // In order to print struct tuples, we need to be able to retrieve the field name for
+    // a slot within a struct. The last index of the absolute path is the appropriate
+    // value. However, the materialized path can be truncated to omit the last few
+    // indices. This sets the struct field idx to supply the last index.
+    if (isScanSlot() && parent_.getPath() != null) {
+      Preconditions.checkState(path_.isResolved());
+      List<Integer> absolutePath = path_.getAbsolutePath();
+      result.setStructFieldIdx(absolutePath.get(absolutePath.size()-1));
+    }
     if (itemTupleDesc_ != null) {
       // Check for recursive or otherwise invalid item tuple descriptors. Since we assign
       // tuple ids globally in increasing order, the id of an item tuple descriptor must

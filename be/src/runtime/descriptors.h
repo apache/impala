@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <map>
+#include <optional>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -144,6 +145,8 @@ class SlotDescriptor {
   TVirtualColumnType::type virtual_column_type() const { return virtual_column_type_; }
   bool IsVirtual() const { return virtual_column_type_ != TVirtualColumnType::NONE; }
 
+  std::optional<int32_t> struct_field_idx() const { return struct_field_idx_; }
+
   /// Comparison function for ordering slot descriptors by their col_path_.
   /// Returns true if 'a' comes before 'b'.
   /// Orders the paths as in a depth-first traversal of the schema tree, as follows:
@@ -246,6 +249,12 @@ class SlotDescriptor {
   const int slot_size_;
 
   const TVirtualColumnType::type virtual_column_type_;
+
+  /// If this is a slot in a struct, this is the field id within that struct. This is
+  /// useful for getting the struct's field name from ColumnType. This is equivalent
+  /// to the final index of the absolute path, but the materialized path can be
+  /// truncated and omit this index.
+  std::optional<int32_t> struct_field_idx_;
 
   /// 'children_tuple_descriptor' should be non-NULL iff this is a complex type slot.
   SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent,

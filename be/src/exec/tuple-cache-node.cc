@@ -65,7 +65,12 @@ Status TupleCacheNode::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile(), "NumTupleCacheBackpressureHalted", TUnit::UNIT);
   num_skipped_counter_ =
       ADD_COUNTER(runtime_profile(), "NumTupleCacheSkipped", TUnit::UNIT);
-
+  // If correctness verification is enabled, add a counter to indicate whether it was
+  // actually performing correctness verification.
+  if (TupleCacheVerificationEnabled(state)) {
+    num_correctness_verification_counter_ =
+      ADD_COUNTER(runtime_profile(), "NumTupleCacheCorrectnessVerification", TUnit::UNIT);
+  }
   // Compute the combined cache key by computing the fragment instance key and
   // fusing it with the compile time key.
   ComputeFragmentInstanceKey(state);
@@ -96,6 +101,9 @@ Status TupleCacheNode::Open(RuntimeState* state) {
       // If the node is marked to skip correctness verification, we don't want to read
       // from the cache as that would prevent its children from executing.
       if (!skip_correctness_verification_) {
+        VLOG_FILE << "Tuple Cache: correctness verification for " << combined_key_;
+        DCHECK(num_correctness_verification_counter_ != nullptr);
+        COUNTER_ADD(num_correctness_verification_counter_, 1);
         // We need the original fragment id to construct the path for the reference debug
         // cache file. If it's missing from the metadata, we return an error status
         // immediately.

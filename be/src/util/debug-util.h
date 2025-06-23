@@ -58,9 +58,18 @@ std::string PrintValue(const T& value) {
   return to_string(value);
 }
 
+// Print functions have two signatures. One writes output to a stringstream passed in
+// as an argument. The second returns a string. In all cases, the second signature is
+// implemented by passing a stringstream into the first signature and returning the
+// resulting string. If the caller is going to write the output to a stringstream, the
+// stringstream signature avoids an extra copy.
+void PrintTuple(const Tuple* t, const TupleDescriptor& d, std::stringstream* out);
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
-std::string PrintRow(TupleRow* row, const RowDescriptor& d);
-std::string PrintBatch(RowBatch* batch);
+void PrintRow(const TupleRow* row, const RowDescriptor& d, std::stringstream* out);
+std::string PrintRow(const TupleRow* row, const RowDescriptor& d);
+void PrintBatch(const RowBatch* batch, std::stringstream* out);
+std::string PrintBatch(const RowBatch* batch);
+
 /// Converts id to a string representation. If necessary, the gdb equivalent is:
 ///    printf "%lx:%lx\n", id.hi, id.lo
 std::string PrintId(const TUniqueId& id, const std::string& separator = ":");

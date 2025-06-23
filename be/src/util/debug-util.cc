@@ -113,11 +113,11 @@ bool ParseId(const string& s, TUniqueId* id) {
   // For backwards compatibility, this method parses two forms of query ID from text:
   //  - <hex-int64_t><colon><hex-int64_t> - this format is the standard going forward
   //  - <decimal-int64_t><space><decimal-int64_t> - legacy compatibility with CDH4 CM
-  DCHECK(id != NULL);
+  DCHECK(id != nullptr);
 
   const char* hi_part = s.c_str();
   char* separator = const_cast<char*>(strchr(hi_part, ':'));
-  if (separator == NULL) {
+  if (separator == nullptr) {
     // Legacy compatibility branch
     char_separator<char> sep(" ");
     tokenizer< char_separator<char>> tokens(s, sep);
@@ -144,8 +144,8 @@ bool ParseId(const string& s, TUniqueId* id) {
   const char* lo_part = separator + 1;
   *separator = '\0';
 
-  char* error_hi = NULL;
-  char* error_lo = NULL;
+  char* error_hi = nullptr;
+  char* error_lo = nullptr;
   id->hi = strtoul(hi_part, &error_hi, 16);
   id->lo = strtoul(lo_part, &error_lo, 16);
 
@@ -154,65 +154,140 @@ bool ParseId(const string& s, TUniqueId* id) {
   return valid;
 }
 
-string PrintTuple(const Tuple* t, const TupleDescriptor& d) {
-  if (t == NULL) return "null";
-  stringstream out;
-  out << "(";
-  bool first_value = true;
-  for (int i = 0; i < d.slots().size(); ++i) {
-    SlotDescriptor* slot_d = d.slots()[i];
-    if (first_value) {
-      first_value = false;
-    } else {
-      out << " ";
+// Forward-declarations to keep the compiler happy
+static void PrintCollection(const Tuple* t, const SlotDescriptor& slot_d,
+    stringstream* out);
+static void PrintStruct(const Tuple* t, const SlotDescriptor& slot_d, stringstream* out);
+
+// Generic recursive dispatch to print a slot descriptor
+static void PrintSlot(const Tuple* t, const SlotDescriptor& slot_d, stringstream* out) {
+  if (t->IsNull(slot_d.null_indicator_offset())) {
+    *out << "null";
+  } else if (slot_d.type().IsCollectionType()) {
+    PrintCollection(t, slot_d, out);
+  } else if (slot_d.type().IsStructType()) {
+    PrintStruct(t, slot_d, out);
+  } else {
+    RawValue::PrintValue(t->GetSlot(slot_d.tuple_offset()), slot_d.type(), -1, out,
+        /*quote_val*/ true);
+  }
+}
+
+// Print a collection (array or map), recursing through the children.
+// Example: [(a 1) (b 2)]
+static void PrintCollection(const Tuple* t, const SlotDescriptor& slot_d,
+    stringstream* out) {
+  DCHECK(t != nullptr);
+  DCHECK(slot_d.type().IsCollectionType());
+  const TupleDescriptor* child_tuple_d = slot_d.children_tuple_descriptor();
+  const CollectionValue* coll_value =
+      reinterpret_cast<const CollectionValue*>(t->GetSlot(slot_d.tuple_offset()));
+  uint8_t* coll_buf = coll_value->ptr;
+  *out << "[";
+  for (int j = 0; j < coll_value->num_tuples; ++j) {
+    PrintTuple(reinterpret_cast<Tuple*>(coll_buf), *child_tuple_d, out);
+    coll_buf += child_tuple_d->byte_size();
+  }
+  *out << "]";
+}
+
+// Print a struct with field names, recursing to children. This is not intended to work
+// with impala_udf::StructVal. Instead, it works with the representation of structs
+// that is directly inside another tuple.
+// Example: {a:1,b:2}
+static void PrintStruct(const Tuple* t, const SlotDescriptor& slot_d, stringstream* out) {
+  DCHECK(t != nullptr);
+  DCHECK(slot_d.type().IsStructType());
+  const TupleDescriptor* child_tuple_d = slot_d.children_tuple_descriptor();
+  DCHECK(child_tuple_d != nullptr);
+  const ColumnType& struct_type = slot_d.type();
+  const std::vector<SlotDescriptor*>& child_slots = child_tuple_d->slots();
+  // The struct may have fields that are not being materialized, so the child_slots may
+  // be a subset of the actual struct type.
+  DCHECK_LE(child_slots.size(), struct_type.children.size());
+  *out << "{";
+  for (int i = 0; i < child_slots.size(); ++i) {
+    if (i != 0) {
+      *out << ",";
     }
-    if (t->IsNull(slot_d->null_indicator_offset())) {
-      out << "null";
-    } else if (slot_d->type().IsCollectionType()) {
-      const TupleDescriptor* item_d = slot_d->children_tuple_descriptor();
-      const CollectionValue* coll_value =
-          reinterpret_cast<const CollectionValue*>(t->GetSlot(slot_d->tuple_offset()));
-      uint8_t* coll_buf = coll_value->ptr;
-      out << "[";
-      for (int j = 0; j < coll_value->num_tuples; ++j) {
-        out << PrintTuple(reinterpret_cast<Tuple*>(coll_buf), *item_d);
-        coll_buf += item_d->byte_size();
+    const SlotDescriptor& child_slot_desc = *child_slots[i];
+    // To find the struct field name, we need the index into the ColumnType's
+    // field_names. Structs can be partially materialized, so the slot's index
+    // is not correct. The struct_field_idx contains the appropriate index into
+    // the field_names.
+    if (child_slot_desc.struct_field_idx().has_value()) {
+      int struct_field_idx = child_slot_desc.struct_field_idx().value();
+      if (struct_field_idx < struct_type.field_names.size()) {
+        *out << struct_type.field_names[struct_field_idx] << ":";
+      } else {
+        // This is invalid. Assert on debug builds, but otherwise handle it for
+        // release builds.
+        DCHECK_LT(struct_field_idx, struct_type.field_names.size());
+        *out << "invalid" << i << ":";
       }
-      out << "]";
     } else {
-      string value_str;
-      RawValue::PrintValue(
-          t->GetSlot(slot_d->tuple_offset()), slot_d->type(), -1, &value_str);
-      out << value_str;
+      *out << "unnamed" << i << ":";
     }
+    PrintSlot(t, child_slot_desc, out);
   }
-  out << ")";
+  *out << "}";
+}
+
+void PrintTuple(const Tuple* t, const TupleDescriptor& tuple_d, stringstream* out) {
+  // The whole tuple is null
+  if (t == nullptr) {
+    *out << "null";
+    return;
+  }
+  *out << "(";
+  for (int i = 0; i < tuple_d.slots().size(); ++i) {
+    if (i != 0) {
+      *out << " ";
+    }
+    const SlotDescriptor& slot_d = *tuple_d.slots()[i];
+    PrintSlot(t, slot_d, out);
+  }
+  *out << ")";
+}
+
+string PrintTuple(const Tuple* t, const TupleDescriptor& tuple_d) {
+  stringstream out;
+  PrintTuple(t, tuple_d, &out);
   return out.str();
 }
 
-string PrintRow(TupleRow* row, const RowDescriptor& d) {
-  stringstream out;
-  out << "[";
-  for (int i = 0; i < d.tuple_descriptors().size(); ++i) {
-    if (i != 0) out << " ";
-    out << PrintTuple(row->GetTuple(i), *d.tuple_descriptors()[i]);
+void PrintRow(const TupleRow* row, const RowDescriptor& row_d, stringstream* out) {
+  *out << "[";
+  for (int i = 0; i < row_d.tuple_descriptors().size(); ++i) {
+    if (i != 0) *out << " ";
+    PrintTuple(row->GetTuple(i), *row_d.tuple_descriptors()[i], out);
   }
-  out << "]";
+  *out << "]";
+}
+
+string PrintRow(const TupleRow* row, const RowDescriptor& row_d) {
+  stringstream out;
+  PrintRow(row, row_d, &out);
   return out.str();
 }
 
-string PrintBatch(RowBatch* batch) {
-  stringstream out;
+void PrintBatch(const RowBatch* batch, stringstream* out) {
   for (int i = 0; i < batch->num_rows(); ++i) {
-    out << PrintRow(batch->GetRow(i), *batch->row_desc()) << "\n";
+    PrintRow(batch->GetRow(i), *batch->row_desc(), out);
+    *out << "\n";
   }
+}
+
+string PrintBatch(const RowBatch* batch) {
+  stringstream out;
+  PrintBatch(batch, &out);
   return out.str();
 }
 
 string PrintPath(const TableDescriptor& tbl_desc, const SchemaPath& path) {
   stringstream ss;
   ss << tbl_desc.database() << "." << tbl_desc.name();
-  const ColumnType* type = NULL;
+  const ColumnType* type = nullptr;
   if (path.size() > 0) {
     ss << "." << tbl_desc.col_descs()[path[0]].name();
     type = &tbl_desc.col_descs()[path[0]].type();
@@ -227,7 +302,7 @@ string PrintPath(const TableDescriptor& tbl_desc, const SchemaPath& path) {
         } else {
           DCHECK_EQ(path[i], 1);
           ss << "pos";
-          type = NULL;
+          type = nullptr;
         }
         break;
       case TYPE_MAP:
@@ -240,7 +315,7 @@ string PrintPath(const TableDescriptor& tbl_desc, const SchemaPath& path) {
         } else {
           DCHECK_EQ(path[i], 2);
           ss << "pos";
-          type = NULL;
+          type = nullptr;
         }
         break;
       case TYPE_STRUCT:

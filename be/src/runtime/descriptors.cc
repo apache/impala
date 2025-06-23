@@ -119,6 +119,9 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc,
     DCHECK(!tdesc.__isset.itemTupleId);
     DCHECK(children_tuple_descriptor == nullptr);
   }
+  if (tdesc.__isset.structFieldIdx) {
+    struct_field_idx_ = tdesc.structFieldIdx;
+  }
 }
 
 bool SlotDescriptor::ColPathLessThan(const SlotDescriptor* a, const SlotDescriptor* b) {
