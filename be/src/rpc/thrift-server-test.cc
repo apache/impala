@@ -140,6 +140,11 @@ INSTANTIATE_TEST_SUITE_P(KerberosOnAndOff,
                          ::testing::Values(KERBEROS_OFF,
                                            KERBEROS_ON));
 
+// TLS ciphers to be used by tests.
+// See IMPALA-14161.
+const char* ciphers =
+    kudu::security::SecurityDefaults::SecurityDefaults::kDefaultTlsCiphers;
+
 TEST(ThriftTestBase, Connectivity) {
   int port = GetServerPort();
   ThriftClient<StatestoreServiceClientWrapper> wrong_port_client(
@@ -147,7 +152,9 @@ TEST(ThriftTestBase, Connectivity) {
   ASSERT_FALSE(wrong_port_client.Open().ok());
 
   ThriftServer* server;
-  EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port).Build(&server));
+  EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
+      .cipher_list(ciphers)
+      .Build(&server));
   ASSERT_OK(server->Start());
 
   // Test that client recovers from failure to connect.
@@ -159,7 +166,9 @@ void TestMaxMessageSize(std::string subscriber_id, bool expect_throw,
   int port = GetServerPort();
   ThriftServer* server;
   ThriftServerBuilder server_builder("DummyStatestore", MakeProcessor(), port);
-  server_builder.is_external_facing(is_external_facing);
+  server_builder
+      .is_external_facing(is_external_facing)
+      .cipher_list(ciphers);
   EXPECT_OK(server_builder.Build(&server));
   ASSERT_OK(server->Start());
 
@@ -202,6 +211,7 @@ TEST_P(ThriftKerberizedParamsTest, SslConnectivity) {
   ThriftServer* server;
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(SERVER_CERT, PRIVATE_KEY)
+                .cipher_list(ciphers)
                 .Build(&server));
   ASSERT_OK(server->Start());
 
@@ -252,6 +262,7 @@ TEST(SslTest, BadCertificate) {
   ThriftServer* server;
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(SERVER_CERT, PRIVATE_KEY)
+                .cipher_list(ciphers)
                 .Build(&server));
   ASSERT_OK(server->Start());
 
@@ -267,6 +278,7 @@ TEST(PasswordProtectedPemFile, CorrectOperation) {
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
                 .pem_password_cmd("echo password")
+                .cipher_list(ciphers)
                 .Build(&server));
   ASSERT_OK(server->Start());
 
@@ -286,6 +298,7 @@ TEST(PasswordProtectedPemFile, BadPassword) {
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), GetServerPort())
                 .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
                 .pem_password_cmd("echo wrongpassword")
+                .cipher_list(ciphers)
                 .Build(&server));
   EXPECT_FALSE(server->Start().ok());
 }
@@ -299,6 +312,7 @@ TEST(PasswordProtectedPemFile, BadCommand) {
   Status s = ThriftServerBuilder("DummyStatestore", MakeProcessor(), GetServerPort()) // NOLINT
       .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
       .pem_password_cmd("cmd-no-exist")
+      .cipher_list(ciphers)
       .Build(&server);
   EXPECT_ERROR(s, TErrorCode::SSL_PASSWORD_CMD_FAILED);
 }
@@ -313,6 +327,7 @@ TEST(SslTest, ClientBeforeServer) {
   ThriftServer* server;
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(SERVER_CERT, PRIVATE_KEY)
+                .cipher_list(ciphers)
                 .Build(&server));
   ASSERT_OK(server->Start());
 
@@ -337,6 +352,7 @@ TEST(SslTest, BadCiphers) {
     ThriftServer* server;
     EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                   .ssl(SERVER_CERT, PRIVATE_KEY)
+                  .cipher_list(ciphers)
                   .Build(&server));
     EXPECT_OK(server->Start());
     auto s1 =
@@ -423,6 +439,7 @@ TEST(SslTest, TLSVersionControl) {
     EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                   .ssl(SERVER_CERT, PRIVATE_KEY)
                   .ssl_version(config.server_version)
+                  .cipher_list(ciphers)
                   .Build(&server));
     if (!SSLProtoVersions::IsSupported(config.server_version)) {
       EXPECT_FALSE(server->Start().ok());
@@ -525,6 +542,7 @@ TEST(SslTest, BadTlsCipherSuites) {
     ThriftServer* server;
     EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                   .ssl(SERVER_CERT, PRIVATE_KEY)
+                  .cipher_list(ciphers)
                   .disable_tls12(true)
                   .tls_ciphersuites("this_is_not_a_ciphersuite")
                   .Build(&server));
@@ -534,6 +552,7 @@ TEST(SslTest, BadTlsCipherSuites) {
     ThriftServer* server;
     EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                   .ssl(SERVER_CERT, PRIVATE_KEY)
+                  .cipher_list(ciphers)
                   .Build(&server));
     EXPECT_OK(server->Start());
     auto s1 = ScopedFlagSetter<string>::Make(&FLAGS_tls_ciphersuites,
@@ -555,6 +574,7 @@ TEST(SslTest, MismatchedTlsCiphersuites) {
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
                 .pem_password_cmd("echo password")
+                .cipher_list(ciphers)
                 .disable_tls12(true)
                 .tls_ciphersuites(TLS1_3_CIPHERSUITE)
                 .Build(&server));
@@ -583,6 +603,7 @@ TEST(SslTest, MismatchTls12ServerTls13Client) {
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
                 .pem_password_cmd("echo password")
+                .cipher_list(ciphers)
                 .tls_ciphersuites("")
                 .Build(&server));
   EXPECT_OK(server->Start());
@@ -610,6 +631,7 @@ TEST(SslTest, MismatchTls13ServerTls12Client) {
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
                 .pem_password_cmd("echo password")
+                .cipher_list(ciphers)
                 .disable_tls12(true)
                 .Build(&server));
   EXPECT_OK(server->Start());
@@ -636,6 +658,7 @@ TEST(SslTest, MatchedTlsCiphersuites) {
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
                 .pem_password_cmd("echo password")
+                .cipher_list(ciphers)
                 .disable_tls12(true)
                 .tls_ciphersuites(TLS1_3_CIPHERSUITE)
                 .Build(&server));
@@ -665,6 +688,7 @@ TEST(SslTest, OverlappingMatchedTlsCiphersuites) {
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
       .ssl(SERVER_CERT, PASSWORD_PROTECTED_PRIVATE_KEY)
       .pem_password_cmd("echo password")
+      .cipher_list(ciphers)
       .disable_tls12(true)
       .tls_ciphersuites(TLS_CIPHERSUITE_LIST)
       .Build(&server));
@@ -702,6 +726,7 @@ TEST(ConcurrencyTest, MaxConcurrentConnections) {
   std::atomic<bool> did_reach_max{false};
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
       .max_concurrent_connections(max_connections)
+      .cipher_list(ciphers)
       .Build(&server));
   EXPECT_OK(server->Start());
 
@@ -739,6 +764,7 @@ TEST(NoPasswordPemFile, BadServerCertificate) {
   ThriftServer* server;
   EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                 .ssl(BAD_SERVER_CERT, BAD_PRIVATE_KEY)
+                .cipher_list(ciphers)
                 .Build(&server));
   ASSERT_OK(server->Start());
 
