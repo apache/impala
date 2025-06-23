@@ -18,11 +18,11 @@
 import {describe, test, expect} from "@jest/globals";
 import {exportedForTest} from "scripts/query_timeline/host_utilization_diagram.js";
 
-describe("Test initializeUtilizationMetrics", () => {
+describe("webui.js_tests.host_utilization_diagram.initializeUtilizationMetrics", () => {
   // Test whether aggregate arrays and time sample arrays are correctly allocated
   // based on counters and max_samples
   const {initializeUtilizationMetrics} = exportedForTest;
-  test("Basic Test", () => {
+  test("basic_case", () => {
     const parent_profile =
     {
       "profile_name" : "Per Node Profiles",

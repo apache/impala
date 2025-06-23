@@ -20,10 +20,10 @@ import {exportedForTest, generateTimesamples, clearTimeseriesValues,
     mapTimeseriesCounters, aggregateProfileTimeseries} from
     "scripts/query_timeline/chart_commons.js";
 
-describe("Test mapTimeseriesCounters", () => {
+describe("webui.js_tests.chart_commons.mapTimeseriesCounters", () => {
   // Test whether the method correctly searches and maps indexes of counters based
   // on counter_name
-  test("Basic Test (Serial Order)", () => {
+  test("basic_test.serial_order", () => {
     const parent_profile =
     {
       "profile_name" : "Per Node Profiles",
@@ -65,7 +65,7 @@ describe("Test mapTimeseriesCounters", () => {
     }
   });
 
-  test("Basic Test (Reverse Order)", () => {
+  test("basic_test.reverse_order", () => {
     const parent_profile =
     {
       "profile_name" : "Per Node Profiles",
@@ -107,7 +107,7 @@ describe("Test mapTimeseriesCounters", () => {
     }
   });
 
-  test("Edge Case (No such 'counter_name' within profile)", () => {
+  test("edge_case.counter_name_undefined", () => {
     const parent_profile =
     {
       "profile_name" : "Per Node Profiles",
@@ -151,12 +151,12 @@ describe("Test mapTimeseriesCounters", () => {
   });
 });
 
-describe("Test accumulateTimeseriesValues", () => {
+describe("webui.js_tests.chart_commons.accumulateTimeseriesValues", () => {
   // Test whether the method correctly accumlates values after parsing values from 'data'
   // in 'time_series_counters' and correctly updates 'max_samples' even in corner cases
   const {accumulateTimeseriesValues} = exportedForTest;
   const DATA_TYPE = "value type";
-  test("Basic Case (time_series_counter.num > max_samples.collected)", () => {
+  test("basic_case.samples_greater_than_collected", () => {
     const max_samples = {
       allocated : 7,
       period : 0,
@@ -183,7 +183,7 @@ describe("Test accumulateTimeseriesValues", () => {
     });
   });
 
-  test("Basic Case (time_series_counter.period > max_samples.period", () => {
+  test("basic_case.sample_period_greater_than_current_period", () => {
     const max_samples = {
       allocated : 7,
       period : 100,
@@ -210,8 +210,7 @@ describe("Test accumulateTimeseriesValues", () => {
     });
   });
 
-  test(`Basic Case (time_series_counter.period <= max_samples.period
-      && time_series_counter.num <= max_samples.collected)`, () => {
+  test("basic_case.period_and_samples_num_within_limits", () => {
     const max_samples = {
       allocated : 7,
       period : 100,
@@ -238,7 +237,7 @@ describe("Test accumulateTimeseriesValues", () => {
     });
   });
 
-  test(`Edge Case (values_array length is smaller than collected samples)`, () => {
+  test("edge_case.allocated_values_array_smaller_than_collected_samples", () => {
     const max_samples = {
       allocated : 2,
       period : 100,
@@ -266,11 +265,11 @@ describe("Test accumulateTimeseriesValues", () => {
   });
 });
 
-describe("Test generateTimesamples", () => {
+describe("webui.js_tests.chart_commons.generateTimesamples", () => {
   // Test whether time sample values generated based on 'max_samples' are correct,
   // even in corner cases, with different 'max_samples' scenarios
   const DATA_TYPE = "timesample type";
-  test("Basic Case (max_samples.allocated > max_samples.available)", () => {
+  test("basic_case.available_samples_within_allocated_size", () => {
     const max_samples = {
       allocated : 10,
       period : 1000,
@@ -286,7 +285,7 @@ describe("Test generateTimesamples", () => {
         null, null, null, null]);
   });
 
-  test("Edge Case (max_samples.allocated < max_samples.available)", () => {
+  test("edge_case.available_samples_exceed_allocated_size", () => {
     const max_samples = {
       allocated : 10,
       period : 1000,
@@ -302,7 +301,7 @@ describe("Test generateTimesamples", () => {
         4.5, 5]);
   });
 
-  test("Edge Case (max_samples.allocated = max_samples.available)", () => {
+  test("edge_case.same_num_available_samples_and_allocated", () => {
     const max_samples = {
       allocated : 10,
       period : 1000,
@@ -318,10 +317,10 @@ describe("Test generateTimesamples", () => {
   });
 });
 
-describe("Test clearTimeseriesValues", () => {
+describe("webui.js_tests.chart_commons.clearTimeseriesValues", () => {
   // Test whether Timeseries arrays are being properly truncated in the correct range
   const DATA_TYPE = "value type";
-  test("Basic Case (max_samples.available < max_samples.allocated)", () => {
+  test("basic_case.available_samples_within_allocated_size", () => {
     const max_samples = {
       allocated : 7,
       period : 1000,
@@ -335,7 +334,7 @@ describe("Test clearTimeseriesValues", () => {
     expect(values_array).toEqual([DATA_TYPE, 0, null, null, null, 10, 100, 10]);
   });
 
-  test("Edge Case (max_samples.available >= max_samples.allocated)", () => {
+  test("edge_case.available_samples_exceed_allocated_size", () => {
     const max_samples = {
       allocated : 7,
       period : 1000,
@@ -351,9 +350,9 @@ describe("Test clearTimeseriesValues", () => {
   });
 });
 
-describe("Test aggregateProfileTimeseries", () => {
+describe("webui.js_tests.chart_commons.aggregateProfileTimeseries", () => {
   // Test correctness of values being aggregated from parsing the profile
-  test("Basic Case", () => {
+  test("basic_case", () => {
     const parent_profile =
     {
       "profile_name" : "Per Node Profiles",

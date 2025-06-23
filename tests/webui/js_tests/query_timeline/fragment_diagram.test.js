@@ -18,13 +18,13 @@
 import {describe, test, expect} from "@jest/globals";
 import {exportedForTest} from "scripts/query_timeline/fragment_diagram.js";
 
-describe("Test getSvg*", () => {
+describe("webui.js_tests.fragment_diagram.getSvgTests", () => {
   // Test whether getSvg* methods correctly set attributes and return expected elements
   const {getSvgRect, getSvgLine, getSvgText, getSvgTitle, getSvgGroup} = exportedForTest;
   const stroke_fill_colors = {black : "#000000", dark_grey : "#505050",
       light_grey : "#F0F0F0", transperent : "rgba(0, 0, 0, 0)"};
 
-  test("Test getSvgRect", () => {
+  test("basic_case.SvgRect", () => {
     expect(getSvgRect(stroke_fill_colors.transperent, 0, 0, 100, 100, "2 2",
         stroke_fill_colors.black).outerHTML).toBe(
           `<rect x="0" y="0" width="100" height="100"`
@@ -34,14 +34,14 @@ describe("Test getSvg*", () => {
         + ` stroke-dasharray="2 2"></rect>`);
   });
 
-  test("Test getSvgLine", () => {
+  test("basic_case.SvgLine", () => {
     expect(getSvgLine(stroke_fill_colors.black, 0, 0, 100, 100, true).outerHTML).toBe(
           `<line x1="0" y1="0" x2="100" y2="100"`
         + ` stroke="${stroke_fill_colors.black}"`
         + ` stroke-dasharray="2 2"></line>`);
   });
 
-  test("Test getSvgText", () => {
+  test("basic_case.SvgText", () => {
     expect(getSvgText("Text", stroke_fill_colors.black, 0, 0, 15, true, 300)
         .outerHTML).toBe(
         `<text x="0" y="0" style="font-size: 10px;" dominant-baseline="middle" `
@@ -49,11 +49,11 @@ describe("Test getSvg*", () => {
         + `lengthAdjust="spacingAndGlyphs">Text</text>`);
   });
 
-  test("Test getSvgTitle", () => {
+  test("basic_case.SvgTitle", () => {
     expect(getSvgTitle("Title").outerHTML).toBe("<title>Title</title>");
   });
 
-  test("Test getSvgGroup", () => {
+  test("basic_case.SvgGroup", () => {
     expect(getSvgGroup().outerHTML).toBe("<g></g>");
   });
 });

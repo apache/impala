@@ -17,11 +17,11 @@
 
 import {exportedForTest} from "scripts/query_timeline/fragment_metrics_diagram.js";
 
-describe("Test initializeFragmentMetrics", () => {
+describe("webui.js_tests.fragment_metrics_diagram.initializeFragmentMetrics", () => {
   // Test whether aggregate arrays and time sample arrays are correctly allocated
   // based on counters and max_samples
   const {initializeFragmentMetrics} = exportedForTest;
-  test("Basic Test", () => {
+  test("basic_case", () => {
     const parent_profile =
     {
       "profile_name" : "Coordinator Fragment F31",

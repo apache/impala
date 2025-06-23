@@ -15,6 +15,9 @@
     "reporters": [ "default", "jest-junit" ]
   },
   "jest-junit": {
-    "outputName": "js-tests.xml"
+    "outputName": "js-tests.xml",
+    "classNameTemplate": "{classname}",
+    "titleTemplate": "{title}",
+    "ancestorSeparator": "."
   }
 }

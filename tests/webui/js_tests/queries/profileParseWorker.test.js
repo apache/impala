@@ -19,10 +19,10 @@ import {describe, test, expect} from "@jest/globals";
 import {readFileSync} from "node:fs";
 
 // JEST does not support workers, so "profileParseWorker.js" cannot be tested directly
-describe("Test Compression Library", () => {
+describe("webui.js_tests.queries.profileParseWorker", () => {
   // Test whether the compression library imported by the worker script
   // properly utilizes the pako library's compression methods
-  test("Basic Test", () => {
+  test("basic_test", () => {
     const exampleJSONProfileText = readFileSync("../../../testdata/impala-profiles/"
         + "impala_profile_log_tpcds_compute_stats_extended.expected.pretty.json",
         {encoding : "utf-8"});
