@@ -1472,7 +1472,6 @@ class TestAdmissionController(TestAdmissionControllerBase):
     self.client.wait_for_admission_control(sleep_query_handle)
     self._wait_for_change_to_profile(sleep_query_handle,
                                       "Admission result: Admitted immediately")
-    self.client.execute("set enable_trivial_query_for_admission=false")
     queued_query_handle = self.client.execute_async("select 2")
     self._wait_for_change_to_profile(queued_query_handle, "Admission result: Queued")
 
