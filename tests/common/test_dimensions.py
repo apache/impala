@@ -169,22 +169,20 @@ def default_client_protocol_dimension():
   return ImpalaTestDimension(PROTOCOL, pytest.config.option.default_test_protocol)
 
 
-def beeswax_client_protocol_dimension():
-  return ImpalaTestDimension(PROTOCOL, BEESWAX)
-
-
 def hs2_client_protocol_dimension():
   return ImpalaTestDimension(PROTOCOL, HS2)
 
 
 def create_client_protocol_dimension():
+  protocols_to_test = [HS2]
+  if pytest.config.option.default_test_protocol == BEESWAX:
+    protocols_to_test.append(BEESWAX)
   # IMPALA-8864: Older python versions do not support SSLContext object that the thrift
-  # http client implementation depends on. Falls back to a dimension without http
-  # transport.
+  # http client implementation depends on. Otherwise, include HS2_HTTP.
   import ssl
-  if not hasattr(ssl, "create_default_context"):
-    return ImpalaTestDimension(PROTOCOL, BEESWAX, HS2)
-  return ImpalaTestDimension(PROTOCOL, BEESWAX, HS2, HS2_HTTP)
+  if hasattr(ssl, "create_default_context"):
+    protocols_to_test.append(HS2_HTTP)
+  return ImpalaTestDimension(PROTOCOL, *protocols_to_test)
 
 
 def create_client_protocol_http_transport():
