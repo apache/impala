@@ -191,8 +191,17 @@ if HIVE_MAJOR_VERSION >= 3:
    # Disable auto compaction of Hive Metastore after HIVE-28662 to prevent Hive from
    # automatically compacting files associated with ACID tables, which could make some
    # test cases non-deterministic, e.g., those in acid.test.
-   'hive.compactor.initiator.on': 'false'
+   'hive.compactor.initiator.on': 'false',
+   'hive.compactor.cleaner.on': 'false'
   })
+  # 'hive.metastore.housekeeping.threads.on' was also set to true by default in
+  # HIVE-28662. But since IMPALA-12827 requires that this configuration be true when
+  # 'VARIANT' is 'housekeeping_on', we set this configuration to true only if
+  # 'VARIANT' is not 'housekeeping_on'.
+  if VARIANT != 'housekeeping_on':
+    CONFIG.update({
+     'hive.metastore.housekeeping.threads.on': 'false'
+    })
 else:
   CONFIG.update({
    # HMS-2 based environments have a different set of expected configurations for event processor
