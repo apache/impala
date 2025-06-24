@@ -102,3 +102,10 @@ explain select count(*) from tpch.region
 row_regex:.* cache key: [0-9a-f][0-9a-f]*.*
 row_regex:.*\[.*TPlanNode\(.*\]
 ====
+---- QUERY
+# Tests HIDE_ANALYZED_QUERY=TRUE
+set HIDE_ANALYZED_QUERY=TRUE;
+explain select count(*) from tpch.region
+---- RESULTS: VERIFY_IS_NOT_IN
+'Analyzed query:'
+====

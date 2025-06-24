@@ -1033,6 +1033,10 @@ enum TImpalaQueryOptions {
   //   BASE64 - the json binary data is read as base64 encoded string.
   //   RAWSTRING - the json binary data is read as raw string.
   JSON_BINARY_FORMAT = 192
+
+  // Hide analyzed query from runtime profile. This is useful if query is too large,
+  // such as INSERT INTO with hundreds of VALUES.
+  HIDE_ANALYZED_QUERY = 193
 }
 
 // The summary of a DML statement.

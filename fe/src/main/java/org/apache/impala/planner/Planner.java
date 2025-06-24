@@ -456,8 +456,9 @@ public class Planner {
       hasHeader = true;
     }
 
-    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal() &&
-        queryStmt != null) {
+    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()
+        && !request.query_ctx.client_request.query_options.hide_analyzed_query
+        && queryStmt != null) {
       // In extended explain include the analyzed query text showing implicit casts
       String queryText = queryStmt.toSql(SHOW_IMPLICIT_CASTS);
       String wrappedText = PrintUtils.wrapString("Analyzed query: " + queryText, 80);

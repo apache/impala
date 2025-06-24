@@ -782,6 +782,9 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   193: optional CatalogObjects.TJsonBinaryFormat json_binary_format =
       TJsonBinaryFormat.NONE;
+
+  // See comment in ImpalaService.thrift
+  194: optional bool hide_analyzed_query = false
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

@@ -1394,6 +1394,10 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_mem_estimate_scale_for_spilling_operator(double_val);
         break;
       }
+      case TImpalaQueryOptions::HIDE_ANALYZED_QUERY: {
+        query_options->__set_hide_analyzed_query(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

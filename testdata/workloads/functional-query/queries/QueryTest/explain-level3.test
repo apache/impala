@@ -143,3 +143,10 @@ order by a
 ''yyyy-MM-dd')) a FROM tpcds_parquet.date_dim GROUP BY'
 'month(to_timestamp(CAST(d_date_sk AS STRING), 'yyyy-MM-dd')) ORDER BY a ASC'
 ====
+---- QUERY
+# Tests HIDE_ANALYZED_QUERY=TRUE
+set HIDE_ANALYZED_QUERY=TRUE;
+explain select count(*) from tpch.region
+---- RESULTS: VERIFY_IS_NOT_IN
+'Analyzed query:'
+====

@@ -465,7 +465,7 @@ static const string _queryStateToSql(
   StringStreamPop sql;
   FieldParserContext ctx(rec, FLAGS_cluster_id, sql);
 
-  sql << "(";
+  sql << "\n(";
 
   for (const auto& field : FIELD_DEFINITIONS) {
     if (field.second.Include(target_schema_version)) {
@@ -681,6 +681,8 @@ void ImpalaServer::WorkloadManagementWorker(const Version& target_schema_version
   if (!FLAGS_debug_actions.empty()) {
     insert_query_opts[TImpalaQueryOptions::DEBUG_ACTION] = FLAGS_debug_actions;
   }
+  // Hide analyzed query since it can be prohibitively long.
+  insert_query_opts[TImpalaQueryOptions::HIDE_ANALYZED_QUERY] = "true";
 
   while (true) {
     // Exit this thread if a shutdown was initiated.
