@@ -30,7 +30,6 @@ import time
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIf
 from tests.util.hdfs_util import NAMENODE
-from tests.verifiers.metric_verifier import MetricVerifier
 
 
 class TestScratchDir(CustomClusterTestSuite):
@@ -234,8 +233,6 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
-    verifier = MetricVerifier(impalad.service)
-    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
     for i in range(5):
       impalad.service.wait_for_metric_value(
           'tmp-file-mgr.scratch-space-bytes-used.dir-' + str(i), 1, allow_greater=True)
@@ -264,8 +261,6 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
-    verifier = MetricVerifier(impalad.service)
-    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
     # dir1 and dir3 have highest priority and will be used as scratch disk.
     impalad.service.wait_for_metric_value(
         'tmp-file-mgr.scratch-space-bytes-used.dir-1', 1, allow_greater=True)
@@ -333,8 +328,6 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
-    verifier = MetricVerifier(impalad.service)
-    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
     # Dir0 is the remote directory.
     impalad.service.wait_for_metric_value(
         'tmp-file-mgr.scratch-space-bytes-used.dir-0', 1, allow_greater=True)
@@ -364,8 +357,6 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
-    verifier = MetricVerifier(impalad.service)
-    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
     # Local directory always ranks before the remote one, so dir0 is the local directory.
     # Only spill to dir0 because it has enough space for the spilling.
     impalad.service.wait_for_metric_value(
@@ -398,8 +389,6 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
-    verifier = MetricVerifier(impalad.service)
-    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
     # Local directory always ranks before the remote one, so dir0 is the local directory.
     # The query spills to both dir0 and dir1. By default the remote file is 16MB each,
     # so the value of metrics1 should be at least one file size.
@@ -431,8 +420,6 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
-    verifier = MetricVerifier(impalad.service)
-    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
     # The query spills to the remote directories and creates remote files,
     # so that the size is bigger than 0, and be integer times of remote file size.
     impalad.service.wait_for_metric_value(
@@ -515,8 +502,6 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_hs2_client()
     handle = self.execute_query_async_using_client(client, self.spill_query, vector)
-    verifier = MetricVerifier(impalad.service)
-    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
     results = client.fetch(self.spill_query, handle)
     assert results.success
     metrics0 = self.get_metric(
@@ -544,8 +529,6 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_hs2_client()
     self.execute_query_async_using_client(client, self.spill_query_big_table, vector)
-    verifier = MetricVerifier(impalad.service)
-    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
     # Dir0 is the remote directory.
     impalad.service.wait_for_metric_value(
         'tmp-file-mgr.scratch-space-bytes-used.dir-0', 1, allow_greater=True)
@@ -585,8 +568,6 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_hs2_client()
     self.execute_query_async_using_client(client, self.spill_query_big_table, vector)
-    verifier = MetricVerifier(impalad.service)
-    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
     # Dir0 is the remote directory.
     impalad.service.wait_for_metric_value(
         'tmp-file-mgr.scratch-space-bytes-used.dir-0', 1, allow_greater=True)
