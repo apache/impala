@@ -949,6 +949,13 @@ class ImpylaHS2ResultSet(object):
       # Beeswax return 'false' or 'true' for boolean column.
       # HS2 return 'False' or 'True'.
       return str(val).lower()
+    elif col_type == 'BINARY':
+      # With Python 3, binary columns are represented as bytes. The default string
+      # representation of bytes has an extra b'...' surrounding the actual value.
+      # To avoid that, this decodes the bytes to a regular string. Since binary values
+      # could be invalid Unicode, this uses 'backslashreplace' to avoid throwing an
+      # error.
+      return val.decode(errors='backslashreplace')
     else:
       return str(val)
 
