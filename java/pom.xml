@@ -88,6 +88,7 @@ under the License.
     <dropwizard-metrics.version>${env.IMPALA_DROPWIZARD_METRICS_VERSION}</dropwizard-metrics.version>
     <aircompressor.version>${env.IMPALA_AIRCOMPRESSOR_VERSION}</aircompressor.version>
     <datasketches.version>${env.IMPALA_DATASKETCHES_VERSION}</datasketches.version>
+    <impala.java.target.version>${env.IMPALA_JAVA_TARGET}</impala.java.target.version>
   </properties>
 
   <repositories>

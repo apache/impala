@@ -667,7 +667,7 @@ under the License.
         <version>3.11.0</version>
         <configuration>
           <source>1.8</source>
-          <target>1.8</target>
+          <target>${impala.java.target.version}</target>
         </configuration>
       </plugin>
 
