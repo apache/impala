@@ -38,7 +38,6 @@ fi
 TPC_DS_DIRNAME=tpc-ds-${IMPALA_TPC_DS_VERSION}
 TPC_DS_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/${TPC_DS_DIRNAME}
 
-echo "Generating TPC-DS data into ${TPC_DS_DATA}"
 # Delete any preexisting data or symlinks
 rm -rf ${TPC_DS_DATA}
 mkdir -p ${TPC_DS_DATA}
@@ -61,20 +60,97 @@ if [ ! -x ${TPC_DS_DSDGEN} ]; then
   exit 1
 fi
 
-if [ -t 1 ]
-then
-  # Output is terminal, show progress verbosely
-  VERBOSITY='-verbose'
+function load-table {
+  local chunk_number=$1
+  local parallelism=$2
+  if (( ${chunk_number} > ${parallelism} )); then
+    echo "Invalid chunk number: ${chunk_number} parallelism: ${parallelism}"
+  fi
+  local tmp_log_file=$(mktemp)
+  set +e
+  if [[ ${parallelism} == 1 ]]; then
+    # TPC-DS doesn't allow specifying -parallel 1, so run without these options.
+    ${TPC_DS_DSDGEN} -force -scale ${SCALE_FACTOR} 2> ${tmp_log_file}
+  else
+    ${TPC_DS_DSDGEN} -force -scale ${SCALE_FACTOR} \
+        -parallel ${parallelism} -child ${chunk_number} 2> ${tmp_log_file}
+  fi
+  RET_VAL=$?
+  set -e
+  if [[ $RET_VAL != 0 ]]; then
+    echo "Failed to generate chunk ${chunk_number}/${parallelism}"
+    cat ${tmp_log_file}
+    return 1
+  fi
+  rm -f ${tmp_log_file}
+  echo "Generated chunk ${chunk_number}/${parallelism}"
+}
+
+# Use the regular generation process for scale factor 1 to avoid changes
+# in the numbers of files for tests. If this is a higher scale factor,
+# generate the tables in parallel to save time. The TPC-DS dsdgen utility
+# has an ability to generate dataset in chunks in separate threads with
+# separate filenames. Use one chunk per CPU.
+
+if [[ $SCALE_FACTOR == 1 ]]; then
+  parallelism=1
 else
-  VERBOSITY=''
+  parallelism=$(nproc)
 fi
 
-${TPC_DS_DSDGEN} -force ${VERBOSITY} -scale ${SCALE_FACTOR}
-# Impala expects each table to be in its own subdirectory.
-for FILE in *.dat; do
-  FILE_DIR=${FILE%.dat}
-  mkdir -p ${FILE_DIR}
-  mv ${FILE} ${FILE_DIR}
+echo "Generating TPC-DS table data with parallelism ${parallelism} into ${TPC_DS_DATA}"
+pids=()
+i=0
+for chunk in $(seq ${parallelism}); do
+  load-table ${chunk} ${parallelism} &
+  pids[${i}]=$!
+  let i=i+1
+done
+
+# wait for all pids
+for pid in ${pids[*]}; do
+  wait $pid
+done
+
+echo "Done generating data"
+
+tables=("call_center" "catalog_page" "catalog_returns" "catalog_sales" "customer"
+        "customer_address" "customer_demographics" "date_dim" "dbgen_version"
+        "household_demographics" "income_band" "inventory" "item" "promotion"
+        "reason" "ship_mode" "store" "store_returns" "store_sales" "time_dim"
+        "warehouse" "web_page" "web_returns" "web_sales" "web_site")
+
+# Verify that all the expected files exist. Impala expects each table to be in its
+# own subdirectory, so this moves them.
+for table in ${tables[*]}; do
+  mkdir -p ${table}
+  if [[ ${parallelism} == 1 ]]; then
+    # If this didn't go parallel, the data file is in the first chunk and doesn't
+    # include the parallelism / chunk number in the filename.
+    data_file="${table}.dat"
+    if ! [[ -f ${data_file} ]]; then
+      echo "Missing expected data file ${data_file}"
+      exit 1
+    fi
+    mv ${data_file} ${table}
+  else
+    # If this is parallel, the filenames are ${table}_${chunk_number}_${parallelism}.dat
+    # If a file is small enough, it may only produce a file for the first chunk.
+    table_parallelism=$(ls ${table}_[0-9]*_${parallelism}.dat | wc -l)
+    if [[ ${table_parallelism} != ${parallelism} && ${table_parallelism} != 1 ]]; then
+      echo "Expected either 1 or ${parallelism} data files. Found ${table_parallelism}"
+      ls ${table}_*_${parallelism}.dat
+      exit 1
+    fi
+    for i in $(seq 1 ${table_parallelism}); do
+      data_file="${table}_${i}_${parallelism}.dat"
+      if ! [[ -f ${data_file} ]]; then
+        echo "Missing expected data file ${data_file}"
+        exit 1
+      fi
+      mv ${data_file} ${table}
+    done
+  fi
 done
 
 touch SUCCESS

@@ -43,7 +43,6 @@ if [ ! -x ${TPC_H_DBGEN} ]; then
   exit 1
 fi
 
-echo "Generating TPC-H data into ${TPC_H_DATA}"
 # Delete any preexisting data or symlinks
 # Need to change permissions to work around an old TPC-H data tarball that had a
 # non-writable top-level directory when extracted.
@@ -66,13 +65,104 @@ else
   VERBOSITY=''
 fi
 
-${TPC_H_DBGEN} ${VERBOSITY} -f -s ${SCALE_FACTOR}
+function load-table {
+  local chunk_number=$1
+  local parallelism=$2
+  if (( ${chunk_number} > ${parallelism} )); then
+    echo "Invalid chunk number: ${chunk_number} parallelism: ${parallelism}"
+  fi
+  local tmp_log_file=$(mktemp)
+  set +e
+  if [[ ${parallelism} == 1 ]]; then
+    # TPC-H doesn't allow specifying -C 1 to use a single chunk, so run without those
+    # options
+    ${TPC_H_DBGEN} ${VERBOSITY} -f -s ${SCALE_FACTOR}  2> ${tmp_log_file}
+  else
+    ${TPC_H_DBGEN} ${VERBOSITY} -f -s ${SCALE_FACTOR} \
+        -C ${parallelism} -S ${chunk_number} 2> ${tmp_log_file}
+  fi
+  RET_VAL=$?
+  set -e
+  if [[ $RET_VAL != 0 ]]; then
+    echo "Failed to generate chunk ${chunk_number}/${parallelism}"
+    cat ${tmp_log_file}
+    return 1
+  fi
+  rm -f ${tmp_log_file}
+  echo "Generated chunk ${chunk_number}/${parallelism}"
+}
 
-# Impala expects each table to be in its own subdirectory.
-for FILE in *.tbl; do
-  FILE_DIR=${FILE%.tbl}
-  mkdir -p ${FILE_DIR}
-  mv ${FILE} ${FILE_DIR}
+# Use the regular generation process for scale factor 1 to avoid changes
+# in the numbers of files for tests. If this is a higher scale factor,
+# generate the tables in parallel to save time. The TPC-H dbgen utility
+# has an ability to generate dataset in chunks in separate threads.
+# Unfortunately, a couple tables (nation and region) are not generated
+# in chunks. Instead, they are duplicated across all the chunks. To avoid
+# races, produce the different chunks in different directories, then move
+# them into place. Use one chunk per CPU.
+if [[ $SCALE_FACTOR == 1 ]]; then
+  parallelism=1
+else
+  parallelism=$(nproc)
+fi
+
+echo "Generating TPC-H data with parallelism ${parallelism} into ${TPC_H_DATA}"
+pids=()
+i=0
+for chunk in $(seq ${parallelism}); do
+  mkdir chunk_${chunk}
+  pushd chunk_${chunk} > /dev/null
+  load-table ${chunk} ${parallelism} &
+  popd > /dev/null
+  pids[${i}]=$!
+  let i=i+1
 done
+
+# wait for all pids
+for pid in ${pids[*]}; do
+  wait $pid
+done
+
+echo "Done generating data"
+
+tables=(
+  "customer"
+  "lineitem"
+  "nation"
+  "orders"
+  "part"
+  "partsupp"
+  "region"
+  "supplier"
+)
+
+# Verify that all the expected files exit. Impala expects each table to be in its own
+# subdirectory, so this moves them.
+for table in ${tables[*]}; do
+  mkdir -p ${table}
+  # If this didn't go parallel or are a non-parallel table (region or nation), the data
+  # file is in the first chunk and the file does not have a suffix.
+  if [[ ${parallelism} == 1 || ${table} == "region" || ${table} == "nation" ]]; then
+    data_file="chunk_1/${table}.tbl"
+    if ! [[ -f ${data_file} ]]; then
+      echo "Missing expected data file ${data_file}"
+      exit 1
+    fi
+    mv ${data_file} ${table}
+  else
+    # Other tables went parallel and have a file in each chunk
+    for i in $(seq 1 ${parallelism}); do
+      data_file="chunk_${i}/${table}.tbl.${i}"
+      if ! [[ -f ${data_file} ]]; then
+        echo "Missing expected data file ${data_file}"
+        exit 1
+      fi
+      mv ${data_file} ${table}
+    done
+  fi
+done
+
+# Cleanup directories
+rm -rf chunk_*
 
 touch SUCCESS
