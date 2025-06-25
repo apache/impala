@@ -7,3 +7,83 @@ select * from primitive_type_widening;
 ---- TYPES
 SMALLINT,INT,BIGINT,DOUBLE,INT,BIGINT,DOUBLE,INT,DOUBLE,DOUBLE
 ====
+---- QUERY
+# IMPALA-13625: Allow reading Parquet int32/int64 as decimal without logical types
+create table read_int_as_decimal (c1 int, c2 bigint) stored as parquet;
+insert into read_int_as_decimal
+values
+    (1, cast(10000000000 as bigint)),
+    (MIN_INT(), MIN_BIGINT()),
+    (MAX_INT(), MAX_BIGINT());
+select * from read_int_as_decimal order by c1;
+---- RESULTS
+-2147483648,-9223372036854775808
+1,10000000000
+2147483647,9223372036854775807
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+alter table read_int_as_decimal change c1 c1 decimal(10,0);
+select c1 from read_int_as_decimal order by c1;
+---- RESULTS
+-2147483648
+1
+2147483647
+---- TYPES
+DECIMAL
+====
+---- QUERY
+alter table read_int_as_decimal change c1 c1 decimal(8,0);
+select c1 from read_int_as_decimal order by c1;
+---- CATCH
+column 'c1' has a precision that does not match the table metadata precision. File metadata precision: 10, table metadata precision: 8.
+====
+---- QUERY
+alter table read_int_as_decimal change c1 c1 decimal(20,4);
+select c1 from read_int_as_decimal order by c1;
+---- RESULTS
+-2147483648.0000
+1.0000
+2147483647.0000
+---- TYPES
+DECIMAL
+====
+---- QUERY
+alter table read_int_as_decimal change c1 c1 decimal(12,4);
+select c1 from read_int_as_decimal order by c1;
+---- RESULTS
+1.0000
+NULL
+NULL
+====
+---- QUERY
+alter table read_int_as_decimal change c2 c2 decimal(19,0);
+select c2 from read_int_as_decimal order by c2;
+---- RESULTS
+-9223372036854775808
+10000000000
+9223372036854775807
+====
+---- QUERY
+alter table read_int_as_decimal change c2 c2 decimal(2,0);
+select c2 from read_int_as_decimal order by c2;
+---- CATCH
+column 'c2' has a precision that does not match the table metadata precision. File metadata precision: 19, table metadata precision: 2.
+====
+---- QUERY
+alter table read_int_as_decimal change c2 c2 decimal(25,5);
+select c2 from read_int_as_decimal order by c2;
+---- RESULTS
+-9223372036854775808.00000
+10000000000.00000
+9223372036854775807.00000
+====
+---- QUERY
+alter table read_int_as_decimal change c2 c2 decimal(20,5);
+select c2 from read_int_as_decimal order by c2;
+---- RESULTS
+10000000000.00000
+NULL
+NULL
+====

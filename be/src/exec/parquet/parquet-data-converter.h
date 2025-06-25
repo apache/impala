@@ -70,6 +70,21 @@ class ParquetDataConverter {
   }
 
   int32_t GetPrecision() const {
+    // If logical type is INTEGER, the precision is determined by the physical type.
+    if (parquet_element_->__isset.logicalType
+        && UNLIKELY(parquet_element_->logicalType.__isset.INTEGER)) {
+      switch (parquet_element_->type) {
+        case parquet::Type::INT32:
+          return ColumnType::MAX_DECIMAL4_PRECISION + 1;
+        case parquet::Type::INT64:
+          return ColumnType::MAX_DECIMAL8_PRECISION + 1;
+        default:
+          DCHECK(false) << "Unexpected physical type for INTEGER logical type: "
+                        << to_string(parquet_element_->type);
+          break;
+      }
+    }
+
     if (parquet_element_->__isset.logicalType
         && parquet_element_->logicalType.__isset.DECIMAL) {
       return parquet_element_->logicalType.DECIMAL.precision;
@@ -77,6 +92,7 @@ class ParquetDataConverter {
 
     return parquet_element_->precision;
   }
+
   /// Returns true if we need to do a conversion from the Parquet type to the slot type.
   bool CheckIfNeedsConversion() {
     if (!MATERIALIZED) return false;
@@ -87,6 +103,11 @@ class ParquetDataConverter {
       return true;
     }
     if (col_type_->type == TYPE_DECIMAL) {
+      // If the logical type is INTEGER for a Decimal slot, conversion is needed.
+      if (parquet_element_->__isset.logicalType
+          && UNLIKELY(parquet_element_->logicalType.__isset.INTEGER)) {
+        return true;
+      }
       if (col_type_->precision != GetPrecision()) {
         // Decimal values can be stored by Decimal4Value (4 bytes), Decimal8Value, and
         // Decimal16Value. We only need to do a conversion for different precision if

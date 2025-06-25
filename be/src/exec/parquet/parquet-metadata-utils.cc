@@ -89,6 +89,11 @@ bool IsSupportedType(PrimitiveType impala_type,
   return encodings->second.find(parquet_type) != encodings->second.end();
 }
 
+/// Returns true if Parquet's logical type is INTEGER.
+bool IsIntLogicalType(const parquet::SchemaElement& element) {
+  return element.__isset.logicalType && element.logicalType.__isset.INTEGER;
+}
+
 /// Returns true if encoding 'e' is supported by Impala, false otherwise.
 static bool IsEncodingSupported(parquet::Encoding::type e) {
   switch (e) {
@@ -208,7 +213,21 @@ int32_t GetScale(const parquet::SchemaElement& schema_element) {
 }
 
 // Precision is required, this should be called after checking IsPrecisionSet()
+// unless logical type is INTEGER, in which case the precision is based on physical type.
 int32_t GetPrecision(const parquet::SchemaElement& schema_element) {
+  if (UNLIKELY(IsIntLogicalType(schema_element))) {
+    switch (schema_element.type) {
+      case parquet::Type::INT32:
+        return ColumnType::MAX_DECIMAL4_PRECISION + 1;
+      case parquet::Type::INT64:
+        return ColumnType::MAX_DECIMAL8_PRECISION + 1;
+      default:
+        DCHECK(false) << "Unexpected physical type for INTEGER logical type: "
+                      << to_string(schema_element.type);
+        break;
+    }
+  }
+
   DCHECK(IsPrecisionSet(schema_element));
   if (schema_element.__isset.logicalType && schema_element.logicalType.__isset.DECIMAL) {
     return schema_element.logicalType.DECIMAL.precision;
@@ -370,7 +389,7 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
 
     // We require that the precision be a positive value, and not larger than the
     // precision in table schema.
-    if (!IsPrecisionSet(schema_element)) {
+    if (!IsPrecisionSet(schema_element) && !IsIntLogicalType(schema_element)) {
       ErrorMsg msg(TErrorCode::PARQUET_MISSING_PRECISION, filename, schema_element.name);
       return Status(msg);
     } else {
@@ -388,7 +407,7 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
       }
     }
 
-    if (!is_converted_type_decimal) {
+    if (!is_converted_type_decimal && !IsIntLogicalType(schema_element)) {
       // TODO: is this validation useful? It is not required at all to read the data and
       // might only serve to reject otherwise perfectly readable files.
       ErrorMsg msg(TErrorCode::PARQUET_BAD_CONVERTED_TYPE, filename,
