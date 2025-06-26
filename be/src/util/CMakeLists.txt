@@ -200,6 +200,7 @@ add_library(UtilTests STATIC
   error-util-test.cc
   filesystem-util-test.cc
   fixed-size-hash-table-test.cc
+  gflag-validator-util-test.cc
   hdfs-util-test.cc
   hdr-histogram-test.cc
   iceberg-utility-functions-test.cc
@@ -260,6 +261,7 @@ ADD_UNIFIED_BE_LSAN_TEST(dict-test "DictTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(error-util-test "ErrorMsg.*")
 ADD_UNIFIED_BE_LSAN_TEST(filesystem-util-test "FilesystemUtil.*")
 ADD_UNIFIED_BE_LSAN_TEST(fixed-size-hash-table-test "FixedSizeHash.*")
+ADD_UNIFIED_BE_LSAN_TEST(gflag-validator-util-test "GFlagValidatorUtil.*")
 ADD_UNIFIED_BE_LSAN_TEST(hdfs-util-test HdfsUtilTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(hdr-histogram-test HdrHistogramTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(iceberg-utility-functions-test "IcebergPartitions.*")

@@ -21,16 +21,11 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "util/gflag-validator-util.h"
+
 using namespace std;
 
 static regex alphanum_underscore_dash("^[A-Za-z0-9\\-_]+$");
-
-// Validator function asserting the value of a flag is greater than or equal to 0.
-static const auto gt_eq_0 = [](const char* name, int32_t val) {
-  if (val >= 0) return true;
-  LOG(ERROR) << "Invalid value for --" << name << ": must be greater than or equal to 0";
-  return false;
-};
 
 DEFINE_bool(enable_workload_mgmt, false,
     "Specifies if Impala will automatically write completed queries in the query log "
@@ -86,11 +81,11 @@ DEFINE_int32_hidden(query_log_write_timeout_s, 0, "Specifies the query timeout i
     "seconds for inserts to the query log table. A value less than 1 indicates to use "
     "the same value as the query_log_write_interval_s flag. The value of this flag will "
     "be set in QUERY_TIMEOUT_S query option of the query log table insert DMLs.");
-DEFINE_validator(query_log_write_timeout_s, gt_eq_0);
+DEFINE_validator(query_log_write_timeout_s, ge_zero);
 
 DEFINE_int32(query_log_dml_exec_timeout_s, 120, "Value of the EXEC_TIME_LIMIT_S "
     "query option on the query log table insert dmls.");
-DEFINE_validator(query_log_dml_exec_timeout_s, gt_eq_0);
+DEFINE_validator(query_log_dml_exec_timeout_s, ge_zero);
 
 DEFINE_int32(query_log_max_queued, 3000, "Maximum number of records that can be queued "
     "before they are written to the impala query log table. This flag operates "
@@ -99,7 +94,7 @@ DEFINE_int32(query_log_max_queued, 3000, "Maximum number of records that can be 
     "matter how much time has passed since the last write. The countdown to the next "
     "write (based on the time period defined in the 'query_log_write_interval_s' flag) "
     "is not restarted.");
-DEFINE_validator(query_log_max_queued, gt_eq_0);
+DEFINE_validator(query_log_max_queued, ge_zero);
 
 DEFINE_string_hidden(workload_mgmt_maintenance_user, "impala", "Specifies the user that "
     "will be used to create and update the workload management database tables.");
@@ -134,21 +129,21 @@ DEFINE_int32(query_log_max_sql_length, 16777216, "Maximum length of a sql statem
     "longer than this value is executed, the sql inserted into the completed queries "
     "table will be trimmed to this length. Any characters that need escaping will have "
     "their backslash character counted towards this limit.");
-DEFINE_validator(query_log_max_sql_length, gt_eq_0);
+DEFINE_validator(query_log_max_sql_length, ge_zero);
 
 DEFINE_int32(query_log_max_plan_length, 16777216, "Maximum length of the sql plan that "
     "will be recorded in the completed queries table. If a plan has a length longer than "
     "this value, the plan inserted into the completed queries table will be trimmed to "
     "this length. Any characters that need escaping will have their backslash character "
     "counted towards this limit.");
-DEFINE_validator(query_log_max_plan_length, gt_eq_0);
+DEFINE_validator(query_log_max_plan_length, ge_zero);
 
 DEFINE_int32_hidden(query_log_shutdown_timeout_s, 30, "Number of seconds to wait for "
     "the queue of completed queries to be drained to the query log table before timing "
     "out and continuing the shutdown process. The completed queries drain process runs "
     "after the shutdown process completes, thus the max shutdown time is extended by the "
     "value specified in this flag.");
-DEFINE_validator(query_log_shutdown_timeout_s, gt_eq_0);
+DEFINE_validator(query_log_shutdown_timeout_s, ge_zero);
 
 DEFINE_string(cluster_id, "", "Specifies an identifier string that uniquely represents "
     "this cluster. This identifier is included in the query log table if enabled.");
@@ -164,11 +159,7 @@ DEFINE_validator(cluster_id, [](const char* name, const string& val) {
 DEFINE_int32_hidden(query_log_max_insert_attempts, 3, "Maximum number of times to "
     "attempt to insert a record into the completed queries table before abandining it.");
 
-DEFINE_validator(query_log_max_insert_attempts, [](const char* name, int32_t val) {
-  if (val > 0) return true;
-  LOG(ERROR) << "Invalid value for --" << name << ": must be greater than 1";
-  return false;
-});
+DEFINE_validator(query_log_max_insert_attempts, ge_one);
 
 DEFINE_string(query_log_request_pool, "", "Specifies a pool or queue used by the queries "
     "that insert into the query log table. Empty value causes no pool to be set.");
