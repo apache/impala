@@ -59,7 +59,7 @@ shell/ext-py/kerberos-1.3.1/*
 shell/ext-py/prettytable-0.7.2/*
 shell/ext-py/sasl-0.3.1/*
 shell/ext-py/six-1.14.0/*
-shell/ext-py/sqlparse-0.3.1/*
+shell/ext-py/sqlparse-0.4.4/*
 shell/ext-py/thrift-0.16.0/*
 shell/ext-py/thrift_sasl-0.4.3/*
 tests/comparison/leopard/static/css/hljs.css
