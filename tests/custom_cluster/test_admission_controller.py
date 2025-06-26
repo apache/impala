@@ -1273,7 +1273,7 @@ class TestAdmissionController(TestAdmissionControllerBase):
   @CustomClusterTestSuite.with_args(
     impalad_args=impalad_admission_ctrl_config_args(
       fs_allocation_file="mem-limit-test-fair-scheduler.xml",
-      llama_site_file="mem-limit-test-llama-site.xml", make_copy=True),
+      llama_site_file="mem-limit-test-llama-site.xml"),
     statestored_args=_STATESTORED_ARGS)
   def test_pool_mem_limit_configs(self, vector):
     """Runs functional tests for the max/min_query_mem_limit pool config attributes"""
@@ -1453,7 +1453,9 @@ class TestAdmissionController(TestAdmissionControllerBase):
     impalad_args=impalad_admission_ctrl_config_args(
       fs_allocation_file="mem-limit-test-fair-scheduler.xml",
       llama_site_file="mem-limit-test-llama-site.xml",
-      additional_args="-default_pool_max_requests 1", make_copy=True),
+      additional_args=("-clamp_query_mem_limit_backend_mem_limit=false "
+                       "-default_pool_max_requests 1"),
+      make_copy=True),
     statestored_args=_STATESTORED_ARGS)
   def test_pool_config_change_while_queued(self):
     """Tests that the invalid checks work even if the query is queued. Makes sure that a
@@ -1463,8 +1465,15 @@ class TestAdmissionController(TestAdmissionControllerBase):
     # by not involving BufferedPlanRootSink.
     self.client.set_configuration_option('spool_query_results', 'false')
 
+    # Instantiate ResourcePoolConfig modifier and initialize 'max-query-mem-limit' to 0
+    # (unclamped).
     pool_name = "invalidTestPool"
     config_str = "max-query-mem-limit"
+    llama_site_path = os.path.join(RESOURCES_DIR, "copy-mem-limit-test-llama-site.xml")
+    config = ResourcePoolConfig(
+        self.cluster.impalads[0].service, self.get_ac_process().service, llama_site_path)
+    config.set_config_value(pool_name, config_str, 0)
+
     self.client.set_configuration_option('request_pool', pool_name)
     self.client.set_configuration_option('enable_trivial_query_for_admission', 'false')
     # Setup to queue a query.
@@ -1475,10 +1484,9 @@ class TestAdmissionController(TestAdmissionControllerBase):
     queued_query_handle = self.client.execute_async("select 2")
     self._wait_for_change_to_profile(queued_query_handle, "Admission result: Queued")
 
-    # Change config to be invalid.
-    llama_site_path = os.path.join(RESOURCES_DIR, "copy-mem-limit-test-llama-site.xml")
-    config = ResourcePoolConfig(
-        self.cluster.impalads[0].service, self.get_ac_process().service, llama_site_path)
+    # Change config to be invalid (max-query-mem-limit < min-query-mem-limit).
+    # impala.admission-control.min-query-mem-limit.root.invalidTestPool is set to
+    # 25MB in mem-limit-test-llama-site.xml.
     config.set_config_value(pool_name, config_str, 1)
     # Close running query so the queued one gets a chance.
     self.client.close_query(sleep_query_handle)
@@ -1499,7 +1507,8 @@ class TestAdmissionController(TestAdmissionControllerBase):
       "select * from functional_parquet.alltypes limit 1")
     self._wait_for_change_to_profile(queued_query_handle, "Admission result: Queued")
     # Change config to something less than what is required to accommodate the
-    # largest min_reservation (which in this case is 32.09 MB.
+    # largest min_reservation (which in this case is 32.09 MB).
+    # Setting max-query-mem-limit = min-query-mem-limit = 25MB is sufficient.
     config.set_config_value(pool_name, config_str, 25 * 1024 * 1024)
     # Close running query so the queued one gets a chance.
     self.client.close_query(sleep_query_handle)
@@ -1507,6 +1516,9 @@ class TestAdmissionController(TestAdmissionControllerBase):
     # Observe that the queued query fails.
     self.client.wait_for_impala_state(queued_query_handle, ERROR, 20),
     self.client.close_query(queued_query_handle)
+
+    # Change the config back to a valid value
+    config.set_config_value(pool_name, config_str, 0)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

@@ -63,9 +63,13 @@ class ResourcePoolConfig(object):
     metric_str = self.CONFIG_TO_METRIC_STR_MAPPING[config_str]
     client = self.impala_service.create_hs2_client()
     client.set_configuration_option('request_pool', pool_name)
-    # set mem_limit to something above the proc limit so that the query always gets
-    # rejected.
-    client.set_configuration_option('mem_limit', '128G')
+    # set mem limit to something above the proc limit so that the query always gets
+    # rejected. Use mem_limit_coordinators and mem_limit_executors because
+    # they have precedent over pool mem limit. mem_limit option, on the other hand,
+    # is clamped to the pool's min and max mem limit (see
+    # ScheduleState::UpdateMemoryRequirements).
+    client.set_configuration_option('mem_limit_coordinators', '128G')
+    client.set_configuration_option('mem_limit_executors', '128G')
     client.set_configuration_option("enable_trivial_query_for_admission", "false")
     metric_key = "admission-controller.{0}.root.{1}".format(metric_str, pool_name)
     start_time = time()

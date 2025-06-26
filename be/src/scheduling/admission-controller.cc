@@ -1634,7 +1634,7 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
       stats->metrics()->total_rejected->Increment(1);
       const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_REJECTED,
           queue_node->pool_name, queue_node->not_admitted_reason);
-      VLOG_QUERY << rejected_msg.msg();
+      VLOG_QUERY << "query_id=" << PrintId(request.query_id) << " " << rejected_msg.msg();
       return Status::Expected(rejected_msg);
     }
 
@@ -1767,7 +1767,8 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
           PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_REJECTED);
       const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_REJECTED,
           queue_node->pool_name, queue_node->not_admitted_reason);
-      VLOG_QUERY << rejected_msg.msg();
+      VLOG_QUERY << "query_id=" << PrintId(queue_node->admission_request.query_id) << " "
+                 << rejected_msg.msg();
       return Status::Expected(rejected_msg);
     } else if (outcome == AdmissionOutcome::TIMED_OUT) {
       bool removed = queue->Remove(queue_node);
@@ -2313,6 +2314,18 @@ Status AdmissionController::ComputeGroupScheduleStates(
   return Status::OK();
 }
 
+static inline string PrintScheduleStateMemInfo(ScheduleState* state) {
+  return Substitute("{per_backend_mem_limit=$0, per_backend_mem_to_admit=$1, "
+      "per_backend_mem_to_admit_source=$2, coord_backend_mem_limit=$3, "
+      "coord_backend_mem_to_admit=$4, coord_backend_mem_to_admit_source=$5}",
+      PrintBytes(state->per_backend_mem_limit()),
+      PrintBytes(state->per_backend_mem_to_admit()),
+      MemLimitSourcePB_Name(state->per_backend_mem_to_admit_source()),
+      PrintBytes(state->coord_backend_mem_limit()),
+      PrintBytes(state->coord_backend_mem_to_admit()),
+      MemLimitSourcePB_Name(state->coord_backend_mem_to_admit_source()));
+}
+
 bool AdmissionController::FindGroupToAdmitOrReject(
     ClusterMembershipMgr::SnapshotPtr& membership_snapshot,
     const TPoolConfig& pool_config, const TPoolConfig& root_cfg, bool admit_from_queue,
@@ -2371,7 +2384,8 @@ bool AdmissionController::FindGroupToAdmitOrReject(
                << PrintBytes(state->GetDedicatedCoordMemoryEstimate())
                << " max_requests=" << max_requests << " max_queued=" << max_queued
                << " max_mem=" << PrintBytes(max_mem) << " is_trivial_query="
-               << PrettyPrinter::Print(state->GetIsTrivialQuery(), TUnit::NONE);
+               << PrettyPrinter::Print(state->GetIsTrivialQuery(), TUnit::NONE)
+               << " ScheduleState=" << PrintScheduleStateMemInfo(state);
     VLOG_QUERY << "Stats: " << pool_stats->DebugString();
 
     if (state->GetIsTrivialQuery() && CanAdmitTrivialRequest(*state)) {
@@ -2674,15 +2688,8 @@ AdmissionController::PoolStats* AdmissionController::GetPoolStats(
 void AdmissionController::AdmitQuery(
     QueueNode* node, string& user, bool was_queued, bool is_trivial) {
   ScheduleState* state = node->admitted_schedule.get();
-  VLOG_RPC << "For Query " << PrintId(state->query_id())
-           << " per_backend_mem_limit set to: "
-           << PrintBytes(state->per_backend_mem_limit())
-           << " per_backend_mem_to_admit set to: "
-           << PrintBytes(state->per_backend_mem_to_admit())
-           << " coord_backend_mem_limit set to: "
-           << PrintBytes(state->coord_backend_mem_limit())
-           << " coord_backend_mem_to_admit set to: "
-           << PrintBytes(state->coord_backend_mem_to_admit());
+  VLOG_RPC << "Admitting query " << PrintId(state->query_id())
+           << " ScheduleState=" << PrintScheduleStateMemInfo(state);
 
   // Update memory and number of queries.
   bool track_per_user = HasQuotaConfig(node->pool_cfg) || HasQuotaConfig(node->root_cfg);
