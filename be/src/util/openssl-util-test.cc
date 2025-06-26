@@ -22,11 +22,18 @@
 #include <openssl/rand.h>
 
 #include "common/init.h"
+#include "common/status.h"
+#include "gutil/strings/substitute.h"
+#include "kudu/util/env.h"
+#include "kudu/util/faststring.h"
+#include "kudu/util/status.h"
 #include "testutil/gtest-util.h"
 #include "util/openssl-util.h"
 
 using std::uniform_int_distribution;
 using std::mt19937_64;
+using strings::Substitute;
+using std::string;
 
 namespace impala {
 
@@ -241,5 +248,220 @@ TEST_F(OpenSSLUtilTest, RandSeeding) {
     ASSERT_OK(key.InitializeRandom(AES_BLOCK_SIZE, key.GetSupportedDefaultMode()));
   }
 }
+
+///
+/// ValidatePemBundle tests
+///
+/// Constants defining paths to test files.
+static const string& EXPIRED_CERT = "bad-cert";
+static const string& FUTURE_CERT = "future-cert";
+static const string& INVALID_CERT = "invalid-server-cert";
+static const string& VALID_CERT_1 = "server-cert";
+static const string& VALID_CERT_2 = "wildcardCA";
+
+/// Constants and functions defining expected error messages.
+static const string& MSG_NEW_BIO_ERR = "OpenSSL error in PEM_read_bio_X509 unexpected "
+    "error '$0' while reading PEM bundle";
+static const string& MSG_NONE_VALID = "PEM bundle contains no valid certificates";
+static string _msg_time(int invalid_notbefore_cnt, int invalid_notafter_cnt) {
+  return Substitute("PEM bundle contains $0 invalid certificate(s) with notBefore in the "
+      "future and $1 invalid certificate(s) with notAfter in the past",
+      invalid_notbefore_cnt, invalid_notafter_cnt);
 }
 
+/// Constants used in the tests
+static const string& INVALID_CERT_TEXT = "-----BEGIN CERTIFICATE-----\nnot a cert";
+
+/// Helper function to read a certificate from the be/src/testutil directory.
+static string read_cert(const string& cert_name) {
+  kudu::faststring contents;
+  kudu::Status s = kudu::ReadFileToString(kudu::Env::Default(),
+      Substitute("$0/be/src/testutil/$1.pem", getenv("IMPALA_HOME"), cert_name),
+      &contents);
+
+  EXPECT_TRUE(s.ok())<< "Certificate '" << cert_name << "' could not be read: "
+      << s.ToString();
+  EXPECT_FALSE(contents.ToString().empty()) << "Certificate '" << cert_name
+      << "' is empty. Please check the test data.";
+
+  string cert = contents.ToString();
+  if (cert.back() != '\n') {
+    cert.push_back('\n');
+  }
+
+  return cert;
+} // function read_cert
+
+/// Asserts a PEM bundle containing one valid certificate is valid.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleHappyPathOneCert) {
+  ASSERT_OK(ValidatePemBundle(Substitute("$0", read_cert(VALID_CERT_1))));
+}
+
+/// Asserts a PEM bundle containing two valid certificates is valid.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleHappyPath) {
+  ASSERT_OK(ValidatePemBundle(Substitute("$0$1", read_cert(VALID_CERT_1),
+      read_cert(VALID_CERT_2))));
+}
+
+/// Asserts an empty PEM bundle is invalid.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleEmpty) {
+  ASSERT_ERROR_MSG(ValidatePemBundle(""), "bundle is empty");
+}
+
+/// Asserts a bundle containing a single expired certificate is invalid.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleExpired) {
+  ASSERT_ERROR_MSG(ValidatePemBundle(read_cert(EXPIRED_CERT)), _msg_time(0, 1));
+}
+
+/// Asserts a bundle containing a single future dated certificate is invalid.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleFutureDated) {
+  ASSERT_ERROR_MSG(ValidatePemBundle(read_cert(FUTURE_CERT)), _msg_time(1, 0));
+}
+
+/// Asserts a bundle containing a single invalid certificate is invalid.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleNotACert) {
+  ASSERT_ERROR_MSG(ValidatePemBundle(INVALID_CERT_TEXT), MSG_NONE_VALID);
+}
+
+/// Asserts a bundle is invalid if it contains one expired and two non-expired
+/// certificates where the expired cert changes position in the bundle.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleThreeCertsOneExpired) {
+  // Expired cert is first in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", read_cert(EXPIRED_CERT),
+      read_cert(VALID_CERT_1), read_cert(VALID_CERT_2))), _msg_time(0, 1));
+
+  // Expired cert is in the middle of the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_1),
+      read_cert(EXPIRED_CERT), read_cert(VALID_CERT_2))), _msg_time(0, 1));
+
+  // Expired cert is last in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_1),
+      read_cert(VALID_CERT_2), read_cert(EXPIRED_CERT))), _msg_time(0, 1));
+}
+
+/// Asserts a bundle is invalid if it contains one future dated and two valid
+/// certificates where the expired cert changes position in the bundle.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleThreeCertsOneFutureDated) {
+  // Expired cert is first in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", read_cert(FUTURE_CERT),
+      read_cert(VALID_CERT_1), read_cert(VALID_CERT_2))), _msg_time(1, 0));
+
+  // Expired cert is in the middle of the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_1),
+      read_cert(FUTURE_CERT), read_cert(VALID_CERT_2))), _msg_time(1, 0));
+
+  // Expired cert is last in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_1),
+      read_cert(VALID_CERT_2), read_cert(FUTURE_CERT))), _msg_time(1, 0));
+}
+
+/// Asserts a bundle is invalid if it contains two expired and one non-expired
+/// certificate no matter the position of the expired cert in the bundle.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleThreeCertsTwoExpired) {
+  // First two certs are expired.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", read_cert(EXPIRED_CERT),
+      read_cert(EXPIRED_CERT), read_cert(VALID_CERT_2))), _msg_time(0, 2));
+
+  // Last two certs are expired.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_2),
+      read_cert(EXPIRED_CERT), read_cert(EXPIRED_CERT))), _msg_time(0, 2));
+}
+
+/// Asserts a bundle is invalid if it contains two future dated and one valid
+/// certificate no matter the position of the future dated cert in the bundle.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleThreeCertsTwoFutureDated) {
+  // First two certs are expired.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", read_cert(FUTURE_CERT),
+      read_cert(FUTURE_CERT), read_cert(VALID_CERT_2))), _msg_time(2, 0));
+
+  // Last two certs are expired.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_2),
+      read_cert(FUTURE_CERT), read_cert(FUTURE_CERT))), _msg_time(2, 0));
+}
+
+/// Asserts a bundle is invalid if it contains one valid and two invalid certificates
+/// where the expired cert changes position in the bundle.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleThreeCertsOneInvalid) {
+  // Invalid cert is first in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2", INVALID_CERT_TEXT,
+      read_cert(VALID_CERT_1), read_cert(VALID_CERT_2))), MSG_NONE_VALID);
+
+  // Invalid cert is in the middle of the bundle.
+  EXPECT_STR_CONTAINS(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_1),
+      INVALID_CERT_TEXT, read_cert(VALID_CERT_2))).GetDetail(),
+      Substitute(MSG_NEW_BIO_ERR, 123));
+
+  // Invalid cert is last in the bundle.
+  EXPECT_STR_CONTAINS(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_1),
+      read_cert(VALID_CERT_2), INVALID_CERT_TEXT)).GetDetail(),
+      Substitute(MSG_NEW_BIO_ERR, 112));
+}
+
+/// Asserts a bundle is invalid if it contains one expired and one non-expired certificate
+/// no matter the position of the expired cert in the bundle.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleTwoCertsExpired) {
+  // Expired cert is first in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1", read_cert(EXPIRED_CERT),
+      read_cert(VALID_CERT_1))), _msg_time(0, 1));
+
+  // Expired cert is last in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1", read_cert(VALID_CERT_1),
+      read_cert(EXPIRED_CERT))), _msg_time(0, 1));
+}
+
+/// Asserts a bundle is invalid if it contains one future dated and one valid certificate
+/// no matter the position of the future dated cert in the bundle.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleTwoCertsFutureDated) {
+  // Expired cert is first in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1", read_cert(FUTURE_CERT),
+      read_cert(VALID_CERT_1))), _msg_time(1, 0));
+
+  // Expired cert is last in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1", read_cert(VALID_CERT_1),
+      read_cert(FUTURE_CERT))), _msg_time(1, 0));
+}
+
+/// Asserts a bundle is invalid if it contains one valid and one invalid certificate
+/// no matter the position of the expired cert in the bundle.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleTwoCertsNotCertFirst) {
+  // Invalid cert is first in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1", INVALID_CERT_TEXT,
+      read_cert(VALID_CERT_1))), MSG_NONE_VALID);
+
+  // Invalid cert is last in the bundle.
+  EXPECT_STR_CONTAINS(ValidatePemBundle(Substitute("$0$1", read_cert(VALID_CERT_1),
+      INVALID_CERT_TEXT)).GetDetail(), Substitute(MSG_NEW_BIO_ERR, 112));
+}
+
+/// Asserts a bundle is invalid if it contains two valid, one expired, and one future
+/// dated certificate no matter the position of the certs in the bundle.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleFourCerts) {
+  // Expired and future dated certs are first in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1", read_cert(EXPIRED_CERT),
+      read_cert(FUTURE_CERT), read_cert(VALID_CERT_1), read_cert(VALID_CERT_2))),
+      _msg_time(1, 1));
+
+  // Expired and future dated certs are last in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2$3", read_cert(VALID_CERT_1),
+      read_cert(VALID_CERT_2), read_cert(EXPIRED_CERT), read_cert(FUTURE_CERT))),
+      _msg_time(1, 1));
+
+  // Expired and future dated certs are intermixed in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1$2$3", read_cert(VALID_CERT_1),
+      read_cert(FUTURE_CERT), read_cert(VALID_CERT_2), read_cert(EXPIRED_CERT))),
+      _msg_time(1, 1));
+}
+
+/// Asserts a bundle is invalid if it contains one expired and one future dated
+/// certificate no matter the position of the certs in the bundle.
+TEST_F(OpenSSLUtilTest, ValidatePemBundleOneExpiredOneFutureDated) {
+  // Expired cert is first in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1", read_cert(EXPIRED_CERT),
+      read_cert(FUTURE_CERT))), _msg_time(1, 1));
+
+  // Future dated cert is first in the bundle.
+  ASSERT_ERROR_MSG(ValidatePemBundle(Substitute("$0$1", read_cert(FUTURE_CERT),
+      read_cert(EXPIRED_CERT))), _msg_time(1, 1));
+}
+
+} // namespace impala

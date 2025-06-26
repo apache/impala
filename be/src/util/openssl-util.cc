@@ -25,19 +25,24 @@
 #include <iostream>
 
 #include <glog/logging.h>
+#include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/pem.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <openssl/tls1.h>
+#include <openssl/x509.h>
 
 #include "common/atomic.h"
+#include "common/compiler-util.h"
 #include "common/status.h"
 #include "gutil/port.h" // ATTRIBUTE_WEAK
 #include "gutil/strings/substitute.h"
 
 #include "common/names.h"
 #include "cpu-info.h"
+#include "kudu/util/openssl_util.h"
 
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
@@ -151,6 +156,63 @@ static Status OpenSSLErr(const string& function, const string& context) {
 void SeedOpenSSLRNG() {
   RAND_load_file("/dev/urandom", RNG_RESEED_BYTES);
 }
+
+Status ValidatePemBundle(const string& bundle) {
+  SCOPED_OPENSSL_NO_PENDING_ERRORS;
+
+  if (UNLIKELY(bundle.empty())) {
+    return Status("bundle is empty");
+  }
+
+  BIO* bio = BIO_new_mem_buf(bundle.data(), bundle.size());
+  if (UNLIKELY(ERR_peek_error() != 0 || bio == nullptr)) {
+    Status ret = OpenSSLErr("BIO_new_mem_buf", Substitute("error '$0' creating BIO from "
+        "PEM bundle", ERR_GET_REASON(ERR_peek_error())));
+    ERR_clear_error();
+    return ret;
+  }
+
+  X509* cert = nullptr;
+  int cert_count = 0;
+  int invalid_notbefore_cnt = 0;
+  int invalid_notafter_cnt = 0;
+  while ((cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr)) != nullptr) {
+    cert_count++;
+    // Check certificate validity (notBefore and notAfter)
+    if (UNLIKELY(X509_cmp_current_time(X509_get0_notBefore(cert)) > 0)) {
+      invalid_notbefore_cnt++;
+    }
+
+    if (UNLIKELY(X509_cmp_current_time(X509_get0_notAfter(cert)) < 0)) {
+      invalid_notafter_cnt++;
+    }
+
+    X509_free(cert);
+  }
+  BIO_free(bio);
+
+  Status ret;
+  if (UNLIKELY(invalid_notbefore_cnt > 0 || invalid_notafter_cnt > 0)) {
+    ret = Status(Substitute(
+        "PEM bundle contains $0 invalid certificate(s) with notBefore in the future "
+        "and $1 invalid certificate(s) with notAfter in the past",
+        invalid_notbefore_cnt, invalid_notafter_cnt));
+  } else if (UNLIKELY(cert_count == 0)) {
+    ret = Status("PEM bundle contains no valid certificates");
+  } else if (UNLIKELY(ERR_GET_REASON(ERR_peek_error()) != PEM_R_NO_START_LINE)) {
+    // The final PEM_read_bio_X509 always sets the openssl error to PEM_R_NO_START_LINE,
+    // if the ssl error is set to anything else, return it.
+    ret = OpenSSLErr("PEM_read_bio_X509", Substitute("unexpected error '$0' while "
+        "reading PEM bundle", ERR_GET_REASON(ERR_peek_error())));
+  } else {
+    ret = Status::OK();
+  }
+
+  // Clear the error left by the final PEM_read_bio_X509 call when it returns nullptr.
+  ERR_clear_error();
+
+  return ret;
+} // function ValidatePemBundle
 
 void IntegrityHash::Compute(const uint8_t* data, int64_t len) {
   // Explicitly ignore the return value from SHA256(); it can't fail.
