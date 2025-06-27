@@ -442,6 +442,10 @@ bootstrap_dependencies() {
   else
     echo ">>> Downloading and extracting toolchain dependencies."
     "$IMPALA_HOME/bin/bootstrap_toolchain.py"
+    rm -rf $IMPALA_HOME/toolchain/toolchain-packages-gcc$IMPALA_GCC_VERSION/binutils-$IMPALA_BINUTILS_VERSION/bin/ld
+    ln -s /usr/bin/ld $IMPALA_HOME/toolchain/toolchain-packages-gcc$IMPALA_GCC_VERSION/binutils-$IMPALA_BINUTILS_VERSION/bin/ld
+    mkdir -p $IMPALA_HOME/toolchain/toolchain-packages-gcc$IMPALA_GCC_VERSION/openldap-$IMPALA_OPENLDAP_VERSION/
+    cp -rf /usr/local/openldap-$IMPALA_OPENLDAP_VERSION  $IMPALA_HOME/toolchain/toolchain-packages-gcc$IMPALA_GCC_VERSION/
     echo "Toolchain bootstrap complete."
   fi
   # Use prebuilt Hadoop native binaries for aarch64
