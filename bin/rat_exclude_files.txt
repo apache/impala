@@ -104,6 +104,7 @@ README*.md
 */README.txt
 testdata/bin/README-BENCHMARK-TEST-GENERATION
 testdata/bin/minicluster_lakekeeper/README.md
+testdata/bin/otel-collector/README.md
 testdata/scale_test_metadata/README.md
 tests/comparison/ORACLE.txt
 bin/distcc/README.md
