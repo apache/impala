@@ -149,6 +149,8 @@ export IMPALA_LLVM_VERSION=5.0.1-p8
 unset IMPALA_LLVM_URL
 export IMPALA_LLVM_ASAN_VERSION=5.0.1-p8
 unset IMPALA_LLVM_ASAN_URL
+export IMPALA_OPENTELEMETRY_CPP_VERSION=1.20.0
+unset IMPALA_OPENTELEMTRY_CPP_URL
 
 # To limit maximum memory available for the mini-cluster and CDH cluster, add the
 # following in $IMPALA_HOME/bin/impala-config-local.sh

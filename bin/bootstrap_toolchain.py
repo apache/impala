@@ -475,8 +475,8 @@ def get_toolchain_downloads():
       ["avro", "binutils", "boost", "breakpad", "bzip2", "calloncehack", "cctz",
        "cloudflarezlib", "cmake", "crcutil", "curl", "flatbuffers", "gdb", "gflags",
        "glog", "gperftools", "jwt-cpp", "libev", "libunwind", "lz4", "mold",
-       "openldap", "orc", "protobuf", "python", "rapidjson", "re2", "snappy", "tpc-h",
-       "tpc-ds", "zlib", "zstd"]]
+       "openldap", "opentelemetry-cpp", "orc", "protobuf", "python", "rapidjson", "re2",
+       "snappy", "tpc-h", "tpc-ds", "zlib", "zstd"]]
   python3_package = ToolchainPackage(
       "python", explicit_version=os.environ.get("IMPALA_PYTHON3_VERSION"))
   gtest_package = ToolchainPackage(

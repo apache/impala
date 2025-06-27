@@ -145,6 +145,7 @@ set_dep_root(CCTZ)
 set_dep_root(CURL)
 set_dep_root(CALLONCEHACK)
 set_dep_root(CLOUDFLAREZLIB)
+set_dep_root(OPENTELEMETRY_CPP)
 
 # The boost-cmake project hasn't been maintained for years. Let's make sure we
 # don't accidentally use it if it can be found.
@@ -423,6 +424,11 @@ IMPALA_ADD_THIRDPARTY_LIB(curl ${CURL_INCLUDE_DIR} ${CURL_STATIC_LIB} "")
 find_package(CallOnceHack REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(calloncehack ${CALLONCEHACK_INCLUDE_DIR} ""
   ${CALLONCEHACK_SHARED_LIB})
+
+# find opentelemetry-cpp sdk
+find_package(OpentelemetryCpp REQUIRED)
+add_compile_definitions(ENABLE_THREAD_INSTRUMENTATION_PREVIEW)
+include_directories(${OPENTELEMETRY_CPP_INCLUDE_DIR})
 
 # Tests that run any security related tests need to link this in to override the
 # krb5_realm_override() implementation in krb5.

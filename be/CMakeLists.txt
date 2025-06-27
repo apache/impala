@@ -450,6 +450,7 @@ set(CLANG_INCLUDE_FLAGS
   "-I${PROTOBUF_INCLUDE_DIR}"
   "-I${CCTZ_INCLUDE_DIR}"
   "-I${CURL_INCLUDE_DIR}"
+  "-I${OPENTELEMETRY_CPP_INCLUDE_DIR}"
 )
 
 # allow linking of static libs into dynamic lib
@@ -658,6 +659,7 @@ set (IMPALA_DEPENDENCIES
   ThriftSaslTransport
   openssl_ssl
   openssl_crypto
+  ${OPENTELEMETRY_CPP_LIBS}
   crcutil
   gutil
   glog
