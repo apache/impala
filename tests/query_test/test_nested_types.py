@@ -194,6 +194,29 @@ class TestNestedCollectionsInSelectList(ImpalaTestSuite):
     """Queries where a map column is in the select list"""
     self.run_test_case('QueryTest/nested-map-in-select-list', vector)
 
+  @SkipIfFS.hive
+  def test_nested_array_from_iceberg_with_delete(self, unique_database):
+    """Tests that a 2D array can be unnested from an Iceberg table that has delete files
+    but not for all data files. In this case there is a UNION in the plan.
+    Regression test for IMPALA-14185.
+    """
+    tbl_name = unique_database + ".nested_arr_in_iceberg_with_delete"
+    self.execute_query("create table {} (id INT, arr ARRAY<ARRAY<int>>) stored by \
+        iceberg tblproperties('format-version'='2')".format(tbl_name))
+
+    # INSERTs are done in Hive as Impala cannot write complex types.
+    self.run_stmt_in_hive("insert into {} values ( \
+        1, array(array(1), array(2), array(3), array(4), array(5)))".format(tbl_name))
+    self.run_stmt_in_hive("insert into {} values ( \
+        2, array(array(1), array(2), array(3), array(4), array(5)))".format(tbl_name))
+    # Impala can delete rows containing complex types.
+    self.execute_query("delete from {} where id=2".format(tbl_name))
+
+    result = self.execute_query_expect_success(self.client,
+        "select id, a1.item.item unnested_item from {0}, {0}.arr a1, a1.item \
+         order by id, unnested_item".format(tbl_name))
+    assert result.data == ['1\t1', '1\t2', '1\t3', '1\t4', '1\t5']
+
 
 class TestMixedCollectionsAndStructsInSelectList(ImpalaTestSuite):
   """Functional tests for the case where collections and structs are embedded into one

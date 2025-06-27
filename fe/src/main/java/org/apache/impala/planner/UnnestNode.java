@@ -90,12 +90,17 @@ public class UnnestNode extends PlanNode {
 
   // Filtering an unnested collection that comes from a UNION [ALL] is not supported, see
   // IMPALA-12753.
+  // The exception is if all children of the UNION node have the same tuple id(s), because
+  // then the conjuncts are naturally applied to all UNION operands. This is the case for
+  // UNION nodes inserted because of Iceberg delete operations. See IMPALA-14185.
   private void checkUnnestFromUnionWithPredicate(Analyzer analyzer)
       throws AnalysisException {
     PlanNode subplanInputNode = containingSubplanNode_.getChild(0);
     if (!(subplanInputNode instanceof UnionNode)) return;
 
     UnionNode union = (UnionNode) subplanInputNode;
+
+    if (allUnionChildrenHaveSameTupleIds(union)) return;
 
     // Tuple descriptors of the UNION and their descendants (for complex types).
     List<TupleDescriptor> unionDescs = new ArrayList<>();
@@ -123,6 +128,15 @@ public class UnnestNode extends PlanNode {
         }
       }
     }
+  }
+
+  private static boolean allUnionChildrenHaveSameTupleIds(UnionNode union) {
+    if (union.getChildren().size() < 2) return true;
+
+    final List<TupleId> firstChildTupleIds = union.getChild(0).getTupleIds();
+    return union.getChildren().stream()
+        .map(planNode -> planNode.getTupleIds())
+        .allMatch(tupleIdList -> tupleIdList.equals(firstChildTupleIds));
   }
 
   // Returns the TupleDescriptors contained by 'tuple' (includes item tuple descs of
