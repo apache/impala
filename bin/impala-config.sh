@@ -314,7 +314,7 @@ export ARCH_NAME=$(uname -p)
 # Java dependencies that are not also runtime components. Declaring versions here allows
 # other branches to override them in impala-config-branch.sh for cleaner patches.
 export IMPALA_BOUNCY_CASTLE_VERSION=1.78
-export IMPALA_COS_VERSION=3.4.0-8.3.20
+export IMPALA_COS_VERSION=3.4.0-8.3.22
 export IMPALA_DERBY_VERSION=10.14.2.0
 export IMPALA_GUAVA_VERSION=32.0.1-jre
 export IMPALA_HUDI_VERSION=0.5.0-incubating
