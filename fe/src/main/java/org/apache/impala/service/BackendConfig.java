@@ -597,4 +597,8 @@ public class BackendConfig {
   public boolean keepsWarmupTablesLoaded() {
     return backendCfg_.keeps_warmup_tables_loaded;
   }
+
+  public boolean truncateExternalTablesWithHms() {
+    return backendCfg_.truncate_external_tables_with_hms;
+  }
 }

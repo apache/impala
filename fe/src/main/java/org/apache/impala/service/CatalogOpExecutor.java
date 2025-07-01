@@ -3655,15 +3655,25 @@ public class CatalogOpExecutor {
     catalog_.getLock().writeLock().unlock();
     modification.addCatalogServiceIdentifiersToTable();
     HdfsTable hdfsTable = (HdfsTable) table;
-    boolean isTableBeingReplicated = false;
+    boolean truncateWithHms = BackendConfig.INSTANCE.truncateExternalTablesWithHms();
     Stopwatch sw = Stopwatch.createStarted();
+
+    if (truncateWithHms && !params.isDelete_stats()) {
+      throw new ImpalaRuntimeException("Setting the query option "
+          + "'DELETE_STATS_IN_TRUNCATE' to false is not supported when the flag "
+          + "'--truncate_external_tables_with_hms' is set to true.");
+    }
+
     try {
-      // if the table is being replicated we issue the HMS API to truncate the table
-      // since it generates additional events which are used by Hive Replication.
       try (MetaStoreClient client = catalog_.getMetaStoreClient(catalogTimeline)) {
-        if (isTableBeingReplicated(client.getHiveClient(), hdfsTable)) {
-          isTableBeingReplicated = true;
-          // We will issue HMS API in these cases. Register in-flight event before we do.
+        if (!truncateWithHms) {
+          // if the table is being replicated we issue the HMS API to truncate the table
+          // since it generates additional events which are used by Hive Replication.
+          truncateWithHms = isTableBeingReplicated(client.getHiveClient(), hdfsTable);
+        }
+
+        if (truncateWithHms) {
+          // We will issue an HMS API call. Register in-flight event before we do.
           modification.registerInflightEvent();
           String dbName = Preconditions.checkNotNull(hdfsTable.getDb()).getName();
           client.getHiveClient()
@@ -3673,7 +3683,7 @@ public class CatalogOpExecutor {
               hdfsTable.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
         }
       }
-      if (!isTableBeingReplicated) {
+      if (!truncateWithHms) {
         // when table is replicated we let the HMS API handle the file deletion logic
         // otherwise we delete the files.
         Collection<? extends FeFsPartition> parts = hdfsTable.loadAllPartitions();

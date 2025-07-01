@@ -149,14 +149,7 @@ class TestEventProcessingCustomConfigsBase(CustomClusterTestSuite):
         # insert overwrite query from Impala also generates a INSERT self-event
         "insert overwrite table {0}.{1} partition "
         "(year, month) select * from functional.alltypessmall where year=2009 "
-        "and month=1".format(db_name, tbl_name),
-        # events processor doesn't process delete column stats events currently,
-        # however, in case of incremental stats, there could be alter table and
-        # alter partition events which should be ignored. Hence we run compute stats
-        # before to make sure that the truncate table command generated alter events
-        # are ignored.
-        "compute incremental stats {0}.{1}".format(db_name, tbl_name),
-        "{0} {1}.{2}".format(TRUNCATE_TBL_STMT, db_name, tbl_name)],
+        "and month=1".format(db_name, tbl_name)],
       False: [
         "create table {0}.{1} like functional.alltypessmall "
         "stored as parquet".format(db_name, tbl_name),
@@ -223,7 +216,14 @@ class TestEventProcessingCustomConfigsBase(CustomClusterTestSuite):
         "insert overwrite {0}.{1} partition(part) select * from {0}.{1}".format(
           db_name, acid_tbl_name),
         # recover partitions will generate add_partition events
-        "alter table {0}.{1} recover partitions".format(db_name, recover_tbl_name)
+        "alter table {0}.{1} recover partitions".format(db_name, recover_tbl_name),
+        # events processor doesn't process delete column stats events currently,
+        # however, in case of incremental stats, there could be alter table and
+        # alter partition events which should be ignored. Hence we run compute stats
+        # before to make sure that the truncate table command generated alter events
+        # are ignored.
+        "compute incremental stats {0}.{1}".format(db_name, tbl_name),
+        "{0} {1}.{2}".format(TRUNCATE_TBL_STMT, db_name, tbl_name)
       ]
     }
     return self_event_test_queries
@@ -337,8 +337,10 @@ class TestEventProcessingCustomConfigsBase(CustomClusterTestSuite):
       if (TRUNCATE_TBL_STMT not in stmt):
         assert tbls_refreshed == tbls_refreshed_after, \
           "Failing query(impala={}): {}".format(use_impala_client, stmt)
-      assert partitions_refreshed == partitions_refreshed_after, \
-        "Failing query(impala={}): {}".format(use_impala_client, stmt)
+      # TRUNCATE refreshes partitions
+      if (TRUNCATE_TBL_STMT not in stmt):
+        assert partitions_refreshed == partitions_refreshed_after, \
+          "Failing query(impala={}): {}".format(use_impala_client, stmt)
     else:
       # hive was used to run the stmts, any events generated should not have been deemed
       # as self events unless there are empty partition add/drop events

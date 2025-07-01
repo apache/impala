@@ -177,10 +177,10 @@ class TestDdlStatements(TestDdlBase):
       assert len(self.filesystem_client.ls(
           "{1}/{0}.db/t1/".format(unique_database, WAREHOUSE))) == 2
 
-      # Truncating the table removes the data files and preserves the table's directory
+      # Truncating the table removes the data files and the staging directory
       self.client.execute("truncate table {0}.t1".format(unique_database))
       assert len(self.filesystem_client.ls(
-          "{1}/{0}.db/t1/".format(unique_database, WAREHOUSE))) == 1
+          "{1}/{0}.db/t1/".format(unique_database, WAREHOUSE))) == 0
 
       self.client.execute(
           "create table {0}.t2(i int) partitioned by (p int)".format(unique_database))

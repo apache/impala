@@ -349,4 +349,6 @@ struct TBackendGflags {
   158: required string warmup_tables_config_file
 
   159: required bool keeps_warmup_tables_loaded
+
+  160: required bool truncate_external_tables_with_hms
 }

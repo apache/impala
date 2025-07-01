@@ -40,9 +40,6 @@ class TestRecursiveListing(ImpalaTestSuite):
     cls.ImpalaTestMatrix.clear_dimension('exec_option')
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        (v.get_value('table_format').file_format == 'text'
-         and v.get_value('table_format').compression_codec == 'none'))
 
   def _show_files(self, table):
     files = self.client.execute("show files in {0}".format(table))
@@ -141,6 +138,18 @@ class TestRecursiveListing(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
     assert len(self._show_files(fq_tbl_name)) == 1
     assert len(self._get_rows(fq_tbl_name)) == 1
+
+    # Verify that TRUNCATE removes data files in subdirectories too.
+    # Regression test for IMPALA-13778.
+    self.filesystem_client.make_dir("{0}/dir1".format(part_path))
+    self.filesystem_client.create_file("{0}/dir1/file1.txt".format(part_path), "file1")
+    self.execute_query_expect_success(self.client, "refresh {0}".format(fq_tbl_name))
+    assert len(self._show_files(fq_tbl_name)) == 2
+    assert len(self._get_rows(fq_tbl_name)) == 2
+
+    self.execute_query_expect_success(self.client, "truncate {0}".format(fq_tbl_name))
+    assert len(self._show_files(fq_tbl_name)) == 0
+    assert len(self._get_rows(fq_tbl_name)) == 0
 
   @SkipIfFS.no_partial_listing
   @pytest.mark.execute_serially

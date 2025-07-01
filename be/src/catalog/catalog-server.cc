@@ -302,6 +302,10 @@ DEFINE_bool(keeps_warmup_tables_loaded, false,
     "--invalidate_tables_on_memory_pressure is turned on. Otherwise, these tables will "
     "keep being loaded and invalidated.");
 
+DEFINE_bool(truncate_external_tables_with_hms, true, "Always use HMS to truncate"
+    "external tables. When false, HMS api is only used for tables being replicated. Using"
+    "HMS has the effect of deleting files recursively and triggering an HMS event.");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
 DECLARE_string(state_store_2_host);

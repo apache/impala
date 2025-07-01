@@ -199,74 +199,15 @@ create table t4 like functional.alltypes
 location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/t4';
 insert into t4 partition(year, month) select * from functional.alltypes;
 compute incremental stats t4;
-# if DELETE_STATS_IN_TRUNCATE is unset then truncate should not
-# delete the table statistics.
+# DELETE_STATS_IN_TRUNCATE=false is unsupported unless
+# '--truncate_external_tables_with_hms=false' (for that case, see
+# custom_cluster/test_no_delete_stats_in_truncate.py).
 set DELETE_STATS_IN_TRUNCATE=0;
 truncate table t4;
-show table stats t4;
----- LABELS
-YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
----- RESULTS
-'2009','1',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','2',280,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','3',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','4',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','5',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','6',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','7',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','8',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','9',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','10',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','11',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2009','12',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','1',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','2',280,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','3',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','4',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','5',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','6',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','7',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','8',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','9',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','10',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','11',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'2010','12',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*,'$ERASURECODE_POLICY'
-'Total','',7300,0,'0B','0B','','','','',''
----- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+---- CATCH
+ImpalaRuntimeException: Setting the query option 'DELETE_STATS_IN_TRUNCATE' to false is not supported when the flag '--truncate_external_tables_with_hms' is set to true.
 ====
 ---- QUERY
-show column stats t4;
----- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
----- RESULTS
-'id','INT',7300,0,4,4,-1,-1
-'bool_col','BOOLEAN',2,0,1,1,3650,3650
-'tinyint_col','TINYINT',10,0,1,1,-1,-1
-'smallint_col','SMALLINT',10,0,2,2,-1,-1
-'int_col','INT',10,0,4,4,-1,-1
-'bigint_col','BIGINT',10,0,8,8,-1,-1
-'float_col','FLOAT',10,0,4,4,-1,-1
-'double_col','DOUBLE',10,0,8,8,-1,-1
-'date_string_col','STRING',736,0,8,8,-1,-1
-'string_col','STRING',10,0,1,1,-1,-1
-'timestamp_col','TIMESTAMP',7300,0,16,16,-1,-1
-'year','INT',2,0,4,4,-1,-1
-'month','INT',12,0,4,4,-1,-1
----- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
-====
----- QUERY
-#Verify that truncate was successful
-select count(*) from t4;
----- RESULTS
-0
----- TYPES
-BIGINT
-====
----- QUERY
-insert into t4 partition(year, month) select * from functional.alltypes;
-compute incremental stats t4;
 # if DELETE_STATS_IN_TRUNCATE is set then truncate should
 # delete the statistics.
 set DELETE_STATS_IN_TRUNCATE=1;
@@ -334,47 +275,20 @@ select count(*) from t4;
 BIGINT
 ====
 ---- QUERY
-# Unpartitioned table case: Show that if DELETE_STATS_IN_TRUNCATE is
-# unset truncation removes all files
-# but does not delete table and column stats.
+# Unpartitioned table case:
+# DELETE_STATS_IN_TRUNCATE=false is unsupported unless
+# '--truncate_external_tables_with_hms=false' (for that case, see
+# custom_cluster/test_no_delete_stats_in_truncate.py).
 create table t6 like functional.tinytable
 location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/t6';
 insert into t6 select * from functional.tinytable;
 compute incremental stats t6;
 set DELETE_STATS_IN_TRUNCATE=0;
 truncate table t6;
-show table stats t6;
----- LABELS
-#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
----- RESULTS
-3,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*,'$ERASURECODE_POLICY'
----- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+---- CATCH
+ImpalaRuntimeException: Setting the query option 'DELETE_STATS_IN_TRUNCATE' to false is not supported when the flag '--truncate_external_tables_with_hms' is set to true.
 ====
 ---- QUERY
-# Show that the truncation removed the column stats.
-show column stats t6;
----- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
----- RESULTS
-'a','STRING',3,0,8,6.666666507720947,-1,-1
-'b','STRING',3,0,7,4,-1,-1
----- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
-====
----- QUERY
-#Verify that truncate was successful
-select count(*) from t6;
----- RESULTS
-0
----- TYPES
-BIGINT
-====
----- QUERY
-# Unpartitioned table case: Show that if DELETE_STATS_IN_TRUNCATE is
-# set truncation removes all files and deletes stats.
-insert into t6 select * from functional.tinytable;
-compute incremental stats t6;
 # table stats should be deleted
 set DELETE_STATS_IN_TRUNCATE=1;
 truncate table t6;

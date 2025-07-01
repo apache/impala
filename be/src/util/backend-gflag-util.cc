@@ -147,6 +147,7 @@ DECLARE_int32(reset_metadata_lock_duration_ms);
 DECLARE_int32(catalog_reset_max_threads);
 DECLARE_string(warmup_tables_config_file);
 DECLARE_bool(keeps_warmup_tables_loaded);
+DECLARE_bool(truncate_external_tables_with_hms);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -552,6 +553,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_catalog_reset_max_threads(FLAGS_catalog_reset_max_threads);
   cfg.__set_warmup_tables_config_file(FLAGS_warmup_tables_config_file);
   cfg.__set_keeps_warmup_tables_loaded(FLAGS_keeps_warmup_tables_loaded);
+  cfg.__set_truncate_external_tables_with_hms(FLAGS_truncate_external_tables_with_hms);
   return Status::OK();
 }
 
