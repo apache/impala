@@ -131,18 +131,24 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
       Reference<Long> numUnknownDiskIds,
       String absPath) throws IOException {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-    int[] fbFileBlockOffsets = new int[blockLocations.length];
-    int blockIdx = 0;
-    for (BlockLocation loc : blockLocations) {
-      if (isEc) {
-        fbFileBlockOffsets[blockIdx++] = FileBlock.createFbFileBlock(
-            fbb,
-            loc.getOffset(),
-            loc.getLength(),
-            (short) hostIndex.getOrAddIndex(REMOTE_NETWORK_ADDRESS));
-      } else {
-        fbFileBlockOffsets[blockIdx++] =
-            FileBlock.createFbFileBlock(fbb, loc, hostIndex, numUnknownDiskIds);
+    int[] fbFileBlockOffsets;
+    if (blockLocations == null) {
+      Preconditions.checkState(fileStatus.getLen() == 0);
+      fbFileBlockOffsets = new int[0];
+    } else {
+      fbFileBlockOffsets = new int[blockLocations.length];
+      int blockIdx = 0;
+      for (BlockLocation loc : blockLocations) {
+        if (isEc) {
+          fbFileBlockOffsets[blockIdx++] = FileBlock.createFbFileBlock(
+              fbb,
+              loc.getOffset(),
+              loc.getLength(),
+              (short) hostIndex.getOrAddIndex(REMOTE_NETWORK_ADDRESS));
+        } else {
+          fbFileBlockOffsets[blockIdx++] =
+              FileBlock.createFbFileBlock(fbb, loc, hostIndex, numUnknownDiskIds);
+        }
       }
     }
     return new FileDescriptor(createFbFileDesc(fbb, fileStatus, relPath,
