@@ -151,6 +151,37 @@ class TestRecursiveListing(ImpalaTestSuite):
     assert len(self._show_files(fq_tbl_name)) == 0
     assert len(self._get_rows(fq_tbl_name)) == 0
 
+    # Verify that INSERT OVERWRITE removes data files in subdirectories too.
+    # Regression test for IMPALA-13778.
+    self.filesystem_client.create_file("{0}/file1.txt".format(part_path), "file1")
+    self.filesystem_client.make_dir("{0}/dir1".format(part_path))
+    self.filesystem_client.create_file("{0}/dir1/file1.txt".format(part_path), "file1")
+    # Also add a hidden and an ignored dir.
+    self.filesystem_client.make_dir("{0}/_tmp.hiddendir".format(part_path))
+    self.filesystem_client.create_file(
+        "{0}/_tmp.hiddendir/file1.txt".format(part_path), "file1")
+    self.filesystem_client.make_dir("{0}/-tmp.ignoreddir".format(part_path))
+    self.filesystem_client.create_file(
+        "{0}/-tmp.ignoreddir/file1.txt".format(part_path), "file1")
+
+    self.execute_query_expect_success(self.client,
+        "insert overwrite {tbl} {part} select 'str'".format(
+            tbl=fq_tbl_name, part="partition(p=1)" if partitioned else ""))
+    assert len(self._show_files(fq_tbl_name)) == 1
+    assert len(self._get_rows(fq_tbl_name)) == 1
+
+    assert ((not partitioned)
+        == self.filesystem_client.exists("{0}/_tmp.hiddendir".format(part_path)))
+    assert ((not partitioned)
+        == self.filesystem_client.exists(
+                "{0}/_tmp.hiddendir/file1.txt".format(part_path)))
+
+    assert ((not partitioned)
+        == self.filesystem_client.exists("{0}/-tmp.ignoreddir".format(part_path)))
+    assert ((not partitioned)
+        == self.filesystem_client.exists(
+                "{0}/-tmp.ignoreddir/file1.txt".format(part_path)))
+
   @SkipIfFS.no_partial_listing
   @pytest.mark.execute_serially
   def test_large_staging_dirs(self, unique_database):

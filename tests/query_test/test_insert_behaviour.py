@@ -67,7 +67,8 @@ class TestInsertBehaviour(ImpalaTestSuite):
     TBL_NAME = "insert_overwrite_nopart"
     table_dir = "%s/functional.db/%s/" % (WAREHOUSE, TBL_NAME)
     hidden_file_locations = [".hidden", "_hidden"]
-    dir_locations = ["dir", ".hidden_dir"]
+    hidden_dir_locations = [".hidden_dir", "_hidden_dir"]
+    dir_locations = ["dir"] + hidden_dir_locations
 
     for dir_ in dir_locations:
       self.filesystem_client.make_dir(table_dir + dir_)
@@ -87,7 +88,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
       assert self.filesystem_client.exists(table_dir + file_), "Hidden file {0} was " \
           "unexpectedly deleted by INSERT OVERWRITE".format(table_dir + file_)
 
-    for dir_ in dir_locations:
+    for dir_ in hidden_dir_locations:
       assert self.filesystem_client.exists(table_dir + dir_), "Directory {0} was " \
           "unexpectedly deleted by INSERT OVERWRITE".format(table_dir + dir_)
 

@@ -17,6 +17,7 @@
 
 #include "runtime/dml-exec-state.h"
 
+#include <algorithm>
 #include <mutex>
 
 #include <boost/algorithm/string.hpp>
@@ -46,6 +47,8 @@
 
 DEFINE_bool(insert_inherit_permissions, false, "If true, new directories created by "
     "INSERTs will inherit the permissions of their parent directories");
+
+DECLARE_string(ignored_dir_prefix_list);
 
 using namespace impala;
 using boost::algorithm::is_any_of;
@@ -179,6 +182,61 @@ bool DmlExecState::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update,
   return catalog_update->updated_partitions.size() != 0;
 }
 
+// Deletes data files and directories in 'path'. Keeps top-level
+//   - hidden files
+//   - hidden directories
+//   - ignored directories.
+Status DeleteUnpartitionedDirData(const hdfsFS& fs_connection,
+    const string& path, HdfsOperationSet* hdfs_ops) {
+  int num_files = 0;
+  // hfdsListDirectory() only sets errno if there is an error, but it doesn't set
+  // it to 0 if the call succeed. When there is no error, errno could be any
+  // value. So need to clear errno before calling it.
+  // Once HDFS-8407 is fixed, the errno reset won't be needed.
+  errno = 0;
+  hdfsFileInfo* existing_files_and_dirs =
+      hdfsListDirectory(fs_connection, path.c_str(), &num_files);
+  if (existing_files_and_dirs == nullptr && errno == EAGAIN) {
+    errno = 0;
+    existing_files_and_dirs =
+        hdfsListDirectory(fs_connection, path.c_str(), &num_files);
+  }
+  // hdfsListDirectory() returns nullptr not only when there is an error but also
+  // when the directory is empty(HDFS-8407). Need to check errno to make sure
+  // the call fails.
+  if (existing_files_and_dirs == nullptr && errno != 0) {
+    return Status(GetHdfsErrorMsg("Could not list directory: ", path));
+  }
+
+  vector<string> ignored_prefixes;
+  boost::split(ignored_prefixes, FLAGS_ignored_dir_prefix_list,
+      [](char ch) { return ch == ','; });
+
+  for (int i = 0; i < num_files; ++i) {
+    const string file_or_dir_name =
+        boost::filesystem::path(existing_files_and_dirs[i].mName).filename().string();
+    if (!IsHiddenFile(file_or_dir_name)) {
+      if (existing_files_and_dirs[i].mKind == kObjectKindFile) {
+        hdfs_ops->Add(DELETE, existing_files_and_dirs[i].mName);
+      } else if (existing_files_and_dirs[i].mKind == kObjectKindDirectory) {
+        auto file_or_dir_name_starts_with_non_empty_prefix =
+          [&file_or_dir_name](const string& prefix) {
+          return !prefix.empty() && file_or_dir_name.find(prefix) == 0;
+        };
+
+        bool dir_ignored = std::any_of(ignored_prefixes.begin(), ignored_prefixes.end(),
+            file_or_dir_name_starts_with_non_empty_prefix);
+        if (!dir_ignored)  {
+          hdfs_ops->Add(DELETE, existing_files_and_dirs[i].mName);
+        }
+      }
+    }
+  }
+  hdfsFreeFileInfo(existing_files_and_dirs, num_files);
+
+  return Status::OK();
+}
+
 Status DmlExecState::FinalizeHdfsInsert(const TFinalizeParams& params,
     bool s3_skip_insert_staging, HdfsTableDescriptor* hdfs_table,
     RuntimeProfile* profile) {
@@ -225,38 +283,9 @@ Status DmlExecState::FinalizeHdfsInsert(const TFinalizeParams& params,
       if (partition.first.empty()) {
         // If the root directory is written to, then the table must not be partitioned
         DCHECK(per_partition_status_.size() == 1);
-        // We need to be a little more careful, and only delete data files in the root
-        // because the tmp directories the sink(s) wrote are there also.
-        // So only delete files in the table directory - all files are treated as data
-        // files by Hive and Impala, but directories are ignored (and may legitimately
-        // be used to store permanent non-table data by other applications).
-        int num_files = 0;
-        // hfdsListDirectory() only sets errno if there is an error, but it doesn't set
-        // it to 0 if the call succeed. When there is no error, errno could be any
-        // value. So need to clear errno before calling it.
-        // Once HDFS-8407 is fixed, the errno reset won't be needed.
-        errno = 0;
-        hdfsFileInfo* existing_files =
-            hdfsListDirectory(partition_fs_connection, part_path.c_str(), &num_files);
-        if (existing_files == nullptr && errno == EAGAIN) {
-          errno = 0;
-          existing_files =
-              hdfsListDirectory(partition_fs_connection, part_path.c_str(), &num_files);
-        }
-        // hdfsListDirectory() returns nullptr not only when there is an error but also
-        // when the directory is empty(HDFS-8407). Need to check errno to make sure
-        // the call fails.
-        if (existing_files == nullptr && errno != 0) {
-          return Status(GetHdfsErrorMsg("Could not list directory: ", part_path));
-        }
-        for (int i = 0; i < num_files; ++i) {
-          const string filename =
-              boost::filesystem::path(existing_files[i].mName).filename().string();
-          if (existing_files[i].mKind == kObjectKindFile && !IsHiddenFile(filename)) {
-            partition_create_ops.Add(DELETE, existing_files[i].mName);
-          }
-        }
-        hdfsFreeFileInfo(existing_files, num_files);
+
+        RETURN_IF_ERROR(DeleteUnpartitionedDirData(
+            partition_fs_connection, part_path, &partition_create_ops));
       } else {
         // This is a partition directory, not the root directory; we can delete
         // recursively with abandon, after checking that it ever existed.
