@@ -357,4 +357,6 @@ struct TBackendGflags {
   163: required double tuple_cache_cost_coefficient_read_bytes
 
   164: required double tuple_cache_cost_coefficient_read_rows
+
+  165: required i32 min_jdbc_scan_cardinality
 }

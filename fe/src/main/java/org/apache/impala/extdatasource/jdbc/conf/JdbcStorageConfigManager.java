@@ -116,33 +116,6 @@ public class JdbcStorageConfigManager {
     return config.get(key.getPropertyName());
   }
 
-  public static String getOrigQueryToExecute(Configuration config) {
-    String query;
-    String tableName = config.get(JdbcStorageConfig.TABLE.getPropertyName());
-    if (tableName != null) {
-      // We generate query as 'select * from tbl'
-      query = "select * from " + tableName;
-    } else {
-      query = config.get(JdbcStorageConfig.QUERY.getPropertyName());
-    }
-
-    return query;
-  }
-
-  public static String getQueryToExecute(Configuration config) {
-    String query = config.get(JdbcStorageConfig.QUERY.getPropertyName());
-    if (query != null) {
-      // Query has been defined, return it
-      return query;
-    }
-
-    // We generate query as 'select * from tbl'
-    String tableName = config.get(JdbcStorageConfig.TABLE.getPropertyName());
-    query = "select * from " + tableName;
-
-    return query;
-  }
-
   private static boolean isEmptyString(String value) {
     return ((value == null) || (value.trim().isEmpty()));
   }

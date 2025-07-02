@@ -79,7 +79,7 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
 
     try {
       initializeDatabaseSource(conf);
-      String sql = JdbcStorageConfigManager.getQueryToExecute(conf);
+      String sql = getQueryToExecute(conf);
       // TODO: If a target database cannot flatten this view query, try to text
       // replace the generated "select *".
       String countQuery = "SELECT COUNT(*) FROM (" + sql + ") tmptable";
@@ -116,7 +116,7 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
 
     try {
       initializeDatabaseSource(conf);
-      String sql = JdbcStorageConfigManager.getQueryToExecute(conf);
+      String sql = getQueryToExecute(conf);
       String partitionQuery = addLimitAndOffsetToQuery(sql, limit, offset);
 
       LOG.info("Query to execute is [{}]", partitionQuery);
@@ -350,4 +350,22 @@ public class GenericJdbcDatabaseAccessor implements DatabaseAccessor {
         .getInt(JdbcStorageConfig.JDBC_FETCH_SIZE.getPropertyName(), DEFAULT_FETCH_SIZE);
   }
 
+  protected String getQueryToExecute(Configuration config) {
+    String query = config.get(JdbcStorageConfig.QUERY.getPropertyName());
+    if (query != null) {
+      // Query has been defined, return it
+      return query;
+    }
+
+    // We generate query as 'select * from tbl'
+    String tableName = config.get(JdbcStorageConfig.TABLE.getPropertyName());
+    // Make jdbc table name to be quoted with double quotes if columnMapping is not empty
+    String columnMapping = config.get(JdbcStorageConfig.COLUMN_MAPPING.getPropertyName());
+    if (!Strings.isNullOrEmpty(columnMapping)) {
+      tableName = getCaseSensitiveName(tableName);
+    }
+    query = "select * from " + tableName;
+
+    return query;
+  }
 }

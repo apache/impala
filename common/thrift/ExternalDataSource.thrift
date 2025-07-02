@@ -93,6 +93,11 @@ struct TPrepareParams {
   // A list of conjunctive (AND) clauses, each of which contains a list of
   // disjunctive (OR) binary predicates. Always set, may be an empty list.
   3: optional list<list<TBinaryPredicate>> predicates
+
+  // Indicate if external JDBC table handler should clean DBCP DataSource object from
+  // cache when its reference count equals 0. Note that the reference count is tracked
+  // across all queries for a given data source in the coordinator.
+  4: optional bool clean_dbcp_ds_cache
 }
 
 // Returned by prepare().

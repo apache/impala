@@ -42,6 +42,7 @@ DECLARE_int32(max_hdfs_partitions_parallel_load);
 DECLARE_int32(max_nonhdfs_partitions_parallel_load);
 DECLARE_int32(initial_hms_cnxn_timeout_s);
 DECLARE_int32(kudu_operation_timeout_ms);
+DECLARE_int32(min_jdbc_scan_cardinality);
 DECLARE_int64(inc_stats_size_limit_bytes);
 DECLARE_string(principal);
 DECLARE_string(lineage_event_log_dir);
@@ -588,6 +589,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
       FLAGS_tuple_cache_cost_coefficient_read_bytes);
   cfg.__set_tuple_cache_cost_coefficient_read_rows(
       FLAGS_tuple_cache_cost_coefficient_read_rows);
+  cfg.__set_min_jdbc_scan_cardinality(FLAGS_min_jdbc_scan_cardinality);
   return Status::OK();
 }
 

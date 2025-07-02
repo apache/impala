@@ -956,6 +956,6 @@ public class LdapHS2Test {
         "Table has been dropped.");
 
     // Two successful authentications for each ExecAndFetch().
-    verifyMetrics(25, 0);
+    verifyMetrics(23, 0);
   }
 }

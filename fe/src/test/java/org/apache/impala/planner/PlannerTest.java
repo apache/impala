@@ -245,6 +245,11 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("hbase");
   }
 
+  @Test
+    public void testJdbcParallel() {
+      runPlannerTestFile("jdbc-parallel");
+    }
+
   /**
    * Test of HBase in the case of disabling the key scan.
    * Normally the HBase scan node goes out to HBase to query the

@@ -71,6 +71,8 @@ DEFINE_bool(skip_external_kerberos_auth, false,
 DEFINE_string(anonymous_user_name, "anonymous",
     "Default username used when a client connects to an unsecured impala daemon and "
     "does not specify a username.");
+DEFINE_int32(min_jdbc_scan_cardinality, 10,
+    "Lower bound for jdbc scan node cardinality estimates used by the FE planner.");
 
 static const string mem_limit_help_msg = "Limit on process memory consumption. "
     "Includes the JVM's memory consumption only if --mem_limit_includes_jvm is true. "
