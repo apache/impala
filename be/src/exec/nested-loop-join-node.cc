@@ -701,6 +701,7 @@ Status NestedLoopJoinNode::NextProbeRow(RuntimeState* state, RowBatch* output_ba
       return Status::OK();
     } else {
       RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));
+      COUNTER_ADD(probe_row_counter_, probe_batch_->num_rows());
     }
   }
   current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);

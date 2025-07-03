@@ -859,3 +859,22 @@ select * from alltypestiny a join alltypestiny b on a.id = b.id;
 ---- CATCH
 Debug Action: PHJ_BUILDER_PREPARE:FAIL@1.0
 ====
+---- QUERY
+# Regression test for IMPALA-14197, to verify NestedLoopJoin sets 'ProbeRows' counter.
+select count(*) from alltypes a, alltypestiny b
+where a.id + b.id < 2000;
+---- RESULTS
+15972
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 7300
+====
+---- QUERY
+# Regression test for IMPALA-14197, to verify NestedLoopJoin sets 'ProbeRows' counter.
+select count(*) from alltypes a, alltypestiny b
+where a.id + b.id < 2000 and
+      a.id < 3000
+---- RESULTS
+15972
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 3000
+====
