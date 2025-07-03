@@ -53,9 +53,11 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.testutil.TestUtils;
 import org.apache.thrift.TException;
 import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -643,6 +645,9 @@ public class EventExecutorServiceTest {
    */
   @Test
   public void testCommitTxn() throws Exception {
+    Assume.assumeFalse("Skipping this since COMMIT_TXN events are ignored on Apache " +
+            "Hive 2/3. So the validWriteIds list is not updated correctly.",
+        TestUtils.isApacheHiveVersion() && TestUtils.getHiveMajorVersion() <= 3);
     EventExecutorService eventExecutorService = createEventExecutorService(2, 2);
     transactionTest(false);
     shutDownEventExecutorService(eventExecutorService);
@@ -654,6 +659,9 @@ public class EventExecutorServiceTest {
    */
   @Test
   public void testAbortTxn() throws Exception {
+    Assume.assumeFalse("Skipping this since COMMIT_TXN events are ignored on Apache " +
+            "Hive 2/3. So the validWriteIds list is not updated correctly.",
+        TestUtils.isApacheHiveVersion() && TestUtils.getHiveMajorVersion() <= 3);
     EventExecutorService eventExecutorService = createEventExecutorService(2, 2);
     transactionTest(true);
     shutDownEventExecutorService(eventExecutorService);

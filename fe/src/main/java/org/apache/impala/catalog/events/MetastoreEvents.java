@@ -3606,10 +3606,7 @@ public class MetastoreEvents {
    */
   public static class IgnoredEvent extends MetastoreEvent {
 
-    /**
-     * Prevent instantiation from outside should use MetastoreEventFactory instead
-     */
-    private IgnoredEvent(
+    public IgnoredEvent(
         CatalogOpExecutor catalogOpExecutor, Metrics metrics, NotificationEvent event) {
       super(catalogOpExecutor, metrics, event);
     }

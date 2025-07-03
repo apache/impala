@@ -448,6 +448,13 @@ public class TestUtils {
   }
 
   /**
+   * Returns whether we are using Apache Hive versions.
+   */
+  public static boolean isApacheHiveVersion() {
+    return Boolean.parseBoolean(System.getenv("USE_APACHE_HIVE"));
+  }
+
+  /**
    * Gets checks if the catalog server running on the given host and port has
    * catalog-v2 enabled
    * @return
