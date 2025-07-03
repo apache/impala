@@ -33,6 +33,9 @@ setup_report_build_error
 KERB_ARGS=""
 
 # Use a different JDK for testing. Picked up by impala-config and start-impala-cluster.
+# Preserve build-time IMPALA_JAVA_TARGET to restore to its original value in
+# run-all-tests.sh later, because sourcing impala-config.sh below might override it.
+: ${IMPALA_JAVA_TARGET_AT_BUILD:=${IMPALA_JAVA_TARGET}}
 if [ ! -z "${TEST_JAVA_HOME_OVERRIDE:-}" ]; then
   export MINICLUSTER_JAVA_HOME="${JAVA_HOME}"
   export IMPALA_JAVA_HOME_OVERRIDE="${TEST_JAVA_HOME_OVERRIDE}"
@@ -42,6 +45,10 @@ elif [ ! -z "${TEST_JDK_VERSION:-}" ]; then
 fi
 
 . "${IMPALA_HOME}/bin/impala-config.sh" > /dev/null 2>&1
+if [[ -n "${IMPALA_JAVA_TARGET_AT_BUILD}" ]]; then
+  export IMPALA_JAVA_TARGET=${IMPALA_JAVA_TARGET_AT_BUILD}
+  echo "Restore IMPALA_JAVA_TARGET to ${IMPALA_JAVA_TARGET}"
+fi
 . "${IMPALA_HOME}/testdata/bin/run-step.sh"
 if "${CLUSTER_DIR}/admin" is_kerberized; then
   KERB_ARGS="--use_kerberos"
