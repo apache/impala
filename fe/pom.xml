@@ -389,6 +389,13 @@ under the License.
       <version>${commons-dbcp2.version}</version>
     </dependency>
 
+    <!-- CVE-2024-47554: Explicitly include commons-io 2.14.0 to fix vulnerability -->
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.14.0</version>
+    </dependency>
+
     <dependency>
       <groupId>com.google.errorprone</groupId>
       <artifactId>error_prone_annotations</artifactId>
@@ -754,6 +761,11 @@ under the License.
         <exclusion>
           <groupId>org.bouncycastle</groupId>
           <artifactId>bcpkix-jdk15on</artifactId>
+        </exclusion>
+        <!-- CVE-2024-47554: Exclude vulnerable commons-io version -->
+        <exclusion>
+          <groupId>commons-io</groupId>
+          <artifactId>commons-io</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
