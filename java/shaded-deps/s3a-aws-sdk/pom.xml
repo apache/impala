@@ -43,7 +43,7 @@ though some of them might not be necessary. The exclusions are sorted alphabetic
     <plugins>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.4.1</version>
+        <version>3.6.0</version>
         <configuration>
           <artifactSet>
             <includes>

@@ -76,6 +76,10 @@ export IMPALA_VERSION=4.4.1.3.3.6.2-1
 # (e.g. thrift) will also depend on this.
 export USE_APACHE_HIVE=${USE_APACHE_HIVE-false}
 
+# Whether to download Kudu from ODP mirror instead of native toolchain S3
+export USE_ODP_KUDU=${USE_ODP_KUDU-true}
+export ODP_KUDU_DIRECT_URL=${ODP_KUDU_DIRECT_URL-}
+
 # Whether to build the backend on Avro C++ library or C.
 # This is added temporarily to help transitioning from Avro C to C++ library.
 export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
@@ -301,6 +305,7 @@ export CDP_OZONE_VERSION=1.4.1.3.3.6.2-1
 export CDP_PARQUET_VERSION=1.13.1
 export CDP_RANGER_VERSION=2.5.0.3.3.6.2-1
 export CDP_TEZ_VERSION=0.10.4.3.3.6.2-1
+export CDP_KUDU_VERSION=1.17.0.3.3.6.2-1
 
 # Ref: https://infra.apache.org/release-download-pages.html#closer
 : ${APACHE_MIRROR:="https://www.apache.org/dyn/closer.cgi"}
@@ -325,7 +330,7 @@ export IMPALA_JUNIT_VERSION=4.12
 export IMPALA_KITE_VERSION=1.1.0
 export IMPALA_LOG4J2_VERSION=2.18.0
 export IMPALA_ORC_JAVA_VERSION=1.8.5
-export IMPALA_PAC4J_VERSION=5.0.0
+export IMPALA_PAC4J_VERSION=4.5.5
 export IMPALA_RELOAD4j_VERSION=1.2.22
 export IMPALA_SLF4J_VERSION=2.0.3
 export IMPALA_SPRINGFRAMEWORK_VERSION=5.3.37
@@ -1049,7 +1054,11 @@ fi
 # overall build type) and does not apply when using a local Kudu build.
 export USE_KUDU_DEBUG_BUILD=${USE_KUDU_DEBUG_BUILD-false}
 
-export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1.17.0.3.3.6.2-1"}
+if $USE_ODP_KUDU; then
+  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"$CDP_KUDU_VERSION"}
+else
+  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1.17.0.3.3.6.2-1"}
+fi
 export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-$IMPALA_KUDU_VERSION
 export IMPALA_KUDU_JAVA_HOME=\
 ${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-${IMPALA_KUDU_VERSION}/java
@@ -1141,6 +1150,7 @@ echo "IMPALA_HBASE_VERSION    = $IMPALA_HBASE_VERSION"
 echo "IMPALA_OZONE_VERSION    = $IMPALA_OZONE_VERSION"
 echo "IMPALA_HUDI_VERSION     = $IMPALA_HUDI_VERSION"
 echo "IMPALA_KUDU_VERSION     = $IMPALA_KUDU_VERSION"
+echo "USE_ODP_KUDU            = $USE_ODP_KUDU"
 echo "IMPALA_RANGER_VERSION   = $IMPALA_RANGER_VERSION"
 echo "IMPALA_ICEBERG_VERSION  = $IMPALA_ICEBERG_VERSION"
 echo "IMPALA_COS_VERSION      = $IMPALA_COS_VERSION"

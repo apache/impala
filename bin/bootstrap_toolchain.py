@@ -376,6 +376,55 @@ class ToolchainKudu(ToolchainPackage):
     return False
 
 
+class OdpKudu(EnvVersionedPackage):
+  """
+  Kudu component that downloads from ODP mirror instead of native toolchain S3.
+  This allows using custom Kudu builds hosted on ODP mirror location.
+  """
+  def __init__(self):
+    # Get the toolchain packages home for destination  
+    toolchain_packages_home = os.environ.get("IMPALA_TOOLCHAIN_PACKAGES_HOME")
+    if not toolchain_packages_home:
+      logging.error("Impala environment not set up correctly, make sure "
+          "$IMPALA_TOOLCHAIN_PACKAGES_HOME is set.")
+      sys.exit(1)
+    
+    # Check for custom Kudu URL from environment variable
+    custom_kudu_url = os.environ.get("ODP_KUDU_DIRECT_URL")
+    
+    if custom_kudu_url:
+      # Use custom direct URL from environment variable
+      logging.info("Using custom Kudu URL from ODP_KUDU_DIRECT_URL: %s", custom_kudu_url)
+      
+      # Extract the filename from the direct URL
+      archive_name = custom_kudu_url.split('/')[-1]
+      archive_basename = archive_name.replace('.tar.gz', '')
+
+      # For direct file URLs, split the URL to get the base path
+      url_parts = custom_kudu_url.rsplit('/', 1)
+      url_prefix_tmpl = url_parts[0] + "/"
+      template_subs = {}
+    else:
+      # Use default ODP mirror URL pattern
+      logging.info("Using default ODP mirror URL pattern for Kudu")
+      template_subs = {"odp_build_number": os.environ["ODP_BUILD_NUMBER"]}
+      url_prefix_tmpl = "https://mirror.odp.acceldata.dev/ODP/standalone/${odp_build_number}/"
+      archive_basename = "kudu-${version}-src" 
+    
+    super(OdpKudu, self).__init__("kudu", url_prefix_tmpl, toolchain_packages_home,
+                                  archive_basename_tmpl=archive_basename,
+                                  unpack_directory_tmpl="kudu-${version}",
+                                  template_subs_in=template_subs)
+
+  def needs_download(self):
+    # This verifies that the unpack directory exists
+    if super(OdpKudu, self).needs_download():
+      return True
+    # For source packages, we don't need the debug/release directory check
+    # like ToolchainKudu since this is a source distribution
+    return False
+
+
 def try_get_platform_release_label():
   """Gets the right package label from the OS version. Returns an OsMapping with both
      'toolchain' and 'cdh' labels. Return None if not found.
@@ -558,8 +607,17 @@ def get_hadoop_downloads():
 
 
 def get_kudu_downloads():
-  # Toolchain Kudu includes Java artifacts.
-  return [ToolchainKudu()]
+  # Check if we should use ODP mirror for Kudu instead of native toolchain
+  use_odp_kudu = os.environ.get("USE_ODP_KUDU", "false") == "true"
+  
+  if use_odp_kudu:
+    # Use ODP mirror for Kudu download
+    logging.info("Using ODP mirror for Kudu download")
+    return [OdpKudu()]
+  else:
+    # Use native toolchain Kudu (original behavior)
+    logging.info("Using native toolchain for Kudu download")
+    return [ToolchainKudu()]
 
 
 def main():
