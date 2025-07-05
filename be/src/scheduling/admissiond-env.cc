@@ -50,7 +50,8 @@ AdmissiondEnv* AdmissiondEnv::admissiond_env_ = nullptr;
 
 AdmissiondEnv::AdmissiondEnv()
   : pool_mem_trackers_(new PoolMemTrackerRegistry),
-    request_pool_service_(new RequestPoolService(DaemonEnv::GetInstance()->metrics())),
+    request_pool_service_(
+        new RequestPoolService(DaemonEnv::GetInstance()->metrics(), true)),
     rpc_mgr_(new RpcMgr(IsInternalTlsConfigured())),
     rpc_metrics_(DaemonEnv::GetInstance()->metrics()->GetOrCreateChildGroup("rpc")) {
   MetricGroup* metrics = DaemonEnv::GetInstance()->metrics();

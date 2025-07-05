@@ -86,8 +86,8 @@ static const string ERROR_USER_NOT_SPECIFIED = "User must be specified because "
 
 const string RequestPoolService::DEFAULT_POOL_NAME = "default-pool";
 
-RequestPoolService::RequestPoolService(MetricGroup* metrics) :
-    resolve_pool_ms_metric_(NULL) {
+RequestPoolService::RequestPoolService(MetricGroup* metrics, bool is_admissiond)
+  : resolve_pool_ms_metric_(NULL) {
   DCHECK(metrics != NULL);
   resolve_pool_ms_metric_ =
       StatsMetric<double>::CreateAndRegister(metrics, RESOLVE_POOL_METRIC_NAME);
@@ -114,7 +114,7 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
 
   jmethodID start_id; // JniRequestPoolService.start(), only called in this method.
   JniMethodDescriptor methods[] = {
-      {"<init>", "([BLjava/lang/String;Ljava/lang/String;Z)V", &ctor_},
+      {"<init>", "([BLjava/lang/String;Ljava/lang/String;ZZ)V", &ctor_},
       {"start", "()V", &start_id},
       {"resolveRequestPool", "([B)[B", &resolve_request_pool_id_},
       {"getPoolConfig", "([B)[B", &get_pool_config_id_},
@@ -142,8 +142,9 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
   ABORT_IF_EXC(jni_env);
 
   jboolean is_be_test = TestInfo::is_be_test();
-  jobject jni_request_pool_service = jni_env->NewObject(jni_request_pool_service_class_,
-      ctor_, cfg_bytes, fair_scheduler_config_path, llama_site_path, is_be_test);
+  jobject jni_request_pool_service =
+      jni_env->NewObject(jni_request_pool_service_class_, ctor_, cfg_bytes,
+          fair_scheduler_config_path, llama_site_path, is_be_test, is_admissiond);
   ABORT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(
       jni_env, jni_request_pool_service, &jni_request_pool_service_));

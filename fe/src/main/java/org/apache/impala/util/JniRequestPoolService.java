@@ -21,20 +21,19 @@ import com.google.common.base.Preconditions;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.Groups;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
-import org.apache.impala.thrift.TErrorCode;
-import org.apache.hadoop.security.Groups;
 import org.apache.impala.thrift.TGetHadoopGroupsRequest;
 import org.apache.impala.thrift.TGetHadoopGroupsResponse;
-import org.apache.impala.thrift.TPoolConfigParams;
+import org.apache.impala.thrift.TLogLevel;
 import org.apache.impala.thrift.TPoolConfig;
+import org.apache.impala.thrift.TPoolConfigParams;
 import org.apache.impala.thrift.TResolveRequestPoolParams;
 import org.apache.impala.thrift.TResolveRequestPoolResult;
-
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -67,12 +66,21 @@ public class JniRequestPoolService {
    *
    * @param fsAllocationPath path to the fair scheduler allocation file.
    * @param sitePath path to the configuration file.
+   * @param isBackendTest true if instantiated from backend test.
+   * @param isAdmissiond true if running in AdmissionD. Enable log4j to Glog hookup.
    */
   public JniRequestPoolService(byte[] thriftBackendConfig, final String fsAllocationPath,
-      final String sitePath, boolean isBackendTest) throws ImpalaException {
+      final String sitePath, boolean isBackendTest, boolean isAdmissiond)
+      throws ImpalaException {
     Preconditions.checkNotNull(fsAllocationPath);
     TBackendGflags cfg = new TBackendGflags();
     JniUtil.deserializeThrift(protocolFactory_, cfg, thriftBackendConfig);
+    if (isAdmissiond) {
+      GlogAppender.Install(TLogLevel.values()[cfg.impala_log_lvl],
+          TLogLevel.values()[cfg.non_impala_java_vlog]);
+      LOG.info("GlogAppender installed for AdmissionD.");
+      LOG.info(JniUtil.getJavaVersion());
+    }
 
     BackendConfig.create(cfg, false);
     requestPoolService_ =

@@ -410,7 +410,7 @@ public class RequestPoolService {
       result.setOnly_coordinators(allocationConf_.get().isOnlyCoordinators(pool));
     }
     if (LOG.isTraceEnabled()) {
-      LOG.debug("getPoolConfig(pool={}): max_mem_resources={}, max_requests={},"
+      LOG.trace("getPoolConfig(pool={}): max_mem_resources={}, max_requests={},"
               + " max_queued={},  queue_timeout_ms={}, default_query_options={},"
               + " max_query_mem_limit={}, min_query_mem_limit={},"
               + " clamp_mem_limit_query_option={}, max_query_cpu_core_per_node_limit={},"

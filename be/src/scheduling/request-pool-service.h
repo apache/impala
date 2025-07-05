@@ -41,7 +41,7 @@ class RequestPoolService {
   /// Initializes the JNI method stubs if configuration files are specified. If any
   /// method can't be found, or if there is any further error, the constructor will
   /// terminate the process.
-  RequestPoolService(MetricGroup* metrics);
+  RequestPoolService(MetricGroup* metrics, bool is_admissiond = false);
 
   /// Resolves the request to a resource pool as determined by the policy. Returns an
   /// error if the request cannot be resolved to a pool or if the user does not have
