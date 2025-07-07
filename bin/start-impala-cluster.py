@@ -205,6 +205,9 @@ parser.add_option("--use_calcite_planner", default="False", type="choice",
                   choices=["true", "True", "false", "False"],
                   help="If true, use the Calcite planner for query optimization "
                   "instead of the Impala planner")
+parser.add_option("--enable_ranger_authz", dest="enable_ranger_authz",
+                  action="store_true", default=False,
+                  help="If true, enable Ranger authorization in Impala cluster.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -468,6 +471,9 @@ def build_catalogd_arg_list(num_catalogd, remap_ports):
           ["-state_store_port={0}".format(state_store_port)])
       args.extend(
           ["-state_store_2_port={0}".format(state_store_port + 1)])
+    if options.enable_ranger_authz:
+      args.extend(["--server-name=server1", "--ranger_service_type=hive",
+                   "--ranger_app_id=impala", "--authorization_provider=ranger"])
     catalogd_arg_list.append(args)
   return catalogd_arg_list
 
@@ -701,6 +707,10 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
           jni_frontend_class="org/apache/impala/calcite/service/CalciteJniFrontend",
           args=args)
       os.environ["USE_CALCITE_PLANNER"] = "true"
+
+    if options.enable_ranger_authz:
+      args = ("--server-name=server1 --ranger_service_type=hive --ranger_app_id=impala "
+              "--authorization_provider=ranger {args}").format(args=args)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):
