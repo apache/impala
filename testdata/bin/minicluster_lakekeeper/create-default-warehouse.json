@@ -1,0 +1,13 @@
+{
+  "warehouse-name": "lakekeeper_demo",
+  "project-id": "00000000-0000-0000-0000-000000000000",
+  "storage-profile": {
+    "type": "hdfs",
+    "url": "hdfs://localhost:20500",
+    "key-prefix": "/test-warehouse/lakekeeper",
+    "config": {
+      "dfs.client.read.shortcircuit": "true",
+      "dfs.domain.socket.path": "/var/lib/hadoop-hdfs/dn_socket"
+    }
+  }
+}

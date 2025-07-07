@@ -63,43 +63,78 @@ public class IcebergRESTCatalog implements IcebergCatalog {
     return instance_;
   }
 
+  private static class IcebergRestConfig {
+    String catalogName;
+    String uri;
+    String user;
+    String secret;
+    String credential;
+    String warehouseLocation;
+
+    IcebergRestConfig(Properties properties) {
+      uri = getRequiredProperty(properties, KEY_URI);
+      catalogName = properties.getProperty(KEY_NAME, "");
+      user = properties.getProperty(KEY_CLIENT_ID);
+      secret = properties.getProperty(KEY_CLIENT_SECRET);
+      credential = getCredential();
+      warehouseLocation = properties.getProperty(KEY_WAREHOUSE);
+    }
+
+    public Map<String, String> getCatalogProperties() {
+      ImmutableMap.Builder<String, String> mapBuilder = new ImmutableMap.Builder<>();
+      mapBuilder.put(CatalogProperties.URI, uri);
+      if (credential != null) mapBuilder.put("credential", credential);
+      if (warehouseLocation != null){
+        mapBuilder.put(CatalogProperties.WAREHOUSE_LOCATION, warehouseLocation);
+      }
+      return mapBuilder.build();
+    }
+
+    public SessionCatalog.SessionContext getSessionContext() {
+      return new SessionCatalog.SessionContext(
+          UUID.randomUUID().toString(),
+          user,
+          getCredentialMap(),
+          ImmutableMap.of());
+    }
+
+    private String getRequiredProperty(Properties properties, String key) {
+      String value = properties.getProperty(key);
+      if (value == null) {
+        throw new IllegalStateException(
+            String.format("Missing property of IcebergRESTCatalog: %s", key));
+      }
+      return value;
+    }
+
+    private String getCredential() {
+      if (user != null && secret != null) {
+        return user + ":" + secret;
+      }
+      return null;
+    }
+
+    private ImmutableMap<String, String> getCredentialMap() {
+      ImmutableMap.Builder<String, String> mapBuilder = new ImmutableMap.Builder<>();
+      if (credential != null) {
+        mapBuilder.put("credential", credential);
+      }
+      return mapBuilder.build();
+    }
+  }
+
   private IcebergRESTCatalog(Properties properties) {
     setContextClassLoader();
 
-    REST_URI = getRequiredProperty(properties, KEY_URI);
-    final String CATALOG_NAME = properties.getProperty(KEY_NAME, "");
-    final String CLIENT_ID = properties.getProperty(KEY_CLIENT_ID, "impala");
-    final String CLIENT_SECRET = properties.getProperty(KEY_CLIENT_SECRET, "");
-    final String CLIENT_CREDS = CLIENT_ID + ":" + CLIENT_SECRET;
-    final String WAREHOUSE_LOCATION = properties.getProperty(KEY_WAREHOUSE, "");
-
-    SessionCatalog.SessionContext context =
-        new SessionCatalog.SessionContext(
-            UUID.randomUUID().toString(),
-            "user",
-            ImmutableMap.of("credential", CLIENT_CREDS),
-            ImmutableMap.of());
-
-    restCatalog_ = new RESTCatalog(context,
+    IcebergRestConfig restConfig = new IcebergRestConfig(properties);
+    REST_URI = restConfig.uri;
+    restCatalog_ = new RESTCatalog(restConfig.getSessionContext(),
         (config) -> HTTPClient.builder(config).uri(REST_URI).build());
     HiveConf conf = new HiveConf(IcebergRESTCatalog.class);
     restCatalog_.setConf(conf);
     restCatalog_.initialize(
-        CATALOG_NAME,
-        ImmutableMap.of(
-            CatalogProperties.URI, REST_URI,
-            "credential", CLIENT_CREDS,
-            CatalogProperties.WAREHOUSE_LOCATION, WAREHOUSE_LOCATION)
-    );
-  }
-
-  private String getRequiredProperty(Properties properties, String key) {
-    String value = properties.getProperty(key);
-    if (value == null) {
-      throw new IllegalStateException(
-          String.format("Missing property of IcebergRESTCatalog: %s", key));
-    }
-    return value;
+        restConfig.catalogName,
+        restConfig.getCatalogProperties());
   }
 
   public String getUri() {

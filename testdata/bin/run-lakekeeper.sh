@@ -1,3 +1,5 @@
+#!/bin/bash
+#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,19 +17,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Use an official Trino image as the base
-FROM trinodb/trino:latest
+# Copy cluster configs to trino docker directory.
+pushd ${HADOOP_CONF_DIR}
+cp core-site.xml hdfs-site.xml ${IMPALA_HOME}/testdata/bin/minicluster_lakekeeper
+popd
 
-# Use the developer username, so Trino will have write access to HDFS
-ARG USERNAME
+cd ${IMPALA_HOME}/testdata/bin/minicluster_lakekeeper
 
-RUN \
-    sed -i 's/http-server.http.port=8080/http-server.http.port=9091/' /etc/trino/config.properties && \
-    sed -i 's/localhost:8080/localhost:9091/' /etc/trino/config.properties && \
-    echo "-DHADOOP_USER_NAME=$USERNAME" >> /etc/trino/jvm.config
-
-COPY hive-site.xml core-site.xml hdfs-site.xml /etc/
-COPY iceberg_lakekeeper.properties iceberg_rest.properties iceberg.properties hive.properties /etc/trino/catalog/
-
-# Expose the Trino port
-EXPOSE 9091
+docker compose up -d
