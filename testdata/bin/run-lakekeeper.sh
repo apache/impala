@@ -17,6 +17,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# Check Iceberg version. We need at least Iceberg 1.5
+IFS='.-' read -r major minor _ <<< "$IMPALA_ICEBERG_VERSION"
+if (( major < 1 )) || { (( major == 1 )) && (( minor < 5 )); }; then
+    echo "Iceberg version does NOT meet requirement (need at least 1.5):" \
+         "$IMPALA_ICEBERG_VERSION"
+    exit
+fi
+
 # Copy cluster configs to trino docker directory.
 pushd ${HADOOP_CONF_DIR}
 cp core-site.xml hdfs-site.xml ${IMPALA_HOME}/testdata/bin/minicluster_lakekeeper

@@ -24,6 +24,8 @@ services:
       - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://postgres:postgres@localhost:54321/postgres
       - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://postgres:postgres@localhost:54321/postgres
       - LAKEKEEPER__ENABLE_HDFS_WITH_SYSTEM_CREDENTIALS=true
+      - LAKEKEEPER__OPENID_PROVIDER_URI=http://localhost:7070/realms/lakekeeper-realm
+      - LAKEKEEPER__OPENID_CLIENT_ID=lakekeeper-client
       - RUST_LOG=trace,axum=trace,sqlx=trace,iceberg-catalog=trace
       - HADOOP_USER_NAME=${USER}
       - HADOOP_CONF_DIR=/etc/hadoop
@@ -40,6 +42,8 @@ services:
         condition: service_completed_successfully
       db:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
     volumes:
       - ./core-site.xml:/etc/hadoop/core-site.xml:ro
       - ./hdfs-site.xml:/etc/hadoop/hdfs-site.xml:ro
@@ -53,61 +57,29 @@ services:
       - LAKEKEEPER__ENABLE_HDFS_WITH_SYSTEM_CREDENTIALS=true
       - LAKEKEEPER__PG_DATABASE_URL_READ=postgresql://postgres:postgres@db:5432/postgres
       - LAKEKEEPER__PG_DATABASE_URL_WRITE=postgresql://postgres:postgres@db:5432/postgres
+      - LAKEKEEPER__OPENID_PROVIDER_URI=http://localhost:7070/realms/lakekeeper-realm
+      - LAKEKEEPER__OPENID_CLIENT_ID=lakekeeper-client
       - RUST_LOG=info
     restart: "no"
     command: [ "migrate" ]
     depends_on:
       db:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
     networks:
       lakekeeper_net:
 
   bootstrap:
-    image: curlimages/curl
+    build: .
     depends_on:
-      lakekeeper:
-        condition: service_healthy
-    restart: "no"
-    command:
-      - -w
-      - "%{http_code}"
-      - "-X"
-      - "POST"
-      - "-v"
-      - "http://localhost:8181/management/v1/bootstrap"
-      - "-H"
-      - "Content-Type: application/json"
-      - "--data"
-      - '{"accept-terms-of-use": true}'
-      - "-o"
-      - "/dev/null"
-      # - "--fail-with-body"
-    network_mode: host
-
-  initialwarehouse:
-    image: curlimages/curl
-    depends_on:
-      lakekeeper:
-        condition: service_healthy
-      bootstrap:
-        condition: service_completed_successfully
-    restart: "no"
-    command:
-      - -w
-      - "%{http_code}"
-      - "-X"
-      - "POST"
-      - "-v"
-      - "http://localhost:8181/management/v1/warehouse"
-      - "-H"
-      - "Content-Type: application/json"
-      - "--data"
-      - "@create-default-warehouse.json"
-      - "-o"
-      - "/dev/null"
+      - keycloak
+      - lakekeeper
     volumes:
-      - ./create-default-warehouse.json:/home/curl_user/create-default-warehouse.json
+      - ./setup.sh:/setup.sh
+      - ./create-default-warehouse.json:/create-default-warehouse.json
     network_mode: host
+    entrypoint: /setup.sh
 
   db:
     image: bitnami/postgresql:16.3.0
@@ -125,6 +97,38 @@ services:
       lakekeeper_net:
     ports:
       - "54321:5432"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - >
+          [ -f /tmp/HealthCheck.java ] ||
+          echo "public class HealthCheck {
+            public static void main(String[] args) throws java.lang.Throwable {
+              java.net.URI uri = java.net.URI.create(args[0]);
+              System.exit(
+                  java.net.HttpURLConnection.HTTP_OK ==
+                  ((java.net.HttpURLConnection)uri.toURL().
+                      openConnection()).getResponseCode() ? 0 : 1);
+            }
+          }" > /tmp/HealthCheck.java &&
+          java /tmp/HealthCheck.java http://localhost:9000/health/live
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: start-dev --import-realm
+    volumes:
+      - ./realm-config.json:/opt/keycloak/data/import/realm.json:ro
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: true
+    networks:
+      lakekeeper_net:
+    ports:
+      - "7070:8080"
 
 networks:
   lakekeeper_net:

@@ -8,7 +8,7 @@ You need docker compose (Compose V2) in your environment. This usually means you
 Via the following scripts you can run/stop Lakekeeper. Be aware that each restart resets the warehouse contents.
 ```
 ${IMPALA_HOME}/testdata/bin/run-lakekeeper.sh
-${IMPALA_HOME}/testdata/bin/stop-lakekeeper.sh
+${IMPALA_HOME}/testdata/bin/kill-lakekeeper.sh
 ```
 
 ## Ingesting data

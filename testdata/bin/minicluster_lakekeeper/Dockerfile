@@ -15,12 +15,5 @@
 # specific language governing permissions and limitations
 # under the License.
 
-connector.name=iceberg
-iceberg.catalog.type=rest
-iceberg.rest-catalog.uri=http://localhost:8181/catalog
-iceberg.rest-catalog.warehouse=lakekeeper_demo
-iceberg.rest-catalog.security=OAUTH2
-iceberg.rest-catalog.oauth2.credential=impala-client:impala-client-secret
-iceberg.rest-catalog.oauth2.server-uri=http://localhost:7070/realms/lakekeeper-realm/protocol/openid-connect/token
-fs.hadoop.enabled=true
-hive.config.resources=/etc/hive-site.xml,/etc/hdfs-site.xml,/etc/core-site.xml
+FROM alpine:latest
+RUN apk add --no-cache curl jq
