@@ -596,3 +596,35 @@ where `data` not in (select min(`data`) from functional_parquet.iceberg_v2_delet
 ---- TYPES
 STRING
 ====
+---- QUERY
+# Regression test for IMPALA-IMPALA-13888.
+select a.id
+from alltypestiny a LEFT ANTI JOIN iceberg_v2_positional_update_all_rows b
+ON a.id = b.i;
+---- RESULTS
+4
+5
+0
+6
+7
+---- TYPES
+INT
+====
+---- QUERY
+# Regression test for IMPALA-IMPALA-13888 with multiple joins.
+select a.id from alltypestiny a
+LEFT ANTI JOIN iceberg_v2_positional_update_all_rows b
+ON a.id = b.i
+LEFT ANTI JOIN iceberg_v2_positional_update_all_rows c
+ON a.id = c.i
+LEFT ANTI JOIN iceberg_v2_positional_update_all_rows d
+ON a.id = d.i;
+---- RESULTS
+4
+5
+0
+6
+7
+---- TYPES
+INT
+====

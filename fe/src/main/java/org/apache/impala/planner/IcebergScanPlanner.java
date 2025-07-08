@@ -359,6 +359,12 @@ public class IcebergScanPlanner {
   private void addDataVirtualPositionSlots(TableRef tblRef) throws AnalysisException {
     List<String> rawPath = Lists.newArrayList(
         tblRef.getUniqueAlias(), VirtualColumn.INPUT_FILE_NAME.getName());
+
+    // If we are inside a semi-join, make the tuple visible so that paths in the tuple can
+    // be resolved in it. See IMPALA-13888.
+    boolean isSemiJoined = analyzer_.isSemiJoined(tblRef.getId());
+    if (isSemiJoined) analyzer_.setVisibleSemiJoinedTuple(tblRef.getId());
+
     SlotDescriptor fileNameSlotDesc =
         SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
     fileNameSlotDesc.setStats(virtualInputFileNameStats());
@@ -367,6 +373,9 @@ public class IcebergScanPlanner {
         tblRef.getUniqueAlias(), VirtualColumn.FILE_POSITION.getName());
     SlotDescriptor filePosSlotDesc =
         SingleNodePlanner.addSlotRefToDesc(analyzer_, rawPath);
+
+    if (isSemiJoined) analyzer_.setVisibleSemiJoinedTuple(null);
+
     filePosSlotDesc.setStats(virtualFilePositionStats());
   }
 
