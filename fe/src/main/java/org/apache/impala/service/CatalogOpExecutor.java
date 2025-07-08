@@ -7532,7 +7532,8 @@ public class CatalogOpExecutor {
               .getPartitionFromThriftPartitionSpec(partSpecList.get(i));
           if (partition != null) {
             HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
-            partBuilder.setLastRefreshEventId(eventIds.get(0));
+            // use last event id, so that batch partition events will not reloaded again
+            partBuilder.setLastRefreshEventId(eventIds.get(eventIds.size() - 1));
             partitionChanged |= hdfsTbl.updatePartition(partBuilder);
           } else {
             LOG.warn("Partition {} no longer exists in table {}. It might be " +

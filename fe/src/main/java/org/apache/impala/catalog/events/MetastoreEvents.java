@@ -136,6 +136,7 @@ public class MetastoreEvents {
     INSERT("INSERT"),
     INSERT_PARTITIONS("INSERT_PARTITIONS"),
     RELOAD("RELOAD"),
+    RELOAD_PARTITIONS("RELOAD_PARTITIONS"),
     ALLOC_WRITE_ID_EVENT("ALLOC_WRITE_ID_EVENT"),
     COMMIT_TXN("COMMIT_TXN"),
     ABORT_TXN("ABORT_TXN"),
@@ -2991,8 +2992,9 @@ public class MetastoreEvents {
           partitions.add(event.getPartitionForBatching());
         }
         try {
-          if (baseEvent_ instanceof InsertEvent) {
-            // for insert event, always reload file metadata so that new files
+          if ((baseEvent_ instanceof InsertEvent) ||
+              (baseEvent_ instanceof ReloadEvent)) {
+            // for insert & reload events, always reload file metadata so that new files
             // are reflected in HdfsPartition
             reloadPartitions(partitions, FileMetadataLoadOpts.FORCE_LOAD, getEventDesc(),
                 true);
@@ -3330,6 +3332,41 @@ public class MetastoreEvents {
             "command to reset the event processor state.",
             getFullyQualifiedTblName()), e);
       }
+    }
+
+    @Override
+    public boolean canBeBatched(MetastoreEvent event) {
+      if (!(event instanceof ReloadEvent)) return false;
+      if (isOlderThanLastSyncEventId(event)) return false;
+      ReloadEvent reloadEvent = (ReloadEvent) event;
+      // make sure that the event is on the same table
+      if (!getFullyQualifiedTblName().equalsIgnoreCase(
+          reloadEvent.getFullyQualifiedTblName())) {
+        return false;
+      }
+      // we currently only batch partition level reload events
+      if (this.reloadPartition_ == null || reloadEvent.reloadPartition_ == null) {
+        return false;
+      }
+      return true;
+    }
+
+    @Override
+    public MetastoreEvent addToBatchEvents(MetastoreEvent event) {
+      if (!(event instanceof ReloadEvent)) return null;
+      BatchPartitionEvent<ReloadEvent> batchEvent = new BatchPartitionEvent<>(
+          this);
+      Preconditions.checkState(batchEvent.canBeBatched(event));
+      batchEvent.addToBatchEvents(event);
+      return batchEvent;
+    }
+
+    @Override
+    protected Partition getPartitionForBatching() { return reloadPartition_; }
+
+    @Override
+    protected MetastoreEventType getBatchEventType() {
+      return MetastoreEventType.RELOAD_PARTITIONS;
     }
 
     private void processTableInvalidate() throws MetastoreNotificationException {
