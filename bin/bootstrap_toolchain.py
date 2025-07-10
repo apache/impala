@@ -163,7 +163,8 @@ class DownloadUnpackTarball(object):
     else:
       download_dir = self.destination_basedir
     try:
-      wget_and_unpack_package(self.url, self.archive_name, download_dir, False)
+      if self.url:
+        wget_and_unpack_package(self.url, self.archive_name, download_dir, False)
     except:  # noqa
       # Clean up any partially-unpacked result.
       if os.path.isdir(unpack_dir):
@@ -359,21 +360,46 @@ class ApacheComponent(EnvVersionedPackage):
                                        makedir=makedir, template_subs_in=template_subs)
 
 
-class ToolchainKudu(ToolchainPackage):
+class ToolchainKudu(DownloadUnpackTarball):
+  """
+  Unpacks a Kudu toolchain tarball from a local path specified by ODP_KUDU_TARBALL_PATH.
+  """
   def __init__(self, platform_label=None):
-    super(ToolchainKudu, self).__init__('kudu', platform_release=platform_label)
+    toolchain_kudu_path = os.environ.get('ODP_KUDU_TARBALL_PATH')
+    if not toolchain_kudu_path or not os.path.isfile(toolchain_kudu_path):
+      logging.error("ODP_KUDU_TARBALL_PATH is not set or file does not exist: %s", toolchain_kudu_path)
+      sys.exit(1)
+    archive_name = os.path.basename(toolchain_kudu_path)
+    archive_basename = archive_name.replace('.tar.gz', '')
+    toolchain_packages_home = os.environ.get("IMPALA_TOOLCHAIN_PACKAGES_HOME")
+    if not toolchain_packages_home:
+      logging.error("Impala environment not set up correctly, make sure $IMPALA_TOOLCHAIN_PACKAGES_HOME is set.")
+      sys.exit(1)
+    directory_name = archive_basename
+    makedir = False
+    # url is None, we only unpack
+    super(ToolchainKudu, self).__init__(
+        url=None,
+        archive_name=archive_name,
+        destination_basedir=toolchain_packages_home,
+        directory_name=directory_name,
+        makedir=makedir
+    )
+    self.local_archive_path = toolchain_kudu_path
 
   def needs_download(self):
-    # This verifies that the unpack directory exists
-    if super(ToolchainKudu, self).needs_download():
-      return True
-    # Additional check to distinguish this from the Kudu Java package
-    # Regardless of the actual build type, the 'kudu' tarball will always contain a
-    # 'debug' and a 'release' directory.
-    if not os.path.exists(os.path.join(self.pkg_directory(), "debug")):
-      return True
-    # Both the pkg_directory and the debug directory exist
-    return False
+    return not os.path.isdir(self.pkg_directory())
+
+  def download(self):
+    # Unpack the archive from the local path to the destination directory
+    unpack_dir = self.pkg_directory()
+    if os.path.exists(unpack_dir):
+      logging.info("Removing existing package directory %s", unpack_dir)
+      shutil.rmtree(unpack_dir)
+    logging.info("Unpacking Kudu toolchain from %s to %s", self.local_archive_path, self.destination_basedir)
+    subprocess.check_call([
+      "tar", "xzf", self.local_archive_path, "--directory={0}".format(self.destination_basedir)
+    ])
 
 
 class OdpKudu(EnvVersionedPackage):
@@ -409,7 +435,7 @@ class OdpKudu(EnvVersionedPackage):
       logging.info("Using default ODP mirror URL pattern for Kudu")
       template_subs = {"odp_build_number": os.environ["ODP_BUILD_NUMBER"]}
       url_prefix_tmpl = "https://mirror.odp.acceldata.dev/ODP/standalone/${odp_build_number}/"
-      archive_basename = "kudu-${version}-src" 
+      archive_basename = "kudu-${version}" 
     
     super(OdpKudu, self).__init__("kudu", url_prefix_tmpl, toolchain_packages_home,
                                   archive_basename_tmpl=archive_basename,
