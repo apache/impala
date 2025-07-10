@@ -28,6 +28,7 @@ import static org.junit.Assert.assertEquals;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.impala.thrift.TTableName;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -35,6 +36,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Tests for the various util methods in FileSystemUtil class
@@ -229,6 +231,22 @@ public class FileSystemUtilTest {
       Path p = new Path(c.first);
       assertEquals(c.second, FileSystemUtil.volumeBucketPair(p));
     }
+  }
+
+  @Test
+  public void testLoadingWarmupTableNames() {
+    String configFile = String.format(
+        "file://%s/testdata/data/warmup_table_list.txt", System.getenv("IMPALA_HOME"));
+    Set<TTableName> tableNames = FileSystemUtil.loadWarmupTableNames(configFile);
+    String db = "tpcds";
+    String[] tables = {"customer", "date_dim", "item", "store_sales"};
+    for (String table : tables) {
+      assertTrue(table + " not found", tableNames.contains(new TTableName(db, table)));
+    }
+    assertTrue(tableNames.contains(new TTableName("tpch", "*")));
+    assertTrue(tableNames.contains(new TTableName("functional", "#")));
+    assertTrue(tableNames.contains(new TTableName("functional", "alltypes etc #")));
+    assertEquals(tables.length + 3, tableNames.size());
   }
 
   private boolean testIsInIgnoredDirectory(Path input) {

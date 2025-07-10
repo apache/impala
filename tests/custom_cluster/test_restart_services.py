@@ -34,6 +34,7 @@ import pytest
 from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
+from tests.common.file_utils import grep_file
 from tests.common.impala_connection import (
     ERROR,
     FINISHED,
@@ -42,6 +43,7 @@ from tests.common.impala_connection import (
 )
 from tests.common.skip import SkipIfFS, SkipIfNotHdfsMinicluster
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
+from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 
 LOG = logging.getLogger(__name__)
 
@@ -1115,3 +1117,66 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     impalad.wait()
     shutdown_duration = time.time() - start_time
     assert shutdown_duration <= self.IDLE_SHUTDOWN_GRACE_PERIOD_S + 10
+
+
+class TestWarmupCatalog(CustomClusterTestSuite):
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="-logbuflevel=-1 --warmup_tables_config_file=file://%s/testdata/data/"
+                    "warmup_table_list.txt --keeps_warmup_tables_loaded=false" %
+                    os.environ['IMPALA_HOME'])
+  def test_warmup_tables_local_config_file(self):
+    self._test_warmup_tables(False)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="-logbuflevel=-1 --warmup_tables_config_file={0}/test-warehouse"
+                    "/warmup_table_list.txt --keeps_warmup_tables_loaded=false"
+                    .format(FILESYSTEM_PREFIX))
+  def test_warmup_tables_hdfs_config_file(self):
+    self._test_warmup_tables(False)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="-logbuflevel=-1 --warmup_tables_config_file={0}/test-warehouse"
+                    "/warmup_table_list.txt --keeps_warmup_tables_loaded=true"
+                    .format(FILESYSTEM_PREFIX))
+  def test_keeps_warmup_tables_loaded(self):
+    self._test_warmup_tables(True)
+
+  def _test_warmup_tables(self, keeps_warmup_tables_loaded):
+    catalogd = self.cluster.catalogd.service
+    self._verify_tables_warmed_up(catalogd)
+    self._verify_warmup_scheduling_order()
+    self.execute_query("invalidate metadata")
+    self._verify_tables_warmed_up(catalogd)
+    self.execute_query("invalidate metadata tpcds.item")
+    catalogd.verify_table_metadata_loaded("tpcds", "item", keeps_warmup_tables_loaded)
+
+  def _verify_tables_warmed_up(self, catalogd):
+    tables = {
+      "tpcds": ["customer", "date_dim", "item", "store_sales"],
+      "tpch": ["customer", "lineitem", "nation", "orders", "part",
+               "partsupp", "region", "supplier"]
+    }
+    for db in tables:
+      for table in tables[db]:
+        catalogd.verify_table_metadata_loaded(db, table)
+    catalogd.verify_table_metadata_loaded("tpcds", "store", expect_loaded=False)
+
+  def _verify_warmup_scheduling_order(self):
+    self.assert_catalogd_log_contains("INFO", "Scheduled 14 tables to be warmed up")
+    with open(self.build_log_path("catalogd", "INFO")) as file:
+      logs = grep_file(file, r"Scheduled warmup on table")
+      assert "tpcds.store_sales" in logs[0]
+      # The order in "tpch" depends on the list tables output and might change in the
+      # future. So just verify the db names.
+      for i in range(1, 9):
+        assert "tpch." in logs[i]
+      assert "tpcds.customer" in logs[9]
+      assert "tpcds.date_dim" in logs[10]
+      assert "tpcds.item" in logs[11]
+      assert "functional.#" in logs[12]
+      assert "functional.alltypes etc #" in logs[13]
+      assert len(logs) == 14

@@ -145,6 +145,8 @@ DECLARE_int32(max_outstanding_events_on_executors);
 DECLARE_bool(consolidate_grant_revoke_requests);
 DECLARE_int32(reset_metadata_lock_duration_ms);
 DECLARE_int32(catalog_reset_max_threads);
+DECLARE_string(warmup_tables_config_file);
+DECLARE_bool(keeps_warmup_tables_loaded);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -548,6 +550,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_iceberg_catalog_num_threads(FLAGS_iceberg_catalog_num_threads);
   cfg.__set_reset_metadata_lock_duration_ms(FLAGS_reset_metadata_lock_duration_ms);
   cfg.__set_catalog_reset_max_threads(FLAGS_catalog_reset_max_threads);
+  cfg.__set_warmup_tables_config_file(FLAGS_warmup_tables_config_file);
+  cfg.__set_keeps_warmup_tables_loaded(FLAGS_keeps_warmup_tables_loaded);
   return Status::OK();
 }
 

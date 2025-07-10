@@ -291,6 +291,17 @@ DEFINE_int32(catalog_reset_max_threads, 10,
     "catalog reset.");
 DEFINE_validator(catalog_reset_max_threads, gt_0);
 
+DEFINE_string(warmup_tables_config_file, "",
+    "Path to the configuration file listing tables to warm up, i.e. loading metadata, "
+    "when catalogd starts or when a global INVALIDATE METADATA finishes.");
+
+DEFINE_bool(keeps_warmup_tables_loaded, false,
+    "If set to true, catalogd will keep metadata of tables in the warmup list always "
+    "loaded even if they are invalidated. Don't set this to true if the catalogd heap "
+    "size is not enough to cache metadata of all these tables and "
+    "--invalidate_tables_on_memory_pressure is turned on. Otherwise, these tables will "
+    "keep being loaded and invalidated.");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
 DECLARE_string(state_store_2_host);
@@ -853,7 +864,7 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
       while (!must_reset) {
         catalog_update_cv_.NotifyOne();
         catalog_update_cv_.Wait(unique_lock);
-        must_reset = is_active_ && !triggered_first_reset_;
+        must_reset = is_ha_determined_ && !triggered_first_reset_;
       }
     }
 

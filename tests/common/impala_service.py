@@ -590,6 +590,26 @@ class CatalogdService(BaseImpalaService):
   def get_catalog_service_port(self):
     return self.service_port
 
+  def verify_table_metadata_loaded(self, db, table, expect_loaded=True, timeout_s=10):
+    page_url = "table_metrics?json&name=%s.%s" % (db, table)
+    start_time = time()
+    while (time() - start_time < timeout_s):
+      response = self.open_debug_webpage(page_url)
+      assert response.status_code == requests.codes.ok
+      response_json = json.loads(response.text)
+      assert "table_metrics" in response_json
+      table_metrics = response_json["table_metrics"]
+      if expect_loaded:
+        if "Table not yet loaded" not in table_metrics:
+          return
+        LOG.info("Table {0}.{1} is not loaded".format(db, table))
+      else:
+        if "Table not yet loaded" in table_metrics:
+          return
+        LOG.info("Table {0}.{1} is loaded".format(db, table))
+      sleep(1)
+    assert False, "Timeout waiting table {0}.{1} to be {2}".format(
+        db, table, "loaded" if expect_loaded else "not loaded")
 
 class AdmissiondService(BaseImpalaService):
   def __init__(self, hostname, webserver_interface, webserver_port,

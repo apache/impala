@@ -345,4 +345,8 @@ struct TBackendGflags {
   156: required i32 reset_metadata_lock_duration_ms
 
   157: required i32 catalog_reset_max_threads
+
+  158: required string warmup_tables_config_file
+
+  159: required bool keeps_warmup_tables_loaded
 }

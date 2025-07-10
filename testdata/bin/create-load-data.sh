@@ -226,6 +226,9 @@ function load-custom-schemas {
   # File used by CreateTableLikeOrc tests
   ln -s ${IMPALA_HOME}/testdata/data/alltypes_non_acid.orc ${SCHEMA_TMP_DIR}
 
+  ln -s ${IMPALA_HOME}/testdata/data/warmup_table_list.txt\
+    ${TMP_DIR}/warmup_table_list.txt
+
   hadoop fs -put -f ${TMP_DIR}/* /test-warehouse
 
   rm -r ${TMP_DIR}

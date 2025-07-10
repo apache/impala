@@ -589,4 +589,12 @@ public class BackendConfig {
   public int getCatalogResetMaxThreads() {
     return backendCfg_.catalog_reset_max_threads;
   }
+
+  public String getWarmupTablesConfigFile() {
+    return backendCfg_.warmup_tables_config_file;
+  }
+
+  public boolean keepsWarmupTablesLoaded() {
+    return backendCfg_.keeps_warmup_tables_loaded;
+  }
 }

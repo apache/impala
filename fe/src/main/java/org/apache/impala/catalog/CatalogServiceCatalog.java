@@ -46,7 +46,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -67,7 +66,6 @@ import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
@@ -308,6 +306,16 @@ public class CatalogServiceCatalog extends Catalog {
 
   private final boolean loadInBackground_;
 
+  // Tables to load metadata in background when catalogd starts or global INVALIDATE
+  // METADATA runs. Supports wildcard to specify all tables under a db. Tables will be
+  // loaded in the same order as in the config file.
+  private final Set<TTableName> warmupTables_;
+
+  // If true, warmup tables will be loaded in background after being explicitly
+  // invalidated by commands or implicitly invalidated by CatalogdTableInvalidator or
+  // HMS RELOAD events.
+  private final boolean keepsWarmupTablesLoaded_;
+
   // Periodically polls HDFS to get the latest set of known cache pools.
   private final ScheduledExecutorService cachePoolReader_ =
     Executors.newScheduledThreadPool(1,
@@ -465,6 +473,10 @@ public class CatalogServiceCatalog extends Catalog {
       commonHmsEventTypes_.add(eventType);
     }
     LOG.info("Common HMS event types: " + commonHmsEventTypes_);
+    keepsWarmupTablesLoaded_ = BackendConfig.INSTANCE.keepsWarmupTablesLoaded();
+    warmupTables_ = FileSystemUtil.loadWarmupTableNames(
+        BackendConfig.INSTANCE.getWarmupTablesConfigFile());
+    LOG.info("Loaded {} table names to warmup", warmupTables_.size());
   }
 
   /**
@@ -2446,7 +2458,7 @@ public class CatalogServiceCatalog extends Catalog {
         catalogTimeline.markEvent("Got database list");
       }
       rebuildDbCache(allHmsDbs, unlockedTimer, catalogTimeline, isSyncDdl);
-
+      scheduleWarmupTables();
       catalogTimeline.markEvent("Updated catalog cache");
     } catch (Exception e) {
       LOG.error("Error initializing Catalog", e);
@@ -2579,6 +2591,31 @@ public class CatalogServiceCatalog extends Catalog {
       }
     }
     Preconditions.checkState(versionLock_.writeLock().isHeldByCurrentThread());
+  }
+
+  private void scheduleWarmupTables() {
+    Preconditions.checkState(versionLock_.writeLock().isHeldByCurrentThread());
+    // if loadInBackground_ is true, tables are already be loading.
+    if (loadInBackground_) return;
+    int cnt = 0;
+    for (TTableName tTblName : warmupTables_) {
+      if (tTblName.table_name.equals("*")) {
+        String dbName = tTblName.db_name;
+        Db db = getDb(dbName);
+        if (db == null) continue;
+        for (String tbl : db.getAllTableNames()) {
+          tableLoadingMgr_.backgroundLoad(new TTableName(dbName, tbl));
+          cnt++;
+          LOG.info("Scheduled warmup on table {}.{} based on wildcard", dbName, tbl);
+        }
+      } else {
+        tableLoadingMgr_.backgroundLoad(tTblName);
+        cnt++;
+        LOG.info("Scheduled warmup on table {}.{}", tTblName.db_name,
+            tTblName.table_name);
+      }
+    }
+    LOG.info("Scheduled {} tables to be warmed up", cnt);
   }
 
   public Db addDb(String dbName, org.apache.hadoop.hive.metastore.api.Database msDb) {
@@ -3310,10 +3347,7 @@ public class CatalogServiceCatalog extends Catalog {
         MetastoreShim.mapToInternalTableType(tblMeta.getTableType()),
         tblMeta.getComments(), eventId);
     Preconditions.checkNotNull(newTable);
-    if (loadInBackground_) {
-      tableLoadingMgr_.backgroundLoad(new TTableName(dbName.toLowerCase(),
-          tblName.toLowerCase()));
-    }
+    scheduleTableLoading(dbName, tblName);
     if (dbWasAdded.getRef()) {
       // The database should always have a lower catalog version than the table because
       // it needs to be created before the table can be added.
@@ -3347,11 +3381,18 @@ public class CatalogServiceCatalog extends Catalog {
     } finally {
       versionLock_.writeLock().unlock();
     }
-    if (loadInBackground_) {
-      tableLoadingMgr_.backgroundLoad(
-          new TTableName(dbName.toLowerCase(), tblName.toLowerCase()));
-    }
+    scheduleTableLoading(dbName, tblName);
     return incompleteTable;
+  }
+
+  private void scheduleTableLoading(String dbName, String tableName) {
+    TTableName tTblName = new TTableName(dbName.toLowerCase(), tableName.toLowerCase());
+    TTableName tDbName = new TTableName(dbName.toLowerCase(), "*");
+    if (loadInBackground_
+        || (keepsWarmupTablesLoaded_
+            && (warmupTables_.contains(tTblName)) || warmupTables_.contains(tDbName))) {
+      tableLoadingMgr_.backgroundLoad(tTblName);
+    }
   }
 
   /**

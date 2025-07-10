@@ -1,0 +1,24 @@
+# Tables are scheduled in the order they apprear in this file.
+# Put the important tables first.
+tpcds.store_sales
+
+# Wildcard can be used to match all tables under a db.
+tpch.*
+
+tpcds.customer
+tpcds.date_dim
+
+# Table names will be converted to lowercase
+tpcds.Item
+
+# Comments are ignored
+#tpcds.store_returns
+//tpcds.store_
+
+# Invalid entries are also ignored
+tpcds
+tpch.
+
+# These will be treated as table names but ignored in loading since they don't exist
+functional.#
+functional.alltypes etc #
