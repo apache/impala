@@ -179,11 +179,11 @@ Status ValidatePemBundle(const string& bundle) {
   while ((cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr)) != nullptr) {
     cert_count++;
     // Check certificate validity (notBefore and notAfter)
-    if (UNLIKELY(X509_cmp_current_time(X509_get0_notBefore(cert)) > 0)) {
+    if (UNLIKELY(X509_cmp_current_time(X509_get_notBefore(cert)) > 0)) {
       invalid_notbefore_cnt++;
     }
 
-    if (UNLIKELY(X509_cmp_current_time(X509_get0_notAfter(cert)) < 0)) {
+    if (UNLIKELY(X509_cmp_current_time(X509_get_notAfter(cert)) < 0)) {
       invalid_notafter_cnt++;
     }
 

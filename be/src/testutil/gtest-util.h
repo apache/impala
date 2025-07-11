@@ -18,6 +18,8 @@
 #ifndef IMPALA_TESTUTIL_GTEST_UTIL_H_
 #define IMPALA_TESTUTIL_GTEST_UTIL_H_
 
+#include <regex>
+
 #include <gtest/gtest.h>
 #include "common/init.h"
 #include "common/status.h"
@@ -64,6 +66,14 @@ namespace impala {
     impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST); \
     return RUN_ALL_TESTS(); \
   } \
+
+// Asserts a string matches the provided regex pattern string.
+#define ASSERT_REGEX_MATCH(actual_str, regex_str)                                       \
+  do {                                                                                  \
+    ASSERT_TRUE(std::regex_search(actual_str, std::regex(regex_str)))                   \
+        << "Expected regex '" << regex_str << "' to match string '"                     \
+        << actual_str << "'";                                                           \
+  } while (0)
 
 }
 #endif // IMPALA_TESTUTIL_GTEST_UTIL_H_

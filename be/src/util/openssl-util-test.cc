@@ -17,6 +17,7 @@
 
 #include <random>
 
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <openssl/err.h>
 #include <openssl/rand.h>
@@ -261,7 +262,7 @@ static const string& VALID_CERT_2 = "wildcardCA";
 
 /// Constants and functions defining expected error messages.
 static const string& MSG_NEW_BIO_ERR = "OpenSSL error in PEM_read_bio_X509 unexpected "
-    "error '$0' while reading PEM bundle";
+    "error '\\d+' while reading PEM bundle";
 static const string& MSG_NONE_VALID = "PEM bundle contains no valid certificates";
 static string _msg_time(int invalid_notbefore_cnt, int invalid_notafter_cnt) {
   return Substitute("PEM bundle contains $0 invalid certificate(s) with notBefore in the "
@@ -279,9 +280,9 @@ static string read_cert(const string& cert_name) {
       Substitute("$0/be/src/testutil/$1.pem", getenv("IMPALA_HOME"), cert_name),
       &contents);
 
-  EXPECT_TRUE(s.ok())<< "Certificate '" << cert_name << "' could not be read: "
+  CHECK(s.ok())<< "Certificate '" << cert_name << "' could not be read: "
       << s.ToString();
-  EXPECT_FALSE(contents.ToString().empty()) << "Certificate '" << cert_name
+  CHECK(!contents.ToString().empty()) << "Certificate '" << cert_name
       << "' is empty. Please check the test data.";
 
   string cert = contents.ToString();
@@ -387,14 +388,12 @@ TEST_F(OpenSSLUtilTest, ValidatePemBundleThreeCertsOneInvalid) {
       read_cert(VALID_CERT_1), read_cert(VALID_CERT_2))), MSG_NONE_VALID);
 
   // Invalid cert is in the middle of the bundle.
-  EXPECT_STR_CONTAINS(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_1),
-      INVALID_CERT_TEXT, read_cert(VALID_CERT_2))).GetDetail(),
-      Substitute(MSG_NEW_BIO_ERR, 123));
+  ASSERT_REGEX_MATCH(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_1),
+      INVALID_CERT_TEXT, read_cert(VALID_CERT_2))).GetDetail(), MSG_NEW_BIO_ERR);
 
   // Invalid cert is last in the bundle.
-  EXPECT_STR_CONTAINS(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_1),
-      read_cert(VALID_CERT_2), INVALID_CERT_TEXT)).GetDetail(),
-      Substitute(MSG_NEW_BIO_ERR, 112));
+  ASSERT_REGEX_MATCH(ValidatePemBundle(Substitute("$0$1$2", read_cert(VALID_CERT_1),
+      read_cert(VALID_CERT_2), INVALID_CERT_TEXT)).GetDetail(), MSG_NEW_BIO_ERR);
 }
 
 /// Asserts a bundle is invalid if it contains one expired and one non-expired certificate
@@ -429,8 +428,8 @@ TEST_F(OpenSSLUtilTest, ValidatePemBundleTwoCertsNotCertFirst) {
       read_cert(VALID_CERT_1))), MSG_NONE_VALID);
 
   // Invalid cert is last in the bundle.
-  EXPECT_STR_CONTAINS(ValidatePemBundle(Substitute("$0$1", read_cert(VALID_CERT_1),
-      INVALID_CERT_TEXT)).GetDetail(), Substitute(MSG_NEW_BIO_ERR, 112));
+  ASSERT_REGEX_MATCH(ValidatePemBundle(Substitute("$0$1", read_cert(VALID_CERT_1),
+      INVALID_CERT_TEXT)).GetDetail(), MSG_NEW_BIO_ERR);
 }
 
 /// Asserts a bundle is invalid if it contains two valid, one expired, and one future
