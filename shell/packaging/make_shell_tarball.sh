@@ -41,6 +41,8 @@ shift
 SHELL_HOME=${IMPALA_HOME}/shell
 BUILD_DIR=${SHELL_HOME}/build
 TARBALL_ROOT=${BUILD_DIR}/impala-shell-${IMPALA_VERSION}
+IMPALA_SYSTEM_PYTHON3_VERSION=$(${IMPALA_SYSTEM_PYTHON3} -c 'import sys; \
+    print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
 
 for PYTHON_EXE in $*; do
   PYTHON_NAME=$(basename ${PYTHON_EXE})
@@ -58,8 +60,13 @@ for PYTHON_EXE in $*; do
   if [[ $PYTHON_MAJOR_VERSION == 2 ]]; then
     source ${IMPALA_HOME}/shell/build/python2_venv/bin/activate
   else
-    source ${IMPALA_HOME}/shell/build/python3_venv/bin/activate
+    if [[ $IMPALA_SYSTEM_PYTHON3_VERSION == $PYTHON_VERSION ]]; then
+      source ${IMPALA_HOME}/shell/build/python3_venv/bin/activate
+    else
+      source ${IMPALA_HOME}/shell/build/python${PYTHON_VERSION}_venv/bin/activate
+    fi
   fi
+
   mkdir -p ${TARBALL_ROOT}/install_py${PYTHON_VERSION}
   pip install --cache ${PIP_CACHE} \
       --target ${TARBALL_ROOT}/install_py${PYTHON_VERSION} ${PYPI_PACKAGE}
