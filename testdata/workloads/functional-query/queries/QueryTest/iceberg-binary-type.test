@@ -1,0 +1,292 @@
+====
+---- QUERY
+CREATE TABLE iceberg_binary_tbl (
+  id INT,
+  string_col STRING,
+  binary_col BINARY
+) STORED AS ICEBERG TBLPROPERTIES('format-version'='2')
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+INSERT INTO iceberg_binary_tbl VALUES
+  (1, 'ascii', CAST('binary1' AS BINARY)),
+  (2, 'ascii', CAST('binary2' AS BINARY)),
+  (3, 'null', NULL),
+  (4, 'empty', CAST('' AS BINARY)),
+  (5, 'valid utf8', CAST('árvíztűrőtükörfúró' AS BINARY)),
+  (6, 'valid utf8', CAST('你好hello' AS BINARY)),
+  (7, 'invalid utf8', CAST(UNHEX('00FF00FF') AS BINARY)),
+  (8, 'invalid utf8', CAST(UNHEX('FF4433221100') AS BINARY))
+---- RUNTIME_PROFILE
+NumModifiedRows: 8
+====
+---- QUERY
+SELECT id, string_col, CAST(binary_col AS STRING) FROM iceberg_binary_tbl
+WHERE string_col != "invalid utf8"
+---- TYPES
+INT, STRING, STRING
+---- RESULTS: RAW_STRING
+1,'ascii','binary1'
+2,'ascii','binary2'
+3,'null','NULL'
+4,'empty',''
+5,'valid utf8','árvíztűrőtükörfúró'
+6,'valid utf8','你好hello'
+====
+---- QUERY
+SELECT id, HEX(CAST(binary_col AS STRING)) FROM iceberg_binary_tbl
+WHERE string_col = "invalid utf8"
+---- TYPES
+INT, STRING
+---- RESULTS
+7,'00FF00FF'
+8,'FF4433221100'
+====
+---- QUERY
+SELECT id, HEX(CAST(binary_col AS STRING)) FROM iceberg_binary_tbl
+WHERE binary_col = CAST(UNHEX("FF4433221100") AS BINARY)
+---- TYPES
+INT, STRING
+---- RESULTS
+8,'FF4433221100'
+====
+---- QUERY
+SET utf8_mode=0;
+SELECT string_col, LENGTH(binary_col) FROM iceberg_binary_tbl
+---- TYPES
+STRING, INT
+---- RESULTS
+'ascii',7
+'ascii',7
+'null',NULL
+'empty',0
+'valid utf8',26
+'valid utf8',11
+'invalid utf8',4
+'invalid utf8',6
+====
+---- QUERY
+SET utf8_mode=1;
+SELECT string_col, LENGTH(binary_col) FROM iceberg_binary_tbl
+---- TYPES
+STRING, INT
+---- RESULTS
+'ascii',7
+'ascii',7
+'null',NULL
+'empty',0
+'valid utf8',26
+'valid utf8',11
+'invalid utf8',4
+'invalid utf8',6
+====
+---- QUERY
+# Test UPDATE on iceberg_binary_tbl
+UPDATE iceberg_binary_tbl
+SET binary_col = CAST('updated' AS BINARY) WHERE id = 2
+---- RUNTIME_PROFILE
+NumModifiedRows: 1
+NumDeletedRows: 1
+====
+---- QUERY
+# Verify UPDATE results
+SELECT id, string_col, CAST(binary_col AS STRING) FROM iceberg_binary_tbl
+WHERE binary_col = CAST('updated' AS BINARY)
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+2,'ascii','updated'
+====
+---- QUERY
+# Test DELETE on iceberg_binary_tbl with binary column condition
+DELETE FROM iceberg_binary_tbl WHERE binary_col = CAST('updated' AS BINARY)
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 1
+====
+---- QUERY
+# Verify DELETE results
+SELECT id, string_col, CAST(binary_col AS STRING) FROM iceberg_binary_tbl
+WHERE string_col != "invalid utf8"
+---- TYPES
+INT, STRING, STRING
+---- RESULTS: RAW_STRING
+1,'ascii','binary1'
+3,'null','NULL'
+4,'empty',''
+5,'valid utf8','árvíztűrőtükörfúró'
+6,'valid utf8','你好hello'
+====
+---- QUERY
+CREATE TABLE iceberg_binary_tbl_big (
+  id INT,
+  int_col INT,
+  binary_col BINARY,
+  binary_col_with_nulls BINARY,
+  timestamp_col TIMESTAMP
+)
+PARTITIONED BY SPEC (MONTH(timestamp_col))
+STORED AS ICEBERG TBLPROPERTIES('format-version'='2')
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+INSERT INTO TABLE iceberg_binary_tbl_big
+SELECT id, int_col, CAST(string_col AS BINARY),
+       CAST(CASE WHEN id % 2 = 0 THEN date_string_col ELSE NULL END AS BINARY),
+       timestamp_col
+    FROM functional.alltypes
+---- RUNTIME_PROFILE
+NumModifiedRows: 310
+NumModifiedRows: 300
+NumModifiedRows: 280
+====
+---- QUERY
+SELECT binary_col_with_nulls FROM iceberg_binary_tbl_big
+WHERE binary_col_with_nulls = CAST("01/02/09" AS BINARY)
+---- TYPES
+BINARY
+---- RESULTS
+'01/02/09'
+'01/02/09'
+'01/02/09'
+'01/02/09'
+'01/02/09'
+====
+---- QUERY
+SELECT binary_col_with_nulls FROM iceberg_binary_tbl_big
+WHERE binary_col_with_nulls > CAST("12/31/09" AS BINARY)
+---- TYPES
+BINARY
+---- RESULTS
+'12/31/10'
+'12/31/10'
+'12/31/10'
+'12/31/10'
+'12/31/10'
+====
+---- QUERY
+SELECT DISTINCT binary_col_with_nulls FROM iceberg_binary_tbl_big
+WHERE binary_col_with_nulls < CAST("01/02/09" AS BINARY)
+---- TYPES
+BINARY
+---- RESULTS
+'01/01/09'
+'01/01/10'
+====
+---- QUERY
+SET DISABLE_OUTERMOST_TOPN=0;
+SELECT binary_col_with_nulls FROM iceberg_binary_tbl_big
+WHERE binary_col = CAST("4" AS BINARY)
+ORDER BY binary_col_with_nulls LIMIT 3
+---- TYPES
+BINARY
+---- RESULTS
+'01/01/09'
+'01/01/10'
+'01/02/09'
+====
+---- QUERY
+SET DISABLE_OUTERMOST_TOPN=1;
+SELECT binary_col_with_nulls FROM iceberg_binary_tbl_big
+WHERE binary_col = CAST("4" AS BINARY)
+ORDER BY binary_col_with_nulls LIMIT 3
+---- TYPES
+BINARY
+---- RESULTS
+'01/01/09'
+'01/01/10'
+'01/02/09'
+====
+---- QUERY
+SELECT COUNT(binary_col_with_nulls), max(binary_col), min(binary_col)
+FROM iceberg_binary_tbl_big
+---- TYPES
+BIGINT, BINARY, BINARY
+---- RESULTS
+3650,'9','0'
+====
+---- QUERY
+# NDV is not yet added for BINARY, casting is needed (IMPALA-11351)
+SELECT COUNT(DISTINCT binary_col_with_nulls), NDV(CAST(binary_col_with_nulls AS STRING))
+FROM iceberg_binary_tbl_big
+---- TYPES
+BIGINT, BIGINT
+---- RESULTS
+730,736
+====
+---- QUERY
+# Test multiple count distinct
+SELECT COUNT(DISTINCT binary_col), COUNT(DISTINCT binary_col_with_nulls)
+FROM iceberg_binary_tbl_big
+WHERE id < 20
+---- TYPES
+BIGINT, BIGINT
+---- RESULTS
+10,2
+====
+---- QUERY
+SELECT bb1.id, bb2.id, bb1.binary_col_with_nulls, bb2.binary_col_with_nulls
+FROM iceberg_binary_tbl_big bb1 LEFT JOIN iceberg_binary_tbl_big bb2
+  ON bb1.binary_col_with_nulls = bb2.binary_col_with_nulls
+WHERE bb1.id < 3 AND bb2.id < 3
+---- TYPES
+INT,  INT, BINARY, BINARY
+---- RESULTS
+0,2,'01/01/09','01/01/09'
+0,0,'01/01/09','01/01/09'
+2,2,'01/01/09','01/01/09'
+2,0,'01/01/09','01/01/09'
+====
+---- QUERY
+# Test UPDATE on iceberg_binary_tbl_big
+UPDATE iceberg_binary_tbl_big
+SET binary_col = CAST('updated' AS BINARY)
+WHERE binary_col_with_nulls < CAST("01/02/09" AS BINARY)
+---- RUNTIME_PROFILE
+NumModifiedRows: 5
+NumDeletedRows: 5
+====
+---- QUERY
+# Verify UPDATE results
+SELECT id, CAST(binary_col AS STRING), CAST(binary_col_with_nulls AS STRING)
+FROM iceberg_binary_tbl_big
+WHERE binary_col = CAST('updated' AS BINARY)
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+0,'updated','01/01/09'
+2,'updated','01/01/09'
+4,'updated','01/01/09'
+6,'updated','01/01/09'
+8,'updated','01/01/09'
+3650,'updated','01/01/10'
+3652,'updated','01/01/10'
+3654,'updated','01/01/10'
+3656,'updated','01/01/10'
+3658,'updated','01/01/10'
+====
+---- QUERY
+# Test DELETE on iceberg_binary_tbl_big with binary column conditions
+DELETE FROM iceberg_binary_tbl_big
+  WHERE binary_col = CAST('updated' AS BINARY)
+    AND binary_col_with_nulls = CAST("01/01/10" AS BINARY)
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 5
+====
+---- QUERY
+# Verify DELETE results
+SELECT id, CAST(binary_col AS STRING), CAST(binary_col_with_nulls AS STRING)
+  FROM iceberg_binary_tbl_big
+  WHERE binary_col = CAST('updated' AS BINARY)
+---- TYPES
+INT, STRING, STRING
+---- RESULTS
+0,'updated','01/01/09'
+2,'updated','01/01/09'
+4,'updated','01/01/09'
+6,'updated','01/01/09'
+8,'updated','01/01/09'
+====

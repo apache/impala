@@ -75,6 +75,9 @@ class TestIcebergTable(IcebergTestSuite):
   def test_alter_iceberg_tables_default(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-alter-default', vector, use_db=unique_database)
 
+  def test_iceberg_binary_type(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-binary-type', vector, use_db=unique_database)
+
   def test_external_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-external', vector, unique_database)
 
