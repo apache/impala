@@ -504,7 +504,7 @@ inline bool CatalogServer::IsCatalogInitialized() {
   // incremented on the active catalogd.
   // The second expression evaluates to true when the the standby catalogd determines that
   // it is the standby.
-  return last_sent_catalog_version_ > 0 || (is_ha_determined_ && !is_active_);
+  return last_sent_catalog_version_ > 0 || (is_ha_determined_ && !is_active_.Load());
 } // CatalogServer::IsCatalogInitialized
 
 bool CatalogServer::WaitForCatalogReady() {

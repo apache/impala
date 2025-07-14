@@ -622,7 +622,7 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
     thrift_iface_(new CatalogServiceThriftIf(this)),
     thrift_serializer_(FLAGS_compact_catalog_topic),
     metrics_(metrics),
-    is_active_(!FLAGS_enable_catalogd_ha),
+    is_active_{!FLAGS_enable_catalogd_ha},
     is_ha_determined_(!FLAGS_enable_catalogd_ha),
     topic_updates_ready_(false),
     last_sent_catalog_version_(0L),
@@ -718,7 +718,7 @@ Status CatalogServer::Start() {
   // Notify the thread to start for the first time.
   {
     lock_guard<mutex> l(catalog_lock_);
-    if (is_active_) catalog_update_cv_.NotifyOne();
+    if (is_active_.Load()) catalog_update_cv_.NotifyOne();
   }
   return Status::OK();
 }
@@ -762,7 +762,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
   // Return if unable to acquire the catalog_lock_, or this instance is not active,
   // or if the topic update data is not yet ready for processing. This indicates the
   // catalog_update_gathering_thread_ is still building a topic update.
-  if (!l || !is_active_ || !topic_updates_ready_) return;
+  if (!l || !is_active_.Load() || !topic_updates_ready_) return;
 
   const TTopicDelta& delta = topic->second;
 
@@ -816,8 +816,8 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
   bool is_matching = (catalogd_registration.address.hostname == FLAGS_hostname
       && catalogd_registration.address.port == FLAGS_catalog_service_port);
   if (is_matching) {
-    if (!is_active_) {
-      is_active_ = true;
+    if (!is_active_.Load()) {
+      is_active_.Store(true);
       active_status_metric_->SetValue(true);
       num_ha_active_status_change_metric_->Increment(1);
       // Reset last_sent_catalog_version_ when the catalogd become active. This will
@@ -843,8 +843,8 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
       LOG(INFO) << "This catalogd instance is changed to active status";
     }
   } else {
-    if (is_active_) {
-      is_active_ = false;
+    if (is_active_.Load()) {
+      is_active_.Store(false);
       active_status_metric_->SetValue(false);
       num_ha_active_status_change_metric_->Increment(1);
       LOG(INFO) << "This catalogd instance is changed to inactive status. "
@@ -897,8 +897,7 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
 }
 
 bool CatalogServer::IsActive() {
-  lock_guard<mutex> l(catalog_lock_);
-  return is_active_;
+  return is_active_.Load();
 }
 
 [[noreturn]] void CatalogServer::GatherCatalogUpdatesThread() {

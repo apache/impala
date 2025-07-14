@@ -225,7 +225,7 @@ class CatalogServer {
   std::mutex catalog_lock_;
 
   /// Set to true if this catalog instance is active.
-  bool is_active_;
+  AtomicBool is_active_;
 
   /// Set to true after active catalog has been determined. Will be true if catalog ha
   /// is not enabled.
@@ -289,7 +289,7 @@ class CatalogServer {
   void UpdateActiveCatalogd(bool is_registration_reply, int64_t active_catalogd_version,
       const TCatalogRegistration& catalogd_registration);
 
-  /// Returns the active status of the catalogd.
+  /// Returns the current active status of the catalogd.
   bool IsActive();
 
   /// Executed by the catalog_update_gathering_thread_. Calls into JniCatalog
