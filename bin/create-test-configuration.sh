@@ -135,6 +135,14 @@ rm -f authz-provider.ini
 # Set IMPALA_JAVA_TOOL_OPTIONS to allow passing it to Tez containers.
 . $IMPALA_HOME/bin/set-impala-java-tool-options.sh
 
+CORE_SITE_VARIANT=disable_block_locations $IMPALA_HOME/bin/generate_xml_config.py \
+  $IMPALA_HOME/testdata/cluster/node_templates/common/etc/hadoop/conf/core-site.xml.py \
+  core-site_disabled_block_locations.xml
+mkdir -p core-site-disabled-block-locations
+rm -f core-site-disabled-block-locations/core-site.xml
+ln -s "${CONFIG_DIR}/core-site_disabled_block_locations.xml" \
+    core-site-disabled-block-locations/core-site.xml
+
 $IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site.xml
 export HIVE_VARIANT=changed_external_dir
 $IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site_ext.xml

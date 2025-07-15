@@ -17,6 +17,7 @@
 
 package org.apache.impala.common;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.impala.common.Pair;
 import static org.apache.impala.common.FileSystemUtil.HIVE_TEMP_FILE_PREFIX;
 import static org.apache.impala.common.FileSystemUtil.SPARK_TEMP_FILE_PREFIX;
@@ -128,6 +129,81 @@ public class FileSystemUtilTest {
     // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_O3FS), true);
     // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_OFS), true);
     // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), true);
+  }
+
+  @Test
+  public void testSupportStorageIdsDisabledCompletely() throws IOException {
+    try {
+      Configuration customConf = new Configuration();
+      customConf.set("impala.preload-block-locations-for-scheduling", "false");
+      FileSystemUtil.setConfiguration(customConf);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ABFS), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ABFSS), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ADL), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_FILE), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_S3A), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_HDFS), false);
+      // The following tests are disabled because the underlying systems is not included
+      // in impala mini cluster.
+      // TODO: enable following tests if we add them into impala mini cluster.
+      // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_O3FS), false);
+      // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_OFS), false);
+      // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), false);
+    } finally {
+      // Reset default configuration.
+      FileSystemUtil.setConfiguration(new Configuration());
+    }
+  }
+
+  @Test
+  public void testSupportStorageIdsDisabledViaScheme() throws IOException {
+    try {
+      Configuration customConf = new Configuration();
+      customConf.set("impala.preload-block-locations-for-scheduling.scheme.hdfs",
+          "false");
+      FileSystemUtil.setConfiguration(customConf);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ABFS), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ABFSS), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ADL), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_FILE), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_S3A), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_HDFS), false);
+      // The following tests are disabled because the underlying systems is not included
+      // in impala mini cluster.
+      // TODO: enable following tests if we add them into impala mini cluster.
+      // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_O3FS), false);
+      // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_OFS), false);
+      // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), false);
+    } finally {
+      // Reset default configuration.
+      FileSystemUtil.setConfiguration(new Configuration());
+    }
+  }
+
+  @Test
+  public void testSupportStorageIdsDisabledViaAuthority() throws IOException {
+    try {
+      Configuration customConf = new Configuration();
+      customConf.set(
+          "impala.preload-block-locations-for-scheduling.authority.localhost:20500",
+          "false");
+      FileSystemUtil.setConfiguration(customConf);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ABFS), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ABFSS), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ADL), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_FILE), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_S3A), false);
+      testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_HDFS), false);
+      // The following tests are disabled because the underlying systems is not included
+      // in impala mini cluster.
+      // TODO: enable following tests if we add them into impala mini cluster.
+      // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_O3FS), false);
+      // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_OFS), false);
+      // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), false);
+    } finally {
+      // Reset default configuration.
+      FileSystemUtil.setConfiguration(new Configuration());
+    }
   }
 
   @Test

@@ -24,6 +24,8 @@ import sys
 kerberize = os.environ.get('IMPALA_KERBERIZE') == 'true'
 target_filesystem = os.environ.get('TARGET_FILESYSTEM')
 
+VARIANT = os.environ.get('CORE_SITE_VARIANT')
+
 jceks_keystore = ("localjceks://file" +
     os.path.join(os.environ['IMPALA_HOME'], 'testdata/jceks/test.jceks'))
 
@@ -133,6 +135,11 @@ CONFIG = {
    'iceberg.io.manifest.cache.max-total-bytes': '104857600',
    'iceberg.io.manifest.cache.max-content-length': '8388608',
 }
+
+if VARIANT == 'disable_block_locations':
+  CONFIG.update({
+      'impala.preload-block-locations-for-scheduling': 'false'
+  })
 
 if target_filesystem == 's3':
   CONFIG.update({'fs.s3a.connection.maximum': 1500})

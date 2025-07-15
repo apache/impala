@@ -55,6 +55,7 @@ KUDU_ARGS = 'kudu_args'
 # Additional args passed to the start-impala-cluster script.
 START_ARGS = 'start_args'
 JVM_ARGS = 'jvm_args'
+CUSTOM_CORE_SITE_DIR = 'custom_core_site_dir'
 HIVE_CONF_DIR = 'hive_conf_dir'
 CLUSTER_SIZE = "cluster_size"
 # Default query options passed to the impala daemon command line. Handled separately from
@@ -157,7 +158,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       impalad_timeout_s=None, expect_cores=None, reset_ranger=False,
       tmp_dir_placeholders=[],
       expect_startup_fail=False, disable_log_buffering=False, log_symlinks=False,
-      workload_mgmt=False, force_restart=False):
+      workload_mgmt=False, force_restart=False, custom_core_site_dir=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     args = dict()
@@ -171,6 +172,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       args[START_ARGS] = start_args
     if jvm_args is not None:
       args[JVM_ARGS] = jvm_args
+    if custom_core_site_dir is not None:
+      args[CUSTOM_CORE_SITE_DIR] = custom_core_site_dir
     if hive_conf_dir is not None:
       args[HIVE_CONF_DIR] = hive_conf_dir
     if kudu_args is not None:
@@ -299,13 +302,20 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if START_ARGS in args:
       cluster_args.extend(args[START_ARGS].split())
 
+    custom_class_path_val = ""
+    if CUSTOM_CORE_SITE_DIR in args:
+      custom_class_path_val = args[CUSTOM_CORE_SITE_DIR]
+
     if HIVE_CONF_DIR in args:
       cls._start_hive_service(args[HIVE_CONF_DIR])
-      # Should let Impala adopt the same hive-site.xml. The only way is to add it in the
-      # beginning of the CLASSPATH. Because there's already a hive-site.xml in the
-      # default CLASSPATH (see bin/set-classpath.sh).
+      custom_class_path_val += ":" + args[HIVE_CONF_DIR]
+
+    if custom_class_path_val:
+      # Should let Impala adopt the custom Hadoop configuration. The only way is to add it
+      # in the beginning of the CLASSPATH. Because there's already Hadoop site xml files
+      # in the default CLASSPATH (see bin/set-classpath.sh).
       cluster_args.append(
-        '--env_vars=CUSTOM_CLASSPATH=%s ' % args[HIVE_CONF_DIR])
+          '--env_vars=CUSTOM_CLASSPATH=%s ' % custom_class_path_val)
 
     if KUDU_ARGS in args:
       cls._restart_kudu_service(args[KUDU_ARGS])

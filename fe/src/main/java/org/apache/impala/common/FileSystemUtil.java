@@ -57,6 +57,7 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +74,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
  */
 public class FileSystemUtil {
 
-  private static final Configuration CONF = new Configuration();
+  private static Configuration CONF;
   private static final Logger LOG = LoggerFactory.getLogger(FileSystemUtil.class);
 
   public static final String SCHEME_ABFS = "abfs";
@@ -160,6 +161,52 @@ public class FileSystemUtil {
           .add(SCHEME_OSS)
           .add(SCHEME_OBS)
           .build();
+
+  private static Set<String> BLOCK_LOCATIONS_FOR_FS_SCHEMES;
+  private static Set<String> NO_BLOCK_LOCATIONS_FOR_AUTHORITIES;
+
+  static {
+    setConfiguration(new Configuration());
+  }
+
+  @VisibleForTesting
+  public static void setConfiguration(Configuration conf) {
+    CONF = conf;
+    initConfigurationDependendentStaticFields();
+  }
+
+  private static void initConfigurationDependendentStaticFields() {
+    resetConfigurationDependendentStaticFields();
+
+    final String PRELOAD_BLOCK_LOCATIONS_CONFIGURATION_PREFIX =
+        "impala.preload-block-locations-for-scheduling";
+    final String AUTHORITY = ".authority.";
+    final String SCHEME = ".scheme.";
+
+    Map<String, String> preloadBlockLocations = CONF.getPropsWithPrefix(
+        PRELOAD_BLOCK_LOCATIONS_CONFIGURATION_PREFIX);
+
+    for (Map.Entry<String, String> noBlocksEntry : preloadBlockLocations.entrySet()) {
+      // By default we load block locations, so no need to do anything when
+      // config is 'true'.
+      if (Boolean.parseBoolean(noBlocksEntry.getValue())) continue;
+
+      // Key is already the string after 'impala.preload-block-locations-for-scheduling'.
+      String key = noBlocksEntry.getKey();
+      if (key.isEmpty()) {
+        BLOCK_LOCATIONS_FOR_FS_SCHEMES.clear();
+      } else if (noBlocksEntry.getKey().startsWith(SCHEME)) {
+        BLOCK_LOCATIONS_FOR_FS_SCHEMES.remove(key.substring(SCHEME.length()));
+      } else if (noBlocksEntry.getKey().startsWith(AUTHORITY)) {
+        NO_BLOCK_LOCATIONS_FOR_AUTHORITIES.add(key.substring(AUTHORITY.length()));
+      }
+    }
+  }
+
+  private static void resetConfigurationDependendentStaticFields() {
+    BLOCK_LOCATIONS_FOR_FS_SCHEMES = new HashSet<>(SCHEME_SUPPORT_STORAGE_IDS);
+    NO_BLOCK_LOCATIONS_FOR_AUTHORITIES = new HashSet<>();
+  }
 
   /**
    * Performs a non-recursive delete of all visible (non-hidden) files in a given
@@ -527,10 +574,12 @@ public class FileSystemUtil {
   }
 
   /**
-   * Returns true if the filesystem supports storage UUIDs in BlockLocation calls.
+   * Returns true if the filesystem supports storage UUIDs in BlockLocation calls, and
+   * preloading block locations is not disabled in the Hadoop configuration.
    */
   public static boolean supportsStorageIds(FileSystem fs) {
-    return SCHEME_SUPPORT_STORAGE_IDS.contains(fs.getScheme());
+    return BLOCK_LOCATIONS_FOR_FS_SCHEMES.contains(fs.getScheme()) &&
+        !NO_BLOCK_LOCATIONS_FOR_AUTHORITIES.contains(fs.getUri().getAuthority());
   }
 
   /**

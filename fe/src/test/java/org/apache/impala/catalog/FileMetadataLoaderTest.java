@@ -30,8 +30,8 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
+import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
@@ -81,6 +81,31 @@ public class FileMetadataLoaderTest {
         /* oldFds = */fml.getLoadedFds(), hostIndex, null, null);
     refreshFml.load();
     assertEquals(1, refreshFml.getStats().loadedFiles);
+  }
+
+  @Test
+  public void testRecursiveLoadingWithoutBlockLocations()
+      throws IOException, CatalogException {
+    try {
+      Configuration customConf = new Configuration();
+      customConf.set(
+          "impala.preload-block-locations-for-scheduling.authority.localhost:20500",
+          "false");
+        FileSystemUtil.setConfiguration(customConf);
+      //TODO(IMPALA-9042): Remove "throws CatalogException"
+      ListMap<TNetworkAddress> hostIndex = new ListMap<>();
+      String tablePath = "hdfs://localhost:20500/test-warehouse/alltypes/";
+      FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
+          /* oldFds = */Collections.emptyList(), hostIndex, null, null);
+      fml.load();
+      List<FileDescriptor> fileDescs = fml.getLoadedFds();
+      for (FileDescriptor fd : fileDescs) {
+        assertEquals(0, fd.getNumFileBlocks());
+      }
+    } finally {
+      // Reset default configuration.
+      FileSystemUtil.setConfiguration(new Configuration());
+    }
   }
 
   @Test
@@ -147,6 +172,30 @@ public class FileMetadataLoaderTest {
     Collections.sort(relPaths);
     assertEquals("data/00001-1-5dbd44ad-18bc-40f2-9dd6-aeb2cc23457c-00000.parquet",
         relPaths.get(0));
+  }
+
+  @Test
+  public void testIcebergLoadingWithoutBlockLocations()
+      throws IOException, CatalogException {
+    try {
+      Configuration customConf = new Configuration();
+      customConf.set("impala.preload-block-locations-for-scheduling.scheme.hdfs",
+          "false");
+      FileSystemUtil.setConfiguration(customConf);
+      CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
+      IcebergFileMetadataLoader fml = getLoaderForIcebergTable(catalog,
+          "functional_parquet", "iceberg_partitioned",
+          /* oldFds = */ Collections.emptyList(),
+          /* requiresDataFilesInTableLocation = */ true);
+      fml.load();
+      List<IcebergFileDescriptor> fileDescs = fml.getLoadedIcebergFds();
+      for (IcebergFileDescriptor fd : fileDescs) {
+        assertEquals(0, fd.getNumFileBlocks());
+      }
+    } finally {
+      // Reset default configuration.
+      FileSystemUtil.setConfiguration(new Configuration());
+    }
   }
 
   @Test
