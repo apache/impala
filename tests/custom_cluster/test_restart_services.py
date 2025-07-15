@@ -1147,36 +1147,41 @@ class TestWarmupCatalog(CustomClusterTestSuite):
 
   def _test_warmup_tables(self, keeps_warmup_tables_loaded):
     catalogd = self.cluster.catalogd.service
-    self._verify_tables_warmed_up(catalogd)
-    self._verify_warmup_scheduling_order()
+    # Other tests might create tables in tpch db. So we fetch the table list instead of
+    # hard-coding the table names here.
+    tpch_tables = self.all_table_names(db="tpch")
+    self._verify_tables_warmed_up(catalogd, tpch_tables)
+    self._verify_warmup_scheduling_order(tpch_tables)
     self.execute_query("invalidate metadata")
-    self._verify_tables_warmed_up(catalogd)
+    self._verify_tables_warmed_up(catalogd, tpch_tables)
     self.execute_query("invalidate metadata tpcds.item")
     catalogd.verify_table_metadata_loaded("tpcds", "item", keeps_warmup_tables_loaded)
 
-  def _verify_tables_warmed_up(self, catalogd):
+  def _verify_tables_warmed_up(self, catalogd, tpch_tables):
     tables = {
       "tpcds": ["customer", "date_dim", "item", "store_sales"],
-      "tpch": ["customer", "lineitem", "nation", "orders", "part",
-               "partsupp", "region", "supplier"]
+      "tpch": tpch_tables
     }
     for db in tables:
       for table in tables[db]:
         catalogd.verify_table_metadata_loaded(db, table)
     catalogd.verify_table_metadata_loaded("tpcds", "store", expect_loaded=False)
 
-  def _verify_warmup_scheduling_order(self):
-    self.assert_catalogd_log_contains("INFO", "Scheduled 14 tables to be warmed up")
+  def _verify_warmup_scheduling_order(self, tpch_tables):
+    num_tpch_tables = len(tpch_tables)
+    num_tables = num_tpch_tables + 6
+    self.assert_catalogd_log_contains(
+        "INFO", "Scheduled %d tables to be warmed up" % num_tables)
     with open(self.build_log_path("catalogd", "INFO")) as file:
       logs = grep_file(file, r"Scheduled warmup on table")
       assert "tpcds.store_sales" in logs[0]
       # The order in "tpch" depends on the list tables output and might change in the
       # future. So just verify the db names.
-      for i in range(1, 9):
+      for i in range(1, 1 + num_tpch_tables):
         assert "tpch." in logs[i]
-      assert "tpcds.customer" in logs[9]
-      assert "tpcds.date_dim" in logs[10]
-      assert "tpcds.item" in logs[11]
-      assert "functional.#" in logs[12]
-      assert "functional.alltypes etc #" in logs[13]
-      assert len(logs) == 14
+      assert "tpcds.customer" in logs[num_tpch_tables + 1]
+      assert "tpcds.date_dim" in logs[num_tpch_tables + 2]
+      assert "tpcds.item" in logs[num_tpch_tables + 3]
+      assert "functional.#" in logs[num_tpch_tables + 4]
+      assert "functional.alltypes etc #" in logs[num_tpch_tables + 5]
+      assert len(logs) == num_tables
