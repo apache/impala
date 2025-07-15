@@ -118,7 +118,8 @@ class Catalog {
 
   /// Returns the metastore event processor summary view. The summary string
   /// in the response can contain detailed metrics along with status
-  Status GetEventProcessorSummary(TEventProcessorMetricsSummaryResponse* response);
+  Status GetEventProcessorSummary(const TEventProcessorMetricsSummaryRequest& req,
+      TEventProcessorMetricsSummaryResponse* response);
 
   /// Gets all functions in the catalog matching the parameters in the given
   /// TFunctionsRequest.

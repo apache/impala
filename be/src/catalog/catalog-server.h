@@ -289,6 +289,12 @@ class CatalogServer {
   void UpdateActiveCatalogd(bool is_registration_reply, int64_t active_catalogd_version,
       const TCatalogRegistration& catalogd_registration);
 
+  /// Wait until the pending HMS events are applied. Used in HA failover before the
+  /// standby catalogd becomes active to get rid of stale metadata when
+  /// catalogd_ha_reset_metadata_on_failover is set to false. Callers should hold the
+  /// catalog_lock_.
+  void WaitUntilHmsEventsSynced(const std::unique_lock<std::mutex>& lock);
+
   /// Returns the current active status of the catalogd.
   bool IsActive();
 

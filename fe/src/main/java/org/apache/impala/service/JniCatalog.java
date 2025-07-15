@@ -64,6 +64,7 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TEventProcessorMetricsSummaryRequest;
 import org.apache.impala.thrift.TGetCatalogDeltaRequest;
 import org.apache.impala.thrift.TGetCatalogDeltaResponse;
 import org.apache.impala.thrift.TGetCatalogServerMetricsResponse;
@@ -517,10 +518,19 @@ public class JniCatalog {
     return execAndSerialize("getOperationUsage", shortDesc, catalog_::getOperationUsage);
   }
 
-  public byte[] getEventProcessorSummary() throws ImpalaException, TException {
+  public byte[] getEventProcessorSummary(byte[] req)
+      throws ImpalaException, TException {
+    TEventProcessorMetricsSummaryRequest thriftReq =
+        new TEventProcessorMetricsSummaryRequest();
+    JniUtil.deserializeThrift(protocolFactory_, thriftReq, req);
+
     String shortDesc = "Getting event processor summary";
+    if (thriftReq.get_latest_event_from_hms) {
+      shortDesc += " (get_latest_event_from_hms=true)";
+    }
     return execAndSerialize(
-        "getEventProcessorSummary", shortDesc, catalog_::getEventProcessorSummary);
+        "getEventProcessorSummary", shortDesc,
+        () -> catalog_.getEventProcessorSummary(thriftReq));
   }
 
   public byte[] setEventProcessorStatus(byte[] thriftParams)

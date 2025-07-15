@@ -87,6 +87,7 @@ import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TEventBatchProgressInfo;
 import org.apache.impala.thrift.TEventProcessorMetrics;
+import org.apache.impala.thrift.TEventProcessorMetricsSummaryRequest;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 import org.apache.impala.thrift.TImpalaTableType;
 import org.apache.impala.thrift.TStatus;
@@ -1407,7 +1408,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   }
 
   @Override
-  public TEventProcessorMetricsSummaryResponse getEventProcessorSummary() {
+  public TEventProcessorMetricsSummaryResponse getEventProcessorSummary(
+      TEventProcessorMetricsSummaryRequest req) {
     TEventProcessorMetricsSummaryResponse summaryResponse =
         new TEventProcessorMetricsSummaryResponse();
     summaryResponse.setSummary(metrics_.toString());
@@ -1419,6 +1421,17 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     progressInfo.last_synced_event_time_s = lastSyncedEventTimeSecs_.get();
     progressInfo.latest_event_id = latestEventId_.get();
     progressInfo.latest_event_time_s = latestEventTimeSecs_.get();
+    if (req.get_latest_event_from_hms) {
+      try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+        progressInfo.latest_event_id =
+            metaStoreClient.getHiveClient().getCurrentNotificationEventId().getEventId();
+        progressInfo.latest_event_time_s = -1;
+      } catch (MetastoreClientInstantiationException | TException e) {
+        progressInfo.latest_event_id = - 1;
+        progressInfo.latest_event_time_s = -1;
+        LOG.warn("Failed to fetch the latest HMS event id. Returning -1", e);
+      }
+    }
     // Assign these lists to local variables in case they are replaced concurrently.
     // It's best effort to make the members in 'progressInfo' consistent but we can't
     // guarantee it.

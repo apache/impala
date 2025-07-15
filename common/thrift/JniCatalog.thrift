@@ -1083,6 +1083,13 @@ struct TCopyTestCaseReq {
   1: required string input_path
 }
 
+struct TEventProcessorMetricsSummaryRequest {
+  // Whether to fetch the latest HMS event id using a HMS RPC or using the cached value
+  // in the EventProcessor. When set to true, 'latest_event_time_s' in the progress info
+  // will be -1 to save a HMS RPC.
+  1: required bool get_latest_event_from_hms = false
+}
+
 struct TEventBatchProgressInfo {
   // Number of original HMS events received in the current batch.
   1: required i32 num_hms_events

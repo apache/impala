@@ -85,6 +85,8 @@ DECLARE_bool(symbolize_stacktrace);
 DECLARE_string(debug_actions);
 DECLARE_int64(thrift_rpc_max_message_size);
 DECLARE_int64(thrift_external_rpc_max_message_size);
+DECLARE_double(hms_event_polling_interval_s);
+DECLARE_bool(catalogd_ha_reset_metadata_on_failover);
 
 DEFINE_int32(memory_maintenance_sleep_time_ms, 10000, "Sleep time in milliseconds "
     "between memory maintenance iterations");
@@ -560,6 +562,14 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
         Substitute("Invalid $0: $1 is less than the minimum value of $2.",
             "thrift_external_rpc_max_message_size",
             FLAGS_thrift_external_rpc_max_message_size, ThriftDefaultMaxMessageSize()));
+  }
+
+  if (!FLAGS_catalogd_ha_reset_metadata_on_failover
+      && FLAGS_hms_event_polling_interval_s <= 0) {
+    CLEAN_EXIT_WITH_ERROR(Substitute(
+        "Invalid hms_event_polling_interval_s: $0. It should be larger than 0 when "
+        "--catalogd_ha_reset_metadata_on_failover is false",
+        FLAGS_hms_event_polling_interval_s));
   }
 
   impala::InitGoogleLoggingSafe(argv[0]);

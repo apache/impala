@@ -26,6 +26,7 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.thrift.TEventProcessorMetrics;
+import org.apache.impala.thrift.TEventProcessorMetricsSummaryRequest;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 
 /**
@@ -98,7 +99,8 @@ public class NoOpEventProcessor implements ExternalEventsProcessor {
   }
 
   @Override
-  public TEventProcessorMetricsSummaryResponse getEventProcessorSummary() {
+  public TEventProcessorMetricsSummaryResponse getEventProcessorSummary(
+      TEventProcessorMetricsSummaryRequest req) {
     return DEFAULT_SUMMARY_RESPONSE;
   }
 

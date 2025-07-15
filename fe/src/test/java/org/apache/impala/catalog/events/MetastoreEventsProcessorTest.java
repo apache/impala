@@ -146,6 +146,7 @@ import org.apache.impala.thrift.TDropDbParams;
 import org.apache.impala.thrift.TDropFunctionParams;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TEventProcessorMetrics;
+import org.apache.impala.thrift.TEventProcessorMetricsSummaryRequest;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.THdfsFileFormat;
@@ -1960,7 +1961,7 @@ public class MetastoreEventsProcessorTest {
     assertTrue("Event process duration should be greater than zero",
         response.getEvents_process_duration_mean() > 0);
     TEventProcessorMetricsSummaryResponse summaryResponse =
-        catalog_.getEventProcessorSummary();
+        catalog_.getEventProcessorSummary(new TEventProcessorMetricsSummaryRequest());
     assertNotNull(summaryResponse);
     assertTrue(response.getLast_synced_event_id() > lastEventSyncId);
   }
@@ -1991,7 +1992,7 @@ public class MetastoreEventsProcessorTest {
     assertTrue("we do not turn off disableHmsSync for table testTblName1",
             response.getEvents_skipped() >= numEventsSkippedBefore);
     TEventProcessorMetricsSummaryResponse summaryResponse =
-            catalog_.getEventProcessorSummary();
+            catalog_.getEventProcessorSummary(new TEventProcessorMetricsSummaryRequest());
     assertNotNull(summaryResponse);
     assertTrue(response.getLast_synced_event_id() > lastEventSyncId);
 
@@ -2052,7 +2053,8 @@ public class MetastoreEventsProcessorTest {
       assertFalse(response.isSetEvents_received_5min_rate());
       assertFalse(response.isSetEvents_received_15min_rate());
       TEventProcessorMetricsSummaryResponse summaryResponse =
-          eventsProcessor_.getEventProcessorSummary();
+          eventsProcessor_.getEventProcessorSummary(
+              new TEventProcessorMetricsSummaryRequest());
       assertNotNull(summaryResponse);
       // Last synced id must be set even when event processor is not active.
       assertTrue(response.isSetLast_synced_event_id());
@@ -2075,7 +2077,7 @@ public class MetastoreEventsProcessorTest {
     assertNotNull(response);
     assertEquals(EventProcessorStatus.DISABLED.toString(), response.getStatus());
     TEventProcessorMetricsSummaryResponse summaryResponse =
-        testCatalog.getEventProcessorSummary();
+        testCatalog.getEventProcessorSummary(new TEventProcessorMetricsSummaryRequest());
     assertNotNull(summaryResponse);
   }
   /**

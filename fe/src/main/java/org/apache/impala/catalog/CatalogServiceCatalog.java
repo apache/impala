@@ -116,6 +116,7 @@ import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TEventProcessorCmdParams;
 import org.apache.impala.thrift.TEventProcessorMetrics;
+import org.apache.impala.thrift.TEventProcessorMetricsSummaryRequest;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TGetCatalogUsageResponse;
@@ -4057,8 +4058,9 @@ public class CatalogServiceCatalog extends Catalog {
    * Gets the events processor summary. Used for populating the contents of the events
    * processor detailed view page
    */
-  public TEventProcessorMetricsSummaryResponse getEventProcessorSummary() {
-    return metastoreEventProcessor_.getEventProcessorSummary();
+  public TEventProcessorMetricsSummaryResponse getEventProcessorSummary(
+      TEventProcessorMetricsSummaryRequest req) {
+    return metastoreEventProcessor_.getEventProcessorSummary(req);
   }
 
   public TSetEventProcessorStatusResponse setEventProcessorStatus(

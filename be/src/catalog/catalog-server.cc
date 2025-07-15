@@ -171,11 +171,24 @@ DEFINE_int32(catalog_operation_log_size, 100, "Number of catalog operation log r
     "to retain in catalogd. If -1, the operation log has unbounded size.");
 
 // The standby catalogd may have stale metadata for some reason, like event processor
-// could have hung or could be just behind in processing events. Also the standby
-// catalogd doesn't get invalidate requests from coordinators so we should probably
+// could have hung or could be just behind in processing events. So we should probably
 // reset its metadata when it becomes active to avoid stale metadata.
-DEFINE_bool_hidden(catalogd_ha_reset_metadata_on_failover, true, "If true, reset all "
-    "metadata when the catalogd becomes active.");
+DEFINE_bool(catalogd_ha_reset_metadata_on_failover, true, "If true, reset all metadata "
+    "when the catalogd becomes active. If false, catalogd keeps using its current "
+    "metadata but will apply all pending HMS events before being active. Setting this "
+    "to false requires enabling HMS notification events processing, i.e. "
+    "hms_event_polling_interval_s > 0");
+
+DEFINE_int32(catalogd_ha_failover_catchup_timeout_s, 300, "When "
+  "catalogd_ha_reset_metadata_on_failover is false, catalogd wait before transitioning to"
+  " the active state until pending HMS events are applied. This flag controls the timeout"
+  " for this wait.");
+
+DEFINE_bool(catalogd_ha_reset_metadata_on_failover_catchup_timeout, true, "If true, "
+  "catalogd will reset all metadata when it times out in catching up HMS events in HA "
+  "failover. If false, catalogd ignored the pending HMS events when timeout happens and "
+  "continue transitioning to the active state. This is only used when "
+  "catalogd_ha_reset_metadata_on_failover is false.");
 
 DEFINE_int32(topic_update_log_gc_frequency, 1000, "Frequency at which the entries "
     "of the catalog topic update log are garbage collected. An entry may survive "
@@ -802,7 +815,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
 
 void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
     int64_t active_catalogd_version, const TCatalogRegistration& catalogd_registration) {
-  lock_guard<mutex> l(catalog_lock_);
+  unique_lock<mutex> l(catalog_lock_);
   if (!active_catalogd_version_checker_->CheckActiveCatalogdVersion(
           is_registration_reply, active_catalogd_version)) {
     return;
@@ -836,6 +849,11 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
         if (!status.ok()) {
           LOG(ERROR) << "Failed to refresh data sources triggered by catalogd failover.";
         }
+        // If HA state has been determined, this is a failover. Apply pending HMS events
+        // to avoid stale metadata. Note that only HMS events before the failover happens
+        // need to be applied. HMS events after that are OK to be applied later since they
+        // are not applied in the previous active catalogd as well.
+        if (is_ha_determined_) WaitUntilHmsEventsSynced(l);
       }
       // Signal the catalog update gathering thread to start.
       topic_updates_ready_ = false;
@@ -858,6 +876,81 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
   }
 
   is_ha_determined_ = true;
+}
+
+void CatalogServer::WaitUntilHmsEventsSynced(const unique_lock<std::mutex>& lock) {
+  DCHECK(lock.mutex() == &catalog_lock_ && lock.owns_lock());
+  uint64_t timeout_ns = FLAGS_catalogd_ha_failover_catchup_timeout_s * NANOS_PER_SEC;
+  MonotonicStopWatch timeout_timer;
+  timeout_timer.Start();
+  LOG(INFO) << "Getting latest HMS event event id and waiting for EventProcessor to "
+               "sync up";
+  TEventProcessorMetricsSummaryResponse response;
+  TEventProcessorMetricsSummaryRequest req;
+  // Fetches the latest HMS event id from HMS directly in case the cached value in
+  // EventProcessor is stale. It's updated every 1s (by default) but could be stale due
+  // to slow HMS RPCs.
+  req.get_latest_event_from_hms = true;
+  Status status = catalog_->GetEventProcessorSummary(req, &response);
+  DCHECK(status.ok());
+  if (response.__isset.error_msg) {
+    triggered_first_reset_ = false;
+    LOG(ERROR) << "EventProcessor is in ERROR state. Resetting all metadata in failover";
+    return;
+  }
+  DCHECK(response.__isset.progress);
+  int64_t latest_hms_event_id = response.progress.latest_event_id;
+  int64_t last_synced_hms_event_id = response.progress.last_synced_event_id;
+  // If there are exceptions in fetching the latest HMS event id, 'latest_hms_event_id'
+  // is set to -1. Retry since we do need a correct value.
+  while (latest_hms_event_id < 0 && timeout_timer.ElapsedTime() < timeout_ns) {
+    SleepForMs(100);
+    status = catalog_->GetEventProcessorSummary(req, &response);
+    DCHECK(status.ok());
+    DCHECK(response.__isset.progress);
+    latest_hms_event_id = response.progress.latest_event_id;
+  }
+  if (latest_hms_event_id < 0) {
+    triggered_first_reset_ = false;
+    LOG(ERROR) << "Timed out getting the latest event id from HMS. Resetting all metadata"
+                  "in failover";
+    return;
+  }
+  // Now that we figure out latest_hms_event_id from HMS, we loop and wait until
+  // last_synced_event_id catch up with this latest_hms_event_id or timeout passed.
+  // Setting get_latest_event_from_hms to false so GetEventProcessorSummary won't send
+  // HMS RPCs.
+  req.get_latest_event_from_hms = false;
+  while (last_synced_hms_event_id < latest_hms_event_id
+      && timeout_timer.ElapsedTime() < timeout_ns) {
+    LOG(INFO) << "Wait until the pending "
+        << (latest_hms_event_id - last_synced_hms_event_id)
+        << " HMS events are applied. Latest event in HMS: id=" << latest_hms_event_id
+        << ". Last synced event: id=" << last_synced_hms_event_id;
+    SleepForMs(REFRESH_METRICS_INTERVAL_MS);
+    status = catalog_->GetEventProcessorSummary(req, &response);
+    DCHECK(status.ok());
+    if (response.__isset.error_msg) {
+      triggered_first_reset_ = false;
+      LOG(ERROR) << "EventProcessor is in ERROR state. Resetting all metadata in "
+                    "failover";
+      return;
+    }
+    DCHECK(response.__isset.progress);
+    last_synced_hms_event_id = response.progress.last_synced_event_id;
+  }
+  if (last_synced_hms_event_id < latest_hms_event_id) {
+    LOG(WARNING) << "Timed out waiting for catching up HMS events.";
+    if (FLAGS_catalogd_ha_reset_metadata_on_failover_catchup_timeout) {
+      triggered_first_reset_ = false;
+      LOG(INFO) << "Fallback to resetting all metadata.";
+    } else {
+      LOG(WARNING) << "Continue with the current cache. Metadata might be stale.";
+    }
+    return;
+  }
+  LOG(INFO) << "EventProcessor is synced up with HMS event id during failover: "
+      << latest_hms_event_id;
 }
 
 [[noreturn]] void CatalogServer::TriggerResetMetadata() {
@@ -1173,8 +1266,10 @@ void CatalogServer::GetCatalogUsage(Document* document) {
 void CatalogServer::EventMetricsUrlCallback(
     const Webserver::WebRequest& req, Document* document) {
   auto& allocator = document->GetAllocator();
+  TEventProcessorMetricsSummaryRequest request;
   TEventProcessorMetricsSummaryResponse event_processor_summary_response;
-  Status status = catalog_->GetEventProcessorSummary(&event_processor_summary_response);
+  Status status = catalog_->GetEventProcessorSummary(
+      request, &event_processor_summary_response);
   if (!status.ok()) {
     Value error(status.GetDetail(), allocator);
     document->AddMember("error", error, allocator);

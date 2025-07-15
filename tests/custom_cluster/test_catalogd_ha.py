@@ -530,6 +530,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true",
     catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
+                  "--debug_actions=catalogd_event_processing_delay:SLEEP@2000 "
                   "--warmup_tables_config_file="
                   "{0}/test-warehouse/warmup_table_list.txt".format(FILESYSTEM_PREFIX),
     start_args="--enable_catalogd_ha")
@@ -537,8 +538,39 @@ class TestCatalogdHA(CustomClusterTestSuite):
     """Verify that the metadata is warmed up in the standby catalogd."""
     for catalogd in self.__get_catalogds():
       self._test_warmed_up_tables(catalogd.service)
-    latest_catalogd = self._test_metadata_after_failover(unique_database, True)
+    latest_catalogd = self._test_metadata_after_failover(
+        unique_database, skip_func_test=True)
     self._test_warmed_up_tables(latest_catalogd)
+
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
+                  "--debug_actions=catalogd_event_processing_delay:SLEEP@3000 "
+                  "--catalogd_ha_failover_catchup_timeout_s=2 "
+                  "--warmup_tables_config_file="
+                  "{0}/test-warehouse/warmup_table_list.txt".format(FILESYSTEM_PREFIX),
+    start_args="--enable_catalogd_ha")
+  def test_failover_catchup_timeout_and_reset(self, unique_database):
+    self._test_metadata_after_failover(unique_database, skip_func_test=True)
+
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
+                  "--debug_actions=catalogd_event_processing_delay:SLEEP@3000 "
+                  "--catalogd_ha_failover_catchup_timeout_s=2 "
+                  "--catalogd_ha_reset_metadata_on_failover_catchup_timeout=false "
+                  "--warmup_tables_config_file="
+                  "{0}/test-warehouse/warmup_table_list.txt".format(FILESYSTEM_PREFIX),
+    start_args="--enable_catalogd_ha")
+  def test_failover_catchup_timeout_not_reset(self, unique_database):
+    # Use allow_table_not_exists=True since the table is missing due to catalog not reset.
+    latest_catalogd = self._test_metadata_after_failover(
+        unique_database, allow_table_not_exists=True, skip_func_test=True)
+    # Verify tables are still loaded
+    self._test_warmed_up_tables(latest_catalogd)
+    # Run a global IM to bring up 'unique_database' in the new catalogd. Otherwise, the
+    # cleanup_database step will fail.
+    self.execute_query("invalidate metadata")
 
   def _test_warmed_up_tables(self, catalogd):
     db = "tpcds"
@@ -547,7 +579,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
       catalogd.verify_table_metadata_loaded(db, table)
     catalogd.verify_table_metadata_loaded(db, "store", expect_loaded=False)
 
-  def _test_metadata_after_failover(self, unique_database, skip_func_test=False):
+  def _test_metadata_after_failover(self, unique_database,
+                                    allow_table_not_exists=False, skip_func_test=False):
     """Verify that the metadata is correct after failover. Returns the current active
     catalogd"""
     (active_catalogd, standby_catalogd) = self.__get_catalogds()
@@ -581,7 +614,14 @@ class TestCatalogdHA(CustomClusterTestSuite):
       self.execute_query_expect_success(
           self.client, "select %s.identity_tmp(10)" % unique_database)
 
-    self.execute_query_expect_success(self.client, "describe %s.tbl" % unique_database)
+    # Check if the new active catalogd has the new table in its cache.
+    try:
+      self.execute_query("describe %s.tbl" % unique_database)
+    except Exception as e:
+      if not allow_table_not_exists:
+        # Due to IMPALA-14228, the query could still fail. But it's not due to stale
+        # metadata so allow this until we resolve IMPALA-14228.
+        assert "Error making an RPC call to Catalog server" in str(e)
     return catalogd_service_2
 
   def test_page_with_disable_ha(self):
