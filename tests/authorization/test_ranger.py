@@ -31,7 +31,7 @@ from builtins import map, range
 import pytest
 import requests
 
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite, HIVE_CONF_DIR
 from tests.common.file_utils import copy_files_to_hdfs_dir
 from tests.common.iceberg_rest_server import IcebergRestServer
 from tests.common.skip import SkipIf, SkipIfFS, SkipIfHive2
@@ -3267,6 +3267,37 @@ class TestRangerIcebergRestCatalog(TestRanger):
       return HS2
 
   @classmethod
+  def need_default_clients(cls):
+    """There will be no HMS, so we shouldn't create the Hive client."""
+    return False
+
+  @classmethod
+  def setup_class(cls):
+    super(TestRangerIcebergRestCatalog, cls).setup_class()
+    try:
+      cls.iceberg_rest_server = IcebergRestServer()
+      cls.iceberg_rest_server.start_rest_server(300)
+    except Exception as e:
+      cls.iceberg_rest_server.stop_rest_server(10)
+      raise e
+
+    try:
+      cls._stop_hive_service()
+    except Exception as e:
+      cls.cleanup_infra_services()
+      raise e
+
+  @classmethod
+  def teardown_class(cls):
+    cls.cleanup_infra_services()
+    super(TestRangerIcebergRestCatalog, cls).teardown_class()
+
+  @classmethod
+  def cleanup_infra_services(cls):
+    cls.iceberg_rest_server.stop_rest_server(10)
+    cls._start_hive_service(None)
+
+  @classmethod
   def add_custom_cluster_constraints(cls):
     # Do not call the super() implementation because this class needs to relax the
     # set of constraints.
@@ -3274,25 +3305,20 @@ class TestRangerIcebergRestCatalog(TestRanger):
       lambda v: v.get_value('table_format').file_format == 'parquet')
 
   def setup_method(self, method):
+    args = method.__dict__
+    if HIVE_CONF_DIR in args:
+      raise Exception("Cannot specify HIVE_CONF_DIR because the tests of this class are "
+          "running without Hive.")
     # Invoke start-impala-cluster.py with '--no_catalogd'
     start_args = "--no_catalogd"
-    if START_ARGS in method.__dict__:
-      start_args = method.__dict__[START_ARGS] + " " + start_args
-    method.__dict__[START_ARGS] = start_args
+    if START_ARGS in args:
+      start_args = args[START_ARGS] + " " + start_args
+    args[START_ARGS] = start_args
 
-    try:
-      self.iceberg_rest_server = IcebergRestServer()
-      self.iceberg_rest_server.start_rest_server(300)
-      super(TestRangerIcebergRestCatalog, self).setup_method(method)
-      self.admin_client = self.create_impala_client(user=ADMIN)
-    except Exception as e:
-      print(e)
-      self.iceberg_rest_server.stop_rest_server(10)
-      raise e
-
-  def teardown_method(self, method):
-    self.iceberg_rest_server.stop_rest_server(10)
-    super(TestRangerIcebergRestCatalog, self).teardown_method(method)
+    super(TestRangerIcebergRestCatalog, self).setup_method(method)
+    # At this point we can create the Impala clients that we will need.
+    self.create_impala_clients()
+    self.admin_client = self.create_impala_client(user=ADMIN)
 
   def _get_all_resource(self):
     return {
