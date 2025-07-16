@@ -382,7 +382,8 @@ class TestAcid(ImpalaTestSuite):
     self.execute_query('insert into %s partition (p="b") values (4)' % tbl)
     result = self.execute_query("select * from %s order by i" % tbl)
     assert result.data == ['3\tb', '4\tb']
-    self.client.wait_for_finished_timeout(
-        other_partition_insert_handle, 0.001 * sleep_time_ms)
+    # Wait 2*sleep_time_ms.
+    assert self.client.wait_for_finished_timeout(
+        other_partition_insert_handle, 0.001 * 2 * sleep_time_ms)
     result = self.execute_query("select * from %s order by i" % tbl)
     assert result.data == ['1\ta', '3\tb', '4\tb']
