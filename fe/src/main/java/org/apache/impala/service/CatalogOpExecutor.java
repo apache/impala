@@ -4043,7 +4043,7 @@ public class CatalogOpExecutor {
     } catch (Exception e) {
       try {
         // Error creating the table in HMS, drop the synchronized table from Kudu.
-        if (!KuduTable.isSynchronizedTable(newTable)) {
+        if (KuduTable.isSynchronizedTable(newTable)) {
           KuduCatalogOpExecutor.dropTable(newTable, /* if exists */ false,
               /* kudu_table_reserve_seconds */ 0, catalogTimeline);
         }
