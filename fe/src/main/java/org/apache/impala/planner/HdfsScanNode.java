@@ -173,39 +173,12 @@ public class HdfsScanNode extends ScanNode {
   // Matches HdfsOrcScanner::ORC_FOOTER_SIZE in backend.
   private static final long ORC_FOOTER_SIZE = 16L * 1024L;
 
-  // When the information of cardinality is not available for the underlying hdfs table,
-  // i.e., the field of cardinality_ is equal to -1, we will attempt to compute an
-  // estimate for the number of rows in getStatsNumbers().
-  // Specifically, we divide the files into 3 categories - uncompressed,
-  // legacy compressed (e.g., text, avro, rc, seq), and
-  // columnar (e.g., parquet and orc).
-  // Depending on the category of a file, we multiply the size of the file by
-  // its corresponding compression factor to derive an estimated original size
-  // of the file before compression.
-  // These estimates were computed based on the empirical compression ratios
-  // that we have observed for 3 tables in our tpch datasets:
-  // customer, lineitem, and orders.
-  // The max compression ratio we have seen for legacy formats is 3.58, whereas
-  // the max compression ratio we have seen for columnar formats is 4.97.
-  private static double ESTIMATED_COMPRESSION_FACTOR_UNCOMPRESSED = 1.0;
-  private static double ESTIMATED_COMPRESSION_FACTOR_LEGACY = 3.58;
-  private static double ESTIMATED_COMPRESSION_FACTOR_COLUMNAR = 4.97;
-
   // Adjustment factor for inputCardinality_ calculation used when doing a partition
   // key scan to reflect that opening a file to read a single row imposes significant
   // overhead per row.
   private static long PARTITION_KEY_SCAN_INPUT_CARDINALITY_ADJUSTMENT_FACTOR = 100;
 
-  private static Set<HdfsFileFormat> VALID_LEGACY_FORMATS =
-      ImmutableSet.<HdfsFileFormat>builder()
-          .add(HdfsFileFormat.RC_FILE)
-          .add(HdfsFileFormat.TEXT)
-          .add(HdfsFileFormat.SEQUENCE_FILE)
-          .add(HdfsFileFormat.AVRO)
-          .add(HdfsFileFormat.JSON)
-          .build();
-
-  private static Set<HdfsFileFormat> VALID_COLUMNAR_FORMATS =
+  public static Set<HdfsFileFormat> VALID_COLUMNAR_FORMATS =
       ImmutableSet.<HdfsFileFormat>builder()
           .add(HdfsFileFormat.PARQUET)
           .add(HdfsFileFormat.HUDI_PARQUET)
@@ -220,9 +193,6 @@ public class HdfsScanNode extends ScanNode {
   // Cost per predicate per row
   private static final double COST_COEFFICIENT_COLUMNAR_PREDICATE_EVAL = 0.0281;
   private static final double COST_COEFFICIENT_NONCOLUMNAR_PREDICATE_EVAL = 0.0549;
-
-  // An estimate of the width of a row when the information is not available.
-  private double DEFAULT_ROW_WIDTH_ESTIMATE = 1.0;
 
   protected final FeFsTable tbl_;
 
@@ -269,10 +239,10 @@ public class HdfsScanNode extends ScanNode {
   // computeScanRangeLocations().
   private long largestScanRangeBytes_ = 0;
 
-  // Input cardinality based on the partition row counts or extrapolation. -1 if invalid.
-  // Both values can be valid to report them in the explain plan, but only one of them is
-  // used for determining the scan cardinality.
-  private long partitionNumRows_ = -1;
+  // Input cardinality based on the extrapolation. -1 if invalid.
+  // Both this value and estimatedMissingStats_.partitionNumRows_ can be valid to report
+  // them in the explain plan, but only one of them is used for determining the scan
+  // cardinality.
   private long extrapolatedNumRows_ = -1;
 
   // Number of scan ranges that will be generated for all TFileSplitGeneratorSpec's.
@@ -318,9 +288,6 @@ public class HdfsScanNode extends ScanNode {
   // collectionConjuncts_.
   private final Map<SlotDescriptor, List<Integer>> dictionaryFilterConjuncts_ =
       new LinkedHashMap<>();
-
-  // Number of partitions that have the row count statistic.
-  private int numPartitionsWithNumRows_ = 0;
 
   // Indicates corrupt table stats based on the number of non-empty scan ranges and
   // numRows set to 0. Set in computeStats().
@@ -370,6 +337,9 @@ public class HdfsScanNode extends ScanNode {
   private final List<Expr> partitionConjuncts_;
 
   private boolean isFullAcidTable_ = false;
+
+  private HdfsEstimatedMissingTableStats estimatedMissingStats_ =
+      new HdfsEstimatedMissingTableStats();
 
   /**
    * Construct a node to scan given data files into tuples described by 'desc',
@@ -1653,15 +1623,17 @@ public class HdfsScanNode extends ScanNode {
     // Choose between the extrapolated row count and the one based on stored stats.
     extrapolatedNumRows_ = FeFsTable.Utils.getExtrapolatedNumRows(tbl_,
             sumValues(totalBytesPerFs_));
-    long statsNumRows = getStatsNumRows(analyzer.getQueryOptions());
     if (extrapolatedNumRows_ != -1) {
       // The extrapolated row count is based on the 'totalBytesPerFs_' which already
       // accounts for table sampling, so no additional adjustment for sampling is
       // necessary.
       cardinality_ = extrapolatedNumRows_;
     } else {
+      estimatedMissingStats_ =
+          new HdfsEstimatedMissingTableStats(analyzer.getQueryOptions(),
+          tbl_, partitions_, tableNumRowsHint_);
       // Set the cardinality based on table or partition stats.
-      cardinality_ = statsNumRows;
+      cardinality_ = estimatedMissingStats_.statsNumRows_;
       // Adjust the cardinality based on table sampling.
       if (sampleParams_ != null && cardinality_ != -1) {
         double fracPercBytes = (double) sampleParams_.getPercentBytes() / 100;
@@ -1729,138 +1701,6 @@ public class HdfsScanNode extends ScanNode {
     if (LOG.isTraceEnabled()) {
       LOG.trace("HdfsScan: cardinality_=" + Long.toString(cardinality_));
     }
-  }
-
-  /**
-   * Computes and returns the number of rows scanned based on the per-partition row count
-   * stats and/or the table-level row count stats, depending on which of those are
-   * available. Partition stats are used as long as they are neither missing nor
-   * corrupted. Otherwise, we fall back to table-level stats even for partitioned tables.
-   * We further estimate the row count if the table-level stats is missing or corrupted,
-   * or some partitions are with corrupt stats. The estimation is done only for those
-   * partitions with corrupt stats.
-   *
-   * Sets these members:
-   * numPartitionsWithNumRows_, partitionNumRows_, hasCorruptTableStats_.
-   *
-   * Currently, we provide a table hint 'TABLE_NUM_ROWS' to set table rows manually if
-   * table has no stats or has corrupt stats. If the table has valid stats, this hint
-   * will be ignored.
-   */
-  private long getStatsNumRows(TQueryOptions queryOptions) {
-    numPartitionsWithNumRows_ = 0;
-    partitionNumRows_ = -1;
-    hasCorruptTableStats_ = false;
-
-    List<FeFsPartition> partitionsWithCorruptOrMissingStats = new ArrayList<>();
-    for (FeFsPartition p : partitions_) {
-      long partNumRows = p.getNumRows();
-      // Check for corrupt stats
-      if (partNumRows < -1 || (partNumRows == 0 && p.getSize() > 0)) {
-        hasCorruptTableStats_ = true;
-        partitionsWithCorruptOrMissingStats.add(p);
-      } else if (partNumRows == -1) { // Check for missing stats
-        partitionsWithCorruptOrMissingStats.add(p);
-      } else if (partNumRows > -1) {
-        // Consider partition with good stats.
-        if (partitionNumRows_ == -1) partitionNumRows_ = 0;
-        partitionNumRows_ = MathUtil.addCardinalities(partitionNumRows_, partNumRows);
-        ++numPartitionsWithNumRows_;
-      }
-    }
-    // If all partitions have good stats, return the total row count contributed
-    // by each of the partitions, as the row count for the table.
-    if (partitionsWithCorruptOrMissingStats.size() == 0
-        && numPartitionsWithNumRows_ > 0) {
-      return partitionNumRows_;
-    }
-
-    // Set cardinality based on table-level stats.
-    long numRows = tbl_.getNumRows();
-    // Depending on the query option of disable_hdfs_num_rows_est, if numRows
-    // is still not available (-1), or partition stats is corrupted, we provide
-    // a crude estimation by computing sumAvgRowSizes, the sum of the slot
-    // size of each column of scalar type, and then generate the estimate using
-    // sumValues(totalBytesPerFs_), the size of the hdfs table.
-    if (!queryOptions.disable_hdfs_num_rows_estimate
-        && (numRows == -1L || hasCorruptTableStats_) && tableNumRowsHint_ == -1L) {
-      // Compute the estimated table size from those partitions with missing or corrupt
-      // row count, when taking compression into consideration
-      long estimatedTableSize =
-          computeEstimatedTableSize(partitionsWithCorruptOrMissingStats);
-
-      double sumAvgRowSizes = 0.0;
-      for (Column col : tbl_.getColumns()) {
-        Type currentType = col.getType();
-        if (currentType instanceof ScalarType) {
-          if (col.getStats().hasAvgSize()) {
-            sumAvgRowSizes = sumAvgRowSizes + col.getStats().getAvgSerializedSize();
-          } else {
-            sumAvgRowSizes = sumAvgRowSizes + col.getType().getSlotSize();
-          }
-        }
-      }
-
-      long estNumRows = 0;
-      if (sumAvgRowSizes == 0.0) {
-        // When the type of each Column is of ArrayType or MapType,
-        // sumAvgRowSizes would be equal to 0. In this case, we use a ultimate
-        // fallback row width if sumAvgRowSizes == 0.0.
-        estNumRows = Math.round(estimatedTableSize / DEFAULT_ROW_WIDTH_ESTIMATE);
-      } else {
-        estNumRows = Math.round(estimatedTableSize / sumAvgRowSizes);
-      }
-
-      // Include the row count contributed by partitions with good stats (if any).
-      numRows = partitionNumRows_ =
-          (partitionNumRows_ > 0) ? partitionNumRows_ + estNumRows : estNumRows;
-    }
-
-    if (numRows < -1 || (numRows == 0 && tbl_.getTotalHdfsBytes() > 0)) {
-      hasCorruptTableStats_ = true;
-    }
-
-    // Use hint value if table no stats or stats is corrupt and hint is set
-    return (numRows >= 0 && !hasCorruptTableStats_) || tableNumRowsHint_ == -1L ?
-        numRows :tableNumRowsHint_;
-  }
-
-  /**
-   * Compute the estimated table size for the partitions contained in
-   * the partitions argument when taking compression into consideration
-   */
-  private long computeEstimatedTableSize(List<FeFsPartition> partitions) {
-    long estimatedTableSize = 0;
-    for (FeFsPartition p : partitions) {
-      HdfsFileFormat format = p.getFileFormat();
-      long estimatedPartitionSize = 0;
-      if (format == HdfsFileFormat.TEXT || format == HdfsFileFormat.JSON) {
-        for (FileDescriptor desc : p.getFileDescriptors()) {
-          HdfsCompression compression = HdfsCompression.fromFileName(desc.getPath());
-          if (HdfsCompression.SUFFIX_MAP.containsValue(compression)) {
-            estimatedPartitionSize += Math.round(desc.getFileLength()
-                * ESTIMATED_COMPRESSION_FACTOR_LEGACY);
-          } else {
-            // When the text file is not compressed.
-            estimatedPartitionSize += Math.round(desc.getFileLength()
-                * ESTIMATED_COMPRESSION_FACTOR_UNCOMPRESSED);
-          }
-        }
-      } else {
-        // When the current partition is not a text file.
-        if (VALID_LEGACY_FORMATS.contains(format)) {
-          estimatedPartitionSize += Math.round(p.getSize()
-              * ESTIMATED_COMPRESSION_FACTOR_LEGACY);
-        } else {
-         Preconditions.checkState(VALID_COLUMNAR_FORMATS.contains(format),
-             "Unknown HDFS compressed format: %s", format, this);
-         estimatedPartitionSize += Math.round(p.getSize()
-             * ESTIMATED_COMPRESSION_FACTOR_COLUMNAR);
-        }
-      }
-      estimatedTableSize += estimatedPartitionSize;
-    }
-    return estimatedTableSize;
   }
 
   /**
@@ -2321,8 +2161,8 @@ public class HdfsScanNode extends ScanNode {
     if (tbl_.getNumClusteringCols() > 0) {
       output.append("\n");
       output.append(String.format("%spartitions: %s/%s rows=%s",
-          prefix, numPartitionsWithNumRows_, partitions_.size(),
-          PrintUtils.printEstCardinality(partitionNumRows_)));
+          prefix, estimatedMissingStats_.numPartitionsWithNumRows_, partitions_.size(),
+          PrintUtils.printEstCardinality(estimatedMissingStats_.partitionNumRows_)));
     }
     return output.toString();
   }
@@ -2715,7 +2555,7 @@ public class HdfsScanNode extends ScanNode {
   public boolean isTableMissingTableStats() {
     if (extrapolatedNumRows_ >= 0) return false;
     if (tbl_.getNumClusteringCols() > 0
-        && numPartitionsWithNumRows_ != partitions_.size()) {
+        && estimatedMissingStats_.numPartitionsWithNumRows_ != partitions_.size()) {
       return true;
     }
     return super.isTableMissingTableStats();
@@ -2724,7 +2564,9 @@ public class HdfsScanNode extends ScanNode {
   public TableSampleClause getSampleParams() { return sampleParams_; }
 
   @Override
-  public boolean hasCorruptTableStats() { return hasCorruptTableStats_; }
+  public boolean hasCorruptTableStats() {
+      return hasCorruptTableStats_ || estimatedMissingStats_.hasCorruptTableStats_;
+  }
 
   public boolean hasMissingDiskIds() { return numScanRangesNoDiskIds_ > 0; }
 
