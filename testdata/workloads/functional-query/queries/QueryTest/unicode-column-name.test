@@ -311,6 +311,25 @@ select * from unicode_partition_values;
 INT, STRING
 ====
 ---- QUERY
+show files in unicode_partition_values;
+---- RESULTS: RAW_STRING
+row_regex:'$NAMENODE/test-warehouse/$DATABASE\.db/unicode_partition_values/p=运/.*\.parq','.*','p=运','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE\.db/unicode_partition_values/p=运营业务数据1234567890!@%23\$%25%5E&%2A\(\)%7B}%5B%5D/.*\.parq','.*','p=运营业务数据1234567890!@%23\$%25%5E&%2A\(\)%7B}%5B%5D','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE\.db/unicode_partition_values/p=运营业务数据/.*\.parq','.*','p=运营业务数据','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from unicode_partition_values
+where p like '运%';
+---- RESULTS: RAW_STRING
+0,'运'
+0,'运营业务数据'
+0,'运营业务数据1234567890!@#$%^&*(){}[]'
+---- TYPES
+INT, STRING
+====
+---- QUERY
 create table unicode_partition_values_iceberg (id int, p string) partitioned by spec (identity(p)) stored by iceberg;
 ---- RESULTS
 'Table has been created.'
@@ -326,4 +345,26 @@ select * from unicode_partition_values_iceberg;
 0,'运营业务数据1234567890!@#$%^&*(){}[]'
 ---- TYPES
 INT, STRING
+====
+---- QUERY
+show files in unicode_partition_values_iceberg;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE\.db/unicode_partition_values_iceberg/data/p=%E8%BF%90/.*\.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE\.db/unicode_partition_values_iceberg/data/p=%E8%BF%90%E8%90%A5%E4%B8%9A%E5%8A%A1%E6%95%B0%E6%8D%AE1234567890%21%40%23%24%25%5E%26\*%28%29%7B%7D%5B%5D/.*\.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE\.db/unicode_partition_values_iceberg/data/p=%E8%BF%90%E8%90%A5%E4%B8%9A%E5%8A%A1%E6%95%B0%E6%8D%AE/.*\.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+insert into unicode_partition_values_iceberg values (2, '运营业务数据');
+select * from unicode_partition_values_iceberg
+where p = '运营业务数据';
+---- RESULTS: RAW_STRING
+0,'运营业务数据'
+2,'运营业务数据'
+---- TYPES
+INT, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 2
 ====

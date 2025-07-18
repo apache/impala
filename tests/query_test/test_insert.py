@@ -333,7 +333,7 @@ class TestInsertPartKey(ImpalaTestSuite):
                  "\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B" \
                  "\x1C\x1D\x1E\x1F\"\x7F'%*/:=?\\{[]#^"
     part_dir = "p=SpecialCharacters%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%" \
-               "10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F%22%7F%27%25%2A" \
+               "10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F%22%7F%27%25*" \
                "%2F%3A%3D%3F%5C%7B%5B%5D%23%5E"
     show_part_value = "SpecialCharacters\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006" \
                       "\\u0007\\b\\t\\n\\u000B\\f\\r\\u000E\\u000F\\u0010" \

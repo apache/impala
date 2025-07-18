@@ -38,9 +38,9 @@ using std::uppercase;
 
 namespace impala {
 
-// It is more convenient to maintain the complement of the set of
-// characters to escape when not in Hive-compat mode.
-static function<bool (char)> ShouldNotEscape = is_any_of("-_.~");
+// It is more convenient to maintain the set of characters that are safe to use
+// directly in URLs without escaping
+static function<bool (char)> IsUrlSafe = is_any_of(".-*_");
 
 // Hive selectively encodes characters. This is the whitelist of
 // characters it will encode.
@@ -53,18 +53,27 @@ static const std::unordered_set<char> SpecialCharacters = {
     '\x1F', '\x7F', '"', '#', '%', '\'', '*', '/', ':', '=', '?', '\\', '{', '[', ']',
     '^'};
 
+// Encodes the input string as a URL-encoded string based on UTF-8.
+// If 'hive_compat' is set to true, the string is encoded in a Hive-compatible way;
+// otherwise, a more standard URL encoding is used, similar to the URLEncoder.encode()
+// method in Java.
 static inline void UrlEncode(const char* in, int in_len, string* out, bool hive_compat) {
   stringstream ss;
   // "uppercase" and "hex" only affect the insertion of integers, not that of char values.
   ss << uppercase << hex << setfill('0');
   for (char ch : std::string_view(in, in_len)) {
-    // Escape the character iff a) we are in Hive-compat mode and the
-    // character is in the Hive whitelist or b) we are not in Hive-compat mode and
-    // the character is not alphanumeric and it is not one of the characters specifically
-    // excluded from escaping (see ShouldNotEscape()).
+    // Escape the character iff
+    //   a) we are in Hive-compat mode and the character is in the Hive whitelist or
+    //   b) we are not in Hive-compat mode and the character is not alphanumeric
+    //      and it is not safe to use in URLs (see IsUrlSafe()).
     if ((hive_compat && SpecialCharacters.count(ch) > 0) || (!hive_compat &&
-            !isalnum(static_cast<unsigned char>(ch)) && !ShouldNotEscape(ch))) {
-      ss << '%' << setw(2) << static_cast<uint32_t>(static_cast<unsigned char>(ch));
+            !isalnum(static_cast<unsigned char>(ch)) && !IsUrlSafe(ch))) {
+      // Iff we are not in Hive-compat mode, we encode space as '+'.
+      if (!hive_compat && ch == ' ') {
+        ss << '+';
+      } else {
+        ss << '%' << setw(2) << static_cast<uint32_t>(static_cast<unsigned char>(ch));
+      }
     } else {
       ss << ch;
     }

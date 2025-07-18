@@ -107,7 +107,12 @@ string TableSinkBase::GetPartitionName(int i) {
 
 string TableSinkBase::UrlEncodePartitionValue(const string& raw_str) {
   string encoded_str;
-  UrlEncode(raw_str, &encoded_str, true);
+  if (IsIceberg()) {
+    // Iceberg partition values should be URL encoded, but not Hive compatible way.
+    UrlEncode(raw_str, &encoded_str, false);
+  } else {
+    UrlEncode(raw_str, &encoded_str, true);
+  }
   return encoded_str.empty() ? table_desc_->null_partition_key_value() : encoded_str;
 }
 

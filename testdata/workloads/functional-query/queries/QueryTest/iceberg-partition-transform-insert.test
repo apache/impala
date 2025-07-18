@@ -427,11 +427,11 @@ INT,BIGINT,DECIMAL,STRING
 ---- QUERY
 show files in multi_col_truncate;
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=0/b_trunc=11/d_trunc=11111.100000/.*.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=0/b_trunc=220/d_trunc=421.000000/.*.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=5/b_trunc=330/d_trunc=113211.200000/.*.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick fox b/i_trunc=5/b_trunc=440/d_trunc=1111154.100000/.*.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick impal/i_trunc=15/b_trunc=550/d_trunc=9999913.200000/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the\+quick\+brown/i_trunc=0/b_trunc=11/d_trunc=11111.100000/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the\+quick\+brown/i_trunc=0/b_trunc=220/d_trunc=421.000000/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the\+quick\+brown/i_trunc=5/b_trunc=330/d_trunc=113211.200000/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the\+quick\+fox\+b/i_trunc=5/b_trunc=440/d_trunc=1111154.100000/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the\+quick\+impal/i_trunc=15/b_trunc=550/d_trunc=9999913.200000/.*.parq','.*','','$ERASURECODE_POLICY'
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=__HIVE_DEFAULT_PARTITION__/i_trunc=__HIVE_DEFAULT_PARTITION__/b_trunc=__HIVE_DEFAULT_PARTITION__/d_trunc=__HIVE_DEFAULT_PARTITION__/.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
 STRING, STRING, STRING, STRING
@@ -1010,7 +1010,7 @@ STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
 show files in mixed_and_shuffled;
 ---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1971-07-01/da_year=1971/s_trunc=green/b_bucket=1/de_trunc=71.00/.*.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1999-09-09/da_year=1999/s_trunc=pink /b_bucket=1/de_trunc=9.00/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1999-09-09/da_year=1999/s_trunc=pink\+/b_bucket=1/de_trunc=9.00/.*.parq','.*','','$ERASURECODE_POLICY'
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2020-01-06/da_year=2020/s_trunc=quick/b_bucket=1/de_trunc=3333.00/.*.parq','.*','','$ERASURECODE_POLICY'
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2021-01-01/da_year=2021/s_trunc=quick/b_bucket=1/de_trunc=543.00/.*.parq','.*','','$ERASURECODE_POLICY'
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2021-01-01/da_year=2021/s_trunc=quick/b_bucket=2/de_trunc=123.00/.*.parq','.*','','$ERASURECODE_POLICY'
@@ -1087,4 +1087,60 @@ where da is not null;
 'green python',717171,71.00,1971-07-01 07:07:07,1971-07-01
 ---- TYPES
 STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
+====
+---- QUERY
+# Test truncate partition transform with Unicode strings
+create table unicode_truncate (s string)
+partitioned by spec (truncate(5, s))
+stored as iceberg;
+====
+---- QUERY
+insert into unicode_truncate values
+('impala'),
+('árvíztűrőtükörfúrógép'),
+('árvíztűrő'),
+('űűű'),
+('你们好hello');
+select * from unicode_truncate;
+---- RESULTS: RAW_STRING
+'impala'
+'árvíztűrőtükörfúrógép'
+'árvíztűrő'
+'űűű'
+'你们好hello'
+---- TYPES
+STRING
+====
+---- QUERY
+show files in unicode_truncate;
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/unicode_truncate/data/s_trunc=impal/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/unicode_truncate/data/s_trunc=%C3%A1rv%C3%ADz/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/unicode_truncate/data/s_trunc=%C5%B1%C5%B1%C5%B1/.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/unicode_truncate/data/s_trunc=%E4%BD%A0%E4%BB%AC%E5%A5%BDhe/.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+select * from unicode_truncate
+where s like "árvíz%";
+---- RESULTS: RAW_STRING
+'árvíztűrőtükörfúrógép'
+'árvíztűrő'
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+select * from unicode_truncate
+where s = "űűű";
+---- RESULTS: RAW_STRING
+'űűű'
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
 ====

@@ -22,6 +22,7 @@
 
 #include "common/compiler-util.h"
 #include "common/logging.h"
+#include "exprs/string-functions.h"
 #include "runtime/timestamp-value.inline.h"
 #include "thirdparty/murmurhash/MurmurHash3.h"
 #include "udf/udf-internal.h"
@@ -102,7 +103,9 @@ StringVal IcebergFunctions::TruncatePartitionTransform(FunctionContext* ctx,
     const StringVal& input, const IntVal& width) {
   if (!CheckInputsAndSetError(ctx, input, width)) return StringVal::null();
   if (input.len <= width.val) return input;
-  return StringVal::CopyFrom(ctx, input.ptr, width.val);
+  // String handled as UTF8 regardless of utf8_mode, because Iceberg spec states that
+  // character strings must be stored as UTF-8 encoded byte arrays.
+  return StringFunctions::Utf8Substring(ctx, input, 1, width.val);
 }
 
 template<typename T, typename W>

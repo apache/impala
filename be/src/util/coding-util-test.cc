@@ -117,14 +117,39 @@ TEST(UrlCodingTest, PathSeparators) {
   string encoded_test_path = "%2Fhome%2Fimpala%2Fdirectory%2F";
   TestUrl(test_path, encoded_test_path, false);
   TestUrl(test_path, encoded_test_path, true);
-  string test = "SpecialCharacters\x01\x02\x03\x04\x05\x06\x07\b\t\n\v\f\r\x0E\x0F\x10"
-                "\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F\x7F\"#%'"
-                "*/:=?\\{[]^";
-  string encoded_test = "SpecialCharacters%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F"
-                        "%10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F%7F%22%23%25"
-                        "%27%2A%2F%3A%3D%3F%5C%7B%5B%5D%5E";
-  TestUrl(test, encoded_test, false);
-  TestUrl(test, encoded_test, true);
+}
+
+// Test URL encoding of the ASCII table, character values from 1 to 127.
+TEST(UrlCodingTest, AsciiCharacters) {
+  string raw = "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D"
+                "\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19"
+                "\x1A\x1B\x1C\x1D\x1E\x1F !\"#$%&'()*+,-./"
+                "0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                "[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F";
+  string hive_encoded = "%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D"
+                        "%0E%0F%10%11%12%13%14%15%16%17%18%19"
+                        "%1A%1B%1C%1D%1E%1F !%22%23$%25&%27()%2A+,-.%2F"
+                        "0123456789%3A;<%3D>%3F@ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                        "%5B%5C%5D%5E_`abcdefghijklmnopqrstuvwxyz%7B|}~%7F";
+  TestUrl(raw, hive_encoded, true);
+  string url_encoded = "%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D"
+                       "%0E%0F%10%11%12%13%14%15%16%17%18%19"
+                       "%1A%1B%1C%1D%1E%1F+%21%22%23%24%25%26%27%28%29*%2B%2C-.%2F"
+                       "0123456789%3A%3B%3C%3D%3E%3F%40ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                       "%5B%5C%5D%5E_%60abcdefghijklmnopqrstuvwxyz%7B%7C%7D%7E%7F";
+  TestUrl(raw, url_encoded, false);
+}
+
+// Test a few unicode characters that are not in the ASCII table.
+TEST(UrlCodingTest, UnicodeCharacters) {
+  string raw = "árvíztűrőtükörfúrógép 你们好 აბგ";
+  string hive_encoded = "árvíztűrőtükörfúrógép 你们好 აბგ";
+  TestUrl(raw, hive_encoded, true);
+  string url_encoded = "%C3%A1rv%C3%ADzt%C5%B1r%C5%91"
+                       "t%C3%BCk%C3%B6rf%C3%BAr%C3%B3g%C3%A9p"
+                       "+%E4%BD%A0%E4%BB%AC%E5%A5%BD"
+                       "+%E1%83%90%E1%83%91%E1%83%92";
+  TestUrl(raw, url_encoded, false);
 }
 
 TEST(Base64Test, Basic) {
