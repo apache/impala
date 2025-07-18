@@ -69,6 +69,7 @@ Catalog::Catalog() {
     {"getCatalogUsage", "()[B", &get_catalog_usage_id_},
     {"getOperationUsage", "()[B", &get_operation_usage_id_},
     {"getCatalogVersion", "()J", &get_catalog_version_id_},
+    {"getNumCatalogResetStarts", "()J", &get_num_catalog_reset_starts_id_},
     {"getCatalogServerMetrics", "()[B", &get_catalog_server_metrics_},
     {"getEventProcessorSummary", "([B)[B", &get_event_processor_summary_},
     {"prioritizeLoad", "([B)V", &prioritize_load_id_},
@@ -124,6 +125,15 @@ Status Catalog::GetCatalogVersion(long* version) {
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
   *version = jni_env->CallLongMethod(catalog_, get_catalog_version_id_);
+  RETURN_ERROR_IF_EXC(jni_env);
+  return Status::OK();
+}
+
+Status Catalog::GetNumCatalogResetStarts(long* num) {
+  JNIEnv* jni_env = JniUtil::GetJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
+  *num = jni_env->CallLongMethod(catalog_, get_num_catalog_reset_starts_id_);
   RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK();
 }

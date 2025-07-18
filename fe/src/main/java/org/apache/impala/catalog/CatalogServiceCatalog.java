@@ -302,6 +302,10 @@ public class CatalogServiceCatalog extends Catalog {
   // The catalog version when we ran reset() last time. Protected by versionLock_.
   private long lastResetStartVersion_ = INITIAL_CATALOG_VERSION;
 
+  // Number of reset() triggered from BE (catalog-server.cc) that has been started.
+  // It's increased everytime reset() starts holding versionLock_.
+  private AtomicLong numCatalogResetStarts_ = new AtomicLong(0);
+
   // Manages the scheduling of background table loading.
   private final TableLoadingMgr tableLoadingMgr_;
 
@@ -2153,7 +2157,7 @@ public class CatalogServiceCatalog extends Catalog {
     }
     long duration = System.currentTimeMillis() - startTime;
     if (!nativeFuncs.isEmpty() || !javaFuncs.isEmpty()) {
-      LOG.info("Loaded {} native {} and {} java functions for database {} in {} ms.",
+      LOG.info("Loaded {} native and {} java functions for database {} in {} ms.",
           nativeFuncs.size(), javaFuncs.size(), db.getName(), duration);
     }
   }
@@ -2383,7 +2387,7 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   public long reset(EventSequence catalogTimeline) throws CatalogException {
-    return reset(catalogTimeline, false);
+    return reset(catalogTimeline, false, false);
   }
 
   /**
@@ -2392,10 +2396,11 @@ public class CatalogServiceCatalog extends Catalog {
    * requesting impalad will use that version to determine when the
    * effects of reset have been applied to its local catalog cache.
    */
-  public long reset(EventSequence catalogTimeline, boolean isSyncDdl)
-      throws CatalogException {
+  public long reset(EventSequence catalogTimeline, boolean isSyncDdl,
+      boolean isCatalogServerRequest) throws CatalogException {
     long startVersion = getCatalogVersion();
-    LOG.info("Invalidating all metadata. Version: " + startVersion);
+    LOG.info("Invalidating all metadata. Version: " + startVersion
+        + ", IsCatalogServerRequest: " + isCatalogServerRequest);
     Stopwatch resetTimer = Stopwatch.createStarted();
     Stopwatch unlockedTimer = Stopwatch.createStarted();
     // First update the policy metadata.
@@ -2434,19 +2439,14 @@ public class CatalogServiceCatalog extends Catalog {
       LOG.error("Couldn't identify the default FS. Cache Pool reader will be disabled.");
     }
     versionLock_.writeLock().lock();
+    // The BE only cares about resets triggered from itself. So not increasing this for
+    // user requests.
+    if (isCatalogServerRequest) numCatalogResetStarts_.incrementAndGet();
     try {
       resetManager_.waitFullMetadataFetch();
       unlockedTimer.stop();
       catalogTimeline.markEvent(GOT_CATALOG_VERSION_WRITE_LOCK);
-      // In case of an empty new catalog, the version should still change to reflect the
-      // reset operation itself and to unblock impalads by making the catalog version >
-      // INITIAL_CATALOG_VERSION. See Frontend.waitForCatalog()
-      if (catalogVersion_ < Catalog.CATALOG_VERSION_AFTER_FIRST_RESET) {
-        catalogVersion_ = Catalog.CATALOG_VERSION_AFTER_FIRST_RESET;
-        LOG.info("First reset initiated. Version: " + catalogVersion_);
-      } else {
-        ++catalogVersion_;
-      }
+      catalogVersion_++;
 
       // Update data source, db and table metadata.
       // First, refresh DataSource objects from HMS and assign new versions.
@@ -3723,6 +3723,10 @@ public class CatalogServiceCatalog extends Catalog {
     } finally {
       versionLock_.readLock().unlock();
     }
+  }
+
+  public long getNumCatalogResetStarts() {
+    return numCatalogResetStarts_.get();
   }
 
   private void acquireVersionReadLock(EventSequence catalogTimeline) {

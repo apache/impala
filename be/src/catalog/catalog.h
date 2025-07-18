@@ -58,6 +58,11 @@ class Catalog {
   /// Status object with information on the error will be returned.
   Status GetCatalogVersion(long* version);
 
+  /// Queries the catalog to get the number of reset() has been starts. Returns OK if the
+  /// operation was successful, otherwise a Status object with information on the error
+  /// will be returned.
+  Status GetNumCatalogResetStarts(long* num);
+
   /// Retrieves the catalog objects that were added/modified/deleted since version
   /// 'from_version'. Returns OK if the operation was successful, otherwise a Status
   /// object with information on the error will be returned. 'caller' is a pointer to
@@ -176,6 +181,7 @@ class Catalog {
   jmethodID get_partial_catalog_object_id_;  // JniCatalog.getPartialCatalogObject()
   jmethodID get_catalog_delta_id_;  // JniCatalog.getCatalogDelta()
   jmethodID get_catalog_version_id_;  // JniCatalog.getCatalogVersion()
+  jmethodID get_num_catalog_reset_starts_id_;  // JniCatalog.getNumCatalogResetStarts()
   jmethodID get_catalog_usage_id_; // JniCatalog.getCatalogUsage()
   jmethodID get_operation_usage_id_; // JniCatalog.getOperationUsage()
   jmethodID get_catalog_server_metrics_; // JniCatalog.getCatalogServerMetrics()

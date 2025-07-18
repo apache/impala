@@ -289,6 +289,10 @@ public class JniCatalog {
     return catalog_.getCatalogVersion();
   }
 
+  public long getNumCatalogResetStarts() {
+    return catalog_.getNumCatalogResetStarts();
+  }
+
   public byte[] getCatalogDelta(byte[] thriftGetCatalogDeltaReq)
       throws ImpalaException, TException {
     TGetCatalogDeltaRequest params = new TGetCatalogDeltaRequest();

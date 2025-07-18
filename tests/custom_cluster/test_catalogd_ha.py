@@ -529,6 +529,26 @@ class TestCatalogdHA(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=true "
+                  "--catalog_topic_mode=minimal "
+                  "--debug_actions=TRIGGER_RESET_METADATA_DELAY:SLEEP@1000",
+    impalad_args="--use_local_catalog=true",
+    start_args="--enable_catalogd_ha")
+  def test_metadata_after_failover_with_delayed_reset(self, unique_database):
+    self._test_metadata_after_failover(unique_database)
+
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
+                  "--catalog_topic_mode=minimal "
+                  "--debug_actions=catalogd_event_processing_delay:SLEEP@1000",
+    impalad_args="--use_local_catalog=true",
+    start_args="--enable_catalogd_ha")
+  def test_metadata_after_failover_with_hms_sync(self, unique_database):
+    self._test_metadata_after_failover(unique_database, skip_func_test=True)
+
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--use_subscriber_id_as_catalogd_priority=true",
     catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
                   "--debug_actions=catalogd_event_processing_delay:SLEEP@2000 "
                   "--warmup_tables_config_file="

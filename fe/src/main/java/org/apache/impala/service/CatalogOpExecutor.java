@@ -7287,7 +7287,10 @@ public class CatalogOpExecutor {
     } else {
       // Invalidate the entire catalog if no table name is provided.
       Preconditions.checkArgument(!req.isIs_refresh());
-      resp.getResult().setVersion(catalog_.reset(catalogTimeline, req.isSync_ddl()));
+      boolean isCatalogServerRequest =
+          !req.header.isSetRequesting_user() && !req.header.isSetCoordinator_hostname();
+      resp.getResult().setVersion(
+          catalog_.reset(catalogTimeline, req.isSync_ddl(), isCatalogServerRequest));
       resp.getResult().setIs_invalidate(true);
     }
     catalogTimeline.markEvent("Finished resetMetadata request");

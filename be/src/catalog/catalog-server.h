@@ -141,7 +141,7 @@ class CatalogServer {
   ///
   /// Returns `true` or `false` indicating if this catalogd is the active catalogd.
   /// If catalog HA is not enabled, returns `true`.
-  bool WaitForCatalogReady();
+  bool WaitCatalogReadinessForWorkloadManagement();
 
   // Initializes workload management by creating or upgrading the necessary database and
   // tables. Does not check if the current catalogd is active or if workload management is
@@ -219,13 +219,29 @@ class CatalogServer {
   /// Thread that periodically wakes up and refreshes certain Catalog metrics.
   std::unique_ptr<Thread> catalog_metrics_refresh_thread_;
 
-  /// Protects is_active_, active_catalogd_version_checker_,
-  /// catalog_update_cv_, pending_topic_updates_, catalog_objects_to/from_version_,
-  /// last_sent_catalog_version, and is_ha_determined_.
-  std::mutex catalog_lock_;
+  /// Min number of started catalog resets that we are safe to serve requests. Set on
+  /// each call of MarkPendingMetadataReset. Inits to 1 to account for the initial reset
+  /// done in startup. Only used when catalogd HA is enabled.
+  AtomicInt64 min_catalog_resets_to_serve_ = 1;
 
   /// Set to true if this catalog instance is active.
   AtomicBool is_active_;
+
+  /// Mark if the pending metadata reset required in startup or HA transition has been
+  /// triggered.
+  AtomicBool triggered_pending_reset_ = false;
+
+  /// Protect metadata state change during HA transition.
+  /// If operation needs to obtain both catalog_lock_ and this, this lock must be
+  /// obtained first.
+  std::mutex ha_transition_lock_;
+
+  /// Protects several field members below.
+  std::mutex catalog_lock_;
+
+  /// -----------------------------------------------------------------------------
+  /// BEGIN: Members that must be protected by catalog_lock_.
+  /// -----------------------------------------------------------------------------
 
   /// Set to true after active catalog has been determined. Will be true if catalog ha
   /// is not enabled.
@@ -256,14 +272,14 @@ class CatalogServer {
   /// Set in UpdateCatalogTopicCallback() and protected by the catalog_lock_.
   int64_t last_sent_catalog_version_;
 
-  /// Mark if the first metadata reset has been triggered.
-  /// Protected by the catalog_lock_.
-  bool triggered_first_reset_;
-
   /// The max catalog version in pending_topic_updates_. Set by the
   /// catalog_update_gathering_thread_ and protected by catalog_lock_.
   /// Value -1 means catalog_update_gathering_thread_ has not set it.
   int64_t catalog_objects_max_version_;
+
+  /// -----------------------------------------------------------------------------
+  /// END: Members that must be protected by catalog_lock_.
+  /// -----------------------------------------------------------------------------
 
   /// Called during each Statestore heartbeat and is responsible for updating the current
   /// set of catalog objects in the IMPALA_CATALOG_TOPIC. Responds to each heartbeat with a
@@ -295,8 +311,17 @@ class CatalogServer {
   /// catalog_lock_.
   void WaitUntilHmsEventsSynced(const std::unique_lock<std::mutex>& lock);
 
-  /// Returns the current active status of the catalogd.
-  bool IsActive();
+  /// Request pending full metadata reset.
+  /// The actual reset will be performed by the TriggerResetMetadata thread later.
+  /// Set min_catalog_resets_to_serve_ to the current catalog resets + 1 to delay
+  /// AcceptRequest() until the reset operation begin in JVM.
+  void MarkPendingMetadataReset(const std::unique_lock<std::mutex>& lock);
+
+  /// If there is a pending metadata reset going to start, e.g. in the initial startup or
+  /// marked by MarkPendingMetadataReset(), wait until it actually starts. This means the
+  /// metadata reset thread has started and acquired the catalog version lock in JVM, the
+  /// request will proceed to wait inside JVM.
+  Status WaitPendingMetadataResetStarts(const std::string& server_address);
 
   /// Executed by the catalog_update_gathering_thread_. Calls into JniCatalog
   /// to get the latest set of catalog objects that exist, along with some metadata on

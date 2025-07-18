@@ -377,9 +377,6 @@ const string HADOOP_VARZ_TEMPLATE = "hadoop-varz.tmpl";
 const string HADOOP_VARZ_WEB_PAGE = "/hadoop-varz";
 
 const int REFRESH_METRICS_INTERVAL_MS = 1000;
-// Catalog version that signal that the first metadata reset has begun.
-// This should match Catalog.CATALOG_VERSION_AFTER_FIRST_RESET
-const int MIN_CATALOG_VERSION_TO_ACCEPT_REQUEST = 100;
 
 // Implementation for the CatalogService thrift interface.
 class CatalogServiceThriftIf : public CatalogServiceIf {
@@ -598,35 +595,17 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
  private:
   CatalogServer* catalog_server_;
   string server_address_;
-  AtomicBool has_initiated_first_reset_{false};
 
   // Check if catalog protocols are compatible between client and catalog server.
   // Return Status::OK() if the protocols are compatible and catalog server is active.
   Status AcceptRequest(CatalogServiceVersion::type client_version) {
     Status status = Status::OK();
     if (client_version < catalog_server_->GetProtocolVersion()) {
-      status = Status(TErrorCode::CATALOG_INCOMPATIBLE_PROTOCOL, client_version + 1,
+      return Status(TErrorCode::CATALOG_INCOMPATIBLE_PROTOCOL, client_version + 1,
           catalog_server_->GetProtocolVersion() + 1);
-    } else if (FLAGS_enable_catalogd_ha && !catalog_server_->IsActive()) {
-      status = Status(Substitute("Request for Catalog service is rejected since "
-          "catalogd $0 is in standby mode", server_address_));
     }
-    if (!status.ok()) return status;
 
-    while (!has_initiated_first_reset_.Load()) {
-      long current_catalog_version = 0;
-      status = catalog_server_->catalog()->GetCatalogVersion(&current_catalog_version);
-      if (!status.ok()) break;
-      if (current_catalog_version >= MIN_CATALOG_VERSION_TO_ACCEPT_REQUEST) {
-        has_initiated_first_reset_.Store(true);
-      } else {
-        VLOG(1) << "Catalog is not initialized yet. Waiting for catalog version ("
-                << current_catalog_version << ") to be >= "
-                << MIN_CATALOG_VERSION_TO_ACCEPT_REQUEST;
-        SleepForMs(100);
-      }
-    }
-    return status;
+    return catalog_server_->WaitPendingMetadataResetStarts(server_address_);
   }
 };
 
@@ -635,11 +614,10 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
     thrift_iface_(new CatalogServiceThriftIf(this)),
     thrift_serializer_(FLAGS_compact_catalog_topic),
     metrics_(metrics),
-    is_active_{!FLAGS_enable_catalogd_ha},
+    is_active_(!FLAGS_enable_catalogd_ha),
     is_ha_determined_(!FLAGS_enable_catalogd_ha),
     topic_updates_ready_(false),
     last_sent_catalog_version_(0L),
-    triggered_first_reset_(false),
     catalog_objects_max_version_(0L) {
   topic_processing_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
       CATALOG_SERVER_TOPIC_PROCESSING_TIMES);
@@ -721,7 +699,7 @@ Status CatalogServer::Start() {
   }
 
   RETURN_IF_ERROR(statestore_subscriber_->Start());
-  if (FLAGS_force_catalogd_active && !IsActive()) {
+  if (FLAGS_force_catalogd_active && !is_active_.Load()) {
     // If both catalogd are started with 'force_catalogd_active' as true in short time,
     // the second election overwrite the first election. The one which registering with
     // statestore first will be inactive.
@@ -813,8 +791,55 @@ void CatalogServer::UpdateCatalogTopicCallback(
   catalog_update_cv_.NotifyOne();
 }
 
+Status CatalogServer::WaitPendingMetadataResetStarts(const string& server_address) {
+  long current_num_reset_starts = 0;
+  bool has_waited = false;
+
+  if (!FLAGS_enable_catalogd_ha) {
+    while (!triggered_pending_reset_.Load()) {
+      RETURN_IF_ERROR(catalog_->GetNumCatalogResetStarts(&current_num_reset_starts));
+      if (current_num_reset_starts > 0) break;
+      if (!has_waited) {
+        has_waited = true;
+        VLOG(1) << "Catalog is not initialized yet. Waiting for catalog reset to start";
+      }
+      SleepForMs(100);
+    }
+    return Status::OK();
+  }
+
+  lock_guard<mutex> meta_lock(ha_transition_lock_);
+  while (true) {
+    // Return error if this catalogd is not active.
+    if (!is_active_.Load()) {
+      return Status(Substitute("Request for Catalog service is rejected since "
+                               "catalogd $0 is in standby mode",
+          server_address));
+    }
+
+    // Early return if first reset has completed.
+    // triggered_pending_reset_=true means initial reset has fully completed.
+    if (triggered_pending_reset_.Load()) return Status::OK();
+
+    // Initial reset maybe ongoing.
+    RETURN_IF_ERROR(catalog_->GetNumCatalogResetStarts(&current_num_reset_starts));
+    int64_t min_catalog_resets_to_serve = min_catalog_resets_to_serve_.Load();
+    if (current_num_reset_starts >= min_catalog_resets_to_serve) break;
+    // Wait a bit until min_catalog_resets_to_serve_ is reached.
+    if (!has_waited) {
+      has_waited = true;
+      VLOG(1) << "Catalog is not initialized yet. Waiting for num of resets ("
+              << current_num_reset_starts << ") to be >= " << min_catalog_resets_to_serve;
+    }
+    SleepForMs(100);
+  }
+
+  return Status::OK();
+}
+
 void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
     int64_t active_catalogd_version, const TCatalogRegistration& catalogd_registration) {
+  lock_guard<mutex> meta_lock(ha_transition_lock_);
   unique_lock<mutex> l(catalog_lock_);
   if (!active_catalogd_version_checker_->CheckActiveCatalogdVersion(
           is_registration_reply, active_catalogd_version)) {
@@ -841,8 +866,9 @@ void CatalogServer::UpdateActiveCatalogd(bool is_registration_reply,
       catalog_->RegenerateServiceId();
       // Clear pending topic updates.
       pending_topic_updates_.clear();
+
       if (FLAGS_catalogd_ha_reset_metadata_on_failover) {
-        triggered_first_reset_ = false;
+        MarkPendingMetadataReset(l);
       } else {
         // Refresh DataSource objects when the catalogd becomes active.
         Status status = catalog_->RefreshDataSources();
@@ -894,7 +920,7 @@ void CatalogServer::WaitUntilHmsEventsSynced(const unique_lock<std::mutex>& lock
   Status status = catalog_->GetEventProcessorSummary(req, &response);
   DCHECK(status.ok());
   if (response.__isset.error_msg) {
-    triggered_first_reset_ = false;
+    MarkPendingMetadataReset(lock);
     LOG(ERROR) << "EventProcessor is in ERROR state. Resetting all metadata in failover";
     return;
   }
@@ -911,7 +937,7 @@ void CatalogServer::WaitUntilHmsEventsSynced(const unique_lock<std::mutex>& lock
     latest_hms_event_id = response.progress.latest_event_id;
   }
   if (latest_hms_event_id < 0) {
-    triggered_first_reset_ = false;
+    MarkPendingMetadataReset(lock);
     LOG(ERROR) << "Timed out getting the latest event id from HMS. Resetting all metadata"
                   "in failover";
     return;
@@ -931,7 +957,7 @@ void CatalogServer::WaitUntilHmsEventsSynced(const unique_lock<std::mutex>& lock
     status = catalog_->GetEventProcessorSummary(req, &response);
     DCHECK(status.ok());
     if (response.__isset.error_msg) {
-      triggered_first_reset_ = false;
+      MarkPendingMetadataReset(lock);
       LOG(ERROR) << "EventProcessor is in ERROR state. Resetting all metadata in "
                     "failover";
       return;
@@ -942,7 +968,7 @@ void CatalogServer::WaitUntilHmsEventsSynced(const unique_lock<std::mutex>& lock
   if (last_synced_hms_event_id < latest_hms_event_id) {
     LOG(WARNING) << "Timed out waiting for catching up HMS events.";
     if (FLAGS_catalogd_ha_reset_metadata_on_failover_catchup_timeout) {
-      triggered_first_reset_ = false;
+      MarkPendingMetadataReset(lock);
       LOG(INFO) << "Fallback to resetting all metadata.";
     } else {
       LOG(WARNING) << "Continue with the current cache. Metadata might be stale.";
@@ -953,6 +979,30 @@ void CatalogServer::WaitUntilHmsEventsSynced(const unique_lock<std::mutex>& lock
       << latest_hms_event_id;
 }
 
+void CatalogServer::MarkPendingMetadataReset(const unique_lock<std::mutex>& lock) {
+  DCHECK(lock.mutex() == &catalog_lock_ && lock.owns_lock())
+      << "Must hold catalog_lock_ to avoid concurrency with TriggerResetMetadata thread";
+  long current_catalog_resets;
+  Status status = catalog_->GetNumCatalogResetStarts(&current_catalog_resets);
+
+  if (status.ok()) {
+    min_catalog_resets_to_serve_.Store(current_catalog_resets + 1);
+    LOG(INFO) << "Marking pending metadata reset. Min number of catalog resets to serve: "
+              << min_catalog_resets_to_serve_.Load();
+  } else {
+    /// If somehow we failed to get the number, sets a conservative value.
+    min_catalog_resets_to_serve_.Add(1);
+    LOG(ERROR) << "Failed to get current catalog version: " << status.GetDetail()
+               << "Some requests might run on stale metadata.";
+  }
+  // Sets this after we updated min_catalog_resets_to_serve_ since the consumers check
+  // this before read/write on num of catalog resets. The consumers are
+  //  - Requests in WaitPendingMetadataResetStarts(). Read this and num of catalog resets
+  //    in JVM.
+  //  - TriggerResetMetadata thread. Reads this and updates num of catalog resets in JVM.
+  triggered_pending_reset_.Store(false);
+}
+
 [[noreturn]] void CatalogServer::TriggerResetMetadata() {
   while (true) {
     bool must_reset = false;
@@ -961,14 +1011,15 @@ void CatalogServer::WaitUntilHmsEventsSynced(const unique_lock<std::mutex>& lock
       while (!must_reset) {
         catalog_update_cv_.NotifyOne();
         catalog_update_cv_.Wait(unique_lock);
-        must_reset = is_ha_determined_ && !triggered_first_reset_;
+        must_reset = is_ha_determined_ && !triggered_pending_reset_.Load();
       }
     }
 
     // Run ResetMetadata without holding 'catalog_lock_' so that it does not block
     // gathering thread from starting. Note that gathering thread will still compete
     // for CatalogServiceCatalog.versionLock_.writeLock() in JVM.
-    VLOG(1) << "Triggering first catalog invalidation.";
+    DebugActionNoFail(FLAGS_debug_actions, "TRIGGER_RESET_METADATA_DELAY");
+    VLOG(1) << "(Re)Triggering first catalog invalidation.";
     TResetMetadataRequest req;
     TResetMetadataResponse resp;
     req.__set_header(TCatalogServiceRequestHeader());
@@ -983,14 +1034,10 @@ void CatalogServer::WaitUntilHmsEventsSynced(const unique_lock<std::mutex>& lock
     {
       // Mark to true, regardless of status.
       unique_lock<mutex> unique_lock(catalog_lock_);
-      triggered_first_reset_ = true;
+      triggered_pending_reset_.Store(true);
       catalog_update_cv_.NotifyOne();
     }
   }
-}
-
-bool CatalogServer::IsActive() {
-  return is_active_.Load();
 }
 
 [[noreturn]] void CatalogServer::GatherCatalogUpdatesThread() {
@@ -1005,8 +1052,9 @@ bool CatalogServer::IsActive() {
     // processing a heartbeat.
     // If require_initial_reset is True, this thread need to let TriggerResetMetadata
     // thread to proceed first.
-    while (topic_updates_ready_ || (require_initial_reset && !triggered_first_reset_)) {
-      if (!triggered_first_reset_) {
+    while (topic_updates_ready_
+        || (require_initial_reset && !triggered_pending_reset_.Load())) {
+      if (!triggered_pending_reset_.Load()) {
         // Wake up TriggerResetMetadata thread.
         catalog_update_cv_.NotifyOne();
       }
@@ -1040,7 +1088,7 @@ bool CatalogServer::IsActive() {
 
     topic_processing_time_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     topic_updates_ready_ = true;
-    if (!triggered_first_reset_) catalog_update_cv_.NotifyOne();
+    if (!triggered_pending_reset_.Load()) catalog_update_cv_.NotifyOne();
   }
 }
 
