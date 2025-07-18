@@ -1,0 +1,15 @@
+====
+---- QUERY
+# The following query needs to run against HDFS because iceberg_lineitem_sixblocks
+# contains position delete files that contain HDFS-specific URIs.
+# 'iceberg_lineitem_sixblocks' contains a single data file with six HDFS blocks. Without
+# block information we schedule the whole data file to a single SCAN operator.
+select count(*) from functional_parquet.iceberg_lineitem_sixblocks where l_orderkey % 2 = 0;
+---- RESULTS
+9805
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+# The following should be in the ExecSummary
+row_regex: 00:SCAN [A-Z0-9]+ +1 +1 +.*
+====

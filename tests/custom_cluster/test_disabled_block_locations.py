@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 from os import getenv
+from tests.util.filesystem_utils import IS_HDFS
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
@@ -34,3 +35,5 @@ class TestDisabledBlockLocations(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(custom_core_site_dir=CORE_SITE_CONFIG_DIR)
   def test_no_block_locations(self, vector):
     self.run_test_case('QueryTest/no-block-locations', vector)
+    if IS_HDFS:
+      self.run_test_case('QueryTest/no-block-locations-hdfs-only', vector)
