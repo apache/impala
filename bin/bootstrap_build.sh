@@ -32,8 +32,9 @@ set -euxo pipefail
 # Install non-java dependencies:
 # Kerberos setup would pop up dialog boxes without this
 export DEBIAN_FRONTEND=noninteractive
-sudo -E apt-get update
-sudo -E apt-get --yes install g++ gcc git libsasl2-dev libssl-dev make python-dev \
+sudo -E apt-get --quiet update
+sudo -E apt-get --yes --quiet install \
+     g++ gcc git libsasl2-dev libssl-dev make python-dev \
      python-setuptools python3-dev python3-setuptools python3-venv libffi-dev \
      libkrb5-dev krb5-admin-server krb5-kdc krb5-user libxml2-dev libxslt-dev
 
@@ -55,12 +56,8 @@ if [[ $DISTRIB_ID == Ubuntu && $DISTRIB_RELEASE == 20.04 ]]; then
   fi
 fi
 
-JDK_VERSION=8
-if [[ $DISTRIB_RELEASE = 14.04 ]]
-then
-  JDK_VERSION=7
-fi
-sudo apt-get --yes install openjdk-${JDK_VERSION}-jdk openjdk-${JDK_VERSION}-source
+JDK_VERSION=17
+sudo apt-get --yes --quiet install openjdk-${JDK_VERSION}-jdk openjdk-${JDK_VERSION}-source
 export JAVA_HOME=/usr/lib/jvm/java-${JDK_VERSION}-openjdk-amd64
 
 # Download Maven since the packaged version is pretty old.
