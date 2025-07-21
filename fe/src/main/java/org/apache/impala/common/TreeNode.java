@@ -153,7 +153,7 @@ public abstract class TreeNode<NodeType extends TreeNode<NodeType>> {
    */
   @SuppressWarnings("unchecked")
   public <C extends TreeNode<NodeType>, D extends C> void collectAll(
-      Predicate<? super C> predicate, List<D> matches) {
+      Predicate<? super C> predicate, Collection<D> matches) {
     if (predicate.apply((C) this)) matches.add((D) this);
     for (NodeType child: children_) child.collectAll(predicate, matches);
   }

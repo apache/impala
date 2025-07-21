@@ -35,6 +35,7 @@ def run_tuple_cache_test(self, vector, query, mtdop):
   if IS_TUPLE_CACHE_CORRECT_CHECK:
     vector.get_value('exec_option')['runtime_filter_wait_time_ms'] = 600000
     vector.get_value('exec_option')['enable_tuple_cache_verification'] = True
+    vector.get_value('exec_option')['tuple_cache_placement_policy'] = 'all_eligible'
   vector.get_value('exec_option')['mt_dop'] = mtdop
   # Run twice to test write and read the tuple cache.
   self.run_test_case(query, vector)

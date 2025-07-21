@@ -36,6 +36,7 @@ import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.ThriftSerializationCtx;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TFileSplitGeneratorSpec;
 import org.apache.impala.thrift.TScanRange;
@@ -176,6 +177,16 @@ public class TupleCacheInfo {
   // the filtered cardinality.
   private long estimatedSerializedSize_ = -1;
 
+  // Estimated size divided by the expected number of nodes. This is used by the cost
+  // based placement for the budget contribution.
+  private long estimatedSerializedSizePerNode_ = -1;
+
+  // Processing cost for writing this location to the cache
+  private long writeProcessingCost_ = -1;
+
+  // Processing cost for reading this location from the cache
+  private long readProcessingCost_ = -1;
+
   public TupleCacheInfo(DescriptorTable descTbl) {
     ineligibilityReasons_ = EnumSet.noneOf(IneligibilityReason.class);
     descriptorTable_ = descTbl;
@@ -205,16 +216,12 @@ public class TupleCacheInfo {
   }
 
   public String getHashString() {
-    Preconditions.checkState(isEligible(),
-        "TupleCacheInfo only has a hash if it is cache eligible");
-    Preconditions.checkState(finalized_, "TupleCacheInfo not finalized");
+    checkFinalizedAndEligible("a hash");
     return finalizedHashString_;
   }
 
   public List<HashTraceElement> getHashTraces() {
-    Preconditions.checkState(isEligible(),
-        "TupleCacheInfo only has a hash trace if it is cache eligible");
-    Preconditions.checkState(finalized_, "TupleCacheInfo not finalized");
+    checkFinalizedAndEligible("a hash trace");
     return hashTraces_;
   }
 
@@ -232,17 +239,34 @@ public class TupleCacheInfo {
   }
 
   public long getCumulativeProcessingCost() {
-    Preconditions.checkState(isEligible(),
-        "TupleCacheInfo only has cost information if it is cache eligible.");
-    Preconditions.checkState(finalized_, "TupleCacheInfo not finalized");
+    checkFinalizedAndEligible("cost information");
     return cumulativeProcessingCost_;
   }
 
   public long getEstimatedSerializedSize() {
-    Preconditions.checkState(isEligible(),
-        "TupleCacheInfo only has cost information if it is cache eligible.");
-    Preconditions.checkState(finalized_, "TupleCacheInfo not finalized");
+    checkFinalizedAndEligible("cost information");
     return estimatedSerializedSize_;
+  }
+
+  public long getEstimatedSerializedSizePerNode() {
+    checkFinalizedAndEligible("cost information");
+    return estimatedSerializedSizePerNode_;
+  }
+
+  public long getWriteProcessingCost() {
+    checkFinalizedAndEligible("cost information");
+    return writeProcessingCost_;
+  }
+
+  public long getReadProcessingCost() {
+    checkFinalizedAndEligible("cost information");
+    return readProcessingCost_;
+  }
+
+  private void checkFinalizedAndEligible(String contextString) {
+    Preconditions.checkState(isEligible(),
+        "TupleCacheInfo only has %s if it is cache eligible.", contextString);
+    Preconditions.checkState(finalized_, "TupleCacheInfo not finalized");
   }
 
   /**
@@ -259,6 +283,8 @@ public class TupleCacheInfo {
         "TupleCacheInfo only calculates cost information if it is cache eligible.");
     Preconditions.checkState(thisPlanNode.getTupleCacheInfo() == this,
         "calculateCostInformation() must be called with its enclosing PlanNode");
+    Preconditions.checkState(thisPlanNode.getNumNodes() > 0,
+        "PlanNode fragment must have nodes");
 
     // This was already called on our children, which are known to be eligible.
     // Pull in the information from our children.
@@ -280,6 +306,23 @@ public class TupleCacheInfo {
       long cardinality = thisPlanNode.getFilteredCardinality();
       estimatedSerializedSize_ = (long) Math.round(
           ExchangeNode.getAvgSerializedRowSize(thisPlanNode) * cardinality);
+      estimatedSerializedSizePerNode_ =
+        (long) estimatedSerializedSize_ / thisPlanNode.getNumNodes();
+      double costCoefficientWriteBytes =
+        BackendConfig.INSTANCE.getTupleCacheCostCoefficientWriteBytes();
+      double costCoefficientWriteRows =
+        BackendConfig.INSTANCE.getTupleCacheCostCoefficientWriteRows();
+      writeProcessingCost_ =
+        (long) (estimatedSerializedSize_ * costCoefficientWriteBytes +
+                cardinality * costCoefficientWriteRows);
+
+      double costCoefficientReadBytes =
+        BackendConfig.INSTANCE.getTupleCacheCostCoefficientReadBytes();
+      double costCoefficientReadRows =
+        BackendConfig.INSTANCE.getTupleCacheCostCoefficientReadRows();
+      readProcessingCost_ =
+        (long) (estimatedSerializedSize_ * costCoefficientReadBytes +
+                cardinality * costCoefficientReadRows);
     }
   }
 
@@ -561,6 +604,53 @@ public class TupleCacheInfo {
     return builder.toString();
   }
 
+  public String getExplainHashTrace(String detailPrefix) {
+    StringBuilder output = new StringBuilder();
+    final int keyFormatWidth = 100;
+    for (HashTraceElement elem : getHashTraces()) {
+      final String hashTrace = elem.getHashTrace();
+      if (hashTrace.length() < keyFormatWidth) {
+        output.append(String.format("%s  %s: %s\n", detailPrefix, elem.getComment(),
+            hashTrace));
+      } else {
+        output.append(String.format("%s  %s:\n", detailPrefix, elem.getComment()));
+        for (int idx = 0; idx < hashTrace.length(); idx += keyFormatWidth) {
+          int stopIdx = Math.min(hashTrace.length(), idx + keyFormatWidth);
+          output.append(String.format("%s  [%s]\n", detailPrefix,
+              hashTrace.substring(idx, stopIdx)));
+        }
+      }
+    }
+    return output.toString();
+  }
+
+  public String getExplainString(String detailPrefix, TExplainLevel detailLevel) {
+    if (detailLevel.ordinal() >= TExplainLevel.VERBOSE.ordinal()) {
+      // At extended level, provide information about whether this location is
+      // eligible. If it is, provide the cache key and cost information.
+      StringBuilder output = new StringBuilder();
+      if (isEligible()) {
+        output.append(String.format("%stuple cache key: %s\n", detailPrefix,
+            getHashString()));
+        output.append(getCostExplainString(detailPrefix));
+        // This PlanNode is eligible for tuple caching, so there may be TupleCacheNodes
+        // above this point. For debuggability, display this node's contribution to the
+        // tuple cache key by printing its hash trace.
+        //
+        // Print trace in chunks to avoid excessive wrapping and padding in impala-shell.
+        // There are other explain lines at VERBOSE level that are over 100 chars long so
+        // we limit the key chunk length similarly here.
+        output.append(getExplainHashTrace(detailPrefix));
+      } else {
+        output.append(String.format("%stuple cache ineligibility reasons: %s\n",
+            detailPrefix, getIneligibilityReasonsString()));
+      }
+      return output.toString();
+    } else {
+      return "";
+    }
+  }
+
   /**
    * Produce explain output describing the cost information for this tuple cache location
    */
@@ -573,8 +663,21 @@ public class TupleCacheInfo {
       output.append("unavailable");
     }
     output.append("\n");
+    output.append(detailPrefix + "estimated serialized size per node: ");
+    if (estimatedSerializedSizePerNode_ > -1) {
+      output.append(PrintUtils.printBytes(estimatedSerializedSizePerNode_));
+    } else {
+      output.append("unavailable");
+    }
+    output.append("\n");
     output.append(detailPrefix + "cumulative processing cost: ");
     output.append(getCumulativeProcessingCost());
+    output.append("\n");
+    output.append(detailPrefix + "cache read processing cost: ");
+    output.append(getReadProcessingCost());
+    output.append("\n");
+    output.append(detailPrefix + "cache write processing cost: ");
+    output.append(getWriteProcessingCost());
     output.append("\n");
     return output.toString();
   }

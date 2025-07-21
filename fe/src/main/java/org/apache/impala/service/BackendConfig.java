@@ -597,4 +597,20 @@ public class BackendConfig {
   public boolean truncateExternalTablesWithHms() {
     return backendCfg_.truncate_external_tables_with_hms;
   }
+
+  public double getTupleCacheCostCoefficientWriteBytes() {
+    return backendCfg_.tuple_cache_cost_coefficient_write_bytes;
+  }
+
+  public double getTupleCacheCostCoefficientWriteRows() {
+    return backendCfg_.tuple_cache_cost_coefficient_write_rows;
+  }
+
+  public double getTupleCacheCostCoefficientReadBytes() {
+    return backendCfg_.tuple_cache_cost_coefficient_read_bytes;
+  }
+
+  public double getTupleCacheCostCoefficientReadRows() {
+    return backendCfg_.tuple_cache_cost_coefficient_read_rows;
+  }
 }

@@ -17,10 +17,13 @@
 
 package org.apache.impala.planner;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TTupleCachePlacementPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,16 +35,34 @@ import com.google.common.base.Preconditions;
  * the plan tree be in a stable form that won't later change. That means that this is
  * designed to run as the last step in planning.
  *
- * The current algorithm is to add a TupleCacheNode at every eligible location. This will
- * need to be refined with cost calculations later.
+ * The cache placement algorithm is controlled by the 'tuple_cache_placement_policy' query
+ * option. See descriptions of these policies at {@link TupleCacheAllEligiblePolicy} and
+ * {@link TupleCacheCostBasedPolicy}.
  */
 public class TupleCachePlanner {
   private final static Logger LOG = LoggerFactory.getLogger(TupleCachePlanner.class);
 
   private final PlannerContext ctx_;
+  private final TQueryOptions queryOptions_;
+  private final TupleCachePlacementPolicy placementPolicy_;
 
   public TupleCachePlanner(PlannerContext ctx) {
     ctx_ = ctx;
+    queryOptions_ =
+      ctx_.getRootAnalyzer().getQueryCtx().client_request.getQuery_options();
+    TTupleCachePlacementPolicy policy = queryOptions_.getTuple_cache_placement_policy();
+    LOG.info("Using tuple cache placement policy: " + policy);
+    switch (policy) {
+    case ALL_ELIGIBLE:
+      placementPolicy_ = new TupleCacheAllEligiblePolicy();
+      break;
+    case COST_BASED:
+      placementPolicy_ = new TupleCacheCostBasedPolicy(queryOptions_);
+      break;
+    default:
+      Preconditions.checkState(false, "Unexpected placement policy: " + policy);
+      placementPolicy_ = null;
+    }
   }
 
   /**
@@ -56,8 +77,25 @@ public class TupleCachePlanner {
     root.computeTupleCacheInfo(ctx_.getRootAnalyzer().getDescTbl(),
         ctx_.getRootAnalyzer().getQueryCtx().query_options_result_hash);
 
-    // Step 2: Build up the new PlanNode tree with TupleCacheNodes added
-    PlanNode newRoot = buildCachingPlan(root);
+    // Step 2: Collect eligible locations
+    Set<PlanNode> eligibleLocations = new HashSet<PlanNode>();
+    root.collectAll(
+        (node) -> {
+           return node.getTupleCacheInfo().isEligible() && !node.omitTupleCache();
+        }, eligibleLocations);
+
+    // If there are no eligible locations, we're done
+    if (eligibleLocations.size() == 0) {
+      return plan;
+    }
+
+    // Step 3: Use the placement policy to compute the final locations
+    Set<PlanNode> finalLocations =
+        placementPolicy_.getFinalCachingLocations(eligibleLocations);
+
+    // Step 4: Build up the new PlanNode tree with TupleCacheNodes added in the specified
+    // locations
+    PlanNode newRoot = buildCachingPlan(root, finalLocations);
     // Since buildCachingPlan is modifying things in place, verify that the top-most plan
     // fragment's plan root matches with the newRoot returned.
     Preconditions.checkState(plan.get(0).getPlanRoot() == newRoot);
@@ -71,35 +109,29 @@ public class TupleCachePlanner {
   /**
    * Add TupleCacheNodes at every eligible location via a bottom-up traversal of the tree.
    */
-  private PlanNode buildCachingPlan(PlanNode node) throws ImpalaException {
+  private PlanNode buildCachingPlan(PlanNode node, Set<PlanNode> locations)
+      throws ImpalaException {
     // Recurse through the children applying the caching policy
     for (int i = 0; i < node.getChildCount(); i++) {
-      node.setChild(i, buildCachingPlan(node.getChild(i)));
+      node.setChild(i, buildCachingPlan(node.getChild(i), locations));
     }
 
-    // If this node is not eligible, then we are done
-    if (!node.getTupleCacheInfo().isEligible()) {
+    // If this node is not in the list of caching locations, then we are done.
+    if (!locations.contains(node)) {
       return node;
     }
 
-    // If node omits tuple cache placement - such as Exchange and Union nodes, where it
-    // would not be beneficial - skip it.
-    if (node.omitTupleCache()) {
-      return node;
-    }
+    // Locations that are not eligible were already filtered out by the collection phase
+    Preconditions.checkState(
+        node.getTupleCacheInfo().isEligible() && !node.omitTupleCache(),
+        "Final location must be eligible");
 
-    // Should we cache above this node?
-    // Simplest policy: always cache if eligible
-    // TODO: Make this more complicated (e.g. cost calculations)
     if (LOG.isTraceEnabled()) {
       LOG.trace("Adding TupleCacheNode above node " + node.getId().toString());
     }
-    // Get current query options
-    TQueryOptions queryOptions =
-      ctx_.getRootAnalyzer().getQueryCtx().client_request.getQuery_options();
     // Allocate TupleCacheNode
     TupleCacheNode tupleCacheNode = new TupleCacheNode(ctx_.getNextNodeId(), node,
-         queryOptions.isEnable_tuple_cache_verification());
+         queryOptions_.isEnable_tuple_cache_verification());
     tupleCacheNode.init(ctx_.getRootAnalyzer());
     PlanFragment curFragment = node.getFragment();
     if (node == curFragment.getPlanRoot()) {

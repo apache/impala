@@ -95,12 +95,11 @@ select year, month from functional.alltypes where year=2009;
 '04:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]'
 ====
 ---- QUERY
-# Tests for cache key and trace with ENABLE_TUPLE_CACHE=TRUE
+# Tests for cache key with ENABLE_TUPLE_CACHE=TRUE
 set ENABLE_TUPLE_CACHE=TRUE;
 explain select count(*) from tpch.region
 ---- RESULTS: VERIFY_IS_SUBSET
 row_regex:.* cache key: [0-9a-f][0-9a-f]*.*
-row_regex:.*\[.*TPlanNode\(.*\]
 ====
 ---- QUERY
 # Tests HIDE_ANALYZED_QUERY=TRUE

@@ -1044,6 +1044,31 @@ enum TImpalaQueryOptions {
   // while setting to a value less than 1.0 will favor broadcast joins more.
   // Default to 1.0, which means no adjustment is applied.
   BROADCAST_COST_SCALE_FACTOR = 194
+
+  // The tuple cache placement policy determines the overarching algorithm for placing
+  // tuple cache locations. The two options are:
+  // all_eligible: Pick all locations that are eligible. This is used for correctness
+  //               testing
+  // cost_based: Pick locations that provide cost improvements while imposing a limit
+  //             on the total amount of caching to avoid excess overhead.
+  // The default is cost_based.
+  TUPLE_CACHE_PLACEMENT_POLICY = 195
+
+  // Minimum cost reduction necessary for tuple caching to consider a location
+  // A location's cost reduction factor is given by the ratio:
+  // cost of execution / cost of reading from the cache
+  // A higher value for this setting is imposing a higher bar for picking locations,
+  // which means it is caching less aggressively. For example, if this is set to 10,
+  // the cost of reading from the cache needs to be 1/10th the cost of execution to
+  // be considered. A value of zero disables the requirement, which is useful for
+  // correctness checking.
+  TUPLE_CACHE_REQUIRED_COST_REDUCTION_FACTOR = 196
+
+  // Maximum bytes per executor to cache for each query execution. This is using
+  // the estimated serialized size to limit the total number of caching locations
+  // for a given query execution. A higher value caches more aggressively. A lower
+  // value reduces caching and thus overhead.
+  TUPLE_CACHE_BUDGET_BYTES_PER_EXECUTOR = 197
 }
 
 // The summary of a DML statement.

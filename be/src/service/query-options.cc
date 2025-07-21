@@ -1405,6 +1405,26 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_broadcast_cost_scale_factor(double_val);
         break;
       }
+      case TImpalaQueryOptions::TUPLE_CACHE_PLACEMENT_POLICY: {
+        TTupleCachePlacementPolicy::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "Tuple cache placement policy",
+            _TTupleCachePlacementPolicy_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_tuple_cache_placement_policy(enum_type);
+        break;
+      }
+      case TImpalaQueryOptions::TUPLE_CACHE_REQUIRED_COST_REDUCTION_FACTOR: {
+        double double_val = 0.0f;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveLowerBound<double>(
+            option, value, 0.0, &double_val));
+        query_options->__set_tuple_cache_required_cost_reduction_factor(double_val);
+        break;
+      }
+      case TImpalaQueryOptions::TUPLE_CACHE_BUDGET_BYTES_PER_EXECUTOR: {
+        MemSpec mem_spec_val{};
+        RETURN_IF_ERROR(QueryOptionParser::Parse<MemSpec>(option, value, &mem_spec_val));
+        query_options->__set_tuple_cache_budget_bytes_per_executor(mem_spec_val.value);
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

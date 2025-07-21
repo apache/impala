@@ -349,4 +349,12 @@ struct TBackendGflags {
   159: required bool keeps_warmup_tables_loaded
 
   160: required bool truncate_external_tables_with_hms
+
+  161: required double tuple_cache_cost_coefficient_write_bytes
+
+  162: required double tuple_cache_cost_coefficient_write_rows
+
+  163: required double tuple_cache_cost_coefficient_read_bytes
+
+  164: required double tuple_cache_cost_coefficient_read_rows
 }

@@ -127,6 +127,7 @@ class TestTupleCacheBase(CustomClusterTestSuite):
   def add_test_dimensions(cls):
     super(TestTupleCacheBase, cls).add_test_dimensions()
     add_mandatory_exec_option(cls, 'enable_tuple_cache', 'true')
+    add_mandatory_exec_option(cls, 'tuple_cache_placement_policy', 'all_eligible')
 
   # Generates a table containing at least <scale> KB of data.
   def create_table(self, fq_table, scale=1):

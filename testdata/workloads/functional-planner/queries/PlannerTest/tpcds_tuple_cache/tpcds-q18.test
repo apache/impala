@@ -1,0 +1,1020 @@
+# TPCDS-Q18
+# start query 18 in stream 0 using template query18.tpl using seed 695118601
+select  i_item_id,
+        ca_country,
+        ca_state,
+        ca_county,
+        avg( cast(cs_quantity as decimal(12,2))) agg1,
+        avg( cast(cs_list_price as decimal(12,2))) agg2,
+        avg( cast(cs_coupon_amt as decimal(12,2))) agg3,
+        avg( cast(cs_sales_price as decimal(12,2))) agg4,
+        avg( cast(cs_net_profit as decimal(12,2))) agg5,
+        avg( cast(c_birth_year as decimal(12,2))) agg6,
+        avg( cast(cd1.cd_dep_count as decimal(12,2))) agg7
+ from catalog_sales, customer_demographics cd1,
+      customer_demographics cd2, customer, customer_address, date_dim, item
+ where cs_sold_date_sk = d_date_sk and
+       cs_item_sk = i_item_sk and
+       cs_bill_cdemo_sk = cd1.cd_demo_sk and
+       cs_bill_customer_sk = c_customer_sk and
+       cd1.cd_gender = 'F' and
+       cd1.cd_education_status = 'Primary' and
+       c_current_cdemo_sk = cd2.cd_demo_sk and
+       c_current_addr_sk = ca_address_sk and
+       c_birth_month in (6,7,3,11,12,8) and
+       d_year = 1999 and
+       ca_state in ('IL','WV','KS'
+                   ,'GA','LA','PA','TX')
+ group by rollup (i_item_id, ca_country, ca_state, ca_county)
+ order by ca_country,
+        ca_state,
+        ca_county,
+	i_item_id
+ limit 100;
+
+# end query 18 in stream 0 using template query18.tpl
+---- PLAN
+Max Per-Host Resource Reservation: Memory=320.88MB Threads=1
+Per-Host Resource Estimates: Memory=3.43GB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=3.43GB mem-reservation=320.88MB thread-reservation=1 runtime-filters-memory=23.00MB
+|  max-parallelism=1 segment-costs=[769832597, 49382686, 100828279, 1100]
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(16,8,10,12,14) WHEN 8 THEN i_item_id WHEN 10 THEN i_item_id WHEN 12 THEN i_item_id WHEN 14 THEN i_item_id WHEN 16 THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_country WHEN 10 THEN ca_country WHEN 12 THEN ca_country WHEN 14 THEN NULL WHEN 16 THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_state WHEN 10 THEN ca_state WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_county WHEN 10 THEN NULL WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END, aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1100
+|
+15:TOP-N [LIMIT=100]
+|  order by: CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_country WHEN 10 THEN ca_country WHEN 12 THEN ca_country WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_state WHEN 10 THEN ca_state WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_county WHEN 10 THEN NULL WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN i_item_id WHEN 10 THEN i_item_id WHEN 12 THEN i_item_id WHEN 14 THEN i_item_id WHEN 16 THEN NULL END ASC
+|  mem-estimate=10.16KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=18 row-size=104B cardinality=100 cost=100828279
+|  in pipelines: 15(GETNEXT), 14(OPEN)
+|
+19:TUPLE CACHE
+|  cache key: 64ad7722bc62d2d0051d9264b33c3157
+|  input scan node ids: 0,1,5,3,4,2,6
+|  estimated serialized size: 834.25MB
+|  estimated serialized size per node: 83.43MB
+|  cumulative processing cost: 819215283
+|  cache read processing cost: 1038015
+|  cache write processing cost: 2361896
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=17 row-size=108B cardinality=7.81M cost=0
+|  in pipelines: 14(GETNEXT)
+|
+14:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) END)
+|  group by: CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN i_item_id WHEN CAST(10 AS INT) THEN i_item_id WHEN CAST(12 AS INT) THEN i_item_id WHEN CAST(14 AS INT) THEN i_item_id WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN ca_country WHEN CAST(10 AS INT) THEN ca_country WHEN CAST(12 AS INT) THEN ca_country WHEN CAST(14 AS INT) THEN NULL WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN ca_state WHEN CAST(10 AS INT) THEN ca_state WHEN CAST(12 AS INT) THEN NULL WHEN CAST(14 AS INT) THEN NULL WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN ca_county WHEN CAST(10 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL WHEN CAST(14 AS INT) THEN NULL WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) WHEN CAST(10 AS INT) THEN CAST(10 AS INT) WHEN CAST(12 AS INT) THEN CAST(12 AS INT) WHEN CAST(14 AS INT) THEN CAST(14 AS INT) WHEN CAST(16 AS INT) THEN CAST(16 AS INT) END
+|  mem-estimate=535.87MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=17 row-size=108B cardinality=7.81M cost=49382686
+|  in pipelines: 14(GETNEXT), 13(OPEN)
+|
+13:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, ca_state, ca_county
+|  Class 1
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, ca_state, NULL
+|  Class 2
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, NULL, NULL
+|  Class 3
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, NULL, NULL, NULL
+|  Class 4
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: NULL, NULL, NULL, NULL
+|  mem-estimate=2.45GB mem-reservation=137.94MB thread-reservation=0
+|  tuple-ids=7N,9N,11N,13N,15N row-size=641B cardinality=7.81M cost=90451987
+|  in pipelines: 13(GETNEXT), 00(OPEN)
+|
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: cs_item_sk = i_item_sk
+|  fk/pk conjuncts: cs_item_sk = i_item_sk
+|  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3,4,2,6 row-size=212B cardinality=6.14M cost=3048424
+|  in pipelines: 00(GETNEXT), 06(OPEN)
+|
+|--06:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
+|     HDFS partitions=1/1 files=1 size=33.54MB
+|     deterministic scan range assignment: true
+|     stored statistics:
+|       table: rows=360.00K size=33.54MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=101.54K
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=6 row-size=32B cardinality=360.00K cost=103680
+|     in pipelines: 06(GETNEXT)
+|
+11:HASH JOIN [INNER JOIN]
+|  hash predicates: c_current_cdemo_sk = cd2.cd_demo_sk
+|  fk/pk conjuncts: c_current_cdemo_sk = cd2.cd_demo_sk
+|  runtime filters: RF002[bloom] <- cd2.cd_demo_sk, RF003[min_max] <- cd2.cd_demo_sk
+|  mem-estimate=55.33MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3,4,2 row-size=180B cardinality=6.14M cost=4629313
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd2]
+|     HDFS partitions=1/1 files=1 size=11.15MB
+|     deterministic scan range assignment: true
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=2 row-size=4B cardinality=1.92M cost=110638
+|     in pipelines: 02(GETNEXT)
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: c_current_addr_sk = ca_address_sk
+|  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
+|  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
+|  mem-estimate=183.40MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3,4 row-size=176B cardinality=6.22M cost=13523791
+|  in pipelines: 00(GETNEXT), 04(OPEN)
+|
+|--18:TUPLE CACHE
+|  |  cache key: dbe29663bf906af6a50f43a635f13866
+|  |  input scan node ids: 4
+|  |  estimated serialized size: 143.26MB
+|  |  estimated serialized size per node: 14.33MB
+|  |  cumulative processing cost: 7541159
+|  |  cache read processing cost: 273617
+|  |  cache write processing cost: 405579
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=69B cardinality=2.06M cost=0
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
+|     HDFS partitions=1/1 files=1 size=307.36MB
+|     deterministic scan range assignment: true
+|     predicates: ca_state IN ('IL', 'WV', 'KS', 'GA', 'LA', 'PA', 'TX')
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: ca_state IN ('IL', 'WV', 'KS', 'GA', 'LA', 'PA', 'TX')
+|     parquet dictionary predicates: ca_state IN ('IL', 'WV', 'KS', 'GA', 'LA', 'PA', 'TX')
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=4 row-size=69B cardinality=2.06M cost=7541159
+|     in pipelines: 04(GETNEXT)
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: cs_bill_customer_sk = c_customer_sk
+|  fk/pk conjuncts: cs_bill_customer_sk = c_customer_sk
+|  runtime filters: RF006[bloom] <- c_customer_sk, RF007[min_max] <- c_customer_sk
+|  mem-estimate=670.10MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3 row-size=107B cardinality=40.30M cost=44826582
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
+|     HDFS partitions=1/1 files=1 size=1.55GB
+|     deterministic scan range assignment: true
+|     predicates: c_birth_month IN (CAST(6 AS INT), CAST(7 AS INT), CAST(3 AS INT), CAST(11 AS INT), CAST(12 AS INT), CAST(8 AS INT))
+|     runtime filters: RF005[min_max] -> c_current_addr_sk, RF003[min_max] -> c_current_cdemo_sk, RF004[bloom] -> c_current_addr_sk, RF002[bloom] -> c_current_cdemo_sk
+|     stored statistics:
+|       table: rows=30.00M size=1.55GB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=3.10M
+|     parquet statistics predicates: c_birth_month IN (CAST(6 AS INT), CAST(7 AS INT), CAST(3 AS INT), CAST(11 AS INT), CAST(12 AS INT), CAST(8 AS INT))
+|     parquet dictionary predicates: c_birth_month IN (CAST(6 AS INT), CAST(7 AS INT), CAST(3 AS INT), CAST(11 AS INT), CAST(12 AS INT), CAST(8 AS INT))
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=3 row-size=20B cardinality=15.00M cost=9483000
+|     in pipelines: 03(GETNEXT)
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: cs_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
+|  runtime filters: RF008[bloom] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1,5 row-size=87B cardinality=87.81M cost=38435205
+|  in pipelines: 00(GETNEXT), 05(OPEN)
+|
+|--17:TUPLE CACHE
+|  |  cache key: 376b0249f0c7a6556869d0060c524207
+|  |  input scan node ids: 5
+|  |  estimated serialized size: 4.37KB
+|  |  estimated serialized size per node: 4.37KB
+|  |  cumulative processing cost: 10467
+|  |  cache read processing cost: 49
+|  |  cache write processing cost: 12
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=5 row-size=8B cardinality=373 cost=0
+|  |  in pipelines: 05(GETNEXT)
+|  |
+|  05:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     deterministic scan range assignment: true
+|     predicates: d_year = CAST(1999 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(1999 AS INT)
+|     parquet dictionary predicates: d_year = CAST(1999 AS INT)
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=5 row-size=8B cardinality=373 cost=10467
+|     in pipelines: 05(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: cs_bill_cdemo_sk = cd1.cd_demo_sk
+|  fk/pk conjuncts: cs_bill_cdemo_sk = cd1.cd_demo_sk
+|  runtime filters: RF010[bloom] <- cd1.cd_demo_sk, RF011[min_max] <- cd1.cd_demo_sk
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1 row-size=79B cardinality=87.81M(filtered from 431.05M) cost=100823841
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--16:TUPLE CACHE
+|  |  cache key: 0f1ca4a0c4781622b7b03aaba11bc6fe
+|  |  input scan node ids: 1
+|  |  estimated serialized size: 8.62MB
+|  |  estimated serialized size per node: 882.45KB
+|  |  cumulative processing cost: 621625
+|  |  cache read processing cost: 25786
+|  |  cache write processing cost: 24397
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=1 row-size=43B cardinality=194.03K cost=0
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd1]
+|     HDFS partitions=1/1 files=1 size=11.15MB
+|     deterministic scan range assignment: true
+|     predicates: cd1.cd_gender = 'F', cd1.cd_education_status = 'Primary'
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     parquet statistics predicates: cd1.cd_gender = 'F', cd1.cd_education_status = 'Primary'
+|     parquet dictionary predicates: cd1.cd_gender = 'F', cd1.cd_education_status = 'Primary'
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=1 row-size=43B cardinality=194.03K cost=621625
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
+   deterministic scan range assignment: true
+   runtime filters: RF011[min_max] -> cs_bill_cdemo_sk, RF007[min_max] -> cs_bill_customer_sk, RF001[min_max] -> cs_item_sk, RF010[bloom] -> cs_bill_cdemo_sk, RF008[bloom] -> cs_sold_date_sk, RF006[bloom] -> cs_bill_customer_sk, RF000[bloom] -> cs_item_sk
+   stored statistics:
+     table: rows=4.32G size=280.96GB
+     partitions: 1831/1831 rows=4.32G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=21.52M est-scan-range=374(filtered from 1831)
+   mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+   tuple-ids=0 row-size=36B cardinality=87.81M(filtered from 4.32G) cost=456222885
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=3.56GB Threads=26
+Per-Host Resource Estimates: Memory=5.82GB
+F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.21MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[1146] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(16,8,10,12,14) WHEN 8 THEN i_item_id WHEN 10 THEN i_item_id WHEN 12 THEN i_item_id WHEN 14 THEN i_item_id WHEN 16 THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_country WHEN 10 THEN ca_country WHEN 12 THEN ca_country WHEN 14 THEN NULL WHEN 16 THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_state WHEN 10 THEN ca_state WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_county WHEN 10 THEN NULL WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END, aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1100
+|
+24:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_country WHEN 10 THEN ca_country WHEN 12 THEN ca_country WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_state WHEN 10 THEN ca_state WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_county WHEN 10 THEN NULL WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN i_item_id WHEN 10 THEN i_item_id WHEN 12 THEN i_item_id WHEN 14 THEN i_item_id WHEN 16 THEN NULL END ASC
+|  limit: 100
+|  mem-estimate=211.95KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=18 row-size=104B cardinality=100 cost=46
+|  in pipelines: 15(GETNEXT)
+|
+F07:PLAN FRAGMENT [HASH(CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(i_item_id) WHEN 9 THEN murmur_hash(i_item_id) WHEN 11 THEN murmur_hash(i_item_id) WHEN 13 THEN murmur_hash(i_item_id) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_country) WHEN 9 THEN murmur_hash(ca_country) WHEN 11 THEN murmur_hash(ca_country) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_state) WHEN 9 THEN murmur_hash(ca_state) WHEN 11 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_county) WHEN 9 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END)] hosts=10 instances=20 (adjusted from 120)
+Per-Instance Resources: mem-estimate=700.77MB mem-reservation=171.94MB thread-reservation=1
+max-parallelism=20 segment-costs=[149863108, 49382686, 100828279, 303] cpu-comparison-result=110 [max(20 (self) vs 110 (sum children))]
+15:TOP-N [LIMIT=100]
+|  order by: CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_country WHEN 10 THEN ca_country WHEN 12 THEN ca_country WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_state WHEN 10 THEN ca_state WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_county WHEN 10 THEN NULL WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN i_item_id WHEN 10 THEN i_item_id WHEN 12 THEN i_item_id WHEN 14 THEN i_item_id WHEN 16 THEN NULL END ASC
+|  mem-estimate=10.16KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=18 row-size=104B cardinality=100 cost=100828279
+|  in pipelines: 15(GETNEXT), 14(OPEN)
+|
+14:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) END)
+|  group by: CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN i_item_id WHEN CAST(10 AS INT) THEN i_item_id WHEN CAST(12 AS INT) THEN i_item_id WHEN CAST(14 AS INT) THEN i_item_id WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN ca_country WHEN CAST(10 AS INT) THEN ca_country WHEN CAST(12 AS INT) THEN ca_country WHEN CAST(14 AS INT) THEN NULL WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN ca_state WHEN CAST(10 AS INT) THEN ca_state WHEN CAST(12 AS INT) THEN NULL WHEN CAST(14 AS INT) THEN NULL WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN ca_county WHEN CAST(10 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL WHEN CAST(14 AS INT) THEN NULL WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) WHEN CAST(10 AS INT) THEN CAST(10 AS INT) WHEN CAST(12 AS INT) THEN CAST(12 AS INT) WHEN CAST(14 AS INT) THEN CAST(14 AS INT) WHEN CAST(16 AS INT) THEN CAST(16 AS INT) END
+|  mem-estimate=44.69MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=17 row-size=108B cardinality=7.81M cost=49382686
+|  in pipelines: 14(GETNEXT), 23(OPEN)
+|
+23:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, ca_state, ca_county
+|  Class 1
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, ca_state, NULL
+|  Class 2
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, NULL, NULL
+|  Class 3
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, NULL, NULL, NULL
+|  Class 4
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: NULL, NULL, NULL, NULL
+|  mem-estimate=619.77MB mem-reservation=137.94MB thread-reservation=0
+|  tuple-ids=8N,10N,12N,14N,16N row-size=641B cardinality=7.81M cost=76445571
+|  in pipelines: 23(GETNEXT), 00(OPEN)
+|
+22:EXCHANGE [HASH(CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(i_item_id) WHEN 9 THEN murmur_hash(i_item_id) WHEN 11 THEN murmur_hash(i_item_id) WHEN 13 THEN murmur_hash(i_item_id) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_country) WHEN 9 THEN murmur_hash(ca_country) WHEN 11 THEN murmur_hash(ca_country) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_state) WHEN 9 THEN murmur_hash(ca_state) WHEN 11 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_county) WHEN 9 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END)]
+|  mem-estimate=81.00MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7N,9N,11N,13N,15N row-size=641B cardinality=22.89M cost=73417537
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=110 (adjusted from 120)
+Per-Host Shared Resources: mem-estimate=19.00MB mem-reservation=19.00MB thread-reservation=0 runtime-filters-memory=19.00MB
+Per-Instance Resources: mem-estimate=213.64MB mem-reservation=139.00MB thread-reservation=1
+max-parallelism=110 segment-costs=[800737616, 1004030271] cpu-comparison-result=110 [max(110 (self) vs 105 (sum children))]
+13:AGGREGATE [STREAMING]
+|  Class 0
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, ca_state, ca_county
+|  Class 1
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, ca_state, NULL
+|  Class 2
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, NULL, NULL
+|  Class 3
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, NULL, NULL, NULL
+|  Class 4
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: NULL, NULL, NULL, NULL
+|  mem-estimate=146.00MB mem-reservation=138.00MB thread-reservation=0
+|  tuple-ids=7N,9N,11N,13N,15N row-size=641B cardinality=22.89M cost=158761602
+|  in pipelines: 00(GETNEXT)
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: cs_item_sk = i_item_sk
+|  fk/pk conjuncts: cs_item_sk = i_item_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3,4,2,6 row-size=212B cardinality=6.14M cost=2688424
+|  in pipelines: 00(GETNEXT), 06(OPEN)
+|
+|--F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=385.14MB mem-reservation=375.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[838440]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: i_item_sk
+|  |  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
+|  |  mem-estimate=374.00MB mem-reservation=374.00MB spill-buffer=2.00MB thread-reservation=0 cost=360000
+|  |
+|  21:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=6 row-size=32B cardinality=360.00K cost=478440
+|  |  in pipelines: 06(GETNEXT)
+|  |
+|  F06:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+|  Per-Instance Resources: mem-estimate=16.14MB mem-reservation=512.00KB thread-reservation=1
+|  max-parallelism=4 segment-costs=[142560]
+|  06:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
+|     HDFS partitions=1/1 files=1 size=33.54MB
+|     stored statistics:
+|       table: rows=360.00K size=33.54MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=101.54K
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=6 row-size=32B cardinality=360.00K cost=103680
+|     in pipelines: 06(GETNEXT)
+|
+11:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=01
+|  hash predicates: c_current_cdemo_sk = cd2.cd_demo_sk
+|  fk/pk conjuncts: c_current_cdemo_sk = cd2.cd_demo_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3,4,2 row-size=180B cardinality=6.14M cost=2708513
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--F10:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=383.41MB mem-reservation=376.00MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  |  max-parallelism=10 segment-costs=[4473540]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: cd2.cd_demo_sk
+|  |  runtime filters: RF002[bloom] <- cd2.cd_demo_sk, RF003[min_max] <- cd2.cd_demo_sk
+|  |  mem-estimate=374.00MB mem-reservation=374.00MB spill-buffer=2.00MB thread-reservation=0 cost=1920800
+|  |
+|  20:EXCHANGE [BROADCAST]
+|  |  mem-estimate=7.41MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=4B cardinality=1.92M cost=2552740
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[172871]
+|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd2, RANDOM]
+|     HDFS partitions=1/1 files=1 size=11.15MB
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=2 row-size=4B cardinality=1.92M cost=110638
+|     in pipelines: 02(GETNEXT)
+|
+10:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=02
+|  hash predicates: c_current_addr_sk = ca_address_sk
+|  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3,4 row-size=176B cardinality=6.22M cost=11464967
+|  in pipelines: 00(GETNEXT), 04(OPEN)
+|
+|--F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=386.71MB mem-reservation=376.00MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  |  max-parallelism=10 segment-costs=[4794994]
+|  JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: ca_address_sk
+|  |  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
+|  |  mem-estimate=374.00MB mem-reservation=374.00MB spill-buffer=2.00MB thread-reservation=0 cost=2058824
+|  |
+|  19:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.71MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=69B cardinality=2.06M cost=2736170
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=20.29MB mem-reservation=4.12MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[7968973]
+|  28:TUPLE CACHE
+|  |  cache key: dbe29663bf906af6a50f43a635f13866
+|  |  input scan node ids: 4
+|  |  estimated serialized size: 143.26MB
+|  |  estimated serialized size per node: 14.33MB
+|  |  cumulative processing cost: 7541159
+|  |  cache read processing cost: 273617
+|  |  cache write processing cost: 405579
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=69B cardinality=2.06M cost=0
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
+|     HDFS partitions=1/1 files=1 size=307.36MB
+|     deterministic scan range assignment: true
+|     predicates: ca_state IN ('IL', 'WV', 'KS', 'GA', 'LA', 'PA', 'TX')
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: ca_state IN ('IL', 'WV', 'KS', 'GA', 'LA', 'PA', 'TX')
+|     parquet dictionary predicates: ca_state IN ('IL', 'WV', 'KS', 'GA', 'LA', 'PA', 'TX')
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=4 row-size=69B cardinality=2.06M cost=7541159
+|     in pipelines: 04(GETNEXT)
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=03
+|  hash predicates: cs_bill_customer_sk = c_customer_sk
+|  fk/pk conjuncts: cs_bill_customer_sk = c_customer_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3 row-size=107B cardinality=40.30M cost=29826582
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=696.34MB mem-reservation=390.00MB thread-reservation=1 runtime-filters-memory=16.00MB
+|  |  max-parallelism=10 segment-costs=[34934990]
+|  JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: c_customer_sk
+|  |  runtime filters: RF006[bloom] <- c_customer_sk, RF007[min_max] <- c_customer_sk
+|  |  mem-estimate=670.10MB mem-reservation=374.00MB spill-buffer=2.00MB thread-reservation=0 cost=15000000
+|  |
+|  18:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.23MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=3 row-size=20B cardinality=15.00M cost=19934990
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
+|  Per-Instance Resources: mem-estimate=20.09MB mem-reservation=5.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[10617000]
+|  27:TUPLE CACHE
+|  |  cache key: e0ed01e21d767eee6828c155356c5553
+|  |  input scan node ids: 3
+|  |  estimated serialized size: 343.32MB
+|  |  estimated serialized size per node: 34.33MB
+|  |  cumulative processing cost: 9483000
+|  |  cache read processing cost: 1993499
+|  |  cache write processing cost: 972000
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=3 row-size=20B cardinality=15.00M cost=0
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
+|     HDFS partitions=1/1 files=1 size=1.55GB
+|     deterministic scan range assignment: true
+|     predicates: c_birth_month IN (CAST(6 AS INT), CAST(7 AS INT), CAST(3 AS INT), CAST(11 AS INT), CAST(12 AS INT), CAST(8 AS INT))
+|     runtime filters: RF005[min_max] -> c_current_addr_sk, RF003[min_max] -> c_current_cdemo_sk, RF004[bloom] -> c_current_addr_sk, RF002[bloom] -> c_current_cdemo_sk
+|     stored statistics:
+|       table: rows=30.00M size=1.55GB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=3.10M
+|     parquet statistics predicates: c_birth_month IN (CAST(6 AS INT), CAST(7 AS INT), CAST(3 AS INT), CAST(11 AS INT), CAST(12 AS INT), CAST(8 AS INT))
+|     parquet dictionary predicates: c_birth_month IN (CAST(6 AS INT), CAST(7 AS INT), CAST(3 AS INT), CAST(11 AS INT), CAST(12 AS INT), CAST(8 AS INT))
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=3 row-size=20B cardinality=15.00M cost=9483000
+|     in pipelines: 03(GETNEXT)
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=04
+|  hash predicates: cs_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1,5 row-size=87B cardinality=87.81M cost=38434832
+|  in pipelines: 00(GETNEXT), 05(OPEN)
+|
+|--F13:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=22.33MB mem-reservation=22.31MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[863]
+|  JOIN BUILD
+|  |  join-table-id=04 plan-id=05 cohort-id=01
+|  |  build expressions: d_date_sk
+|  |  runtime filters: RF008[bloom] <- d_date_sk
+|  |  mem-estimate=21.31MB mem-reservation=21.31MB spill-buffer=64.00KB thread-reservation=0 cost=373
+|  |
+|  17:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=5 row-size=8B cardinality=373 cost=490
+|  |  in pipelines: 05(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.05MB mem-reservation=4.50MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[10483]
+|  26:TUPLE CACHE
+|  |  cache key: 376b0249f0c7a6556869d0060c524207
+|  |  input scan node ids: 5
+|  |  estimated serialized size: 4.37KB
+|  |  estimated serialized size per node: 4.37KB
+|  |  cumulative processing cost: 10467
+|  |  cache read processing cost: 49
+|  |  cache write processing cost: 12
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=5 row-size=8B cardinality=373 cost=0
+|  |  in pipelines: 05(GETNEXT)
+|  |
+|  05:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     deterministic scan range assignment: true
+|     predicates: d_year = CAST(1999 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(1999 AS INT)
+|     parquet dictionary predicates: d_year = CAST(1999 AS INT)
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=5 row-size=8B cardinality=373 cost=10467
+|     in pipelines: 05(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=05
+|  hash predicates: cs_bill_cdemo_sk = cd1.cd_demo_sk
+|  fk/pk conjuncts: cs_bill_cdemo_sk = cd1.cd_demo_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1 row-size=79B cardinality=87.81M(filtered from 431.05M) cost=100629811
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F14:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=196.33MB mem-reservation=188.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[451890]
+|  JOIN BUILD
+|  |  join-table-id=05 plan-id=06 cohort-id=01
+|  |  build expressions: cd1.cd_demo_sk
+|  |  runtime filters: RF010[bloom] <- cd1.cd_demo_sk, RF011[min_max] <- cd1.cd_demo_sk
+|  |  mem-estimate=187.00MB mem-reservation=187.00MB spill-buffer=1.00MB thread-reservation=0 cost=194030
+|  |
+|  16:EXCHANGE [BROADCAST]
+|  |  mem-estimate=8.33MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=43B cardinality=194.03K cost=257860
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=20.18MB mem-reservation=5.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[648118]
+|  25:TUPLE CACHE
+|  |  cache key: 0f1ca4a0c4781622b7b03aaba11bc6fe
+|  |  input scan node ids: 1
+|  |  estimated serialized size: 8.62MB
+|  |  estimated serialized size per node: 882.45KB
+|  |  cumulative processing cost: 621625
+|  |  cache read processing cost: 25786
+|  |  cache write processing cost: 24397
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=1 row-size=43B cardinality=194.03K cost=0
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd1, RANDOM]
+|     HDFS partitions=1/1 files=1 size=11.15MB
+|     deterministic scan range assignment: true
+|     predicates: cd1.cd_gender = 'F', cd1.cd_education_status = 'Primary'
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     parquet statistics predicates: cd1.cd_gender = 'F', cd1.cd_education_status = 'Primary'
+|     parquet dictionary predicates: cd1.cd_gender = 'F', cd1.cd_education_status = 'Primary'
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=1 row-size=43B cardinality=194.03K cost=621625
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
+   runtime filters: RF011[min_max] -> cs_bill_cdemo_sk, RF007[min_max] -> cs_bill_customer_sk, RF001[min_max] -> cs_item_sk, RF010[bloom] -> cs_bill_cdemo_sk, RF008[bloom] -> cs_sold_date_sk, RF006[bloom] -> cs_bill_customer_sk, RF000[bloom] -> cs_item_sk
+   stored statistics:
+     table: rows=4.32G size=280.96GB
+     partitions: 1831/1831 rows=4.32G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=21.52M est-scan-range=374(filtered from 1831)
+   mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+   tuple-ids=0 row-size=36B cardinality=87.81M(filtered from 4.32G) cost=456222885
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=1.63GB Threads=43
+Per-Host Resource Estimates: Memory=4.30GB
+F10:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.21MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[1146] cpu-comparison-result=210 [max(1 (self) vs 210 (sum children))]
+PLAN-ROOT SINK
+|  output exprs: CASE valid_tid(16,8,10,12,14) WHEN 8 THEN i_item_id WHEN 10 THEN i_item_id WHEN 12 THEN i_item_id WHEN 14 THEN i_item_id WHEN 16 THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_country WHEN 10 THEN ca_country WHEN 12 THEN ca_country WHEN 14 THEN NULL WHEN 16 THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_state WHEN 10 THEN ca_state WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_county WHEN 10 THEN NULL WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END, aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (8, 10, 12, 14, 16), CASE valid_tid(16,8,10,12,14) WHEN 8 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 10 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 12 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 14 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN 16 THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) END)
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1100
+|
+26:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_country WHEN 10 THEN ca_country WHEN 12 THEN ca_country WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_state WHEN 10 THEN ca_state WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_county WHEN 10 THEN NULL WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN i_item_id WHEN 10 THEN i_item_id WHEN 12 THEN i_item_id WHEN 14 THEN i_item_id WHEN 16 THEN NULL END ASC
+|  limit: 100
+|  mem-estimate=211.95KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=18 row-size=104B cardinality=100 cost=46
+|  in pipelines: 15(GETNEXT)
+|
+F09:PLAN FRAGMENT [HASH(CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(i_item_id) WHEN 9 THEN murmur_hash(i_item_id) WHEN 11 THEN murmur_hash(i_item_id) WHEN 13 THEN murmur_hash(i_item_id) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_country) WHEN 9 THEN murmur_hash(ca_country) WHEN 11 THEN murmur_hash(ca_country) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_state) WHEN 9 THEN murmur_hash(ca_state) WHEN 11 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_county) WHEN 9 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END)] hosts=10 instances=20 (adjusted from 120)
+Per-Instance Resources: mem-estimate=664.46MB mem-reservation=171.94MB thread-reservation=1
+max-parallelism=20 segment-costs=[149863108, 49382686, 100828279, 303] cpu-comparison-result=210 [max(20 (self) vs 210 (sum children))]
+15:TOP-N [LIMIT=100]
+|  order by: CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_country WHEN 10 THEN ca_country WHEN 12 THEN ca_country WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_state WHEN 10 THEN ca_state WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN ca_county WHEN 10 THEN NULL WHEN 12 THEN NULL WHEN 14 THEN NULL WHEN 16 THEN NULL END ASC, CASE valid_tid(16,8,10,12,14) WHEN 8 THEN i_item_id WHEN 10 THEN i_item_id WHEN 12 THEN i_item_id WHEN 14 THEN i_item_id WHEN 16 THEN NULL END ASC
+|  mem-estimate=10.16KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=18 row-size=104B cardinality=100 cost=100828279
+|  in pipelines: 15(GETNEXT), 14(OPEN)
+|
+14:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_quantity AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_list_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_coupon_amt AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_sales_price AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cs_net_profit AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(c_birth_year AS DECIMAL(12,2))) END), aggif(valid_tid(16,8,10,12,14) IN (CAST(8 AS INT), CAST(10 AS INT), CAST(12 AS INT), CAST(14 AS INT), CAST(16 AS INT)), CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(10 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(12 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(14 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) WHEN CAST(16 AS INT) THEN avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2))) END)
+|  group by: CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN i_item_id WHEN CAST(10 AS INT) THEN i_item_id WHEN CAST(12 AS INT) THEN i_item_id WHEN CAST(14 AS INT) THEN i_item_id WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN ca_country WHEN CAST(10 AS INT) THEN ca_country WHEN CAST(12 AS INT) THEN ca_country WHEN CAST(14 AS INT) THEN NULL WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN ca_state WHEN CAST(10 AS INT) THEN ca_state WHEN CAST(12 AS INT) THEN NULL WHEN CAST(14 AS INT) THEN NULL WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN ca_county WHEN CAST(10 AS INT) THEN NULL WHEN CAST(12 AS INT) THEN NULL WHEN CAST(14 AS INT) THEN NULL WHEN CAST(16 AS INT) THEN NULL END, CASE valid_tid(16,8,10,12,14) WHEN CAST(8 AS INT) THEN CAST(8 AS INT) WHEN CAST(10 AS INT) THEN CAST(10 AS INT) WHEN CAST(12 AS INT) THEN CAST(12 AS INT) WHEN CAST(14 AS INT) THEN CAST(14 AS INT) WHEN CAST(16 AS INT) THEN CAST(16 AS INT) END
+|  mem-estimate=44.69MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=17 row-size=108B cardinality=7.81M cost=49382686
+|  in pipelines: 14(GETNEXT), 25(OPEN)
+|
+25:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, ca_state, ca_county
+|  Class 1
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, ca_state, NULL
+|  Class 2
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, NULL, NULL
+|  Class 3
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, NULL, NULL, NULL
+|  Class 4
+|    output: avg:merge(CAST(cs_quantity AS DECIMAL(12,2))), avg:merge(CAST(cs_list_price AS DECIMAL(12,2))), avg:merge(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg:merge(CAST(cs_sales_price AS DECIMAL(12,2))), avg:merge(CAST(cs_net_profit AS DECIMAL(12,2))), avg:merge(CAST(c_birth_year AS DECIMAL(12,2))), avg:merge(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: NULL, NULL, NULL, NULL
+|  mem-estimate=619.77MB mem-reservation=137.94MB thread-reservation=0
+|  tuple-ids=8N,10N,12N,14N,16N row-size=641B cardinality=7.81M cost=76445571
+|  in pipelines: 25(GETNEXT), 00(OPEN)
+|
+24:EXCHANGE [HASH(CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(i_item_id) WHEN 9 THEN murmur_hash(i_item_id) WHEN 11 THEN murmur_hash(i_item_id) WHEN 13 THEN murmur_hash(i_item_id) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_country) WHEN 9 THEN murmur_hash(ca_country) WHEN 11 THEN murmur_hash(ca_country) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_state) WHEN 9 THEN murmur_hash(ca_state) WHEN 11 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END,CASE valid_tid(7,9,11,13,15) WHEN 7 THEN murmur_hash(ca_county) WHEN 9 THEN murmur_hash(NULL) WHEN 11 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) WHEN 15 THEN murmur_hash(NULL) END)]
+|  mem-estimate=35.82MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=7N,9N,11N,13N,15N row-size=641B cardinality=22.89M cost=73417537
+|  in pipelines: 00(GETNEXT)
+|
+F06:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=10 instances=40 (adjusted from 120)
+Per-Instance Resources: mem-estimate=364.40MB mem-reservation=138.00MB thread-reservation=1
+max-parallelism=110 segment-costs=[204309019, 1004030271] cpu-comparison-result=210 [max(210 (self) vs 175 (sum children))]
+13:AGGREGATE [STREAMING]
+|  Class 0
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, ca_state, ca_county
+|  Class 1
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, ca_state, NULL
+|  Class 2
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, ca_country, NULL, NULL
+|  Class 3
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: i_item_id, NULL, NULL, NULL
+|  Class 4
+|    output: avg(CAST(cs_quantity AS DECIMAL(12,2))), avg(CAST(cs_list_price AS DECIMAL(12,2))), avg(CAST(cs_coupon_amt AS DECIMAL(12,2))), avg(CAST(cs_sales_price AS DECIMAL(12,2))), avg(CAST(cs_net_profit AS DECIMAL(12,2))), avg(CAST(c_birth_year AS DECIMAL(12,2))), avg(CAST(cd1.cd_dep_count AS DECIMAL(12,2)))
+|    group by: NULL, NULL, NULL, NULL
+|  mem-estimate=296.78MB mem-reservation=138.00MB thread-reservation=0
+|  tuple-ids=7N,9N,11N,13N,15N row-size=641B cardinality=22.89M cost=158761602
+|  in pipelines: 00(GETNEXT)
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: cs_item_sk = i_item_sk
+|  fk/pk conjuncts: cs_item_sk = i_item_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3,4,2,6 row-size=212B cardinality=6.14M cost=2688424
+|  in pipelines: 00(GETNEXT), 06(OPEN)
+|
+|--F11:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=147.14MB mem-reservation=137.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[838440]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: i_item_sk
+|  |  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
+|  |  mem-estimate=136.00MB mem-reservation=136.00MB spill-buffer=2.00MB thread-reservation=0 cost=360000
+|  |
+|  23:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.14MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=6 row-size=32B cardinality=360.00K cost=478440
+|  |  in pipelines: 06(GETNEXT)
+|  |
+|  F08:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+|  Per-Instance Resources: mem-estimate=16.14MB mem-reservation=512.00KB thread-reservation=1
+|  max-parallelism=4 segment-costs=[142560]
+|  06:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
+|     HDFS partitions=1/1 files=1 size=33.54MB
+|     stored statistics:
+|       table: rows=360.00K size=33.54MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=101.54K
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=6 row-size=32B cardinality=360.00K cost=103680
+|     in pipelines: 06(GETNEXT)
+|
+11:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=01
+|  hash predicates: c_current_cdemo_sk = cd2.cd_demo_sk
+|  fk/pk conjuncts: c_current_cdemo_sk = cd2.cd_demo_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3,4,2 row-size=180B cardinality=6.14M cost=2708513
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--F12:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=145.41MB mem-reservation=138.00MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  |  max-parallelism=10 segment-costs=[4473540]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: cd2.cd_demo_sk
+|  |  runtime filters: RF002[bloom] <- cd2.cd_demo_sk, RF003[min_max] <- cd2.cd_demo_sk
+|  |  mem-estimate=136.00MB mem-reservation=136.00MB spill-buffer=2.00MB thread-reservation=0 cost=1920800
+|  |
+|  22:EXCHANGE [BROADCAST]
+|  |  mem-estimate=7.41MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=4B cardinality=1.92M cost=2552740
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=1.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[172871]
+|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd2, RANDOM]
+|     HDFS partitions=1/1 files=1 size=11.15MB
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=2 row-size=4B cardinality=1.92M cost=110638
+|     in pipelines: 02(GETNEXT)
+|
+10:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash-table-id=02
+|  hash predicates: c_current_addr_sk = ca_address_sk
+|  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
+|  tuple-ids=0,1,5,3,4 row-size=176B cardinality=6.22M cost=11464967
+|  in pipelines: 00(GETNEXT), 04(OPEN)
+|
+|--F13:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=10 instances=40 (adjusted from 120)
+|  |  Per-Instance Resources: mem-estimate=21.21MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  |  max-parallelism=110 segment-costs=[2940664]
+|  JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: ca_address_sk
+|  |  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
+|  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0 cost=2058824
+|  |
+|  21:EXCHANGE [HASH(ca_address_sk)]
+|  |  mem-estimate=10.71MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=69B cardinality=2.06M cost=881840
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=31.40MB mem-reservation=4.12MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[17745335]
+|  30:TUPLE CACHE
+|  |  cache key: dbe29663bf906af6a50f43a635f13866
+|  |  input scan node ids: 4
+|  |  estimated serialized size: 143.26MB
+|  |  estimated serialized size per node: 14.33MB
+|  |  cumulative processing cost: 7541159
+|  |  cache read processing cost: 273617
+|  |  cache write processing cost: 405579
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=69B cardinality=2.06M cost=0
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
+|     HDFS partitions=1/1 files=1 size=307.36MB
+|     deterministic scan range assignment: true
+|     predicates: ca_state IN ('IL', 'WV', 'KS', 'GA', 'LA', 'PA', 'TX')
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: ca_state IN ('IL', 'WV', 'KS', 'GA', 'LA', 'PA', 'TX')
+|     parquet dictionary predicates: ca_state IN ('IL', 'WV', 'KS', 'GA', 'LA', 'PA', 'TX')
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=4 row-size=69B cardinality=2.06M cost=7541159
+|     in pipelines: 04(GETNEXT)
+|
+20:EXCHANGE [HASH(c_current_addr_sk)]
+|  mem-estimate=15.98MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,1,5,3 row-size=107B cardinality=40.30M cost=28685513
+|  in pipelines: 00(GETNEXT)
+|
+F04:PLAN FRAGMENT [HASH(cs_bill_customer_sk)] hosts=10 instances=50 (adjusted from 120)
+Per-Instance Resources: mem-estimate=40.70MB mem-reservation=0B thread-reservation=1
+max-parallelism=50 segment-costs=[440687026]
+09:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash-table-id=03
+|  hash predicates: cs_bill_customer_sk = c_customer_sk
+|  fk/pk conjuncts: cs_bill_customer_sk = c_customer_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1,5,3 row-size=107B cardinality=40.30M cost=29826582
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--F14:PLAN FRAGMENT [HASH(cs_bill_customer_sk)] hosts=10 instances=50 (adjusted from 120)
+|  |  Per-Instance Resources: mem-estimate=43.23MB mem-reservation=33.00MB thread-reservation=1 runtime-filters-memory=16.00MB
+|  |  max-parallelism=50 segment-costs=[18046500]
+|  JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: c_customer_sk
+|  |  runtime filters: RF006[bloom] <- c_customer_sk, RF007[min_max] <- c_customer_sk
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0 cost=15000000
+|  |
+|  19:EXCHANGE [HASH(c_customer_sk)]
+|  |  mem-estimate=10.23MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=3 row-size=20B cardinality=15.00M cost=3046500
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
+|  Per-Instance Resources: mem-estimate=24.69MB mem-reservation=5.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[36531000]
+|  29:TUPLE CACHE
+|  |  cache key: d43ce3bcb097d7de31f1d77a951fcf5e
+|  |  input scan node ids: 3
+|  |  estimated serialized size: 343.32MB
+|  |  estimated serialized size per node: 34.33MB
+|  |  cumulative processing cost: 9483000
+|  |  cache read processing cost: 1993499
+|  |  cache write processing cost: 972000
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=3 row-size=20B cardinality=15.00M cost=0
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
+|     HDFS partitions=1/1 files=1 size=1.55GB
+|     deterministic scan range assignment: true
+|     predicates: c_birth_month IN (CAST(6 AS INT), CAST(7 AS INT), CAST(3 AS INT), CAST(11 AS INT), CAST(12 AS INT), CAST(8 AS INT))
+|     runtime filters: RF005[min_max] -> c_current_addr_sk, RF003[min_max] -> c_current_cdemo_sk, RF004[bloom] -> c_current_addr_sk, RF002[bloom] -> c_current_cdemo_sk
+|     stored statistics:
+|       table: rows=30.00M size=1.55GB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=3.10M
+|     parquet statistics predicates: c_birth_month IN (CAST(6 AS INT), CAST(7 AS INT), CAST(3 AS INT), CAST(11 AS INT), CAST(12 AS INT), CAST(8 AS INT))
+|     parquet dictionary predicates: c_birth_month IN (CAST(6 AS INT), CAST(7 AS INT), CAST(3 AS INT), CAST(11 AS INT), CAST(12 AS INT), CAST(8 AS INT))
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=3 row-size=20B cardinality=15.00M cost=9483000
+|     in pipelines: 03(GETNEXT)
+|
+18:EXCHANGE [HASH(cs_bill_customer_sk)]
+|  mem-estimate=21.55MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,1,5 row-size=87B cardinality=87.81M cost=51187483
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Host Shared Resources: mem-estimate=19.00MB mem-reservation=19.00MB thread-reservation=0 runtime-filters-memory=19.00MB
+Per-Instance Resources: mem-estimate=35.25MB mem-reservation=1.00MB thread-reservation=1
+max-parallelism=130 segment-costs=[1220571393]
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=04
+|  hash predicates: cs_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1,5 row-size=87B cardinality=87.81M cost=38434832
+|  in pipelines: 00(GETNEXT), 05(OPEN)
+|
+|--F15:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[863]
+|  JOIN BUILD
+|  |  join-table-id=04 plan-id=05 cohort-id=01
+|  |  build expressions: d_date_sk
+|  |  runtime filters: RF008[bloom] <- d_date_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=373
+|  |
+|  17:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=5 row-size=8B cardinality=373 cost=490
+|  |  in pipelines: 05(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.05MB mem-reservation=4.50MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[10483]
+|  28:TUPLE CACHE
+|  |  cache key: 376b0249f0c7a6556869d0060c524207
+|  |  input scan node ids: 5
+|  |  estimated serialized size: 4.37KB
+|  |  estimated serialized size per node: 4.37KB
+|  |  cumulative processing cost: 10467
+|  |  cache read processing cost: 49
+|  |  cache write processing cost: 12
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=5 row-size=8B cardinality=373 cost=0
+|  |  in pipelines: 05(GETNEXT)
+|  |
+|  05:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     deterministic scan range assignment: true
+|     predicates: d_year = CAST(1999 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(1999 AS INT)
+|     parquet dictionary predicates: d_year = CAST(1999 AS INT)
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=5 row-size=8B cardinality=373 cost=10467
+|     in pipelines: 05(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=05
+|  hash predicates: cs_bill_cdemo_sk = cd1.cd_demo_sk
+|  fk/pk conjuncts: cs_bill_cdemo_sk = cd1.cd_demo_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,1 row-size=79B cardinality=87.81M(filtered from 431.05M) cost=100629811
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F16:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=213.33MB mem-reservation=205.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[451890]
+|  JOIN BUILD
+|  |  join-table-id=05 plan-id=06 cohort-id=01
+|  |  build expressions: cd1.cd_demo_sk
+|  |  runtime filters: RF010[bloom] <- cd1.cd_demo_sk, RF011[min_max] <- cd1.cd_demo_sk
+|  |  mem-estimate=204.00MB mem-reservation=204.00MB spill-buffer=1.00MB thread-reservation=0 cost=194030
+|  |
+|  16:EXCHANGE [BROADCAST]
+|  |  mem-estimate=8.33MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=43B cardinality=194.03K cost=257860
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=20.18MB mem-reservation=5.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[648118]
+|  27:TUPLE CACHE
+|  |  cache key: 0f1ca4a0c4781622b7b03aaba11bc6fe
+|  |  input scan node ids: 1
+|  |  estimated serialized size: 8.62MB
+|  |  estimated serialized size per node: 882.45KB
+|  |  cumulative processing cost: 621625
+|  |  cache read processing cost: 25786
+|  |  cache write processing cost: 24397
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=1 row-size=43B cardinality=194.03K cost=0
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics cd1, RANDOM]
+|     HDFS partitions=1/1 files=1 size=11.15MB
+|     deterministic scan range assignment: true
+|     predicates: cd1.cd_gender = 'F', cd1.cd_education_status = 'Primary'
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     parquet statistics predicates: cd1.cd_gender = 'F', cd1.cd_education_status = 'Primary'
+|     parquet dictionary predicates: cd1.cd_gender = 'F', cd1.cd_education_status = 'Primary'
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=1 row-size=43B cardinality=194.03K cost=621625
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
+   runtime filters: RF011[min_max] -> cs_bill_cdemo_sk, RF007[min_max] -> cs_bill_customer_sk, RF001[min_max] -> cs_item_sk, RF010[bloom] -> cs_bill_cdemo_sk, RF008[bloom] -> cs_sold_date_sk, RF006[bloom] -> cs_bill_customer_sk, RF000[bloom] -> cs_item_sk
+   stored statistics:
+     table: rows=4.32G size=280.96GB
+     partitions: 1831/1831 rows=4.32G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=21.52M est-scan-range=374(filtered from 1831)
+   mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+   tuple-ids=0 row-size=36B cardinality=87.81M(filtered from 4.32G) cost=456222885
+   in pipelines: 00(GETNEXT)
+====

@@ -51,7 +51,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // plus one. Thus, the second argument to the DCHECK has to be updated every
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 constexpr unsigned NUM_QUERY_OPTIONS =
-    TImpalaQueryOptions::BROADCAST_COST_SCALE_FACTOR + 1;
+    TImpalaQueryOptions::TUPLE_CACHE_BUDGET_BYTES_PER_EXECUTOR + 1;
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(), NUM_QUERY_OPTIONS);             \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
@@ -380,6 +380,12 @@ constexpr unsigned NUM_QUERY_OPTIONS =
   QUERY_OPT_FN(hide_analyzed_query, HIDE_ANALYZED_QUERY, TQueryOptionLevel::ADVANCED)    \
   QUERY_OPT_FN(broadcast_cost_scale_factor, BROADCAST_COST_SCALE_FACTOR,                 \
       TQueryOptionLevel::ADVANCED)                                                       \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(tuple_cache_placement_policy,                          \
+      TUPLE_CACHE_PLACEMENT_POLICY, TQueryOptionLevel::ADVANCED)                         \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(tuple_cache_required_cost_reduction_factor,            \
+      TUPLE_CACHE_REQUIRED_COST_REDUCTION_FACTOR, TQueryOptionLevel::ADVANCED)           \
+  TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(tuple_cache_budget_bytes_per_executor,                 \
+      TUPLE_CACHE_BUDGET_BYTES_PER_EXECUTOR, TQueryOptionLevel::ADVANCED)                \
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.

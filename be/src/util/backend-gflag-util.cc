@@ -301,6 +301,21 @@ DEFINE_int32(iceberg_catalog_num_threads, 16,
     "Maximum number of threads to use for Iceberg catalog operations. These threads are "
     "shared among concurrent Iceberg catalog operation (ie., ExpireSnapshot).");
 
+// These coefficients have not been determined empirically. The write coefficient
+// matches the coefficient for a broadcast sender in DataStreamSink. The read
+// coefficient matches the coefficient for an exchange receiver in ExchandeNode.
+// This includes both a bytes coefficient and a rows coefficient to allow experimentation
+// and tuning.
+// TODO: Tune these empirically.
+DEFINE_double(tuple_cache_cost_coefficient_write_bytes, 0.0027,
+    "Cost coefficient for writing a byte to the tuple cache.");
+DEFINE_double(tuple_cache_cost_coefficient_write_rows, 0.00,
+    "Cost coefficient for writing a row to the tuple cache.");
+DEFINE_double(tuple_cache_cost_coefficient_read_bytes, 0.00,
+    "Cost coefficient for reading a byte from the tuple cache.");
+DEFINE_double(tuple_cache_cost_coefficient_read_rows, 0.1329,
+    "Cost coefficient for reading a row from the tuple cache.");
+
 using strings::Substitute;
 
 namespace impala {
@@ -313,6 +328,15 @@ static bool ValidatePositiveDouble(const char* flagname, double value) {
   }
   LOG(ERROR) << Substitute(
       "$0 must be greater than 0.0, value $1 is invalid", flagname, value);
+  return false;
+}
+
+static bool ValidateNonnegativeDouble(const char* flagname, double value) {
+  if (0.0 <= value) {
+    return true;
+  }
+  LOG(ERROR) << Substitute(
+      "$0 must be greater than or equal to 0.0, value $1 is invalid", flagname, value);
   return false;
 }
 
@@ -333,6 +357,10 @@ DEFINE_validator(query_cpu_count_divisor, &ValidatePositiveDouble);
 DEFINE_validator(min_processing_per_thread, &ValidatePositiveInt64);
 DEFINE_validator(query_cpu_root_factor, &ValidatePositiveDouble);
 DEFINE_validator(iceberg_catalog_num_threads, &ValidatePositiveInt32);
+DEFINE_validator(tuple_cache_cost_coefficient_write_bytes, &ValidateNonnegativeDouble);
+DEFINE_validator(tuple_cache_cost_coefficient_write_rows, &ValidateNonnegativeDouble);
+DEFINE_validator(tuple_cache_cost_coefficient_read_bytes, &ValidateNonnegativeDouble);
+DEFINE_validator(tuple_cache_cost_coefficient_read_rows, &ValidateNonnegativeDouble);
 
 Status GetConfigFromCommand(const string& flag_cmd, string& result) {
   result.clear();
@@ -552,6 +580,14 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_warmup_tables_config_file(FLAGS_warmup_tables_config_file);
   cfg.__set_keeps_warmup_tables_loaded(FLAGS_keeps_warmup_tables_loaded);
   cfg.__set_truncate_external_tables_with_hms(FLAGS_truncate_external_tables_with_hms);
+  cfg.__set_tuple_cache_cost_coefficient_write_bytes(
+      FLAGS_tuple_cache_cost_coefficient_write_bytes);
+  cfg.__set_tuple_cache_cost_coefficient_write_rows(
+      FLAGS_tuple_cache_cost_coefficient_write_rows);
+  cfg.__set_tuple_cache_cost_coefficient_read_bytes(
+      FLAGS_tuple_cache_cost_coefficient_read_bytes);
+  cfg.__set_tuple_cache_cost_coefficient_read_rows(
+      FLAGS_tuple_cache_cost_coefficient_read_rows);
   return Status::OK();
 }
 

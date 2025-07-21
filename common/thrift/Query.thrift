@@ -136,6 +136,16 @@ enum TSlotCountStrategy {
   PLANNER_CPU_ASK = 1
 }
 
+// Set of options for the tuple_cache_placement_policy. See TupleCachePlanner and
+// associated classes for the specific policies for each option.
+enum TTupleCachePlacementPolicy {
+  // Place tuple cache nodes at all eligible locations
+  ALL_ELIGIBLE = 0,
+
+  // Place tuple cache nodes using costing policies
+  COST_BASED = 1
+}
+
 // constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
 const i32 NUM_NODES_ALL_RACKS = -1
@@ -788,6 +798,16 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   195: optional double broadcast_cost_scale_factor = 1.0
+
+  // See comment in ImpalaService.thrift
+  196: optional TTupleCachePlacementPolicy tuple_cache_placement_policy =
+      TTupleCachePlacementPolicy.COST_BASED;
+
+  // See comment in ImpalaService.thrift
+  197: optional double tuple_cache_required_cost_reduction_factor = 3.0;
+
+  // See comment in ImpalaService.thrift (defaults to 100MB)
+  198: optional i64 tuple_cache_budget_bytes_per_executor = 104857600;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

@@ -1,0 +1,1161 @@
+# Some of tests here are copied from ../ddl.test
+create table t as select * from functional.alltypes
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.03MB Threads=1
+Per-Host Resource Estimates: Memory=20MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.10MB mem-reservation=4.03MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[3777605]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0 cost=3760262
+|
+01:TUPLE CACHE
+|  cache key: e9f9ad583e91e3b8b4c9755365a3090c
+|  input scan node ids: 0
+|  estimated serialized size: 662.99KB
+|  estimated serialized size per node: 66.30KB
+|  cumulative processing cost: 17343
+|  cache read processing cost: 970
+|  cache write processing cost: 1833
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=7.30K cost=17343
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=4.03MB Threads=2
+Per-Host Resource Estimates: Memory=21MB
+F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=1.07MB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[3764061]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0 cost=3760262
+|
+01:EXCHANGE [RANDOM]
+|  mem-estimate=993.45KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=3799
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 24)
+Per-Instance Resources: mem-estimate=20.36MB mem-reservation=4.03MB thread-reservation=1
+max-parallelism=10 segment-costs=[62944]
+02:TUPLE CACHE
+|  cache key: e9f9ad583e91e3b8b4c9755365a3090c
+|  input scan node ids: 0
+|  estimated serialized size: 662.99KB
+|  estimated serialized size per node: 66.30KB
+|  cumulative processing cost: 17343
+|  cache read processing cost: 970
+|  cache write processing cost: 1833
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=7.30K cost=17343
+   in pipelines: 00(GETNEXT)
+====
+create table t as
+select distinct a.int_col, a.string_col from functional.alltypes a
+inner join functional.alltypessmall b on (a.id = b.id)
+where a.year = 2009 and b.month = 2
+---- PLAN
+Max Per-Host Resource Reservation: Memory=18.98MB Threads=1
+Per-Host Resource Estimates: Memory=51MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=50.94MB mem-reservation=18.98MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  max-parallelism=1 segment-costs=[9748, 3621916]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: a.int_col, a.string_col
+|  mem-estimate=221B mem-reservation=0B thread-reservation=0 cost=3621916
+|
+07:TUPLE CACHE
+|  cache key: 4e8437e0d41ba7bb619673ef008e7e91
+|  input scan node ids: 0,1
+|  estimated serialized size: 273B
+|  estimated serialized size per node: 27B
+|  cumulative processing cost: 9748
+|  cache read processing cost: 1
+|  cache write processing cost: 0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=17B cardinality=13 cost=0
+|  in pipelines: 03(GETNEXT)
+|
+03:AGGREGATE [FINALIZE]
+|  group by: a.int_col, a.string_col
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=2 row-size=17B cardinality=13 cost=76
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+06:TUPLE CACHE
+|  cache key: 768fd84d79652eb391d1b9a1c58753bb
+|  input scan node ids: 0,1
+|  estimated serialized size: 429B
+|  estimated serialized size per node: 42B
+|  cumulative processing cost: 9672
+|  cache read processing cost: 1
+|  cache write processing cost: 1
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1 row-size=25B cardinality=13 cost=0
+|  in pipelines: 00(GETNEXT)
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|  fk/pk conjuncts: a.id = b.id
+|  runtime filters: RF000[bloom] <- b.id
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=25B cardinality=13 cost=963
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--05:TUPLE CACHE
+|  |  cache key: 8ed296fd735ce04ed930f8061b5fbe22
+|  |  input scan node ids: 1
+|  |  estimated serialized size: 200B
+|  |  estimated serialized size per node: 200B
+|  |  cumulative processing cost: 57
+|  |  cache read processing cost: 3
+|  |  cache write processing cost: 0
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=1 row-size=4B cardinality=25 cost=0
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partition predicates: b.`month` = CAST(2 AS INT)
+|     HDFS partitions=1/4 files=1 size=1.58KB
+|     deterministic scan range assignment: true
+|     stored statistics:
+|       table: rows=100 size=6.32KB
+|       partitions: 1/1 rows=25
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=100
+|     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
+|     tuple-ids=1 row-size=4B cardinality=25 cost=57
+|     in pipelines: 01(GETNEXT)
+|
+04:TUPLE CACHE
+|  cache key: 7bb8e2a858ec75313b864cfe1c4a4e6f
+|  input scan node ids: 0
+|  estimated serialized size: 89.11KB
+|  estimated serialized size per node: 8.91KB
+|  cumulative processing cost: 8652
+|  cache read processing cost: 485
+|  cache write processing cost: 246
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=21B cardinality=3.65K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes a]
+   partition predicates: a.`year` = CAST(2009 AS INT)
+   HDFS partitions=12/24 files=12 size=238.68KB
+   deterministic scan range assignment: true
+   runtime filters: RF000[bloom] -> a.id
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 12/12 rows=3.65K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=622
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=21B cardinality=3.65K cost=8652
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=23.91MB Threads=4
+Per-Host Resource Estimates: Memory=72MB
+F02:PLAN FRAGMENT [HASH(a.int_col,a.string_col)] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[78, 3621916] cpu-comparison-result=11 [max(1 (self) vs 11 (sum children))]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: a.int_col, a.string_col
+|  mem-estimate=221B mem-reservation=0B thread-reservation=0 cost=3621916
+|
+06:AGGREGATE [FINALIZE]
+|  group by: a.int_col, a.string_col
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=2 row-size=17B cardinality=13 cost=76
+|  in pipelines: 06(GETNEXT), 00(OPEN)
+|
+05:EXCHANGE [HASH(a.int_col,a.string_col)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=17B cardinality=13 cost=2
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 12)
+Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+Per-Instance Resources: mem-estimate=38.08MB mem-reservation=14.03MB thread-reservation=1
+max-parallelism=10 segment-costs=[9666, 20] cpu-comparison-result=11 [max(10 (self) vs 11 (sum children))]
+10:TUPLE CACHE
+|  cache key: 8299471539153599d0f44404bd572e63
+|  input scan node ids: 0
+|  estimated serialized size: 273B
+|  estimated serialized size per node: 27B
+|  cumulative processing cost: 9778
+|  cache read processing cost: 1
+|  cache write processing cost: 0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=17B cardinality=13 cost=0
+|  in pipelines: 00(GETNEXT)
+|
+03:AGGREGATE [STREAMING]
+|  group by: a.int_col, a.string_col
+|  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=2 row-size=17B cardinality=13 cost=76
+|  in pipelines: 00(GETNEXT)
+|
+09:TUPLE CACHE
+|  cache key: 6d91c292f1c154c2042d1605389c0440
+|  input scan node ids: 0
+|  estimated serialized size: 429B
+|  estimated serialized size per node: 42B
+|  cumulative processing cost: 9702
+|  cache read processing cost: 1
+|  cache write processing cost: 1
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1 row-size=25B cardinality=13 cost=0
+|  in pipelines: 00(GETNEXT)
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: a.id = b.id
+|  fk/pk conjuncts: a.id = b.id
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=25B cardinality=13 cost=938
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=2.95MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[55]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: b.id
+|  |  runtime filters: RF000[bloom] <- b.id
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=25
+|  |
+|  04:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=4B cardinality=25 cost=30
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.03MB mem-reservation=4.01MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[57]
+|  08:TUPLE CACHE
+|  |  cache key: 8ed296fd735ce04ed930f8061b5fbe22
+|  |  input scan node ids: 1
+|  |  estimated serialized size: 200B
+|  |  estimated serialized size per node: 200B
+|  |  cumulative processing cost: 57
+|  |  cache read processing cost: 3
+|  |  cache write processing cost: 0
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=1 row-size=4B cardinality=25 cost=0
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b, RANDOM]
+|     partition predicates: b.`month` = CAST(2 AS INT)
+|     HDFS partitions=1/4 files=1 size=1.58KB
+|     deterministic scan range assignment: true
+|     stored statistics:
+|       table: rows=100 size=6.32KB
+|       partitions: 1/1 rows=25
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=100
+|     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
+|     tuple-ids=1 row-size=4B cardinality=25 cost=57
+|     in pipelines: 01(GETNEXT)
+|
+07:TUPLE CACHE
+|  cache key: 6a50d18a98795cc3f86b2abe97b121a2
+|  input scan node ids: 0
+|  estimated serialized size: 89.11KB
+|  estimated serialized size per node: 8.91KB
+|  cumulative processing cost: 8652
+|  cache read processing cost: 485
+|  cache write processing cost: 246
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=21B cardinality=3.65K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes a, RANDOM]
+   partition predicates: a.`year` = CAST(2009 AS INT)
+   HDFS partitions=12/24 files=12 size=238.68KB
+   deterministic scan range assignment: true
+   runtime filters: RF000[bloom] -> a.id
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 12/12 rows=3.65K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=622
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=21B cardinality=3.65K cost=8652
+   in pipelines: 00(GETNEXT)
+====
+# CTAS with a view that has a limit clause (IMPALA-1411)
+create table t as
+select int_col from functional.hive_view
+---- PLAN
+Max Per-Host Resource Reservation: Memory=32.00KB Threads=1
+Per-Host Resource Estimates: Memory=16MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[3639241]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: CAST(1 AS TINYINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=3621898
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   limit: 1
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=0B cardinality=1 cost=17343
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=32.00KB Threads=2
+Per-Host Resource Estimates: Memory=16MB
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[3621898]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: CAST(1 AS TINYINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=3621898
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 1
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=0B cardinality=1 cost=0
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 24)
+Per-Instance Resources: mem-estimate=16.02MB mem-reservation=32.00KB thread-reservation=1
+max-parallelism=10 segment-costs=[17343]
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   limit: 1
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=0B cardinality=1 cost=17343
+   in pipelines: 00(GETNEXT)
+====
+# CTAS with multiple nested inline views that have a limit clause (IMPALA-1411)
+create table t as
+select * from
+  (select * from
+     (select int_col from functional.alltypestiny limit 1) v1 ) v2
+---- PLAN
+Max Per-Host Resource Reservation: Memory=8.00KB Threads=1
+Per-Host Resource Estimates: Memory=16MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[3621915]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=4B mem-reservation=0B thread-reservation=0 cost=3621899
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   stored statistics:
+     table: rows=8 size=460B
+     partitions: 4/4 rows=8
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2
+   limit: 1
+   mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
+   tuple-ids=0 row-size=4B cardinality=1 cost=16
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=8.00KB Threads=2
+Per-Host Resource Estimates: Memory=16MB
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[3621899]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=4B mem-reservation=0B thread-reservation=0 cost=3621899
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 1
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=4B cardinality=1 cost=0
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+Per-Instance Resources: mem-estimate=16.03MB mem-reservation=8.00KB thread-reservation=1
+max-parallelism=4 segment-costs=[16]
+00:SCAN HDFS [functional.alltypestiny, RANDOM]
+   HDFS partitions=4/4 files=4 size=460B
+   stored statistics:
+     table: rows=8 size=460B
+     partitions: 4/4 rows=8
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2
+   limit: 1
+   mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
+   tuple-ids=0 row-size=4B cardinality=1 cost=16
+   in pipelines: 00(GETNEXT)
+====
+
+# CTAS with a select statement that has a limit and offset clause (IMPALA-1411)
+create table t as
+select * from functional.alltypestiny order by id limit 1 offset 5
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.01MB Threads=1
+Per-Host Resource Estimates: Memory=20MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.00MB mem-reservation=4.01MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[29, 3621916]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=89B mem-reservation=0B thread-reservation=0 cost=3621916
+|
+01:TOP-N [LIMIT=1 OFFSET=5]
+|  order by: id ASC
+|  mem-estimate=534B mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=89B cardinality=1 cost=13
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+02:TUPLE CACHE
+|  cache key: 7663eaa15083f0de0bc5722b03d246d9
+|  input scan node ids: 0
+|  estimated serialized size: 744B
+|  estimated serialized size per node: 186B
+|  cumulative processing cost: 16
+|  cache read processing cost: 1
+|  cache write processing cost: 2
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=8 cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=8 size=460B
+     partitions: 4/4 rows=8
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2
+   mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=8 cost=16
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=4.01MB Threads=2
+Per-Host Resource Estimates: Memory=20MB
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=372.09KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[3621900] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=89B mem-reservation=0B thread-reservation=0 cost=3621898
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 5
+|  order by: id ASC
+|  limit: 1
+|  mem-estimate=372.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=89B cardinality=0 cost=2
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+Per-Instance Resources: mem-estimate=20.00MB mem-reservation=4.01MB thread-reservation=1
+max-parallelism=4 segment-costs=[29, 0]
+01:TOP-N [LIMIT=6]
+|  order by: id ASC
+|  mem-estimate=534B mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=89B cardinality=6 cost=13
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+03:TUPLE CACHE
+|  cache key: 7663eaa15083f0de0bc5722b03d246d9
+|  input scan node ids: 0
+|  estimated serialized size: 744B
+|  estimated serialized size per node: 186B
+|  cumulative processing cost: 16
+|  cache read processing cost: 1
+|  cache write processing cost: 2
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=8 cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypestiny, RANDOM]
+   HDFS partitions=4/4 files=4 size=460B
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=8 size=460B
+     partitions: 4/4 rows=8
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2
+   mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=8 cost=16
+   in pipelines: 00(GETNEXT)
+====
+# CTAS with an inline view that has a limit and offset clause (IMPALA-1411)
+create table t as
+select * from
+  (select int_col from functional.alltypestiny order by id limit 2 offset 5) v
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.01MB Threads=1
+Per-Host Resource Estimates: Memory=20MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.00MB mem-reservation=4.01MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[29, 3621902]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=16B mem-reservation=0B thread-reservation=0 cost=3621902
+|
+01:TOP-N [LIMIT=2 OFFSET=5]
+|  order by: id ASC
+|  mem-estimate=56B mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=2 cost=13
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+02:TUPLE CACHE
+|  cache key: 7d02972699db783a7b0ff21ac027c89c
+|  input scan node ids: 0
+|  estimated serialized size: 96B
+|  estimated serialized size per node: 24B
+|  cumulative processing cost: 16
+|  cache read processing cost: 1
+|  cache write processing cost: 0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=8B cardinality=8 cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=8 size=460B
+     partitions: 4/4 rows=8
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2
+   mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
+   tuple-ids=0 row-size=8B cardinality=8 cost=16
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=4.01MB Threads=2
+Per-Host Resource Estimates: Memory=20MB
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=48.01KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[3621899] cpu-comparison-result=4 [max(1 (self) vs 4 (sum children))]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=3621898
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 5
+|  order by: id ASC
+|  limit: 2
+|  mem-estimate=48.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=0 cost=1
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+Per-Instance Resources: mem-estimate=20.00MB mem-reservation=4.01MB thread-reservation=1
+max-parallelism=4 segment-costs=[29, 0]
+01:TOP-N [LIMIT=7]
+|  order by: id ASC
+|  mem-estimate=56B mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=7 cost=13
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+03:TUPLE CACHE
+|  cache key: 7d02972699db783a7b0ff21ac027c89c
+|  input scan node ids: 0
+|  estimated serialized size: 96B
+|  estimated serialized size per node: 24B
+|  cumulative processing cost: 16
+|  cache read processing cost: 1
+|  cache write processing cost: 0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=8B cardinality=8 cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypestiny, RANDOM]
+   HDFS partitions=4/4 files=4 size=460B
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=8 size=460B
+     partitions: 4/4 rows=8
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2
+   mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
+   tuple-ids=0 row-size=8B cardinality=8 cost=16
+   in pipelines: 00(GETNEXT)
+====
+# CTAS with sort columns
+create table t sort by (int_col, bool_col) as
+select * from functional.alltypes
+---- PLAN
+Max Per-Host Resource Reservation: Memory=16.03MB Threads=1
+Per-Host Resource Estimates: Memory=32MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=32.00MB mem-reservation=16.03MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[48576, 3760262]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0 cost=3760262
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=89B cardinality=7.30K cost=31233
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+02:TUPLE CACHE
+|  cache key: e9f9ad583e91e3b8b4c9755365a3090c
+|  input scan node ids: 0
+|  estimated serialized size: 662.99KB
+|  estimated serialized size per node: 66.30KB
+|  cumulative processing cost: 17343
+|  cache read processing cost: 970
+|  cache write processing cost: 1833
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=7.30K cost=17343
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=16.03MB Threads=2
+Per-Host Resource Estimates: Memory=33MB
+F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=12.97MB mem-reservation=12.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[35032, 3760262]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false]
+|  partitions=1
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0 cost=3760262
+|
+02:SORT
+|  order by: int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=89B cardinality=7.30K cost=31233
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [RANDOM]
+|  mem-estimate=993.45KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=3799
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 24)
+Per-Instance Resources: mem-estimate=20.36MB mem-reservation=4.03MB thread-reservation=1
+max-parallelism=10 segment-costs=[62944]
+03:TUPLE CACHE
+|  cache key: e9f9ad583e91e3b8b4c9755365a3090c
+|  input scan node ids: 0
+|  estimated serialized size: 662.99KB
+|  estimated serialized size per node: 66.30KB
+|  cumulative processing cost: 17343
+|  cache read processing cost: 970
+|  cache write processing cost: 1833
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=7.30K cost=17343
+   in pipelines: 00(GETNEXT)
+====
+# CTAS with partitions and sort columns
+create table t partitioned by (year, month) sort by (int_col, bool_col) as
+select * from functional.alltypes
+---- PLAN
+Max Per-Host Resource Reservation: Memory=16.03MB Threads=1
+Per-Host Resource Estimates: Memory=32MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=32.00MB mem-reservation=16.03MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[48576, 3760262]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0 cost=3760262
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=89B cardinality=7.30K cost=31233
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+02:TUPLE CACHE
+|  cache key: e9f9ad583e91e3b8b4c9755365a3090c
+|  input scan node ids: 0
+|  estimated serialized size: 662.99KB
+|  estimated serialized size per node: 66.30KB
+|  cumulative processing cost: 17343
+|  cache read processing cost: 970
+|  cache write processing cost: 1833
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=7.30K cost=17343
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=16.03MB Threads=2
+Per-Host Resource Estimates: Memory=37MB
+F01:PLAN FRAGMENT [HASH(functional.alltypes.year,functional.alltypes.month)] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=12.97MB mem-reservation=12.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[35032, 3760262]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=63.45KB mem-reservation=0B thread-reservation=0 cost=3760262
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST, int_col ASC NULLS LAST, bool_col ASC NULLS LAST
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=89B cardinality=7.30K cost=31233
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
+|  mem-estimate=993.45KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=3799
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 24)
+Per-Instance Resources: mem-estimate=23.63MB mem-reservation=4.03MB thread-reservation=1
+max-parallelism=10 segment-costs=[62944]
+03:TUPLE CACHE
+|  cache key: e9f9ad583e91e3b8b4c9755365a3090c
+|  input scan node ids: 0
+|  estimated serialized size: 662.99KB
+|  estimated serialized size per node: 66.30KB
+|  cumulative processing cost: 17343
+|  cache read processing cost: 970
+|  cache write processing cost: 1833
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=7.30K cost=17343
+   in pipelines: 00(GETNEXT)
+====
+# IMPALA-4167: if no (no)shuffle hint is given for CTAS into partitioned HDFS table, then
+# Impala is free to decide whether to add an exchange node or not. In this example, the
+# planner decides to shuffle. The aim of this test is to have a reference query where
+# noshuffle hint would lead to a different plan.
+# Note that noclustered hint is added to ensure consistent plans on Impala 2.x and 3.x,
+# because IMPALA-5293 changed clustered to be the default on 3.x.
+create /*+ noclustered */table t partitioned by (year, month) as
+select * from functional.alltypes
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=4.03MB Threads=2
+Per-Host Resource Estimates: Memory=25MB
+F01:PLAN FRAGMENT [HASH(functional.alltypes.year,functional.alltypes.month)] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=1.03MB mem-reservation=0B thread-reservation=1
+|  max-parallelism=10 segment-costs=[3764061]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
+|  mem-estimate=63.45KB mem-reservation=0B thread-reservation=0 cost=3760262
+|
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
+|  mem-estimate=993.45KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=3799
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 24)
+Per-Instance Resources: mem-estimate=23.63MB mem-reservation=4.03MB thread-reservation=1
+max-parallelism=10 segment-costs=[62944]
+02:TUPLE CACHE
+|  cache key: e9f9ad583e91e3b8b4c9755365a3090c
+|  input scan node ids: 0
+|  estimated serialized size: 662.99KB
+|  estimated serialized size per node: 66.30KB
+|  cumulative processing cost: 17343
+|  cache read processing cost: 970
+|  cache write processing cost: 1833
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=7.30K cost=17343
+   in pipelines: 00(GETNEXT)
+====
+# IMPALA-4167: non-shuffled CTAS into partitioned table has no exchange node before write.
+# Note that plan hint tests for CTAS are minimal by design, as this logic is covered well
+# in insert.test.
+# Note that noclustered hint is added to ensure consistent plans on Impala 2.x and 3.x,
+# because IMPALA-5293 changed clustered to be the default on 3.x.
+create /*+ noshuffle, noclustered */ table t partitioned by (year, month) as
+select * from functional.alltypes
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=4.03MB Threads=2
+Per-Host Resource Estimates: Memory=25MB
+F01:PLAN FRAGMENT [HASH(functional.alltypes.year,functional.alltypes.month)] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=1.03MB mem-reservation=0B thread-reservation=1
+|  max-parallelism=10 segment-costs=[3764061]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
+|  mem-estimate=63.45KB mem-reservation=0B thread-reservation=0 cost=3760262
+|
+01:EXCHANGE [HASH(functional.alltypes.year,functional.alltypes.month)]
+|  mem-estimate=993.45KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=3799
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 24)
+Per-Instance Resources: mem-estimate=23.63MB mem-reservation=4.03MB thread-reservation=1
+max-parallelism=10 segment-costs=[62944]
+02:TUPLE CACHE
+|  cache key: e9f9ad583e91e3b8b4c9755365a3090c
+|  input scan node ids: 0
+|  estimated serialized size: 662.99KB
+|  estimated serialized size per node: 66.30KB
+|  cumulative processing cost: 17343
+|  cache read processing cost: 970
+|  cache write processing cost: 1833
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=7.30K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 24/24 rows=7.30K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=310
+   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=7.30K cost=17343
+   in pipelines: 00(GETNEXT)
+====
+# CTAS with more complex select query
+create table t partitioned by (c_nationkey) sort by (c_custkey) as
+select c_custkey, max(o_totalprice) as maxprice, c_nationkey
+  from tpch.orders join tpch.customer on c_custkey = o_custkey
+ where c_nationkey < 10
+ group by c_custkey, c_nationkey
+---- PLAN
+Max Per-Host Resource Reservation: Memory=34.94MB Threads=1
+Per-Host Resource Estimates: Memory=51MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=50.94MB mem-reservation=34.94MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  max-parallelism=1 segment-costs=[8333477, 178515, 4409218]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false, PARTITION-KEYS=(c_nationkey)]
+|  partitions=25
+|  output exprs: c_custkey, max(o_totalprice), c_nationkey
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0 cost=4409218
+|
+04:SORT
+|  order by: c_nationkey ASC NULLS LAST, c_custkey ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=18B cardinality=150.00K cost=178515
+|  in pipelines: 04(GETNEXT), 03(OPEN)
+|
+08:TUPLE CACHE
+|  cache key: 5ce44149bb5c81be120f796766ab013d
+|  input scan node ids: 0,1
+|  estimated serialized size: 3.15MB
+|  estimated serialized size per node: 1.57MB
+|  cumulative processing cost: 8333477
+|  cache read processing cost: 19935
+|  cache write processing cost: 8910
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=18B cardinality=150.00K cost=0
+|  in pipelines: 03(GETNEXT)
+|
+03:AGGREGATE [FINALIZE]
+|  output: max(o_totalprice)
+|  group by: c_custkey, c_nationkey
+|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  tuple-ids=2 row-size=18B cardinality=150.00K cost=993506
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+07:TUPLE CACHE
+|  cache key: 331dbec25b9283e2a5af31415d97bb81
+|  input scan node ids: 0,1
+|  estimated serialized size: 7.41MB
+|  estimated serialized size per node: 3.71MB
+|  cumulative processing cost: 7339971
+|  cache read processing cost: 30391
+|  cache write processing cost: 20993
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1 row-size=26B cardinality=228.68K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: o_custkey = c_custkey
+|  fk/pk conjuncts: o_custkey = c_custkey
+|  runtime filters: RF000[bloom] <- c_custkey
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=26B cardinality=228.68K cost=441187
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--06:TUPLE CACHE
+|  |  cache key: 729fff08b06858466430f2b1bbae07b0
+|  |  input scan node ids: 1
+|  |  estimated serialized size: 205.08KB
+|  |  estimated serialized size per node: 205.08KB
+|  |  cumulative processing cost: 864778
+|  |  cache read processing cost: 1993
+|  |  cache write processing cost: 567
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=1 row-size=10B cardinality=15.00K cost=0
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  01:SCAN HDFS [tpch.customer]
+|     HDFS partitions=1/1 files=1 size=23.08MB
+|     deterministic scan range assignment: true
+|     predicates: c_nationkey < CAST(10 AS SMALLINT)
+|     stored statistics:
+|       table: rows=150.00K size=23.08MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=150.00K
+|     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+|     tuple-ids=1 row-size=10B cardinality=15.00K cost=864778
+|     in pipelines: 01(GETNEXT)
+|
+05:TUPLE CACHE
+|  cache key: 8310644f189aa574a97e008385767db3
+|  input scan node ids: 0
+|  estimated serialized size: 28.61MB
+|  estimated serialized size per node: 14.31MB
+|  cumulative processing cost: 6034006
+|  cache read processing cost: 199350
+|  cache write processing cost: 81000
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=16B cardinality=1.50M cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch.orders]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   deterministic scan range assignment: true
+   runtime filters: RF000[bloom] -> o_custkey
+   stored statistics:
+     table: rows=1.50M size=162.56MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.18M
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=1.50M cost=6034006
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=51.69MB Threads=5
+Per-Host Resource Estimates: Memory=81MB
+F03:PLAN FRAGMENT [HASH(c_nationkey)] hosts=2 instances=2
+|  Per-Instance Resources: mem-estimate=7.33MB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=2 segment-costs=[207600, 4409218] cpu-comparison-result=3 [max(2 (self) vs 3 (sum children))]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.t, OVERWRITE=false, PARTITION-KEYS=(c_nationkey)]
+|  partitions=25
+|  output exprs: c_custkey, max(o_totalprice), c_nationkey
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0 cost=4409218
+|
+08:SORT
+|  order by: c_nationkey ASC NULLS LAST, c_custkey ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=18B cardinality=150.00K cost=178515
+|  in pipelines: 08(GETNEXT), 06(OPEN)
+|
+07:EXCHANGE [HASH(c_nationkey)]
+|  mem-estimate=1.33MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=18B cardinality=150.00K cost=29085
+|  in pipelines: 06(GETNEXT)
+|
+F02:PLAN FRAGMENT [HASH(c_custkey,c_nationkey)] hosts=2 instances=2
+Per-Instance Resources: mem-estimate=11.42MB mem-reservation=4.75MB thread-reservation=1
+max-parallelism=2 segment-costs=[930185, 251160] cpu-comparison-result=3 [max(2 (self) vs 3 (sum children))]
+06:AGGREGATE [FINALIZE]
+|  output: max:merge(o_totalprice)
+|  group by: c_custkey, c_nationkey
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=2 row-size=18B cardinality=150.00K cost=899158
+|  in pipelines: 06(GETNEXT), 00(OPEN)
+|
+05:EXCHANGE [HASH(c_custkey,c_nationkey)]
+|  mem-estimate=1.42MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=18B cardinality=160.02K cost=31027
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
+Per-Instance Resources: mem-estimate=38.17MB mem-reservation=25.00MB thread-reservation=1
+max-parallelism=2 segment-costs=[7499075, 267937] cpu-comparison-result=3 [max(2 (self) vs 3 (sum children))]
+12:TUPLE CACHE
+|  cache key: 595303d6a82ff6cbe552f87c2917c40c
+|  input scan node ids: 0
+|  estimated serialized size: 3.36MB
+|  estimated serialized size per node: 1.68MB
+|  cumulative processing cost: 8383568
+|  cache read processing cost: 21266
+|  cache write processing cost: 9505
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=18B cardinality=160.02K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+03:AGGREGATE [STREAMING]
+|  output: max(o_totalprice)
+|  group by: c_custkey, c_nationkey
+|  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=2 row-size=18B cardinality=160.02K cost=1038882
+|  in pipelines: 00(GETNEXT)
+|
+11:TUPLE CACHE
+|  cache key: 2e5e647f00b10107ed9b14d4295d422c
+|  input scan node ids: 0
+|  estimated serialized size: 7.41MB
+|  estimated serialized size per node: 3.71MB
+|  cumulative processing cost: 7344686
+|  cache read processing cost: 30391
+|  cache write processing cost: 20993
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,1 row-size=26B cardinality=228.68K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: o_custkey = c_custkey
+|  fk/pk conjuncts: o_custkey = c_custkey
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=26B cardinality=228.68K cost=426187
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F04:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  |  Per-Instance Resources: mem-estimate=3.09MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=2 segment-costs=[18986]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: c_custkey
+|  |  runtime filters: RF000[bloom] <- c_custkey
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0 cost=15000
+|  |
+|  04:EXCHANGE [BROADCAST]
+|  |  mem-estimate=160.48KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=10B cardinality=15.00K cost=3986
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.05MB mem-reservation=12.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[865507]
+|  10:TUPLE CACHE
+|  |  cache key: 729fff08b06858466430f2b1bbae07b0
+|  |  input scan node ids: 1
+|  |  estimated serialized size: 205.08KB
+|  |  estimated serialized size per node: 205.08KB
+|  |  cumulative processing cost: 864778
+|  |  cache read processing cost: 1993
+|  |  cache write processing cost: 567
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=1 row-size=10B cardinality=15.00K cost=0
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  01:SCAN HDFS [tpch.customer, RANDOM]
+|     HDFS partitions=1/1 files=1 size=23.08MB
+|     deterministic scan range assignment: true
+|     predicates: c_nationkey < CAST(10 AS SMALLINT)
+|     stored statistics:
+|       table: rows=150.00K size=23.08MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=150.00K
+|     mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+|     tuple-ids=1 row-size=10B cardinality=15.00K cost=864778
+|     in pipelines: 01(GETNEXT)
+|
+09:TUPLE CACHE
+|  cache key: 3d784b6bccae4e83dcf0209e1faa1314
+|  input scan node ids: 0
+|  estimated serialized size: 28.61MB
+|  estimated serialized size per node: 14.31MB
+|  cumulative processing cost: 6034006
+|  cache read processing cost: 199350
+|  cache write processing cost: 81000
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0 row-size=16B cardinality=1.50M cost=0
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch.orders, RANDOM]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   deterministic scan range assignment: true
+   runtime filters: RF000[bloom] -> o_custkey
+   stored statistics:
+     table: rows=1.50M size=162.56MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.18M
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=16B cardinality=1.50M cost=6034006
+   in pipelines: 00(GETNEXT)
+====

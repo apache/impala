@@ -1,0 +1,813 @@
+# Unpartitioned insert.
+create table store_sales_unpartitioned
+stored as parquet as
+select * from store_sales
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=96.00MB Threads=12
+Per-Host Resource Estimates: Memory=12.19GB
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+|  Per-Instance Resources: mem-estimate=1.02GB mem-reservation=8.00MB thread-reservation=1
+|  max-parallelism=120 segment-costs=[108991552732]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_unpartitioned, OVERWRITE=false]
+|  partitions=1
+|  output exprs: tpcds_partitioned_parquet_snap.store_sales.ss_sold_time_sk, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk, tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, tpcds_partitioned_parquet_snap.store_sales.ss_promo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_ticket_number, tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost, tpcds_partitioned_parquet_snap.store_sales.ss_list_price, tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_discount_amt, tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost, tpcds_partitioned_parquet_snap.store_sales.ss_ext_list_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_tax, tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt, tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, tpcds_partitioned_parquet_snap.store_sales.ss_net_paid_inc_tax, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit, tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
+|  mem-estimate=1.00GB mem-reservation=0B thread-reservation=0 cost=97047706322
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=8.64G cost=11943846410
+   in pipelines: 00(GETNEXT)
+====
+# Unpartitioned insert with less than 256MB estimated data to write.
+create table store_sales_unpartitioned_small
+stored as parquet as
+select * from store_sales
+where ss_sold_date_sk = 2450816
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=176.00KB Threads=1
+Per-Host Resource Estimates: Memory=284MB
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=283.75MB mem-reservation=176.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[40845904]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_unpartitioned_small, OVERWRITE=false]
+|  partitions=1
+|  output exprs: tpcds_partitioned_parquet_snap.store_sales.ss_sold_time_sk, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk, tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, tpcds_partitioned_parquet_snap.store_sales.ss_promo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_ticket_number, tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost, tpcds_partitioned_parquet_snap.store_sales.ss_list_price, tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_discount_amt, tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost, tpcds_partitioned_parquet_snap.store_sales.ss_ext_list_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_tax, tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt, tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, tpcds_partitioned_parquet_snap.store_sales.ss_net_paid_inc_tax, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit, tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
+|  mem-estimate=267.75MB mem-reservation=0B thread-reservation=0 cost=36802982
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   partition predicates: ss_sold_date_sk = CAST(2450816 AS INT)
+   HDFS partitions=1/1824 files=1 size=218.89MB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1/1 rows=2.92M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=8.64G
+   mem-estimate=16.00MB mem-reservation=176.00KB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=2.92M cost=4042922
+   in pipelines: 00(GETNEXT)
+====
+# Unpartitioned insert with writer & scan instances < maximum allowed (120).
+# Cost-wise, scanner only need 40 instances, but writer need 88 instances.
+create table store_sales_unpartitioned_medium
+stored as parquet as
+select * from store_sales
+where ss_sold_date_sk < 2450910
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=1.55MB Threads=9
+Per-Host Resource Estimates: Memory=2.39GB
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=88
+|  Per-Instance Resources: mem-estimate=272.03MB mem-reservation=176.00KB thread-reservation=1
+|  max-parallelism=88 segment-costs=[3108264904]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_unpartitioned_medium, OVERWRITE=false]
+|  partitions=1
+|  output exprs: tpcds_partitioned_parquet_snap.store_sales.ss_sold_time_sk, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk, tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, tpcds_partitioned_parquet_snap.store_sales.ss_promo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_ticket_number, tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost, tpcds_partitioned_parquet_snap.store_sales.ss_list_price, tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_discount_amt, tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost, tpcds_partitioned_parquet_snap.store_sales.ss_ext_list_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_tax, tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt, tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, tpcds_partitioned_parquet_snap.store_sales.ss_net_paid_inc_tax, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit, tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
+|  mem-estimate=256.03MB mem-reservation=0B thread-reservation=0 cost=2768066475
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   partition predicates: ss_sold_date_sk < CAST(2450910 AS INT)
+   HDFS partitions=93/1824 files=93 size=19.88GB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 93/93 rows=246.09M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=119.03M
+   mem-estimate=16.00MB mem-reservation=176.00KB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=246.09M cost=340198429
+   in pipelines: 00(GETNEXT)
+====
+# Same unpartitioned insert as before, but with low MAX_FS_WRITERS.
+create table store_sales_unpartitioned_medium
+stored as parquet as
+select * from store_sales
+where ss_sold_date_sk < 2450910
+---- QUERYOPTIONS
+MAX_FS_WRITERS=20
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=1.72MB Threads=12
+Per-Host Resource Estimates: Memory=2.27GB
+F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=20
+|  Per-Instance Resources: mem-estimate=1.02GB mem-reservation=0B thread-reservation=1
+|  max-parallelism=20 segment-costs=[2904081862]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_unpartitioned_medium, OVERWRITE=false]
+|  partitions=1
+|  output exprs: tpcds_partitioned_parquet_snap.store_sales.ss_sold_time_sk, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk, tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk, tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, tpcds_partitioned_parquet_snap.store_sales.ss_promo_sk, tpcds_partitioned_parquet_snap.store_sales.ss_ticket_number, tpcds_partitioned_parquet_snap.store_sales.ss_quantity, tpcds_partitioned_parquet_snap.store_sales.ss_wholesale_cost, tpcds_partitioned_parquet_snap.store_sales.ss_list_price, tpcds_partitioned_parquet_snap.store_sales.ss_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_discount_amt, tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost, tpcds_partitioned_parquet_snap.store_sales.ss_ext_list_price, tpcds_partitioned_parquet_snap.store_sales.ss_ext_tax, tpcds_partitioned_parquet_snap.store_sales.ss_coupon_amt, tpcds_partitioned_parquet_snap.store_sales.ss_net_paid, tpcds_partitioned_parquet_snap.store_sales.ss_net_paid_inc_tax, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit, tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
+|  mem-estimate=1.00GB mem-reservation=0B thread-reservation=0 cost=2768066475
+|
+01:EXCHANGE [RANDOM]
+|  mem-estimate=19.08MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=96B cardinality=246.09M cost=136015387
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=93
+Per-Instance Resources: mem-estimate=23.81MB mem-reservation=176.00KB thread-reservation=1
+max-parallelism=93 segment-costs=[1988428320]
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   partition predicates: ss_sold_date_sk < CAST(2450910 AS INT)
+   HDFS partitions=93/1824 files=93 size=19.88GB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 93/93 rows=246.09M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=119.03M
+   mem-estimate=16.00MB mem-reservation=176.00KB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=246.09M cost=340198429
+   in pipelines: 00(GETNEXT)
+====
+# Partition by ss_sold_date_sk, just like the original table.
+create table store_sales_duplicate partitioned by (ss_sold_date_sk)
+stored as parquet as
+select * from store_sales
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=168.00MB Threads=24
+Per-Host Resource Estimates: Memory=62.74GB
+F01:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk)] hosts=10 instances=120
+|  Per-Instance Resources: mem-estimate=5.17GB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=120 segment-costs=[44372981821, 97047706322]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_duplicate, OVERWRITE=false, PARTITION-KEYS=(ss_sold_date_sk)]
+|  partitions=1824
+|  output exprs: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk
+|  mem-estimate=1.00GB mem-reservation=0B thread-reservation=0 cost=97047706322
+|
+02:SORT
+|  order by: ss_sold_date_sk ASC NULLS LAST
+|  mem-estimate=4.17GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=96B cardinality=8.64G cost=39597689640
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk)]
+|  mem-estimate=21.72MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=96B cardinality=8.64G cost=4775292181
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Instance Resources: mem-estimate=62.88MB mem-reservation=8.00MB thread-reservation=1
+max-parallelism=1824 segment-costs=[69810676358]
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=8.64G cost=11943846410
+   in pipelines: 00(GETNEXT)
+====
+# Partition by ss_sold_date_sk, but limit at 5 rows.
+create table store_sales_5_rows partitioned by (ss_sold_date_sk)
+stored as parquet as
+select * from store_sales
+limit 5
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=14.00MB Threads=2
+Per-Host Resource Estimates: Memory=22MB
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=6.02MB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[24, 3954291]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_5_rows, OVERWRITE=false, PARTITION-KEYS=(ss_sold_date_sk)]
+|  partitions=1824
+|  output exprs: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk
+|  mem-estimate=480B mem-reservation=0B thread-reservation=0 cost=3954291
+|
+02:SORT
+|  order by: ss_sold_date_sk ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=96B cardinality=5 cost=22
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 5
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=96B cardinality=5 cost=2
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 120)
+Per-Instance Resources: mem-estimate=16.39MB mem-reservation=8.00MB thread-reservation=1
+max-parallelism=10 segment-costs=[39]
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M
+   limit: 5
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=5 cost=6
+   in pipelines: 00(GETNEXT)
+====
+# Partition by ss_sold_date_sk, but have only 1 row per partition.
+create table store_sales_1_row_per_part partitioned by (ss_sold_date_sk)
+stored as parquet as
+select count(*), ss_sold_date_sk
+from store_sales group by ss_sold_date_sk
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=14.06MB Threads=2
+Per-Host Resource Estimates: Memory=47MB
+F01:PLAN FRAGMENT [HASH(ss_sold_date_sk)] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[5592, 1694, 3956795] cpu-comparison-result=10 [max(10 (self) vs 10 (sum children))]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_1_row_per_part, OVERWRITE=false, PARTITION-KEYS=(ss_sold_date_sk)]
+|  partitions=1824
+|  output exprs: count(*), ss_sold_date_sk
+|  mem-estimate=2.13KB mem-reservation=0B thread-reservation=0 cost=3956795
+|
+04:SORT
+|  order by: ss_sold_date_sk ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=12B cardinality=1.82K cost=1694
+|  in pipelines: 04(GETNEXT), 03(OPEN)
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: ss_sold_date_sk
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=1 row-size=12B cardinality=1.82K cost=5289
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(ss_sold_date_sk)]
+|  mem-estimate=162.14KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=12B cardinality=1.82K cost=303
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 120)
+Per-Instance Resources: mem-estimate=30.62MB mem-reservation=6.12MB thread-reservation=1
+max-parallelism=10 segment-costs=[5604, 2349]
+05:TUPLE CACHE
+|  cache key: 0f28ed31aa6856c81f1e044cb23ef2d3
+|  input scan node ids: 0
+|  estimated serialized size: 28.50KB
+|  estimated serialized size per node: 2.85KB
+|  cumulative processing cost: 5604
+|  cache read processing cost: 242
+|  cache write processing cost: 78
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=12B cardinality=1.82K cost=0
+|  in pipelines: 00(GETNEXT)
+|
+01:AGGREGATE [STREAMING]
+|  output: sum_init_zero(tpcds_partitioned_parquet_snap.store_sales.stats: num_rows)
+|  group by: ss_sold_date_sk
+|  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=1 row-size=12B cardinality=1.82K cost=5289
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   deterministic scan range assignment: true
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M
+   mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+   tuple-ids=0 row-size=12B cardinality=1.82K cost=315
+   in pipelines: 00(GETNEXT)
+====
+# Partition by ss_sold_date_sk, but have insert 5 partition and 1 row per partition.
+create table store_sales_5_part_1_row_per_part partitioned by (ss_sold_date_sk)
+stored as parquet as
+select count(*), ss_store_sk, ss_sold_date_sk
+from store_sales group by ss_store_sk, ss_sold_date_sk
+limit 5
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=470.62MB Threads=16
+Per-Host Resource Estimates: Memory=701MB
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=6.02MB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[5, 3954244] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_5_part_1_row_per_part, OVERWRITE=false, PARTITION-KEYS=(ss_sold_date_sk)]
+|  partitions=1824
+|  output exprs: count(*), ss_store_sk, ss_sold_date_sk
+|  mem-estimate=80B mem-reservation=0B thread-reservation=0 cost=3954244
+|
+05:SORT
+|  order by: ss_sold_date_sk ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=16B cardinality=5 cost=5
+|  in pipelines: 05(GETNEXT), 03(OPEN)
+|
+04:EXCHANGE [UNPARTITIONED]
+|  limit: 5
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=16B cardinality=5 cost=0
+|  in pipelines: 03(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(ss_store_sk,ss_sold_date_sk)] hosts=10 instances=30 (adjusted from 120)
+Per-Instance Resources: mem-estimate=22.34MB mem-reservation=2.88MB thread-reservation=1
+max-parallelism=30 segment-costs=[228190932, 7] cpu-comparison-result=120 [max(30 (self) vs 120 (sum children))]
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: ss_store_sk, ss_sold_date_sk
+|  limit: 5
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  tuple-ids=1 row-size=16B cardinality=5 cost=201792013
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(ss_store_sk,ss_sold_date_sk)]
+|  mem-estimate=12.34MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=16B cardinality=142.93M cost=26398919
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Instance Resources: mem-estimate=52.34MB mem-reservation=38.00MB thread-reservation=1
+max-parallelism=1360 segment-costs=[13514707828, 220910505]
+01:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: ss_store_sk, ss_sold_date_sk
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=16B cardinality=142.93M cost=12519387294
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M
+   mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
+   tuple-ids=0 row-size=8B cardinality=8.64G cost=995320534
+   in pipelines: 00(GETNEXT)
+====
+# Number of partition & scan instances < maximum allowed (120).
+create table store_sales_83_part partitioned by (ss_sold_date_sk)
+stored as parquet as
+select * from store_sales
+where ss_sold_date_sk < 2450900
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=49.55MB Threads=17
+Per-Host Resource Estimates: Memory=4.42GB
+F01:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk)] hosts=10 instances=78
+|  Per-Instance Resources: mem-estimate=513.52MB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=78 segment-costs=[1123464765, 2460972835]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_83_part, OVERWRITE=false, PARTITION-KEYS=(ss_sold_date_sk)]
+|  partitions=1824
+|  output exprs: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk
+|  mem-estimate=256.76MB mem-reservation=0B thread-reservation=0 cost=2460972835
+|
+02:SORT
+|  order by: ss_sold_date_sk ASC NULLS LAST
+|  mem-estimate=256.76MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=96B cardinality=218.75M cost=1002560725
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk)]
+|  mem-estimate=18.11MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=96B cardinality=218.75M cost=120904040
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=83
+Per-Instance Resources: mem-estimate=46.47MB mem-reservation=176.00KB thread-reservation=1
+max-parallelism=83 segment-costs=[1767513380]
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   partition predicates: ss_sold_date_sk < CAST(2450900 AS INT)
+   HDFS partitions=83/1824 files=83 size=17.74GB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 83/83 rows=218.75M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=133.91M
+   mem-estimate=16.00MB mem-reservation=176.00KB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=218.75M cost=302402289
+   in pipelines: 00(GETNEXT)
+====
+# Number of partition & scan instances < num executors.
+create table store_sales_4_part partitioned by (ss_sold_date_sk)
+stored as parquet as
+select * from store_sales
+where ss_sold_date_sk < 2450820
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=6.17MB Threads=2
+Per-Host Resource Estimates: Memory=535MB
+F01:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk)] hosts=4 instances=4
+|  Per-Instance Resources: mem-estimate=517.65MB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=4 segment-costs=[58077317, 130969386]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_4_part, OVERWRITE=false, PARTITION-KEYS=(ss_sold_date_sk)]
+|  partitions=1824
+|  output exprs: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk
+|  mem-estimate=258.83MB mem-reservation=0B thread-reservation=0 cost=130969386
+|
+02:SORT
+|  order by: ss_sold_date_sk ASC NULLS LAST
+|  mem-estimate=258.83MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=96B cardinality=11.31M cost=51827204
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk)]
+|  mem-estimate=10.39MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=96B cardinality=11.31M cost=6250113
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=4 instances=4
+Per-Instance Resources: mem-estimate=17.56MB mem-reservation=176.00KB thread-reservation=1
+max-parallelism=4 segment-costs=[91371298]
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   partition predicates: ss_sold_date_sk < CAST(2450820 AS INT)
+   HDFS partitions=4/1824 files=4 size=875.57MB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 4/4 rows=11.31M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.61G
+   mem-estimate=16.00MB mem-reservation=176.00KB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=11.31M cost=15632634
+   in pipelines: 00(GETNEXT)
+====
+# Partition number is 1.
+# There should be no shuffling.
+create table store_sales_1_part partitioned by (ss_sold_date_sk)
+stored as parquet as
+select * from store_sales
+where ss_sold_date_sk = 2450816
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=6.17MB Threads=1
+Per-Host Resource Estimates: Memory=536MB
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=535.50MB mem-reservation=6.17MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[17446509, 36802982]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_1_part, OVERWRITE=false, PARTITION-KEYS=(ss_sold_date_sk)]
+|  partitions=1824
+|  output exprs: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk
+|  mem-estimate=267.75MB mem-reservation=0B thread-reservation=0 cost=36802982
+|
+01:SORT
+|  order by: ss_sold_date_sk ASC NULLS LAST
+|  mem-estimate=267.75MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=96B cardinality=2.92M cost=13403587
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   partition predicates: ss_sold_date_sk = CAST(2450816 AS INT)
+   HDFS partitions=1/1824 files=1 size=218.89MB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1/1 rows=2.92M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=8.64G
+   mem-estimate=16.00MB mem-reservation=176.00KB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=2.92M cost=4042922
+   in pipelines: 00(GETNEXT)
+====
+# Partition number is 1 with large number of rows.
+# NDV(ca_country) = 1
+# There should be no shuffling.
+create table customer_address_1_huge_part partitioned by (part_col)
+stored as parquet as
+select a.*, a.ca_country as part_col
+from customer_address as a, customer_address as b
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=12.25MB Threads=3
+Per-Host Resource Estimates: Memory=51.02GB
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=51.00GB mem-reservation=12.12MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[2393532728547225, 2622165786501232] cpu-comparison-result=20 [max(10 (self) vs 20 (sum children))]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.customer_address_1_huge_part, OVERWRITE=false, PARTITION-KEYS=(ca_country)]
+|  partitions=1
+|  output exprs: ca_address_sk, ca_address_id, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, ca_state, ca_zip, ca_country, ca_gmt_offset, ca_location_type, ca_country
+|  mem-estimate=1.00GB mem-reservation=0B thread-reservation=0 cost=2622165786501232
+|
+04:SORT
+|  order by: ca_country ASC NULLS LAST
+|  mem-estimate=50.00GB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=232B cardinality=225.00T cost=2358455207032019
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 00
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,1 row-size=232B cardinality=225.00T cost=35077500000000
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=40.00KB mem-reservation=0B thread-reservation=1
+|  |  max-parallelism=10 segment-costs=[19934990]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=40.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=0B cardinality=15.00M cost=19934990
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=128.00KB thread-reservation=1
+|  max-parallelism=10 segment-costs=[324000]
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address b, RANDOM]
+|     HDFS partitions=1/1 files=1 size=307.36MB
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=1 row-size=0B cardinality=15.00M cost=0
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address a, RANDOM]
+   HDFS partitions=1/1 files=1 size=307.36MB
+   stored statistics:
+     table: rows=15.00M size=307.36MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.58M
+   mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+   tuple-ids=0 row-size=232B cardinality=15.00M cost=21515206
+   in pipelines: 00(GETNEXT)
+====
+# Partition number is 1 (constant expression) with large number of rows.
+# Since the partitioning col is a constant expression, it is recognized as
+# non-partitioned insert and maximum num writer is scheduled.
+# Along with maximum number of scan scheduled, shuffling in-between is eliminated.
+create table store_sales_1_huge_part partitioned by (part_col)
+stored as parquet as
+select a.*, 100000 as part_col
+from store_sales a, store_sales b;
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=96.25MB Threads=15
+Per-Host Resource Estimates: Memory=12.22GB
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+|  Per-Instance Resources: mem-estimate=1.02GB mem-reservation=8.00MB thread-reservation=1
+|  max-parallelism=120 segment-costs=[2517058240805469066] cpu-comparison-result=120 [max(120 (self) vs 30 (sum children))]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_1_huge_part, OVERWRITE=false, PARTITION-KEYS=(100000)]
+|  partitions=1
+|  output exprs: a.ss_sold_time_sk, a.ss_item_sk, a.ss_customer_sk, a.ss_cdemo_sk, a.ss_hdemo_sk, a.ss_addr_sk, a.ss_store_sk, a.ss_promo_sk, a.ss_ticket_number, a.ss_quantity, a.ss_wholesale_cost, a.ss_list_price, a.ss_sales_price, a.ss_ext_discount_amt, a.ss_ext_sales_price, a.ss_ext_wholesale_cost, a.ss_ext_list_price, a.ss_ext_tax, a.ss_coupon_amt, a.ss_net_paid, a.ss_net_paid_inc_tax, a.ss_net_profit, a.ss_sold_date_sk, CAST(100000 AS INT)
+|  mem-estimate=1.00GB mem-reservation=0B thread-reservation=0 cost=1079134528315963008
+|
+02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 00
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,1 row-size=96B cardinality=9223372.04T cost=1437923700545659648
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=80.00KB mem-reservation=0B thread-reservation=1
+|  |  max-parallelism=10 segment-costs=[11482473870]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=80.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=0B cardinality=8.64G cost=11482473870
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
+|  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=128.00KB thread-reservation=1
+|  max-parallelism=20 segment-costs=[186622600]
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales b, RANDOM]
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
+|     stored statistics:
+|       table: rows=8.64G size=389.90GB
+|       partitions: 1824/1824 rows=8.64G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=390.22M
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=1 row-size=0B cardinality=8.64G cost=0
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales a, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=8.64G cost=11943846410
+   in pipelines: 00(GETNEXT)
+====
+# Partition number is 4 with large number of rows.
+# Since the partitioning col is a arithmetic expression, it is recognized as
+# partitioned insert, but the expression is not evaluated further to lower partition
+# estimate down from 1824 to 4.
+# Shuffling in-between is kept because data partitioning between F02 and F00 is different.
+create table store_sales_4_huge_part partitioned by (part_col)
+stored as parquet as
+select a.*, (a.ss_sold_date_sk % 4) as part_col
+from store_sales a, store_sales b;
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=168.25MB Threads=27
+Per-Host Resource Estimates: Memory=62.79GB
+F02:PLAN FRAGMENT [HASH((a.ss_sold_date_sk % 4))] hosts=10 instances=120
+|  Per-Instance Resources: mem-estimate=5.17GB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=120 segment-costs=[9223372036854775807, 1079134528315963008] cpu-comparison-result=240 [max(240 (self) vs 30 (sum children))]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_4_huge_part, OVERWRITE=false, PARTITION-KEYS=((ss_sold_date_sk % 4))]
+|  partitions=1824
+|  output exprs: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk, (ss_sold_date_sk % CAST(4 AS INT))
+|  mem-estimate=1.00GB mem-reservation=0B thread-reservation=0 cost=1079134528315963008
+|
+05:SORT
+|  order by: (ss_sold_date_sk % 4) ASC NULLS LAST
+|  mem-estimate=4.17GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=96B cardinality=9223372.04T cost=9223372036854775807
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:EXCHANGE [HASH((a.ss_sold_date_sk % 4))]
+|  mem-estimate=22.19MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,1 row-size=96B cardinality=9223372.04T cost=727724053707841792
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Instance Resources: mem-estimate=64.75MB mem-reservation=8.00MB thread-reservation=1
+max-parallelism=1824 segment-costs=[2031908871662953610]
+02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 00
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,1 row-size=96B cardinality=9223372.04T cost=1437923700545659648
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=80.00KB mem-reservation=0B thread-reservation=1
+|  |  max-parallelism=10 segment-costs=[11482473870]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=80.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=0B cardinality=8.64G cost=11482473870
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=20 (adjusted from 120)
+|  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=128.00KB thread-reservation=1
+|  max-parallelism=20 segment-costs=[186622600]
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales b, RANDOM]
+|     HDFS partitions=1824/1824 files=1824 size=389.90GB
+|     stored statistics:
+|       table: rows=8.64G size=389.90GB
+|       partitions: 1824/1824 rows=8.64G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=390.22M
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=1 row-size=0B cardinality=8.64G cost=0
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales a, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=8.64G cost=11943846410
+   in pipelines: 00(GETNEXT)
+====
+# Partition number is 20 with large number of rows.
+# NDV(cs_ship_mode_sk) = 20.
+# Shuffling in-between is kept because data partitioning between F02 and F00 is different.
+create table catalog_sales_20_huge_part partitioned by (part_col)
+stored as parquet as
+select a.*, a.cs_ship_mode_sk as part_col
+from catalog_sales a, catalog_sales b;
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=24.12MB Threads=16
+Per-Host Resource Estimates: Memory=52.34GB
+F02:PLAN FRAGMENT [HASH(a.cs_ship_mode_sk)] hosts=10 instances=20
+|  Per-Instance Resources: mem-estimate=26.00GB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=20 segment-costs=[9223372036854775807, 1079134528315963008] cpu-comparison-result=140 [max(140 (self) vs 20 (sum children))]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.catalog_sales_20_huge_part, OVERWRITE=false, PARTITION-KEYS=(cs_ship_mode_sk)]
+|  partitions=20
+|  output exprs: cs_sold_time_sk, cs_ship_date_sk, cs_bill_customer_sk, cs_bill_cdemo_sk, cs_bill_hdemo_sk, cs_bill_addr_sk, cs_ship_customer_sk, cs_ship_cdemo_sk, cs_ship_hdemo_sk, cs_ship_addr_sk, cs_call_center_sk, cs_catalog_page_sk, cs_ship_mode_sk, cs_warehouse_sk, cs_item_sk, cs_promo_sk, cs_order_number, cs_quantity, cs_wholesale_cost, cs_list_price, cs_sales_price, cs_ext_discount_amt, cs_ext_sales_price, cs_ext_wholesale_cost, cs_ext_list_price, cs_ext_tax, cs_coupon_amt, cs_ext_ship_cost, cs_net_paid, cs_net_paid_inc_tax, cs_net_paid_inc_ship, cs_net_paid_inc_ship_tax, cs_net_profit, cs_sold_date_sk, cs_ship_mode_sk
+|  mem-estimate=1.00GB mem-reservation=0B thread-reservation=0 cost=1079134528315963008
+|
+05:SORT
+|  order by: cs_ship_mode_sk ASC NULLS LAST
+|  mem-estimate=25.00GB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=140B cardinality=9223372.04T cost=9223372036854775807
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:EXCHANGE [HASH(a.cs_ship_mode_sk)]
+|  mem-estimate=27.34MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,1 row-size=140B cardinality=9223372.04T cost=727724053707841792
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Instance Resources: mem-estimate=27.56MB mem-reservation=1.00MB thread-reservation=1
+max-parallelism=1831 segment-costs=[2031908868428384405]
+02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 00
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,1 row-size=140B cardinality=9223372.04T cost=1437923700545659648
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=40.00KB mem-reservation=0B thread-reservation=1
+|  |  max-parallelism=10 segment-costs=[5741383630]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |  mem-estimate=40.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=0B cardinality=4.32G cost=5741383630
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=10 (adjusted from 120)
+|  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=128.00KB thread-reservation=1
+|  max-parallelism=10 segment-costs=[93313684]
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales b, RANDOM]
+|     HDFS partitions=1831/1831 files=1831 size=280.96GB
+|     stored statistics:
+|       table: rows=4.32G size=280.96GB
+|       partitions: 1831/1831 rows=4.32G
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=21.52M
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=1 row-size=0B cardinality=4.32G cost=0
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales a, RANDOM]
+   HDFS partitions=1831/1831 files=1831 size=280.96GB
+   stored statistics:
+     table: rows=4.32G size=280.96GB
+     partitions: 1831/1831 rows=4.32G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=21.52M
+   mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+   tuple-ids=0 row-size=140B cardinality=4.32G cost=8709277205
+   in pipelines: 00(GETNEXT)
+====
+# Partition with cardinality = 0.
+create table store_sales_zero_cardinality partitioned by (ss_sold_date_sk)
+stored as parquet as
+select * from store_sales
+where ss_sold_date_sk = 1
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=6.00MB Threads=1
+Per-Host Resource Estimates: Memory=10MB
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=6.00MB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[0, 3954235]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_zero_cardinality, OVERWRITE=false, PARTITION-KEYS=(ss_sold_date_sk)]
+|  partitions=1824
+|  output exprs: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk
+|  mem-estimate=96B mem-reservation=0B thread-reservation=0 cost=3954235
+|
+01:SORT
+|  order by: ss_sold_date_sk ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=96B cardinality=0 cost=0
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   partition predicates: ss_sold_date_sk = CAST(1 AS INT)
+   partitions=0/1824 files=0 size=0B
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 0/0 rows=unavailable
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=0
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=96B cardinality=0 cost=0
+   in pipelines: 00(GETNEXT)
+====
+# Partitioned insert with unavailable stats.
+# tpcds_seq_snap does not have stats collected.
+# Exchange node must exist in query plan.
+create table store_sales_without_stats partitioned by (part_col)
+stored as parquet as
+select *, ss_item_sk as part_col
+from tpcds_seq_snap.store_sales
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=102.00MB Threads=13
+Per-Host Resource Estimates: Memory=1.36GB
+F01:PLAN FRAGMENT [HASH(ss_item_sk)] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=1.12GB mem-reservation=6.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[0, 3954235]
+WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_without_stats, OVERWRITE=false, PARTITION-KEYS=(ss_item_sk)]
+|  partitions=unavailable
+|  output exprs: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit, ss_sold_date_sk, ss_item_sk
+|  mem-estimate=1.00GB mem-reservation=0B thread-reservation=0 cost=3954235
+|
+02:SORT
+|  order by: ss_item_sk ASC NULLS LAST
+|  mem-estimate=128.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=100B cardinality=unavailable cost=0
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(ss_item_sk)]
+|  mem-estimate=22.19MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=100B cardinality=unavailable cost=0
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Instance Resources: mem-estimate=20.06MB mem-reservation=8.00MB thread-reservation=1
+max-parallelism=120 segment-costs=[1200000000]
+00:SCAN HDFS [tpcds_seq_snap.store_sales, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=215.99MB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/1824 rows=unavailable
+     columns missing stats: ss_sold_time_sk, ss_item_sk, ss_customer_sk, ss_cdemo_sk, ss_hdemo_sk, ss_addr_sk, ss_store_sk, ss_promo_sk, ss_ticket_number, ss_quantity, ss_wholesale_cost, ss_list_price, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price, ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid, ss_net_paid_inc_tax, ss_net_profit
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=100B cardinality=unavailable cost=1200000000
+   in pipelines: 00(GETNEXT)
+====

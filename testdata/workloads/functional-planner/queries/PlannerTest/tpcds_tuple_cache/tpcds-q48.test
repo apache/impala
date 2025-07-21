@@ -1,0 +1,794 @@
+# TPCDS-Q48
+# start query 48 in stream 0 using template query48.tpl using seed 1637730879
+select sum (ss_quantity)
+ from store_sales, store, customer_demographics, customer_address, date_dim
+ where s_store_sk = ss_store_sk
+ and  ss_sold_date_sk = d_date_sk and d_year = 1999
+ and
+ (
+  (
+   cd_demo_sk = ss_cdemo_sk
+   and
+   cd_marital_status = 'D'
+   and
+   cd_education_status = 'College'
+   and
+   ss_sales_price between 100.00 and 150.00
+   )
+ or
+  (
+  cd_demo_sk = ss_cdemo_sk
+   and
+   cd_marital_status = 'W'
+   and
+   cd_education_status = 'Secondary'
+   and
+   ss_sales_price between 50.00 and 100.00
+  )
+ or
+ (
+  cd_demo_sk = ss_cdemo_sk
+  and
+   cd_marital_status = 'M'
+   and
+   cd_education_status = '2 yr Degree'
+   and
+   ss_sales_price between 150.00 and 200.00
+ )
+ )
+ and
+ (
+  (
+  ss_addr_sk = ca_address_sk
+  and
+  ca_country = 'United States'
+  and
+  ca_state in ('NE', 'IA', 'NY')
+  and ss_net_profit between 0 and 2000
+  )
+ or
+  (ss_addr_sk = ca_address_sk
+  and
+  ca_country = 'United States'
+  and
+  ca_state in ('IN', 'TN', 'OH')
+  and ss_net_profit between 150 and 3000
+  )
+ or
+  (ss_addr_sk = ca_address_sk
+  and
+  ca_country = 'United States'
+  and
+  ca_state in ('KS', 'CA', 'CO')
+  and ss_net_profit between 50 and 25000
+  )
+ )
+;
+
+# end query 48 in stream 0 using template query48.tpl
+---- PLAN
+Max Per-Host Resource Reservation: Memory=93.52MB Threads=1
+Per-Host Resource Estimates: Memory=285MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=284.79MB mem-reservation=93.52MB thread-reservation=1 runtime-filters-memory=5.00MB
+|  max-parallelism=1 segment-costs=[1600567798, 0]
+PLAN-ROOT SINK
+|  output exprs: sum(ss_quantity)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|
+15:TUPLE CACHE
+|  cache key: ce71afa7c95ef319b1e3bf4ad7d006bc
+|  input scan node ids: 0,2,3,4,1
+|  estimated serialized size: 12B
+|  estimated serialized size per node: 1B
+|  cumulative processing cost: 1600567798
+|  cache read processing cost: 0
+|  cache write processing cost: 0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=1 cost=0
+|  in pipelines: 09(GETNEXT)
+|
+09:AGGREGATE [FINALIZE]
+|  output: sum(CAST(ss_quantity AS BIGINT))
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=1 cost=194387
+|  in pipelines: 09(GETNEXT), 00(OPEN)
+|
+14:TUPLE CACHE
+|  cache key: 84559eea11536bceb683e4ba4998ae82
+|  input scan node ids: 0,2,3,4,1
+|  estimated serialized size: 374.93MB
+|  estimated serialized size per node: 37.49MB
+|  cumulative processing cost: 1600373411
+|  cache read processing cost: 369058
+|  cache write processing cost: 1061475
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,3,4,1 row-size=122B cardinality=2.78M cost=0
+|  in pipelines: 00(GETNEXT)
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  runtime filters: RF000[bloom] <- s_store_sk, RF001[min_max] <- s_store_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2,3,4,1 row-size=122B cardinality=2.78M cost=1216827
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
+|     HDFS partitions=1/1 files=1 size=119.76KB
+|     deterministic scan range assignment: true
+|     stored statistics:
+|       table: rows=1.35K size=119.76KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.35K
+|     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+|     tuple-ids=1 row-size=4B cardinality=1.35K cost=77
+|     in pipelines: 01(GETNEXT)
+|
+13:TUPLE CACHE
+|  cache key: 26b241ad0632a4defe7ccac18f0ea518
+|  input scan node ids: 0,2,3,4
+|  estimated serialized size: 353.74MB
+|  estimated serialized size per node: 35.37MB
+|  cumulative processing cost: 1599156507
+|  cache read processing cost: 369058
+|  cache write processing cost: 1001492
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,3,4 row-size=118B cardinality=2.78M cost=0
+|  in pipelines: 00(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF002[bloom] <- d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2,3,4 row-size=118B cardinality=2.78M cost=3986720
+|  in pipelines: 00(GETNEXT), 04(OPEN)
+|
+|--12:TUPLE CACHE
+|  |  cache key: 376b0249f0c7a6556869d0060c524207
+|  |  input scan node ids: 4
+|  |  estimated serialized size: 4.37KB
+|  |  estimated serialized size per node: 4.37KB
+|  |  cumulative processing cost: 10467
+|  |  cache read processing cost: 49
+|  |  cache write processing cost: 12
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=373 cost=0
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     deterministic scan range assignment: true
+|     predicates: d_year = CAST(1999 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(1999 AS INT)
+|     parquet dictionary predicates: d_year = CAST(1999 AS INT)
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=4 row-size=8B cardinality=373 cost=10467
+|     in pipelines: 04(GETNEXT)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_addr_sk = ca_address_sk
+|  fk/pk conjuncts: ss_addr_sk = ca_address_sk
+|  other predicates: ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH') OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH') OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ca_state IN ('KS', 'CA', 'CO')
+|  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
+|  mem-estimate=154.91MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,3 row-size=110B cardinality=13.58M cost=25780105
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--11:TUPLE CACHE
+|  |  cache key: 0bdece8c2954bb659e3eb63c931c6cb1
+|  |  input scan node ids: 3
+|  |  estimated serialized size: 116.86MB
+|  |  estimated serialized size per node: 11.69MB
+|  |  cumulative processing cost: 4947000
+|  |  cache read processing cost: 346483
+|  |  cache write processing cost: 330840
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=3 row-size=43B cardinality=2.61M cost=0
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
+|     HDFS partitions=1/1 files=1 size=307.36MB
+|     deterministic scan range assignment: true
+|     predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
+|     parquet dictionary predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=3 row-size=43B cardinality=2.61M cost=4947000
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_cdemo_sk = cd_demo_sk
+|  fk/pk conjuncts: ss_cdemo_sk = cd_demo_sk
+|  other predicates: cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_marital_status = 'M', cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_education_status = '2 yr Degree', cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_education_status = '2 yr Degree', cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
+|  runtime filters: RF006[bloom] <- cd_demo_sk, RF007[min_max] <- cd_demo_sk
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=67B cardinality=80.75M cost=57169583
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--10:TUPLE CACHE
+|  |  cache key: 43c4d3adfa7496a09cd3bcebbc527f4f
+|  |  input scan node ids: 2
+|  |  estimated serialized size: 7.38MB
+|  |  estimated serialized size per node: 755.58KB
+|  |  cumulative processing cost: 510987
+|  |  cache read processing cost: 24154
+|  |  cache write processing cost: 20890
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=2 row-size=39B cardinality=181.75K cost=0
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics]
+|     HDFS partitions=1/1 files=1 size=11.15MB
+|     deterministic scan range assignment: true
+|     predicates: cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree', cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree'
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=2 row-size=39B cardinality=181.75K cost=510987
+|     in pipelines: 02(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   deterministic scan range assignment: true
+   predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
+   runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_addr_sk, RF007[min_max] -> ss_cdemo_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_addr_sk, RF006[bloom] -> ss_cdemo_sk
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M est-scan-range=374(filtered from 1824)
+   parquet dictionary predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=28B cardinality=165.13M(filtered from 863.99M) cost=1506751645
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=922.14MB Threads=21
+Per-Host Resource Estimates: Memory=1.07GB
+F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=184.84KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[25, 0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+PLAN-ROOT SINK
+|  output exprs: sum(ss_quantity)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|
+15:AGGREGATE [FINALIZE]
+|  output: sum:merge(ss_quantity)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=1 cost=8
+|  in pipelines: 15(GETNEXT), 09(OPEN)
+|
+14:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=168.84KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=120 cost=17
+|  in pipelines: 09(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Host Shared Resources: mem-estimate=5.00MB mem-reservation=5.00MB thread-reservation=0 runtime-filters-memory=5.00MB
+Per-Instance Resources: mem-estimate=28.02MB mem-reservation=20.00MB thread-reservation=1
+max-parallelism=160 segment-costs=[1592308701, 123] cpu-comparison-result=120 [max(120 (self) vs 62 (sum children))]
+21:TUPLE CACHE
+|  cache key: 8b2c961918190301e32e765e79e48611
+|  input scan node ids: 0
+|  estimated serialized size: 1.41KB
+|  estimated serialized size per node: 144B
+|  cumulative processing cost: 1604658357
+|  cache read processing cost: 15
+|  cache write processing cost: 3
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=120 cost=0
+|  in pipelines: 09(GETNEXT)
+|
+09:AGGREGATE
+|  output: sum(CAST(ss_quantity AS BIGINT))
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=120 cost=194387
+|  in pipelines: 09(GETNEXT), 00(OPEN)
+|
+20:TUPLE CACHE
+|  cache key: 387c3dc27d23ab59ca360828a9831682
+|  input scan node ids: 0
+|  estimated serialized size: 374.93MB
+|  estimated serialized size per node: 37.49MB
+|  cumulative processing cost: 1604463970
+|  cache read processing cost: 369058
+|  cache write processing cost: 1061475
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,3,4,1 row-size=122B cardinality=2.78M cost=0
+|  in pipelines: 00(GETNEXT)
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: ss_store_sk = s_store_sk
+|  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2,3,4,1 row-size=122B cardinality=2.78M cost=1215477
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[3140]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: s_store_sk
+|  |  runtime filters: RF000[bloom] <- s_store_sk, RF001[min_max] <- s_store_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
+|  |
+|  13:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=4B cardinality=1.35K cost=1790
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=16.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[120]
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
+|     HDFS partitions=1/1 files=1 size=119.76KB
+|     stored statistics:
+|       table: rows=1.35K size=119.76KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.35K
+|     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+|     tuple-ids=1 row-size=4B cardinality=1.35K cost=77
+|     in pipelines: 01(GETNEXT)
+|
+19:TUPLE CACHE
+|  cache key: 5f513b4ed477f88b32675fb900d958d4
+|  input scan node ids: 0
+|  estimated serialized size: 353.74MB
+|  estimated serialized size per node: 35.37MB
+|  cumulative processing cost: 1603245233
+|  cache read processing cost: 369058
+|  cache write processing cost: 1001492
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,3,4 row-size=118B cardinality=2.78M cost=0
+|  in pipelines: 00(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=01
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2,3,4 row-size=118B cardinality=2.78M cost=3986347
+|  in pipelines: 00(GETNEXT), 04(OPEN)
+|
+|--F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[863]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: d_date_sk
+|  |  runtime filters: RF002[bloom] <- d_date_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=373
+|  |
+|  12:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=373 cost=490
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.05MB mem-reservation=4.50MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[10483]
+|  18:TUPLE CACHE
+|  |  cache key: 376b0249f0c7a6556869d0060c524207
+|  |  input scan node ids: 4
+|  |  estimated serialized size: 4.37KB
+|  |  estimated serialized size per node: 4.37KB
+|  |  cumulative processing cost: 10467
+|  |  cache read processing cost: 49
+|  |  cache write processing cost: 12
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=373 cost=0
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     deterministic scan range assignment: true
+|     predicates: d_year = CAST(1999 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(1999 AS INT)
+|     parquet dictionary predicates: d_year = CAST(1999 AS INT)
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=4 row-size=8B cardinality=373 cost=10467
+|     in pipelines: 04(GETNEXT)
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=02
+|  hash predicates: ss_addr_sk = ca_address_sk
+|  fk/pk conjuncts: ss_addr_sk = ca_address_sk
+|  other predicates: ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH') OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH') OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ca_state IN ('KS', 'CA', 'CO')
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,3 row-size=110B cardinality=13.58M cost=23173008
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--F08:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=420.46MB mem-reservation=410.00MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  |  max-parallelism=10 segment-costs=[6071927]
+|  JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: ca_address_sk
+|  |  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
+|  |  mem-estimate=408.00MB mem-reservation=408.00MB spill-buffer=2.00MB thread-reservation=0 cost=2607097
+|  |
+|  11:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.46MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=3 row-size=43B cardinality=2.61M cost=3464830
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=20.18MB mem-reservation=4.12MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[5305997]
+|  17:TUPLE CACHE
+|  |  cache key: 0bdece8c2954bb659e3eb63c931c6cb1
+|  |  input scan node ids: 3
+|  |  estimated serialized size: 116.86MB
+|  |  estimated serialized size per node: 11.69MB
+|  |  cumulative processing cost: 4947000
+|  |  cache read processing cost: 346483
+|  |  cache write processing cost: 330840
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=3 row-size=43B cardinality=2.61M cost=0
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
+|     HDFS partitions=1/1 files=1 size=307.36MB
+|     deterministic scan range assignment: true
+|     predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
+|     parquet dictionary predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=3 row-size=43B cardinality=2.61M cost=4947000
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=03
+|  hash predicates: ss_cdemo_sk = cd_demo_sk
+|  fk/pk conjuncts: ss_cdemo_sk = cd_demo_sk
+|  other predicates: cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_marital_status = 'M', cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_education_status = '2 yr Degree', cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_education_status = '2 yr Degree', cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
+|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=67B cardinality=80.75M cost=56987837
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=212.10MB mem-reservation=205.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[423286]
+|  JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: cd_demo_sk
+|  |  runtime filters: RF006[bloom] <- cd_demo_sk, RF007[min_max] <- cd_demo_sk
+|  |  mem-estimate=204.00MB mem-reservation=204.00MB spill-buffer=1.00MB thread-reservation=0 cost=181746
+|  |
+|  10:EXCHANGE [BROADCAST]
+|  |  mem-estimate=7.10MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=39B cardinality=181.75K cost=241540
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=20.17MB mem-reservation=5.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[533840]
+|  16:TUPLE CACHE
+|  |  cache key: 43c4d3adfa7496a09cd3bcebbc527f4f
+|  |  input scan node ids: 2
+|  |  estimated serialized size: 7.38MB
+|  |  estimated serialized size per node: 755.58KB
+|  |  cumulative processing cost: 510987
+|  |  cache read processing cost: 24154
+|  |  cache write processing cost: 20890
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=2 row-size=39B cardinality=181.75K cost=0
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
+|     HDFS partitions=1/1 files=1 size=11.15MB
+|     deterministic scan range assignment: true
+|     predicates: cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree', cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree'
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=2 row-size=39B cardinality=181.75K cost=510987
+|     in pipelines: 02(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   deterministic scan range assignment: true
+   predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
+   runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_addr_sk, RF007[min_max] -> ss_cdemo_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_addr_sk, RF006[bloom] -> ss_cdemo_sk
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M est-scan-range=374(filtered from 1824)
+   parquet dictionary predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=28B cardinality=165.13M(filtered from 863.99M) cost=1506751645
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=922.14MB Threads=21
+Per-Host Resource Estimates: Memory=1.07GB
+F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=184.84KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[25, 0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+PLAN-ROOT SINK
+|  output exprs: sum(ss_quantity)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
+|
+15:AGGREGATE [FINALIZE]
+|  output: sum:merge(ss_quantity)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=1 cost=8
+|  in pipelines: 15(GETNEXT), 09(OPEN)
+|
+14:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=168.84KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=120 cost=17
+|  in pipelines: 09(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Host Shared Resources: mem-estimate=5.00MB mem-reservation=5.00MB thread-reservation=0 runtime-filters-memory=5.00MB
+Per-Instance Resources: mem-estimate=28.02MB mem-reservation=20.00MB thread-reservation=1
+max-parallelism=160 segment-costs=[1592308701, 123] cpu-comparison-result=120 [max(120 (self) vs 62 (sum children))]
+21:TUPLE CACHE
+|  cache key: 8b2c961918190301e32e765e79e48611
+|  input scan node ids: 0
+|  estimated serialized size: 1.41KB
+|  estimated serialized size per node: 144B
+|  cumulative processing cost: 1604658357
+|  cache read processing cost: 15
+|  cache write processing cost: 3
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=120 cost=0
+|  in pipelines: 09(GETNEXT)
+|
+09:AGGREGATE
+|  output: sum(CAST(ss_quantity AS BIGINT))
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=5 row-size=8B cardinality=120 cost=194387
+|  in pipelines: 09(GETNEXT), 00(OPEN)
+|
+20:TUPLE CACHE
+|  cache key: 387c3dc27d23ab59ca360828a9831682
+|  input scan node ids: 0
+|  estimated serialized size: 374.93MB
+|  estimated serialized size per node: 37.49MB
+|  cumulative processing cost: 1604463970
+|  cache read processing cost: 369058
+|  cache write processing cost: 1061475
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,3,4,1 row-size=122B cardinality=2.78M cost=0
+|  in pipelines: 00(GETNEXT)
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: ss_store_sk = s_store_sk
+|  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2,3,4,1 row-size=122B cardinality=2.78M cost=1215477
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[3140]
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: s_store_sk
+|  |  runtime filters: RF000[bloom] <- s_store_sk, RF001[min_max] <- s_store_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
+|  |
+|  13:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=4B cardinality=1.35K cost=1790
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=16.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[120]
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
+|     HDFS partitions=1/1 files=1 size=119.76KB
+|     stored statistics:
+|       table: rows=1.35K size=119.76KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.35K
+|     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+|     tuple-ids=1 row-size=4B cardinality=1.35K cost=77
+|     in pipelines: 01(GETNEXT)
+|
+19:TUPLE CACHE
+|  cache key: 5f513b4ed477f88b32675fb900d958d4
+|  input scan node ids: 0
+|  estimated serialized size: 353.74MB
+|  estimated serialized size per node: 35.37MB
+|  cumulative processing cost: 1603245233
+|  cache read processing cost: 369058
+|  cache write processing cost: 1001492
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,3,4 row-size=118B cardinality=2.78M cost=0
+|  in pipelines: 00(GETNEXT)
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=01
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2,3,4 row-size=118B cardinality=2.78M cost=3986347
+|  in pipelines: 00(GETNEXT), 04(OPEN)
+|
+|--F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[863]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: d_date_sk
+|  |  runtime filters: RF002[bloom] <- d_date_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=373
+|  |
+|  12:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=373 cost=490
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.05MB mem-reservation=4.50MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[10483]
+|  18:TUPLE CACHE
+|  |  cache key: 376b0249f0c7a6556869d0060c524207
+|  |  input scan node ids: 4
+|  |  estimated serialized size: 4.37KB
+|  |  estimated serialized size per node: 4.37KB
+|  |  cumulative processing cost: 10467
+|  |  cache read processing cost: 49
+|  |  cache write processing cost: 12
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=4 row-size=8B cardinality=373 cost=0
+|  |  in pipelines: 04(GETNEXT)
+|  |
+|  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     deterministic scan range assignment: true
+|     predicates: d_year = CAST(1999 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d_year = CAST(1999 AS INT)
+|     parquet dictionary predicates: d_year = CAST(1999 AS INT)
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=4 row-size=8B cardinality=373 cost=10467
+|     in pipelines: 04(GETNEXT)
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=02
+|  hash predicates: ss_addr_sk = ca_address_sk
+|  fk/pk conjuncts: ss_addr_sk = ca_address_sk
+|  other predicates: ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH') OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH') OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ca_state IN ('NE', 'IA', 'NY') OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ca_state IN ('KS', 'CA', 'CO'), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ca_state IN ('IN', 'TN', 'OH') OR ca_state IN ('KS', 'CA', 'CO')
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,2,3 row-size=110B cardinality=13.58M cost=23173008
+|  in pipelines: 00(GETNEXT), 03(OPEN)
+|
+|--F08:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=420.46MB mem-reservation=410.00MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  |  max-parallelism=10 segment-costs=[6071927]
+|  JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |  build expressions: ca_address_sk
+|  |  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
+|  |  mem-estimate=408.00MB mem-reservation=408.00MB spill-buffer=2.00MB thread-reservation=0 cost=2607097
+|  |
+|  11:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.46MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=3 row-size=43B cardinality=2.61M cost=3464830
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=20.18MB mem-reservation=4.12MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[5305997]
+|  17:TUPLE CACHE
+|  |  cache key: 0bdece8c2954bb659e3eb63c931c6cb1
+|  |  input scan node ids: 3
+|  |  estimated serialized size: 116.86MB
+|  |  estimated serialized size per node: 11.69MB
+|  |  cumulative processing cost: 4947000
+|  |  cache read processing cost: 346483
+|  |  cache write processing cost: 330840
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=3 row-size=43B cardinality=2.61M cost=0
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  03:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
+|     HDFS partitions=1/1 files=1 size=307.36MB
+|     deterministic scan range assignment: true
+|     predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
+|     parquet dictionary predicates: ca_state IN ('NE', 'IA', 'NY', 'IN', 'TN', 'OH', 'KS', 'CA', 'CO'), ca_country = 'United States'
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=3 row-size=43B cardinality=2.61M cost=4947000
+|     in pipelines: 03(GETNEXT)
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=03
+|  hash predicates: ss_cdemo_sk = cd_demo_sk
+|  fk/pk conjuncts: ss_cdemo_sk = cd_demo_sk
+|  other predicates: cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_marital_status = 'M', cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'M', cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_marital_status = 'M', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_marital_status = 'M', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', cd_marital_status = 'D' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', cd_marital_status = 'D' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'W' OR cd_education_status = '2 yr Degree', cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree', cd_education_status = 'College' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = '2 yr Degree', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_education_status = '2 yr Degree', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'Secondary' OR cd_education_status = '2 yr Degree', cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
+|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=0,2 row-size=67B cardinality=80.75M cost=56987837
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=212.10MB mem-reservation=205.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[423286]
+|  JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |  build expressions: cd_demo_sk
+|  |  runtime filters: RF006[bloom] <- cd_demo_sk, RF007[min_max] <- cd_demo_sk
+|  |  mem-estimate=204.00MB mem-reservation=204.00MB spill-buffer=1.00MB thread-reservation=0 cost=181746
+|  |
+|  10:EXCHANGE [BROADCAST]
+|  |  mem-estimate=7.10MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=39B cardinality=181.75K cost=241540
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=20.17MB mem-reservation=5.00MB thread-reservation=1
+|  max-parallelism=10 segment-costs=[533840]
+|  16:TUPLE CACHE
+|  |  cache key: 43c4d3adfa7496a09cd3bcebbc527f4f
+|  |  input scan node ids: 2
+|  |  estimated serialized size: 7.38MB
+|  |  estimated serialized size per node: 755.58KB
+|  |  cumulative processing cost: 510987
+|  |  cache read processing cost: 24154
+|  |  cache write processing cost: 20890
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=2 row-size=39B cardinality=181.75K cost=0
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
+|     HDFS partitions=1/1 files=1 size=11.15MB
+|     deterministic scan range assignment: true
+|     predicates: cd_marital_status = 'D' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree', cd_education_status = 'College' OR cd_marital_status = 'W' AND cd_education_status = 'Secondary' OR cd_marital_status = 'M' AND cd_education_status = '2 yr Degree'
+|     stored statistics:
+|       table: rows=1.92M size=11.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=197.97K
+|     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
+|     tuple-ids=2 row-size=39B cardinality=181.75K cost=510987
+|     in pipelines: 02(GETNEXT)
+|
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=389.90GB
+   deterministic scan range assignment: true
+   predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
+   runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_addr_sk, RF007[min_max] -> ss_cdemo_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_addr_sk, RF006[bloom] -> ss_cdemo_sk
+   stored statistics:
+     table: rows=8.64G size=389.90GB
+     partitions: 1824/1824 rows=8.64G
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=390.22M est-scan-range=374(filtered from 1824)
+   parquet dictionary predicates: ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit <= CAST(2000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit <= CAST(3000 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit <= CAST(25000 AS DECIMAL(5,0)), ss_net_profit >= CAST(0 AS DECIMAL(3,0)) OR ss_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ss_net_profit >= CAST(50 AS DECIMAL(3,0)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=28B cardinality=165.13M(filtered from 863.99M) cost=1506751645
+   in pipelines: 00(GETNEXT)
+====
