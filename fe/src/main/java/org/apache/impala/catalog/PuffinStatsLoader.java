@@ -66,10 +66,9 @@ public class PuffinStatsLoader {
   private final Table iceApiTable_;
   private final String tblName_;
 
-  // The timestamp of the HMS stats and columns that have HMS stats. Puffin NDVs will only
-  // be loaded if they are more recent than existing HMS stats.
-  private final long hmsStatsTimestampMs_;
-  private final Set<Integer> fieldIdsWithHmsStats_;
+  // Map of fields that have HMS stats - the values are the snapshot IDs. Puffin NDVs will
+  // only be loaded if they are more recent than existing HMS stats.
+  private final Map<Integer, Long> fieldIdsWithHmsStats_;
 
   // The blobs to read from Puffin files. Initialised in 'initBlobsToRead()'. The keys of
   // the inner map are fieldIds and its values are snapshotIds - together they identify
@@ -94,11 +93,10 @@ public class PuffinStatsLoader {
     }
   }
 
-  private PuffinStatsLoader(Table iceApiTable, String tblName, long hmsStatsTimestampMs,
-      Set<Integer> fieldIdsWithHmsStats) {
+  private PuffinStatsLoader(Table iceApiTable, String tblName,
+      Map<Integer, Long> fieldIdsWithHmsStats) {
     iceApiTable_ = iceApiTable;
     tblName_ = tblName;
-    hmsStatsTimestampMs_ = hmsStatsTimestampMs;
     fieldIdsWithHmsStats_ = fieldIdsWithHmsStats;
   }
 
@@ -107,15 +105,16 @@ public class PuffinStatsLoader {
    * column, the most recent available NDV value is chosen.
    *
    * Stats for columns in 'fieldIdsWithHmsStats' are only loaded if they belong to a
-   * snapshot that is more recent than 'hmsStatsTimestampMs'.
+   * snapshot that is more recent than the corresponding snapshot id in the map, i.e. if
+   * the Puffin NDV is more recent than the HMS one.
    *
    * If it is detected that there are multiple blobs for a given fieldId-snapshotId pair,
    * a warning log is issued, but no attempt is made to detect all such cases.
    */
   public static Map<Integer, PuffinStatsRecord> loadPuffinStats(Table iceApiTable,
-      String tblName, long hmsStatsTimestampMs, Set<Integer> fieldIdsWithHmsStats) {
+      String tblName, Map<Integer, Long> fieldIdsWithHmsStats) {
     PuffinStatsLoader loader = new PuffinStatsLoader(iceApiTable, tblName,
-        hmsStatsTimestampMs, fieldIdsWithHmsStats);
+        fieldIdsWithHmsStats);
     return loader.loadPuffinStatsImpl();
   }
 
@@ -194,8 +193,9 @@ public class PuffinStatsLoader {
   // Returns true if there are HMS stats for the column referenced by 'fieldId' that are
   // at least as recent as the snapshot referenced by 'snapshotId'
   private boolean hmsHasMoreRecentStats(int fieldId, long snapshotId) {
-    long snapshotTs = iceApiTable_.snapshot(snapshotId).timestampMillis();
-    return hmsStatsTimestampMs_ >= snapshotTs && fieldIdsWithHmsStats_.contains(fieldId);
+    Long hmsSnapshot = fieldIdsWithHmsStats_.get(fieldId);
+    if (hmsSnapshot == null) return false;
+    return isMoreRecentSnapshot(hmsSnapshot, snapshotId);
   }
 
   // Checks the metadata of 'statsFile' and loads NDV values where available.

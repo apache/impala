@@ -117,12 +117,9 @@ class TestIcebergTableWithPuffinStats(CustomClusterTestSuite):
 
     self._change_metadata_json_file(tbl_info, "not_all_blobs_current.metadata.json")
 
-    # Get the latest snapshot's timestamp, set an HMS stat and set the last compute stats
-    # property to one second before the latest snapshot.
-    latest_snapshot_timestamp = self._get_latest_snapshot_timestamp(
-        tbl_info.full_tbl_name)
-    timestamp_before_snapshot = latest_snapshot_timestamp - 1
+    prev_snapshot_id = self._get_snapshot_ids(tbl_info.full_tbl_name)[1]
 
+    # Set HMS stats for the first and third column, for the previous snapshot.
     # There are Puffin stats from the latest snapshot for the first two columns, and older
     # Puffin stats for the next two columns - the HMS stats are more recent than these
     # older Puffin stats.
@@ -131,8 +128,9 @@ class TestIcebergTableWithPuffinStats(CustomClusterTestSuite):
             tbl_info.full_tbl_name),
         "alter table {} set column stats bigint_col('numDVs'='300')".format(
             tbl_info.full_tbl_name),
-        "alter table {} set tblproperties('impala.lastComputeStatsTime'='{}')".format(
-            tbl_info.full_tbl_name, timestamp_before_snapshot)
+        "alter table {} set tblproperties('impala.computeStatsSnapshotIds'= \
+            '1:{prev_snapshot_id},3:{prev_snapshot_id}')".format(tbl_info.full_tbl_name,
+                prev_snapshot_id=prev_snapshot_id)
     ]
     for stmt in stmts:
       self.execute_query(stmt)
@@ -175,12 +173,12 @@ class TestIcebergTableWithPuffinStats(CustomClusterTestSuite):
 
     return self.TblInfo(tbl_name, vector, tbl_loc, tbl_properties)
 
-  def _get_latest_snapshot_timestamp(self, tbl_name):
-    query_template = "select unix_timestamp(max(committed_at)) \
-        latest_snapshot from {}.snapshots"
+  def _get_snapshot_ids(self, tbl_name):
+    """ Returns the list of the table's snapshot ids, starting with the current one."""
+    query_template = "select snapshot_id from {}.snapshots order by committed_at desc"
     query = query_template.format(tbl_name)
     query_res = self.execute_query(query)
-    return int(query_res.data[0])
+    return query_res.data
 
   def _copy_files_to_puffin_tbl(self, tbl_name, tbl_loc, uuid):
     version_info = sys.version_info

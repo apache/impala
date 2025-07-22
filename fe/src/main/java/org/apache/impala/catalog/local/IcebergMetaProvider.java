@@ -325,7 +325,7 @@ public class IcebergMetaProvider implements MetaProvider {
     org.apache.iceberg.Table iceTbl = tblImpl.iceApiTbl_;
     Map<Integer, PuffinStatsLoader.PuffinStatsRecord> puffinStats =
         PuffinStatsLoader.loadPuffinStats(iceTbl, tblImpl.fullName(),
-            -1, Collections.emptySet());
+            Collections.emptyMap());
 
     List<ColumnStatisticsObj> res = new ArrayList<>();
     for (String colName : colNames) {

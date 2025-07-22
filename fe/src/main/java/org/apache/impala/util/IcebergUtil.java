@@ -1380,9 +1380,18 @@ public class IcebergUtil {
     return "";
   }
 
+  /**
+   * This is a helper class for converting the value of the
+   * 'impala.computeStatsSnapshotIds' table property to a Map representation and back.
+   *
+   * In the case of Iceberg tables, for each column with HMS stats, this property stores
+   * the snapshot id for which stats have been computed. It is a comma-separated list of
+   * values of the form "fieldIdRangeStart[-fieldIdRangeEndIncl]:snapshotId". The fieldId
+   * part may be a single value or a contiguous, inclusive range.
+   */
   public static class ComputeStatsSnapshotPropertyConverter {
-    public static TreeMap<Long, Long> stringToMap(String snapshotIds) {
-      TreeMap<Long, Long> res = new TreeMap<Long, Long>();
+    public static TreeMap<Integer, Long> stringToMap(String snapshotIds) {
+      TreeMap<Integer, Long> res = new TreeMap<Integer, Long>();
       if (snapshotIds == null) return res;
 
       String[] columns = snapshotIds.split(",");
@@ -1399,11 +1408,11 @@ public class IcebergUtil {
 
           String[] colRange = colStr.split("-");
           if (colRange.length == 1) {
-            res.put(Long.parseLong(colRange[0]), snapshotId);
+            res.put(Integer.parseInt(colRange[0]), snapshotId);
           } else if (colRange.length == 2) {
-            long rangeStart = Long.parseLong(colRange[0]);
-            long rangeEnd = Long.parseLong(colRange[1]);
-            for (long colId = rangeStart; colId <= rangeEnd; ++colId) {
+            int rangeStart = Integer.parseInt(colRange[0]);
+            int rangeEnd = Integer.parseInt(colRange[1]);
+            for (int colId = rangeStart; colId <= rangeEnd; ++colId) {
               res.put(colId, snapshotId);
             }
           } else {
@@ -1417,11 +1426,11 @@ public class IcebergUtil {
       return res;
     }
 
-    public static String mapToString(TreeMap<Long, Long> colAndSnapshotIds) {
+    public static String mapToString(TreeMap<Integer, Long> colAndSnapshotIds) {
       ConversionState state = new ConversionState();
 
-      for (Map.Entry<Long, Long> entry : colAndSnapshotIds.entrySet()) {
-        long col = entry.getKey();
+      for (Map.Entry<Integer, Long> entry : colAndSnapshotIds.entrySet()) {
+        int col = entry.getKey();
         long snapshotId = entry.getValue();
 
         if (state.canContinueRange(col, snapshotId)) {
@@ -1436,7 +1445,7 @@ public class IcebergUtil {
       return state.getResult();
     }
 
-    private static TreeMap<Long, Long> logAndReturnEmptyMap(String snapshotIdsStr) {
+    private static TreeMap<Integer, Long> logAndReturnEmptyMap(String snapshotIdsStr) {
       LOG.warn(String.format(
           "Invalid value for table property '%s': \"%s\". Ignoring it.",
           IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS, snapshotIdsStr));
@@ -1445,13 +1454,13 @@ public class IcebergUtil {
 
     private static class ConversionState {
       // Intentionally not using -1 as that is the snapshot ID of empty tables.
-      private static final long INVALID = -10;
-      private long colRangeStart_ = INVALID;
-      private long lastCol_ = INVALID;
+      private static final int INVALID = -10;
+      private int colRangeStart_ = INVALID;
+      private int lastCol_ = INVALID;
       private long lastSnapshotId_ = INVALID;
       private final StringBuilder sb_ = new StringBuilder();
 
-      private boolean canContinueRange(long col, long snapshotId) {
+      private boolean canContinueRange(int col, long snapshotId) {
         return lastCol_ != INVALID && lastSnapshotId_ != INVALID
             && lastSnapshotId_ == snapshotId && (lastCol_ + 1 == col);
       }
@@ -1468,7 +1477,7 @@ public class IcebergUtil {
         }
       }
 
-      private void initNewRange(long col, long snapshotId) {
+      private void initNewRange(int col, long snapshotId) {
         if (colRangeStart_ != INVALID) sb_.append(",");
         colRangeStart_ = col;
         lastCol_ = col;

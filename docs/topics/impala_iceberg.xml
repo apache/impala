@@ -896,10 +896,11 @@ ORDER BY made_current_at;
       come from different snapshots.
       </p>
       <p>
-      In case there are both HMS and Puffin stats for a column, the more recent one will
-      be used - for HMS stats we use the 'impala.lastComputeStatsTime' table property, and
-      for Puffin stats we use the snapshot timestamp to determine which one is more
-      recent.
+      In case there are both HMS and Puffin NDV stats for a column, the more recent one
+      will be used. For HMS stats we use the 'impala.computeStatsSnapshotId' table
+      property which stores, for each column, the snapshot for which HMS stats were
+      calculated. We compare this with the snapshot of the Puffin stats to decide which
+      is more recent.
       </p>
       <p>
       Reading Puffin stats is disabled by default; set the "--enable_reading_puffin_stats"

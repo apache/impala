@@ -574,12 +574,11 @@ public class IcebergTable extends Table implements FeIcebergTable {
     if (!BackendConfig.INSTANCE.enableReadingPuffinStats()) return;
     if (!isPuffinStatsReadingEnabledForTable()) return;
 
-    long hmsStatsTimestampMs = getLastComputeStatsTimeMs();
-    Set<Integer> fieldIdsWithHmsStats = collectFieldIdsWithNdvStats();
+    Map<Integer, Long> fieldIdsWithHmsStats = getComputeStatsSnapshotMap(msTable_);
 
     Map<Integer, PuffinStatsLoader.PuffinStatsRecord> puffinNdvs =
         PuffinStatsLoader.loadPuffinStats(icebergApiTable_, getFullName(),
-            hmsStatsTimestampMs, fieldIdsWithHmsStats);
+            fieldIdsWithHmsStats);
     for (Map.Entry<Integer, PuffinStatsLoader.PuffinStatsRecord> entry
         : puffinNdvs.entrySet()) {
       int fieldId = entry.getKey();
@@ -600,12 +599,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         // mode: in local catalog mode, the catalog sends the stats in HMS objects, so
         // NDVs for unsupported types would be lost.
         if (ColumnStats.supportsNdv(colType)) {
-          // Only use the value from Puffin if it is more recent than the HMS stat value
-          // or if the latter doesn't exist.
-          if (!col.getStats().hasNumDistinctValues()
-              || snapshot.timestampMillis() >= hmsStatsTimestampMs) {
-            col.getStats().setNumDistinctValues(ndv);
-          }
+          col.getStats().setNumDistinctValues(ndv);
         }
       }
     }
@@ -892,18 +886,23 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public void updateComputeStatsIcebergSnapshotsProperty(
       org.apache.hadoop.hive.metastore.api.Table msTbl,
       TAlterTableUpdateStatsParams params) {
-    String snapshotIds = msTbl.getParameters().get(
-        IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS);
+    TreeMap<Integer, Long> computeStatsMap = getComputeStatsSnapshotMap(msTbl);
 
-    TreeMap<Long, Long> computeStatsMap =
-        IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(snapshotIds);
     updateComputeStatsIcebergSnapshotMap(computeStatsMap, params);
     String property =
         IcebergUtil.ComputeStatsSnapshotPropertyConverter.mapToString(computeStatsMap);
     msTbl.putToParameters(IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS, property);
   }
 
-  private void updateComputeStatsIcebergSnapshotMap(Map<Long, Long> map,
+  private TreeMap<Integer, Long> getComputeStatsSnapshotMap(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    String snapshotIds = msTbl.getParameters().get(
+        IcebergTable.COMPUTE_STATS_SNAPSHOT_IDS);
+
+    return IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(snapshotIds);
+  }
+
+  private void updateComputeStatsIcebergSnapshotMap(Map<Integer, Long> map,
       TAlterTableUpdateStatsParams params) {
     // This will be -1 if there is no snapshot yet.
     Preconditions.checkState(params.isSetSnapshot_id());
@@ -912,7 +911,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     // Insert/update columns for which we have computed stats.
     if (params.isSetColumn_stats()) {
       for (String colName : params.column_stats.keySet()) {
-        long fieldId = getIcebergApiTable().schema().findField(colName).fieldId();
+        int fieldId = getIcebergApiTable().schema().findField(colName).fieldId();
         map.put(fieldId, currentSnapshotId);
       }
     }

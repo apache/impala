@@ -477,18 +477,18 @@ public class IcebergUtilTest {
 
     // Fill a disjunct range
     String disjunctRanges = "1-4:1234,6-8:1234,10:2345";
-    TreeMap<Long, Long> disjunctRangesMap =
+    TreeMap<Integer, Long> disjunctRangesMap =
         IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(disjunctRanges);
-    disjunctRangesMap.put(5L, 1234L);
+    disjunctRangesMap.put(5, 1234L);
     String completedRange = "1-8:1234,10:2345";
     assertEquals(completedRange,
         IcebergUtil.ComputeStatsSnapshotPropertyConverter.mapToString(disjunctRangesMap));
 
     // Split a range
     String rangeToSplit = "1-8:1234,10:2345";
-    TreeMap<Long, Long> rangeToSplitMap =
+    TreeMap<Integer, Long> rangeToSplitMap =
         IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(rangeToSplit);
-    rangeToSplitMap.put(4L, 2345L);
+    rangeToSplitMap.put(4, 2345L);
     String splitRanges = "1-3:1234,4:2345,5-8:1234,10:2345";
     assertEquals(splitRanges,
         IcebergUtil.ComputeStatsSnapshotPropertyConverter.mapToString(rangeToSplitMap));
@@ -514,7 +514,7 @@ public class IcebergUtilTest {
   }
 
   private String computeStatsPropertyRoundTrip(String property) {
-    TreeMap<Long, Long> map =
+    TreeMap<Integer, Long> map =
         IcebergUtil.ComputeStatsSnapshotPropertyConverter.stringToMap(property);
     return IcebergUtil.ComputeStatsSnapshotPropertyConverter.mapToString(map);
   }
