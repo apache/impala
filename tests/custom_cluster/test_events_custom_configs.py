@@ -1728,7 +1728,7 @@ class TestEventSyncFailures(TestEventProcessingCustomConfigsBase):
     client.close_query(handle)
 
   @CustomClusterTestSuite.with_args(
-    catalogd_args="--debug_actions=catalogd_event_processing_delay:SLEEP@2000")
+    catalogd_args="--debug_actions=catalogd_event_processing_delay:SLEEP@4000")
   def test_hms_event_sync_timeout(self, vector, unique_database):
     client = self.default_impala_client(vector.get_value('protocol'))
     # Timeline label shown in the profile when the wait failed.
