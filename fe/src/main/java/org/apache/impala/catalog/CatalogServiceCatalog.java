@@ -481,7 +481,7 @@ public class CatalogServiceCatalog extends Catalog {
     keepsWarmupTablesLoaded_ = BackendConfig.INSTANCE.keepsWarmupTablesLoaded();
     warmupTables_ = FileSystemUtil.loadWarmupTableNames(
         BackendConfig.INSTANCE.getWarmupTablesConfigFile());
-    LOG.info("Loaded {} table names to warmup", warmupTables_.size());
+    LOG.info("Loaded {} table names to warmup:\n{}", warmupTables_.size(), warmupTables_);
   }
 
   /**

@@ -87,6 +87,8 @@ DECLARE_int64(thrift_rpc_max_message_size);
 DECLARE_int64(thrift_external_rpc_max_message_size);
 DECLARE_double(hms_event_polling_interval_s);
 DECLARE_bool(catalogd_ha_reset_metadata_on_failover);
+DECLARE_bool(enable_insert_events);
+DECLARE_bool(enable_reload_events);
 
 DEFINE_int32(memory_maintenance_sleep_time_ms, 10000, "Sleep time in milliseconds "
     "between memory maintenance iterations");
@@ -564,12 +566,23 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
             FLAGS_thrift_external_rpc_max_message_size, ThriftDefaultMaxMessageSize()));
   }
 
-  if (!FLAGS_catalogd_ha_reset_metadata_on_failover
-      && FLAGS_hms_event_polling_interval_s <= 0) {
-    CLEAN_EXIT_WITH_ERROR(Substitute(
-        "Invalid hms_event_polling_interval_s: $0. It should be larger than 0 when "
-        "--catalogd_ha_reset_metadata_on_failover is false",
-        FLAGS_hms_event_polling_interval_s));
+  if (!FLAGS_catalogd_ha_reset_metadata_on_failover) {
+    if (FLAGS_hms_event_polling_interval_s <= 0) {
+      CLEAN_EXIT_WITH_ERROR(Substitute(
+          "Invalid hms_event_polling_interval_s: $0. It should be larger than 0 when "
+          "--catalogd_ha_reset_metadata_on_failover is false",
+          FLAGS_hms_event_polling_interval_s));
+    }
+    if (!FLAGS_enable_insert_events) {
+      CLEAN_EXIT_WITH_ERROR(Substitute(
+          "--enable_insert_events should be true when "
+          "--catalogd_ha_reset_metadata_on_failover is false"));
+    }
+    if (!FLAGS_enable_reload_events) {
+      CLEAN_EXIT_WITH_ERROR(Substitute(
+          "--enable_reload_events should be true when "
+          "--catalogd_ha_reset_metadata_on_failover is false"));
+    }
   }
 
   impala::InitGoogleLoggingSafe(argv[0]);

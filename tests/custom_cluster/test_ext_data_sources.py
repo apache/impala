@@ -113,7 +113,8 @@ class TestExtDataSources(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     statestored_args="--use_subscriber_id_as_catalogd_priority=true "
                      "--statestore_heartbeat_frequency_ms=1000",
-    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false",
+    catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
+                  "--enable_reload_events=true",
     start_args="--enable_catalogd_ha")
   def test_catalogd_ha_failover(self):
     """The test case for cluster started with catalogd HA enabled."""
