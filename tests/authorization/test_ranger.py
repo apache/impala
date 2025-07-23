@@ -1459,16 +1459,7 @@ class TestRanger(CustomClusterTestSuite):
         admin_client.execute("create database {0}".format(unique_database))
         admin_client.execute("create table {0}.{1} (id int, bigint_col bigint)"
             .format(unique_database, unique_table))
-        admin_client.execute("grant select on table functional.alltypes to user {0}"
-            .format(grantee_user))
         admin_client.execute("refresh authorization")
-
-        # Even though the user 'grantee_user' was granted the SELECT privilege on the
-        # table 'functional.alltypes', the user still could not execute the query due to
-        # IMPALA-13767.
-        result = self.execute_query_expect_failure(non_owner_client,
-            "with t as (select * from functional.alltypes) select * from t")
-        assert "{0} default.t".format(error_msg_prefix) in str(result)
 
         admin_client.execute("grant select (id) on table {0}.{1} to user {2}"
             .format(unique_database, unique_table, grantee_user))
@@ -1490,8 +1481,6 @@ class TestRanger(CustomClusterTestSuite):
         # 'bigint_col', the query could be executed.
         non_owner_client.execute(test_select_query)
       finally:
-        admin_client.execute("revoke select on table functional.alltypes from user {0}"
-            .format(grantee_user))
         admin_client.execute("revoke select (id) on table {0}.{1} from user {2}"
             .format(unique_database, unique_table, grantee_user))
         admin_client.execute("revoke select (bigint_col) on table {0}.{1} from user {2}"
@@ -3658,5 +3647,63 @@ class TestRangerWithCalcite(TestRanger):
   def test_view_on_view_all_configs(self, unique_name):
     self._test_view_on_view_all_configs(unique_name)
 
+  @pytest.mark.execute_serially
   def test_table_masking_calcite_frontend(self, unique_name):
     self._test_table_masking_calcite_frontend(unique_name)
+
+  @pytest.mark.execute_serially
+  def test_cte(self):
+    """
+    This verifies the Calcite planner won't treat CTEs as names of actual tables.
+    """
+    with self.create_impala_client(user=ADMIN) as admin_client, \
+        self.create_impala_client(user=NON_OWNER) as non_owner_client:
+      # Set the query option of 'use_calcite_planner' to 1 to use the Calcite planner.
+      non_owner_client.set_configuration({"use_calcite_planner": 1})
+      database = "functional"
+      table_1 = database + "." + "alltypes"
+      table_2 = database + "." "alltypestiny"
+      test_query_1 = "with t as (select * from {0}) select * from t".format(table_1)
+      # A query that has a WITH clause involving more than one CTE.
+      test_query_2 = "with " \
+          "t1 as (select id from {0}), " \
+          "t2 as (select id from {1}) " \
+          "select * from t1, t2 where t1.id = t2.id".format(table_1, table_2)
+      # A query that has more than one WITH clause. A WITH clause is defined in the
+      # inline view 'v', and the outer CTE, i.e., 't1', is not referenced within 'v'.
+      test_query_3 = "with " \
+          "t1 as (select id from {0}) " \
+          "select v.id from " \
+          "(with t2 as (select id from {1}) select * from t2) v, t1 " \
+          "where v.id = t1.id".format(table_1, table_2)
+      # A query that has more than one WITH clause. A WITH clause is defined in the
+      # inline view 'v', and the outer CTE, i.e., 't1', is referenced within 'v'.
+      test_query_4 = "with " \
+          "t1 as (select id from {0} where id < 2) " \
+          "select v.id from " \
+          "(with t2 as (select id from {1}) select * from t2, t1 " \
+          "where t2.id = t1.id) v".format(table_1, table_2)
+      error_classic_fe = "AnalysisException: duplicated inline view column alias: " \
+          "'id' in inline view 'v'"
+      try:
+        admin_client.execute("grant select on table {0} to user {1}"
+            .format(table_1, NON_OWNER))
+        admin_client.execute("grant select on table {0} to user {1}"
+            .format(table_2, NON_OWNER))
+        non_owner_client.execute(test_query_1)
+        non_owner_client.execute(test_query_2)
+        non_owner_client.execute(test_query_3)
+        non_owner_client.execute(test_query_4)
+
+        # Set the query option of 'use_calcite_planner' to 0 to use the classic frontend.
+        non_owner_client.set_configuration({"use_calcite_planner": 0})
+        # Impala's classic frontend supports 'test_query_3'.
+        non_owner_client.execute(test_query_3)
+        # Impala's classic frontend could not support 'test_query_4'.
+        result = self.execute_query_expect_failure(non_owner_client, test_query_4)
+        assert error_classic_fe in str(result)
+      finally:
+        admin_client.execute("revoke select on table {0} from user {1}"
+            .format(table_1, NON_OWNER))
+        admin_client.execute("revoke select on table {0} from user {1}"
+            .format(table_2, NON_OWNER))

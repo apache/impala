@@ -32,6 +32,8 @@ import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.SqlWith;
+import org.apache.calcite.sql.SqlWithItem;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.StmtMetadataLoader;
@@ -58,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.Stack;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -200,19 +203,46 @@ public class CalciteMetadataHandler implements CompilerStep {
     // will contain that table.
     public final List<String> errorTables_ = new ArrayList<>();
 
+    // This stack contains the sets of TableName's of the currently visited SqlWith
+    // nodes, with the set of TableName's of the most recently visited SqlWith node being
+    // the top of the stack.
+    public final Stack<Set<TableName>> withItemTableNames_ = new Stack<>();
+
     public TableVisitor(String currentDb) {
       this.currentDb_ = currentDb.toLowerCase();
     }
 
     @Override
     public Void visit(SqlCall call) {
+      if (call instanceof SqlWith) {
+        withItemTableNames_.push(new HashSet<>());
+      }
+
       if (call.getKind() == SqlKind.SELECT) {
         SqlSelect select = (SqlSelect) call;
         if (select.getFrom() != null) {
           tableNames_.addAll(getTableNames(select.getFrom()));
         }
       }
-      return super.visit(call);
+
+      if (call.getKind() == SqlKind.WITH_ITEM) {
+        TableName tableName = new TableName(this.currentDb_.toLowerCase(),
+            ((SqlWithItem) call).name.names.get(0).toLowerCase());
+        // Since a SqlWithItem node cannot exist without a SqlWith node, we can be sure
+        // the top stack element was added by the respective SqlWith node of this
+        // SqlWithItem. Adding 'tableName' to this stack element would allow us to
+        // determine in getTableNames() if a given TableName derived from a SqlIdentifier
+        // was registered via a SqlWithItem node of which the corresponding SqlWith node
+        // is an ancestor of the SqlIdentifier.
+        withItemTableNames_.peek().add(tableName);
+      }
+
+      Void v = super.visit(call);
+
+      if (call instanceof SqlWith) {
+        withItemTableNames_.pop();
+      }
+      return v;
     }
 
     private List<TableName> getTableNames(SqlNode fromNode) {
@@ -221,8 +251,14 @@ public class CalciteMetadataHandler implements CompilerStep {
         String tableName = fromNode.toString();
         List<String> parts = Splitter.on('.').splitToList(tableName);
         if (parts.size() == 1) {
-          localTableNames.add(new TableName(
-              currentDb_.toLowerCase(), parts.get(0).toLowerCase()));
+          TableName tableNameToAdd = new TableName(
+              currentDb_.toLowerCase(), parts.get(0).toLowerCase());
+          // Do not collect this table if 'tableNameToAdd' was already registered via
+          // a SqlWithItem node since in this case 'tableNameToAdd' is not an actual
+          // table.
+          if (!isRegisteredBySqlWithItem(tableNameToAdd)) {
+            localTableNames.add(tableNameToAdd);
+          }
         } else if (parts.size() == 2) {
           localTableNames.add(
               new TableName(parts.get(0).toLowerCase(), parts.get(1).toLowerCase()));
@@ -246,6 +282,13 @@ public class CalciteMetadataHandler implements CompilerStep {
         }
       }
       return localTableNames;
+    }
+
+    private boolean isRegisteredBySqlWithItem(TableName tableName) {
+      for (Set<TableName> tableNames : withItemTableNames_) {
+        if (tableNames.contains(tableName)) return true;
+      }
+      return false;
     }
 
     /**
