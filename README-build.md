@@ -36,7 +36,7 @@ can do so through the environment variables and scripts listed below.
 | JAVA | "${JAVA_HOME}/bin/java" | Java binary location. |
 | CLASSPATH | | See bin/set-classpath.sh for details. |
 | PYTHONPATH | | See bin/set-pythonpath.sh for details. |
-| USE_APACHE_COMPONENTS | false | Use Apache components for Hadoop, HBase, Hive, Tez, Ranger. It will set USE_APACHE_{HADOOP,HBASE,HIVE,TEZ,RANGER} variable as true if not set. |
+| USE_APACHE_COMPONENTS | false | Use Apache components for Hadoop, HBase, Hive, Tez, Ranger. It will set USE_APACHE_{HADOOP,HBASE,HIVE,TEZ,RANGER} variable as true if not set false. |
 | USE_APACHE_HADOOP | false | Use Apache Hadoop |
 | USE_APACHE_HBASE | false | Use Apache HBase |
 | USE_APACHE_HIVE | false | Use Apache Hive |

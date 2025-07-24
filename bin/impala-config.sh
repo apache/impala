@@ -414,12 +414,12 @@ else
   export IMPALA_RANGER_URL=${CDP_RANGER_URL-}
   export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
   export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
-  export USE_APACHE_HADOOP=false
-  export USE_APACHE_HBASE=false
-  export USE_APACHE_HIVE=false
-  export USE_APACHE_TEZ=false
-  export USE_APACHE_RANGER=false
-  export USE_APACHE_OZONE=false
+  export USE_APACHE_HADOOP=${USE_APACHE_HADOOP:=false}
+  export USE_APACHE_HBASE=${USE_APACHE_HBASE:=false}
+  export USE_APACHE_HIVE=${USE_APACHE_HIVE:=false}
+  export USE_APACHE_TEZ=${USE_APACHE_TEZ:=false}
+  export USE_APACHE_RANGER=${USE_APACHE_RANGER:=false}
+  export USE_APACHE_OZONE=${USE_APACHE_OZONE:=false}
 fi
 
 export APACHE_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/apache_components"
@@ -1063,7 +1063,7 @@ export RANGER_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 #   -Dorg.apache.logging.log4j.simplelog.StatusLogger.level=TRACE
 #
 # We use a unique -Dhive.log.file to distinguish the HiveMetaStore and HiveServer2 logs.
-export HIVE_CONF_DIR="$IMPALA_FE_DIR/./src/test/resources"
+export HIVE_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 
 # Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
 # any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
