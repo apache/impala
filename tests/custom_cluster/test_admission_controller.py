@@ -2223,6 +2223,82 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--vmodule admission-controller=3 --default_pool_max_requests=1 "
+    "--queue_wait_timeout_ms=60000 ")
+  def test_kill_statestore_with_queries_running(self):
+    long_query = "select count(*), sleep(10000) from functional.alltypes limit 1"
+    short_query = "select count(*) from functional.alltypes limit 1"
+    timeout_s = 60
+
+    handle1 = self.client.execute_async(long_query)
+    # Make sure the first query has been admitted.
+    self.client.wait_for_impala_state(handle1, RUNNING, timeout_s)
+
+    # Run another query. This query should be queued because only 1 query is allowed in
+    # the default pool.
+    handle2 = self.client.execute_async(short_query)
+    self._wait_for_change_to_profile(handle2, "Admission result: Queued")
+
+    # Restart the statestore while queries are running/queued.
+    statestore = self.cluster.statestored
+    statestore.kill()
+    statestore.start()
+
+    # Verify that both queries eventually complete.
+    self.client.wait_for_impala_state(handle1, FINISHED, timeout_s)
+    self.client.close_query(handle1)
+    self.client.wait_for_impala_state(handle2, FINISHED, timeout_s)
+    self.client.close_query(handle2)
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--vmodule admission-controller=3 --default_pool_max_requests=1 "
+    "--queue_wait_timeout_ms=60000 ", disable_log_buffering=True)
+  def test_kill_coord_with_queries_running(self):
+    long_query = "select count(*), sleep(1000000000) from functional.alltypes limit 1"
+    short_query = "select count(*) from functional.alltypes limit 1"
+    timeout_s = 10
+
+    all_coords = self.cluster.get_all_coordinators()
+    assert len(all_coords) >= 2, "Test requires at least two coordinators"
+    coord1 = all_coords[0]
+    coord2 = all_coords[1]
+
+    # Make sure the first query has been admitted.
+    client1 = coord1.service.create_hs2_client()
+    handle1 = client1.execute_async(long_query)
+    client1.wait_for_impala_state(handle1, RUNNING, timeout_s)
+    query_id1 = client1.handle_id(handle1)
+
+    # Run another query. This query should be queued because only 1 query is allowed in
+    # the default pool.
+    client2 = coord2.service.create_hs2_client()
+    handle2 = client2.execute_async(short_query)
+    self._wait_for_change_to_profile(handle2, "Admission result: Queued", client=client2)
+
+    # Kill the coordinator handling the running query.
+    coord1.kill()
+    try:
+      client1.close_query(handle1)
+    except Exception:
+      pass
+
+    # The first query should be canceled after coord1 is killed,
+    # allowing the queued query to run.
+    admissiond_log = self.get_ac_log_name()
+    self.assert_log_contains(admissiond_log, 'INFO',
+      "Released query id={}".format(query_id1), expected_count=1)
+    client2.wait_for_impala_state(handle2, FINISHED, timeout_s)
+    client2.close_query(handle2)
+
+    # Cleanup.
+    client1.close()
+    client2.close()
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
   def test_retained_removed_coords_size(self):
     # Use a flag value below the hard cap (1000). Expect the value to be accepted.
     self._start_impala_cluster([
