@@ -234,6 +234,7 @@ PLAN-ROOT SINK
 |  |
 |  |--27:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns]
 |  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
+|  |     runtime filters: RF023[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_item_sk, RF022[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_item_sk
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
 |  |       partitions: 2114/2114 rows=216.00M
@@ -356,6 +357,7 @@ PLAN-ROOT SINK
 |  |
 |  |--15:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns]
 |  |     HDFS partitions=2060/2060 files=2060 size=32.77GB
+|  |     runtime filters: RF015[min_max] -> tpcds_partitioned_parquet_snap.catalog_returns.cr_item_sk, RF014[bloom] -> tpcds_partitioned_parquet_snap.catalog_returns.cr_item_sk
 |  |     stored statistics:
 |  |       table: rows=432.02M size=32.77GB
 |  |       partitions: 2060/2060 rows=432.02M
@@ -474,6 +476,7 @@ PLAN-ROOT SINK
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns]
 |     HDFS partitions=2004/2004 files=2004 size=48.14GB
+|     runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_item_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_item_sk
 |     stored statistics:
 |       table: rows=863.99M size=48.14GB
 |       partitions: 2004/2004 rows=863.99M
@@ -496,7 +499,7 @@ PLAN-ROOT SINK
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=1.91GB Threads=145
-Per-Host Resource Estimates: Memory=13.19GB
+Per-Host Resource Estimates: Memory=13.20GB
 F27:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.07MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[539] cpu-comparison-result=674 [max(1 (self) vs 674 (sum children))]
@@ -761,10 +764,12 @@ max-parallelism=80 segment-costs=[74437, 3952483, 3622, 509107, 1136665] cpu-com
 |  |  |  in pipelines: 27(GETNEXT)
 |  |  |
 |  |  F18:PLAN FRAGMENT [RANDOM] hosts=10 instances=50 (adjusted from 120)
+|  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  |  Per-Instance Resources: mem-estimate=23.50MB mem-reservation=256.00KB thread-reservation=1
 |  |  max-parallelism=50 segment-costs=[451704816]
 |  |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns, RANDOM]
 |  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
+|  |     runtime filters: RF023[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_item_sk, RF022[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_item_sk
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
 |  |       partitions: 2114/2114 rows=216.00M
@@ -992,10 +997,12 @@ max-parallelism=80 segment-costs=[74437, 3952483, 3622, 509107, 1136665] cpu-com
 |  |  |  in pipelines: 15(GETNEXT)
 |  |  |
 |  |  F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=100 (adjusted from 120)
+|  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  |  Per-Instance Resources: mem-estimate=23.50MB mem-reservation=32.00KB thread-reservation=1
 |  |  max-parallelism=100 segment-costs=[903433931]
 |  |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns, RANDOM]
 |  |     HDFS partitions=2060/2060 files=2060 size=32.77GB
+|  |     runtime filters: RF015[min_max] -> tpcds_partitioned_parquet_snap.catalog_returns.cr_item_sk, RF014[bloom] -> tpcds_partitioned_parquet_snap.catalog_returns.cr_item_sk
 |  |     stored statistics:
 |  |       table: rows=432.02M size=32.77GB
 |  |       partitions: 2060/2060 rows=432.02M
@@ -1219,10 +1226,12 @@ max-parallelism=390 segment-costs=[3885151565, 440125] cpu-comparison-result=247
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=23.50MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=190 segment-costs=[1806773027]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
 |     HDFS partitions=2004/2004 files=2004 size=48.14GB
+|     runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_item_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_item_sk
 |     stored statistics:
 |       table: rows=863.99M size=48.14GB
 |       partitions: 2004/2004 rows=863.99M
@@ -1254,7 +1263,7 @@ max-parallelism=630 segment-costs=[6205817173]
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=1.91GB Threads=145
-Per-Host Resource Estimates: Memory=13.19GB
+Per-Host Resource Estimates: Memory=13.20GB
 F27:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.07MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[539] cpu-comparison-result=674 [max(1 (self) vs 674 (sum children))]
@@ -1519,10 +1528,12 @@ max-parallelism=80 segment-costs=[74437, 3952483, 3622, 509107, 1136665] cpu-com
 |  |  |  in pipelines: 27(GETNEXT)
 |  |  |
 |  |  F18:PLAN FRAGMENT [RANDOM] hosts=10 instances=50 (adjusted from 120)
+|  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  |  Per-Instance Resources: mem-estimate=23.50MB mem-reservation=256.00KB thread-reservation=1
 |  |  max-parallelism=50 segment-costs=[451704816]
 |  |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns, RANDOM]
 |  |     HDFS partitions=2114/2114 files=2114 size=16.74GB
+|  |     runtime filters: RF023[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_item_sk, RF022[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_item_sk
 |  |     stored statistics:
 |  |       table: rows=216.00M size=16.74GB
 |  |       partitions: 2114/2114 rows=216.00M
@@ -1750,10 +1761,12 @@ max-parallelism=80 segment-costs=[74437, 3952483, 3622, 509107, 1136665] cpu-com
 |  |  |  in pipelines: 15(GETNEXT)
 |  |  |
 |  |  F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=100 (adjusted from 120)
+|  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  |  Per-Instance Resources: mem-estimate=23.50MB mem-reservation=32.00KB thread-reservation=1
 |  |  max-parallelism=100 segment-costs=[903433931]
 |  |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns, RANDOM]
 |  |     HDFS partitions=2060/2060 files=2060 size=32.77GB
+|  |     runtime filters: RF015[min_max] -> tpcds_partitioned_parquet_snap.catalog_returns.cr_item_sk, RF014[bloom] -> tpcds_partitioned_parquet_snap.catalog_returns.cr_item_sk
 |  |     stored statistics:
 |  |       table: rows=432.02M size=32.77GB
 |  |       partitions: 2060/2060 rows=432.02M
@@ -1977,10 +1990,12 @@ max-parallelism=390 segment-costs=[3885151565, 440125] cpu-comparison-result=247
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+|  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 |  Per-Instance Resources: mem-estimate=23.50MB mem-reservation=512.00KB thread-reservation=1
 |  max-parallelism=190 segment-costs=[1806773027]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns, RANDOM]
 |     HDFS partitions=2004/2004 files=2004 size=48.14GB
+|     runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.store_returns.sr_item_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_returns.sr_item_sk
 |     stored statistics:
 |       table: rows=863.99M size=48.14GB
 |       partitions: 2004/2004 rows=863.99M

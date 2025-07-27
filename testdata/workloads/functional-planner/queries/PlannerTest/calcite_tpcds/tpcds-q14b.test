@@ -337,6 +337,7 @@ PLAN-ROOT SINK
 |  |  |--48:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: is_not_null_pred(tpcds_partitioned_parquet_snap.item_4.i_item_sk)
+|  |  |     runtime filters: RF039[min_max] -> tpcds_partitioned_parquet_snap.item_4.i_item_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=360.00K size=33.54MB
 |  |  |       columns: all
@@ -764,6 +765,7 @@ PLAN-ROOT SINK
 |  |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |     predicates: is_not_null_pred(tpcds_partitioned_parquet_snap.item.i_item_sk)
+|  |     runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_item_sk
 |  |     stored statistics:
 |  |       table: rows=360.00K size=33.54MB
 |  |       columns: all
@@ -1424,6 +1426,7 @@ max-parallelism=90 segment-costs=[5878988, 847694218, 220] cpu-comparison-result
 |  |  |  48:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: is_not_null_pred(tpcds_partitioned_parquet_snap.item_4.i_item_sk)
+|  |  |     runtime filters: RF039[min_max] -> tpcds_partitioned_parquet_snap.item_4.i_item_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=360.00K size=33.54MB
 |  |  |       columns: all
@@ -2220,6 +2223,7 @@ max-parallelism=7 segment-costs=[201655276, 8568806] cpu-comparison-result=399 [
 |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |     predicates: is_not_null_pred(tpcds_partitioned_parquet_snap.item.i_item_sk)
+|  |     runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_item_sk
 |  |     stored statistics:
 |  |       table: rows=360.00K size=33.54MB
 |  |       columns: all
@@ -3065,6 +3069,7 @@ max-parallelism=90 segment-costs=[5878988, 847694218, 220] cpu-comparison-result
 |  |  |  48:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |  |     predicates: is_not_null_pred(tpcds_partitioned_parquet_snap.item_4.i_item_sk)
+|  |  |     runtime filters: RF039[min_max] -> tpcds_partitioned_parquet_snap.item_4.i_item_sk
 |  |  |     stored statistics:
 |  |  |       table: rows=360.00K size=33.54MB
 |  |  |       columns: all
@@ -3869,6 +3874,7 @@ max-parallelism=7 segment-costs=[195386723]
 |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=33.54MB
 |  |     predicates: is_not_null_pred(tpcds_partitioned_parquet_snap.item.i_item_sk)
+|  |     runtime filters: RF007[min_max] -> tpcds_partitioned_parquet_snap.item.i_item_sk
 |  |     stored statistics:
 |  |       table: rows=360.00K size=33.54MB
 |  |       columns: all

@@ -37,6 +37,8 @@ public class ImpalaHdfsScanNode extends HdfsScanNode {
 
   private final List<Expr> assignedConjuncts_;
 
+  private final TableRef hdfsTblRef_;
+
   public ImpalaHdfsScanNode(PlanNodeId id, TupleDescriptor tupleDesc,
       List<? extends FeFsPartition> partitions,
       TableRef hdfsTblRef, MultiAggregateInfo aggInfo, List<Expr> partConjuncts,
@@ -46,6 +48,11 @@ public class ImpalaHdfsScanNode extends HdfsScanNode {
         partConjuncts, isPartitionScanOnly);
     this.assignedConjuncts_ = assignedConjuncts;
     this.countStarSlot_ = countStarDescriptor;
+    this.hdfsTblRef_ = hdfsTblRef;
+  }
+
+  public TableRef getTableRef() {
+    return hdfsTblRef_;
   }
 
   @Override

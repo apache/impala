@@ -37,12 +37,14 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.calcite.functions.AnalyzedFunctionCallExpr;
 import org.apache.impala.calcite.functions.AnalyzedNullLiteral;
 import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.calcite.rel.phys.ImpalaHashJoinNode;
+import org.apache.impala.calcite.rel.phys.ImpalaHdfsScanNode;
 import org.apache.impala.calcite.rel.phys.ImpalaNestedLoopJoinNode;
 import org.apache.impala.calcite.rel.util.CreateExprVisitor;
 import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
@@ -146,11 +148,11 @@ public class ImpalaJoinRel extends Join
     // register the equi join conjuncts with the analyzer such that
     // value transfer graph creation can consume it. It is only useful
     // in the value transfer graph if the value transfer is equal on
-    // both sides. Any outer join is removed since the value on the outer
-    // join side could be NULL when the left side is not NULL.
-    if (equiJoinConjuncts.size() > 0 && joinOp == JoinOperator.INNER_JOIN) {
+    // both sides.
+    if (equiJoinConjuncts.size() > 0) {
       List<Expr> equiJoinExprs = new ArrayList<Expr>(equiJoinConjuncts);
-      analyzer.registerConjuncts(getJoinConjunctListToRegister(equiJoinExprs));
+      registerConjuncts(getJoinConjunctListToRegister(equiJoinExprs), analyzer,
+          joinNode);
     }
 
     return new NodeWithExprs(joinNode, outputExprs, getRowType().getFieldNames());
@@ -164,7 +166,6 @@ public class ImpalaJoinRel extends Join
     builder.setFilterCondition(null);
     return inputPlanRel.getPlanNode(builder.build());
   }
-
 
   /**
    * Checks and adds null wrapping for expressions fed into the null producing side of an
@@ -477,6 +478,48 @@ public class ImpalaJoinRel extends Join
     }
     return true;
 
+  }
+
+  /**
+   * Register the conjuncts with the analyzer.  They are used for the
+   * valueTransfersGraph to determine if runtime filters can be created.
+   */
+  private void registerConjuncts(List<Expr> equiJoinExprs, Analyzer analyzer,
+      PlanNode joinNode) throws ImpalaException {
+
+    JoinOperator joinOp = getImpalaJoinOp();
+    if (joinOp == JoinOperator.RIGHT_OUTER_JOIN) {
+      List<TableRef> lhsTableRefs = getTableRefs(joinNode.getChild(0));
+      registerOuterJoinedTids(lhsTableRefs, analyzer, joinOp);
+    }
+    List<TableRef> rhsTableRefs = getTableRefs(joinNode.getChild(1));
+    if (joinOp == JoinOperator.LEFT_OUTER_JOIN) {
+      registerOuterJoinedTids(rhsTableRefs, analyzer, joinOp);
+    }
+    for (TableRef tableRef : rhsTableRefs) {
+      analyzer.registerOnClauseConjuncts(equiJoinExprs, tableRef);
+    }
+  }
+
+  private void registerOuterJoinedTids(List<TableRef> tableRefs, Analyzer analyzer,
+      JoinOperator joinOp) {
+    for (TableRef tableRef : tableRefs) {
+      analyzer.registerOuterJoinedTids(tableRef.getId().asList(), tableRef);
+      tableRef.setJoinOp(joinOp);
+    }
+  }
+
+  private List<TableRef> getTableRefs(PlanNode planNode) {
+    if (planNode instanceof ImpalaHdfsScanNode) {
+      ImpalaHdfsScanNode scanNode = (ImpalaHdfsScanNode) planNode;
+      return Lists.newArrayList(scanNode.getTableRef());
+    }
+
+    List<TableRef> tableRefs = new ArrayList<>();
+    for (PlanNode child : planNode.getChildren()) {
+      tableRefs.addAll(getTableRefs(child));
+    }
+    return tableRefs;
   }
 
   private static class ConjunctInfo {
