@@ -1368,10 +1368,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       return;
     }
 
-    // Include the build-side of a RuntimeFilter; look past the 1st ExchangeNode.
-    // If the build-side is hashable, merge the hash. Otherwise mark this node as
-    // ineligible because the RuntimeFilter is too complex to reason about.
+    // For runtime filters consumed by this node, include the build-side of the
+    // RuntimeFilter (look past the 1st ExchangeNode). If the build-side is hashable,
+    // merge the hash. Otherwise mark this node as ineligible because the RuntimeFilter
+    // is too complex to reason about.
     for (RuntimeFilter filter : runtimeFilters_) {
+      // We should only include runtime filters consumed by this node. If this node is
+      // the source of the runtime filter, skip it.
+      if (filter.getSrc() == this) continue;
       // We want the build side of the join.
       PlanNode build = filter.getSrc().getBuildNode();
       Preconditions.checkState(!build.contains(this),

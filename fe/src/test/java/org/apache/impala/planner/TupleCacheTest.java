@@ -118,6 +118,21 @@ public class TupleCacheTest extends PlannerTestBase {
           String.format(basicJoinTmpl, "probe.id = build.id"),
           String.format(basicJoinTmpl, "probe.id = build.id and build.id < 100"),
           isDistributedPlan);
+
+      // JoinNodes produce runtime filters and don't consume them. Verify that produced
+      // runtime filters don't get incorporated into the hash.
+      List<PlanNode> cacheEligibleNodes =
+        getCacheEligibleNodes(String.format(basicJoinTmpl, "probe.id = build.id"));
+      for (PlanNode node : cacheEligibleNodes) {
+        if (node instanceof JoinNode) {
+          // The join node should not have any hash trace elements due to runtime filters
+          List<HashTraceElement> hashTraces = node.getTupleCacheInfo().getHashTraces();
+          for (HashTraceElement hashTrace : hashTraces) {
+            assertTrue(hashTrace.getComment().indexOf("runtime filter") == -1);
+            assertTrue(hashTrace.getComment().indexOf("RF0") == -1);
+          }
+        }
+      }
     }
   }
 
