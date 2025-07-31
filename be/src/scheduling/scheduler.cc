@@ -206,22 +206,44 @@ Status Scheduler::ComputeScanRangeAssignment(
       bool node_random_replica = node.__isset.hdfs_scan_node
           && node.hdfs_scan_node.__isset.random_replica
           && node.hdfs_scan_node.random_replica;
+      bool node_schedule_oldest_to_newest = node.__isset.hdfs_scan_node
+        && node.hdfs_scan_node.__isset.schedule_scanranges_oldest_to_newest
+        && node.hdfs_scan_node.schedule_scanranges_oldest_to_newest;
 
       FragmentScanRangeAssignment* assignment =
           &state->GetFragmentScheduleState(fragment.idx)->scan_range_assignment;
 
-      const vector<TScanRangeLocationList>* locations = nullptr;
+      const vector<TScanRangeLocationList>* locations = &entry.second.concrete_ranges;
       vector<TScanRangeLocationList> expanded_locations;
-      if (entry.second.split_specs.empty()) {
-        // directly use the concrete ranges.
-        locations = &entry.second.concrete_ranges;
-      } else {
-        // union concrete ranges and expanded specs.
+      // Copy the ranges to a separate vector if:
+      // 1. There are split specs to union with the concrete ranges
+      // 2. We're scheduling oldest to newest and need to sort the ranges without
+      //    changing the original vector
+      if (!entry.second.split_specs.empty() || node_schedule_oldest_to_newest) {
+        locations = &expanded_locations;
         expanded_locations.insert(expanded_locations.end(),
             entry.second.concrete_ranges.begin(), entry.second.concrete_ranges.end());
-        RETURN_IF_ERROR(
-            GenerateScanRanges(entry.second.split_specs, &expanded_locations));
-        locations = &expanded_locations;
+        // union concrete ranges and expanded specs
+        if (!entry.second.split_specs.empty()) {
+          RETURN_IF_ERROR(
+              GenerateScanRanges(entry.second.split_specs, &expanded_locations));
+        }
+      }
+      if (node_schedule_oldest_to_newest) {
+        DCHECK_GE(expanded_locations.size(),
+            entry.second.concrete_ranges.size() + entry.second.split_specs.size());
+        // This only makes sense for HDFS scan nodes
+        DCHECK(node.__isset.hdfs_scan_node);
+        // Sort the scan ranges by modification time ascending
+        std::sort(expanded_locations.begin(), expanded_locations.end(),
+            [](const TScanRangeLocationList& scanRange1,
+               const TScanRangeLocationList& scanRange2) {
+              DCHECK(scanRange1.scan_range.__isset.hdfs_file_split);
+              const THdfsFileSplit& split1 = scanRange1.scan_range.hdfs_file_split;
+              DCHECK(scanRange2.scan_range.__isset.hdfs_file_split);
+              const THdfsFileSplit& split2 = scanRange2.scan_range.hdfs_file_split;
+              return split1.mtime < split2.mtime;
+            });
       }
       DCHECK(locations != nullptr);
       RETURN_IF_ERROR(

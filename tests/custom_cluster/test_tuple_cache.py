@@ -875,6 +875,10 @@ class TestTupleCacheFullCluster(TestTupleCacheBase):
       assert entries_in_use - entries_baseline[impalad] == max(mt_dop, 1)
     assert_deterministic_scan(vector, before_result.runtime_profile)
 
+    entries_before_insert = {
+      impalad: self.get_tuple_cache_metric(impalad.service, "entries-in-use")
+      for impalad in self.cluster.impalads}
+
     # Insert another row, which creates a file / scan range
     # This uses a very large seed for table_value() to get a unique row that isn't
     # already in the table.
@@ -894,24 +898,20 @@ class TestTupleCacheFullCluster(TestTupleCacheBase):
     unique_compile_keys = \
         set([key.split("_")[0] for key in after_insert_unique_cache_keys])
     assert len(unique_compile_keys) == 1
-    # Verify the cache metrics. We can do a more exact bound by looking at the total
-    # across all impalads. The lower bound for this is the number of unique cache
-    # keys across both queries we ran. The upper bound for the number of entries is
-    # double the expected number from the first run of the query.
-    #
-    # This is not the exact number, because cache key X could have run on executor 1
-    # for the first query and on executor 2 for the second query. Even though it would
-    # appear as a single unique cache key, it is two different cache entries in different
-    # executors.
-    all_cache_keys = unique_cache_keys.union(after_insert_unique_cache_keys)
-    total_entries_in_use = 0
+
+    # Verify the cache metrics. Scheduling scan ranges from oldest to newest makes this
+    # deterministic. The new file will be scheduled last and will change exactly one
+    # cache key.
+    assert len(after_insert_unique_cache_keys - unique_cache_keys) == 1
+    total_new_entries = 0
     for impalad in self.cluster.impalads:
       new_entries_in_use = self.get_tuple_cache_metric(impalad.service, "entries-in-use")
-      new_entries_in_use -= entries_baseline[impalad]
-      assert new_entries_in_use >= max(mt_dop, 1)
-      assert new_entries_in_use <= (2 * max(mt_dop, 1))
-      total_entries_in_use += new_entries_in_use
-    assert total_entries_in_use >= len(all_cache_keys)
+      new_entries_in_use -= entries_before_insert[impalad]
+      # We're comparing with before the insert, so one node will have a new entry and all
+      # others will be the same.
+      assert new_entries_in_use in [0, 1]
+      total_new_entries += new_entries_in_use
+    assert total_new_entries == 1
     assert_deterministic_scan(vector, after_insert_result.runtime_profile)
 
     # The extra scan range means that at least one fragment instance key changed

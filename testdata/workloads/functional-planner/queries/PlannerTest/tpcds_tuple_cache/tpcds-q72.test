@@ -109,6 +109,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse]
 |     HDFS partitions=1/1 files=1 size=5.99KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     stored statistics:
 |       table: rows=22 size=5.99KB
 |       columns: all
@@ -199,6 +200,7 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_item_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.item.i_item_sk
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -231,6 +233,7 @@ PLAN-ROOT SINK
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim d1]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d1.d_year = CAST(2002 AS INT)
 |     runtime filters: RF007[min_max] -> d1.d_week_seq, RF006[bloom] -> d1.d_week_seq
 |     stored statistics:
@@ -266,6 +269,7 @@ PLAN-ROOT SINK
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics]
 |     HDFS partitions=1/1 files=1 size=11.15MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: cd_marital_status = 'D'
 |     stored statistics:
 |       table: rows=1.92M size=11.15MB
@@ -300,6 +304,7 @@ PLAN-ROOT SINK
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: hd_buy_potential = '>10000'
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB
@@ -479,6 +484,7 @@ max-parallelism=609330 segment-costs=[4101117248955, 6093265120169] cpu-comparis
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse, RANDOM]
 |     HDFS partitions=1/1 files=1 size=5.99KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     stored statistics:
 |       table: rows=22 size=5.99KB
 |       columns: all
@@ -649,6 +655,7 @@ max-parallelism=374 segment-costs=[4303039497]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_item_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.item.i_item_sk
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -699,6 +706,7 @@ max-parallelism=374 segment-costs=[4303039497]
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim d1, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d1.d_year = CAST(2002 AS INT)
 |     runtime filters: RF007[min_max] -> d1.d_week_seq, RF006[bloom] -> d1.d_week_seq
 |     stored statistics:
@@ -751,6 +759,7 @@ max-parallelism=374 segment-costs=[4303039497]
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=11.15MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: cd_marital_status = 'D'
 |     stored statistics:
 |       table: rows=1.92M size=11.15MB
@@ -802,6 +811,7 @@ max-parallelism=374 segment-costs=[4303039497]
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: hd_buy_potential = '>10000'
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB
@@ -981,6 +991,7 @@ max-parallelism=609330 segment-costs=[4101117248955, 6093265120169] cpu-comparis
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse, RANDOM]
 |     HDFS partitions=1/1 files=1 size=5.99KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     stored statistics:
 |       table: rows=22 size=5.99KB
 |       columns: all
@@ -1151,6 +1162,7 @@ max-parallelism=374 segment-costs=[4303039497]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF004[min_max] -> tpcds_partitioned_parquet_snap.item.i_item_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.item.i_item_sk
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -1201,6 +1213,7 @@ max-parallelism=374 segment-costs=[4303039497]
 |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim d1, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d1.d_year = CAST(2002 AS INT)
 |     runtime filters: RF007[min_max] -> d1.d_week_seq, RF006[bloom] -> d1.d_week_seq
 |     stored statistics:
@@ -1253,6 +1266,7 @@ max-parallelism=374 segment-costs=[4303039497]
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=11.15MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: cd_marital_status = 'D'
 |     stored statistics:
 |       table: rows=1.92M size=11.15MB
@@ -1304,6 +1318,7 @@ max-parallelism=374 segment-costs=[4303039497]
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: hd_buy_potential = '>10000'
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB

@@ -98,6 +98,7 @@ PLAN-ROOT SINK
 |  29:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -148,6 +149,7 @@ PLAN-ROOT SINK
 |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -198,6 +200,7 @@ PLAN-ROOT SINK
 |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -248,6 +251,7 @@ PLAN-ROOT SINK
 |  23:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -298,6 +302,7 @@ PLAN-ROOT SINK
 |  21:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -348,6 +353,7 @@ PLAN-ROOT SINK
 |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -398,6 +404,7 @@ PLAN-ROOT SINK
 |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -448,6 +455,7 @@ PLAN-ROOT SINK
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -498,6 +506,7 @@ PLAN-ROOT SINK
 |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -548,6 +557,7 @@ PLAN-ROOT SINK
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -598,6 +608,7 @@ PLAN-ROOT SINK
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -648,6 +659,7 @@ PLAN-ROOT SINK
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -698,6 +710,7 @@ PLAN-ROOT SINK
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -748,6 +761,7 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -792,6 +806,7 @@ PLAN-ROOT SINK
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.reason]
 |     HDFS partitions=1/1 files=1 size=2.49KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: r_reason_sk = CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -824,6 +839,7 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -901,6 +917,7 @@ PLAN-ROOT SINK
 |  29:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -969,6 +986,7 @@ PLAN-ROOT SINK
 |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1037,6 +1055,7 @@ PLAN-ROOT SINK
 |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1105,6 +1124,7 @@ PLAN-ROOT SINK
 |  23:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1173,6 +1193,7 @@ PLAN-ROOT SINK
 |  21:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1241,6 +1262,7 @@ PLAN-ROOT SINK
 |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1309,6 +1331,7 @@ PLAN-ROOT SINK
 |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1377,6 +1400,7 @@ PLAN-ROOT SINK
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1445,6 +1469,7 @@ PLAN-ROOT SINK
 |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1513,6 +1538,7 @@ PLAN-ROOT SINK
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1581,6 +1607,7 @@ PLAN-ROOT SINK
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1649,6 +1676,7 @@ PLAN-ROOT SINK
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1717,6 +1745,7 @@ PLAN-ROOT SINK
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1785,6 +1814,7 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1833,6 +1863,7 @@ PLAN-ROOT SINK
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.49KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: r_reason_sk = CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -1879,6 +1910,7 @@ max-parallelism=110 segment-costs=[1043704170, 123]
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -1956,6 +1988,7 @@ PLAN-ROOT SINK
 |  29:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2024,6 +2057,7 @@ PLAN-ROOT SINK
 |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2092,6 +2126,7 @@ PLAN-ROOT SINK
 |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(100 AS INT), ss_quantity >= CAST(81 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2160,6 +2195,7 @@ PLAN-ROOT SINK
 |  23:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2228,6 +2264,7 @@ PLAN-ROOT SINK
 |  21:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2296,6 +2333,7 @@ PLAN-ROOT SINK
 |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(80 AS INT), ss_quantity >= CAST(61 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2364,6 +2402,7 @@ PLAN-ROOT SINK
 |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2432,6 +2471,7 @@ PLAN-ROOT SINK
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2500,6 +2540,7 @@ PLAN-ROOT SINK
 |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(60 AS INT), ss_quantity >= CAST(41 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2568,6 +2609,7 @@ PLAN-ROOT SINK
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2636,6 +2678,7 @@ PLAN-ROOT SINK
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2704,6 +2747,7 @@ PLAN-ROOT SINK
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(40 AS INT), ss_quantity >= CAST(21 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2772,6 +2816,7 @@ PLAN-ROOT SINK
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2840,6 +2885,7 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2888,6 +2934,7 @@ PLAN-ROOT SINK
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.49KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: r_reason_sk = CAST(1 AS INT)
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -2934,6 +2981,7 @@ max-parallelism=110 segment-costs=[1043704170, 123]
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    predicates: ss_quantity <= CAST(20 AS INT), ss_quantity >= CAST(1 AS INT)
    stored statistics:
      table: rows=8.64G size=389.90GB

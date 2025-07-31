@@ -143,6 +143,7 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: (household_demographics.hd_dep_count = CAST(1 AS INT) OR household_demographics.hd_vehicle_count = CAST(-1 AS INT))
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB
@@ -175,6 +176,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: date_dim.d_dom <= CAST(2 AS INT), date_dim.d_dom >= CAST(1 AS INT), date_dim.d_year IN (CAST(1998 AS INT), CAST(1999 AS INT), CAST(2000 AS INT))
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -209,6 +211,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |     HDFS partitions=1/1 files=1 size=119.76KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: store.s_city IN ('Bethel', 'Summit')
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
@@ -452,6 +455,7 @@ max-parallelism=130 segment-costs=[1264807850]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: (household_demographics.hd_dep_count = CAST(1 AS INT) OR household_demographics.hd_vehicle_count = CAST(-1 AS INT))
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB
@@ -501,6 +505,7 @@ max-parallelism=130 segment-costs=[1264807850]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: date_dim.d_dom <= CAST(2 AS INT), date_dim.d_dom >= CAST(1 AS INT), date_dim.d_year IN (CAST(1998 AS INT), CAST(1999 AS INT), CAST(2000 AS INT))
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -552,6 +557,7 @@ max-parallelism=130 segment-costs=[1264807850]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=119.76KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: store.s_city IN ('Bethel', 'Summit')
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
@@ -795,6 +801,7 @@ max-parallelism=130 segment-costs=[1264807850]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: (household_demographics.hd_dep_count = CAST(1 AS INT) OR household_demographics.hd_vehicle_count = CAST(-1 AS INT))
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB
@@ -844,6 +851,7 @@ max-parallelism=130 segment-costs=[1264807850]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: date_dim.d_dom <= CAST(2 AS INT), date_dim.d_dom >= CAST(1 AS INT), date_dim.d_year IN (CAST(1998 AS INT), CAST(1999 AS INT), CAST(2000 AS INT))
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -895,6 +903,7 @@ max-parallelism=130 segment-costs=[1264807850]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=119.76KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: store.s_city IN ('Bethel', 'Summit')
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB

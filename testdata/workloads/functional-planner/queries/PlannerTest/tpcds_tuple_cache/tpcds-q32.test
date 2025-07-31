@@ -45,7 +45,7 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT), 00(OPEN)
 |
 18:TUPLE CACHE
-|  cache key: da6da09eacddf981d4240b4e33a4356f
+|  cache key: c89ceeedaa6209a74fa39627ae62ae8d
 |  input scan node ids: 0,1,2,3,4
 |  estimated serialized size: 8.53MB
 |  estimated serialized size per node: 873.21KB
@@ -65,7 +65,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 06(OPEN)
 |
 |--17:TUPLE CACHE
-|  |  cache key: 348dc72c31a29011b1fafed5eee095be
+|  |  cache key: a254668d8114610f1344c744f2c022cb
 |  |  input scan node ids: 3,4
 |  |  estimated serialized size: 5.50MB
 |  |  estimated serialized size per node: 562.78KB
@@ -106,6 +106,7 @@ PLAN-ROOT SINK
 |  |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_date <= DATE '1998-05-04', d_date >= DATE '1998-02-03'
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -120,6 +121,7 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
 |     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF006[bloom] -> cs_sold_date_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -131,7 +133,7 @@ PLAN-ROOT SINK
 |     in pipelines: 03(GETNEXT)
 |
 15:TUPLE CACHE
-|  cache key: 818fd1b21c07afdec6ad20712a330664
+|  cache key: f3e3a8449bbc6ec279451669b74f25fe
 |  input scan node ids: 0,1,2
 |  estimated serialized size: 8.53MB
 |  estimated serialized size per node: 873.21KB
@@ -165,6 +167,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '1998-05-04', d_date >= DATE '1998-02-03'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -177,7 +180,7 @@ PLAN-ROOT SINK
 |     in pipelines: 02(GETNEXT)
 |
 13:TUPLE CACHE
-|  cache key: 16c28937a9f9fbede98af82a9236b7ef
+|  cache key: 0cf87513453e4bab4ec3e43a41ec19f4
 |  input scan node ids: 0,1
 |  estimated serialized size: 5.97MB
 |  estimated serialized size per node: 611.24KB
@@ -197,7 +200,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--12:TUPLE CACHE
-|  |  cache key: e263f9e3da19540cfcef2dc61a92bfc6
+|  |  cache key: d4559916fd1a7170be59a6d02eac2789
 |  |  input scan node ids: 1
 |  |  estimated serialized size: 4.39KB
 |  |  estimated serialized size per node: 1.10KB
@@ -211,6 +214,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: i_manufact_id = CAST(948 AS INT)
 |     runtime filters: RF001[min_max] -> i_item_sk, RF000[bloom] -> i_item_sk
 |     stored statistics:
@@ -224,7 +228,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 11:TUPLE CACHE
-|  cache key: 9c0116f07b54af07e4e60214e5fc9eff
+|  cache key: 8d413dc4da684983932914e320a6ce55
 |  input scan node ids: 0
 |  estimated serialized size: 3.41MB
 |  estimated serialized size per node: 349.28KB
@@ -238,6 +242,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
    HDFS partitions=1831/1831 files=1831 size=280.96GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_item_sk, RF005[min_max] -> cs_item_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.catalog_sales.cs_item_sk, RF002[bloom] -> cs_sold_date_sk, RF004[bloom] -> cs_item_sk
    stored statistics:
      table: rows=4.32G size=280.96GB
@@ -312,7 +317,7 @@ max-parallelism=10 segment-costs=[183570, 185] cpu-comparison-result=65 [max(20 
 |  Per-Instance Resources: mem-estimate=37.62MB mem-reservation=22.00MB thread-reservation=1
 |  max-parallelism=40 segment-costs=[305783037, 55282093] cpu-comparison-result=40 [max(40 (self) vs 11 (sum children))]
 |  21:TUPLE CACHE
-|  |  cache key: e8915ae650c0ff0fb75c84950dea39fb
+|  |  cache key: 51c6f6539fe7e9a5f975c3691007c7b9
 |  |  input scan node ids: 3
 |  |  estimated serialized size: 654.92MB
 |  |  estimated serialized size per node: 65.49MB
@@ -370,6 +375,7 @@ max-parallelism=10 segment-costs=[183570, 185] cpu-comparison-result=65 [max(20 
 |  |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_date <= DATE '1998-05-04', d_date >= DATE '1998-02-03'
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -384,6 +390,7 @@ max-parallelism=10 segment-costs=[183570, 185] cpu-comparison-result=65 [max(20 
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
 |     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF006[bloom] -> cs_sold_date_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -443,6 +450,7 @@ max-parallelism=10 segment-costs=[38820017]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '1998-05-04', d_date >= DATE '1998-02-03'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -570,7 +578,7 @@ max-parallelism=10 segment-costs=[183570, 185] cpu-comparison-result=65 [max(20 
 |  Per-Instance Resources: mem-estimate=37.62MB mem-reservation=22.00MB thread-reservation=1
 |  max-parallelism=40 segment-costs=[305783037, 55282093] cpu-comparison-result=40 [max(40 (self) vs 11 (sum children))]
 |  21:TUPLE CACHE
-|  |  cache key: e8915ae650c0ff0fb75c84950dea39fb
+|  |  cache key: 51c6f6539fe7e9a5f975c3691007c7b9
 |  |  input scan node ids: 3
 |  |  estimated serialized size: 654.92MB
 |  |  estimated serialized size per node: 65.49MB
@@ -628,6 +636,7 @@ max-parallelism=10 segment-costs=[183570, 185] cpu-comparison-result=65 [max(20 
 |  |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_date <= DATE '1998-05-04', d_date >= DATE '1998-02-03'
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -642,6 +651,7 @@ max-parallelism=10 segment-costs=[183570, 185] cpu-comparison-result=65 [max(20 
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
 |     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF006[bloom] -> cs_sold_date_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -701,6 +711,7 @@ max-parallelism=10 segment-costs=[38820017]
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '1998-05-04', d_date >= DATE '1998-02-03'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB

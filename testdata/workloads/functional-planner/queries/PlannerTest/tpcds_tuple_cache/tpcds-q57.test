@@ -151,6 +151,7 @@ PLAN-ROOT SINK
 |  |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: (d_year = CAST(2001 AS INT) OR (d_year = CAST(2000 AS INT) AND d_moy = CAST(12 AS INT)) OR (d_year = CAST(2002 AS INT) AND d_moy = CAST(1 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -279,6 +280,7 @@ PLAN-ROOT SINK
 |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: (d_year = CAST(2001 AS INT) OR (d_year = CAST(2000 AS INT) AND d_moy = CAST(12 AS INT)) OR (d_year = CAST(2002 AS INT) AND d_moy = CAST(1 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -381,6 +383,7 @@ PLAN-ROOT SINK
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: (d_year = CAST(2001 AS INT) OR (d_year = CAST(2000 AS INT) AND d_moy = CAST(12 AS INT)) OR (d_year = CAST(2002 AS INT) AND d_moy = CAST(1 AS INT)))
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -599,6 +602,7 @@ max-parallelism=2147483640 segment-costs=[5732825156303337910, 408] cpu-comparis
 |  |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: (d_year = CAST(2001 AS INT) OR (d_year = CAST(2000 AS INT) AND d_moy = CAST(12 AS INT)) OR (d_year = CAST(2002 AS INT) AND d_moy = CAST(1 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -819,6 +823,7 @@ max-parallelism=543050 segment-costs=[3641602439, 1710158229, 5430492465901] cpu
 |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: (d_year = CAST(2001 AS INT) OR (d_year = CAST(2000 AS INT) AND d_moy = CAST(12 AS INT)) OR (d_year = CAST(2002 AS INT) AND d_moy = CAST(1 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -988,6 +993,7 @@ max-parallelism=435 segment-costs=[7568871876, 6765092689] cpu-comparison-result
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: (d_year = CAST(2001 AS INT) OR (d_year = CAST(2000 AS INT) AND d_moy = CAST(12 AS INT)) OR (d_year = CAST(2002 AS INT) AND d_moy = CAST(1 AS INT)))
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -1206,6 +1212,7 @@ max-parallelism=2147483640 segment-costs=[5732825156303337910, 408] cpu-comparis
 |  |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: (d_year = CAST(2001 AS INT) OR (d_year = CAST(2000 AS INT) AND d_moy = CAST(12 AS INT)) OR (d_year = CAST(2002 AS INT) AND d_moy = CAST(1 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -1426,6 +1433,7 @@ max-parallelism=543050 segment-costs=[3641602439, 1710158229, 5430492465901] cpu
 |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: (d_year = CAST(2001 AS INT) OR (d_year = CAST(2000 AS INT) AND d_moy = CAST(12 AS INT)) OR (d_year = CAST(2002 AS INT) AND d_moy = CAST(1 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -1595,6 +1603,7 @@ max-parallelism=435 segment-costs=[7568871876, 6765092689] cpu-comparison-result
 |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: (d_year = CAST(2001 AS INT) OR (d_year = CAST(2000 AS INT) AND d_moy = CAST(12 AS INT)) OR (d_year = CAST(2002 AS INT) AND d_moy = CAST(1 AS INT)))
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB

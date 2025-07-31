@@ -103,6 +103,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: i_category IN ('Jewelry', 'Home', 'Shoes')
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -137,6 +138,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '2001-05-12', d_date >= DATE '2001-04-12'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -151,6 +153,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF001[min_max] -> ss_item_sk, RF000[bloom] -> ss_item_sk, RF002[bloom] -> ss_sold_date_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -269,6 +272,7 @@ max-parallelism=32 segment-costs=[320824245, 366808260] cpu-comparison-result=32
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: i_category IN ('Jewelry', 'Home', 'Shoes')
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -320,6 +324,7 @@ max-parallelism=32 segment-costs=[320824245, 366808260] cpu-comparison-result=32
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '2001-05-12', d_date >= DATE '2001-04-12'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -451,6 +456,7 @@ max-parallelism=32 segment-costs=[320824245, 366808260] cpu-comparison-result=32
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: i_category IN ('Jewelry', 'Home', 'Shoes')
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -502,6 +508,7 @@ max-parallelism=32 segment-costs=[320824245, 366808260] cpu-comparison-result=32
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '2001-05-12', d_date >= DATE '2001-04-12'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB

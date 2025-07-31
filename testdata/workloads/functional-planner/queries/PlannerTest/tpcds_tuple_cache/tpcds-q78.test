@@ -92,7 +92,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 11(GETNEXT), 05(OPEN)
 |  |
 |  |--24:TUPLE CACHE
-|  |  |  cache key: 61f1f416e1c2b78d3296bc4ff9dd4a0d
+|  |  |  cache key: cb9e13190c47347a302a087dece34697
 |  |  |  input scan node ids: 0,1,2
 |  |  |  estimated serialized size: 481.42MB
 |  |  |  estimated serialized size per node: 48.14MB
@@ -134,6 +134,7 @@ PLAN-ROOT SINK
 |  |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT)
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
@@ -156,6 +157,7 @@ PLAN-ROOT SINK
 |  |  |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns]
 |  |  |     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     stored statistics:
 |  |  |       table: rows=863.99M size=48.14GB
 |  |  |       partitions: 2004/2004 rows=863.99M
@@ -168,6 +170,7 @@ PLAN-ROOT SINK
 |  |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     runtime filters: RF016[bloom] -> ss_sold_date_sk
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -194,7 +197,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 06(GETNEXT), 08(OPEN)
 |  |
 |  |--22:TUPLE CACHE
-|  |  |  cache key: a6698132e45141c7d3234fa8d36a7f0b
+|  |  |  cache key: 4a5290a0c24ef4c8990b02588d1d9e16
 |  |  |  input scan node ids: 8
 |  |  |  estimated serialized size: 4.37KB
 |  |  |  estimated serialized size per node: 4.37KB
@@ -208,6 +211,7 @@ PLAN-ROOT SINK
 |  |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT)
 |  |     runtime filters: RF008[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_year
 |  |     stored statistics:
@@ -268,7 +272,7 @@ PLAN-ROOT SINK
 |  in pipelines: 12(GETNEXT), 14(OPEN)
 |
 |--21:TUPLE CACHE
-|  |  cache key: ceab19b1c0a0eeaacb51b2743db0a1f7
+|  |  cache key: 41299eec7e7a08813541f64b61c43dd6
 |  |  input scan node ids: 14
 |  |  estimated serialized size: 4.37KB
 |  |  estimated serialized size per node: 4.37KB
@@ -282,6 +286,7 @@ PLAN-ROOT SINK
 |  14:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT)
 |     runtime filters: RF000[bloom] -> tpcds_partitioned_parquet_snap.date_dim.d_year
 |     stored statistics:
@@ -467,6 +472,7 @@ max-parallelism=570 segment-costs=[5626132876, 344790029, 293] cpu-comparison-re
 |  |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT)
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
@@ -892,6 +898,7 @@ max-parallelism=570 segment-costs=[5626132876, 344790029, 293] cpu-comparison-re
 |  |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2002 AS INT)
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB

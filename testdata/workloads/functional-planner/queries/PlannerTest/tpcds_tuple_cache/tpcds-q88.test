@@ -161,6 +161,7 @@ PLAN-ROOT SINK
 |  |  59:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -195,6 +196,7 @@ PLAN-ROOT SINK
 |  |  57:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -227,6 +229,7 @@ PLAN-ROOT SINK
 |  |  58:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(12 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -241,6 +244,7 @@ PLAN-ROOT SINK
 |  56:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF047[min_max] -> ss_sold_time_sk, RF045[min_max] -> ss_hdemo_sk, RF043[min_max] -> ss_store_sk, RF046[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -309,6 +313,7 @@ PLAN-ROOT SINK
 |  |  51:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -343,6 +348,7 @@ PLAN-ROOT SINK
 |  |  49:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -375,6 +381,7 @@ PLAN-ROOT SINK
 |  |  50:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(11 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -389,6 +396,7 @@ PLAN-ROOT SINK
 |  48:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF041[min_max] -> ss_sold_time_sk, RF039[min_max] -> ss_hdemo_sk, RF037[min_max] -> ss_store_sk, RF040[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -457,6 +465,7 @@ PLAN-ROOT SINK
 |  |  43:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -491,6 +500,7 @@ PLAN-ROOT SINK
 |  |  41:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -523,6 +533,7 @@ PLAN-ROOT SINK
 |  |  42:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(11 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -537,6 +548,7 @@ PLAN-ROOT SINK
 |  40:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF035[min_max] -> ss_sold_time_sk, RF033[min_max] -> ss_hdemo_sk, RF031[min_max] -> ss_store_sk, RF034[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -605,6 +617,7 @@ PLAN-ROOT SINK
 |  |  35:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -639,6 +652,7 @@ PLAN-ROOT SINK
 |  |  33:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -671,6 +685,7 @@ PLAN-ROOT SINK
 |  |  34:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(10 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -685,6 +700,7 @@ PLAN-ROOT SINK
 |  32:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF029[min_max] -> ss_sold_time_sk, RF027[min_max] -> ss_hdemo_sk, RF025[min_max] -> ss_store_sk, RF028[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -753,6 +769,7 @@ PLAN-ROOT SINK
 |  |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -787,6 +804,7 @@ PLAN-ROOT SINK
 |  |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -819,6 +837,7 @@ PLAN-ROOT SINK
 |  |  26:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(10 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -833,6 +852,7 @@ PLAN-ROOT SINK
 |  24:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF023[min_max] -> ss_sold_time_sk, RF021[min_max] -> ss_hdemo_sk, RF019[min_max] -> ss_store_sk, RF022[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -913,6 +933,7 @@ PLAN-ROOT SINK
 |  |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -947,6 +968,7 @@ PLAN-ROOT SINK
 |  |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -979,6 +1001,7 @@ PLAN-ROOT SINK
 |  |  18:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(9 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -993,6 +1016,7 @@ PLAN-ROOT SINK
 |  16:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF017[min_max] -> ss_sold_time_sk, RF015[min_max] -> ss_hdemo_sk, RF013[min_max] -> ss_store_sk, RF016[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1073,6 +1097,7 @@ PLAN-ROOT SINK
 |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -1107,6 +1132,7 @@ PLAN-ROOT SINK
 |  |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -1139,6 +1165,7 @@ PLAN-ROOT SINK
 |  |  10:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(9 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -1153,6 +1180,7 @@ PLAN-ROOT SINK
 |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF011[min_max] -> ss_sold_time_sk, RF009[min_max] -> ss_hdemo_sk, RF007[min_max] -> ss_store_sk, RF010[bloom] -> ss_sold_time_sk, RF008[bloom] -> ss_hdemo_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1216,6 +1244,7 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |     HDFS partitions=1/1 files=1 size=119.76KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: store.s_store_name = 'ese'
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
@@ -1250,6 +1279,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB
@@ -1282,6 +1312,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |     HDFS partitions=1/1 files=1 size=1.31MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: time_dim.t_hour = CAST(8 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
@@ -1296,6 +1327,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF005[min_max] -> ss_sold_time_sk, RF003[min_max] -> ss_hdemo_sk, RF001[min_max] -> ss_store_sk, RF004[bloom] -> ss_sold_time_sk, RF002[bloom] -> ss_hdemo_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -1409,6 +1441,7 @@ PLAN-ROOT SINK
 |  |  59:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -1460,6 +1493,7 @@ PLAN-ROOT SINK
 |  |  57:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -1509,6 +1543,7 @@ PLAN-ROOT SINK
 |  |  58:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(12 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -1523,6 +1558,7 @@ PLAN-ROOT SINK
 |  56:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF047[min_max] -> ss_sold_time_sk, RF045[min_max] -> ss_hdemo_sk, RF043[min_max] -> ss_store_sk, RF046[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1627,6 +1663,7 @@ PLAN-ROOT SINK
 |  |  51:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -1678,6 +1715,7 @@ PLAN-ROOT SINK
 |  |  49:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -1727,6 +1765,7 @@ PLAN-ROOT SINK
 |  |  50:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(11 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -1741,6 +1780,7 @@ PLAN-ROOT SINK
 |  48:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF041[min_max] -> ss_sold_time_sk, RF039[min_max] -> ss_hdemo_sk, RF037[min_max] -> ss_store_sk, RF040[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1845,6 +1885,7 @@ PLAN-ROOT SINK
 |  |  43:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -1896,6 +1937,7 @@ PLAN-ROOT SINK
 |  |  41:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -1945,6 +1987,7 @@ PLAN-ROOT SINK
 |  |  42:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(11 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -1959,6 +2002,7 @@ PLAN-ROOT SINK
 |  40:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF035[min_max] -> ss_sold_time_sk, RF033[min_max] -> ss_hdemo_sk, RF031[min_max] -> ss_store_sk, RF034[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2063,6 +2107,7 @@ PLAN-ROOT SINK
 |  |  35:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -2114,6 +2159,7 @@ PLAN-ROOT SINK
 |  |  33:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -2163,6 +2209,7 @@ PLAN-ROOT SINK
 |  |  34:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(10 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -2177,6 +2224,7 @@ PLAN-ROOT SINK
 |  32:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF029[min_max] -> ss_sold_time_sk, RF027[min_max] -> ss_hdemo_sk, RF025[min_max] -> ss_store_sk, RF028[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2281,6 +2329,7 @@ PLAN-ROOT SINK
 |  |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -2332,6 +2381,7 @@ PLAN-ROOT SINK
 |  |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -2381,6 +2431,7 @@ PLAN-ROOT SINK
 |  |  26:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(10 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -2395,6 +2446,7 @@ PLAN-ROOT SINK
 |  24:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF023[min_max] -> ss_sold_time_sk, RF021[min_max] -> ss_hdemo_sk, RF019[min_max] -> ss_store_sk, RF022[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2511,6 +2563,7 @@ PLAN-ROOT SINK
 |  |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -2562,6 +2615,7 @@ PLAN-ROOT SINK
 |  |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -2611,6 +2665,7 @@ PLAN-ROOT SINK
 |  |  18:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(9 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -2625,6 +2680,7 @@ PLAN-ROOT SINK
 |  16:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF017[min_max] -> ss_sold_time_sk, RF015[min_max] -> ss_hdemo_sk, RF013[min_max] -> ss_store_sk, RF016[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2741,6 +2797,7 @@ PLAN-ROOT SINK
 |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -2792,6 +2849,7 @@ PLAN-ROOT SINK
 |  |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -2841,6 +2899,7 @@ PLAN-ROOT SINK
 |  |  10:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(9 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -2855,6 +2914,7 @@ PLAN-ROOT SINK
 |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF011[min_max] -> ss_sold_time_sk, RF009[min_max] -> ss_hdemo_sk, RF007[min_max] -> ss_store_sk, RF010[bloom] -> ss_sold_time_sk, RF008[bloom] -> ss_hdemo_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -2950,6 +3010,7 @@ max-parallelism=170 segment-costs=[1644364547, 123] cpu-comparison-result=120 [m
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=119.76KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: store.s_store_name = 'ese'
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
@@ -3001,6 +3062,7 @@ max-parallelism=170 segment-costs=[1644364547, 123] cpu-comparison-result=120 [m
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB
@@ -3050,6 +3112,7 @@ max-parallelism=170 segment-costs=[1644364547, 123] cpu-comparison-result=120 [m
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.31MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: time_dim.t_hour = CAST(8 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
@@ -3064,6 +3127,7 @@ max-parallelism=170 segment-costs=[1644364547, 123] cpu-comparison-result=120 [m
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF005[min_max] -> ss_sold_time_sk, RF003[min_max] -> ss_hdemo_sk, RF001[min_max] -> ss_store_sk, RF004[bloom] -> ss_sold_time_sk, RF002[bloom] -> ss_hdemo_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -3177,6 +3241,7 @@ PLAN-ROOT SINK
 |  |  59:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -3228,6 +3293,7 @@ PLAN-ROOT SINK
 |  |  57:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -3277,6 +3343,7 @@ PLAN-ROOT SINK
 |  |  58:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(12 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -3291,6 +3358,7 @@ PLAN-ROOT SINK
 |  56:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF047[min_max] -> ss_sold_time_sk, RF045[min_max] -> ss_hdemo_sk, RF043[min_max] -> ss_store_sk, RF046[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -3395,6 +3463,7 @@ PLAN-ROOT SINK
 |  |  51:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -3446,6 +3515,7 @@ PLAN-ROOT SINK
 |  |  49:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -3495,6 +3565,7 @@ PLAN-ROOT SINK
 |  |  50:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(11 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -3509,6 +3580,7 @@ PLAN-ROOT SINK
 |  48:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF041[min_max] -> ss_sold_time_sk, RF039[min_max] -> ss_hdemo_sk, RF037[min_max] -> ss_store_sk, RF040[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -3613,6 +3685,7 @@ PLAN-ROOT SINK
 |  |  43:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -3664,6 +3737,7 @@ PLAN-ROOT SINK
 |  |  41:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -3713,6 +3787,7 @@ PLAN-ROOT SINK
 |  |  42:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(11 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -3727,6 +3802,7 @@ PLAN-ROOT SINK
 |  40:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF035[min_max] -> ss_sold_time_sk, RF033[min_max] -> ss_hdemo_sk, RF031[min_max] -> ss_store_sk, RF034[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -3831,6 +3907,7 @@ PLAN-ROOT SINK
 |  |  35:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -3882,6 +3959,7 @@ PLAN-ROOT SINK
 |  |  33:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -3931,6 +4009,7 @@ PLAN-ROOT SINK
 |  |  34:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(10 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -3945,6 +4024,7 @@ PLAN-ROOT SINK
 |  32:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF029[min_max] -> ss_sold_time_sk, RF027[min_max] -> ss_hdemo_sk, RF025[min_max] -> ss_store_sk, RF028[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -4049,6 +4129,7 @@ PLAN-ROOT SINK
 |  |  27:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -4100,6 +4181,7 @@ PLAN-ROOT SINK
 |  |  25:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -4149,6 +4231,7 @@ PLAN-ROOT SINK
 |  |  26:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(10 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -4163,6 +4246,7 @@ PLAN-ROOT SINK
 |  24:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF023[min_max] -> ss_sold_time_sk, RF021[min_max] -> ss_hdemo_sk, RF019[min_max] -> ss_store_sk, RF022[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -4279,6 +4363,7 @@ PLAN-ROOT SINK
 |  |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -4330,6 +4415,7 @@ PLAN-ROOT SINK
 |  |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -4379,6 +4465,7 @@ PLAN-ROOT SINK
 |  |  18:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(9 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -4393,6 +4480,7 @@ PLAN-ROOT SINK
 |  16:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF017[min_max] -> ss_sold_time_sk, RF015[min_max] -> ss_hdemo_sk, RF013[min_max] -> ss_store_sk, RF016[bloom] -> ss_sold_time_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -4509,6 +4597,7 @@ PLAN-ROOT SINK
 |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_store_name = 'ese'
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -4560,6 +4649,7 @@ PLAN-ROOT SINK
 |  |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -4609,6 +4699,7 @@ PLAN-ROOT SINK
 |  |  10:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: time_dim.t_hour = CAST(9 AS INT), time_dim.t_minute < CAST(30 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -4623,6 +4714,7 @@ PLAN-ROOT SINK
 |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF011[min_max] -> ss_sold_time_sk, RF009[min_max] -> ss_hdemo_sk, RF007[min_max] -> ss_store_sk, RF010[bloom] -> ss_sold_time_sk, RF008[bloom] -> ss_hdemo_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -4718,6 +4810,7 @@ max-parallelism=170 segment-costs=[1644364547, 123] cpu-comparison-result=120 [m
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=119.76KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: store.s_store_name = 'ese'
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
@@ -4769,6 +4862,7 @@ max-parallelism=170 segment-costs=[1644364547, 123] cpu-comparison-result=120 [m
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=41.69KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ((household_demographics.hd_dep_count = CAST(1 AS INT) AND household_demographics.hd_vehicle_count <= CAST(3 AS INT)) OR (household_demographics.hd_dep_count = CAST(2 AS INT) AND household_demographics.hd_vehicle_count <= CAST(4 AS INT)) OR (household_demographics.hd_dep_count = CAST(0 AS INT) AND household_demographics.hd_vehicle_count <= CAST(2 AS INT)))
 |     stored statistics:
 |       table: rows=7.20K size=41.69KB
@@ -4818,6 +4912,7 @@ max-parallelism=170 segment-costs=[1644364547, 123] cpu-comparison-result=120 [m
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.31MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: time_dim.t_hour = CAST(8 AS INT), time_dim.t_minute >= CAST(30 AS INT)
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
@@ -4832,6 +4927,7 @@ max-parallelism=170 segment-costs=[1644364547, 123] cpu-comparison-result=120 [m
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF005[min_max] -> ss_sold_time_sk, RF003[min_max] -> ss_hdemo_sk, RF001[min_max] -> ss_store_sk, RF004[bloom] -> ss_sold_time_sk, RF002[bloom] -> ss_hdemo_sk
    stored statistics:
      table: rows=8.64G size=389.90GB

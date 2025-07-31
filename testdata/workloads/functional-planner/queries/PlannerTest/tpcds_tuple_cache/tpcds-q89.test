@@ -110,6 +110,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_year IN (CAST(2001 AS INT))
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -144,6 +145,7 @@ PLAN-ROOT SINK
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ((i_category IN ('Women', 'Music', 'Home') AND i_class IN ('fragrances', 'pop', 'bedding')) OR (i_category IN ('Books', 'Men', 'Children') AND i_class IN ('home repair', 'sports-apparel', 'infants')))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -168,6 +170,7 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_item_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_item_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -320,6 +323,7 @@ max-parallelism=70 segment-costs=[660247863, 265111122] cpu-comparison-result=70
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_year IN (CAST(2001 AS INT))
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -371,6 +375,7 @@ max-parallelism=70 segment-costs=[660247863, 265111122] cpu-comparison-result=70
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ((i_category IN ('Women', 'Music', 'Home') AND i_class IN ('fragrances', 'pop', 'bedding')) OR (i_category IN ('Books', 'Men', 'Children') AND i_class IN ('home repair', 'sports-apparel', 'infants')))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -395,6 +400,7 @@ max-parallelism=70 segment-costs=[660247863, 265111122] cpu-comparison-result=70
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_item_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_item_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
@@ -547,6 +553,7 @@ max-parallelism=70 segment-costs=[660247863, 265111122] cpu-comparison-result=70
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_year IN (CAST(2001 AS INT))
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -598,6 +605,7 @@ max-parallelism=70 segment-costs=[660247863, 265111122] cpu-comparison-result=70
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ((i_category IN ('Women', 'Music', 'Home') AND i_class IN ('fragrances', 'pop', 'bedding')) OR (i_category IN ('Books', 'Men', 'Children') AND i_class IN ('home repair', 'sports-apparel', 'infants')))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -622,6 +630,7 @@ max-parallelism=70 segment-costs=[660247863, 265111122] cpu-comparison-result=70
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF001[min_max] -> ss_store_sk, RF005[min_max] -> ss_item_sk, RF000[bloom] -> ss_store_sk, RF002[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_item_sk
    stored statistics:
      table: rows=8.64G size=389.90GB

@@ -67,6 +67,11 @@ public class TupleCacheNode extends PlanNode {
     for (HdfsScanNode scanNode : childTupleCacheInfo_.getInputScanNodes()) {
       // Inputs into the tuple cache need to use deterministic scan range assignment
       scanNode.setDeterministicScanRangeAssignment(true);
+      // To improve cache hits when data is appended to a table, modify scheduling
+      // to schedule in order of increasing modification time. This will limit the
+      // impact of a new scan range. For example, if there is only one new scan range,
+      // then only one node should have a different runtime cache key.
+      scanNode.setScheduleScanRangesOldestToNewest(true);
       inputScanNodeIds_.add(scanNode.getId().asInt());
     }
     computeTupleIds();

@@ -261,6 +261,11 @@ public class HdfsScanNode extends ScanNode {
   // This has no impact on mt_dop=0.
   private boolean deterministicScanRangeAssignment_ = false;
 
+  // True if this scan node should schedule scan ranges in order from oldest to
+  // newest. Scheduling in this order reduces the disruption when a new file is
+  // added to an existing table.
+  private boolean scheduleScanRangesOldestToNewest_ = false;
+
   // True if this is a scan that only returns partition keys and is only required to
   // return at least one of each of the distinct values of the partition keys.
   private final boolean isPartitionKeyScan_;
@@ -1873,13 +1878,13 @@ public class HdfsScanNode extends ScanNode {
       msg.hdfs_scan_node.setSkip_header_line_count(skipHeaderLineCount_);
     }
     msg.hdfs_scan_node.setUse_mt_scan_node(useMtScanNode_);
-    // The reason we skip setting the deterministic scan range assignment field for
-    // tuple cache is that has not been set yet at this point. At the point we are
-    // computing the tuple cache key, it is always false and has no information.
-    // Even if it was set, it would not tell us anything about the result set.
+    // These two fields are purely about scheduling policy, so they do not impact the
+    // compile-time key. They are also not set yet when the tuple cache key is computed.
     if (!serialCtx.isTupleCache()) {
       msg.hdfs_scan_node.setDeterministic_scanrange_assignment(
           deterministicScanRangeAssignment_);
+      msg.hdfs_scan_node.setSchedule_scanranges_oldest_to_newest(
+          scheduleScanRangesOldestToNewest_);
     }
     if (countStarSlot_ != null) {
       msg.hdfs_scan_node.setCount_star_slot_offset(countStarSlot_.getByteOffset());
@@ -1954,6 +1959,13 @@ public class HdfsScanNode extends ScanNode {
         output.append(detailPrefix)
           .append(String.format("deterministic scan range assignment: %b\n",
               deterministicScanRangeAssignment_));
+      }
+      // Include information about scheduling scan ranges oldest to newest only if
+      // it is set. This is currently only used for tuple caching.
+      if (scheduleScanRangesOldestToNewest_) {
+        output.append(detailPrefix)
+          .append(String.format("schedule scan ranges oldest to newest: %b\n",
+              scheduleScanRangesOldestToNewest_));
       }
 
       if (!conjuncts_.isEmpty()) {
@@ -2654,6 +2666,14 @@ public class HdfsScanNode extends ScanNode {
 
   public boolean usesDeterministicScanRangeAssignment() {
     return deterministicScanRangeAssignment_;
+  }
+
+  public void setScheduleScanRangesOldestToNewest(boolean enabled) {
+    scheduleScanRangesOldestToNewest_ = enabled;
+  }
+
+  public boolean scheduleScanRangesOldestToNewest() {
+    return scheduleScanRangesOldestToNewest_;
   }
 
   // Remove any expression in 'exprs' that has matching equality predicate,

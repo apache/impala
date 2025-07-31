@@ -357,6 +357,12 @@ struct THdfsScanNode {
   // each fragment instance has its own list of scan ranges. If false,
   // the fragment instances use a shared queue.
   15: optional bool deterministic_scanrange_assignment
+
+  // Whether the scheduler should schedule HDFS scan ranges from oldest to newest by
+  // sorting them by modification time. Scheduling in this order is more consistent
+  // when new files are being added to a table. For tuple caching, this can improve the
+  // cache hits by avoiding unnecessary disruption to the runtime keys.
+  16: optional bool schedule_scanranges_oldest_to_newest
 }
 
 struct TDataSourceScanNode {

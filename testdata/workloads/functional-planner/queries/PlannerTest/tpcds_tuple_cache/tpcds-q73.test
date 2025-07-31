@@ -106,6 +106,7 @@ PLAN-ROOT SINK
 |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: date_dim.d_dom <= CAST(2 AS INT), date_dim.d_dom >= CAST(1 AS INT), date_dim.d_year IN (CAST(1999 AS INT), CAST(2000 AS INT), CAST(2001 AS INT))
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -140,6 +141,7 @@ PLAN-ROOT SINK
 |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_county IN ('Franklin Parish', 'Ziebach County', 'Luce County', 'Williamson County')
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -174,6 +176,7 @@ PLAN-ROOT SINK
 |  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: household_demographics.hd_vehicle_count > CAST(0 AS INT), household_demographics.hd_buy_potential IN ('501-1000', 'Unknown'), CASE WHEN household_demographics.hd_vehicle_count > CAST(0 AS INT) THEN CAST(household_demographics.hd_dep_count AS DOUBLE) / CAST(household_demographics.hd_vehicle_count AS DOUBLE) ELSE NULL END > CAST(1 AS DOUBLE)
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -188,6 +191,7 @@ PLAN-ROOT SINK
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF005[min_max] -> store_sales.ss_store_sk, RF007[min_max] -> store_sales.ss_hdemo_sk, RF002[bloom] -> store_sales.ss_sold_date_sk, RF004[bloom] -> store_sales.ss_store_sk, RF006[bloom] -> store_sales.ss_hdemo_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -213,6 +217,7 @@ PLAN-ROOT SINK
 08:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
    HDFS partitions=1/1 files=1 size=1.55GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF001[min_max] -> c_customer_sk, RF000[bloom] -> c_customer_sk
    stored statistics:
      table: rows=30.00M size=1.55GB
@@ -348,6 +353,7 @@ max-parallelism=10 segment-costs=[15905570, 3999486] cpu-comparison-result=90 [m
 |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: date_dim.d_dom <= CAST(2 AS INT), date_dim.d_dom >= CAST(1 AS INT), date_dim.d_year IN (CAST(1999 AS INT), CAST(2000 AS INT), CAST(2001 AS INT))
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -399,6 +405,7 @@ max-parallelism=10 segment-costs=[15905570, 3999486] cpu-comparison-result=90 [m
 |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_county IN ('Franklin Parish', 'Ziebach County', 'Luce County', 'Williamson County')
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -450,6 +457,7 @@ max-parallelism=10 segment-costs=[15905570, 3999486] cpu-comparison-result=90 [m
 |  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: household_demographics.hd_vehicle_count > CAST(0 AS INT), household_demographics.hd_buy_potential IN ('501-1000', 'Unknown'), CASE WHEN household_demographics.hd_vehicle_count > CAST(0 AS INT) THEN CAST(household_demographics.hd_dep_count AS DOUBLE) / CAST(household_demographics.hd_vehicle_count AS DOUBLE) ELSE NULL END > CAST(1 AS DOUBLE)
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -464,6 +472,7 @@ max-parallelism=10 segment-costs=[15905570, 3999486] cpu-comparison-result=90 [m
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF005[min_max] -> store_sales.ss_store_sk, RF007[min_max] -> store_sales.ss_hdemo_sk, RF002[bloom] -> store_sales.ss_sold_date_sk, RF004[bloom] -> store_sales.ss_store_sk, RF006[bloom] -> store_sales.ss_hdemo_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -611,6 +620,7 @@ max-parallelism=10 segment-costs=[15905570, 3999486] cpu-comparison-result=90 [m
 |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: date_dim.d_dom <= CAST(2 AS INT), date_dim.d_dom >= CAST(1 AS INT), date_dim.d_year IN (CAST(1999 AS INT), CAST(2000 AS INT), CAST(2001 AS INT))
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -662,6 +672,7 @@ max-parallelism=10 segment-costs=[15905570, 3999486] cpu-comparison-result=90 [m
 |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: store.s_county IN ('Franklin Parish', 'Ziebach County', 'Luce County', 'Williamson County')
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
@@ -713,6 +724,7 @@ max-parallelism=10 segment-costs=[15905570, 3999486] cpu-comparison-result=90 [m
 |  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=41.69KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: household_demographics.hd_vehicle_count > CAST(0 AS INT), household_demographics.hd_buy_potential IN ('501-1000', 'Unknown'), CASE WHEN household_demographics.hd_vehicle_count > CAST(0 AS INT) THEN CAST(household_demographics.hd_dep_count AS DOUBLE) / CAST(household_demographics.hd_vehicle_count AS DOUBLE) ELSE NULL END > CAST(1 AS DOUBLE)
 |  |     stored statistics:
 |  |       table: rows=7.20K size=41.69KB
@@ -727,6 +739,7 @@ max-parallelism=10 segment-costs=[15905570, 3999486] cpu-comparison-result=90 [m
 |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF005[min_max] -> store_sales.ss_store_sk, RF007[min_max] -> store_sales.ss_hdemo_sk, RF002[bloom] -> store_sales.ss_sold_date_sk, RF004[bloom] -> store_sales.ss_store_sk, RF006[bloom] -> store_sales.ss_hdemo_sk
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB

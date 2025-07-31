@@ -104,6 +104,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: i_category IN ('Men', 'Books', 'Children')
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -138,6 +139,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '1998-04-27', d_date >= DATE '1998-03-28'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -152,6 +154,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
    HDFS partitions=1824/1824 files=1824 size=145.75GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF001[min_max] -> ws_item_sk, RF000[bloom] -> ws_item_sk, RF002[bloom] -> ws_sold_date_sk
    stored statistics:
      table: rows=2.16G size=145.75GB
@@ -271,6 +274,7 @@ max-parallelism=20 segment-costs=[92951481, 129094315] cpu-comparison-result=25 
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: i_category IN ('Men', 'Books', 'Children')
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -322,6 +326,7 @@ max-parallelism=20 segment-costs=[92951481, 129094315] cpu-comparison-result=25 
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '1998-04-27', d_date >= DATE '1998-03-28'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -454,6 +459,7 @@ max-parallelism=20 segment-costs=[92951481, 129094315] cpu-comparison-result=25 
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: i_category IN ('Men', 'Books', 'Children')
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -505,6 +511,7 @@ max-parallelism=20 segment-costs=[92951481, 129094315] cpu-comparison-result=25 
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '1998-04-27', d_date >= DATE '1998-03-28'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB

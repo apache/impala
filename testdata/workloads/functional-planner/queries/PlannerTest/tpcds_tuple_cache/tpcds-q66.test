@@ -301,6 +301,7 @@ PLAN-ROOT SINK
 |  |  12:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse]
 |  |     HDFS partitions=1/1 files=1 size=5.99KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     stored statistics:
 |  |       table: rows=22 size=5.99KB
 |  |       columns: all
@@ -344,6 +345,7 @@ PLAN-ROOT SINK
 |  |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_year = CAST(2002 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -378,6 +380,7 @@ PLAN-ROOT SINK
 |  |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.ship_mode]
 |  |     HDFS partitions=1/1 files=1 size=2.68KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: sm_carrier IN ('HARMSTORF', 'USPS')
 |  |     stored statistics:
 |  |       table: rows=20 size=2.68KB
@@ -412,6 +415,7 @@ PLAN-ROOT SINK
 |  |  14:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: t_time <= CAST(53085 AS INT), t_time >= CAST(24285 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -426,6 +430,7 @@ PLAN-ROOT SINK
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
 |     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF015[min_max] -> cs_sold_time_sk, RF013[min_max] -> cs_ship_mode_sk, RF009[min_max] -> cs_warehouse_sk, RF014[bloom] -> cs_sold_time_sk, RF012[bloom] -> cs_ship_mode_sk, RF010[bloom] -> cs_sold_date_sk, RF008[bloom] -> cs_warehouse_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -478,6 +483,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse]
 |     HDFS partitions=1/1 files=1 size=5.99KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     stored statistics:
 |       table: rows=22 size=5.99KB
 |       columns: all
@@ -509,6 +515,7 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_year = CAST(2002 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -543,6 +550,7 @@ PLAN-ROOT SINK
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.ship_mode]
 |     HDFS partitions=1/1 files=1 size=2.68KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: sm_carrier IN ('HARMSTORF', 'USPS')
 |     stored statistics:
 |       table: rows=20 size=2.68KB
@@ -577,6 +585,7 @@ PLAN-ROOT SINK
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |     HDFS partitions=1/1 files=1 size=1.31MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: t_time <= CAST(53085 AS INT), t_time >= CAST(24285 AS INT)
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
@@ -591,6 +600,7 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales]
    HDFS partitions=1824/1824 files=1824 size=145.75GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF007[min_max] -> ws_sold_time_sk, RF005[min_max] -> ws_ship_mode_sk, RF001[min_max] -> ws_warehouse_sk, RF006[bloom] -> ws_sold_time_sk, RF004[bloom] -> ws_ship_mode_sk, RF002[bloom] -> ws_sold_date_sk, RF000[bloom] -> ws_warehouse_sk
    stored statistics:
      table: rows=2.16G size=145.75GB
@@ -728,6 +738,7 @@ max-parallelism=60 segment-costs=[14430, 14430, 440, 2038] cpu-comparison-result
 |  |  12:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=5.99KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     stored statistics:
 |  |       table: rows=22 size=5.99KB
 |  |       columns: all
@@ -788,6 +799,7 @@ max-parallelism=60 segment-costs=[14430, 14430, 440, 2038] cpu-comparison-result
 |  |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_year = CAST(2002 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -839,6 +851,7 @@ max-parallelism=60 segment-costs=[14430, 14430, 440, 2038] cpu-comparison-result
 |  |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.ship_mode, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.68KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: sm_carrier IN ('HARMSTORF', 'USPS')
 |  |     stored statistics:
 |  |       table: rows=20 size=2.68KB
@@ -890,6 +903,7 @@ max-parallelism=60 segment-costs=[14430, 14430, 440, 2038] cpu-comparison-result
 |  |  14:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: t_time <= CAST(53085 AS INT), t_time >= CAST(24285 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -904,6 +918,7 @@ max-parallelism=60 segment-costs=[14430, 14430, 440, 2038] cpu-comparison-result
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
 |     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF015[min_max] -> cs_sold_time_sk, RF013[min_max] -> cs_ship_mode_sk, RF009[min_max] -> cs_warehouse_sk, RF014[bloom] -> cs_sold_time_sk, RF012[bloom] -> cs_ship_mode_sk, RF010[bloom] -> cs_sold_date_sk, RF008[bloom] -> cs_warehouse_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -989,6 +1004,7 @@ max-parallelism=30 segment-costs=[265017298, 87597] cpu-comparison-result=44 [ma
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse, RANDOM]
 |     HDFS partitions=1/1 files=1 size=5.99KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     stored statistics:
 |       table: rows=22 size=5.99KB
 |       columns: all
@@ -1037,6 +1053,7 @@ max-parallelism=30 segment-costs=[265017298, 87597] cpu-comparison-result=44 [ma
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_year = CAST(2002 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -1088,6 +1105,7 @@ max-parallelism=30 segment-costs=[265017298, 87597] cpu-comparison-result=44 [ma
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.ship_mode, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.68KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: sm_carrier IN ('HARMSTORF', 'USPS')
 |     stored statistics:
 |       table: rows=20 size=2.68KB
@@ -1139,6 +1157,7 @@ max-parallelism=30 segment-costs=[265017298, 87597] cpu-comparison-result=44 [ma
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.31MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: t_time <= CAST(53085 AS INT), t_time >= CAST(24285 AS INT)
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
@@ -1153,6 +1172,7 @@ max-parallelism=30 segment-costs=[265017298, 87597] cpu-comparison-result=44 [ma
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=145.75GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF007[min_max] -> ws_sold_time_sk, RF005[min_max] -> ws_ship_mode_sk, RF001[min_max] -> ws_warehouse_sk, RF006[bloom] -> ws_sold_time_sk, RF004[bloom] -> ws_ship_mode_sk, RF002[bloom] -> ws_sold_date_sk, RF000[bloom] -> ws_warehouse_sk
    stored statistics:
      table: rows=2.16G size=145.75GB
@@ -1290,6 +1310,7 @@ max-parallelism=60 segment-costs=[14430, 14430, 440, 2038] cpu-comparison-result
 |  |  12:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=5.99KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     stored statistics:
 |  |       table: rows=22 size=5.99KB
 |  |       columns: all
@@ -1350,6 +1371,7 @@ max-parallelism=60 segment-costs=[14430, 14430, 440, 2038] cpu-comparison-result
 |  |  13:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_year = CAST(2002 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -1401,6 +1423,7 @@ max-parallelism=60 segment-costs=[14430, 14430, 440, 2038] cpu-comparison-result
 |  |  15:SCAN HDFS [tpcds_partitioned_parquet_snap.ship_mode, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.68KB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: sm_carrier IN ('HARMSTORF', 'USPS')
 |  |     stored statistics:
 |  |       table: rows=20 size=2.68KB
@@ -1452,6 +1475,7 @@ max-parallelism=60 segment-costs=[14430, 14430, 440, 2038] cpu-comparison-result
 |  |  14:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: t_time <= CAST(53085 AS INT), t_time >= CAST(24285 AS INT)
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
@@ -1466,6 +1490,7 @@ max-parallelism=60 segment-costs=[14430, 14430, 440, 2038] cpu-comparison-result
 |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales, RANDOM]
 |     HDFS partitions=1831/1831 files=1831 size=280.96GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF015[min_max] -> cs_sold_time_sk, RF013[min_max] -> cs_ship_mode_sk, RF009[min_max] -> cs_warehouse_sk, RF014[bloom] -> cs_sold_time_sk, RF012[bloom] -> cs_ship_mode_sk, RF010[bloom] -> cs_sold_date_sk, RF008[bloom] -> cs_warehouse_sk
 |     stored statistics:
 |       table: rows=4.32G size=280.96GB
@@ -1551,6 +1576,7 @@ max-parallelism=30 segment-costs=[265017298, 87597] cpu-comparison-result=44 [ma
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse, RANDOM]
 |     HDFS partitions=1/1 files=1 size=5.99KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     stored statistics:
 |       table: rows=22 size=5.99KB
 |       columns: all
@@ -1599,6 +1625,7 @@ max-parallelism=30 segment-costs=[265017298, 87597] cpu-comparison-result=44 [ma
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_year = CAST(2002 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -1650,6 +1677,7 @@ max-parallelism=30 segment-costs=[265017298, 87597] cpu-comparison-result=44 [ma
 |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.ship_mode, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.68KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: sm_carrier IN ('HARMSTORF', 'USPS')
 |     stored statistics:
 |       table: rows=20 size=2.68KB
@@ -1701,6 +1729,7 @@ max-parallelism=30 segment-costs=[265017298, 87597] cpu-comparison-result=44 [ma
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.31MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: t_time <= CAST(53085 AS INT), t_time >= CAST(24285 AS INT)
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
@@ -1715,6 +1744,7 @@ max-parallelism=30 segment-costs=[265017298, 87597] cpu-comparison-result=44 [ma
 01:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=145.75GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF007[min_max] -> ws_sold_time_sk, RF005[min_max] -> ws_ship_mode_sk, RF001[min_max] -> ws_warehouse_sk, RF006[bloom] -> ws_sold_time_sk, RF004[bloom] -> ws_ship_mode_sk, RF002[bloom] -> ws_sold_date_sk, RF000[bloom] -> ws_warehouse_sk
    stored statistics:
      table: rows=2.16G size=145.75GB

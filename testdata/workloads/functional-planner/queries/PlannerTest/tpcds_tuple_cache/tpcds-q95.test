@@ -157,6 +157,7 @@ PLAN-ROOT SINK
 |  |  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.web_site]
 |  |  |     HDFS partitions=1/1 files=1 size=17.88KB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: web_company_name = 'pri'
 |  |  |     stored statistics:
 |  |  |       table: rows=66 size=17.88KB
@@ -203,6 +204,7 @@ PLAN-ROOT SINK
 |  |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: d_date <= DATE '2000-04-30', d_date >= DATE '2000-03-01'
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
@@ -237,6 +239,7 @@ PLAN-ROOT SINK
 |  |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
 |  |  |     HDFS partitions=1/1 files=1 size=307.36MB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: ca_state = 'TN'
 |  |  |     stored statistics:
 |  |  |       table: rows=15.00M size=307.36MB
@@ -251,6 +254,7 @@ PLAN-ROOT SINK
 |  |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales ws1]
 |  |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     runtime filters: RF015[min_max] -> ws1.ws_ship_addr_sk, RF013[min_max] -> ws1.ws_ship_date_sk, RF011[min_max] -> ws1.ws_web_site_sk, RF014[bloom] -> ws1.ws_ship_addr_sk, RF012[bloom] -> ws1.ws_ship_date_sk, RF010[bloom] -> ws1.ws_web_site_sk
 |  |     stored statistics:
 |  |       table: rows=2.16G size=145.75GB
@@ -279,6 +283,7 @@ PLAN-ROOT SINK
 |  |--05:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales ws2]
 |  |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     runtime filters: RF007[min_max] -> ws2.ws_order_number, RF006[bloom] -> ws2.ws_order_number
 |  |     stored statistics:
 |  |       table: rows=2.16G size=145.75GB
@@ -292,6 +297,7 @@ PLAN-ROOT SINK
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales ws1]
 |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF007[min_max] -> ws1.ws_order_number, RF009[min_max] -> ws1.ws_order_number, RF006[bloom] -> ws1.ws_order_number, RF008[bloom] -> ws1.ws_order_number
 |     stored statistics:
 |       table: rows=2.16G size=145.75GB
@@ -319,6 +325,7 @@ PLAN-ROOT SINK
 |--07:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns]
 |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.web_returns.wr_order_number, RF000[bloom] -> tpcds_partitioned_parquet_snap.web_returns.wr_order_number
 |     stored statistics:
 |       table: rows=216.00M size=16.74GB
@@ -341,6 +348,7 @@ PLAN-ROOT SINK
 |--09:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales ws2]
 |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF001[min_max] -> ws2.ws_order_number, RF003[min_max] -> ws2.ws_order_number, RF000[bloom] -> ws2.ws_order_number, RF002[bloom] -> ws2.ws_order_number
 |     stored statistics:
 |       table: rows=2.16G size=145.75GB
@@ -354,6 +362,7 @@ PLAN-ROOT SINK
 08:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales ws1]
    HDFS partitions=1824/1824 files=1824 size=145.75GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF001[min_max] -> ws1.ws_order_number, RF003[min_max] -> ws1.ws_order_number, RF005[min_max] -> ws1.ws_order_number, RF000[bloom] -> ws1.ws_order_number, RF002[bloom] -> ws1.ws_order_number, RF004[bloom] -> ws1.ws_order_number
    stored statistics:
      table: rows=2.16G size=145.75GB
@@ -499,6 +508,7 @@ max-parallelism=2820 segment-costs=[28173502000, 32755414, 43005, 3] cpu-compari
 |  |  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.web_site, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=17.88KB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: web_company_name = 'pri'
 |  |  |     stored statistics:
 |  |  |       table: rows=66 size=17.88KB
@@ -562,6 +572,7 @@ max-parallelism=2820 segment-costs=[28173502000, 32755414, 43005, 3] cpu-compari
 |  |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: d_date <= DATE '2000-04-30', d_date >= DATE '2000-03-01'
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
@@ -613,6 +624,7 @@ max-parallelism=2820 segment-costs=[28173502000, 32755414, 43005, 3] cpu-compari
 |  |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=307.36MB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: ca_state = 'TN'
 |  |  |     stored statistics:
 |  |  |       table: rows=15.00M size=307.36MB
@@ -627,6 +639,7 @@ max-parallelism=2820 segment-costs=[28173502000, 32755414, 43005, 3] cpu-compari
 |  |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales ws1, RANDOM]
 |  |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     runtime filters: RF015[min_max] -> ws1.ws_ship_addr_sk, RF013[min_max] -> ws1.ws_ship_date_sk, RF011[min_max] -> ws1.ws_web_site_sk, RF014[bloom] -> ws1.ws_ship_addr_sk, RF012[bloom] -> ws1.ws_ship_date_sk, RF010[bloom] -> ws1.ws_web_site_sk
 |  |     stored statistics:
 |  |       table: rows=2.16G size=145.75GB
@@ -942,6 +955,7 @@ max-parallelism=2820 segment-costs=[28173502000, 32755414, 43005, 3] cpu-compari
 |  |  |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.web_site, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=17.88KB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: web_company_name = 'pri'
 |  |  |     stored statistics:
 |  |  |       table: rows=66 size=17.88KB
@@ -1005,6 +1019,7 @@ max-parallelism=2820 segment-costs=[28173502000, 32755414, 43005, 3] cpu-compari
 |  |  |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: d_date <= DATE '2000-04-30', d_date >= DATE '2000-03-01'
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
@@ -1056,6 +1071,7 @@ max-parallelism=2820 segment-costs=[28173502000, 32755414, 43005, 3] cpu-compari
 |  |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=307.36MB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: ca_state = 'TN'
 |  |  |     stored statistics:
 |  |  |       table: rows=15.00M size=307.36MB
@@ -1070,6 +1086,7 @@ max-parallelism=2820 segment-costs=[28173502000, 32755414, 43005, 3] cpu-compari
 |  |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.web_sales ws1, RANDOM]
 |  |     HDFS partitions=1824/1824 files=1824 size=145.75GB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     runtime filters: RF015[min_max] -> ws1.ws_ship_addr_sk, RF013[min_max] -> ws1.ws_ship_date_sk, RF011[min_max] -> ws1.ws_web_site_sk, RF014[bloom] -> ws1.ws_ship_addr_sk, RF012[bloom] -> ws1.ws_ship_date_sk, RF010[bloom] -> ws1.ws_web_site_sk
 |  |     stored statistics:
 |  |       table: rows=2.16G size=145.75GB

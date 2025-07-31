@@ -122,6 +122,7 @@ PLAN-ROOT SINK
 |  |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: ss_addr_sk IS NULL, ss_store_sk = CAST(457 AS INT)
 |  |  |     stored statistics:
 |  |  |       table: rows=8.64G size=389.90GB
@@ -168,6 +169,7 @@ PLAN-ROOT SINK
 |  |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales ss1]
 |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ss_store_sk = CAST(457 AS INT)
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -245,6 +247,7 @@ PLAN-ROOT SINK
 |  |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
 |  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: ss_addr_sk IS NULL, ss_store_sk = CAST(457 AS INT)
 |  |  |     stored statistics:
 |  |  |       table: rows=8.64G size=389.90GB
@@ -291,6 +294,7 @@ PLAN-ROOT SINK
 |  |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales ss1]
 |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ss_store_sk = CAST(457 AS INT)
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -550,6 +554,7 @@ max-parallelism=4 segment-costs=[231557, 23] cpu-comparison-result=480 [max(4 (s
 |  |  |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |  |  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |  |     deterministic scan range assignment: true
+|  |  |  |     schedule scan ranges oldest to newest: true
 |  |  |  |     predicates: ss_addr_sk IS NULL, ss_store_sk = CAST(457 AS INT)
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=8.64G size=389.90GB
@@ -611,6 +616,7 @@ max-parallelism=4 segment-costs=[231557, 23] cpu-comparison-result=480 [max(4 (s
 |  |  |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales ss1, RANDOM]
 |  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: ss_store_sk = CAST(457 AS INT)
 |  |  |     stored statistics:
 |  |  |       table: rows=8.64G size=389.90GB
@@ -758,6 +764,7 @@ max-parallelism=4 segment-costs=[231557, 23] cpu-comparison-result=480 [max(4 (s
 |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ss_addr_sk IS NULL, ss_store_sk = CAST(457 AS INT)
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -819,6 +826,7 @@ max-parallelism=4 segment-costs=[231557, 23] cpu-comparison-result=480 [max(4 (s
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales ss1, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_store_sk = CAST(457 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB
@@ -1067,6 +1075,7 @@ max-parallelism=4 segment-costs=[231557, 23] cpu-comparison-result=480 [max(4 (s
 |  |  |  |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |  |  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |  |     deterministic scan range assignment: true
+|  |  |  |     schedule scan ranges oldest to newest: true
 |  |  |  |     predicates: ss_addr_sk IS NULL, ss_store_sk = CAST(457 AS INT)
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=8.64G size=389.90GB
@@ -1128,6 +1137,7 @@ max-parallelism=4 segment-costs=[231557, 23] cpu-comparison-result=480 [max(4 (s
 |  |  |  00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales ss1, RANDOM]
 |  |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |  |     deterministic scan range assignment: true
+|  |  |     schedule scan ranges oldest to newest: true
 |  |  |     predicates: ss_store_sk = CAST(457 AS INT)
 |  |  |     stored statistics:
 |  |  |       table: rows=8.64G size=389.90GB
@@ -1283,6 +1293,7 @@ max-parallelism=4 segment-costs=[231557, 23] cpu-comparison-result=480 [max(4 (s
 |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |  |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ss_addr_sk IS NULL, ss_store_sk = CAST(457 AS INT)
 |  |     stored statistics:
 |  |       table: rows=8.64G size=389.90GB
@@ -1344,6 +1355,7 @@ max-parallelism=4 segment-costs=[231557, 23] cpu-comparison-result=480 [max(4 (s
 |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales ss1, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: ss_store_sk = CAST(457 AS INT)
 |     stored statistics:
 |       table: rows=8.64G size=389.90GB

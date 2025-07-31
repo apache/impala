@@ -77,6 +77,7 @@ PLAN-ROOT SINK
 |  |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_month_seq <= CAST(1220 AS INT), d_month_seq >= CAST(1209 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -129,6 +130,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_month_seq <= CAST(1220 AS INT), d_month_seq >= CAST(1209 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -259,6 +261,7 @@ max-parallelism=5230 segment-costs=[52275927885, 7286100529, 247] cpu-comparison
 |  |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_month_seq <= CAST(1220 AS INT), d_month_seq >= CAST(1209 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -343,6 +346,7 @@ max-parallelism=1824 segment-costs=[56272761904, 8902589222] cpu-comparison-resu
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_month_seq <= CAST(1220 AS INT), d_month_seq >= CAST(1209 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -473,6 +477,7 @@ max-parallelism=5230 segment-costs=[52275927885, 7286100529, 247] cpu-comparison
 |  |  05:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_month_seq <= CAST(1220 AS INT), d_month_seq >= CAST(1209 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -557,6 +562,7 @@ max-parallelism=1824 segment-costs=[56272761904, 8902589222] cpu-comparison-resu
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_month_seq <= CAST(1220 AS INT), d_month_seq >= CAST(1209 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB

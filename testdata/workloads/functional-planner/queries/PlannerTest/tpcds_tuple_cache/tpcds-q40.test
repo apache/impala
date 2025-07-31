@@ -44,7 +44,7 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT), 09(OPEN)
 |
 13:TUPLE CACHE
-|  cache key: 77ca5df52de1bbd7e8c7c03c7cdbb0a5
+|  cache key: 5bbc01bffdf0fd3eae7ce0691993d101
 |  input scan node ids: 0,1,4,3,2
 |  estimated serialized size: 179.45MB
 |  estimated serialized size per node: 17.95MB
@@ -73,6 +73,7 @@ PLAN-ROOT SINK
 |--02:SCAN HDFS [tpcds_partitioned_parquet_snap.warehouse]
 |     HDFS partitions=1/1 files=1 size=5.99KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     stored statistics:
 |       table: rows=22 size=5.99KB
 |       columns: all
@@ -104,6 +105,7 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: i_current_price <= CAST(1.49 AS DECIMAL(3,2)), i_current_price >= CAST(0.99 AS DECIMAL(2,2))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -138,6 +140,7 @@ PLAN-ROOT SINK
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '1999-03-04', d_date >= DATE '1999-01-03'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -159,6 +162,7 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_returns]
 |     HDFS partitions=2060/2060 files=2060 size=32.77GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF003[min_max] -> tpcds_partitioned_parquet_snap.catalog_returns.cr_item_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.catalog_returns.cr_item_sk
 |     stored statistics:
 |       table: rows=432.02M size=32.77GB
@@ -172,6 +176,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.catalog_sales]
    HDFS partitions=1831/1831 files=1831 size=280.96GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    runtime filters: RF001[min_max] -> cs_warehouse_sk, RF003[min_max] -> cs_item_sk, RF000[bloom] -> cs_warehouse_sk, RF002[bloom] -> cs_item_sk, RF004[bloom] -> cs_sold_date_sk
    stored statistics:
      table: rows=4.32G size=280.96GB
@@ -304,6 +309,7 @@ max-parallelism=110 segment-costs=[1044734340, 74109479] cpu-comparison-result=1
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: i_current_price <= CAST(1.49 AS DECIMAL(3,2)), i_current_price >= CAST(0.99 AS DECIMAL(2,2))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -355,6 +361,7 @@ max-parallelism=110 segment-costs=[1044734340, 74109479] cpu-comparison-result=1
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '1999-03-04', d_date >= DATE '1999-01-03'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -546,6 +553,7 @@ max-parallelism=110 segment-costs=[1044734340, 74109479] cpu-comparison-result=1
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: i_current_price <= CAST(1.49 AS DECIMAL(3,2)), i_current_price >= CAST(0.99 AS DECIMAL(2,2))
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
@@ -597,6 +605,7 @@ max-parallelism=110 segment-costs=[1044734340, 74109479] cpu-comparison-result=1
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_date <= DATE '1999-03-04', d_date >= DATE '1999-01-03'
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB

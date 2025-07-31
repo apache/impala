@@ -76,7 +76,7 @@ WRITE TO HDFS [tpcds_partitioned_parquet_snap.store_sales_unpartitioned_medium, 
      table: rows=8.64G size=389.90GB
      partitions: 93/93 rows=246.09M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=119.03M
+   extrapolated-rows=disabled max-scan-range-rows=117.22M
    mem-estimate=16.00MB mem-reservation=176.00KB thread-reservation=0
    tuple-ids=0 row-size=96B cardinality=246.09M cost=340198429
    in pipelines: 00(GETNEXT)
@@ -114,7 +114,7 @@ max-parallelism=93 segment-costs=[1988428320]
      table: rows=8.64G size=389.90GB
      partitions: 93/93 rows=246.09M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=119.03M
+   extrapolated-rows=disabled max-scan-range-rows=117.22M
    mem-estimate=16.00MB mem-reservation=176.00KB thread-reservation=0
    tuple-ids=0 row-size=96B cardinality=246.09M cost=340198429
    in pipelines: 00(GETNEXT)
@@ -261,6 +261,7 @@ max-parallelism=10 segment-costs=[5604, 2349]
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1824/1824 rows=8.64G
@@ -373,7 +374,7 @@ max-parallelism=83 segment-costs=[1767513380]
      table: rows=8.64G size=389.90GB
      partitions: 83/83 rows=218.75M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=133.91M
+   extrapolated-rows=disabled max-scan-range-rows=131.97M
    mem-estimate=16.00MB mem-reservation=176.00KB thread-reservation=0
    tuple-ids=0 row-size=96B cardinality=218.75M cost=302402289
    in pipelines: 00(GETNEXT)
@@ -415,7 +416,7 @@ max-parallelism=4 segment-costs=[91371298]
      table: rows=8.64G size=389.90GB
      partitions: 4/4 rows=11.31M
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=2.61G
+   extrapolated-rows=disabled max-scan-range-rows=2.55G
    mem-estimate=16.00MB mem-reservation=176.00KB thread-reservation=0
    tuple-ids=0 row-size=96B cardinality=11.31M cost=15632634
    in pipelines: 00(GETNEXT)
@@ -801,7 +802,7 @@ F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Instance Resources: mem-estimate=20.06MB mem-reservation=8.00MB thread-reservation=1
 max-parallelism=120 segment-costs=[1200000000]
 00:SCAN HDFS [tpcds_seq_snap.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=215.99MB
+   HDFS partitions=1824/1824 files=1824 size=215.93MB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/1824 rows=unavailable

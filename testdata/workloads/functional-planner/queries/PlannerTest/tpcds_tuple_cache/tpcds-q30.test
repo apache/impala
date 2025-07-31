@@ -91,6 +91,7 @@ PLAN-ROOT SINK
 |  |--10:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
 |  |     HDFS partitions=1/1 files=1 size=307.36MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     stored statistics:
 |  |       table: rows=15.00M size=307.36MB
 |  |       columns: all
@@ -122,6 +123,7 @@ PLAN-ROOT SINK
 |  |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_year = CAST(2000 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -136,6 +138,7 @@ PLAN-ROOT SINK
 |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.web_returns]
 |     HDFS partitions=2114/2114 files=2114 size=16.74GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF011[min_max] -> wr_returning_addr_sk, RF012[bloom] -> wr_returned_date_sk, RF010[bloom] -> wr_returning_addr_sk
 |     stored statistics:
 |       table: rows=216.00M size=16.74GB
@@ -189,6 +192,7 @@ PLAN-ROOT SINK
 |  |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
 |  |     HDFS partitions=1/1 files=1 size=307.36MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ca_state = 'GA'
 |  |     stored statistics:
 |  |       table: rows=15.00M size=307.36MB
@@ -215,6 +219,7 @@ PLAN-ROOT SINK
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.customer]
 |     HDFS partitions=1/1 files=1 size=1.55GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF009[min_max] -> c_current_addr_sk, RF008[bloom] -> c_current_addr_sk
 |     stored statistics:
 |       table: rows=30.00M size=1.55GB
@@ -273,6 +278,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_year = CAST(2000 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -474,6 +480,7 @@ max-parallelism=10 segment-costs=[74581045, 545] cpu-comparison-result=122 [max(
 |  |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_year = CAST(2000 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -575,6 +582,7 @@ max-parallelism=10 segment-costs=[74581045, 545] cpu-comparison-result=122 [max(
 |  |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=307.36MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ca_state = 'GA'
 |  |     stored statistics:
 |  |       table: rows=15.00M size=307.36MB
@@ -601,6 +609,7 @@ max-parallelism=10 segment-costs=[74581045, 545] cpu-comparison-result=122 [max(
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.55GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF009[min_max] -> c_current_addr_sk, RF008[bloom] -> c_current_addr_sk
 |     stored statistics:
 |       table: rows=30.00M size=1.55GB
@@ -726,6 +735,7 @@ max-parallelism=20 segment-costs=[123639497]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_year = CAST(2000 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -927,6 +937,7 @@ max-parallelism=10 segment-costs=[74581045, 545] cpu-comparison-result=122 [max(
 |  |  09:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: d_year = CAST(2000 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
@@ -1028,6 +1039,7 @@ max-parallelism=10 segment-costs=[74581045, 545] cpu-comparison-result=122 [max(
 |  |  06:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=307.36MB
 |  |     deterministic scan range assignment: true
+|  |     schedule scan ranges oldest to newest: true
 |  |     predicates: ca_state = 'GA'
 |  |     stored statistics:
 |  |       table: rows=15.00M size=307.36MB
@@ -1054,6 +1066,7 @@ max-parallelism=10 segment-costs=[74581045, 545] cpu-comparison-result=122 [max(
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.customer, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.55GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF009[min_max] -> c_current_addr_sk, RF008[bloom] -> c_current_addr_sk
 |     stored statistics:
 |       table: rows=30.00M size=1.55GB
@@ -1179,6 +1192,7 @@ max-parallelism=20 segment-costs=[123639497]
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_year = CAST(2000 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB

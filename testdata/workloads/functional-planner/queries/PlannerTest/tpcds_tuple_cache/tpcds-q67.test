@@ -162,6 +162,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_month_seq <= CAST(1207 AS INT), d_month_seq >= CAST(1196 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -196,6 +197,7 @@ PLAN-ROOT SINK
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
@@ -434,6 +436,7 @@ max-parallelism=1824 segment-costs=[257850166519, 2328086935759] cpu-comparison-
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_month_seq <= CAST(1207 AS INT), d_month_seq >= CAST(1196 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -485,6 +488,7 @@ max-parallelism=1824 segment-costs=[257850166519, 2328086935759] cpu-comparison-
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
@@ -723,6 +727,7 @@ max-parallelism=1824 segment-costs=[257850166519, 2328086935759] cpu-comparison-
 |  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: d_month_seq <= CAST(1207 AS INT), d_month_seq >= CAST(1196 AS INT)
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
@@ -774,6 +779,7 @@ max-parallelism=1824 segment-costs=[257850166519, 2328086935759] cpu-comparison-
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all

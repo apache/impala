@@ -75,6 +75,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.reason]
 |     HDFS partitions=1/1 files=1 size=2.49KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: r_reason_desc = 'reason 64'
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -96,6 +97,7 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_returns]
 |     HDFS partitions=2004/2004 files=2004 size=48.14GB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     runtime filters: RF001[min_max] -> sr_reason_sk, RF000[bloom] -> sr_reason_sk
 |     stored statistics:
 |       table: rows=863.99M size=48.14GB
@@ -109,6 +111,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    deterministic scan range assignment: true
+   schedule scan ranges oldest to newest: true
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1824/1824 rows=8.64G
@@ -205,6 +208,7 @@ max-parallelism=830 segment-costs=[8297732700, 225439237] cpu-comparison-result=
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.49KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: r_reason_desc = 'reason 64'
 |     stored statistics:
 |       table: rows=67 size=2.49KB
@@ -359,6 +363,7 @@ max-parallelism=830 segment-costs=[8297732700, 225439237] cpu-comparison-result=
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.49KB
 |     deterministic scan range assignment: true
+|     schedule scan ranges oldest to newest: true
 |     predicates: r_reason_desc = 'reason 64'
 |     stored statistics:
 |       table: rows=67 size=2.49KB

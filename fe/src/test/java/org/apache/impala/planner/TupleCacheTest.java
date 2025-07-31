@@ -469,18 +469,20 @@ public class TupleCacheTest extends PlannerTestBase {
   @Test
   public void testDeterministicScheduling() {
     // Verify that the HdfsScanNode that feeds into a TupleCacheNode uses deterministic
-    // scan range scheduling. When there are more ways for locations to be cache
-    // ineligible, this test will be expanded to cover the case where scan nodes don't
-    // use deterministic scheduling.
+    // scan range scheduling and oldest to newest scheduling. When there are more
+    // ways for locations to be cache ineligible, this test will be expanded to cover the
+    // case where scan nodes don't use deterministic scheduling / oldest to newest.
     List<PlanNode> cacheEligibleNodes =
         getCacheEligibleNodes("select id from functional.alltypes where int_col = 500");
     for (PlanNode node : cacheEligibleNodes) {
-      // The HdfsScanNode for this query will have determinstic scan range assignment set
-      // This test uses mt_dop=0, so the value wouldn't matter for execution, but it
-      // still verifies that it is set properly.
+      // The HdfsScanNode for this query will have determinstic scan range assignment and
+      // oldest to newest scheduling set. This test uses mt_dop=0, so the deterministic
+      // scheduling value wouldn't matter for execution, but it still verifies that it is
+      // set properly.
       if (node instanceof HdfsScanNode) {
         HdfsScanNode hdfsScanNode = (HdfsScanNode) node;
         assertTrue(hdfsScanNode.usesDeterministicScanRangeAssignment());
+        assertTrue(hdfsScanNode.scheduleScanRangesOldestToNewest());
       }
     }
   }
