@@ -109,16 +109,21 @@ def parse_retried_query_id(profile_text):
   return retried_query_id.group(1)
 
 
-def parse_num_rows_fetched(profile_text):
+def parse_num_rows_fetched(profile_text, missing_ok=False):
   """Parses the number of rows fetched from the query profile text."""
-  num_rows_fetched = re.search(r'\n\s+\-\sNumRowsFetched:\s+(\d+)', profile_text)
+  num_rows_fetched = re.search(r'\n\s+\-\s+NumRowsFetched:\s+\S+\s+\((\d+)\)',
+      profile_text)
+  if missing_ok and num_rows_fetched is None:
+    return None
   assert num_rows_fetched is not None, "Number of Rows Fetched not found in query profile"
   return int(num_rows_fetched.group(1))
 
 
-def parse_admission_result(profile_text):
+def parse_admission_result(profile_text, missing_ok=False):
   """Parses the admission result from the query profile text."""
   admission_result = re.search(r'\n\s+Admission result:\s+(.*?)\n', profile_text)
+  if missing_ok and admission_result is None:
+    return None
   assert admission_result is not None, "Admission Result not found in query profile"
   return admission_result.group(1)
 
