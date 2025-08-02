@@ -622,7 +622,8 @@ enum CatalogLookupStatus {
   // TODO: Fix partition lookup logic to not do it with IDs.
   PARTITION_NOT_FOUND,
   DATA_SOURCE_NOT_FOUND,
-  VERSION_MISMATCH
+  VERSION_MISMATCH,
+  CATALOG_SERVICE_CHANGED
 }
 
 // RPC response for GetPartialCatalogObject.
@@ -646,6 +647,9 @@ struct TGetPartialCatalogObjectResponse {
 
   // Loaded time in catalogd corresponding to 'object_version_number'.
   9: optional i64 object_loaded_time_ms
+
+  // The CatalogService service ID this result came from.
+  10: optional Types.TUniqueId catalog_service_id
 }
 
 

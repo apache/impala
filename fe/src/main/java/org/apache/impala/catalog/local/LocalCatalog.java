@@ -81,9 +81,14 @@ public class LocalCatalog implements FeCatalog {
   private Map<String, FeDb> dbs_ = new HashMap<>();
   private Map<String, HdfsCachePool> hdfsCachePools_ = null;
   private String nullPartitionKeyValue_;
+  // Catalog service id when MetaProvider is CatalogdMetaProvider
+  private TUniqueId catalogServiceId_ = Catalog.INITIAL_CATALOG_SERVICE_ID;
 
   public LocalCatalog(MetaProvider metaProvider) {
     metaProvider_ = Preconditions.checkNotNull(metaProvider);
+    if (metaProvider instanceof CatalogdMetaProvider) {
+      catalogServiceId_ = ((CatalogdMetaProvider) metaProvider).getCatalogServiceId();
+    }
   }
 
   public String getProviderURI() {
@@ -298,7 +303,7 @@ public class LocalCatalog implements FeCatalog {
 
   @Override
   public TUniqueId getCatalogServiceId() {
-    throw new UnsupportedOperationException("TODO");
+    return catalogServiceId_;
   }
 
   @Override

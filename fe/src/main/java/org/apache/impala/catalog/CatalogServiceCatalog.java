@@ -4213,7 +4213,9 @@ public class CatalogServiceCatalog extends Catalog {
       try (ThreadNameAnnotator tna = new ThreadNameAnnotator(
             "Get Partial Catalog Object - " +
             Catalog.toCatalogObjectKey(req.object_desc))) {
-        return doGetPartialCatalogObject(req, reason);
+        TGetPartialCatalogObjectResponse resp = doGetPartialCatalogObject(req, reason);
+        resp.setCatalog_service_id(JniCatalog.getServiceId());
+        return resp;
       } finally {
         partialObjectFetchAccess_.release();
       }

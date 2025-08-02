@@ -343,6 +343,7 @@ class TestObservability(ImpalaTestSuite):
         r'Frontend:',
         r'Referenced Tables:',
         r'Original Table Versions:',
+        r'Catalog Service ID:',
         r'CatalogFetch.ColumnStats.Hits',
         r'CatalogFetch.ColumnStats.Misses',
         r'CatalogFetch.ColumnStats.Requests',

@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import com.codahale.metrics.Histogram;
@@ -340,7 +341,8 @@ public class CatalogdMetaProvider implements MetaProvider {
    */
   @GuardedBy("catalogServiceIdLock_")
   private TUniqueId catalogServiceId_ = Catalog.INITIAL_CATALOG_SERVICE_ID;
-  private final Object catalogServiceIdLock_ = new Object();
+  private final ReentrantReadWriteLock catalogServiceIdLock_ =
+      new ReentrantReadWriteLock(true /*fair ordering*/);
 
   /**
    * Object that is used to synchronize on and signal when the catalog is ready for use.
@@ -398,6 +400,15 @@ public class CatalogdMetaProvider implements MetaProvider {
 
   public String getURI() {
     return "Catalogd (URI TODO)";
+  }
+
+  public TUniqueId getCatalogServiceId() {
+    catalogServiceIdLock_.readLock().lock();
+    try {
+      return catalogServiceId_;
+    } finally {
+      catalogServiceIdLock_.readLock().unlock();
+    }
   }
 
   public CacheStats getCacheStats() {
@@ -468,6 +479,13 @@ public class CatalogdMetaProvider implements MetaProvider {
     new TDeserializer().deserialize(resp, ret);
     if (resp.isSetStatus() && resp.status.status_code != TErrorCode.OK) {
       throw new TException(String.join("\n", resp.status.error_msgs));
+    }
+    if (resp.isSetCatalog_service_id()
+        && witnessCatalogServiceId(resp.getCatalog_service_id())) {
+      throw new InconsistentMetadataFetchException(
+          CatalogLookupStatus.CATALOG_SERVICE_CHANGED,
+          String.format("Catalog service ID changed to %s",
+              PrintId(resp.getCatalog_service_id())));
     }
 
     // If we get a "not found" response, then we assume that this was a case of an
@@ -1521,13 +1539,16 @@ public class CatalogdMetaProvider implements MetaProvider {
 
     // NOTE: the return value is ignored when this function is called by a DDL
     // operation.
-    synchronized (catalogServiceIdLock_) {
+    catalogServiceIdLock_.readLock().lock();
+    try {
       // Set catalog_object_version_lower_bound to lastResetCatalogVersion_ + 1. All
       // catalog objects with catalog version <= lastResetCatalogVersion_ should have
       // been invalidated. See more comments above the definition of
       // lastResetCatalogVersion_.
       return new TUpdateCatalogCacheResponse(catalogServiceId_,
           lastResetCatalogVersion_.get() + 1, lastSeenCatalogVersion_.get());
+    } finally {
+      catalogServiceIdLock_.readLock().unlock();
     }
   }
 
@@ -1606,40 +1627,57 @@ public class CatalogdMetaProvider implements MetaProvider {
   /**
    * Witness a service ID received from the catalog. We can see the service IDs
    * either from a DDL response (in which case the service ID is part of the RPC
-   * response object) or from a statestore topic update (in which case the service ID
-   * is part of the published CATALOG object).
+   * response object), or from a statestore topic update (in which case the service ID
+   * is part of the published CATALOG object), or from a GetPartialCatalogObject response.
    *
-   * If we notice the service ID changed, we need to invalidate our cache.
+   * If we notice the service ID changed (except the initial startup), we need to
+   * invalidate our cache. Returns true in this case so callers can replan the query.
    */
-  private void witnessCatalogServiceId(TUniqueId serviceId) {
-    synchronized (catalogServiceIdLock_) {
-      if (!catalogServiceId_.equals(serviceId)) {
-        if (!catalogServiceId_.equals(Catalog.INITIAL_CATALOG_SERVICE_ID)) {
-          LOG.warn("Detected catalog service restart: service ID changed from " +
-              "{} to {}. Invalidating all cached metadata on this coordinator.",
-              PrintId(catalogServiceId_), PrintId(serviceId));
-        }
-        catalogServiceId_ = serviceId;
+  private boolean witnessCatalogServiceId(TUniqueId serviceId) {
+    // Fast path to check if the catalog service id changes.
+    catalogServiceIdLock_.readLock().lock();
+    try {
+      if (catalogServiceId_.equals(serviceId)) return false;
+    } finally {
+      catalogServiceIdLock_.readLock().unlock();
+    }
+    catalogServiceIdLock_.writeLock().lock();
+    try {
+      // Double-check the condition because another thread might have updated it
+      // while we were waiting for the write lock.
+      if (catalogServiceId_.equals(serviceId)) return false;
+      boolean needsReplan = true;
+      if (!catalogServiceId_.equals(Catalog.INITIAL_CATALOG_SERVICE_ID)) {
+        LOG.warn("Detected catalog service restart: service ID changed from " +
+            "{} to {}. Invalidating all cached metadata on this coordinator.",
+            PrintId(catalogServiceId_), PrintId(serviceId));
         cache_.invalidateAll();
-        // Clear cached items from the previous catalogd instance. Otherwise, we'll
-        // ignore new updates from the new catalogd instance since they have lower
-        // versions.
-        hdfsCachePools_.clear();
-        // TODO(todd): we probably need to invalidate the auth policy too.
-        // we are probably better off detecting this at a higher level and
-        // reinstantiating the metaprovider entirely, similar to how ImpaladCatalog
-        // handles this.
-
-        // TODO(todd): slight race here: a concurrent request from the old catalog
-        // could theoretically be just about to write something back into the cache
-        // after we do the above invalidate. Maybe we would be better off replacing
-        // the whole cache object, or doing a soft barrier here to wait for any
-        // concurrent cache accessors to cycle out. Another option is to associate
-        // the catalog service ID as part of all of the cache keys.
-        //
-        // This is quite unlikely to be an issue in practice, so deferring it to later
-        // clean-up.
+      } else {
+        // Callers don't need replan if this is the first reset.
+        needsReplan = false;
       }
+      catalogServiceId_ = serviceId;
+      // Clear cached items from the previous catalogd instance. Otherwise, we'll
+      // ignore new updates from the new catalogd instance since they have lower
+      // versions.
+      hdfsCachePools_.clear();
+      // TODO(todd): we probably need to invalidate the auth policy too.
+      // we are probably better off detecting this at a higher level and
+      // reinstantiating the metaprovider entirely, similar to how ImpaladCatalog
+      // handles this.
+
+      // TODO(todd): slight race here: a concurrent request from the old catalog
+      // could theoretically be just about to write something back into the cache
+      // after we do the above invalidate. Maybe we would be better off replacing
+      // the whole cache object, or doing a soft barrier here to wait for any
+      // concurrent cache accessors to cycle out. Another option is to associate
+      // the catalog service ID as part of all of the cache keys.
+      //
+      // This is quite unlikely to be an issue in practice, so deferring it to later
+      // clean-up.
+      return needsReplan;
+    } finally {
+      catalogServiceIdLock_.writeLock().unlock();
     }
   }
 

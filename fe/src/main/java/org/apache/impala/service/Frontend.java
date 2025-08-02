@@ -2928,6 +2928,11 @@ public class Frontend {
                 new Date(t.getLastLoadedTimeMs()).toString()))
             .collect(Collectors.joining("\n")));
 
+    // Add the catalog service id that shows where the metadata comes (usually from the
+    // current active catalogd).
+    FrontendProfile.getCurrent().addInfoString("Catalog Service ID",
+        PrintId(stmtTableCache.catalog.getCatalogServiceId()));
+
     // Analyze and authorize stmt
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory_, timeline);
     AnalysisResult analysisResult = analysisCtx.analyzeAndAuthorize(compilerFactory,
