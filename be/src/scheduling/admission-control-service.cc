@@ -212,6 +212,16 @@ void AdmissionControlService::GetQueryStatus(const GetQueryStatusRequestPB* req,
   }
 
   RespondAndReleaseRpc(status, resp, rpc_context);
+  if (admission_state->admission_done && !admission_state->admit_status.ok()) {
+    LOG(INFO) << "Query " << req->query_id()
+              << " was rejected. Removing admission state to free resources.";
+    // If this RPC fails and the admission state is already removed,
+    // a retry may fail with an "Invalid handle" error because the entry is gone.
+    // This is okay and doesn't cause any real problem.
+    // To make it more robust, we may delay the removal using a time-based approach.
+    discard_result(admission_state_map_.Delete(req->query_id()));
+    VLOG(3) << "Current admission state map size: " << admission_state_map_.Count();
+  }
 }
 
 void AdmissionControlService::ReleaseQuery(const ReleaseQueryRequestPB* req,

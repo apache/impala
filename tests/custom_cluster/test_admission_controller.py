@@ -2330,6 +2330,76 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+    impalad_args=("--vmodule=admission-control-service=3 --default_pool_max_requests=1 "
+      "--queue_wait_timeout_ms=1"),
+      disable_log_buffering=True)
+  def test_admission_state_map_mem_leak(self):
+    """
+    Regression test to reproduce IMPALA-14276.
+    Steps:
+    1. Submit a long-running query to coord1 and let it run.
+    2. Repeatedly submit short queries to coord2 that get queued and time out due to
+       admission limits.
+    3. Get memory usage before and after to check for possible memory leak in
+       admissiond.
+    """
+
+    # Long-running query that blocks a request slot.
+    long_query = "select count(*) from functional.alltypes where int_col = sleep(10000)"
+    # Simple short query used to trigger queuing and timeout.
+    short_query = "select count(*) from functional.alltypes limit 1"
+
+    # Max timeout for waiting on query state transitions.
+    timeout_s = 10
+
+    ac = self.cluster.admissiond
+    all_coords = self.cluster.get_all_coordinators()
+    assert len(all_coords) >= 2, "Test requires at least two coordinators"
+
+    coord1, coord2 = all_coords[0], all_coords[1]
+
+    # Submit long query to coord1 to occupy the admission slot.
+    client1 = coord1.service.create_hs2_client()
+    handle1 = client1.execute_async(long_query)
+    client1.wait_for_impala_state(handle1, RUNNING, timeout_s)
+
+    # Allow some time for the system to stabilize.
+    sleep(5)
+    # Capture memory usage before stressing the system.
+    old_total_bytes = ac.service.get_metric_value("tcmalloc.bytes-in-use")
+    assert old_total_bytes != 0
+
+    # Submit short queries to coord2 which will be queued and time out.
+    client2 = coord2.service.create_hs2_client()
+    number_of_iterations = 500
+    for i in range(number_of_iterations):
+        handle2 = client2.execute_async(short_query)
+        self._wait_for_change_to_profile(
+            handle2,
+            "Query Status: Admission for query exceeded timeout",
+            client=client2,
+            timeout=timeout_s)
+        client2.close_query(handle2)
+
+    # Capture memory usage after the test.
+    new_total_bytes = ac.service.get_metric_value("tcmalloc.bytes-in-use")
+
+    # Ensure memory usage has not grown more than 10%, indicating no leak.
+    assert new_total_bytes < old_total_bytes * 1.1
+    # Check if the admission state map size stays 1 all the time, which is
+    # the long running query.
+    admissiond_log = self.get_ac_log_name()
+    self.assert_log_contains(admissiond_log, 'INFO',
+      "Current admission state map size: {}".format(1),
+      expected_count=number_of_iterations)
+
+    # Cleanup clients.
+    client1.close()
+    client2.close()
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
       impalad_args="--vmodule admission-controller=3 "
       "--debug_actions=IMPALA_SERVICE_POOL:127.0.0.1:29500:ReleaseQueryBackends:FAIL@1.0 "
       "--admission_control_slots=1 --executor_groups=default-pool-group1")
