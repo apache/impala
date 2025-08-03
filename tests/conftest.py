@@ -389,8 +389,17 @@ def unique_database(request, testid_checksum):
                        'characters.'.format(db_name))
 
   def cleanup_database(client, db_name, must_exist):
-    result = client.execute('DROP DATABASE {0} `{1}` CASCADE'.format(
-      "" if must_exist else "IF EXISTS", db_name))
+    for i in range(2):
+      try:
+        result = client.execute('DROP DATABASE {0} `{1}` CASCADE'.format(
+          "" if must_exist else "IF EXISTS", db_name))
+        break
+      except Exception as e:
+        if i == 0:
+          # Retry in case we hit IMPALA-14228.
+          LOG.warn("Ignored cleanup failure once: " + str(e))
+        else:
+          raise e
     assert result.success
     # The database directory may not be removed if there are external tables in the
     # database when it is dropped. The external locations are not removed by cascade.

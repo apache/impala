@@ -740,6 +740,8 @@ class CatalogdProcess(BaseImpalaProcess):
     if wait_until_ready:
       self.service.wait_for_metric_value('statestore-subscriber.connected',
                                          expected_value=1, timeout=30)
+      # Also wait until web pages are initialized
+      self.service.wait_for_page_ready("healthz")
 
   def set_jvm_log_level(self, class_name, level):
     """Helper method to set JVM log level for certain class name."""

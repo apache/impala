@@ -107,9 +107,11 @@ class TestCatalogdHA(CustomClusterTestSuite):
     for catalogd in catalogds:
       port = catalogd.get_webserver_port()
       page = requests.get(self.HEALTHZ_URL.format(port))
-      assert page.status_code == requests.codes.ok
+      LOG.info("Status of healthz page at port {}: {}".format(port, page.status_code))
+      assert page.status_code == requests.codes.ok, "port {} not ready".format(port)
       page = requests.head(self.HEALTHZ_URL.format(port))
-      assert page.status_code == requests.codes.ok
+      LOG.info("Status of healthz page at port {}: {}".format(port, page.status_code))
+      assert page.status_code == requests.codes.ok, "port {} not ready".format(port)
     first_impalad = self.cluster.get_first_impalad()
     page = requests.head(self.HEALTHZ_URL.format(first_impalad.get_webserver_port()))
     assert page.status_code == requests.codes.ok
@@ -242,7 +244,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     statestored_args=SS_AUTO_FAILOVER_ARGS,
     catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
                   "--enable_reload_events=true",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_catalogd_auto_failover(self, unique_database):
     """Tests for Catalog Service auto fail over without failed RPCs."""
     self.__test_catalogd_auto_failover(unique_database)
@@ -261,7 +264,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
         + "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:FAIL@1.0"),
     catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
                   "--enable_reload_events=true",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_catalogd_auto_failover_with_failed_rpc(self, unique_database):
     """Tests for Catalog Service auto fail over with failed RPCs."""
     self.__test_catalogd_auto_failover(unique_database)
@@ -281,7 +285,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     # minicluster has 68 Db when this test is written. So total sleep is ~3.4s.
     catalogd_args="--reset_metadata_lock_duration_ms=100 "
                   "--debug_actions=reset_metadata_loop_locked:SLEEP@50",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   @UniqueDatabase.parametrize(name_prefix='aaa_test_catalogd_auto_failover_slow_first_db')
   def test_catalogd_auto_failover_slow_first_db(self, unique_database):
     """Tests for Catalog Service auto fail over with both slow metadata reset and slow
@@ -296,7 +301,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     # minicluster has 68 Db when this test is written. So total sleep is ~3.4s.
     catalogd_args="--reset_metadata_lock_duration_ms=100 "
                   "--debug_actions=reset_metadata_loop_locked:SLEEP@50",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   @UniqueDatabase.parametrize(name_prefix='zzz_test_catalogd_auto_failover_slow_last_db')
   def test_catalogd_auto_failover_slow_last_db(self, unique_database):
     """Tests for Catalog Service auto fail over with both slow metadata reset and slow
@@ -371,7 +377,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
                      "--statestore_heartbeat_frequency_ms=1000",
     catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
                   "--enable_reload_events=true",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_catalogd_manual_failover(self, unique_database):
     """Tests for Catalog Service manual fail over without failed RPCs."""
     self.__test_catalogd_manual_failover(unique_database)
@@ -390,7 +397,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
                      "--debug_actions=SEND_UPDATE_CATALOGD_RPC_FIRST_ATTEMPT:FAIL@1.0",
     catalogd_args="--catalogd_ha_reset_metadata_on_failover=false "
                   "--enable_reload_events=true",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_catalogd_manual_failover_with_failed_rpc(self, unique_database):
     """Tests for Catalog Service manual fail over with failed RPCs."""
     self.__test_catalogd_manual_failover(unique_database)
@@ -407,7 +415,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     statestored_args="--use_subscriber_id_as_catalogd_priority=true "
                      "--statestore_heartbeat_frequency_ms=1000",
     impalad_args="--debug_actions=IGNORE_NEW_ACTIVE_CATALOGD_ADDR:FAIL@1.0",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_manual_failover_with_coord_ignore_notification(self):
     """Tests for Catalog Service manual failover with coordinators to ignore failover
     notification."""
@@ -476,7 +485,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(
     catalogd_args="--force_catalogd_active=true",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_two_catalogd_with_force_active(self, unique_database):
     """The test case for cluster started with catalogd HA enabled and
     both catalogds started with 'force_catalogd_active' as true.
@@ -489,7 +499,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     statestored_args="--use_subscriber_id_as_catalogd_priority=true",
     catalogd_args="--debug_actions='catalogd_wait_sync_ddl_version_delay:SLEEP@{0}'"
                   .format(SYNC_DDL_DELAY_S * 1000),
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_catalogd_failover_with_sync_ddl(self, unique_database):
     """Tests for Catalog Service force fail-over when running DDL with SYNC_DDL
     enabled."""
@@ -528,7 +539,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
     catalogd_args="--catalogd_ha_reset_metadata_on_failover=true "
                   "--catalog_topic_mode=minimal",
     impalad_args="--use_local_catalog=true",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_metadata_after_failover(self, unique_database):
     self._test_metadata_after_failover(
         unique_database, self._create_native_fn, self._verify_native_fn)
@@ -541,7 +553,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
                   "--catalog_topic_mode=minimal "
                   "--debug_actions=TRIGGER_RESET_METADATA_DELAY:SLEEP@1000",
     impalad_args="--use_local_catalog=true",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_metadata_after_failover_with_delayed_reset(self, unique_database):
     self._test_metadata_after_failover(
         unique_database, self._create_native_fn, self._verify_native_fn)
@@ -554,7 +567,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
                   "--catalog_topic_mode=minimal --enable_reload_events=true "
                   "--debug_actions=catalogd_event_processing_delay:SLEEP@1000",
     impalad_args="--use_local_catalog=true",
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_metadata_after_failover_with_hms_sync(self, unique_database):
     self._test_metadata_after_failover(
         unique_database, self._create_new_table, self._verify_new_table)
@@ -565,7 +579,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
                   "--debug_actions=catalogd_event_processing_delay:SLEEP@2000 "
                   "--enable_reload_events=true --warmup_tables_config_file="
                   "{0}/test-warehouse/warmup_table_list.txt".format(FILESYSTEM_PREFIX),
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_warmed_up_metadata_after_failover(self, unique_database):
     """Verify that the metadata is warmed up in the standby catalogd."""
     for catalogd in self.__get_catalogds():
@@ -587,7 +602,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
                   "--catalogd_ha_failover_catchup_timeout_s=2 "
                   "--enable_reload_events=true --warmup_tables_config_file="
                   "{0}/test-warehouse/warmup_table_list.txt".format(FILESYSTEM_PREFIX),
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_failover_catchup_timeout_and_reset(self, unique_database):
     self._test_metadata_after_failover(
         unique_database, self._create_new_table, self._verify_new_table)
@@ -600,7 +616,8 @@ class TestCatalogdHA(CustomClusterTestSuite):
                   "--catalogd_ha_reset_metadata_on_failover_catchup_timeout=false "
                   "--enable_reload_events=true --warmup_tables_config_file="
                   "{0}/test-warehouse/warmup_table_list.txt".format(FILESYSTEM_PREFIX),
-    start_args="--enable_catalogd_ha")
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_failover_catchup_timeout_not_reset(self, unique_database):
     # Skip verifying the table existence since it's missing due to catalog not reset.
     latest_catalogd, _ = self._test_metadata_after_failover(
@@ -625,12 +642,15 @@ class TestCatalogdHA(CustomClusterTestSuite):
                   "--debug_actions=catalogd_event_processing_delay:SLEEP@1000 "
                   "--enable_reload_events=true --warmup_tables_config_file="
                   "file://%s/testdata/data/warmup_test_config.txt" % IMPALA_HOME,
-    impalad_args="--use_local_catalog=true",
-    start_args="--enable_catalogd_ha")
+    impalad_args="--catalog_client_connection_num_retries=2 "
+                 "--use_local_catalog=true",
+    start_args="--enable_catalogd_ha",
+    disable_log_buffering=True)
   def test_warmed_up_metadata_failover_catchup(self):
     """All tables under the 'warmup_test_db' will be warmed up based on the config.
     Use local-catalog mode so coordinator needs to fetch metadata from catalogd after
-    each DDL."""
+    each DDL. Use a smaller catalog_client_connection_num_retries since RPC retries will
+    all fail due to IMPALA-14228. We retry the query instead."""
     db = "warmup_test_db"
     self.execute_query("create database if not exists " + db)
     try:

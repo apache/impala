@@ -163,6 +163,24 @@ class BaseImpalaService(object):
                metric_name, expected_value, timeout, value, total_wait))
     self.__metric_timeout_assert(metric_name, expected_value, timeout, value)
 
+  def wait_for_page_ready(self, page_name, timeout=10, interval=1):
+    start_time = time()
+    total_wait = 0
+    while (total_wait < timeout):
+      response = self.open_debug_webpage(page_name)
+      total_wait = time() - start_time
+      if response.status_code == requests.codes.not_found:
+        LOG.info(
+            "Debug webpage {}:{}/{} not yet available. Sleeping {}s before next retry"
+            .format(self.webserver_interface, self.webserver_port, page_name,
+                    interval))
+        sleep(interval)
+        continue
+      LOG.info(
+          "Debug webpage {}:{}/{} is ready. total_wait: {}s"
+          .format(self.webserver_interface, self.webserver_port, page_name, total_wait))
+      return
+
   def __request_minidump(self, pid):
     """
     Impala processes (impalad, catalogd, statestored) have a signal handler for
