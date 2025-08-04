@@ -97,6 +97,14 @@ if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
   exit 1
 fi
 
+# Ensure the IMPALA_TOOLCHAIN_COMMIT_HASH matches the hash in the toolchain build ids.
+TOOLCHAIN_SHORT_HASH="${IMPALA_TOOLCHAIN_BUILD_ID_X86_64#*-}"
+if [[ ! "$IMPALA_TOOLCHAIN_COMMIT_HASH" == "$TOOLCHAIN_SHORT_HASH"* ]]; then
+  echo "ERROR: IMPALA_TOOLCHAIN_COMMIT_HASH '$IMPALA_TOOLCHAIN_COMMIT_HASH' does not " \
+    "start with TOOLCHAIN_SHORT_HASH '$TOOLCHAIN_SHORT_HASH'"
+  exit 1
+fi
+
 export ARCH_NAME=$(uname -p)
 
 # Versions of toolchain dependencies.
