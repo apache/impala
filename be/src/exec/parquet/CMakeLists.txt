@@ -26,6 +26,8 @@ add_library(ExecParquet
   hdfs-parquet-table-writer.cc
   parquet-bloom-filter-util.cc
   parquet-bool-decoder.cc
+  parquet-byte-stream-split-decoder.cc
+  parquet-byte-stream-split-encoder.cc
   parquet-collection-column-reader.cc
   parquet-column-readers.cc
   parquet-column-stats.cc
@@ -50,6 +52,7 @@ endif()
 add_library(ExecParquetTests STATIC
   hdfs-parquet-scanner-test.cc
   parquet-bool-decoder-test.cc
+  parquet-byte-stream-split-test.cc
   parquet-common-test.cc
   parquet-delta-coder-test.cc
   parquet-page-index-test.cc
@@ -60,6 +63,7 @@ add_library(ExecParquetTests STATIC
 add_dependencies(ExecParquetTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(parquet-bool-decoder-test ParquetBoolDecoder.*)
+ADD_UNIFIED_BE_LSAN_TEST(parquet-byte-stream-split-test "ParquetByteStreamSplitDecoderTest.*:ParquetByteStreamSplitEncoderTest.*:ParquetByteStreamSplitCoderTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(parquet-common-test ParquetCommon.*)
 ADD_UNIFIED_BE_LSAN_TEST(parquet-delta-coder-test "ParquetDeltaEncoder.*:ParquetDeltaDecoder.*:ParquetDeltaCoder.*")
 ADD_UNIFIED_BE_LSAN_TEST(parquet-page-index-test ParquetPageIndex.*)
