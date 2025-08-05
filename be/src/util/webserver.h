@@ -21,6 +21,7 @@
 #include <string>
 #include <boost/function.hpp>
 #include <boost/thread/pthread/shared_mutex.hpp>
+#include <shared_mutex>
 #include <rapidjson/fwd.h>
 
 #include "common/status.h"
@@ -305,6 +306,9 @@ class Webserver {
   /// If true, the OAuth token in Authorization header will be used for authentication.
   /// An incoming connection will be accepted if the OAuth token could be verified.
   bool use_oauth_ = false;
+
+  // Lock guarding the compressed_buffer_mem_tracker
+  std::shared_mutex compressed_buffer_mem_tracker_lock_;
 
   // Track memory for the comppressed string buffer
   std::shared_ptr<MemTracker> compressed_buffer_mem_tracker_;
