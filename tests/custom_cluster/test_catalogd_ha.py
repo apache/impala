@@ -769,6 +769,11 @@ class TestCatalogdHA(CustomClusterTestSuite):
     assert catalogd_service_2.get_metric_value(
         "catalog-server.ha-number-active-status-change") > 0
     assert catalogd_service_2.get_metric_value("catalog-server.active-status")
+    # Make sure coordinator has updated the active catalogd address.
+    self.cluster.get_first_impalad().service.wait_for_metric_value(
+        "catalog.active-catalogd-address",
+        expected_value="{}:{}".format(catalogd_service_2.hostname,
+                                      catalogd_service_2.service_port))
 
     for i in range(2):
       try:
@@ -784,6 +789,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
           continue
         assert False, str(e)
 
+    # Recover the cluster to have two catalogds
     active_catalogd.start()
     return standby_catalogd, active_catalogd
 
