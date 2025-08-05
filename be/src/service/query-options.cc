@@ -1398,6 +1398,13 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_hide_analyzed_query(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::BROADCAST_COST_SCALE_FACTOR: {
+        double double_val = 0.0f;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckInclusiveLowerBound<double>(
+            option, value, 0.0, &double_val));
+        query_options->__set_broadcast_cost_scale_factor(double_val);
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

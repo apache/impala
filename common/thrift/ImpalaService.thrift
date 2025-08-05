@@ -1037,6 +1037,13 @@ enum TImpalaQueryOptions {
   // Hide analyzed query from runtime profile. This is useful if query is too large,
   // such as INSERT INTO with hundreds of VALUES.
   HIDE_ANALYZED_QUERY = 193
+
+  // A scale factor that is applied to the cost of a broadcast join.
+  // This is used to adjust DataDistribution strategy between broadcast joins vs
+  // partitioned joins. Setting to a value greater than 1.0 will favor partitioned joins,
+  // while setting to a value less than 1.0 will favor broadcast joins more.
+  // Default to 1.0, which means no adjustment is applied.
+  BROADCAST_COST_SCALE_FACTOR = 194
 }
 
 // The summary of a DML statement.

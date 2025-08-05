@@ -603,11 +603,14 @@ public class DistributedPlanner {
           hashTblBuildCost *= (long) (ctx_.getQueryOptions().broadcast_to_partition_factor
               * Math.max(1.0, Math.sqrt(actual_dop)));
         }
-        broadcastCost = dataPayload + hashTblBuildCost;
+        broadcastCost = (long) ((dataPayload + hashTblBuildCost)
+            * ctx_.getQueryOptions().broadcast_cost_scale_factor);
       }
     }
     if (LOG.isTraceEnabled()) {
-      LOG.trace("broadcast: cost=" + Long.toString(broadcastCost));
+      LOG.trace("broadcast: cost=" + Long.toString(broadcastCost)
+          + " broadcast_cost_scale_factor="
+          + ctx_.getQueryOptions().broadcast_cost_scale_factor);
       LOG.trace("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
           + Float.toString(rhsTree.getAvgRowSize()) + " #nodes="
           + Integer.toString(leftChildNodes));

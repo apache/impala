@@ -785,6 +785,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   194: optional bool hide_analyzed_query = false
+
+  // See comment in ImpalaService.thrift
+  195: optional double broadcast_cost_scale_factor = 1.0
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external
