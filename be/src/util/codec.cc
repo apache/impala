@@ -111,14 +111,16 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const CodecInfo& c
       compressor->reset(new SnappyCompressor(mem_pool, reuse));
       break;
     case THdfsCompression::LZ4:
-      compressor->reset(new Lz4Compressor(mem_pool, reuse));
+      compressor->reset(new Lz4Compressor(mem_pool, reuse,
+          codec_info.compression_level_));
       break;
     case THdfsCompression::ZSTD:
       compressor->reset(new ZstandardCompressor(mem_pool, reuse,
           codec_info.compression_level_));
       break;
     case THdfsCompression::LZ4_BLOCKED:
-      compressor->reset(new Lz4BlockCompressor(mem_pool, reuse));
+      compressor->reset(new Lz4BlockCompressor(mem_pool, reuse,
+          codec_info.compression_level_));
       break;
     default: {
       if (format == THdfsCompression::LZO) return Status(NO_LZO_MSG);
@@ -140,10 +142,13 @@ Status Codec::ValidateCompressionLevel(THdfsCompression::type format,
       return ZstandardCompressor::ValidateCompressionLevel(compression_level);
     case THdfsCompression::BZIP2:
       return BzipCompressor::ValidateCompressionLevel(compression_level);
+    case THdfsCompression::LZ4:
+    case THdfsCompression::LZ4_BLOCKED:
+      return Lz4Compressor::ValidateCompressionLevel(compression_level);
     default:
       // Note: BZIP2 compression levels are supported for disk-spill
       // Parquet or ORC does not support BZIP compression
-      return Status("Compression level only supported for ZSTD, ZLIB(GZIP, DEFLATE)"
+      return Status("Compression level only supported for ZSTD, ZLIB(GZIP, DEFLATE), LZ4,"
           " and BZIP2. Note: BZIP2 is not supported by Parquet(i.e. to write tables)");
   }
 }

@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <lz4hc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <zstd.h>
@@ -405,6 +406,8 @@ TEST_F(DecompressorTest, Snappy) {
 
 TEST_F(DecompressorTest, LZ4) {
   RunTest(THdfsCompression::LZ4);
+  RunTest(THdfsCompression::LZ4, LZ4HC_CLEVEL_MIN);
+  RunTest(THdfsCompression::LZ4, LZ4HC_CLEVEL_MAX);
 }
 
 TEST_F(DecompressorTest, Gzip) {
@@ -608,6 +611,8 @@ TEST_F(DecompressorTest, LZ4HadoopCompat) {
 
 TEST_F(DecompressorTest, LZ4Blocked) {
   RunTest(THdfsCompression::LZ4_BLOCKED);
+  RunTest(THdfsCompression::LZ4_BLOCKED, LZ4HC_CLEVEL_MIN);
+  RunTest(THdfsCompression::LZ4_BLOCKED, LZ4HC_CLEVEL_MAX);
 }
 }
 

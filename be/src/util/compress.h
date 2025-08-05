@@ -138,8 +138,11 @@ class SnappyCompressor : public Codec {
 /// allocated and will cause an error if asked to do so.
 class Lz4Compressor : public Codec {
  public:
-  Lz4Compressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false);
+  Lz4Compressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false,
+      std::optional<int> compression_level = std::nullopt);
   virtual ~Lz4Compressor() { }
+
+  virtual Status Init() override WARN_UNUSED_RESULT;
 
   virtual int64_t MaxOutputLen(
       int64_t input_len, const uint8_t* input = nullptr) override;
@@ -147,6 +150,10 @@ class Lz4Compressor : public Codec {
       const uint8_t* input, int64_t* output_length,
       uint8_t** output) override WARN_UNUSED_RESULT;
   virtual std::string file_extension() const override { return "lz4"; }
+
+  static Status ValidateCompressionLevel(int compression_level);
+ private:
+  int compression_level_;
 };
 
 /// ZStandard compression codec.
@@ -175,7 +182,8 @@ class ZstandardCompressor : public Codec {
 /// Hadoop's block compression scheme on top of LZ4.
 class Lz4BlockCompressor : public Codec {
  public:
-  Lz4BlockCompressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false);
+  Lz4BlockCompressor(MemPool* mem_pool = nullptr, bool reuse_buffer = false,
+      std::optional<int> compression_level = std::nullopt);
   virtual ~Lz4BlockCompressor() { }
 
   virtual int64_t MaxOutputLen(
@@ -184,5 +192,7 @@ class Lz4BlockCompressor : public Codec {
       const uint8_t* input, int64_t* output_length,
       uint8_t** output) override WARN_UNUSED_RESULT;
   virtual std::string file_extension() const override { return "lz4"; }
+ private:
+  int compression_level_;
 };
 }

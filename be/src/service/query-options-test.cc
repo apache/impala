@@ -17,6 +17,7 @@
 
 #include "service/query-options.h"
 
+#include <lz4hc.h>
 #include <zstd.h>
 #include <zlib.h>
 #include <boost/preprocessor/seq/for_each.hpp>
@@ -630,6 +631,8 @@ TEST(QueryOptions, CompressionCodec) {
       case THdfsCompression::ZLIB:
       case THdfsCompression::BZIP2:
       case THdfsCompression::DEFLATE:
+      case THdfsCompression::LZ4:
+      case THdfsCompression::LZ4_BLOCKED:
         EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("$0:1", codec),
         &options, nullptr).ok());
         break;
@@ -700,6 +703,29 @@ TEST(QueryOptions, CompressionCodec) {
     Substitute("BZIP2:$0", bzip_min_clevel - 1), &options, nullptr).ok());
   EXPECT_FALSE(SetQueryOption("compression_codec",
     Substitute("BZIP2:$0", bzip_max_clevel + 1), &options, nullptr).ok());
+
+  // Test compression levels for LZ4 / LZ4_BLOCKED
+  for (const string& lz4_codec : {"lz4", "lz4_blocked"}) {
+    // LZ4's default behavior is considered level 1 (and is tested above).
+    // LZ4's high compression API is used for levels between LZ4HC_CLEVEL_MIN (3) and
+    // LZ4HC_CLEVEL_MAX (12)
+    for (int i = LZ4HC_CLEVEL_MIN; i <= LZ4HC_CLEVEL_MAX; i++) {
+      EXPECT_TRUE(SetQueryOption("compression_codec", Substitute("$0:$1", lz4_codec, i),
+         &options, nullptr).ok());
+    }
+    // LZ4 added a level 2 in 1.10.0. If using a version without that support, test that
+    // level 2 fails. (If using a version with that support, this is tested by the loop
+    // above.)
+    if (LZ4HC_CLEVEL_MIN > 2) {
+      EXPECT_FALSE(SetQueryOption("compression_codec",
+          Substitute("$0:$1", lz4_codec, 2), &options, nullptr).ok());
+    }
+    EXPECT_FALSE(SetQueryOption("compression_codec",
+        Substitute("$0:$1", lz4_codec, LZ4HC_CLEVEL_MAX + 1), &options, nullptr).ok());
+    // Zero is not a valid level
+    EXPECT_FALSE(SetQueryOption("compression_codec",
+        Substitute("$0:$1", lz4_codec, 0), &options, nullptr).ok());
+  }
 #undef CASE
 #undef ENTRIES
 #undef ENTRY

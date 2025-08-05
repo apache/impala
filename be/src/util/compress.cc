@@ -26,6 +26,7 @@
 #include <zlib.h>
 #include <boost/crc.hpp>
 #include <lz4.h>
+#include <lz4hc.h>
 #include <snappy.h>
 #include <zconf.h>
 #include <zstd.h>
@@ -341,8 +342,24 @@ uint32_t SnappyCompressor::ComputeChecksum(int64_t input_len, const uint8_t* inp
   return ((chk >> 15) | (chk << 17)) + 0xa282ead8;
 }
 
-Lz4Compressor::Lz4Compressor(MemPool* mem_pool, bool reuse_buffer)
-  : Codec(mem_pool, reuse_buffer) {
+Lz4Compressor::Lz4Compressor(MemPool* mem_pool, bool reuse_buffer,
+    std::optional<int> compression_level)
+  : Codec(mem_pool, reuse_buffer), compression_level_(compression_level.value_or(1)) {
+}
+
+Status Lz4Compressor::ValidateCompressionLevel(int compression_level) {
+  if (compression_level == 1 ||
+      (compression_level >= LZ4HC_CLEVEL_MIN &&
+       compression_level <= LZ4HC_CLEVEL_MAX)) {
+    return Status::OK();
+  }
+  return Status(Substitute("Invalid LZ4 compression level '$0'."
+      " Valid values are 1 or between [$1, $2] for high compression", compression_level,
+      LZ4HC_CLEVEL_MIN, LZ4HC_CLEVEL_MAX));
+}
+
+Status Lz4Compressor::Init() {
+  return ValidateCompressionLevel(compression_level_);
 }
 
 int64_t Lz4Compressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
@@ -357,8 +374,16 @@ Status Lz4Compressor::ProcessBlock(bool output_preallocated, int64_t input_lengt
   if (MaxOutputLen(input_length, input) == 0) {
     return Status(TErrorCode::LZ4_COMPRESSION_INPUT_TOO_LARGE, input_length);
   }
-  *output_length = LZ4_compress_default(reinterpret_cast<const char*>(input),
-      reinterpret_cast<char*>(*output), input_length, *output_length);
+  if (compression_level_ == 1) {
+    *output_length = LZ4_compress_default(reinterpret_cast<const char*>(input),
+        reinterpret_cast<char*>(*output), input_length, *output_length);
+  } else {
+    DCHECK(compression_level_ >= LZ4HC_CLEVEL_MIN &&
+        compression_level_ <= LZ4HC_CLEVEL_MAX);
+    *output_length = LZ4_compress_HC(reinterpret_cast<const char*>(input),
+        reinterpret_cast<char*>(*output), input_length, *output_length,
+        compression_level_);
+  }
   return Status::OK();
 }
 
@@ -411,8 +436,9 @@ Status ZstandardCompressor::ValidateCompressionLevel(int compression_level) {
   }
 }
 
-Lz4BlockCompressor::Lz4BlockCompressor(MemPool* mem_pool, bool reuse_buffer)
-  : Codec(mem_pool, reuse_buffer) {
+Lz4BlockCompressor::Lz4BlockCompressor(MemPool* mem_pool, bool reuse_buffer,
+    std::optional<int> compression_level)
+  : Codec(mem_pool, reuse_buffer), compression_level_(compression_level.value_or(1)) {
 }
 
 int64_t Lz4BlockCompressor::MaxOutputLen(int64_t input_length, const uint8_t* input) {
@@ -444,8 +470,17 @@ Status Lz4BlockCompressor::ProcessBlock(bool output_preallocated, int64_t input_
   if (input_length > 0) {
     uint8_t* sizep = outp;
     outp += sizeof(int32_t);
-    const int64_t size = LZ4_compress_default(reinterpret_cast<const char*>(input),
-        reinterpret_cast<char*>(outp), input_length, *output_length - (outp - *output));
+    int64_t size = 0;
+    if (compression_level_ == 1) {
+      size = LZ4_compress_default(reinterpret_cast<const char*>(input),
+          reinterpret_cast<char*>(outp), input_length, *output_length - (outp - *output));
+    } else {
+      DCHECK(compression_level_ >= LZ4HC_CLEVEL_MIN &&
+          compression_level_ <= LZ4HC_CLEVEL_MAX);
+      size = LZ4_compress_HC(reinterpret_cast<const char*>(input),
+          reinterpret_cast<char*>(outp), input_length, *output_length - (outp - *output),
+          compression_level_);
+    }
     if (size == 0) { return Status(TErrorCode::LZ4_COMPRESS_DEFAULT_FAILED); }
     ReadWriteUtil::PutInt(sizep, static_cast<uint32_t>(size));
     outp += size;
