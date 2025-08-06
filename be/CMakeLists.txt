@@ -595,6 +595,7 @@ set (UNIFIED_TEST_LIBS
   ExprsTests
   GUtilTests
   IoTests
+  OtelTests
   RpcTests
   RuntimeTests
   SchedulingTests

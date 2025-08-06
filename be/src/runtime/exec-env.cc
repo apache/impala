@@ -160,6 +160,7 @@ DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ai_api_key_jceks_secret);
 DECLARE_string(ai_endpoint);
 DECLARE_string(ai_additional_platforms);
+DECLARE_bool(otel_trace_enabled);
 
 DEFINE_int32(backend_client_connection_num_retries, 3, "Retry backend connections.");
 // When network is unstable, TCP will retry and sending could take longer time.
@@ -347,7 +348,7 @@ Status ExecEnv::Init() {
   LOG(INFO) << "Initializing impalad with backend uuid: " << PrintId(backend_id_);
 
   // Initialize OTel
-  if (FLAGS_is_coordinator && otel_trace_enabled()) {
+  if (FLAGS_is_coordinator && FLAGS_otel_trace_enabled) {
     RETURN_IF_ERROR(init_otel_tracer());
   }
 

@@ -202,10 +202,15 @@ def cleanup_tmp_test_dir(dir_path):
   shutil.rmtree(dir_path, ignore_errors=True)
 
 
-def count_lines(file_path):
+def count_lines(file_path, missing_ok=False):
   """Counts the number of lines in the file located at 'file_path'."""
-  with open(file_path, 'rb') as file:
-    return sum(1 for _ in file.readlines())
+  try:
+    with open(file_path, 'rb') as file:
+      return sum(1 for _ in file.readlines())
+  except IOError:
+    if missing_ok:
+      return 0
+    raise
 
 
 def file_ends_with_char(file_path, char="\n"):
@@ -240,7 +245,7 @@ def file_ends_with_char(file_path, char="\n"):
 
 
 def wait_for_file_line_count(file_path, expected_line_count, max_attempts=3,
-    sleep_time_s=1, backoff=2, last_char="\n"):
+    sleep_time_s=1, backoff=2, last_char="\n", exact_match=False):
   """
   Waits until the given file contains the expected number of lines or until the timeout is
   reached. Fails an assert if the timeout is reached before the expected number of lines
@@ -254,6 +259,9 @@ def wait_for_file_line_count(file_path, expected_line_count, max_attempts=3,
     backoff: Backoff factor for exponential backoff (default is 2).
     last_char: Optional character that the file should end with (default is newline). If
                None, the file is not checked for a specific ending character.
+    exact_match: If True, the function will assert that the file has exactly the expected
+                 number of lines. If False, it will check if the file has at least the
+                 expected number of lines.
 
   Raises:
     AssertionError: If the file does not reach the expected line count within the given
@@ -261,7 +269,11 @@ def wait_for_file_line_count(file_path, expected_line_count, max_attempts=3,
                     character (if provided).
   """
   def assert_trace_file_lines():
-    ret = count_lines(file_path) == expected_line_count
+    if exact_match:
+      ret = count_lines(file_path) == expected_line_count
+    else:
+      ret = count_lines(file_path) >= expected_line_count
+
     if last_char is not None:
       ret = ret and file_ends_with_char(file_path, last_char)
 

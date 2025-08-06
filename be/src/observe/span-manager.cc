@@ -34,9 +34,13 @@
 #include "common/compiler-util.h"
 #include "gen-cpp/Types_types.h"
 #include "observe/timed-span.h"
+#include "runtime/coordinator.h"
+#include "runtime/exec-env.h"
 #include "scheduling/admission-control-client.h"
+#include "scheduling/admission-controller.h"
 #include "service/client-request-state.h"
 #include "util/debug-util.h"
+#include "util/network-util.h"
 
 using namespace opentelemetry;
 using namespace std;
@@ -54,6 +58,7 @@ static constexpr char const* ATTR_STATE = "State";
 
 // Names of attributes on both Root and one or more child spans.
 static constexpr char const* ATTR_CLUSTER_ID = "ClusterId";
+static constexpr char const* ATTR_COORDINATOR = "Coordinator";
 static constexpr char const* ATTR_ORIGINAL_QUERY_ID = "OriginalQueryId";
 static constexpr char const* ATTR_QUERY_ID = "QueryId";
 static constexpr char const* ATTR_QUERY_TYPE = "QueryType";
@@ -155,7 +160,7 @@ SpanManager::~SpanManager() {
   root_->End();
   debug_log_span(root_.get(), "Root", query_id_, false);
   LOG(INFO) << strings::Substitute("Closed OpenTelemetry trace with trace_id=\"$0\" "
-      "span_id=\"$1\"", root_->TraceId(), root_->SpanId());
+      "span_id=\"$1\" query_id=\"$2\"", root_->TraceId(), root_->SpanId(), query_id_);
 
   scope_.reset();
   root_.reset();
@@ -176,7 +181,8 @@ void SpanManager::AddChildSpanEvent(const nostd::string_view& name) {
     LOG(WARNING) << strings::Substitute("Attempted to add event '$0' with no active "
         "child span trace_id=\"$1\" span_id=\"$2\"\n$3", name.data(), root_->TraceId(),
         root_->SpanId(), GetStackTrace());
-    DCHECK(current_child_) << "Cannot add event when child span is not active.";
+    DCHECK(current_child_) << strings::Substitute("Cannot add event '$0' when child span "
+        "is not active.", name.data());
   }
 } // function AddChildSpanEvent
 
@@ -185,7 +191,9 @@ void SpanManager::StartChildSpanInit() {
   ChildSpanBuilder(ChildSpanType::INIT,
       {
         {ATTR_CLUSTER_ID, FLAGS_cluster_id},
-        {ATTR_QUERY_ID, query_id_}
+        {ATTR_QUERY_ID, query_id_},
+        {ATTR_COORDINATOR, TNetworkAddressToString(
+                     ExecEnv::GetInstance()->configured_backend_address())}
       });
 
   {
@@ -261,10 +269,10 @@ void SpanManager::StartChildSpanAdmissionControl() {
   ChildSpanBuilder(ChildSpanType::ADMISSION_CONTROL);
 } // function StartChildSpanAdmissionControl
 
-void SpanManager::EndChildSpanAdmissionControl() {
+void SpanManager::EndChildSpanAdmissionControl(const Status& cause) {
   lock_guard<mutex> l(child_span_mu_);
   lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
-  DoEndChildSpanAdmissionControl();
+  DoEndChildSpanAdmissionControl(&cause);
 } // function EndChildSpanAdmissionControl
 
 inline void SpanManager::DoEndChildSpanAdmissionControl(const Status* cause) {
@@ -276,23 +284,36 @@ inline void SpanManager::DoEndChildSpanAdmissionControl(const Status* cause) {
 
   DCHECK_CHILD_SPAN_TYPE(ChildSpanType::ADMISSION_CONTROL);
 
-  bool was_queued = false;
-  const string* adm_result = nullptr;
-
-  if (LIKELY(client_request_state_->summary_profile() != nullptr)) {
-      adm_result =
-          client_request_state_->summary_profile()->GetInfoString("Admission result");
-  }
+  bool queued = false;
+  string adm_result;
 
   if (LIKELY(client_request_state_->admission_control_client() != nullptr)) {
-    was_queued = client_request_state_->admission_control_client()->WasQueued();
+    queued = client_request_state_->admission_control_client()->WasQueued();
+  }
+
+  if (LIKELY(client_request_state_->summary_profile() != nullptr)) {
+    // The case of a query being cancelled while in the admission queue is handled here
+    // because the summary profile may not be updated by the time this code runs.
+    if (UNLIKELY(queued && cause != nullptr && cause->code() == TErrorCode::CANCELLED)) {
+      adm_result = AdmissionController::PROFILE_INFO_VAL_CANCELLED_IN_QUEUE;
+    } else{
+      const string* profile_adm_res = client_request_state_->summary_profile()->
+          GetInfoString("Admission result");
+      if (UNLIKELY(profile_adm_res == nullptr)) {
+        // Handle the case where the query closes during admission control before the
+        // summary profile is updated with the admission result.
+        adm_result = "";
+      } else {
+        adm_result = *profile_adm_res;
+      }
+    }
   }
 
   EndChildSpan(
       cause,
       OtelAttributesMap{
-        {ATTR_QUEUED, was_queued},
-        {ATTR_ADM_RESULT, (adm_result == nullptr ? "" : *adm_result)},
+        {ATTR_QUEUED, queued},
+        {ATTR_ADM_RESULT, adm_result},
         {ATTR_REQUEST_POOL, client_request_state_->request_pool()}
       });
 } // function DoEndChildSpanAdmissionControl
@@ -329,11 +350,26 @@ inline void SpanManager::DoEndChildSpanQueryExecution(const Status* cause) {
     attrs.emplace(ATTR_NUM_DELETED_ROWS, static_cast<int64_t>(0));
     attrs.emplace(ATTR_NUM_MODIFIED_ROWS, static_cast<int64_t>(0));
   } else {
-    attrs.emplace(ATTR_NUM_DELETED_ROWS, static_cast<int64_t>(-1));
-    attrs.emplace(ATTR_NUM_MODIFIED_ROWS, static_cast<int64_t>(-1));
+    int64_t num_deleted_rows = 0;
+    int64_t num_modified_rows = 0;
+
+    if (client_request_state_->GetCoordinator() != nullptr
+        && client_request_state_->GetCoordinator()->dml_exec_state() != nullptr) {
+      num_deleted_rows =
+      client_request_state_->GetCoordinator()->dml_exec_state()->GetNumDeletedRows();
+      num_modified_rows =
+          client_request_state_->GetCoordinator()->dml_exec_state()->GetNumModifiedRows();
+    }
+
+    attrs.emplace(ATTR_NUM_DELETED_ROWS, num_deleted_rows);
+    attrs.emplace(ATTR_NUM_MODIFIED_ROWS, num_modified_rows);
   }
 
-  attrs.emplace(ATTR_NUM_ROWS_FETCHED, client_request_state_->num_rows_fetched());
+  if (client_request_state_->stmt_type() == TStmtType::DDL) {
+    attrs.emplace(ATTR_NUM_ROWS_FETCHED, 0);
+  } else {
+    attrs.emplace(ATTR_NUM_ROWS_FETCHED, client_request_state_->num_rows_fetched());
+  }
 
   EndChildSpan(cause, attrs);
 } // function DoEndChildSpanQueryExecution
@@ -365,42 +401,48 @@ void SpanManager::EndChildSpanClose() {
   DCHECK_CHILD_SPAN_TYPE(ChildSpanType::CLOSE);
 
   lock_guard<mutex> l(child_span_mu_);
-  lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
-  EndChildSpan();
 
-  // Set all root span attributes to avoid dereferencing the client_request_state_ in the
-  // dtor (as the dtor is invoked when client_request_state_ is destroyed).
-  root_->SetAttribute(ATTR_QUERY_TYPE,
-    to_string(client_request_state_->exec_request().stmt_type));
+  root_->SetAttribute(ATTR_COORDINATOR, TNetworkAddressToString(
+                     ExecEnv::GetInstance()->configured_backend_address()));
 
-  if (client_request_state_->query_status().ok()) {
-    root_->SetAttributeEmpty(ATTR_ERROR_MESSAGE);
-  } else {
-    string error_msg = client_request_state_->query_status().msg().msg();
+  {
+    lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
+    EndChildSpan();
 
-    for (const auto& detail : client_request_state_->query_status().msg().details()) {
-      error_msg += "\n" + detail;
+    // Set all root span attributes to avoid dereferencing the client_request_state_ in
+    // the dtor (as the dtor is invoked when client_request_state_ is destroyed).
+    root_->SetAttribute(ATTR_QUERY_TYPE,
+      to_string(client_request_state_->exec_request().stmt_type));
+
+    if (client_request_state_->query_status().ok()) {
+      root_->SetAttributeEmpty(ATTR_ERROR_MESSAGE);
+    } else {
+      string error_msg = client_request_state_->query_status().msg().msg();
+
+      for (const auto& detail : client_request_state_->query_status().msg().details()) {
+        error_msg += "\n" + detail;
+      }
+
+      root_->SetAttribute(ATTR_ERROR_MESSAGE, error_msg);
     }
 
-    root_->SetAttribute(ATTR_ERROR_MESSAGE, error_msg);
-  }
+    if (UNLIKELY(client_request_state_->WasRetried())) {
+      root_->SetAttribute(ATTR_STATE, ClientRequestState::RetryStateToString(
+          client_request_state_->retry_state()));
+      root_->SetAttribute(ATTR_RETRIED_QUERY_ID,
+          PrintId(client_request_state_->retried_id()));
+    } else {
+      root_->SetAttribute(ATTR_STATE,
+        ClientRequestState::ExecStateToString(client_request_state_->exec_state()));
+        root_->SetAttributeEmpty(ATTR_RETRIED_QUERY_ID);
+    }
 
-  if (UNLIKELY(client_request_state_->WasRetried())) {
-    root_->SetAttribute(ATTR_STATE, ClientRequestState::RetryStateToString(
-        client_request_state_->retry_state()));
-    root_->SetAttribute(ATTR_RETRIED_QUERY_ID,
-        PrintId(client_request_state_->retried_id()));
-  } else {
-    root_->SetAttribute(ATTR_STATE,
-      ClientRequestState::ExecStateToString(client_request_state_->exec_state()));
-      root_->SetAttributeEmpty(ATTR_RETRIED_QUERY_ID);
-  }
-
-  if (UNLIKELY(client_request_state_->IsRetriedQuery())) {
-    root_->SetAttribute(ATTR_ORIGINAL_QUERY_ID,
-        PrintId(client_request_state_->original_id()));
-  } else {
-    root_->SetAttributeEmpty(ATTR_ORIGINAL_QUERY_ID);
+    if (UNLIKELY(client_request_state_->IsRetriedQuery())) {
+      root_->SetAttribute(ATTR_ORIGINAL_QUERY_ID,
+          PrintId(client_request_state_->original_id()));
+    } else {
+      root_->SetAttributeEmpty(ATTR_ORIGINAL_QUERY_ID);
+    }
   }
 } // function EndChildSpanClose
 
@@ -408,14 +450,17 @@ inline void SpanManager::ChildSpanBuilder(const ChildSpanType& span_type,
     OtelAttributesMap&& additional_attributes, bool running) {
   DCHECK(client_request_state_ != nullptr) << "Cannot start child span without a valid "
       "client request state.";
-  DCHECK(span_type != ChildSpanType::NONE) << "Span type cannot be " << span_type << ".";
+  DCHECK(span_type != ChildSpanType::NONE) << strings::Substitute("Span type cannot be "
+      "'$0'.", to_string(span_type));
 
   if (UNLIKELY(current_child_)) {
     LOG(WARNING) << strings::Substitute("Attempted to start child span '$0' while "
         "another child span '$1' is still active trace_id=\"$2\" span_id=\"$3\"\n$4",
         to_string(span_type), to_string(child_span_type_), root_->TraceId(),
         root_->SpanId(), GetStackTrace());
-    DCHECK(false) << "Should not start a new child span while one is already active.";
+    DCHECK(false) << strings::Substitute("Should not start child span '$0' when child "
+        "span '$1' is already active.", to_string(span_type),
+        to_string(child_span_type_));
 
     {
       lock_guard<mutex> crs_lock(*(client_request_state_->lock()));

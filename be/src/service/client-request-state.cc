@@ -84,6 +84,7 @@ DECLARE_bool(abort_on_failed_audit_event);
 DECLARE_bool(abort_on_failed_lineage_event);
 DECLARE_int32(krpc_port);
 DECLARE_int64(max_result_cache_size);
+DECLARE_bool(otel_trace_enabled);
 DECLARE_bool(use_local_catalog);
 
 namespace impala {
@@ -124,7 +125,8 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
     fetch_rows_timeout_us_(MICROS_PER_MILLI * query_options().fetch_rows_timeout_ms),
     parent_driver_(query_driver) {
 
-  if (otel_trace_enabled() && should_otel_trace_query(sql_stmt().c_str())) {
+  if (FLAGS_otel_trace_enabled && should_otel_trace_query(sql_stmt(),
+    query_ctx.session.session_type)) {
     // initialize OpenTelemetry for this query
     VLOG(2) << "Initializing OpenTelemetry for query " << PrintId(query_id());
     otel_span_manager_ = build_span_manager(this);
@@ -320,6 +322,9 @@ Status ClientRequestState::Exec() {
     }
     case TStmtType::DDL: {
       DCHECK(exec_req.__isset.catalog_op_request);
+      if (otel_trace_query()) {
+        otel_span_manager_->StartChildSpanQueryExecution();
+      }
       LOG_AND_RETURN_IF_ERROR(ExecDdlRequest());
       break;
     }
@@ -653,7 +658,8 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
   DCHECK(exec_req.__isset.query_exec_request);
   UniqueIdPB query_id_pb;
   TUniqueIdToUniqueIdPB(query_id(), &query_id_pb);
-  if (otel_trace_query()) {
+
+  if (otel_trace_query() && !IsCTAS()) {
     otel_span_manager_->StartChildSpanAdmissionControl();
   }
 
@@ -663,13 +669,15 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
           summary_profile_, blacklisted_executor_addresses_},
       query_events_, &schedule_, &wait_start_time_ms_, &wait_end_time_ms_,
       otel_span_manager_.get());
+
+  if (otel_trace_query() && !IsCTAS()) {
+    otel_span_manager_->EndChildSpanAdmissionControl(admit_status);
+    otel_span_manager_->StartChildSpanQueryExecution();
+  }
+
   {
     lock_guard<mutex> l(lock_);
     if (!UpdateQueryStatus(admit_status).ok()) return;
-  }
-
-  if (otel_trace_query()) {
-    otel_span_manager_->EndChildSpanAdmissionControl();
   }
 
   DCHECK(schedule_.get() != nullptr);
@@ -718,7 +726,6 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
 }
 
 Status ClientRequestState::ExecDdlRequestImplSync() {
-
   if (catalog_op_type() != TCatalogOpType::DDL &&
       catalog_op_type() != TCatalogOpType::RESET_METADATA) {
     Status status = ExecLocalCatalogOp(exec_request().catalog_op_request);
@@ -1211,6 +1218,9 @@ void ClientRequestState::Finalize(const Status* cause) {
   if (otel_trace_query()) {
    otel_span_manager_->AddChildSpanEvent("QueryUnregistered");
    otel_span_manager_->EndChildSpanClose();
+
+   // End the root span and thus the entire trace is also ended.
+   otel_span_manager_.reset();
   }
 }
 
@@ -1268,7 +1278,7 @@ void ClientRequestState::Wait() {
     lock_guard<mutex> l(lock_);
     if (returns_result_set()) {
       query_events()->MarkEvent("Rows available");
-      if (otel_trace_query()) {
+      if (LIKELY(status.code() != TErrorCode::CANCELLED) && otel_trace_query()) {
         otel_span_manager_->AddChildSpanEvent("RowsAvailable");
       }
     } else {

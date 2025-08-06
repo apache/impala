@@ -61,6 +61,9 @@ DEFINE_validator(otel_trace_exporter, [](const char* flagname, const string& val
   return false;
 }); // flag otel_trace_exporter
 
+DEFINE_bool_hidden(otel_trace_beeswax, false, "Specifies whether or not to trace queries "
+    "submitted via the Beeswax protocol. This flag is hidden because tracing Beeswax "
+    "queries is not supported.");
 
 //
 // Start of HTTP related flags.
@@ -160,10 +163,11 @@ DEFINE_string(otel_trace_tls_minimum_version, "", "String containing the minimum
     "TLS version, if not specified, defaults to the overall minimum TLS version.");
 DEFINE_validator(otel_trace_tls_minimum_version, [](const char* flagname,
     const string& value) {
-  if (value.empty() || value == "1.2" || value == "1.3") {
+  if (value.empty() || value == impala::TLSVersions::TLSV1_2 || value == "tlsv1.3") {
     return true;
   }
-  LOG(ERROR) << "Flag '" << flagname << "' must be empty or one of: '1.2', '1.3'.";
+  LOG(ERROR) << "Flag '" << flagname << "' must be empty or one of: '"
+      << impala::TLSVersions::TLSV1_2 << "', 'tlsv1.3'.";
   return false;
 }); // flag otel_trace_tls_minimum_version
 

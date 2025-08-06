@@ -18,8 +18,11 @@
 #include "otel.h"
 
 #include <chrono>
+#include <functional>
 #include <memory>
+#include <regex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <boost/algorithm/string/case_conv.hpp>
@@ -50,8 +53,10 @@
 #include <opentelemetry/trace/tracer.h>
 #include <opentelemetry/version.h>
 
+#include "common/compiler-util.h"
 #include "common/status.h"
 #include "common/version.h"
+#include "gen-cpp/Query_types.h"
 #include "observe/otel-instrument.h"
 #include "observe/span-manager.h"
 #include "service/client-request-state.h"
@@ -67,6 +72,7 @@ DECLARE_string(otel_trace_additional_headers);
 DECLARE_int32(otel_trace_batch_queue_size);
 DECLARE_int32(otel_trace_batch_max_batch_size);
 DECLARE_int32(otel_trace_batch_schedule_delay_ms);
+DECLARE_bool(otel_trace_beeswax);
 DECLARE_string(otel_trace_ca_cert_path);
 DECLARE_string(otel_trace_ca_cert_string);
 DECLARE_string(otel_trace_collector_url);
@@ -89,7 +95,6 @@ DECLARE_int32(otel_trace_timeout_s);
 DECLARE_string(otel_trace_tls_cipher_suites);
 DECLARE_bool(otel_trace_tls_insecure_skip_verify);
 DECLARE_string(otel_trace_tls_minimum_version);
-DECLARE_bool(otel_trace_enabled);
 
 // Other flags
 DECLARE_string(ssl_cipher_list);
@@ -98,6 +103,26 @@ DECLARE_string(ssl_minimum_version);
 
 // Constants
 static const string SCOPE_SPAN_NAME = "org.apache.impala.impalad.query";
+static const regex query_newline(
+    "(select|alter|compute|create|delete|drop|insert|invalidate|update|with)\\s*"
+    "(\n|\\s*\\\\*\\/)", regex::icase | regex::optimize | regex::nosubs);
+
+// Lambda function to check if SQL starts with relevant keywords for tracing
+static const function<bool(std::string_view)> is_traceable_sql =
+    [](std::string_view sql_str) -> bool {
+      return
+          LIKELY(boost::algorithm::istarts_with(sql_str, "select ")
+              || boost::algorithm::istarts_with(sql_str, "alter ")
+              || boost::algorithm::istarts_with(sql_str, "compute ")
+              || boost::algorithm::istarts_with(sql_str, "create ")
+              || boost::algorithm::istarts_with(sql_str, "delete ")
+              || boost::algorithm::istarts_with(sql_str, "drop ")
+              || boost::algorithm::istarts_with(sql_str, "insert ")
+              || boost::algorithm::istarts_with(sql_str, "invalidate ")
+              || boost::algorithm::istarts_with(sql_str, "update ")
+              || boost::algorithm::istarts_with(sql_str, "with "))
+          || regex_search(sql_str.cbegin(), sql_str.cend(), query_newline);
+    };
 
 namespace impala {
 
@@ -112,16 +137,64 @@ static inline bool otel_tls_enabled() {
       || !FLAGS_otel_trace_ca_cert_string.empty()
       || !FLAGS_otel_trace_tls_minimum_version.empty()
       || !FLAGS_otel_trace_ssl_ciphers.empty()
-      || !FLAGS_otel_trace_tls_cipher_suites.empty();
+      || !FLAGS_otel_trace_tls_cipher_suites.empty()
+      || FLAGS_otel_trace_collector_url.find("https://") == 0;
 } // function otel_tls_enabled
 
-bool otel_trace_enabled() {
-  return FLAGS_otel_trace_enabled;
-} // function otel_trace_enabled
+bool should_otel_trace_query(std::string_view sql,
+    const TSessionType::type& session_type) {
+  if (LIKELY(!FLAGS_otel_trace_beeswax) && session_type == TSessionType::BEESWAX) {
+    return false;
+  }
 
-bool should_otel_trace_query(const char* sql) {
-  DCHECK(sql != nullptr) << "SQL statement cannot be null.";
-  return boost::algorithm::istarts_with(sql, "select ");
+  if (LIKELY(is_traceable_sql(sql))) {
+    return true;
+  }
+
+  // Loop until all leading comments and whitespace are skipped.
+  while (true) {
+    if (boost::algorithm::istarts_with(sql, "/*")) {
+      // Handle leading inline comments
+      size_t end_comment = sql.find("*/");
+      if (end_comment != string_view::npos) {
+        sql = sql.substr(end_comment + 2);
+        continue;
+      }
+    } else if (boost::algorithm::istarts_with(sql, "--")) {
+      // Handle leading comment lines
+      size_t end_comment = sql.find("\n");
+      if (end_comment != string_view::npos) {
+        sql = sql.substr(end_comment + 1);
+        continue;
+      }
+    } else if (UNLIKELY(boost::algorithm::istarts_with(sql, " "))) {
+      // Handle leading whitespace. Since Impala removes leading whitespace from the SQL
+      // statement, this case only happens if the sql statement starts with inline
+      // comments or there is a leading space on the first non-comment line.
+      size_t end_comment = sql.find_first_not_of(" ");
+      if (end_comment != string_view::npos) {
+        sql = sql.substr(end_comment);
+        continue;
+      }
+    } else if (boost::algorithm::istarts_with(sql, "\n")) {
+      // Handline newlines after inline comments.
+      size_t end_comment = sql.find_first_not_of("\n");
+      if (end_comment != string_view::npos) {
+        sql = sql.substr(end_comment);
+        continue;
+      }
+    }
+
+    // Check if the SQL statement starts with any of the keywords we want to trace
+    if (LIKELY(is_traceable_sql(sql))) {
+      return true;
+    }
+
+    // No more patterns to check
+    break;
+  }
+
+  return false;
 } // function should_otel_trace_query
 
 // Initializes an OtlpHttpExporter instance with configuration from global flags. The
@@ -158,13 +231,9 @@ static Status init_exporter_http(unique_ptr<SpanExporter>& exporter) {
       // Set minimum TLS version to the value of the global ssl_minimum_version flag.
       // Since this flag is in the format "tlv1.2" or "tlsv1.3", we need to
       // convert it to the format expected by OtlpHttpExporterOptions.
-      const string min_ssl_ver = to_lower_copy(trim_copy(FLAGS_ssl_minimum_version));
-
-      if (!min_ssl_ver.empty() && min_ssl_ver.rfind("tlsv", 0) != 0) {
-        return Status("ssl_minimum_version must start with 'tlsv'");
+      if (!FLAGS_ssl_minimum_version.empty()) {
+        opts.ssl_min_tls = FLAGS_ssl_minimum_version.substr(4); // Remove "tlsv" prefix
       }
-
-      opts.ssl_min_tls = min_ssl_ver.substr(4); // Remove "tlsv" prefix
     } else {
       opts.ssl_min_tls = FLAGS_otel_trace_tls_minimum_version;
     }

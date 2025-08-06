@@ -533,9 +533,6 @@ Status Coordinator::StartBackendExec() {
   query_events_->MarkEvent(Substitute("Ready to start on $0 backends", num_backends));
   parent_query_driver_->SetExecTimeLimit(parent_request_state_);
 
-  if (parent_request_state_->otel_trace_query()) {
-     parent_request_state_->otel_span_manager()->StartChildSpanQueryExecution();
-  }
   // Serialize the TQueryCtx once and pass it to each backend. The serialized buffer must
   // stay valid until WaitOnExecRpcs() has returned.
   ThriftSerializer serializer(true);

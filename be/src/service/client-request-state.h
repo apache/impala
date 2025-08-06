@@ -826,6 +826,9 @@ class ClientRequestState {
   /// remote.
   std::unique_ptr<AdmissionControlClient> admission_control_client_;
 
+  /// SpanManager instance for this query.
+  std::shared_ptr<SpanManager> otel_span_manager_;
+
   /// Executes a local catalog operation (an operation that does not need to execute
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.
   Status ExecLocalCatalogOp(const TCatalogOpRequest& catalog_op) WARN_UNUSED_RESULT;
@@ -1016,7 +1019,9 @@ class ClientRequestState {
   Status TryKillQueryRemotely(
       const TUniqueId& query_id, const KillQueryRequestPB& request);
 
-  /// SpanManager instance for this query.
-  std::shared_ptr<SpanManager> otel_span_manager_;
+  bool IsCTAS() const {
+    return catalog_op_type() == TCatalogOpType::DDL
+      && ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT;
+  }
 };
 }

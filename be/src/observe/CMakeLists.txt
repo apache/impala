@@ -29,3 +29,15 @@ add_library(Observe
   timed-span.cc
 )
 add_dependencies(Observe gen-deps)
+
+if (BUILD_WITH_NO_TESTS)
+  return()
+endif()
+
+add_library(OtelTests STATIC
+  otel-test.cc
+)
+
+add_dependencies(OtelTests gen-deps)
+
+ADD_UNIFIED_BE_LSAN_TEST(otel-test OtelTest.*)

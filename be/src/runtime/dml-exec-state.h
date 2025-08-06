@@ -107,6 +107,9 @@ class DmlExecState {
   /// Return the total number of modified rows across all partitions.
   int64_t GetNumModifiedRows();
 
+  /// Return the total number of deleted rows across all partitions.
+  int64_t GetNumDeletedRows();
+
   /// Populates 'catalog_update' with PartitionStatusMap data.
   /// Returns true if a catalog update is required, false otherwise.
   bool PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update,

@@ -143,6 +143,7 @@ DECLARE_bool(enable_ldap_auth);
 DECLARE_bool(enable_workload_mgmt);
 DECLARE_bool(gen_experimental_profile);
 DECLARE_bool(use_local_catalog);
+DECLARE_bool(otel_trace_enabled);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served."
     "If 0 or less, the Beeswax server is not started. This interface is deprecated and "
@@ -3618,7 +3619,7 @@ bool ImpalaServer::CancelQueriesForGracefulShutdown() {
   // Clean up temporary files if needed.
   ExecEnv::GetInstance()->tmp_file_mgr()->CleanupAtShutdown();
 
-  if (FLAGS_is_coordinator && otel_trace_enabled()) {
+  if (FLAGS_is_coordinator && FLAGS_otel_trace_enabled) {
     shutdown_otel_tracer();
   }
 

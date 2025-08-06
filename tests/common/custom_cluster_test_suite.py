@@ -672,7 +672,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     Returns None if no impalad was started."""
     return cls.cluster.impalads[0].service if cls.cluster.impalads else None
 
-  def query_id_from_ui(self, section, match_func=None, match_query=None, coord_idx=0):
+  def query_id_from_ui(self, section, match_func=None, match_query=None, coord_idx=0,
+      not_found_ok=False):
     """
       Calls to the debug UI's queries page and loops over all queries in the specified
       section calling the provided func for each query, Returns the string id of the
@@ -689,6 +690,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                      is used instead of match_func.
         coord_idx:   Index of the Impalad to use as the coordinator. This is used to
                      determine which impalad's UI to query.
+        not_found_ok: If True, returns None when no matching query is found. If False,
+                      fails an assert when no matching query is found.
 
       Returns:
         String of the query id of the first matching query or None if no query matches.
@@ -712,7 +715,11 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         query_id = query['query_id']
         return query_id, service.read_query_profile_page(query_id)
 
-    assert False, "No matching query found in section '{}'".format(section)
+    if not_found_ok:
+      return None, None
+    else:
+      assert False, "No matching query found in section '{}'".format(section)
+
 
   def query_profile_from_ui(self, query_id, coord_idx=0):
     """

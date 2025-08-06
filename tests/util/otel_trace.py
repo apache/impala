@@ -21,6 +21,8 @@ import json
 import os
 import sys
 
+from time import sleep
+
 from tests.common.environ import IMPALA_LOCAL_BUILD_VERSION
 
 # Valid types of OpenTelemetry attribute values.
@@ -106,6 +108,7 @@ class OtelSpan:
       scope_name: The name of the scope that produced this span.
       scope_version: The version of the scope that produced this span.
       attributes: A dictionary of attribute key to AttributeValue object.
+      events:     A dictionary of event name to event time.
       start_time: The start time of the span in nanoseconds since epoch.
       end_time: The end time of the span in nanoseconds since epoch.
       flags: The OpenTelemetry trace flags of the span (represented as an integer).
@@ -122,6 +125,7 @@ class OtelSpan:
     self.scope_name = ""
     self.scope_version = ""
     self.attributes = {}
+    self.events = {}
     self.start_time = 0
     self.end_time = 0
     self.flags = -1
@@ -136,9 +140,35 @@ class OtelSpan:
     return self.parent_span_id is None
 
   def add_attribute(self, key, value):
+    if sys.version_info.major < 3:
+      assert isinstance(key, unicode), "key must be a string"  # noqa: F821
+      key = str(key)
+    else:
+      assert isinstance(key, str), "key must be a string"
+
+    assert isinstance(value, AttributeValue), "Value must be an instance of " \
+        "AttributeValue, got: {}".format(type(value))
+
     self.attributes[key] = value
     if key == "QueryId":
       self.query_id = value.value
+
+  def add_event(self, name, time_unix_nano):
+    if sys.version_info.major < 3:
+      assert isinstance(name, unicode), "Event name must be a string"  # noqa: F821
+      name = str(name)
+      assert isinstance(time_unix_nano, unicode), \
+          "Time value must be a string"  # noqa: F821
+      time_unix_nano = str(time_unix_nano)
+    else:
+      assert isinstance(name, str), "Event name must be a string"
+      assert isinstance(time_unix_nano, str), "Time value must be a string"
+
+    try:
+      self.events[name] = int(time_unix_nano)
+    except ValueError:
+        raise ValueError("Could not convert time_unix_nano '{}' to an integer"
+            .format(time_unix_nano))
 
   def __str__(self):
     """
@@ -153,6 +183,8 @@ class OtelSpan:
             self.scope_name, self.scope_version, self.query_id)
     for k in self.attributes:
       s += "\n    '{}': {},".format(k, self.attributes[k])
+    for k in self.events:
+      s += "\n    '{}': {},".format(k, self.events[k])
     s += "\n  })"
 
     return s
@@ -226,6 +258,11 @@ def __parse_line(line):
             key, value = __parse_attr(attr)
             s.add_attribute(key, value)
 
+          # Parse each span event list.
+          if "events" in span:
+            for event in span["events"]:
+              s.add_event(event["name"], event["timeUnixNano"])
+
           parsed_spans.append(s)
   except Exception as e:
     sys.stderr.write("Failed to parse json:\n{}".format(line))
@@ -249,10 +286,33 @@ def parse_trace_file(file_path, query_id):
   traces_by_query_id = {}
   parsed_spans = []
 
-  with open(file_path, "r") as f:
-    lines = f.readlines()
-    for line in lines:
-      parsed_spans.extend(__parse_line(line))
+  max_retries = 3
+  retry_count = 0
+
+  while retry_count < max_retries:
+    try:
+      with open(file_path, "r") as f:
+        lines = f.readlines()
+        for line in lines:
+          if not line.endswith('\n'):
+            # Line does not end with a newline, thus the entire trace has not yet been
+            # written to the file. Retry by restarting the loop
+            parsed_spans = []
+            retry_count += 1
+            print("Line doesn't end with newline, retrying (attempt {} of {})"
+                .format(retry_count, max_retries))
+            sleep(1)
+            break
+          parsed_spans.extend(__parse_line(line))
+        else:
+          # Successfully read all lines, exit the retry loop.
+          break
+    except Exception as e:
+      retry_count += 1
+      if retry_count >= max_retries:
+        raise
+      print("Error reading trace file, retrying (attempt {} of {}): {}"
+          .format(retry_count, max_retries, e))
 
   # Build a map of query_id -> OtelTrace for easy lookup.
   # First, locate all root spans

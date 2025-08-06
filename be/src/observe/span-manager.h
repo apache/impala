@@ -92,7 +92,7 @@ public:
   // client_request_state_->lock().
   void EndChildSpanInit();
   void EndChildSpanSubmitted();
-  void EndChildSpanAdmissionControl();
+  void EndChildSpanAdmissionControl(const Status& cause);
   void EndChildSpanQueryExecution();
   void EndChildSpanClose();
 

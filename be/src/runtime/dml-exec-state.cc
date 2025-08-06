@@ -160,6 +160,15 @@ int64_t DmlExecState::GetNumModifiedRows() {
   return result;
 }
 
+int64_t DmlExecState::GetNumDeletedRows() {
+  lock_guard<mutex> l(lock_);
+  int64_t result = 0;
+  for (const PartitionStatusMap::value_type& p : per_partition_status_) {
+    result += p.second.num_deleted_rows();
+  }
+  return result;
+}
+
 bool DmlExecState::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update,
     const TFinalizeParams& finalize_params) {
   lock_guard<mutex> l(lock_);
