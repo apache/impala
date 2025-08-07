@@ -697,6 +697,13 @@ Coordinator::BackendState::CancelResult Coordinator::BackendState::Cancel(
       goto done;
     }
 
+    // Drop the lock while we send the cancel RPC. RPC threads from ReportExecStatus
+    // acquire the lock when calling IsDone() via LogFirstInProgress(). If this holds the
+    // lock for an extended period of time, it can block all of the RPC threads, leaving
+    // no thread to process this CancelQueryFInstances RPC locally. This causes a
+    // temporary deadlock until this RPC times out (10 seconds).
+    l.unlock();
+
     CancelQueryFInstancesRequestPB request;
     *request.mutable_query_id() = query_id_;
     CancelQueryFInstancesResponsePB response;
@@ -708,6 +715,18 @@ Coordinator::BackendState::CancelResult Coordinator::BackendState::Cancel(
         RpcMgr::DoRpcWithRetry(proxy, &ControlServiceProxy::CancelQueryFInstances,
             request, &response, query_ctx_, "Cancel() RPC failed", num_retries,
             timeout_ms, backoff_time_ms, "COORD_CANCEL_QUERY_FINSTANCES_RPC");
+
+    // Reacquire the lock after the RPC completes
+    l.lock();
+
+    // If this became done while we dropped the lock for the CancelQueryFInstances RPC,
+    // the results of the RPC should be ignored.
+    if (IsDoneLocked(l)) {
+      VLogForBackend(Substitute(
+          "Ignoring result of cancel RPC because the backend is already done: $0",
+          status_.GetDetail()));
+      goto done;
+    }
 
     if (!rpc_status.ok()) {
       status_.MergeStatus(rpc_status);
