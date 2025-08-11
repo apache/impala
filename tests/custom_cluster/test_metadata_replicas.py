@@ -26,7 +26,8 @@ from tests.util.hive_utils import HiveDbWrapper
 @SkipIfFS.hive
 @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=false",
-    catalogd_args="--catalog_topic_mode=full")
+    catalogd_args="--catalog_topic_mode=full",
+    statestored_args="--statestore_update_frequency_ms=1000")
 class TestMetadataReplicas(CustomClusterTestSuite):
   """ Validates metadata content across catalogd and impalad coordinators.
   This test is only valid in legacy catalog mode. """
@@ -44,8 +45,6 @@ class TestMetadataReplicas(CustomClusterTestSuite):
     self.__validate_metadata()
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      statestored_args="--statestore_update_frequency_ms=1000")
   def test_catalog_restart(self, testid_checksum):
     """ IMPALA-6948: reproduces the issue by deleting a table from Hive while the catalogd
         is down. When catalogd is restarted, if the regression is present, the deleted
