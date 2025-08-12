@@ -120,3 +120,10 @@ def parse_admission_result(profile_text):
   admission_result = re.search(r'\n\s+Admission result:\s+(.*?)\n', profile_text)
   assert admission_result is not None, "Admission Result not found in query profile"
   return admission_result.group(1)
+
+
+def parse_default_db(profile_text):
+  """Parses the default db from the query profile text."""
+  default_db = re.search(r'\n\s+Default Db:\s+(.*?)\n', profile_text)
+  assert default_db is not None, "Default Db not found in query profile"
+  return default_db.group(1)

@@ -403,9 +403,6 @@ void SpanManager::EndChildSpan(const Status* cause,
       current_child_->SetAttribute(a.first, a.second);
     }
 
-    current_child_->SetAttribute(ATTR_STATUS,
-        ClientRequestState::ExecStateToString(client_request_state_->exec_state()));
-
     const Status* query_status;
     if (cause != nullptr) {
       query_status = cause;
@@ -415,6 +412,8 @@ void SpanManager::EndChildSpan(const Status* cause,
 
     if (query_status->ok()) {
       current_child_->SetAttributeEmpty(ATTR_ERROR_MSG);
+      current_child_->SetAttribute(ATTR_STATUS,
+        ClientRequestState::ExecStateToString(client_request_state_->exec_state()));
     } else {
       string error_msg = query_status->msg().msg();
 
@@ -423,6 +422,8 @@ void SpanManager::EndChildSpan(const Status* cause,
       }
 
       current_child_->SetAttribute(ATTR_ERROR_MSG, error_msg);
+      current_child_->SetAttribute(ATTR_STATUS,
+            ClientRequestState::ExecStateToString(ClientRequestState::ExecState::ERROR));
     }
 
     current_child_->End();
