@@ -147,7 +147,7 @@ def run_workload(base_dir, workloads, options):
 
   run_workload = ["{0}/bin/run-workload.py".format(IMPALA_HOME)]
 
-  impalads = ",".join(["localhost:{0}".format(21000 + i)
+  impalads = ",".join(["localhost:{0}".format(21050 + i)
                        for i in range(0, int(options.num_impalads))])
 
   run_workload += ["--workloads={0}".format(workloads),

@@ -33,7 +33,8 @@ import time
 import traceback
 
 from optparse import OptionParser
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
+from tests.common.impala_connection import ImpylaHS2Connection
+from tests.common.test_vector import HS2
 from multiprocessing.pool import ThreadPool
 
 LOG = logging.getLogger('load-data.py')
@@ -112,6 +113,8 @@ HIVE_ARGS = '-n %s -u "jdbc:hive2://%s/default;%s" --verbose=true'\
 
 HADOOP_CMD = os.path.join(os.environ['HADOOP_HOME'], 'bin/hadoop')
 
+HS2_HOST_PORT = "{}:{}".format(options.impalad, 21050)
+
 def available_workloads(workload_dir):
   return [subdir for subdir in os.listdir(workload_dir)
             if os.path.isdir(os.path.join(workload_dir, subdir))]
@@ -181,7 +184,8 @@ def exec_impala_query_from_file(file_name):
   LOG.info("Beginning execution of impala SQL on {0}: {1}".format(
            options.impalad, file_name))
   is_success = True
-  impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
+  impala_client = ImpylaHS2Connection(HS2_HOST_PORT,
+                                      use_kerberos=options.use_kerberos)
   output_file = file_name + ".log"
   query = None
   with open(output_file, 'w') as out_file:
@@ -234,7 +238,7 @@ def generate_schema_statements(workload):
     generate_cmd += " --hive_warehouse_dir=%s" % options.hive_warehouse_dir
   if options.hdfs_namenode is not None:
     generate_cmd += " --hdfs_namenode=%s" % options.hdfs_namenode
-  generate_cmd += " --backend=%s" % options.impalad
+  generate_cmd += " --backend=%s" % HS2_HOST_PORT
   LOG.info('Executing Generate Schema Command: ' + generate_cmd)
   schema_cmd = os.path.join(TESTDATA_BIN_DIR, generate_cmd)
   error_msg = 'Error generating schema statements for workload: ' + workload
