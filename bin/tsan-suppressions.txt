@@ -47,3 +47,8 @@ race:impala::HdfsColumnarScanner::ProcessScratchBatchCodegenOrInterpret
 
 # TODO: IMPALA-12757: TSAN flags lock-order-inversion during internal-server-test
 deadlock:impala::KrpcDataStreamSender::Channel::WaitForRpcLocked
+
+# TODO: IMPALA-14289: TSAN false-positive over timed_mutex
+# https://github.com/google/sanitizers/issues/1620
+# https://github.com/llvm/llvm-project/issues/142370
+race:impala::HdfsScanNode::ThreadTokenAvailableCb
