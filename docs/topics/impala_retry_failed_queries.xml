@@ -50,7 +50,7 @@ under the License.
     <p><b>Type:</b>
       <codeph>BOOLEAN</codeph></p>
     <p><b>Default:</b>
-      <codeph>TRUE</codeph></p>
+      <codeph>FALSE</codeph></p>
     <p><b>Added in:</b>
       <keyword keyref="impala40"/></p>
     <p><b>Related information:</b>
