@@ -289,6 +289,8 @@ def install_deps(venv_dir, is_py3):
   py_str = "3" if is_py3 else "2"
   LOG.info("Installing setuptools into the python{0} virtualenv".format(py_str))
   exec_pip_install(venv_dir, is_py3, ["-r", SETUPTOOLS_REQS_PATH])
+  if is_py3:
+    exec_pip_install(venv_dir, is_py3, ["packaging==24.1"])
   cc = select_cc()
   if cc is None:
     raise Exception("CC not available")
