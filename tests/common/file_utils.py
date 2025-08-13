@@ -208,13 +208,64 @@ def count_lines(file_path):
     return sum(1 for _ in file.readlines())
 
 
+def file_ends_with_char(file_path, char="\n"):
+  """
+  Checks if a file ends with a specified character.
+
+  Args:
+    file_path: Path to the file to check.
+    char: The character to check for at the end of the file (default is newline)/
+
+  Returns:
+    bool: True if the file ends with the specified character, False otherwise.
+
+  Raises:
+    AssertionError: If char is not a single character.
+  """
+  assert isinstance(char, str)
+
+  char = char.encode('utf-8')
+  assert len(char) == 1, "char parameter must be a single character, got: {}".format(char)
+
+  assert os.path.isfile(file_path), "File does not exist: {}".format(file_path)
+  if os.path.getsize(file_path) == 0:
+    return False
+
+  with open(file_path, 'rb') as f:
+    # Move to the last character of the file
+    f.seek(-1, os.SEEK_END)
+    last_char = f.read(1)
+    # Check if the last character matches the provided character
+    return last_char == char
+
+
 def wait_for_file_line_count(file_path, expected_line_count, max_attempts=3,
-    sleep_time_s=1, backoff=2):
-  """Waits until the given file contains the expected number of lines or until the
-      timeout is reached. Fails an assert if the timeout is reached before the expected
-      number of lines is found."""
+    sleep_time_s=1, backoff=2, last_char="\n"):
+  """
+  Waits until the given file contains the expected number of lines or until the timeout is
+  reached. Fails an assert if the timeout is reached before the expected number of lines
+  is found.
+
+  Args:
+    file_path: Path to the file to check.
+    expected_line_count: Expected number of lines in the file.
+    max_attempts: Maximum number of attempts to check the file (default is 3).
+    sleep_time_s: Time to wait between attempts in seconds (default is 1).
+    backoff: Backoff factor for exponential backoff (default is 2).
+    last_char: Optional character that the file should end with (default is newline). If
+               None, the file is not checked for a specific ending character.
+
+  Raises:
+    AssertionError: If the file does not reach the expected line count within the given
+                    number of attempts or if the file does not end with the specified
+                    character (if provided).
+  """
   def assert_trace_file_lines():
-    return count_lines(file_path) == expected_line_count
+    ret = count_lines(file_path) == expected_line_count
+    if last_char is not None:
+      ret = ret and file_ends_with_char(file_path, last_char)
+
+    return ret
 
   assert retry(assert_trace_file_lines, max_attempts, sleep_time_s, backoff), \
       "File '{}' did not reach expected line count of '{}'. actual line count: '{}'" \

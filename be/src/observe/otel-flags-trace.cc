@@ -26,6 +26,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gutil/strings/split.h>
+#include <gutil/strings/substitute.h>
 #include <opentelemetry/sdk/trace/batch_span_processor_options.h>
 
 #include "common/status.h"
@@ -173,7 +174,8 @@ DEFINE_string(otel_trace_tls_cipher_suites, "", "List of allowed TLS cipher suit
     "using TLS 1.3, default to the value of Impala’s tls_ciphersuites startup flag.");
 
 DEFINE_bool(otel_trace_tls_insecure_skip_verify, false, "If set to true, skips "
-    "verification of collector’s TLS certificate.");
+    "verification of collector’s TLS certificate. This should only be set to false for "
+    "development / testing");
 //
 // End of TLS related flags.
 //
@@ -204,11 +206,12 @@ DEFINE_validator(otel_trace_retry_policy_backoff_multiplier, ge_one);
 //
 // Start of Span Processor flags
 //
-static const string SPAN_PROCESSOR_HELP = "The span processor implementation to use for "
-    "exporting spans to the OTel Collector. Supported values: '"
-    + impala::SPAN_PROCESSOR_BATCH + "' and '" + impala::SPAN_PROCESSOR_SIMPLE + "'.";
-DEFINE_string(otel_trace_span_processor, impala::SPAN_PROCESSOR_BATCH.c_str(),
-    SPAN_PROCESSOR_HELP.c_str());
+// This flag is hidden because simple span processor blocks the query processing while
+// communicating with the OTel collector.
+DEFINE_string_hidden(otel_trace_span_processor, impala::SPAN_PROCESSOR_BATCH.c_str(),
+    strings::Substitute("The span processor implementation to use for exporting spans to "
+    "the OTel Collector. Supported values: '$0' and '$1'.", impala::SPAN_PROCESSOR_BATCH,
+    impala::SPAN_PROCESSOR_SIMPLE).c_str());
 DEFINE_validator(otel_trace_span_processor, [](const char* flagname,
     const string& value) {
   const std::string trimmed = boost::algorithm::trim_copy(value);

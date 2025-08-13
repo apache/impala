@@ -1144,7 +1144,13 @@ Status ClientRequestState::ExecEventProcessorCmd() {
 
 void ClientRequestState::Finalize(const Status* cause) {
   if (otel_trace_query()) {
-    // No need to end previous child span since this function takes care of it.
+    // In a non-error case, end the query execution span since it will be the active span.
+    if (cause == nullptr || cause->ok()) {
+      otel_span_manager_->EndChildSpanQueryExecution();
+    }
+
+    // No need to end previous child span in an error case. This function silently closes
+    // the active child span if there is one.
     otel_span_manager_->StartChildSpanClose(cause);
   }
 

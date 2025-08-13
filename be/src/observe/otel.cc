@@ -268,6 +268,9 @@ Status init_otel_tracer() {
     }
   } else {
     VLOG(2) << "Using SimpleSpanProcessor for OTel spans";
+    LOG(WARNING) << "Setting --otel_trace_span_processor=simple blocks the query "
+    "processing thread while exporting spans to the OTel collector. This will cause "
+    "significant performance degradation and is not recommended for production use.";
     processor = make_unique<SimpleSpanProcessor>(move(exporter));
   }
 
@@ -289,7 +292,7 @@ void shutdown_otel_tracer() {
   provider_.reset();
 }
 
-shared_ptr<SpanManager> build_span_manager(const ClientRequestState* crs) {
+shared_ptr<SpanManager> build_span_manager(ClientRequestState* crs) {
   DCHECK(provider_) << "OpenTelemetry tracer was not initialized.";
 
   return make_shared<SpanManager>(

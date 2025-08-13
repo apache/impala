@@ -52,6 +52,6 @@ Status init_otel_tracer();
 void shutdown_otel_tracer();
 
 // Builds a SpanManager instance for the given query.
-std::shared_ptr<SpanManager> build_span_manager(const ClientRequestState*);
+std::shared_ptr<SpanManager> build_span_manager(ClientRequestState*);
 
 } // namespace impala
