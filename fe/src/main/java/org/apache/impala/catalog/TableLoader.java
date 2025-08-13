@@ -93,7 +93,7 @@ public class TableLoader {
         msTbl = msClient.getHiveClient().getTable(db.getName(), tblName);
         catalogTimeline.markEvent(FETCHED_HMS_TABLE);
       }
-      if (eventId != -1 && catalog_.isEventProcessingActive()) {
+      if (eventId != -1 && catalog_.isEventProcessingEnabled()) {
         // If the eventId is not -1 it means this table was likely created by Impala.
         // However, since the load operation of the table can happen much later, it is
         // possible that the table was recreated outside Impala and hence the eventId

@@ -1162,7 +1162,7 @@ public class CatalogOpExecutor {
      * parameters. No-op if event processing is disabled.
      */
     private void addCatalogServiceIdentifiersToTable() {
-      if (!catalog_.isEventProcessingActive()) return;
+      if (!catalog_.isEventProcessingEnabled()) return;
       org.apache.hadoop.hive.metastore.api.Table msTbl = table_.getMetaStoreTable();
       msTbl.putToParameters(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
           catalog_.getCatalogServiceId());
@@ -1236,7 +1236,7 @@ public class CatalogOpExecutor {
           || params.getAlter_type() == TAlterTableType.RENAME_TABLE) {
         alterTableOrViewRename(tbl,
             TableName.fromThrift(params.getRename_params().getNew_table_name()),
-            modification, wantMinimalResult, response, catalogTimeline, debugAction);
+            wantMinimalResult, response, catalogTimeline, debugAction);
         modification.validateInProgressModificationComplete();
         return;
       }
@@ -1938,7 +1938,7 @@ public class CatalogOpExecutor {
   private void addCatalogServiceIdentifiers(
       org.apache.hadoop.hive.metastore.api.Table msTbl, String catalogServiceId,
       long catalogVersion) {
-    if (!catalog_.isEventProcessingActive()) return;
+    if (!catalog_.isEventProcessingEnabled()) return;
     msTbl.putToParameters(
         MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
         catalogServiceId);
@@ -2395,7 +2395,7 @@ public class CatalogOpExecutor {
   private List<NotificationEvent> getNextMetastoreEventsForTableIfEnabled(
       EventSequence catalogTimeline, long eventId, String dbName, String tblName,
       String eventType) throws MetastoreNotificationException {
-    if (!catalog_.isEventProcessingActive()) return Collections.emptyList();
+    if (!catalog_.isEventProcessingEnabled()) return Collections.emptyList();
     List<NotificationEvent> events = MetastoreEventsProcessor
         .getNextMetastoreEventsInBatchesForTable(catalog_, eventId, dbName, tblName,
             eventType);
@@ -2412,7 +2412,7 @@ public class CatalogOpExecutor {
   private List<NotificationEvent> getNextMetastoreEventsForDbIfEnabled(
       EventSequence catalogTimeline, long eventId, String dbName, String eventType)
       throws MetastoreNotificationException {
-    if (!catalog_.isEventProcessingActive()) return Collections.emptyList();
+    if (!catalog_.isEventProcessingEnabled()) return Collections.emptyList();
     List<NotificationEvent> events = MetastoreEventsProcessor
         .getNextMetastoreEventsInBatchesForDb(catalog_, eventId, dbName, eventType);
     catalogTimeline.markEvent(FETCHED_HMS_EVENT_BATCH);
@@ -2426,7 +2426,7 @@ public class CatalogOpExecutor {
   private List<NotificationEvent> getNextMetastoreDropEventsForDbIfEnabled(
       EventSequence catalogTimeline, long eventId, String dbName)
       throws MetastoreNotificationException {
-    if (!catalog_.isEventProcessingActive()) return Collections.emptyList();
+    if (!catalog_.isEventProcessingEnabled()) return Collections.emptyList();
     List<String> eventTypes = Lists.newArrayList(
         DropDatabaseEvent.EVENT_TYPE, DropTableEvent.EVENT_TYPE);
     NotificationFilter filter = e -> dbName.equalsIgnoreCase(e.getDbName())
@@ -2527,8 +2527,10 @@ public class CatalogOpExecutor {
             .getMetastoreEventProcessor().getEventsFactory().get(notificationEvent, null);
         Preconditions.checkState(event instanceof AlterTableEvent);
         AlterTableEvent alterEvent = (AlterTableEvent) event;
+        // Skip other alter events in case there are concurrent modification from other
+        // engines.
         if (!alterEvent.isRename()) continue;
-        return new Pair<>(events.get(0).getEventId(),
+        return new Pair<>(alterEvent.getEventId(),
             new Pair<>(alterEvent.getBeforeTable(), alterEvent.getAfterTable()));
       } catch (MetastoreNotificationException e) {
         throw new CatalogException("Unable to create a metastore event", e);
@@ -5754,8 +5756,7 @@ public class CatalogOpExecutor {
    * reloaded on the next access.
    */
   private void alterTableOrViewRename(Table oldTbl, TableName newTableName,
-      InProgressTableModification modification, boolean wantMinimalResult,
-      TDdlExecResponse response, EventSequence catalogTimeline,
+      boolean wantMinimalResult, TDdlExecResponse response, EventSequence catalogTimeline,
       @Nullable String debugAction) throws ImpalaException {
     Preconditions.checkState(oldTbl.isWriteLockedByCurrentThread());
     TableName tableName = oldTbl.getTableName();
@@ -5763,10 +5764,14 @@ public class CatalogOpExecutor {
         oldTbl.getMetaStoreTable().deepCopy();
     msTbl.setDbName(newTableName.getDb());
     msTbl.setTableName(newTableName.getTbl());
+    // Gets the latest event id before we trigger the alter_table HMS RPC. We then use
+    // this id to find the triggered ALTER_TABLE event for self-event detection based on
+    // createEventId and EventDeleteLog.
     long eventId = -1;
-    try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
-      eventId = getCurrentEventId(msClient);
-      catalogTimeline.markEvent(FETCHED_LATEST_HMS_EVENT_ID + eventId);
+    if (catalog_.isEventProcessingEnabled()) {
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
+        eventId = getCurrentEventId(msClient, catalogTimeline);
+      }
     }
     // If oldTbl is a synchronized Kudu table, rename the underlying Kudu table.
     boolean isSynchronizedKuduTable = (oldTbl instanceof KuduTable) &&
@@ -5817,11 +5822,19 @@ public class CatalogOpExecutor {
         catalog_.renameTable(tableName.toThrift(), newTableName.toThrift());
     Preconditions.checkNotNull(result);
     if (renamedTable != null) {
-      org.apache.hadoop.hive.metastore.api.Table tblBefore = renamedTable.second.first;
-      addToDeleteEventLog(renamedTable.first, DeleteEventLog
-          .getTblKey(tblBefore.getDbName(), tblBefore.getTableName()));
+      eventId = renamedTable.first;
+      LOG.info("Got ALTER_TABLE RENAME event id {}.", eventId);
+    } else if (catalog_.isEventProcessingEnabled()) {
+      // Using the eventId at the beginning of the operation is better than nothing.
+      LOG.warn("ALTER_TABLE RENAME event not found. Using {} in createEventId of {} " +
+              "and DeleteEventLog for {}.",
+          eventId, newTableName, tableName);
+    }
+    if (catalog_.isEventProcessingEnabled()) {
+      addToDeleteEventLog(eventId, DeleteEventLog
+          .getTblKey(tableName.getDb(), tableName.getTbl()));
       if (result.second != null) {
-        result.second.setCreateEventId(renamedTable.first);
+        result.second.setCreateEventId(eventId);
       }
     }
     TCatalogObject oldTblDesc = null, newTblDesc = null;
@@ -5846,18 +5859,15 @@ public class CatalogOpExecutor {
       // The rename succeeded in HMS but failed in the catalog cache. The cache is in an
       // inconsistent state, so invalidate the new table to reload it.
       newTblDesc = catalog_.invalidateTable(newTableName.toThrift(),
-          new Reference<>(), new Reference<>(), catalogTimeline);
+          new Reference<>(), new Reference<>(), catalogTimeline, eventId);
       if (newTblDesc == null) {
         throw new ImpalaRuntimeException(String.format(
             "The new table/view %s was concurrently removed during rename.",
             newTableName));
       }
+      LOG.info("Invalidated {} to recover from catalog rename failure", newTableName);
     } else {
       Preconditions.checkNotNull(result.first);
-      // TODO: call addVersionsForInflightEvents using InProgressTableModification object
-      // that is passed into catalog_.renameTable()
-      catalog_.addVersionsForInflightEvents(
-          false, result.second, modification.newVersionNumber());
       newTblDesc = wantMinimalResult ?
           result.second.toInvalidationObject() : result.second.toTCatalogObject();
     }
@@ -5875,7 +5885,7 @@ public class CatalogOpExecutor {
    * collected.
    */
   public void addToDeleteEventLog(long eventId, String objectKey) {
-    if (!catalog_.isEventProcessingActive()) {
+    if (!catalog_.isEventProcessingEnabled()) {
       LOG.trace("Not adding event {}:{} since events processing is not active", eventId,
           objectKey);
       return;
@@ -6591,7 +6601,7 @@ public class CatalogOpExecutor {
    */
   private void addCatalogServiceIdentifiers(
       org.apache.hadoop.hive.metastore.api.Table msTbl, Partition partition) {
-    if (!catalog_.isEventProcessingActive()) return;
+    if (!catalog_.isEventProcessingEnabled()) return;
     Preconditions.checkState(msTbl.isSetParameters());
     Preconditions.checkNotNull(partition, "Partition is null");
     Map<String, String> tblParams = msTbl.getParameters();
@@ -6625,7 +6635,7 @@ public class CatalogOpExecutor {
    */
   private void addToInflightVersionsOfPartition(
       Map<String, String> partitionParams, HdfsPartition.Builder partBuilder) {
-    if (!catalog_.isEventProcessingActive()) return;
+    if (!catalog_.isEventProcessingEnabled()) return;
     Preconditions.checkState(partitionParams != null);
     String version = partitionParams
         .get(MetastoreEventPropertyKey.CATALOG_VERSION.getKey());
@@ -8203,7 +8213,7 @@ public class CatalogOpExecutor {
    */
   private void addCatalogServiceIdentifiers(
       Database msDb, String catalogServiceId, long newCatalogVersion) {
-    if (!catalog_.isEventProcessingActive()) return;
+    if (!catalog_.isEventProcessingEnabled()) return;
     Preconditions.checkNotNull(msDb);
     msDb.putToParameters(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
         catalogServiceId);

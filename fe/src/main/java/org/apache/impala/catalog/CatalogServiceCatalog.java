@@ -601,10 +601,8 @@ public class CatalogServiceCatalog extends Catalog {
     return metastoreEventProcessor_;
   }
 
-  public boolean isEventProcessingActive() {
-    return metastoreEventProcessor_ instanceof MetastoreEventsProcessor
-        && EventProcessorStatus.ACTIVE
-        .equals(((MetastoreEventsProcessor) metastoreEventProcessor_).getStatus());
+  public boolean isEventProcessingEnabled() {
+    return metastoreEventProcessor_ instanceof MetastoreEventsProcessor;
   }
 
   /**
@@ -1282,7 +1280,7 @@ public class CatalogServiceCatalog extends Catalog {
    * @return true if given event information evaluates to a self-event, false otherwise
    */
   public boolean evaluateSelfEvent(SelfEventContext ctx) throws CatalogException {
-    Preconditions.checkState(isEventProcessingActive(),
+    Preconditions.checkState(isEventProcessingEnabled(),
         "Event processing should be enabled when calling this method");
     boolean isInsertEvent = ctx.isInsertEventContext();
     long versionNumber =
@@ -1416,7 +1414,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public boolean addVersionsForInflightEvents(
       boolean isInsertEvent, Table tbl, long versionNumber) {
-    if (!isEventProcessingActive()) return false;
+    if (!isEventProcessingEnabled()) return false;
     boolean added = tbl.addToVersionsForInflightEvents(isInsertEvent, versionNumber);
     if (added) {
       LOG.info("Added {} {} in table's {} in-flight events",
@@ -1435,7 +1433,7 @@ public class CatalogServiceCatalog extends Catalog {
    * @return true if versionNumber is added to in-flight list. Otherwise, return false.
    */
   public boolean addVersionsForInflightEvents(Db db, long versionNumber) {
-    if (!isEventProcessingActive()) return false;
+    if (!isEventProcessingEnabled()) return false;
     boolean added = db.addToVersionsForInflightEvents(versionNumber);
     if (added) {
       LOG.info("Added catalog version {} in database's {} in-flight events",
@@ -3268,6 +3266,8 @@ public class CatalogServiceCatalog extends Catalog {
    * removed from the catalog cache.
    * Sets dbWasAdded to true if both a new database and table were added to the catalog
    * cache.
+   * 'eventId' is used to update createEventId of the table which avoids the table being
+   * dropped in processing older events.
    */
   public TCatalogObject invalidateTable(TTableName tableName,
       Reference<Boolean> tblWasRemoved, Reference<Boolean> dbWasAdded,

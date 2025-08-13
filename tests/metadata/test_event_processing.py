@@ -25,6 +25,7 @@ import threading
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     add_mandatory_exec_option)
+from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfHive2, SkipIfCatalogV2
 from tests.common.test_vector import HS2
@@ -744,3 +745,47 @@ class TestEventSyncWaiting(ImpalaTestSuite):
         t.close()
       self.execute_query("drop database if exists {} cascade".format(db))
       self.execute_query("drop database if exists {}_2 cascade".format(db))
+
+
+class TestSelfRenameEvent(ImpalaTestSuite):
+  @pytest.mark.execute_serially
+  def test_self_rename_events(self, unique_database):
+    """Regression test for IMPALA-14307"""
+    try:
+      catalogd = ImpalaCluster.get_e2e_test_cluster().catalogd
+      self.execute_query("create table {}.tbl_a(i int)".format(unique_database))
+      # Wait until the CREATE_DATABASE and CREATE_TABLE events are skipped.
+      EventProcessorUtils.wait_for_event_processing(self)
+      self.execute_query(
+          "alter table {0}.tbl_a rename to {0}.tbl_b".format(unique_database))
+      self.execute_query(":event_processor('pause')")
+
+      with self.create_impala_client() as alter_client:
+        version_after_create = catalogd.service.get_catalog_version()
+        alter_client.set_configuration(
+            {"debug_action": "catalogd_table_rename_delay:SLEEP@6000"})
+        alter_handle = alter_client.execute_async(
+            "alter table {0}.tbl_b rename to {0}.tbl_a".format(unique_database))
+        alter_client.wait_for_admission_control(alter_handle, timeout_s=10)
+        # Wait for at most 10 second until catalogd increase the version for rename
+        # operation. This indicates the rename starts.
+        start_time = time.time()
+        while (time.time() - start_time < 10.0
+               and catalogd.service.get_catalog_version() <= version_after_create):
+          time.sleep(0.05)
+        # Sleep to let catalogd sends the alter_table HMS RPC
+        time.sleep(1)
+        # Invalidate tbl_b to remove it in catalog
+        self.execute_query("invalidate metadata {}.tbl_b".format(unique_database))
+        alter_client.wait_for_finished_timeout(alter_handle, timeout=10)
+        alter_client.close_query(alter_handle)
+
+      # Resume event processing. The first ALTER_TABLE RENAME events should be skipped.
+      events_skipped_before = EventProcessorUtils.get_int_metric('events-skipped', 0)
+      self.execute_query(":event_processor('start')")
+      EventProcessorUtils.wait_for_event_processing(self)
+      events_skipped_after = EventProcessorUtils.get_int_metric('events-skipped', 0)
+      assert events_skipped_after == events_skipped_before + 2
+    finally:
+      # Recover event processing to avoid impacting other tests
+      self.execute_query(":event_processor('start')")

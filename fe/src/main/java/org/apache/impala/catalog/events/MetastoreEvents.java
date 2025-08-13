@@ -1821,9 +1821,13 @@ public class MetastoreEvents {
       } else {
         if (oldTblRemoved.getRef()) {
           metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLES_REMOVED).inc();
+          infoLog("Removed table {}.{}", tableBefore_.getDbName(),
+              tableBefore_.getTableName());
         }
         if (newTblAdded.getRef()) {
           metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLES_ADDED).inc();
+          infoLog("Added table {}.{}", tableAfter_.getDbName(),
+              tableAfter_.getTableName());
         }
       }
     }
