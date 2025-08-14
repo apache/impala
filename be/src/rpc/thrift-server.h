@@ -18,6 +18,7 @@
 #pragma once
 
 #include <mutex>
+#include <string_view>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/unordered_map.hpp>
@@ -606,7 +607,7 @@ class ThriftServerBuilder {
 
 /// Contains a map from string for --ssl_minimum_version to Thrift's SSLProtocol.
 struct SSLProtoVersions {
-  static std::map<std::string, apache::thrift::transport::SSLProtocol> PROTO_MAP;
+  static std::map<std::string_view, apache::thrift::transport::SSLProtocol> PROTO_MAP;
 
   /// Given a string, find a corresponding SSLProtocol from PROTO_MAP. Returns an error if
   /// one cannot be found. Matching is case-insensitive.

@@ -449,7 +449,7 @@ TEST(SslTest, TLSVersionControl) {
 
     for (auto client_version : SSLProtoVersions::PROTO_MAP) {
       auto s = ScopedFlagSetter<string>::Make(
-          &FLAGS_ssl_minimum_version, client_version.first);
+          &FLAGS_ssl_minimum_version, string(client_version.first));
       ThriftClient<StatestoreServiceClientWrapper> ssl_client(
           "localhost", port, "", nullptr, true);
       if (!SSLProtoVersions::IsSupported(client_version.second)) {

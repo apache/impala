@@ -83,6 +83,17 @@ static const int RNG_RESEED_INTERVAL = 128;
 // Number of bytes of entropy to add at RNG_RESEED_INTERVAL.
 static const int RNG_RESEED_BYTES = 512;
 
+// Valid strings for TLS versions.
+const std::string_view TLSVersions::TLSV1_0 = "tlsv1";
+const std::string_view TLSVersions::TLSV1_1 = "tlsv1.1";
+const std::string_view TLSVersions::TLSV1_2 = "tlsv1.2";
+
+inline const std::vector<std::string_view> TLSVersions::VALUES = {
+    TLSVersions::TLSV1_0,
+    TLSVersions::TLSV1_1,
+    TLSVersions::TLSV1_2
+};
+
 int MaxSupportedTlsVersion() {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
   return SSLv23_method()->version;

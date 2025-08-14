@@ -45,6 +45,20 @@ namespace impala {
 #define TLS1_2_VERSION 0x0303
 #endif
 
+/// Valid strings for minimum TLS versions. Does not include TLSv1.3 because Thrift does
+/// not yet support that value as a minimum TLS version.
+/// TODO: Add TLSV1_3 when ssl_minimum_version=tlsv1.3 is supported.
+class TLSVersions final {
+public:
+  static const std::string_view TLSV1_0;
+  static const std::string_view TLSV1_1;
+  static const std::string_view TLSV1_2;
+
+  static const std::vector<std::string_view> VALUES;
+
+  TLSVersions() = delete;
+};
+
 /// Returns the maximum supported TLS version available in the linked OpenSSL library.
 int MaxSupportedTlsVersion();
 

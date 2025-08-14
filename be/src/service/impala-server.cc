@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <exception>
 #include <sstream>
+#include <string_view>
 #ifdef CALLONCEHACK
 #include <calloncehack.h>
 #endif
@@ -255,15 +256,25 @@ DEFINE_string(tls_ciphersuites,
 
 const string SSL_MIN_VERSION_HELP = "The minimum SSL/TLS version that Thrift "
     "services should use for both client and server connections. Supported versions are "
-    "TLSv1.0, TLSv1.1 and TLSv1.2 (as long as the system OpenSSL library supports them)";
+    "TLSv1, TLSv1.1, and TLSv1.2 (as long as the system OpenSSL library supports them)";
 DEFINE_string(ssl_minimum_version, "tlsv1.2", SSL_MIN_VERSION_HELP.c_str());
 DEFINE_validator(ssl_minimum_version, [](const char* flagname, const string& value) {
-  const std::string trimmed = boost::algorithm::trim_copy(value);
-  return boost::iequals(trimmed, "tlsv1")
-      || boost::iequals(trimmed, "tlsv1.0")
-      || boost::iequals(trimmed, "tlsv1.1")
-      || boost::iequals(trimmed, "tlsv1.2")
-      || boost::iequals(trimmed, "tlsv1.3");
+   // empty is allowed if TLS is not configured
+  if (value.empty()) {
+    if (impala::IsExternalTlsConfigured() || impala::IsInternalTlsConfigured()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  for (const std::string_view& valid_value : impala::TLSVersions::VALUES) {
+    if (value == valid_value) {
+      return true;
+    }
+  }
+
+  return false;
 });
 
 DEFINE_int32(idle_session_timeout, 0, "The time, in seconds, that a session may be idle"

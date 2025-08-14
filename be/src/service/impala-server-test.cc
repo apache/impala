@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
 #include <sstream>
 #include <vector>
@@ -68,5 +69,117 @@ TEST(ImpalaServerTest, PopulateAuthorizedProxyConfig) {
     EXPECT_EQ("*", *proxies.find("*"));
 
     EXPECT_EQ(proxy_map.end(), proxy_map.find("doesnotexist"));
+  }
+}
+
+// ssl_minimum_version flag validation tests.
+const auto VALID_TLS_VERSIONS = {"tlsv1", "tlsv1.1", "tlsv1.2"};
+TEST(ImpalaServerTest, FlagSSLMinimumVersionValidValues) {
+  for (const auto& tls_ver : VALID_TLS_VERSIONS) {
+    gflags::FlagSaver s;
+    EXPECT_EQ(Substitute("ssl_minimum_version set to $0\n", tls_ver),
+        gflags::SetCommandLineOption("ssl_minimum_version", tls_ver));
+  }
+}
+
+TEST(ImpalaServerTest, FlagSSLMinimumVersionInvalidValues) {
+  {
+    gflags::FlagSaver s;
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", "tlsv1.0").empty());
+  }
+
+  {
+    gflags::FlagSaver s;
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", "TLSv1").empty());
+  }
+
+  {
+    gflags::FlagSaver s;
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", "TLSv1.1").empty());
+  }
+
+  {
+    gflags::FlagSaver s;
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", "TLSv1.2").empty());
+  }
+
+  {
+    gflags::FlagSaver s;
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", "tlsv1.3").empty());
+  }
+
+  {
+    gflags::FlagSaver s;
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", "TLSv1.3").empty());
+  }
+
+  {
+    gflags::FlagSaver s;
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", " ").empty());
+  }
+}
+
+TEST(ImpalaServerTest, FlagSSLMinimumVersionEmpty) {
+  {
+    // Flag can be empty if TLS is not configured.
+    gflags::FlagSaver s;
+    EXPECT_EQ("ssl_minimum_version set to \n",
+        gflags::SetCommandLineOption("ssl_minimum_version", ""));
+  }
+
+  {
+    // Flag cannot be empty if external TLS is configured.
+    gflags::FlagSaver s;
+    gflags::SetCommandLineOption("ssl_server_certificate", "some_cert.pem");
+    gflags::SetCommandLineOption("ssl_private_key", "some_key.pem");
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", "").empty());
+  }
+
+  {
+    // Flag cannot be empty if internal TLS is configured.
+    gflags::FlagSaver s;
+    gflags::SetCommandLineOption("ssl_client_ca_certificate", "some_ca_cert.pem");
+    gflags::SetCommandLineOption("ssl_server_certificate", "some_cert.pem");
+    gflags::SetCommandLineOption("ssl_private_key", "some_key.pem");
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", "").empty());
+  }
+}
+
+TEST(ImpalaServerTest, FlagSSLMinimumVersionExternalTLSConfigured) {
+  for (const auto& tls_ver : VALID_TLS_VERSIONS) {
+    // Flag validation passes if external TLS is configured.
+    gflags::FlagSaver s;
+    gflags::SetCommandLineOption("ssl_server_certificate", "some_cert.pem");
+    gflags::SetCommandLineOption("ssl_private_key", "some_key.pem");
+    EXPECT_EQ(Substitute("ssl_minimum_version set to $0\n", tls_ver),
+        gflags::SetCommandLineOption("ssl_minimum_version", tls_ver));
+  }
+
+  {
+    // Flag validation fails if external TLS is configured and flag has an invalid value.
+    gflags::FlagSaver s;
+    gflags::SetCommandLineOption("ssl_server_certificate", "some_cert.pem");
+    gflags::SetCommandLineOption("ssl_private_key", "some_key.pem");
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", "foo").empty());
+  }
+}
+
+TEST(ImpalaServerTest, FlagSSLMinimumVersionInternalTLSConfigured) {
+  for (const auto& tls_ver : VALID_TLS_VERSIONS) {
+    // Flag validation passes if internal TLS is configured.
+    gflags::FlagSaver s;
+    gflags::SetCommandLineOption("ssl_server_certificate", "some_cert.pem");
+    gflags::SetCommandLineOption("ssl_private_key", "some_key.pem");
+    EXPECT_EQ(Substitute("ssl_minimum_version set to $0\n", tls_ver),
+        gflags::SetCommandLineOption("ssl_minimum_version", tls_ver));
+  }
+
+  {
+    // Flag validation fails if internal TLS is configured and flag has an invalid value.
+    gflags::FlagSaver s;
+    gflags::SetCommandLineOption("ssl_client_ca_certificate", "some_ca_cert.pem");
+    gflags::SetCommandLineOption("ssl_server_certificate", "some_cert.pem");
+    gflags::SetCommandLineOption("ssl_private_key", "some_key.pem");
+    EXPECT_TRUE(gflags::SetCommandLineOption("ssl_minimum_version", "foo").empty());
   }
 }

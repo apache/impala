@@ -16,6 +16,7 @@
 // under the License.
 
 #include <mutex>
+#include <string_view>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -71,10 +72,10 @@ namespace impala {
 // Specifies the allowed set of values for --ssl_minimum_version. To keep consistent with
 // Apache Kudu, specifying a single version enables all versions including and succeeding
 // that one (e.g. TLSv1.1 enables v1.1 and v1.2).
-map<string, SSLProtocol> SSLProtoVersions::PROTO_MAP = {
-    {"tlsv1.2", TLSv1_2},
-    {"tlsv1.1", TLSv1_1},
-    {"tlsv1", TLSv1_0}};
+map<std::string_view, SSLProtocol> SSLProtoVersions::PROTO_MAP = {
+    {TLSVersions::TLSV1_2, TLSv1_2},
+    {TLSVersions::TLSV1_1, TLSv1_1},
+    {TLSVersions::TLSV1_0, TLSv1_0}};
 
 // A generic wrapper for OpenSSL structures.
 template <typename T>
