@@ -22,6 +22,7 @@ import requests
 
 from tests.util.retry import retry
 
+
 def get_num_completed_backends(service, query_id):
     """Get the number of completed backends for the given query_id from the
     'query_backends' web page."""
@@ -92,18 +93,21 @@ def assert_query_stopped(impalad, query_id):
   assert len(expected_queries) == 1
 
 
-def run(client, query, queue):
+def run(test_class, query, options, queue):
   """Execute query and put results or errors into queue."""
-  try:
-    queue.put(str(client.execute(query)))
-  except Exception as ex:
-    queue.put(str(ex))
+  with test_class.create_impala_client() as client:
+    if options:
+      client.set_configuration(options)
+    try:
+        queue.put(str(client.execute(query)))
+    except Exception as ex:
+        queue.put(str(ex))
 
 
-def start(client, query):
+def start(test_class, query, options=None):
   """Execute a query in a separate process. Returns (process, queue)."""
   queue = Queue()
-  proc = Process(target=run, args=(client, query, queue))
+  proc = Process(target=run, args=(test_class, query, options, queue))
   proc.start()
   return proc, queue
 

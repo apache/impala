@@ -1087,7 +1087,7 @@ class TestWebPage(ImpalaTestSuite):
 
     # Start the query completely async. The server doesn't return a response until
     # the query has exited the CREATED state, so we need to get the query ID another way.
-    proc, queue = start(self.client, "select count(*) from functional_parquet.alltypes")
+    proc, queue = start(self, "select count(*) from functional_parquet.alltypes")
     wait_for_state(impalad, 'CREATED')
 
     in_flight_queries = impalad.get_debug_webpage_json('queries')['in_flight_queries']
@@ -1113,11 +1113,11 @@ class TestWebPage(ImpalaTestSuite):
     impalad = ImpalaCluster.get_e2e_test_cluster().impalads[0].service
     wait_for_state(impalad, None)
     delay_created_action = "impalad_load_tables_delay:SLEEP@5000"
-    self.client.set_configuration({'debug_action': delay_created_action})
 
     # Start the query completely async. The server doesn't return a response until
     # the query has exited the CREATED state, so we need to get the query ID another way.
-    proc, queue = start(self.client, "select count(*) from functional_parquet.alltypes")
+    proc, queue = start(self, "select count(*) from functional_parquet.alltypes",
+                        {'debug_action': delay_created_action})
     wait_for_state(impalad, 'CREATED')
 
     in_flight_queries = impalad.get_debug_webpage_json('queries')['in_flight_queries']

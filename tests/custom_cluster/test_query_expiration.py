@@ -119,9 +119,15 @@ class TestQueryExpiration(CustomClusterTestSuite):
         r"minimum memory reservation is greater than memory available.*\nQuery "
         + r"[0-9a-f]+:[0-9a-f]+ expired due to client inactivity \(timeout is 1s000ms\)")
     # hs2 client does not automaticaly close time_limit_expire_handle.
-    # manually close it.
+    # manually close it. It can take few miliseconds in slow build (ie., ASAN) until
+    # query actually closed in the coordinator. So make sure from the log that it is
+    # actually closed.
+    tle_query_id = client.get_query_id(time_limit_expire_handle)
     client.close_query(time_limit_expire_handle)
-    self._check_num_executing(impalad, 2)
+    self.assert_impalad_log_contains(
+        'INFO', r'ReleaseQueryState\(\): deleted query_id=' + tle_query_id,
+        timeout_s=4)
+    self._check_num_executing(impalad, 2, 0)
     # Both queries with query_timeout_s < 4 should generate this message.
     self.assert_impalad_log_contains('INFO', "Expiring query due to client inactivity: "
         r"[0-9a-f]+:[0-9a-f]+, last activity was at: \d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d",
