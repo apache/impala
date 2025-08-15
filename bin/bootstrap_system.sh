@@ -78,6 +78,7 @@ UBUNTU16=
 UBUNTU18=
 UBUNTU20=
 UBUNTU22=
+UBUNTU24=
 IN_DOCKER=
 if [[ -f /etc/redhat-release ]]; then
   REDHAT=true
@@ -119,8 +120,12 @@ else
     then
       UBUNTU22=true
       echo "Identified Ubuntu 22.04 system."
+    elif [[ $DISTRIB_RELEASE = 24.04 ]]
+    then
+      UBUNTU24=true
+      echo "Identified Ubuntu 24.04 system."
     else
-      echo "This script supports Ubuntu versions 16.04, 18.04, 20.04, or 22.04" >&2
+      echo "This script supports Ubuntu versions 16.04, 18.04, 20.04, 22.04, or 24.04" >&2
       exit 1
     fi
   else
@@ -162,6 +167,12 @@ function ubuntu20 {
 
 function ubuntu22 {
   if [[ "$UBUNTU22" == true ]]; then
+    "$@"
+  fi
+}
+
+function ubuntu24 {
+  if [[ "$UBUNTU24" == true ]]; then
     "$@"
   fi
 }
@@ -262,9 +273,12 @@ if [[ $UBUNTU20 == true ]]; then
   fi
 fi
 
-# Required by Kudu in the minicluster
-ubuntu20 apt-get --yes install libtinfo5
-ubuntu22 apt-get --yes install libtinfo5
+# Required by Kudu in the minicluster. Older Kudu versions depend on libtinfo5,
+# versions that can be compiled for Ubuntu 24.04 depend on libtinfo6.
+ubuntu20 apt-get --yes install libtinfo5 libtinfo6
+ubuntu22 apt-get --yes install libtinfo5 libtinfo6
+ubuntu24 apt-get --yes install libtinfo6
+
 ARCH_NAME=$(uname -p)
 if [[ $ARCH_NAME == 'aarch64' ]]; then
   ubuntu apt-get --yes install unzip pkg-config flex maven python3-pip build-essential \
@@ -328,14 +342,14 @@ function setup_python2() {
 redhat8 setup_python2
 redhat8 pip install --user argparse
 
-# Point Python to Python 3 for Redhat 9 and Ubuntu 22
+# Point Python to Python 3 for Redhat 9 and Ubuntu 22, or newer
 function setup_python3() {
   # If python is already set, then use it. Otherwise, try to point python to python3.
   if ! command -v python > /dev/null; then
     if command -v python3 ; then
       # Newer OSes (e.g. Redhat 9 and equivalents) make it harder to get Python 2, and we
       # need to start using Python 3 by default.
-      # For these new OSes (Ubuntu 22, Redhat 9), there is no alternative entry for
+      # For these new OSes (Ubuntu 22+, Redhat 9), there is no alternative entry for
       # python, so we need to create one from scratch.
       if command -v alternatives > /dev/null; then
         if sudo alternatives --list | grep python > /dev/null ; then
@@ -359,6 +373,7 @@ function setup_python3() {
 
 redhat9 setup_python3
 ubuntu22 setup_python3
+ubuntu24 setup_python3
 
 # CentOS repos don't contain ccache, so install from EPEL
 redhat sudo yum install -y epel-release

@@ -88,7 +88,8 @@ OS_MAPPING = [
   OsMapping('ubuntu16', "ec2-package-ubuntu-16-04"),
   OsMapping('ubuntu18', "ec2-package-ubuntu-18-04"),
   OsMapping('ubuntu20', "ec2-package-ubuntu-20-04"),
-  OsMapping('ubuntu22', "ec2-package-ubuntu-22-04")
+  OsMapping('ubuntu22', "ec2-package-ubuntu-22-04"),
+  OsMapping('ubuntu24', "ec2-package-ubuntu-24-04")
 ]
 
 

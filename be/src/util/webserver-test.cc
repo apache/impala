@@ -66,10 +66,18 @@ const string TO_ESCAPE_KEY = "ToEscape";
 const string TO_ESCAPE_VALUE = "<script language='javascript'>";
 const string ESCAPED_VALUE = "&lt;script language=&apos;javascript&apos;&gt;";
 
+// Specialize a deleter for the pipe in exec() below
+template <>
+struct std::default_delete<FILE> {
+  void operator()(FILE* p) const {
+    pclose(p);
+  }
+};
+
 string exec(const char* cmd) {
     std::array<char, 1024> buffer;
     string result;
-    unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    unique_ptr<FILE> pipe(popen(cmd, "r"));
     if (!pipe) {
       throw std::runtime_error(Substitute("popen() failed with $0", errno));
     }

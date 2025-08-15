@@ -81,13 +81,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=108-a38e3142e7
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=541-a38e3142e7
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=126-264503de7e
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=568-264503de7e
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-a38e3142e70ce74cdf18c3527ece27835adaa58f}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-264503de7ee132bba093c6cd0f1d309c2e10ca94}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -115,7 +115,7 @@ else
   export IMPALA_AVRO_VERSION=1.7.4-p5
 fi
 unset IMPALA_AVRO_URL
-export IMPALA_BINUTILS_VERSION=2.35.1
+export IMPALA_BINUTILS_VERSION=2.42
 unset IMPALA_BINUTILS_URL
 export IMPALA_BOOST_VERSION=1.74.0-p1
 unset IMPALA_BOOST_URL
@@ -137,7 +137,7 @@ export IMPALA_FLATBUFFERS_VERSION=1.9.0-p1
 unset IMPALA_FLATBUFFERS_URL
 export IMPALA_GCC_VERSION=10.4.0
 unset IMPALA_GCC_URL
-export IMPALA_GDB_VERSION=12.1
+export IMPALA_GDB_VERSION=12.1-p1
 unset IMPALA_GDB_URL
 export IMPALA_GFLAGS_VERSION=2.2.0-p2
 unset IMPALA_GFLAGS_URL
@@ -1118,7 +1118,7 @@ fi
 # overall build type) and does not apply when using a local Kudu build.
 export USE_KUDU_DEBUG_BUILD=${USE_KUDU_DEBUG_BUILD-false}
 
-export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"e742f86f6d"}
+export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"54f3bd31c"}
 export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-$IMPALA_KUDU_VERSION
 export IMPALA_KUDU_JAVA_HOME=\
 ${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-${IMPALA_KUDU_VERSION}/java

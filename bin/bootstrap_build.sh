@@ -18,7 +18,7 @@
 # under the License.
 
 # This script builds Impala from scratch. It is known to work on Ubuntu versions 16.04,
-# 18.04, 20.04, and 22.04. To run it you need to have:
+# 18.04, 20.04, 22.04 and 24.04. To run it you need to have:
 #
 # 1. At least 8GB of free disk space
 # 4. A connection to the internet (parts of the build download dependencies)
