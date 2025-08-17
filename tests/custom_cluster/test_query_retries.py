@@ -93,6 +93,7 @@ class TestQueryRetries(CustomClusterTestSuite):
   _count_query_result = "55"
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_retries_from_cancellation_pool(self):
     """Tests that queries are retried instead of cancelled if one of the nodes leaves the
     cluster. The retries are triggered by the cancellation pool in the ImpalaServer. The
@@ -138,7 +139,8 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      statestored_args="-statestore_heartbeat_frequency_ms=1000")
+      statestored_args="-statestore_heartbeat_frequency_ms=1000",
+      force_restart=True)
   def test_kill_impalad_expect_retry(self):
     """Launch a query, wait for it to start running, kill a random impalad and then
     validate that the query has successfully been retried. Increase the statestore
@@ -251,7 +253,8 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      statestored_args="-statestore_heartbeat_frequency_ms=60000")
+      statestored_args="-statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
   def test_retry_exec_rpc_failure(self):
     """Test ExecFInstance RPC failures. Set a really high statestort heartbeat frequency
     so that killed impalads are not removed from the cluster membership. This will cause
@@ -306,8 +309,9 @@ class TestQueryRetries(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--debug_actions=" + _get_rpc_fail_action(FAILED_KRPC_PORT),
-      statestored_args="--statestore_heartbeat_frequency_ms=1000 \
-          --statestore_max_missed_heartbeats=2")
+      statestored_args=("--statestore_heartbeat_frequency_ms=1000 "
+                        "--statestore_max_missed_heartbeats=2"),
+      force_restart=True)
   def test_retry_exec_rpc_failure_before_admin_delay(self):
     """Test retried query triggered by RPC failures by simulating RPC errors at the port
     of the 2nd node in the cluster. Simulate admission delay for query with debug_action
@@ -375,7 +379,7 @@ class TestQueryRetries(CustomClusterTestSuite):
       impalad_args="--debug_actions=" + _get_rpc_fail_action(FAILED_KRPC_PORT),
       statestored_args="--statestore_heartbeat_frequency_ms=1000 \
           --statestore_max_missed_heartbeats=2",
-      cluster_size=2, num_exclusive_coordinators=1)
+      cluster_size=2, num_exclusive_coordinators=1, force_restart=True)
   def test_retry_query_failure_all_executors_blacklisted(self):
     """Test retried query triggered by RPC failures by simulating RPC errors at the port
     of the 2nd node, which is the only executor in the cluster. Simulate admission delay
@@ -438,7 +442,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      statestored_args="-statestore_heartbeat_frequency_ms=1000")
+      statestored_args="-statestore_heartbeat_frequency_ms=1000", force_restart=True)
   def test_multiple_retries(self):
     """Test that a query can only be retried once, and that if the retry attempt fails,
     it fails correctly and with the right error message. Multiple retry attempts are
@@ -498,6 +502,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.__validate_memz()
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_retry_fetched_rows(self):
     """Test that query retries are not triggered if some rows have already been
     fetched. Run a query, fetch some rows from it, kill one of the impalads that is
@@ -612,7 +617,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.client.close_query(handle)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(disable_log_buffering=True)
+  @CustomClusterTestSuite.with_args(disable_log_buffering=True, force_restart=True)
   def test_query_retry_reaches_spool_limit(self):
     """Test retryable queries with results spooling enabled and
     spool_all_results_for_retries=true that reach spooling mem limit will return rows and
@@ -661,6 +666,7 @@ class TestQueryRetries(CustomClusterTestSuite):
              "fetched some rows" % self.client.handle_id(handle) in str(e)
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_original_query_cancel(self):
     """Test canceling a retryable query with spool_all_results_for_retries=true. Make sure
     Coordinator::Wait() won't block in cancellation."""
@@ -682,6 +688,7 @@ class TestQueryRetries(CustomClusterTestSuite):
         assert "Cancelled" in str(e)
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_retry_finished_query(self):
     """Test that queries in FINISHED state can still be retried before the client fetch
     any rows. Sets batch_size to 1 so results will be available as soon as possible.
@@ -708,7 +715,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      statestored_args="-statestore_heartbeat_frequency_ms=60000")
+      statestored_args="-statestore_heartbeat_frequency_ms=60000", force_restart=True)
   def test_retry_query_cancel(self):
     """Trigger a query retry, and then cancel the retried query. Validate that the
     cancelled query fails with the correct error message. Set a really high statestore
@@ -750,7 +757,8 @@ class TestQueryRetries(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--debug_actions=RETRY_DELAY_CHECKING_ORIGINAL_DRIVER:SLEEP@1000",
-      statestored_args="--statestore_heartbeat_frequency_ms=60000")
+      statestored_args="--statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
   def test_retrying_query_cancel(self):
     """Trigger a query retry, and then cancel and close the retried query in RETRYING
     state. Validate that it doesn't crash the impalad. Set a really high statestore
@@ -780,7 +788,8 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      statestored_args="--statestore_heartbeat_frequency_ms=60000")
+      statestored_args="--statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
   def test_retrying_query_before_inflight(self):
     """Trigger a query retry, and delay setting the original query inflight as that may
     happen after the query is retried. Validate that the query succeeds. Set a really
@@ -820,7 +829,8 @@ class TestQueryRetries(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--debug_actions=RETRY_DELAY_GET_QUERY_DRIVER:SLEEP@2000",
-      statestored_args="--statestore_heartbeat_frequency_ms=60000")
+      statestored_args="--statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
   def test_retry_query_close_before_getting_query_driver(self):
     """Trigger a query retry, and then close the retried query before getting
     the query driver. Validate that it doesn't crash the impalad.
@@ -847,7 +857,8 @@ class TestQueryRetries(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--debug_actions=QUERY_RETRY_SET_RESULT_CACHE:FAIL",
-      statestored_args="--statestore_heartbeat_frequency_ms=60000")
+      statestored_args="--statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
   def test_retry_query_result_cacheing_failed(self):
     """Test setting up results cacheing failed."""
 
@@ -874,7 +885,8 @@ class TestQueryRetries(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--debug_actions=QUERY_RETRY_SET_QUERY_IN_FLIGHT:FAIL",
-      statestored_args="--statestore_heartbeat_frequency_ms=60000")
+      statestored_args="--statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
   def test_retry_query_set_query_in_flight_failed(self):
     """Test setting query in flight failed."""
 
@@ -898,7 +910,8 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      statestored_args="-statestore_heartbeat_frequency_ms=60000")
+      statestored_args="-statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
   def test_retry_query_timeout(self):
     """Trigger a query retry, and then leave the query handle open until the
     'query_timeout_s' causes the handle to be closed. Assert that the runtime profile of
@@ -941,8 +954,10 @@ class TestQueryRetries(CustomClusterTestSuite):
     assert impalad_service.get_metric_value('impala-server.num-queries-expired') == 1
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args="--idle_session_timeout=1",
-        statestored_args="--statestore_heartbeat_frequency_ms=60000")
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--idle_session_timeout=1",
+      statestored_args="--statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
   def test_retry_query_session_timeout(self):
     """Similar to 'test_retry_query_timeout' except with an idle session timeout."""
     self.close_impala_clients()
@@ -977,7 +992,8 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      statestored_args="-statestore_heartbeat_frequency_ms=60000")
+      statestored_args="-statestore_heartbeat_frequency_ms=60000",
+      force_restart=True)
   def test_retry_query_hs2(self):
     """Test query retries with the HS2 protocol. Enable the results set cache as well and
     test that query retries work with the results cache."""

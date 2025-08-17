@@ -30,7 +30,6 @@ import requests
 import shutil
 import subprocess
 from abc import ABCMeta, abstractproperty
-from cm_api.api_client import ApiResource as CmApiResource
 from collections import defaultdict
 from collections import OrderedDict
 from contextlib import contextmanager
@@ -38,7 +37,6 @@ from getpass import getuser
 from io import BytesIO
 from multiprocessing.pool import ThreadPool
 from random import choice
-from sys import maxsize
 from tempfile import mkdtemp
 from threading import Lock
 from time import mktime, strptime
@@ -49,6 +47,13 @@ try:
   from urllib.parse import urlparse
 except ImportError:
   from urlparse import urlparse
+
+try:
+  from cm_api.api_client import ApiResource as CmApiResource
+except ImportError:
+  # If the cm_api module is not available, we will not be able to use Cloudera Manager.
+  # This is fine for local testing.
+  pass
 
 from tests.comparison.db_connection import HiveConnection, ImpalaConnection
 from tests.common.environ import HIVE_MAJOR_VERSION
@@ -179,12 +184,9 @@ class Cluster(with_metaclass(ABCMeta, object)):
     """
     Print the cluster impalad version info to the console sorted by hostname.
     """
-    def _sorter(i1, i2):
-      return cmp(i1.host_name, i2.host_name)
-
     version_info = self.impala.get_version_info()
     print("Cluster Impalad Version Info:")
-    for impalad in sorted(version_info.keys(), cmp=_sorter):
+    for impalad in sorted(version_info.keys(), key=lambda x: x.host_name):
       print("{0}: {1}".format(impalad.host_name, version_info[impalad]))
 
 
@@ -635,7 +637,7 @@ class Impala(Service):
       impalads = self.impalads
     promise = self._thread_pool.map_async(func, impalads)
     # Python doesn't handle ctrl-c well unless a timeout is provided.
-    results = promise.get(maxsize)
+    results = promise.get(timeout=(2 ** 31 - 1))
     if as_dict:
       results = dict(zip(impalads, results))
     return results

@@ -30,6 +30,7 @@ import time
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIf
 from tests.util.hdfs_util import NAMENODE
+from tests.util.parse_util import bytes_to_str
 
 
 class TestScratchDir(CustomClusterTestSuite):
@@ -537,16 +538,18 @@ class TestScratchDir(CustomClusterTestSuite):
     hostname = socket.gethostname()
     # Verify that there are leftover files in the remote scratch dirs after being killed.
     full_dfs_tmp_path = "{}/impala-scratch".format(self.dfs_tmp_path())
-    files_result = subprocess.check_output(["hdfs", "dfs", "-ls", full_dfs_tmp_path])
+    files_result = bytes_to_str(
+        subprocess.check_output(["hdfs", "dfs", "-ls", full_dfs_tmp_path]))
     assert "Found 1 items" in files_result
     assert hostname in files_result
     full_dfs_tmp_path_with_hostname = "{}/{}".format(full_dfs_tmp_path, hostname)
-    files_result = subprocess.check_output(["hdfs", "dfs", "-ls",
-        full_dfs_tmp_path_with_hostname])
+    files_result = bytes_to_str(
+        subprocess.check_output(["hdfs", "dfs", "-ls", full_dfs_tmp_path_with_hostname]))
     assert "Found 1 items" in files_result
     impalad.start()
     # Verify that the leftover files being removed after the impala daemon restarted.
-    files_result = subprocess.check_output(["hdfs", "dfs", "-ls", full_dfs_tmp_path])
+    files_result = bytes_to_str(
+        subprocess.check_output(["hdfs", "dfs", "-ls", full_dfs_tmp_path]))
     assert files_result == ""
 
   @pytest.mark.execute_serially
@@ -578,6 +581,7 @@ class TestScratchDir(CustomClusterTestSuite):
     client.close()
     # Verify that no host-level dir in the remote scratch dirs after shutdown.
     full_dfs_tmp_path = "{}/impala-scratch".format(self.dfs_tmp_path())
-    files_result = subprocess.check_output(["hdfs", "dfs", "-ls", full_dfs_tmp_path])
+    files_result = bytes_to_str(
+        subprocess.check_output(["hdfs", "dfs", "-ls", full_dfs_tmp_path]))
     assert files_result == ""
     impalad.start()

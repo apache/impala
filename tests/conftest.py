@@ -696,7 +696,7 @@ def validate_python_version():
 def pytest_collection_modifyitems(items, config, session):
   """Hook to handle --shard_tests command line option.
 
-  If set, this "deselects" a subset of tests, by hashing
+  If set, this "deselects" a subset of tests, by hashing (using crc32())
   their id into buckets.
   """
   if not config.option.shard_tests:
@@ -710,7 +710,7 @@ def pytest_collection_modifyitems(items, config, session):
 
   items_selected, items_deselected = [], []
   for i in items:
-    if hash(i.nodeid) % num_shards == this_shard:
+    if crc32(i.nodeid.encode('utf-8')) % num_shards == this_shard:
       items_selected.append(i)
     else:
       items_deselected.append(i)

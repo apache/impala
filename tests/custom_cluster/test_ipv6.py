@@ -22,6 +22,7 @@ import logging
 import os
 import pytest
 import requests
+import sys
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.network import SKIP_SSL_MSG
@@ -66,7 +67,8 @@ WEBUI_PORTS = [25000, 25010, 25020]
 # Error text can depend on both protocol and python version.
 CONN_ERR = ["Could not connect", "Connection refused"]
 CERT_ERR = ["doesn't match", "certificate verify failed"]
-WEB_CERT_ERR = "CertificateError"
+WEB_CERT_ERR = ("CertificateError" if sys.version_info.major < 3
+                else "SSLCertVerificationError")
 
 
 class TestIPv6Base(CustomClusterTestSuite):

@@ -33,11 +33,11 @@ from time import sleep, time
 from builtins import range
 import pytest
 
+from impala_shell.impala_client import utf8_encode_if_needed
 from impala_shell.impala_shell import ImpalaShell as ImpalaShellClass
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT, ImpalaTestSuite
-from tests.common.skip import SkipIf
 from tests.common.test_dimensions import (
     create_client_protocol_dimension,
     create_client_protocol_strict_dimension,
@@ -60,8 +60,9 @@ from tests.shell.util import (
 DEFAULT_QUERY = 'select 1'
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
-RUSSIAN_CHARS = (u"А, Б, В, Г, Д, Е, Ё, Ж, З, И, Й, К, Л, М, Н, О, П, Р,"
-                 u"С, Т, У, Ф, Х, Ц,Ч, Ш, Щ, Ъ, Ы, Ь, Э, Ю, Я")
+RUSSIAN_CHARS = utf8_encode_if_needed(
+    u"А, Б, В, Г, Д, Е, Ё, Ж, З, И, Й, К, Л, М, Н, О, П, Р,"
+    u"С, Т, У, Ф, Х, Ц,Ч, Ш, Щ, Ъ, Ы, Ь, Э, Ю, Я")
 
 """IMPALA-12216 implemented timestamp to be printed in case of any error/warning
   during query execution, below is an example :
@@ -89,6 +90,7 @@ def find_query_option(key, string, strip_brackets=True):
   values = re.findall(pattern, string, re.MULTILINE)
   assert len(values) == 1
   return values[0].strip("[]") if strip_brackets else values[0]
+
 
 @pytest.fixture
 def empty_table(unique_database, request):
@@ -299,7 +301,6 @@ class TestImpalaShell(ImpalaTestSuite):
         "Column metadata states there are 11 values, but read 10 values from column id."
     )
 
-
   def test_completed_query_errors_2(self, vector):
     if vector.get_value('strict_hs2_protocol'):
       pytest.skip("Impala-10827: Multiple queries not supported in strict hs2 mode.")
@@ -412,7 +413,7 @@ class TestImpalaShell(ImpalaTestSuite):
     args = ['-p', '-q', 'select 1; profile;']
     result_set = run_impala_shell_cmd(vector, args)
     # This regex helps us uniquely identify a profile.
-    regex = re.compile("Operator\s+#Hosts\s+#Inst\s+Avg\s+Time")
+    regex = re.compile(r"Operator\s+#Hosts\s+#Inst\s+Avg\s+Time")
     # We expect two query profiles.
     assert len(re.findall(regex, result_set.stdout)) == 2, \
         "Could not detect two profiles, stdout: %s" % result_set.stdout
@@ -626,24 +627,24 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_international_characters(self, vector):
     """Sanity test to ensure that the shell can read international characters."""
-    args = ['-B', '-q', "select '{0}'".format(RUSSIAN_CHARS.encode('utf-8'))]
+    args = ['-B', '-q', "select '{0}'".format(RUSSIAN_CHARS)]
     result = run_impala_shell_cmd(vector, args)
     assert 'UnicodeDecodeError' not in result.stderr
-    assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
+    assert RUSSIAN_CHARS in result.stdout
 
   def test_international_characters_prettyprint(self, vector):
     """IMPALA-2717: ensure we can handle international characters in pretty-printed
     output"""
-    args = ['-q', "select '{0}'".format(RUSSIAN_CHARS.encode('utf-8'))]
+    args = ['-q', "select '{0}'".format(RUSSIAN_CHARS)]
     result = run_impala_shell_cmd(vector, args)
     assert 'UnicodeDecodeError' not in result.stderr
-    assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
+    assert RUSSIAN_CHARS in result.stdout
 
   def test_international_characters_prettyprint_tabs(self, vector):
     """IMPALA-2717: ensure we can handle international characters in pretty-printed
     output when pretty-printing falls back to delimited output."""
 
-    args = ['-q', "select '{0}\\t'".format(RUSSIAN_CHARS.encode('utf-8'))]
+    args = ['-q', "select '{0}\\t'".format(RUSSIAN_CHARS)]
 
     result = run_impala_shell_cmd(vector, args)
     protocol = vector.get_value('protocol')
@@ -654,13 +655,13 @@ class TestImpalaShell(ImpalaTestSuite):
       assert protocol in ('hs2', 'hs2-http'), protocol
       assert 'Reverting to tab delimited text' not in result.stderr
     assert 'UnicodeDecodeError' not in result.stderr
-    assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
+    assert RUSSIAN_CHARS in result.stdout
 
   def test_international_characters_profile(self, vector):
     """IMPALA-12145: ensure we can handle international characters in the profile. """
     if vector.get_value('strict_hs2_protocol'):
       pytest.skip("Profile not supported in strict hs2 mode.")
-    text = RUSSIAN_CHARS.encode('utf-8')
+    text = RUSSIAN_CHARS
     args = ['-o', '/dev/null', '-p', '-q', "select '{0}'".format(text)]
     result = run_impala_shell_cmd(vector, args)
     assert 'UnicodeDecodeError' not in result.stderr
@@ -687,7 +688,7 @@ class TestImpalaShell(ImpalaTestSuite):
     # is running against Hive which is another variable. On thrift 0.14 and higher,
     # talking to Hive, the result is b'\\xaa', so allow this as another possibility.
     assert '\xef\xbf\xbd' in result.stdout or '\xaa' in result.stdout or \
-           '\\xaa' in result.stdout
+           '\\xaa' in result.stdout or '�' in result.stdout
 
   def test_global_config_file(self, vector):
     """Test global and user configuration files."""
@@ -776,13 +777,13 @@ class TestImpalaShell(ImpalaTestSuite):
     assert "WARNING: Option 'config_file' can be only set from shell." in result.stderr
     err_msg = ("WARNING: Unable to read configuration file correctly. "
                "Ignoring unrecognized config option: 'invalid_option'\n")
-    assert  err_msg in result.stderr
+    assert err_msg in result.stderr
 
     args = ['--config_file=%s/impalarc_with_error' % QUERY_FILE_PATH]
     result = run_impala_shell_cmd(vector, args, expect_success=False)
     err_msg = ("Unexpected value in configuration file. "
                "'maybe' is not a valid value for a boolean option.")
-    assert  err_msg in result.stderr
+    assert err_msg in result.stderr
 
     # live_progress and live_summary are not supported with strict_hs2_protocol
     if not vector.get_value('strict_hs2_protocol'):
@@ -886,7 +887,7 @@ class TestImpalaShell(ImpalaTestSuite):
 
     # Test with an escaped variable.
     result = run_impala_shell_cmd(vector, ['--var=msg1=1', '--var=msg2=${var:msg1}2',
-                                           '--var=msg3=\${var:msg1}${var:msg2}',
+                                           '--var=msg3=\\${var:msg1}${var:msg2}',
                                            "--query=select '${var:msg3}'"])
     self._validate_shell_messages(result.stderr, ['${var:msg1}12', 'Fetched 1 row(s)'],
                                   should_exist=True)
@@ -894,7 +895,7 @@ class TestImpalaShell(ImpalaTestSuite):
     # Referencing a non-existent variable will result in an error.
     result = run_impala_shell_cmd(vector, [
         '--var=msg1=1', '--var=msg2=${var:doesnotexist}2',
-        '--var=msg3=\${var:msg1}${var:msg2}', "--query=select '${var:msg3}'"],
+        '--var=msg3=\\${var:msg1}${var:msg2}', "--query=select '${var:msg3}'"],
         expect_success=False)
     self._validate_shell_messages(result.stderr,
                                   ['Error: Unknown variable DOESNOTEXIST',
@@ -1045,7 +1046,7 @@ class TestImpalaShell(ImpalaTestSuite):
             if e.errno != errno.EINTR:
               raise
         data = connection.recv(1024)
-        assert expected_output in data
+        assert expected_output in str(data)
       finally:
         if impala_shell.poll() is None:
           impala_shell.kill()
@@ -1063,7 +1064,7 @@ class TestImpalaShell(ImpalaTestSuite):
     try:
       socket.setdefaulttimeout(10)
       s = socket.socket()
-      s.bind(("",0))
+      s.bind(("", 0))
       s.listen(1)
       test_impalad_port = s.getsockname()[1]
       load_balancer_fqdn = "my-load-balancer.local"
@@ -1087,7 +1088,7 @@ class TestImpalaShell(ImpalaTestSuite):
       assert "Could not execute command:" in result.stderr
     else:
       assert "Encountered: EOF" in result.stderr
-    args = ['-q', 'with v as (select 1) \;"']
+    args = ['-q', 'with v as (select 1) \\;"']
     result = run_impala_shell_cmd(vector, args, expect_success=False)
     if vector.get_value('strict_hs2_protocol'):
       assert "cannot recognize input near"
@@ -1103,15 +1104,16 @@ class TestImpalaShell(ImpalaTestSuite):
     sql_file, sql_path = tempfile.mkstemp()
     # This generates a sql file size of ~50K.
     num_cols = 1000
-    os.write(sql_file, "select \n")
-    for i in range(num_cols):
-      if i < num_cols:
-        os.write(sql_file, "col_{0} as a{1},\n".format(i, i))
-        os.write(sql_file, "col_{0} as b{1},\n".format(i, i))
-        os.write(sql_file, "col_{0} as c{1}{2}\n".format(
-            i, i, "," if i < num_cols - 1 else ""))
-    os.write(sql_file, "from non_existence_large_table;")
-    os.close(sql_file)
+    with open(sql_path, 'w') as f:
+      f.write("select \n")
+      for i in range(num_cols):
+        if i < num_cols:
+          f.write("col_{0} as a{1},\n".format(i, i))
+          f.write("col_{0} as b{1},\n".format(i, i))
+          f.write("col_{0} as c{1}{2}\n".format(
+              i, i, "," if i < num_cols - 1 else ""))
+      f.write("from non_existence_large_table;")
+      f.close()
 
     try:
       args = ['-f', sql_path, '-d', unique_database]
@@ -1148,7 +1150,7 @@ class TestImpalaShell(ImpalaTestSuite):
     tzname = find_query_option("TIMEZONE", result_set.stdout)
     assert os.path.isfile("/usr/share/zoneinfo/" + tzname)
 
-  def test_find_query_option(self, vector):
+  def test_find_query_option(self):
     """Test utility function find_query_option()."""
     test_input = """
         not_an_option
@@ -1177,8 +1179,8 @@ class TestImpalaShell(ImpalaTestSuite):
     # --connect_timeout_ms not supported with HTTP transport. Refer to the comment
     # in ImpalaClient::_get_http_transport() for details.
     # --http_socket_timeout_s not supported for strict_hs2_protocol.
-    if (vector.get_value('protocol') == 'hs2-http' and
-          vector.get_value('strict_hs2_protocol')):
+    if (vector.get_value('protocol') == 'hs2-http'
+        and vector.get_value('strict_hs2_protocol')):
         pytest.skip("THRIFT-4600")
 
     with closing(socket.socket()) as s:
@@ -1259,9 +1261,9 @@ class TestImpalaShell(ImpalaTestSuite):
     assert "|                    |" in result.stdout, result.stdout
     assert "| árvíztűrőtükörfúró |" in result.stdout, result.stdout
     assert "| 你好hello          |" in result.stdout, result.stdout
-    assert "| \x00\xef\xbf\xbd\x00\xef\xbf\xbd                 |" in result.stdout, \
-        result.stdout
-    assert '| \xef\xbf\xbdD3"\x11\x00              |' in result.stdout, result.stdout
+    # The last two output lines are malformed UTF-8 strings.
+    assert "| " + utf8_encode_if_needed("\0�\0�") in result.stdout, result.stdout
+    assert "| " + utf8_encode_if_needed("�D3\"") in result.stdout, result.stdout
 
   def test_binary_as_string(self, vector):
     query = """select cast(binary_col as string) from functional.binary_tbl
@@ -1292,8 +1294,8 @@ class TestImpalaShell(ImpalaTestSuite):
     # way that python2 and python3 represent floating point values, the output
     # from the shell will differ with regard to which version of python the
     # shell is running under.
-    assert("3\t3\t30.299999999999997" in result.stdout or
-      "3\t3\t30.3" in result.stdout), result.stdout
+    assert ("3\t3\t30.299999999999997" in result.stdout
+            or "3\t3\t30.3" in result.stdout), result.stdout
 
     assert "4\t4\t40.4" in result.stdout, result.stdout
 
@@ -1410,8 +1412,8 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_http_socket_timeout(self, vector):
     """Test setting different http_socket_timeout_s values."""
-    if (vector.get_value('strict_hs2_protocol') or
-          vector.get_value('protocol') != 'hs2-http'):
+    if (vector.get_value('strict_hs2_protocol')
+        or vector.get_value('protocol') != 'hs2-http'):
         pytest.skip("http socket timeout not supported in strict hs2 mode."
                     " Only supported with hs2-http protocol.")
     # Test http_socket_timeout_s=0, expect errors

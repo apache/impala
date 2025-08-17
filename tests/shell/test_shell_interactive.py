@@ -35,6 +35,7 @@ from time import sleep
 import pexpect
 import pytest
 
+from impala_shell.impala_client import utf8_encode_if_needed
 # This import is the actual ImpalaShell class from impala_shell.py.
 # We rename it to ImpalaShellClass here because we later import another
 # class called ImpalaShell from tests/shell/util.py, and we don't want
@@ -63,6 +64,7 @@ from tests.shell.util import (
     spawn_shell,
     stderr_get_first_error_msg,
 )
+from tests.util.parse_util import bytes_to_str
 
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
@@ -117,7 +119,7 @@ class RequestHandler503(http.server.SimpleHTTPRequestHandler):
     self.end_headers()
     if self.should_send_body_text():
       # Optionally send body text with 503 message.
-      self.wfile.write("EXTRA")
+      self.wfile.write(b"EXTRA")
 
 
 class RequestHandler503Extra(RequestHandler503):
@@ -195,7 +197,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     proc.expect(":{0}] {1}>".format(get_impalad_port(vector), db))
     if not expectations: return
     for e in expectations:
-      assert e in proc.before
+      assert e in bytes_to_str(proc.before)
 
   def _wait_for_num_open_sessions(self, vector, impala_service, expected, err):
     """Helper method to wait for the number of open sessions to reach 'expected'."""
@@ -403,7 +405,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
   def test_cancellation_mid_command(self, vector):
     """Test that keyboard interrupt cancels multiline query strings"""
     if vector.get_value('strict_hs2_protocol'):
-      pytest.skip("IMPALA-10827: Cancellation infrastructure does not " +
+      pytest.skip("IMPALA-10827: Cancellation infrastructure does not "
           "work in strict hs2 mode.")
     shell_cmd = get_shell_cmd(vector)
     multiline_query = ["select column_1\n", "from table_1\n", "where ..."]
@@ -413,7 +415,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     for query_line in multiline_query:
       child_proc.send(query_line)
     child_proc.sendintr()
-    child_proc.expect("\^C")
+    child_proc.expect(r"\^C")
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline('quit;')
     child_proc.wait()
@@ -425,7 +427,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     child_proc.send("\n")
     child_proc.expect(">")
     child_proc.sendintr()
-    child_proc.expect("> \^C")
+    child_proc.expect(r"> \^C")
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline('quit;')
     child_proc.wait()
@@ -435,7 +437,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     if vector.get_value('strict_hs2_protocol'):
       pytest.skip("IMPALA-10827: Failed, need to investigate.")
     # test a unicode query spanning multiple lines
-    unicode_bytes = u'\ufffd'.encode('utf-8')
+    unicode_bytes = utf8_encode_if_needed(u'\ufffd')
     args = "select '{0}'\n;".format(unicode_bytes)
     result = run_impala_shell_interactive(vector, args)
     assert "Fetched 1 row(s)" in result.stderr, result.stderr
@@ -449,7 +451,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     child_proc = spawn_shell(shell_cmd)
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline("select '{0}'\n;".format(unicode_bytes))
-    child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
+    child_proc.expect(r"Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline('quit;')
     child_proc.wait()
@@ -476,7 +478,6 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     result = run_impala_shell_interactive(vector, args)
     assert "Fetched 1 row(s)" in result.stderr, result.stderr
     assert "세율중분류구분코드" in result.stdout
-
 
   def test_welcome_string(self, vector):
     """Test that the shell's welcome message is only printed once
@@ -616,7 +617,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       run_impala_shell_interactive(vector, "drop database if exists foo;")
       self.create_impala_clients()
 
-  def test_multiline_queries_in_history(self, vector, tmp_history_file):
+  def test_multiline_queries_in_history(self, vector, tmp_history_file):  # noqa: U100
     """Test to ensure that multiline queries with comments are preserved in history
 
     Ensure that multiline queries are preserved when they're read back from history.
@@ -638,7 +639,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     for query, _ in queries:
       child_proc.expect(PROMPT_REGEX)
       child_proc.sendline(query)
-      child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
+      child_proc.expect(r"Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline('quit;')
     child_proc.wait()
@@ -649,7 +650,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       assert history_entry in result.stderr, "'%s' not in '%s'" % (history_entry,
                                                                    result.stderr)
 
-  def test_history_does_not_duplicate_on_interrupt(self, vector, tmp_history_file):
+  def test_history_does_not_duplicate_on_interrupt(
+      self, vector, tmp_history_file):  # noqa: U100
     """This test verifies that once the cmdloop is broken the history file will not be
     re-read. The cmdloop can be broken when the user sends a SIGINT or exceptions
     occur."""
@@ -662,7 +664,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     # initialize history
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline("select 1;")
-    child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
+    child_proc.expect(r"Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline("quit;")
     child_proc.wait()
@@ -671,9 +673,9 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     child_proc = spawn_shell(shell_cmd)
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendintr()
-    child_proc.expect("\^C")
+    child_proc.expect(r"\^C")
     child_proc.sendline("select 2;")
-    child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
+    child_proc.expect(r"Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline("quit;")
     child_proc.wait()
@@ -682,12 +684,14 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     p = ImpalaShell(vector)
     p.send_cmd('history')
     result = p.get_result().stderr.splitlines()
-    assert "[1]: select 1;" == result[1]
-    assert "[2]: quit;" == result[2]
-    assert "[3]: select 2;" == result[3]
-    assert "[4]: quit;" == result[4]
+    # Python 2 and Python 3 shell have different first lines in the history output.
+    start_idx = 1 if "Server version: " in result[0] else 0
+    assert "[1]: select 1;" == result[start_idx]
+    assert "[2]: quit;" == result[start_idx + 1]
+    assert "[3]: select 2;" == result[start_idx + 2]
+    assert "[4]: quit;" == result[start_idx + 3]
 
-  def test_history_file_option(self, vector, tmp_history_file):
+  def test_history_file_option(self, vector, tmp_history_file):  # noqa: U100
     """
     Setting the 'tmp_history_file' fixture above means that the IMPALA_HISTFILE
     environment will be overridden. Here we override that environment by passing
@@ -704,7 +708,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       history_contents = open(new_hist.name).read()
       assert "select 'hi'" in history_contents
 
-  def test_rerun(self, vector, tmp_history_file):
+  def test_rerun(self, vector, tmp_history_file):  # noqa: U100
     """Smoke test for the 'rerun' command"""
     if vector.get_value('strict_hs2_protocol'):
       pytest.skip("Rerun not supported in strict hs2 mode.")
@@ -721,11 +725,12 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
         ("second_command"))
     child_proc.sendline('history;')
     child_proc.expect(":{0}] default>".format(get_impalad_port(vector)))
-    assert '[1]: select \'first_command\';' in child_proc.before
-    assert '[2]: select \'second_command\';' in child_proc.before
-    assert '[3]: history;' in child_proc.before
+    before_line = child_proc.before.decode('UTF-8', 'replace')
+    assert '[1]: select \'first_command\';' in before_line
+    assert '[2]: select \'second_command\';' in before_line
+    assert '[3]: history;' in before_line
     # Rerunning command should not add an entry into history.
-    assert '[4]' not in child_proc.before
+    assert '[4]' not in before_line
     self._expect_with_cmd(child_proc, "@0", vector, ("Command index out of range"))
     self._expect_with_cmd(child_proc, "rerun   4", vector, ("Command index out of range"))
     self._expect_with_cmd(child_proc, "@-4", vector, ("Command index out of range"))
@@ -861,7 +866,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       # IMPALA-5416: Test that two source commands on a line won't crash the shell.
       result = run_impala_shell_interactive(
           vector, "source shell.cmds;source shell.cmds;")
-      assert len(re.findall("version\(\)", result.stdout)) == 2
+      assert len(re.findall(r"version\(\)", result.stdout)) == 2
     finally:
       os.chdir(cwd)
 
@@ -888,11 +893,11 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     # the client does not fetch. For statements returning 0 rows we do not
     # want an empty line in stdout.
     result = run_impala_shell_interactive(vector, "-- foo \n use default;")
-    assert re.search('> \[', result.stdout)
+    assert re.search(r'> \[', result.stdout)
     result = run_impala_shell_interactive(vector,
         "select * from functional.alltypes limit 0;")
     assert "Fetched 0 row(s)" in result.stderr
-    assert re.search('> \[', result.stdout)
+    assert re.search(r'> \[', result.stdout)
 
   def test_set_and_set_all(self, vector):
     """IMPALA-2181. Tests the outputs of SET and SET ALL commands. SET should contain the
@@ -1050,15 +1055,15 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       assert '| \'--\' |' in result.stdout
       assert '| --   |' in result.stdout
 
-    query = ('select * from (\n' +
-             'select count(*) from functional.alltypes\n' +
+    query = ('select * from (\n'
+             'select count(*) from functional.alltypes\n'
              ') v; -- Incomplete SQL statement in this line')
     result = run_impala_shell_interactive(vector, query)
     assert '| count(*) |' in result.stdout
 
-    query = ('select id from functional.alltypes\n' +
-             'order by id; /*\n' +
-             '* Multi-line comment\n' +
+    query = ('select id from functional.alltypes\n'
+             'order by id; /*\n'
+             '* Multi-line comment\n'
              '*/')
     result = run_impala_shell_interactive(vector, query)
     assert '| id   |' in result.stdout
@@ -1154,7 +1159,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     proc.sendeof()
     proc.wait()
 
-  def test_strip_leading_comment(self, vector):
+  def test_strip_leading_comment(self):
     """Test stripping leading comments from SQL statements"""
     assert ('--delete\n', 'select 1') == \
         ImpalaShellClass.strip_leading_comment('--delete\nselect 1')
@@ -1230,7 +1235,6 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
         "Bad date/time conversion format: yyyy年MM月dd日"
     )
 
-
   def test_timezone_validation(self, vector):
     """Test that query option TIMEZONE is validated when executing a query.
 
@@ -1300,7 +1304,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
                   "-i{0}:{1}".format(http_503_server_extra.HOST,
                                      http_503_server_extra.PORT)]
     shell_proc = spawn_shell(impala_shell_executable + shell_args)
-    shell_proc.expect("HTTP code 503: Service Unavailable \[EXTRA\]", timeout=10)
+    shell_proc.expect(r"HTTP code 503: Service Unavailable \[EXTRA\]", timeout=10)
 
 
 def run_impala_shell_interactive(vector, input_lines, shell_args=None,

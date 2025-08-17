@@ -31,6 +31,7 @@ from xml.etree.ElementTree import parse
 
 from tests.util.filesystem_base import BaseFilesystem
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX
+from tests.util.parse_util import bytes_to_str
 
 
 class HdfsConfig(object):
@@ -220,13 +221,13 @@ class HadoopFsCommandLineClient(BaseFilesystem):
           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     status = process.returncode
-    return (status, stdout, stderr)
+    return (status, bytes_to_str(stdout), bytes_to_str(stderr))
 
   def create_file(self, path, file_data, overwrite=True):
     """Creates a temporary file with the specified file_data on the local filesystem,
     then puts it into the specified path."""
     if not overwrite and self.exists(path): return False
-    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+    with tempfile.NamedTemporaryFile(mode='w+t', delete=False) as tmp_file:
       tmp_file.write(file_data)
     put_cmd_params = ['-put', '-d']
     if overwrite: put_cmd_params.append('-f')

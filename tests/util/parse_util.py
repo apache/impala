@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import, division, print_function
 import re
+import sys
 from datetime import datetime
 
 # IMPALA-6715: Every so often the stress test or the TPC workload directories get
@@ -285,3 +286,11 @@ def get_time_summary_stats_counter(counter_name, runtime_profile):
           max_value=parse_duration_string_ns(summary_stat['max'])))
 
   return summary_stats
+
+
+def bytes_to_str(bytes):
+    """Utility function to convert bytes to string.
+    This is needed to handle the differences between Python 2 and 3."""
+    if sys.version_info.major < 3:
+        return str(bytes)
+    return bytes.decode('utf-8', errors='replace')

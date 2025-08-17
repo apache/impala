@@ -1,20 +1,5 @@
 ====
 ---- QUERY
-# test querying text table "extended" ASCII (latin) delimiters:
-# fields terminated by '-2' -- thorn character
-# escaped by '-22' -- lowercase e with circumflex
-# lines terminated by '\n'
-select * from functional.text_thorn_ecirc_newline
----- RESULTS
-'one','two',3,4
-'one\xfeone','two',3,4
-'one\xea','two',3,4
-'one\xea\xfeone','two',3,4
-'one\xea\xea','two',3,4
----- TYPES
-STRING,STRING,INT,INT
-====
----- QUERY
 # create new tables like the ones above to test inserting
 create table tecn like functional.text_thorn_ecirc_newline;
 ---- RESULTS

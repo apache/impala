@@ -29,6 +29,7 @@ from tests.common.skip import SkipIfFS
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.stress.stress_util import run_tasks, Task
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX, IS_HDFS
+from tests.util.parse_util import bytes_to_str
 from tests.conftest import DEFAULT_HIVE_SERVER2
 
 
@@ -339,7 +340,8 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
 
     table_location = "{0}/test-warehouse/{1}.db/{2}/data".format(
         FILESYSTEM_PREFIX, unique_database, table_name)
-    data_files_on_fs_result = check_output(["hdfs", "dfs", "-ls", table_location])
+    data_files_on_fs_result = bytes_to_str(
+        check_output(["hdfs", "dfs", "-ls", table_location]))
     # The first row of the HDFS result is a summary, the following lines contain
     # 1 file each.
     data_files_on_fs_rows = data_files_on_fs_result.strip().split('\n')[1:]

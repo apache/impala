@@ -47,6 +47,7 @@ from tests.shell.util import run_impala_shell_cmd
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX, get_fs_path, IS_HDFS, WAREHOUSE
 from tests.util.get_parquet_metadata import get_parquet_metadata
 from tests.util.iceberg_util import cast_ts, get_snapshots, IcebergCatalogs, quote
+from tests.util.parse_util import bytes_to_str
 
 LOG = logging.getLogger(__name__)
 
@@ -1130,35 +1131,35 @@ class TestIcebergTable(IcebergTestSuite):
          {'key': 6, 'value': 1},
          {'key': 7, 'value': 2}]
     assert datafiles[1]['lower_bounds'] == \
-        [{'key': 1, 'value': 'abc'},
+        [{'key': 1, 'value': b'abc'},
          # INT is serialized as 4-byte little endian
-         {'key': 2, 'value': '\x00\x00\x00\x00'},
+         {'key': 2, 'value': b'\x00\x00\x00\x00'},
          # BOOLEAN is serialized as 0x00 for FALSE
-         {'key': 3, 'value': '\x00'},
+         {'key': 3, 'value': b'\x00'},
          # BIGINT is serialized as 8-byte little endian
-         {'key': 4, 'value': '\x40\xaf\x0d\x86\x48\x70\x00\x00'},
+         {'key': 4, 'value': b'\x40\xaf\x0d\x86\x48\x70\x00\x00'},
          # TIMESTAMP is serialized as 8-byte little endian (number of microseconds since
          # 1970-01-01 00:00:00)
-         {'key': 5, 'value': '\xc0\xd7\xff\x06\xd0\xff\xff\xff'},
+         {'key': 5, 'value': b'\xc0\xd7\xff\x06\xd0\xff\xff\xff'},
          # DATE is serialized as 4-byte little endian (number of days since 1970-01-01)
-         {'key': 6, 'value': '\x93\xfe\xff\xff'},
+         {'key': 6, 'value': b'\x93\xfe\xff\xff'},
          # Unlike other numerical values, DECIMAL is serialized as big-endian.
-         {'key': 7, 'value': '\xd8\xf0'}]
+         {'key': 7, 'value': b'\xd8\xf0'}]
     assert datafiles[1]['upper_bounds'] == \
-        [{'key': 1, 'value': 'ghij'},
+        [{'key': 1, 'value': b'ghij'},
          # INT is serialized as 4-byte little endian
-         {'key': 2, 'value': '\x03\x00\x00\x00'},
+         {'key': 2, 'value': b'\x03\x00\x00\x00'},
          # BOOLEAN is serialized as 0x01 for TRUE
-         {'key': 3, 'value': '\x01'},
+         {'key': 3, 'value': b'\x01'},
          # BIGINT is serialized as 8-byte little endian
-         {'key': 4, 'value': '\x81\x58\xc2\x97\x56\xd5\x00\x00'},
+         {'key': 4, 'value': b'\x81\x58\xc2\x97\x56\xd5\x00\x00'},
          # TIMESTAMP is serialized as 8-byte little endian (number of microseconds since
          # 1970-01-01 00:00:00)
-         {'key': 5, 'value': '\x80\x02\x86\xef\x2f\x00\x00\x00'},
+         {'key': 5, 'value': b'\x80\x02\x86\xef\x2f\x00\x00\x00'},
          # DATE is serialized as 4-byte little endian (number of days since 1970-01-01)
-         {'key': 6, 'value': '\x6d\x01\x00\x00'},
+         {'key': 6, 'value': b'\x6d\x01\x00\x00'},
          # Unlike other numerical values, DECIMAL is serialized as big-endian.
-         {'key': 7, 'value': '\x00\xdc\x14'}]
+         {'key': 7, 'value': b'\x00\xdc\x14'}]
 
   def test_using_upper_lower_bound_metrics(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-upper-lower-bound-metrics', vector,
@@ -2224,7 +2225,7 @@ class TestIcebergV2Table(IcebergTestSuite):
       table_location = "{0}/test-warehouse/{1}.db/{2}/data".format(
           FILESYSTEM_PREFIX, unique_database, table_name)
       files_result = check_output(["hdfs", "dfs", "-ls", table_location])
-      assert "Found 1 items" in files_result
+      assert "Found 1 items" in bytes_to_str(files_result)
 
   def test_predicate_push_down_hint(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-predicate-push-down-hint', vector,

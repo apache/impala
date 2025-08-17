@@ -1553,7 +1553,7 @@ class ImpalaShell(cmd.Cmd, object):
       # undecodable elements.
       if self.last_query_handle is not None:
         self.imp_client.close_query(self.last_query_handle)
-      log_exception_with_timestamp(e, "UnicodeDecodeError", "Please check for"
+      log_exception_with_timestamp(e, "UnicodeDecodeError", "Please check for "
          "columns containing binary data to find the possible source of the error")
     except QueryStateException as e:
       # an exception occurred while executing the query
@@ -1964,6 +1964,7 @@ class ImpalaShell(cmd.Cmd, object):
       else:
         print("Error: OAuth access token not found in json payload")
         sys.exit(1)
+
 
 TIPS = [
   "Press TAB twice to see a list of available commands.",

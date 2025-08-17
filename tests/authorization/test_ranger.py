@@ -45,6 +45,7 @@ from tests.util.calculation_util import get_random_id
 from tests.util.filesystem_utils import WAREHOUSE, WAREHOUSE_PREFIX
 from tests.util.hdfs_util import NAMENODE
 from tests.util.iceberg_util import get_snapshots
+from tests.util.parse_util import bytes_to_str
 
 ADMIN = "admin"
 OWNER_USER = getuser()
@@ -791,7 +792,7 @@ class TestRanger(CustomClusterTestSuite):
         "{0}/service/public/v2/api/policy?servicename=test_impala&policyname={1}".format(
             RANGER_HOST, policy_name),
         auth=RANGER_AUTH, headers=REST_HEADERS)
-    assert 300 > r.status_code >= 200, r.content
+    assert 300 > r.status_code >= 200, bytes_to_str(r.content)
 
   @staticmethod
   def _check_privileges(result, expected):
@@ -807,7 +808,14 @@ class TestRanger(CustomClusterTestSuite):
 
   def _run_query_as_user(self, query, username, expect_success):
     """Helper to run an input query as a given user."""
-    impala_client = self.create_impala_client(user=username)
+    with self.create_impala_client(user=username) as impala_client:
+      if expect_success:
+        return self.execute_query_expect_success(
+            impala_client, query, query_options={'sync_ddl': 1})
+      return self.execute_query_expect_failure(impala_client, query)
+
+  def _run_query_with_client(self, query, impala_client, expect_success):
+    """Helper to run an input query using a given impala_client."""
     if expect_success:
       return self.execute_query_expect_success(
           impala_client, query, query_options={'sync_ddl': 1})
@@ -882,6 +890,7 @@ class TestRanger(CustomClusterTestSuite):
     grantee_role = "grantee_role"
     resource_owner_role = OWNER_USER
     admin_client = self.create_impala_client(user=ADMIN)
+    user_client = self.create_impala_client(user=OWNER_USER)
     unique_database = unique_name + "_db"
     table_name = "tbl"
     column_names = ["a", "b"]
@@ -899,15 +908,15 @@ class TestRanger(CustomClusterTestSuite):
       # able to create a UDF.
       admin_client.execute("grant all on uri '{0}{1}' to user {2}"
           .format(os.getenv("FILESYSTEM_PREFIX"), udf_uri, OWNER_USER))
-      self._run_query_as_user("create database {0}".format(unique_database), OWNER_USER,
-          True)
-      self._run_query_as_user("create table {0}.{1} ({2} int, {3} string)"
+      self._run_query_with_client("create database {0}".format(unique_database),
+                                  user_client, True)
+      self._run_query_with_client("create table {0}.{1} ({2} int, {3} string)"
           .format(unique_database, table_name, column_names[0], column_names[1]),
-          OWNER_USER, True)
-      self._run_query_as_user("create function {0}.{1} "
+          user_client, True)
+      self._run_query_with_client("create function {0}.{1} "
           "location '{2}{3}' symbol='org.apache.impala.TestUdf'"
           .format(unique_database, udf_name, os.getenv("FILESYSTEM_PREFIX"), udf_uri),
-          OWNER_USER, True)
+          user_client, True)
 
       for data in test_data:
         grantee_type = data[0]
@@ -935,6 +944,8 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("revoke create on server from user {0}".format(OWNER_USER))
       admin_client.execute("revoke all on uri '{0}{1}' from user {2}"
           .format(os.getenv("FILESYSTEM_PREFIX"), udf_uri, OWNER_USER))
+      admin_client.close()
+      user_client.close()
 
   def _test_grant_revoke_by_owner_on_database(self, privilege, unique_database,
       grantee_type, grantee, resource_owner_role):
@@ -946,10 +957,11 @@ class TestRanger(CustomClusterTestSuite):
     set_database_owner_role_stmt = "alter database {0} set owner role {1}"
     resource_owner_group = OWNER_USER
     admin_client = self.create_impala_client(user=ADMIN)
+    user_client = self.create_impala_client(user=OWNER_USER)
 
     try:
-      self._run_query_as_user(grant_database_stmt
-          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+      self._run_query_with_client(grant_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), user_client,
           True)
       result = admin_client.execute(show_grant_database_stmt
           .format(grantee_type, grantee, unique_database))
@@ -959,8 +971,8 @@ class TestRanger(CustomClusterTestSuite):
           [grantee_type, grantee, unique_database, "*", "*", "", "", "", "",
            privilege, "false"]])
 
-      self._run_query_as_user(revoke_database_stmt
-          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+      self._run_query_with_client(revoke_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), user_client,
           True)
       result = admin_client.execute(show_grant_database_stmt
           .format(grantee_type, grantee, unique_database))
@@ -977,12 +989,12 @@ class TestRanger(CustomClusterTestSuite):
           .format(unique_database, resource_owner_group))
       admin_client.execute("invalidate metadata")
 
-      result = self._run_query_as_user(grant_database_stmt
-          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+      result = self._run_query_with_client(grant_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), user_client,
           False)
       assert ERROR_GRANT in str(result)
-      result = self._run_query_as_user(revoke_database_stmt
-          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+      result = self._run_query_with_client(revoke_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), user_client,
           False)
       assert ERROR_REVOKE in str(result)
 
@@ -992,12 +1004,12 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute(set_database_owner_role_stmt
           .format(unique_database, resource_owner_role))
 
-      result = self._run_query_as_user(grant_database_stmt
-          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+      result = self._run_query_with_client(grant_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), user_client,
           False)
       assert ERROR_GRANT in str(result)
-      result = self._run_query_as_user(revoke_database_stmt
-          .format(privilege, unique_database, grantee_type, grantee), OWNER_USER,
+      result = self._run_query_with_client(revoke_database_stmt
+          .format(privilege, unique_database, grantee_type, grantee), user_client,
           False)
       assert ERROR_REVOKE in str(result)
       # Change the database owner back to the user 'OWNER_USER'.
@@ -1009,6 +1021,8 @@ class TestRanger(CustomClusterTestSuite):
       # from interfering with other tests.
       admin_client.execute(revoke_database_stmt
           .format(privilege, unique_database, grantee_type, grantee))
+      admin_client.close()
+      user_client.close()
 
   def _test_grant_revoke_by_owner_on_table(self, privilege, unique_database, table_name,
       grantee_type, grantee, resource_owner_role):
@@ -1020,23 +1034,24 @@ class TestRanger(CustomClusterTestSuite):
     show_grant_table_stmt = "show grant {0} {1} on table {2}.{3}"
     resource_owner_group = OWNER_USER
     admin_client = self.create_impala_client(user=ADMIN)
+    user_client = self.create_impala_client(user=OWNER_USER)
     set_table_owner_user_stmt = "alter table {0}.{1} set owner user {2}"
     set_table_owner_group_stmt = "alter table {0}.{1} set owner group {2}"
     set_table_owner_role_stmt = "alter table {0}.{1} set owner role {2}"
 
     try:
-      self._run_query_as_user(grant_table_stmt
+      self._run_query_with_client(grant_table_stmt
           .format(privilege, unique_database, table_name, grantee_type, grantee),
-          OWNER_USER, True)
+          user_client, True)
       result = admin_client.execute(show_grant_table_stmt
           .format(grantee_type, grantee, unique_database, table_name))
       TestRanger._check_privileges(result, [
           [grantee_type, grantee, unique_database, table_name, "*", "", "", "",
           "", privilege, "false"]])
 
-      self._run_query_as_user(revoke_table_stmt
+      self._run_query_with_client(revoke_table_stmt
           .format(privilege, unique_database, table_name, grantee_type, grantee),
-          OWNER_USER, True)
+          user_client, True)
       result = admin_client.execute(show_grant_table_stmt
           .format(grantee_type, grantee, unique_database, table_name))
       TestRanger._check_privileges(result, [])
@@ -1052,13 +1067,13 @@ class TestRanger(CustomClusterTestSuite):
           .format(unique_database, table_name, resource_owner_group))
       admin_client.execute("refresh {0}.{1}".format(unique_database, table_name))
 
-      result = self._run_query_as_user(grant_table_stmt
+      result = self._run_query_with_client(grant_table_stmt
           .format(privilege, unique_database, table_name, grantee_type, grantee),
-          OWNER_USER, False)
+          user_client, False)
       assert ERROR_GRANT in str(result)
-      result = self._run_query_as_user(revoke_table_stmt
+      result = self._run_query_with_client(revoke_table_stmt
           .format(privilege, unique_database, table_name, grantee_type, grantee),
-          OWNER_USER, False)
+          user_client, False)
       assert ERROR_REVOKE in str(result)
 
       # Set the owner of the table to a role that has the same name as
@@ -1067,13 +1082,13 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute(set_table_owner_role_stmt
           .format(unique_database, table_name, resource_owner_role))
 
-      result = self._run_query_as_user(grant_table_stmt
+      result = self._run_query_with_client(grant_table_stmt
           .format(privilege, unique_database, table_name, grantee_type, grantee),
-          OWNER_USER, False)
+          user_client, False)
       assert ERROR_GRANT in str(result)
-      result = self._run_query_as_user(revoke_table_stmt
+      result = self._run_query_with_client(revoke_table_stmt
           .format(privilege, unique_database, table_name, grantee_type, grantee),
-          OWNER_USER, False)
+          user_client, False)
       assert ERROR_REVOKE in str(result)
       # Change the table owner back to the user 'OWNER_USER'.
       admin_client.execute(set_table_owner_user_stmt
@@ -1084,6 +1099,8 @@ class TestRanger(CustomClusterTestSuite):
       # from interfering with other tests.
       admin_client.execute(revoke_table_stmt
           .format(privilege, unique_database, table_name, grantee_type, grantee))
+      admin_client.close()
+      user_client.close()
 
   def _test_grant_revoke_by_owner_on_column(self, privilege, column_names,
       unique_database, table_name, grantee_type, grantee, resource_owner_role):
@@ -1095,14 +1112,15 @@ class TestRanger(CustomClusterTestSuite):
     show_grant_column_stmt = "show grant {0} {1} on column {2}.{3}.{4}"
     resource_owner_group = OWNER_USER
     admin_client = self.create_impala_client(user=ADMIN)
+    user_client = self.create_impala_client(user=OWNER_USER)
     set_table_owner_user_stmt = "alter table {0}.{1} set owner user {2}"
     set_table_owner_group_stmt = "alter table {0}.{1} set owner group {2}"
     set_table_owner_role_stmt = "alter table {0}.{1} set owner role {2}"
 
     try:
-      self._run_query_as_user(grant_column_stmt
+      self._run_query_with_client(grant_column_stmt
           .format(privilege, column_names[0], unique_database, table_name,
-          grantee_type, grantee), OWNER_USER, True)
+          grantee_type, grantee), user_client, True)
       result = admin_client.execute(show_grant_column_stmt
           .format(grantee_type, grantee, unique_database, table_name,
           column_names[0]))
@@ -1110,9 +1128,9 @@ class TestRanger(CustomClusterTestSuite):
           [grantee_type, grantee, unique_database, table_name, column_names[0],
           "", "", "", "", privilege, "false"]])
 
-      self._run_query_as_user(revoke_column_stmt
+      self._run_query_with_client(revoke_column_stmt
           .format(privilege, column_names[0], unique_database, table_name,
-          grantee_type, grantee), OWNER_USER, True)
+          grantee_type, grantee), user_client, True)
       result = admin_client.execute(show_grant_column_stmt
           .format(grantee_type, grantee, unique_database, table_name,
           column_names[0]))
@@ -1125,13 +1143,13 @@ class TestRanger(CustomClusterTestSuite):
           .format(unique_database, table_name, resource_owner_group))
       admin_client.execute("refresh {0}.{1}".format(unique_database, table_name))
 
-      result = self._run_query_as_user(grant_column_stmt
+      result = self._run_query_with_client(grant_column_stmt
           .format(privilege, column_names[0], unique_database, table_name,
-          grantee_type, grantee), OWNER_USER, False)
+          grantee_type, grantee), user_client, False)
       assert ERROR_GRANT in str(result)
-      result = self._run_query_as_user(revoke_column_stmt
+      result = self._run_query_with_client(revoke_column_stmt
           .format(privilege, column_names[0], unique_database, table_name,
-          grantee_type, grantee), OWNER_USER, False)
+          grantee_type, grantee), user_client, False)
       assert ERROR_REVOKE in str(result)
 
       # Set the owner of the table to a role that has the same name as 'OWNER_USER' and
@@ -1140,13 +1158,13 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute(set_table_owner_role_stmt
           .format(unique_database, table_name, resource_owner_role))
 
-      result = self._run_query_as_user(grant_column_stmt
+      result = self._run_query_with_client(grant_column_stmt
           .format(privilege, column_names[0], unique_database, table_name,
-          grantee_type, grantee), OWNER_USER, False)
+          grantee_type, grantee), user_client, False)
       assert ERROR_GRANT in str(result)
-      result = self._run_query_as_user(revoke_column_stmt
+      result = self._run_query_with_client(revoke_column_stmt
           .format(privilege, column_names[0], unique_database, table_name,
-          grantee_type, grantee), OWNER_USER, False)
+          grantee_type, grantee), user_client, False)
       assert ERROR_REVOKE in str(result)
       # Change the table owner back to the user 'owner_user'.
       admin_client.execute(set_table_owner_user_stmt
@@ -1158,19 +1176,22 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute(revoke_column_stmt
           .format(privilege, column_names[0], unique_database, table_name,
           grantee_type, grantee))
+      admin_client.close()
+      user_client.close()
 
   def _test_grant_revoke_by_owner_on_udf(self, privilege, unique_database, udf_name,
       grantee_type, grantee):
     # Due to IMPALA-11743 and IMPALA-12685, the owner of a UDF could not grant
     # or revoke the SELECT privilege.
-    result = self._run_query_as_user("grant {0} on user_defined_fn "
-        "{1}.{2} to {3} {4}".format(privilege, unique_database, udf_name,
-        grantee_type, grantee), OWNER_USER, False)
-    assert ERROR_GRANT in str(result)
-    result = self._run_query_as_user("revoke {0} on user_defined_fn "
-        "{1}.{2} from {3} {4}".format(privilege, unique_database, udf_name,
-        grantee_type, grantee), OWNER_USER, False)
-    assert ERROR_REVOKE in str(result)
+    with self.create_impala_client(user=OWNER_USER) as user_client:
+      result = self._run_query_with_client("grant {0} on user_defined_fn "
+          "{1}.{2} to {3} {4}".format(privilege, unique_database, udf_name,
+          grantee_type, grantee), user_client, False)
+      assert ERROR_GRANT in str(result)
+      result = self._run_query_with_client("revoke {0} on user_defined_fn "
+          "{1}.{2} from {3} {4}".format(privilege, unique_database, udf_name,
+          grantee_type, grantee), user_client, False)
+      assert ERROR_REVOKE in str(result)
 
   def _test_allow_catalog_cache_op_from_masked_users(self, unique_name):
     """Verify that catalog cache operations are allowed for masked users
@@ -1820,6 +1841,7 @@ class TestRangerIndependent(TestRanger):
   def test_grant_multiple_columns_consolidate_grant_revoke_requests(self):
     self._test_grant_multiple_columns(1)
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=LEGACY_CATALOG_IMPALAD_ARGS,
@@ -2199,10 +2221,12 @@ class TestRangerLegacyCatalog(TestRanger):
   def test_legacy_catalog_ownership(self):
       self._test_ownership()
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   def test_grant_revoke_by_owner_legacy_catalog(self, unique_name):
     self._test_grant_revoke_by_owner(unique_name)
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   def test_select_view_created_by_non_superuser_with_catalog_v1(self, unique_name):
     self._test_select_view_created_by_non_superuser(unique_name)
@@ -2231,10 +2255,12 @@ class TestRangerLocalCatalog(TestRanger):
       pytest.xfail("getTableIfCached() faulty behavior, known issue")
       self._test_ownership()
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   def test_grant_revoke_by_owner_local_catalog(self, unique_name):
     self._test_grant_revoke_by_owner(unique_name)
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   def test_select_view_created_by_non_superuser_with_local_catalog(self, unique_name):
     self._test_select_view_created_by_non_superuser(unique_name)
@@ -2453,6 +2479,8 @@ class TestRangerLocalCatalog(TestRanger):
       else:
         assert "Error revoking a privilege in Ranger. Ranger error message: " \
                "HTTP 403 Error: Grantee group invalid_group doesn't exist" in str(result)
+    invalid_impala_client.close()
+    valid_impala_client.close()
 
   @pytest.mark.execute_serially
   def test_show_functions(self, unique_name):

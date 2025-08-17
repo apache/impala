@@ -347,7 +347,7 @@ export IMPALA_KERBERIZE=false
 unset IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY
 unset IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED
 
-export IMPALA_USE_PYTHON3_TESTS=${IMPALA_USE_PYTHON3_TESTS:-false}
+export IMPALA_USE_PYTHON3_TESTS=${IMPALA_USE_PYTHON3_TESTS:-true}
 
 # Source the branch and local config override files here to override any
 # variables above or any variables below that allow overriding via environment

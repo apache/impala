@@ -81,7 +81,8 @@ class SkipIfFS:
   incorrent_reported_ec = pytest.mark.skipif(IS_OZONE and IS_EC, reason="HDDS-8543")
 
   # These need test infra work to re-enable.
-  hive = pytest.mark.skipif(not IS_HDFS, reason="Hive doesn't work")
+  hive = pytest.mark.skipif(
+      not IS_HDFS, reason="HiveServer2 doesn't work or not started")
   hbase = pytest.mark.skipif(not IS_HDFS, reason="HBase not started")
   qualified_path = pytest.mark.skipif(not IS_HDFS,
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")
@@ -135,6 +136,7 @@ class SkipIf:
   not_tuple_cache = pytest.mark.skipif(not IS_TUPLE_CACHE,
       reason="Tuple Cache needed")
 
+
 class SkipIfLocal:
   # These are skipped due to product limitations.
   hdfs_blocks = pytest.mark.skipif(IS_LOCAL,
@@ -152,6 +154,7 @@ class SkipIfLocal:
   root_path = pytest.mark.skipif(IS_LOCAL,
       reason="Tests rely on the root directory")
 
+
 class SkipIfNotHdfsMinicluster:
   # These are skipped when not running against a local HDFS mini-cluster.
   plans = pytest.mark.skipif(
@@ -165,6 +168,7 @@ class SkipIfNotHdfsMinicluster:
       reason="Test is tuned for scheduling decisions made on a 3-node HDFS minicluster "
              "with no EC")
 
+
 class SkipIfBuildType:
   dev_build = pytest.mark.skipif(IMPALA_TEST_CLUSTER_PROPERTIES.is_dev(),
       reason="Test takes too much time on debug build.")
@@ -172,6 +176,7 @@ class SkipIfBuildType:
       reason="Test depends on debug build startup option.")
   remote = pytest.mark.skipif(IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
       reason="Test depends on running against a local Impala cluster")
+
 
 class SkipIfEC:
   contain_full_explain = pytest.mark.skipif(IS_EC, reason="Contain full explain output "
@@ -225,6 +230,7 @@ class SkipIfHive2:
   ranger_auth = pytest.mark.skipif(HIVE_MAJOR_VERSION <= 2,
       reason="Hive 2 doesn't support Ranger authorization.")
 
+
 class SkipIfCatalogV2:
   """Expose decorators as methods so that is_catalog_v2_cluster() can be evaluated lazily
   when needed, instead of whenever this module is imported."""
@@ -260,6 +266,7 @@ class SkipIfCatalogV2:
     return pytest.mark.skipif(
       IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
       reason="Table isn't invalidated with Local catalog and enabled hms_event_polling.")
+
 
 class SkipIfApacheHive():
   feature_not_supported = pytest.mark.skipif(IS_APACHE_HIVE,

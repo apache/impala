@@ -1010,7 +1010,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     assert cancel == "{0}s000ms".format(get_remain_shutdown_query_cancel(
         self.COORD_SHUTDOWN_FAST_DEADLINE_S, self.COORD_SHUTDOWN_FAST_DEADLINE_S))
     assert registered == "0"
-    assert running > 0
+    assert int(running) > 0
     self.cluster.impalads[1].wait_for_exit()
     # The slow query should be cancelled.
     self.__check_deadline_expired(SLOW_QUERY, slow_query_handle, True)

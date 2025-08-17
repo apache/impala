@@ -161,20 +161,19 @@ class TestQueries(ImpalaTestSuite):
     file_format = vector.get_value('table_format').file_format
     if file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
-    vector.get_value('exec_option')['disable_outermost_topn'] = 1
-    vector.get_value('exec_option')['analytic_rank_pushdown_threshold'] = 0
-    self.run_test_case('QueryTest/sort', vector)
+    new_vector = deepcopy(vector)
+    options = new_vector.get_value('exec_option')
+    options['disable_outermost_topn'] = 1
+    options['analytic_rank_pushdown_threshold'] = 0
+    self.run_test_case('QueryTest/sort', new_vector)
     # We can get the sort tests for free from the top-n file
-    self.run_test_case('QueryTest/top-n', vector)
+    self.run_test_case('QueryTest/top-n', new_vector)
 
     if file_format in ['parquet', 'orc']:
       # set timestamp options to get consistent results for both format.
-      new_vector = deepcopy(vector)
-      options = new_vector.get_value('exec_option')
       options['convert_legacy_hive_parquet_utc_timestamps'] = 1
       options['timezone'] = '"Europe/Budapest"'
       self.run_test_case('QueryTest/sort-complex', new_vector)
-
 
   def test_partitioned_top_n(self, vector):
     """Test partitioned Top-N operator."""

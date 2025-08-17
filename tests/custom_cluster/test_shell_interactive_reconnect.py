@@ -18,7 +18,6 @@
 from __future__ import absolute_import, division, print_function
 import socket
 
-import pexpect
 import pytest
 
 # Follow tests/shell/test_shell_interactive.py naming.
@@ -31,6 +30,7 @@ from tests.shell.util import get_impalad_port, get_shell_cmd, ImpalaShell, spawn
 from tests.verifiers.metric_verifier import MetricVerifier
 
 NUM_QUERIES = 'impala-server.num-queries'
+
 
 class TestShellInteractiveReconnect(CustomClusterTestSuite):
   """ Check if interactive shell is using the current DB after reconnecting """
@@ -75,6 +75,7 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
       assert "alltypesaggmultifilesnopart" in result.stdout, result.stdout
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(force_restart=True)
   def test_auto_reconnect_after_impalad_died(self):
     """Test reconnect after restarting the remote impalad without using connect;"""
     # Use pexpect instead of ImpalaShell() since after using get_result() in ImpalaShell()

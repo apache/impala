@@ -25,7 +25,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIf
 from tests.util.filesystem_utils import WAREHOUSE
 
-tmp = tempfile.NamedTemporaryFile(delete=False)
+tmp = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
 BAD_KEY_FILE = tmp.name
 
 

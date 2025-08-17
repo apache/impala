@@ -21,6 +21,8 @@ from __future__ import absolute_import, division, print_function
 import logging
 import os
 import shlex
+import sys
+
 from select import select
 from subprocess import PIPE, Popen, STDOUT, call
 from textwrap import dedent
@@ -35,6 +37,7 @@ def dump_server_stacktraces():
   LOG.debug('Dumping stacktraces of running servers')
   call([os.path.join(os.environ['IMPALA_HOME'], "bin/dump-stacktraces.sh")])
 
+
 def exec_process(cmd):
   """Executes a subprocess, waiting for completion. The process exit code, stdout and
   stderr are returned as a tuple."""
@@ -46,6 +49,7 @@ def exec_process(cmd):
   rc = p.returncode
   return rc, stdout, stderr
 
+
 def exec_process_async(cmd):
   """Executes a subprocess, returning immediately. The process object is returned for
   later retrieval of the exit code etc. """
@@ -54,6 +58,7 @@ def exec_process_async(cmd):
   # with the rest being arguments.
   return Popen(shlex.split(cmd), shell=False, stdout=PIPE, stderr=PIPE,
       universal_newlines=True)
+
 
 def shell(cmd, cmd_prepend="set -euo pipefail\n", stdout=PIPE, stderr=STDOUT,
     timeout_secs=None, **popen_kwargs):
@@ -77,6 +82,7 @@ def shell(cmd, cmd_prepend="set -euo pipefail\n", stdout=PIPE, stderr=STDOUT,
     remaining_fds.append(stderr_fileno)
   stdout = list()
   stderr = list()
+
   def _read_available_output():
     while True:
       available_fds, _, _ = select(remaining_fds, [], [], 0)
@@ -88,7 +94,7 @@ def shell(cmd, cmd_prepend="set -euo pipefail\n", stdout=PIPE, stderr=STDOUT,
           if not data:
             del remaining_fds[0]
           else:
-            stdout.append(data)
+            stdout.append(data if sys.version_info.major < 3 else data.decode())
         elif fd == stderr_fileno:
           if not data:
             del remaining_fds[-1]

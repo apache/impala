@@ -23,10 +23,8 @@ from contextlib import closing
 import logging
 import os
 import re
-import shlex
 import socket
 from subprocess import PIPE, Popen
-import sys
 import time
 
 import pexpect
@@ -54,6 +52,7 @@ LOG.addHandler(logging.StreamHandler())
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
 IMPALA_HOME = os.environ['IMPALA_HOME']
 
+
 def build_shell_env(env=None):
   """ Construct the environment for the shell to run in based on 'env', or the current
   process's environment if env is None."""
@@ -69,24 +68,24 @@ def build_shell_env(env=None):
 
 
 def assert_var_substitution(result):
-  assert_pattern(r'\bfoo_number=.*$', 'foo_number= 123123', result.stdout, \
+  assert_pattern(r'\bfoo_number=.*$', 'foo_number= 123123', result.stdout,
     'Numeric values not replaced correctly')
-  assert_pattern(r'\bfoo_string=.*$', 'foo_string=123', result.stdout, \
+  assert_pattern(r'\bfoo_string=.*$', 'foo_string=123', result.stdout,
     'String values not replaced correctly')
-  assert_pattern(r'\bVariables:[\s\n]*BAR:\s*[0-9]*\n\s*FOO:\s*[0-9]*', \
-    'Variables:\n\tBAR: 456\n\tFOO: 123', result.stdout, \
+  assert_pattern(r'\bVariables:[\s\n]*BAR:\s*[0-9]*\n\s*FOO:\s*[0-9]*',
+    'Variables:\n\tBAR: 456\n\tFOO: 123', result.stdout,
     "Set variable not listed correctly by the first SET command")
-  assert_pattern(r'\bError: Unknown variable FOO1$', \
-    'Error: Unknown variable FOO1', result.stderr, \
+  assert_pattern(r'\bError: Unknown variable FOO1$',
+    'Error: Unknown variable FOO1', result.stderr,
     'Missing variable FOO1 not reported correctly')
-  assert_pattern(r'\bmulti_test=.*$', 'multi_test=456_123_456_123', \
+  assert_pattern(r'\bmulti_test=.*$', 'multi_test=456_123_456_123',
     result.stdout, 'Multiple replaces not working correctly')
-  assert_pattern(r'\bError:\s*Unknown\s*substitution\s*syntax\s*' +
-                 r'\(RANDOM_NAME\). Use \${VAR:var_name}', \
-    'Error: Unknown substitution syntax (RANDOM_NAME). Use ${VAR:var_name}', \
+  assert_pattern(r'\bError:\s*Unknown\s*substitution\s*syntax\s*'
+                 r'\(RANDOM_NAME\). Use \${VAR:var_name}',
+    'Error: Unknown substitution syntax (RANDOM_NAME). Use ${VAR:var_name}',
     result.stderr, "Invalid variable reference")
   assert_pattern(r'"This should be not replaced: \${VAR:foo} \${HIVEVAR:bar}"',
-    '"This should be not replaced: ${VAR:foo} ${HIVEVAR:bar}"', \
+    '"This should be not replaced: ${VAR:foo} ${HIVEVAR:bar}"',
     result.stdout, "Variable escaping not working")
   assert_pattern(r'\bVariable MYVAR set to.*$', 'Variable MYVAR set to foo123',
     result.stderr, 'No evidence of MYVAR variable being set.')
@@ -97,11 +96,11 @@ def assert_var_substitution(result):
     result.stdout, 'No evidence of variable FOO being unset')
   assert_pattern(r'\bUnsetting variable BAR$', 'Unsetting variable BAR',
     result.stdout, 'No evidence of variable BAR being unset')
-  assert_pattern(r'\bVariables:[\s\n]*No variables defined\.$', \
-    'Variables:\n\tNo variables defined.', result.stdout, \
+  assert_pattern(r'\bVariables:[\s\n]*No variables defined\.$',
+    'Variables:\n\tNo variables defined.', result.stdout,
     'Unset variables incorrectly listed by third SET command.')
-  assert_pattern(r'\bNo variable called NONEXISTENT is set', \
-    'No variable called NONEXISTENT is set', result.stdout, \
+  assert_pattern(r'\bNo variable called NONEXISTENT is set',
+    'No variable called NONEXISTENT is set', result.stdout,
     'Problem unsetting non-existent variable.')
   assert_pattern(r'\bVariable COMMENT_TYPE1 set to.*$',
     'Variable COMMENT_TYPE1 set to ok', result.stderr,
@@ -112,10 +111,11 @@ def assert_var_substitution(result):
   assert_pattern(r'\bVariable COMMENT_TYPE3 set to.*$',
     'Variable COMMENT_TYPE3 set to ok', result.stderr,
     'No evidence of COMMENT_TYPE3 variable being set.')
-  assert_pattern(r'\bVariables:[\s\n]*COMMENT_TYPE1:.*[\s\n]*' + \
-    'COMMENT_TYPE2:.*[\s\n]*COMMENT_TYPE3:.*$',
-    'Variables:\n\tCOMMENT_TYPE1: ok\n\tCOMMENT_TYPE2: ok\n\tCOMMENT_TYPE3: ok', \
+  assert_pattern(r'\bVariables:[\s\n]*COMMENT_TYPE1:.*[\s\n]*'
+    r'COMMENT_TYPE2:.*[\s\n]*COMMENT_TYPE3:.*$',
+    'Variables:\n\tCOMMENT_TYPE1: ok\n\tCOMMENT_TYPE2: ok\n\tCOMMENT_TYPE3: ok',
     result.stdout, 'Set variables not listed correctly by the SET command')
+
 
 def assert_pattern(pattern, result, text, message):
   """Asserts that the pattern, when applied to text, returns the expected result"""
@@ -216,6 +216,7 @@ def get_open_sessions_metric(vector):
   else:
     assert protocol == 'beeswax', protocol
     return 'impala-server.num-open-beeswax-sessions'
+
 
 class ImpalaShellResult(object):
   def __init__(self):
@@ -380,12 +381,13 @@ def get_dev_impala_shell_executable():
 def create_impala_shell_executable_dimension(dev_only=False):
   _, include_pypi = get_dev_impala_shell_executable()
   dimensions = []
-  if os.getenv("IMPALA_SYSTEM_PYTHON2"):
+  python3_pytest = (os.getenv("IMPALA_USE_PYTHON3_TESTS", "false") == "true")
+  if os.getenv("IMPALA_SYSTEM_PYTHON2") and not python3_pytest:
     dimensions.append('dev')
   if os.getenv("IMPALA_SYSTEM_PYTHON3"):
     dimensions.append('dev3')
   if include_pypi and not dev_only:
-    if os.getenv("IMPALA_SYSTEM_PYTHON2"):
+    if os.getenv("IMPALA_SYSTEM_PYTHON2") and not python3_pytest:
       dimensions.append('python2')
     if os.getenv("IMPALA_SYSTEM_PYTHON3"):
       dimensions.append('python3')

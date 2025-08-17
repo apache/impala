@@ -35,6 +35,7 @@ import socket
 import subprocess
 import time
 import string
+
 from functools import wraps
 from getpass import getuser
 from impala.hiveserver2 import HiveServer2Cursor
@@ -455,7 +456,7 @@ class ImpalaTestSuite(BaseTestSuite):
   @classmethod
   def close_impala_clients(cls):
     """Closes Impala clients created by create_impala_clients()."""
-    # cls.client should be equal to one of belove, unless test method implicitly override.
+    # cls.client should be equal to one of below, unless test method implicitly override.
     # Closing twice would lead to error in some clients (impyla+SSL).
     if cls.client not in (cls.beeswax_client, cls.hs2_client, cls.hs2_http_client):
       cls.client.close()

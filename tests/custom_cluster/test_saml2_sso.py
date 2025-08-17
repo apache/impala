@@ -21,6 +21,7 @@ import base64
 import datetime
 import os
 import pytest
+import sys
 import uuid
 import xml.etree.ElementTree as ET
 import zlib
@@ -40,13 +41,20 @@ from tests.shell.util import run_impala_shell_cmd
 
 class NoRedirection(HTTPErrorProcessor):
   """Allows inspecting http redirection responses. """
-  def http_response(self, request, response):
+  def http_response(self, request, response):  # noqa: U100
     return response
 
 
 def format_time(time):
   """ Converts datetimes to the format expected in SAML2 XMLs. """
   return time.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def encode_if_needed(value):
+  """ Encodes the value to bytes if needed, depending on the python version. """
+  if sys.version_info.major < 3:
+    return value.encode('utf-8') if isinstance(value, str) else value
+  return value if isinstance(value, bytes) else value.encode('utf-8')
 
 
 class TestClientSaml(CustomClusterTestSuite):
@@ -100,9 +108,9 @@ class TestClientSaml(CustomClusterTestSuite):
               "--saml2_ee_test_mode=true"
               % (CERT_DIR, CERT_DIR, SP_CALLBACK_URL))
 
-  SSO_ARGS_WITH_GROUP_FILTER = (SSO_ARGS + " " +
-                                "--saml2_group_filter=group1,group2 "
-                                "--saml2_group_attribute_name=eduPersonAffiliation")
+  SSO_ARGS_WITH_GROUP_FILTER = (
+      "{} --saml2_group_filter=group1,group2 "
+      "--saml2_group_attribute_name=eduPersonAffiliation").format(SSO_ARGS)
 
   @CustomClusterTestSuite.with_args(impalad_args=SSO_ARGS, cluster_size=1)
   def test_saml2_browser_profile_no_group_filter(self, vector):
@@ -131,7 +139,7 @@ class TestClientSaml(CustomClusterTestSuite):
 
   @CustomClusterTestSuite.with_args(
       impalad_args=SSO_ARGS_WITH_GROUP_FILTER, cluster_size=1)
-  def test_saml2_browser_profile_with_group_filter(self, vector):
+  def test_saml2_browser_profile_with_group_filter(self):
       # test the SAML worflow with different attributes
       self._test_saml2_browser_workflow("", False)
 
@@ -157,7 +165,8 @@ class TestClientSaml(CustomClusterTestSuite):
     """ Initial POST request to hs2-http port, response should be redirected
         to IDP and contain the authnrequest. """
     opener = build_opener(NoRedirection)
-    req = Request("http://localhost:%s" % TestClientSaml.HOST_PORT, " ")
+    payload = encode_if_needed(" ")
+    req = Request("http://localhost:%s" % TestClientSaml.HOST_PORT, payload)
     req.add_header('X-Hive-Token-Response-Port', TestClientSaml.CLIENT_PORT)
     response = opener.open(req)
     relay_state, client_id, saml_req_xml = \
@@ -171,7 +180,10 @@ class TestClientSaml(CustomClusterTestSuite):
     assert client_id is not None
     new_url = response.info()["location"]
     assert new_url.startswith(TestClientSaml.IDP_URL)
-    query = parse_qs(urlparse(new_url).query.encode('ASCII'))
+    query_part = urlparse(new_url).query
+    query = parse_qs(query_part.encode('ASCII') if sys.version_info.major < 3
+                     else query_part)
+    assert "RelayState" in query, query
     relay_state = query["RelayState"][0]
     assert relay_state is not None
     saml_req = query["SAMLRequest"][0]
@@ -187,7 +199,8 @@ class TestClientSaml(CustomClusterTestSuite):
   def _request_resource_with_bearer(self, client_id, bearer_token):
     """ Send POST request to hs2-http port again, this time with bearer tokan.
         The response should contain a security cookie if the validation succeeded """
-    req = Request("http://localhost:%s" % TestClientSaml.HOST_PORT, " ")
+    payload = encode_if_needed(" ")
+    req = Request("http://localhost:%s" % TestClientSaml.HOST_PORT, payload)
     req.add_header('X-Hive-Client-Identifier', client_id)
     req.add_header('Authorization', "Bearer " + bearer_token)
     opener = build_opener(NoRedirection)
@@ -205,10 +218,11 @@ class TestClientSaml(CustomClusterTestSuite):
         Impala should answer with a form that submits to CLIENT_PORT and contains
         the bearer token as a hidden state. """
     authn_resp = self._generate_authn_response(request_id, attributes_xml)
-    encoded_authn_resp = base64.urlsafe_b64encode(authn_resp)
-    body = "SAMLResponse=%s&RelayState=%s" % (encoded_authn_resp, relay_state)
+    encoded_authn_resp = base64.urlsafe_b64encode(authn_resp.encode('utf-8'))
+    body = (b"SAMLResponse=" + encoded_authn_resp + b"&RelayState="
+            + encode_if_needed(relay_state))
     opener = build_opener(NoRedirection)
-    req = Request(TestClientSaml.SP_CALLBACK_URL, body)
+    req = Request(TestClientSaml.SP_CALLBACK_URL, encode_if_needed(body))
     response = opener.open(req)
     bearer_token = self._parse_xhtml_form(response, expect_success)
     return bearer_token
@@ -244,7 +258,7 @@ class TestClientSaml(CustomClusterTestSuite):
         message = input.attrib["value"]
 
     if expect_success:
-      assert token.startswith("u=user1")
+      assert token.startswith("u=user1"), str(content)
     else:
       assert message == TestClientSaml.ASSERTATION_ERROR_MESSAGE
     return token

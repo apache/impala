@@ -26,6 +26,7 @@ from tests.comparison.common import ValExpr, ValExprList
 
 module_contents = dict()
 
+
 class DataTypeMetaclass(type):
   '''Provides sorting of classes used to determine upcasting.'''
 
@@ -39,9 +40,23 @@ class DataTypeMetaclass(type):
   def __cmp__(cls, other):
     if not isinstance(other, DataTypeMetaclass):
       return -1
-    return cmp(
-        getattr(cls, 'CMP_VALUE', cls.__name__),
-        getattr(other, 'CMP_VALUE', other.__name__))
+    val_this = getattr(cls, 'CMP_VALUE', cls.__name__)
+    val_other = getattr(other, 'CMP_VALUE', other.__name__)
+    if (val_this < val_other):
+      return -1
+    elif (val_this > val_other):
+      return 1
+    else:
+      return 0
+
+  def __lt__(cls, other):
+    # This __lt__ method replace __cmp__ that is removed in Python3.
+    # See https://peps.python.org/pep-0207/.
+    # It is mainly to serve max() inside update_return_type_and_append() of funcs.py.
+    if not isinstance(other, DataTypeMetaclass):
+      return False
+    return (getattr(cls, 'CMP_VALUE', cls.__name__)
+            < getattr(other, 'CMP_VALUE', other.__name__))
 
 
 class DataType(with_metaclass(DataTypeMetaclass, ValExpr)):
@@ -90,7 +105,6 @@ class DataType(with_metaclass(DataTypeMetaclass, ValExpr)):
   @property
   def exact_type(self):
     return type(self)
-
 
 
 class Boolean(DataType):
@@ -213,6 +227,10 @@ JOINABLE_TYPES = (Char, Decimal, Int, Timestamp)
 TYPES = tuple(set(type_.type for type_ in EXACT_TYPES))
 
 __DECIMAL_TYPE_CACHE = dict()
+__CHAR_TYPE_CACHE = dict()
+__VARCHAR_TYPE_CACHE = dict()
+
+
 def get_decimal_class(total_digits, fractional_digits):
   cache_key = (total_digits, fractional_digits)
   if cache_key not in __DECIMAL_TYPE_CACHE:
@@ -223,7 +241,6 @@ def get_decimal_class(total_digits, fractional_digits):
   return __DECIMAL_TYPE_CACHE[cache_key]
 
 
-__CHAR_TYPE_CACHE = dict()
 def get_char_class(length):
   if length not in __CHAR_TYPE_CACHE:
     __CHAR_TYPE_CACHE[length] = type(
@@ -233,7 +250,6 @@ def get_char_class(length):
   return __CHAR_TYPE_CACHE[length]
 
 
-__VARCHAR_TYPE_CACHE = dict()
 def get_varchar_class(length):
   if length not in __VARCHAR_TYPE_CACHE:
     __VARCHAR_TYPE_CACHE[length] = type(

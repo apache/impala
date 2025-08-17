@@ -20,10 +20,13 @@ from collections import defaultdict
 import json
 import logging
 import socket
+import sys
 import threading
 import time
 import traceback
 import uuid
+
+import pytest
 
 from builtins import range
 from thrift.protocol import TBinaryProtocol
@@ -115,6 +118,7 @@ class KillableThreadedServer(TServer):
     self.port = self.serverTransport.port
 
   def shutdown(self):
+    LOG.info('Server localhost:{} is shutting down'.format(self.port))
     self.is_shutdown = True
     self.serverTransport.close()
     self.wait_until_down()
@@ -127,20 +131,22 @@ class KillableThreadedServer(TServer):
       cnxn = TSocket.TSocket('localhost', self.port)
       try:
         cnxn.open()
+        LOG.info('Server localhost:{} is up'.format(cnxn.port))
         return
       except Exception:
         if i == num_tries - 1: raise
-      time.sleep(0.1)
+      time.sleep(0.5)
 
   def wait_until_down(self, num_tries=10):
     for i in range(num_tries):
       cnxn = TSocket.TSocket('localhost', self.port)
       try:
         cnxn.open()
-        time.sleep(0.1)
       except Exception:
+        LOG.info('Server localhost:{} is down'.format(cnxn.port))
         return
-    raise Exception("Server did not stop")
+      time.sleep(0.5)
+    raise Exception("Server localhost:{} did not stop".format(cnxn.port))
 
   def serve(self):
     self.serverTransport.listen()
@@ -149,8 +155,12 @@ class KillableThreadedServer(TServer):
       # Since accept() can take a while, check again if the server is shutdown to avoid
       # starting an unnecessary thread.
       if self.is_shutdown: return
-      t = threading.Thread(target=self.handle, args=(client,))
-      t.setDaemon(self.daemon)
+      t = None
+      if sys.version_info.major < 3:
+        t = threading.Thread(target=self.handle, args=(client,))
+        t.setDaemon(True)
+      else:
+        t = threading.Thread(target=self.handle, args=(client,), daemon=self.daemon)
       t.start()
 
   def handle(self, client):
@@ -196,6 +206,9 @@ class StatestoreSubscriber(object):
     self.heartbeat_cb, self.update_cb = heartbeat_cb, update_cb
     self.subscriber_id = "python-test-client-%s" % uuid.uuid1()
     self.exception = None
+    self.server = None
+    self.server_thread = None
+    self.client_transport = None
 
   def __enter__(self):
     return self
@@ -239,19 +252,24 @@ class StatestoreSubscriber(object):
     return response
 
   def __init_server(self):
+    LOG.info('Initializing server')
     processor = Subscriber.Processor(self)
     transport = WildcardServerSocket()
     tfactory = TTransport.TBufferedTransportFactory()
     pfactory = TBinaryProtocol.TBinaryProtocolFactory()
     self.server = KillableThreadedServer(processor, transport, tfactory, pfactory,
                                          daemon=True)
-    self.server_thread = threading.Thread(target=self.server.serve)
-    self.server_thread.setDaemon(True)
+    if sys.version_info.major < 3:
+      self.server_thread = threading.Thread(target=self.server.serve)
+      self.server_thread.setDaemon(True)
+    else:
+      self.server_thread = threading.Thread(target=self.server.serve, daemon=True)
     self.server_thread.start()
     self.server.wait_until_up()
     self.port = self.server.port
 
   def __init_client(self):
+    LOG.info('Initializing client')
     self.client_transport = \
         TTransport.TBufferedTransport(TSocket.TSocket('localhost', 24000))
     self.protocol = TBinaryProtocol.TBinaryProtocol(self.client_transport)
@@ -352,6 +370,7 @@ class StatestoreSubscriber(object):
       time.sleep(0.2)
 
 
+@pytest.mark.execute_serially
 @SkipIfDockerizedCluster.statestore_not_exposed
 class TestStatestore(BaseTestSuite):
   def make_topic_update(self, topic_name, key_template="foo", value_template="bar",
