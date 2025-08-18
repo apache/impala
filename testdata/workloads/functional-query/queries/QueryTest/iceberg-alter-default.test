@@ -74,7 +74,7 @@ CREATE TABLE iceberg_hadoop_catalog(
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
-'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test_warehouse/$DATABASE/hadoop_catalog_test');
+'iceberg.catalog_location'='$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test');
 ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(event_time TIMESTAMP, register_time DATE);
 ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(message STRING, price DECIMAL(8,1));
 ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(map_test MAP <STRING, array <STRING>>, struct_test STRUCT <f1: BIGINT, f2: BIGINT>);
