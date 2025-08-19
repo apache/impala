@@ -540,7 +540,7 @@ class TestDdlStatements(TestDdlBase):
 
     def run_rename(i):
       if i % 2 == 0:
-        tlc.client.execute("set sync_ddl=1")
+        tlc.client.set_configuration_option("sync_ddl", "1")
       is_partitioned = i % 4 < 2
       tbl_name = "{}.tbl_{}".format(unique_database, i)
       tlc.client.execute("create table {}(i int){}".format(
@@ -1056,45 +1056,28 @@ class TestAsyncDDL(TestDdlBase):
   @classmethod
   def test_get_operation_status_for_client(self, client, unique_database):
     # Setup
-    client.execute("drop table if exists {0}.alltypes_clone".format(unique_database))
+    SLEEP_S = 2
     client.execute("select count(*) from functional_parquet.alltypes")
-    client.execute("set enable_async_ddl_execution=true")
-    client.execute("set debug_action=\"CRS_DELAY_BEFORE_CATALOG_OP_EXEC:SLEEP@10000\"")
-
+    client.set_configuration_option("enable_async_ddl_execution", "true")
+    client.set_configuration_option("debug_action",
+        "CRS_DELAY_BEFORE_CATALOG_OP_EXEC:SLEEP@%s" % (SLEEP_S * 1000))
     # Run the test query which will only compile the DDL in execute_statement()
     # and measure the time spent. Should be less than 3s.
     start = time.time()
     handle = client.execute_async(
-        "create table {0}.alltypes_clone as select * from \
-        functional_parquet.alltypes".format(unique_database))
+      "create table {0}.alltypes_clone as select sleep({1})".format(
+          unique_database, SLEEP_S * 1000))
     end = time.time()
     assert (end - start <= 3)
 
     # The table creation and population part will be done in a separate thread.
-    # The repeated call below to get_operation_status() finds out the number of
-    # times that each state is reached in BE for that part of the work.
-    num_times_in_initialized_state = 0
-    num_times_in_pending_state = 0
-    num_times_in_running_state = 0
-    while not client.state_is_finished(handle):
-
-      state = client.get_impala_exec_state(handle)
-
-      if (state == INITIALIZED):
-        num_times_in_initialized_state += 1
-
-      if (state == PENDING):
-        num_times_in_pending_state += 1
-
-      if (state == RUNNING):
-        num_times_in_running_state += 1
-
-    # The query must reach INITIALIZED_STATE 0 time and PENDING_STATE at least
-    # once. The number of times in PENDING_STATE is a function of the length of
-    # the delay. The query reaches RUNNING_STATE when it populates the new table.
-    assert num_times_in_initialized_state == 0
-    assert num_times_in_pending_state > 1
-    assert num_times_in_running_state > 0
+    # The query must be in PENDING state after execute_async and enter RUNNING state
+    # after creating the table in catalogd (at least SLEEP_S delay). The query can
+    # enter FINISHED state after another delay of at least SLEEP_S.
+    assert client.get_impala_exec_state(handle) == PENDING
+    client.wait_for_impala_state(handle, RUNNING, SLEEP_S + 3)
+    client.wait_for_impala_state(handle, FINISHED, SLEEP_S + 3)
+    client.close_query(handle)
 
   def test_get_operation_status_for_async_ddl(self, vector, unique_database):
     """Tests that for an asynchronously executed DDL with delay, GetOperationStatus
