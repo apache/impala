@@ -17,5 +17,5 @@
 
 # Newer versions of setuptools don't support Python 2.7
 setuptools == 44.1.1
-  wheel == 0.35.1
+  wheel == 0.38.1
 setuptools-scm == 5.0.2
