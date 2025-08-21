@@ -54,8 +54,8 @@ public class IcebergPartitionField extends StmtNode {
     Preconditions.checkState(type.isScalarType());
     sourceId_ = sourceId;
     fieldId_ = fieldId;
-    origFieldName_ = origFieldName;
-    fieldName_ = fieldName;
+    origFieldName_ = origFieldName.toLowerCase();
+    fieldName_ = fieldName.toLowerCase();
     transform_ = transform;
     type_ = (ScalarType)type;
   }

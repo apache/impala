@@ -18,3 +18,37 @@ STRING, STRING
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 1
 ====
+---- QUERY
+# IMPALA-14290: check partition columns case insensitivity
+CREATE TABLE partition_case_insensitive ( START_TIME TIMESTAMP, End_Time TIMESTAMP )
+PARTITIONED BY SPEC (DAY(START_TIME), MONTH(enD_tIMe))
+STORED AS ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+ALTER TABLE partition_case_insensitive SET PARTITION SPEC (MONTH(start_TIME), DAY(end_time));
+---- RESULTS
+'Updated partition spec.'
+====
+---- QUERY
+INSERT INTO partition_case_insensitive VALUES ("2023-11-27 00:00:00", "2024-08-12 00:00:00");
+ALTER TABLE partition_case_insensitive DROP PARTITION (MONTH(sTARt_timE) = "2023-11");
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+INSERT INTO partition_case_insensitive VALUES ("2023-12-27 00:00:00", "2024-08-12 00:00:00");
+INSERT INTO partition_case_insensitive VALUES ("2023-12-25 00:00:00", "2024-08-12 00:00:00");
+INSERT INTO partition_case_insensitive VALUES ("2023-12-25 00:00:00", "2024-07-12 00:00:00");
+INSERT INTO partition_case_insensitive VALUES ("2023-11-27 00:00:00", "2024-07-12 00:00:00");
+SHOW PARTITIONS partition_case_insensitive;
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"start_time_day":null,"end_time_month":null,"start_time_month":"646","end_time_day":"19916"}',1,1
+'{"start_time_day":null,"end_time_month":null,"start_time_month":"647","end_time_day":"19916"}',1,1
+'{"start_time_day":null,"end_time_month":null,"start_time_month":"647","end_time_day":"19947"}',2,2
+---- TYPES
+STRING, BIGINT, BIGINT
+====
