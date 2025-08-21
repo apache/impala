@@ -3847,7 +3847,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   bool_col boolean
 )
 STORED BY ICEBERG STORED AS AVRO
-LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_avro_format';
+LOCATION '/test-warehouse/iceberg_test/avro/iceberg_avro_format';
 ---- DEPENDENT_LOAD_HIVE
 INSERT INTO TABLE {db_name}{db_suffix}.{table_name} values(1, 'A', 0.5, true),(2, 'B', 1.5, true),(3, 'C', 2.5, false);
 ====
@@ -3863,7 +3863,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   bool_col boolean
 )
 STORED BY ICEBERG
-LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_mixed_file_format';
+LOCATION '/test-warehouse/iceberg_test/mixed_formats/iceberg_mixed_file_format';
 ---- DEPENDENT_LOAD_HIVE
 -- This INSERT must run in Hive, because Impala doesn't support inserting into tables
 -- with avro and orc file formats.
@@ -3886,7 +3886,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 )
 PARTITIONED BY (int_col int)
 STORED BY ICEBERG
-LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_mixed_file_format_part';
+LOCATION '/test-warehouse/iceberg_test/mixed_formats/iceberg_mixed_file_format_part';
 ---- DEPENDENT_LOAD_HIVE
 -- This INSERT must run in Hive, because Impala doesn't support inserting into tables
 -- with avro and orc file formats.
@@ -3906,7 +3906,7 @@ CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   i int
 )
 STORED BY ICEBERG
-LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_query_metadata'
+LOCATION '/test-warehouse/iceberg_test/metadata/iceberg_query_metadata'
 TBLPROPERTIES('format-version'='2');
 ---- DEPENDENT_LOAD
 INSERT INTO {db_name}{db_suffix}.{table_name} VALUES (1);
@@ -3943,7 +3943,7 @@ CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   mp map<int, float>
 )
 STORED BY ICEBERG
-LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_metadata_alltypes'
+LOCATION '/test-warehouse/iceberg_test/metadata/iceberg_metadata_alltypes'
 TBLPROPERTIES('format-version'='2');
 ---- DEPENDENT_LOAD_HIVE
 INSERT INTO {db_name}{db_suffix}.{table_name} VALUES (

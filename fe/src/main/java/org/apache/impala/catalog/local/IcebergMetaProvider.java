@@ -163,15 +163,9 @@ public class IcebergMetaProvider implements MetaProvider {
     ImmutableList.Builder<TBriefTableMeta> ret = ImmutableList.builder();
     Namespace ns = Namespace.of(dbName);
     for (TableIdentifier tid : iceCatalog_.listTables(ns.toString())) {
-      try {
-        org.apache.iceberg.Table tbl = iceCatalog_.loadTable(tid, null, null);
-        TBriefTableMeta briefMeta = new TBriefTableMeta(getIcebergTableName(tbl));
-        briefMeta.setMsType("TABLE");
-        ret.add(briefMeta);
-      } catch (NoSuchTableException | IcebergTableLoadingException e) {
-        // Ignore tables that cannot be loaded.
-        LOG.error(e.toString());
-      }
+      TBriefTableMeta briefMeta = new TBriefTableMeta(tid.name());
+      briefMeta.setMsType("TABLE");
+      ret.add(briefMeta);
     }
     return ret.build();
   }
