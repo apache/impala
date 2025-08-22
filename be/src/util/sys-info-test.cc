@@ -26,6 +26,8 @@
 
 #include "common/names.h"
 
+DECLARE_int32(num_cores);
+
 namespace impala {
 
 TEST(CpuInfoTest, Basic) {
@@ -54,6 +56,13 @@ TEST(CpuInfoTest, InvalidSchedGetCpuValue) {
     ASSERT_LT(reported_core, FAKE_NUM_CORES);
   }
 
+}
+
+// IMPALA-13413: Test that --num_cores flag is respected by CpuInfo::Init().
+TEST(CpuInfoTest, NumCoresFlag) {
+  if (FLAGS_num_cores > 0) {
+    EXPECT_EQ(FLAGS_num_cores, CpuInfo::num_cores());
+  }
 }
 
 class DiskInfoTest : public ::testing::Test {

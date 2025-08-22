@@ -300,6 +300,19 @@ ADD_UNIFIED_BE_LSAN_TEST(summary-util-test "PrintTableTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(symbols-util-test "SymbolsUtil.*")
 ADD_UNIFIED_BE_LSAN_TEST(system-state-info-test "SystemStateInfoTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(sys-info-test "CpuInfoTest.*:DiskInfoTest.*")
+# IMPALA-13413: Test that --num_cores flag is respected by CpuInfo::Init().
+# This requires a custom ADD_TEST because we need to pass --num_cores flag.
+# Use system cores + 1 to ensure the test value differs from actual cores.
+include(ProcessorCount)
+ProcessorCount(SYSTEM_CORES)
+math(EXPR NUM_CORES_FOR_TEST "${SYSTEM_CORES} + 1")
+ADD_TEST(NAME num-cores-flag-test
+  COMMAND "${CMAKE_SOURCE_DIR}/bin/run-jvm-binary.sh"
+          "${BUILD_OUTPUT_ROOT_DIRECTORY}/service/unifiedbetests"
+          "--num_cores=${NUM_CORES_FOR_TEST}"
+          "--gtest_filter=CpuInfoTest.NumCoresFlag"
+          -log_dir=$ENV{IMPALA_BE_TEST_LOGS_DIR})
+set_tests_properties(num-cores-flag-test PROPERTIES DEPENDS unified-be-test-validated-executable)
 ADD_UNIFIED_BE_LSAN_TEST(thread-pool-test "ThreadPoolTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(time-test "TimeTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(tuple-row-compare-test "TupleRowCompareTest.*")

@@ -490,12 +490,6 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   srand(time(NULL));
   BlockImpalaShutdownSignal();
 
-  CpuInfo::Init();
-  DiskInfo::Init();
-  MemInfo::Init();
-  OsInfo::Init();
-  TestInfo::Init(test_mode);
-
   // Set the default hostname. The user can override this with the hostname flag.
   ABORT_IF_ERROR(GetHostname(&FLAGS_hostname));
 
@@ -517,6 +511,13 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
 
   google::SetVersionString(impala::GetBuildVersion());
   google::ParseCommandLineFlags(&argc, &argv, true);
+
+  CpuInfo::Init();
+  DiskInfo::Init();
+  MemInfo::Init();
+  OsInfo::Init();
+  TestInfo::Init(test_mode);
+
   if (!FLAGS_redaction_rules_file.empty()) {
     if (VLOG_ROW_IS_ON || !FLAGS_vmodule.empty()) {
       CLEAN_EXIT_WITH_ERROR("Redaction cannot be used in combination with log level 3 or "
