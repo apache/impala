@@ -17,23 +17,24 @@
 
 package org.apache.impala.calcite.schema;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+
 import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeImpl;
 import org.apache.calcite.schema.Table;
-import org.apache.calcite.schema.impl.ViewTable;
 import org.apache.calcite.schema.impl.AbstractSchema;
+import org.apache.calcite.schema.impl.ViewTable;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.View;
+import org.apache.impala.catalog.local.LocalFsTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
-
-import com.google.common.collect.ImmutableList;
 
 import java.lang.reflect.Type;
 import java.util.HashMap;
@@ -65,32 +66,33 @@ public class CalciteDb extends AbstractSchema {
         Analyzer analyzer) throws ImpalaException {
       if (tableMap_.containsKey(tableName)) return this;
 
-      if (table instanceof HdfsTable) {
-          tableMap_.put(tableName.toLowerCase(),
-              new CalciteTable(table, reader_, analyzer));
-          return this;
+      if (table instanceof LocalFsTable || table instanceof HdfsTable) {
+        tableMap_.put(
+            tableName.toLowerCase(), new CalciteTable(table, reader_, analyzer));
+        return this;
       }
 
-      if (table instanceof View) {
-          tableMap_.put(tableName.toLowerCase(), createViewTable(table));
-          return this;
+      if (table instanceof FeView) {
+        tableMap_.put(tableName.toLowerCase(), createViewTable(table));
+        return this;
       }
 
-      throw new UnsupportedFeatureException(
-          "Table " + table.getFullName() + " has unsupported type " +
-              table.getClass().getSimpleName() + ". The Calcite planner only supports " +
-              "HdfsTable's and View's.");
+      throw new UnsupportedFeatureException("Table " + table.getFullName()
+          + " has unsupported type " + table.getClass().getSimpleName()
+          + ". The Calcite planner only supports "
+          + "HdfsTable's and FeView's.");
     }
 
     private static ViewTable createViewTable(FeTable feTable) throws ImpalaException {
       RelDataType rowType = CalciteTable.buildColumnsForRelDataType(feTable);
       JavaTypeFactory typeFactory = (JavaTypeFactory) ImpalaTypeSystemImpl.TYPE_FACTORY;
       Type elementType = typeFactory.getJavaClass(rowType);
-      return new ViewTable(elementType,
-          RelDataTypeImpl.proto(rowType), ((View) feTable).getQueryStmt().toSql(),
+      return new ViewTable(elementType, RelDataTypeImpl.proto(rowType),
+          ((FeView) feTable).getQueryStmt().toSql(),
           /* schemaPath */ ImmutableList.of(),
-          /* viewPath */ ImmutableList.of(feTable.getDb().getName().toLowerCase(),
-          feTable.getName().toLowerCase()));
+          /* viewPath */
+          ImmutableList.of(
+              feTable.getDb().getName().toLowerCase(), feTable.getName().toLowerCase()));
     }
 
     public CalciteDb build() {

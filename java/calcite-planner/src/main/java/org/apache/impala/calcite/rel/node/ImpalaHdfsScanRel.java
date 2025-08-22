@@ -27,8 +27,8 @@ import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BaseTableRef;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
@@ -39,22 +39,21 @@ import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsPartition;
-import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.PlanNodeId;
-import org.apache.impala.planner.SingleNodePlanner;
 import org.apache.impala.planner.ScanNode;
+import org.apache.impala.planner.SingleNodePlanner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 /**
  * ImpalaHdfsScanRel. Calcite RelNode which maps to an Impala TableScan node.
  */
@@ -138,7 +137,7 @@ public class ImpalaHdfsScanRel extends TableScan
   private List<Expr> createScanOutputExprs(List<SlotDescriptor> slotDescs)
       throws ImpalaException {
     CalciteTable calciteTable = (CalciteTable) getTable();
-    HdfsTable table = calciteTable.getHdfsTable();
+    FeFsTable table = calciteTable.getFeFsTable();
     // IMPALA-12961: The output expressions are contained in a list which
     // may have holes in it (if the table scan column is not in the output).
     // The width of the list must include all columns, including the acid ones,

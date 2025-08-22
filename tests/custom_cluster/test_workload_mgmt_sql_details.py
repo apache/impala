@@ -429,8 +429,6 @@ class TestWorkloadManagementSQLDetailsCalcite(WorkloadManagementTestSuite):
 
   @CustomClusterTestSuite.with_args(
       start_args="--use_calcite_planner=true",
-      impalad_args="--use_local_catalog=false",
-      catalogd_args="--catalog_topic_mode=full",
       cluster_size=1, workload_mgmt=True)
   def test_tpcds_8_decimal(self, vector):
     """Runs the tpcds-decimal_v2-q8 query using the calcite planner and asserts the query

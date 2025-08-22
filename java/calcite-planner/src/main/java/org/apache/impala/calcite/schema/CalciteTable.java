@@ -17,6 +17,9 @@
 
 package org.apache.impala.calcite.schema;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.plan.RelOptAbstractTable;
@@ -47,39 +50,36 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.calcite.rel.util.ImpalaBaseTableRef;
+import org.apache.impala.calcite.type.ImpalaTypeConverter;
+import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
+import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IcebergTable;
-import org.apache.impala.calcite.rel.util.ImpalaBaseTableRef;
-import org.apache.impala.calcite.type.ImpalaTypeConverter;
-import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
-import org.apache.impala.calcite.util.SimplifiedAnalyzer;
-import org.apache.impala.planner.HdfsEstimatedMissingTableStats;
-import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.UnsupportedFeatureException;
+import org.apache.impala.planner.HdfsEstimatedMissingTableStats;
+import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.util.AcidUtils;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-
 public class CalciteTable extends RelOptAbstractTable
     implements Table, Prepare.PreparingTable {
-
-  private final HdfsTable table_;
+  private final FeFsTable table_;
 
   private final Map<Integer, Integer> impalaPositionMap_;
 
@@ -94,15 +94,18 @@ public class CalciteTable extends RelOptAbstractTable
   public CalciteTable(FeTable table, CalciteCatalogReader reader,
       Analyzer analyzer) throws ImpalaException {
     super(reader, table.getName(), buildColumnsForRelDataType(table));
-    this.table_ = (HdfsTable) table;
+    this.table_ = (FeFsTable) table;
     this.qualifiedTableName_ = table.getTableName().toPath();
     this.columns_ = table.getColumnsInHiveOrder();
     this.impalaPositionMap_ = buildPositionMap();
     this.analyzer_ = (SimplifiedAnalyzer) analyzer;
-    estimatedMissingStats_ = table_.getNumRows() < 0
-        ? new HdfsEstimatedMissingTableStats(analyzer.getQueryOptions(), table_,
-            table_.getPartitions(), -1)
-        : null;
+    // TODO: If table_.getNumRows() is unknown (-1), this logic will load all partitions
+    // to compute estimation using HdfsEstimatedMissingTableStats. This is potentially
+    // expensive and should be avoided in local catalog mode.
+    estimatedMissingStats_ = table_.getNumRows() < 0 ?
+        new HdfsEstimatedMissingTableStats(
+            analyzer.getQueryOptions(), table_, table_.loadAllPartitions(), -1) :
+        null;
 
     checkIfTableIsSupported(table);
   }
@@ -131,11 +134,10 @@ public class CalciteTable extends RelOptAbstractTable
       throw new UnsupportedFeatureException("Views are not supported yet.");
     }
 
-    if (!(table instanceof HdfsTable)) {
+    if (!(table instanceof FeFsTable)) {
       String tableType = table.getClass().getSimpleName().replace("Table", "");
       throw new UnsupportedFeatureException(tableType + " tables are not supported yet.");
     }
-
   }
 
   public BaseTableRef createBaseTableRef(SimplifiedAnalyzer analyzer
@@ -165,9 +167,7 @@ public class CalciteTable extends RelOptAbstractTable
     return impalaPair.first;
   }
 
-  public HdfsTable getHdfsTable() {
-    return table_;
-  }
+  public FeFsTable getFeFsTable() { return table_; }
 
   @Override
   public List<String> getQualifiedName() {
@@ -247,7 +247,6 @@ public class CalciteTable extends RelOptAbstractTable
   }
 
   public Column getColumn(int i) {
-    HdfsTable feFsTable = (HdfsTable) table_;
     return columns_.get(i);
   }
 

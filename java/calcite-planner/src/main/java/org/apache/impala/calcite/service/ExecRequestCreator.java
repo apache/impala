@@ -17,12 +17,14 @@
 
 package org.apache.impala.calcite.service;
 
-import org.apache.impala.calcite.rel.node.NodeWithExprs;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.JoinOperator;
+import org.apache.impala.calcite.rel.node.NodeWithExprs;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.ImpalaException;
@@ -33,9 +35,9 @@ import org.apache.impala.planner.NestedLoopJoinNode;
 import org.apache.impala.planner.ParallelPlanner;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.PlanNode;
+import org.apache.impala.planner.PlanRootSink;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.PlannerContext;
-import org.apache.impala.planner.PlanRootSink;
 import org.apache.impala.planner.RuntimeFilterGenerator;
 import org.apache.impala.planner.SingleNodePlanner;
 import org.apache.impala.planner.SingularRowSrcNode;
@@ -55,18 +57,16 @@ import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.util.EventSequence;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
 
 /**
  * ExecRequestCreator. Responsible for taking a PlanNode and the output Expr list
@@ -329,8 +329,8 @@ public class ExecRequestCreator implements CompilerStep {
   private List<TNetworkAddress> getHostLocations(Collection<FeTable> tables) {
     Set<TNetworkAddress> hostLocations = new HashSet<>();
     for (FeTable table : tables) {
-      if (table instanceof HdfsTable) {
-        hostLocations.addAll(((HdfsTable) table).getHostIndex().getList());
+      if (table instanceof FeFsTable) {
+        hostLocations.addAll(((FeFsTable) table).getHostIndex().getList());
       }
     }
     return new ArrayList<>(hostLocations);
