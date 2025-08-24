@@ -1093,8 +1093,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// dynamically scroll through the results, but also allow users to download a file
   /// containing all the results for a query.
   Status SetupResultsCacheing(const QueryHandle& query_handle,
-      const std::shared_ptr<SessionState>& session,
-      int64_t cache_num_rows) WARN_UNUSED_RESULT;
+      const std::shared_ptr<SessionState>& session, int64_t cache_num_rows,
+      bool* returns_result_set) WARN_UNUSED_RESULT;
 
   /// Helper functions to translate between HiveServer2 and Impala structs
 

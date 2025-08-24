@@ -285,7 +285,7 @@ class ClientRequestState {
   int num_rows_fetched() const { return num_rows_fetched_; }
   void set_fetched_rows() { fetched_rows_ = true; }
   bool fetched_rows() const { return fetched_rows_; }
-  bool returns_result_set() { return !result_metadata_.columns.empty(); }
+  bool returns_result_set() const { return !result_metadata_.columns.empty(); }
   const TResultSetMetadata* result_metadata() const { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_ctx_.query_id; }
 

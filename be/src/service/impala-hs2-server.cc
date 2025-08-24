@@ -631,8 +631,11 @@ void ImpalaServer::ExecuteStatementCommon(TExecuteStatementResp& return_val,
   status = query_handle->WaitAsync();
   if (!status.ok()) goto return_error;
 
-  // Optionally enable result caching on the ClientRequestState.
-  status = SetupResultsCacheing(query_handle, session, cache_num_rows);
+  // Check if query return result set and optionally enable result caching on the
+  // ClientRequestState.
+  bool returns_result_set;
+  status =
+      SetupResultsCacheing(query_handle, session, cache_num_rows, &returns_result_set);
   if (!status.ok()) goto return_error;
 
   // Once the query is running do a final check for session closure and add it to the
@@ -641,7 +644,7 @@ void ImpalaServer::ExecuteStatementCommon(TExecuteStatementResp& return_val,
   if (!status.ok()) goto return_error;
   return_val.__isset.operationHandle = true;
   return_val.operationHandle.__set_operationType(TOperationType::EXECUTE_STATEMENT);
-  return_val.operationHandle.__set_hasResultSet(query_handle->returns_result_set());
+  return_val.operationHandle.__set_hasResultSet(returns_result_set);
   // Secret is inherited from session.
   TUniqueIdToTHandleIdentifier(query_handle->query_id(), secret,
                                &return_val.operationHandle.operationId);
@@ -657,13 +660,25 @@ void ImpalaServer::ExecuteStatementCommon(TExecuteStatementResp& return_val,
 }
 
 Status ImpalaServer::SetupResultsCacheing(const QueryHandle& query_handle,
-    const shared_ptr<SessionState>& session, int64_t cache_num_rows) {
-  // Optionally enable result caching on the ClientRequestState.
-  if (cache_num_rows > 0) {
+    const shared_ptr<SessionState>& session, int64_t cache_num_rows,
+    bool* returns_result_set) {
+  QueryResultSet* result_set = nullptr;
+  {
+    // IMPALA-14359: Hold handle lock to observe members of query_handle.
+    // Need to investigate whether race against ClientRequestState::ExecDdlRequestImpl
+    // should be handled differently.
+    lock_guard<mutex> l(*query_handle->lock());
+    *returns_result_set = query_handle->returns_result_set();
+
+    // Optionally enable result caching on the ClientRequestState.
+    if (cache_num_rows <= 0) return Status::OK();
     const TResultSetMetadata* result_set_md = query_handle->result_metadata();
-    QueryResultSet* result_set =
-        QueryResultSet::CreateHS2ResultSet(session->hs2_version, *result_set_md, nullptr,
-            query_handle->query_options().stringify_map_keys, 0);
+    result_set = QueryResultSet::CreateHS2ResultSet(session->hs2_version, *result_set_md,
+        nullptr, query_handle->query_options().stringify_map_keys, 0);
+  }
+
+  // SetResultCache obtain CRS lock, so need to release it first.
+  if (result_set != nullptr) {
     RETURN_IF_ERROR(query_handle->SetResultCache(result_set, cache_num_rows));
   }
   return Status::OK();

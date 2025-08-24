@@ -366,8 +366,9 @@ void QueryDriver::RetryQueryFromThread(
   if (request_state->IsResultCacheingEnabled()) {
     status = DebugAction(FLAGS_debug_actions, "QUERY_RETRY_SET_RESULT_CACHE");
     if (status.ok()) {
-      status = parent_server_->SetupResultsCacheing(
-          retry_query_handle, session, request_state->result_cache_max_size());
+      bool returns_result_set;
+      status = parent_server_->SetupResultsCacheing(retry_query_handle, session,
+          request_state->result_cache_max_size(), &returns_result_set);
     }
     if (!status.ok()) {
       string error_msg = Substitute(
