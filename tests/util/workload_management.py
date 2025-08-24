@@ -247,7 +247,7 @@ def assert_query(query_tbl, client, expected_cluster_id="", raw_profile=None,
     query_opts = re.search(r'\n\s+Query Options \(set by configuration\):\s+(.*?)\n',
         profile_text)
     assert query_opts is not None
-    assert value == query_opts.group(1).replace("&apos;", "'"), \
+    assert value == query_opts.group(1).replace("&apos;", "'").replace("&quot;", '"'), \
         "query opts set by config incorrect"
 
   # Resource Pool

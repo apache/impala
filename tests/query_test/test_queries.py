@@ -36,6 +36,7 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension,
     default_protocol_or_parquet_constraint,
     extend_exec_option_dimension,
+    single_compression_constraint,
     FILE_FORMAT_TO_STORED_AS_MAP,
 )
 from tests.util.filesystem_utils import get_fs_path
@@ -58,6 +59,9 @@ class TestQueries(ImpalaTestSuite):
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(lambda v:
           v.get_value('table_format').file_format == 'parquet')
+
+    cls.ImpalaTestMatrix.add_constraint(single_compression_constraint)
+
     # Run these queries through both beeswax and HS2 to get coverage of both protocols.
     # Don't run all combinations of table format and protocol - the dimensions should
     # be orthogonal.
@@ -121,7 +125,12 @@ class TestQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/top-n', vector)
 
     if file_format in ['parquet', 'orc']:
-      self.run_test_case('QueryTest/top-n-complex', vector)
+      # set timestamp options to get consistent results for both format.
+      new_vector = deepcopy(vector)
+      options = new_vector.get_value('exec_option')
+      options['convert_legacy_hive_parquet_utc_timestamps'] = 1
+      options['timezone'] = '"Europe/Budapest"'
+      self.run_test_case('QueryTest/top-n-complex', new_vector)
 
   def test_union(self, vector):
     self.run_test_case('QueryTest/union', vector)
@@ -143,6 +152,9 @@ class TestQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/intersect', vector)
 
   def test_except(self, vector):
+    if vector.get_value('table_format').file_format == "hbase":
+      pytest.xfail(reason="IMPALA-14333 - HBase does not return rows "
+                   "where tinyint_col is NULL")
     self.run_test_case('QueryTest/except', vector)
 
   def test_sort(self, vector):
@@ -156,10 +168,19 @@ class TestQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/top-n', vector)
 
     if file_format in ['parquet', 'orc']:
-      self.run_test_case('QueryTest/sort-complex', vector)
+      # set timestamp options to get consistent results for both format.
+      new_vector = deepcopy(vector)
+      options = new_vector.get_value('exec_option')
+      options['convert_legacy_hive_parquet_utc_timestamps'] = 1
+      options['timezone'] = '"Europe/Budapest"'
+      self.run_test_case('QueryTest/sort-complex', new_vector)
+
 
   def test_partitioned_top_n(self, vector):
     """Test partitioned Top-N operator."""
+    if vector.get_value('table_format').file_format == "hbase":
+      pytest.xfail(reason="IMPALA-14333 - HBase does not return rows "
+                   "where tinyint_col is NULL")
     self.run_test_case('QueryTest/partitioned-top-n', vector)
     if vector.get_value('table_format').file_format in ['parquet', 'orc']:
       self.run_test_case('QueryTest/partitioned-top-n-complex', vector)

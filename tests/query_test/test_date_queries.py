@@ -27,6 +27,7 @@ from tests.common.test_dimensions import (
     create_exec_option_dimension_from_dict,
     create_uncompressed_text_dimension,
     default_protocol_or_parquet_constraint,
+    single_compression_constraint
 )
 from tests.shell.util import create_impala_shell_executable_dimension
 
@@ -44,9 +45,10 @@ class TestDateQueriesBase(ImpalaTestSuite):
     # DATE type is only supported for text, parquet, avro, orc and json fileformat on HDFS
     # and HBASE.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ('text', 'hbase', 'parquet', 'json')
-        or (v.get_value('table_format').file_format == 'avro'
-            and v.get_value('table_format').compression_codec == 'snap'))
+        v.get_value('table_format').file_format in (
+            'text', 'hbase', 'parquet', 'json', 'avro'))
+
+    cls.ImpalaTestMatrix.add_constraint(single_compression_constraint)
 
     # Run these queries through both beeswax and HS2 to get coverage of date returned
     # via both protocols.

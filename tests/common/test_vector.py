@@ -57,9 +57,12 @@
 # Additional examples of usage can be found within the test suites.
 
 from __future__ import absolute_import, division, print_function
+from collections import OrderedDict
 from itertools import product
 from copy import deepcopy
+import random
 import logging
+import os
 
 
 LOG = logging.getLogger(__name__)
@@ -126,6 +129,9 @@ class ImpalaTestVector(object):
   def __str__(self):
       return ' | '.join(['%s' % vector_value for vector_value in self.vector_values])
 
+  def __repr__(self):
+    return str(self)
+
   # Each value in a test vector is wrapped in the Value object. This wrapping is
   # done internally so this object should never need to be created by the user.
   class Value(object):
@@ -134,14 +140,17 @@ class ImpalaTestVector(object):
       self.value = value
 
     def __str__(self):
-      return '%s: %s' % (self.name, self.value)
+      return '"%s: %s"' % (self.name, self.value)
+
+    def __repr__(self):
+      return str(self)
 
 
 # Matrix -> Collection of vectors
 # Vector -> Call to get specific values
 class ImpalaTestMatrix(object):
   def __init__(self, *args):
-    self.dimensions = dict((arg.name, arg) for arg in args)
+    self.dimensions = OrderedDict((arg.name, arg) for arg in args)
     self.constraint_list = list()
     self.independent_exec_option_names = set()
 
@@ -244,15 +253,49 @@ class ImpalaTestMatrix(object):
       for vec in product(*self.__extract_vector_values()) if self.is_valid(vec)]
 
   def __generate_pairwise_combinations(self):
-    from allpairspy import AllPairs
-    all_pairs = AllPairs
-
     # Pairwise fails if the number of inputs == 1. Use exhaustive in this case the
     # results will be the same.
     if len(self.dimensions) == 1:
       return self.__generate_exhaustive_combinations()
-    return [ImpalaTestVector(self.__deepcopy_vector_values(vec))
-      for vec in all_pairs(self.__extract_vector_values(), filter_func=self.is_valid)]
+    vals = self.__extract_vector_values()
+    all_vectors = [v for v in product(*vals) if self.is_valid(v)]
+    # Add possibility to shuffle vectors to get different covering vector set.
+    # This could excercise 3+ way combinations skipped by the pair wise algorithm.
+    seed = os.environ.get('IMPALA_TEST_VECTOR_SEED', None)
+    if seed:
+      rnd = random.Random(seed)
+      rnd.shuffle(all_vectors)
+    found = set()
+    result = []
+    # Originally allpairspy was used for vector set generation to cover all pairs,
+    # but it turned out to be unreliable when using constraints (IMPALA-13125). Below
+    # is a simple implementation that may use more vectors than needed but will always
+    # cover all parameter pairs if possible (constraints can lead to pairs that can't
+    # be covered). A caveat is that first the product of all dimensions is needed
+    # ('all_vectors'), which grows exponentially with the number of dimensions, but the
+    # vector counts in Impala tests are still manageable.
+    #
+    # Note that there is not much to optimize in the test suites I checked, because due
+    # to the constraints and the size differences between dimensions the vector set
+    # is dictated by a few dimensions (file_format+exec_options) and this set can easily
+    # cover pairs with other dimensions.
+    #
+    #  TODO: is there a nicer algorithm / is it needed?
+    #   pair creation could be modelled as a bipartite graph with dimension pairs A and
+    #   test vectors B as vertices, and a minimal set of B would be needed to have
+    #   adjacent node for each vertex in A - I am pretty sure that this is polynomial, but
+    #   didn't do the research
+    # The following steps look for "better vectors" first that cover more dimension pairs
+    # to avoid very suboptimal solutions - the example on allpairspy site was covered
+    # with 25 vectors instead of the 21 of by allpairspy, which seems acceptable.
+    remaining = self.__pairwise_step(all_vectors, result, found, len(self.dimensions))
+    remaining = self.__pairwise_step(remaining, result, found, 2)
+    remaining = self.__pairwise_step(remaining, result, found, 1)
+    assert len(remaining) == 0
+
+    res = [ImpalaTestVector(self.__deepcopy_vector_values(vec))
+      for vec in result]
+    return res
 
   def add_constraint(self, constraint_func):
     self.constraint_list.append(constraint_func)
@@ -266,11 +309,38 @@ class ImpalaTestMatrix(object):
     return [v[1] for v in self.dimensions.items()]
 
   def is_valid(self, vector):
+    assert isinstance(vector, tuple)
+    assert len(vector) == len(self.dimensions)
     for constraint in self.constraint_list:
-      if (isinstance(vector, list) or isinstance(vector, tuple)) and\
-          len(vector) == len(self.dimensions):
-        valid = constraint(ImpalaTestVector(vector))
-        if valid:
-          continue
+      if not constraint(ImpalaTestVector(vector)):
         return False
     return True
+
+  def __pairwise_step(self, vectors, results, pairs_covered, min_cover_count):
+    """ Simple algorithm to select a subset of 'vectors' (each with N items) to cover
+        every parameter pair.
+        With 'min_cover_count'=1 all pairs will be covered (if possible), for bigger
+        values only those vectors will be selected that cover at least 'min_cover_count'
+        new pairs and the unused vectors will be returned in the result of the function.
+        'pairs_covered' is a set of the already covered pairs. The key is a tuple of 4
+        elements (i, v[i], j, v[j]) where i<j and both are < N. Each vector covers
+        N * (N - 1) pairs.
+    """
+    remaining = []
+    for v in vectors:
+      cnt = 0
+      for i, x in enumerate(v):
+        for j, y in enumerate(v[i + 1:], i + 1):
+          t = (i, x, j, y)
+          if t not in pairs_covered:
+            cnt += 1
+      if cnt == 0: continue
+      if cnt < min_cover_count:
+        remaining.append(v)
+        continue
+      results.append(v)
+      for i, x in enumerate(v):
+        for j, y in enumerate(v[i + 1:], i + 1):
+          t = (i, x, j, y)
+          pairs_covered.add(t)
+    return remaining

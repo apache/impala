@@ -27,6 +27,7 @@ from tests.common.test_dimensions import (
     create_client_protocol_dimension,
     create_exec_option_dimension_from_dict,
     default_protocol_or_parquet_constraint,
+    single_compression_constraint,
 )
 from tests.util.filesystem_utils import IS_S3
 
@@ -44,10 +45,9 @@ class TestDecimalQueries(ImpalaTestSuite):
     # Hive < 0.11 does not support decimal so we can't run these tests against the other
     # file formats.
     # TODO: Enable them on Hive >= 0.11.
-    cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ['parquet', 'orc', 'kudu', 'json']
-        or (v.get_value('table_format').file_format == 'text'
-            and v.get_value('table_format').compression_codec == 'none'))
+    cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('table_format').file_format
+                                        in ['text', 'parquet', 'orc', 'kudu', 'json'])
+    cls.ImpalaTestMatrix.add_constraint(single_compression_constraint)
 
     # Run these queries through both beeswax and HS2 to get coverage of decimals returned
     # via both protocols.

@@ -65,6 +65,13 @@ class TableFormatInfo(object):
                         'kudu', 'iceberg', 'json']
   KNOWN_COMPRESSION_CODECS = ['none', 'snap', 'gzip', 'bzip', 'def', 'zstd', 'lz4']
   KNOWN_COMPRESSION_TYPES = ['none', 'block', 'record']
+  DEFAULT_COMPRESSIONS_IN_TESTS = {
+    'avro': 'snap',
+    'json': 'none',  # some tables (e.g. date_tbl) was only created for none
+    'seq': 'gzip',
+    'rc': 'bzip',
+    'text': 'none'  # use none for tables that are not written by Impala
+  }
 
   def __init__(self, **kwargs):
     self.dataset = kwargs.get('dataset', 'UNKNOWN')
@@ -218,6 +225,14 @@ def orc_schema_resolution_constraint(v):
   file_format = v.get_table_format().file_format
   orc_schema_resolution = v.get_value('orc_schema_resolution')
   return file_format == 'orc' or orc_schema_resolution == 0
+
+
+def single_compression_constraint(v):
+  """ Constraint to use a single compression in compressable file formats """
+  file_format = v.get_value('table_format').file_format
+  compression = v.get_value('table_format').compression_codec
+  if file_format not in TableFormatInfo.DEFAULT_COMPRESSIONS_IN_TESTS: return True
+  return TableFormatInfo.DEFAULT_COMPRESSIONS_IN_TESTS[file_format] == compression
 
 
 # Common sets of values for the exec option vectors

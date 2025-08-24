@@ -51,6 +51,9 @@ from itertools import product
 from optparse import OptionParser
 from allpairspy import AllPairs as all_pairs
 
+# TODO IMPALA-13125 turned out to be not completely reliably - this script may also miss
+#      some pairs
+
 parser = OptionParser()
 parser.add_option("-w", "--workload", dest="workload",
                   help="The workload to generate test vectors for")
