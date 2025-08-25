@@ -240,15 +240,21 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // last synced id in full table reload
   public long getCreateEventId() { return createEventId_; }
 
-  public void setCreateEventId(long eventId) {
-    // TODO: Add a preconditions check for eventId < lastSycnedEventId
+  public void setCreateEventId(long eventId, boolean suppressLogging) {
+    if (eventId < createEventId_) {
+      if (!suppressLogging) {
+        LOG.warn("Ignored stale createEventId: {}. Current id: {}",
+            eventId, createEventId_);
+      }
+      return;
+    }
     createEventId_ = eventId;
-    LOG.debug("createEventId_ for table: {} set to: {}", getFullName(), createEventId_);
-    // TODO: Should we reset lastSyncedEvent Id if it is less than event Id?
-    // If we don't reset it - we may start syncing table from an event id which
-    // is less than create event id
+    if (!suppressLogging) {
+      LOG.debug("createEventId_ for table: {} set to: {}", getFullName(), createEventId_);
+    }
+    // Don't need to sync table from events older than create event id.
     if (lastSyncedEventId_ < eventId) {
-      setLastSyncedEventId(eventId);
+      setLastSyncedEventId(eventId, suppressLogging);
     }
   }
 
@@ -257,9 +263,15 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   }
 
   public void setLastSyncedEventId(long eventId) {
+    setLastSyncedEventId(eventId, false);
+  }
+
+  public void setLastSyncedEventId(long eventId, boolean suppressLogging) {
     // TODO: Add a preconditions check for eventId >= createEventId_
-    LOG.debug("lastSyncedEventId_ for table: {} set from {} to {}", getFullName(),
-        lastSyncedEventId_, eventId);
+    if (!suppressLogging) {
+      LOG.debug("lastSyncedEventId_ for table: {} set from {} to {}", getFullName(),
+          lastSyncedEventId_, eventId);
+    }
     lastSyncedEventId_ = eventId;
   }
 
@@ -581,9 +593,13 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
         // keep the legacy behavior as showing the table type as TABLE.
         tblType = TImpalaTableType.TABLE;
       }
+      // Use -1 as 'createEventId' since this is either in coordinator where no HMS events
+      // are being processed or imported from a COPY TESTCASE statement which shouldn't be
+      // used in production (it's used to examine metadata in dev env).
       newTable =
           IncompleteTable.createUninitializedTable(parentDb, thriftTable.getTbl_name(),
-              tblType, MetadataOp.getTableComment(thriftTable.getMetastore_table()));
+              tblType, MetadataOp.getTableComment(thriftTable.getMetastore_table()),
+              /*createEventId*/-1);
     }
     newTable.storedInImpaladCatalogCache_ = loadedInImpalad;
     try {

@@ -842,6 +842,8 @@ public class CatalogOpExecutor {
         tblAddedLater.setRef(true);
         return false;
       }
+      LOG.debug("EventId: {} Removing table {}.{} since its create event id is {}",
+          eventId, dbName, tblName, tblToBeRemoved.getCreateEventId());
       Table removedTbl = db.removeTable(tblToBeRemoved.getName());
       removedTbl.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
       catalog_.getDeleteLog().addRemovedObject(removedTbl.toMinimalTCatalogObject());
@@ -896,14 +898,15 @@ public class CatalogOpExecutor {
             "EventId: {} Table was not added since it was removed later", eventId);
         return false;
       }
-      Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName,
-          MetastoreShim.mapToInternalTableType(msTbl.getTableType()),
-          MetadataOp.getTableComment(msTbl));
-      incompleteTable.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
       // set the createEventId of the table to eventId since we are adding table
       // due to the given eventId.
-      incompleteTable.setCreateEventId(eventId);
+      Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName,
+          MetastoreShim.mapToInternalTableType(msTbl.getTableType()),
+          MetadataOp.getTableComment(msTbl), eventId);
+      incompleteTable.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
       db.addTable(incompleteTable);
+      LOG.debug("EventId: {} Added table {}. Catalog version: {}",
+          eventId, incompleteTable.getFullName(), incompleteTable.getCatalogVersion());
       return true;
     } finally {
       getMetastoreDdlLock().unlock();
@@ -5809,18 +5812,36 @@ public class CatalogOpExecutor {
             String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
       }
     }
-    List<NotificationEvent> events = null;
-    // the alter table event is generated on the renamed table
-    events = getNextMetastoreEventsForTableIfEnabled(catalogTimeline, eventId,
-        msTbl.getDbName(), msTbl.getTableName(), AlterTableEvent.EVENT_TYPE);
-    Pair<Long, Pair<org.apache.hadoop.hive.metastore.api.Table,
-        org.apache.hadoop.hive.metastore.api.Table>> renamedTable =
-        getRenamedTableFromEvents(events);
+    eventId = trackAlterTableRenameEvent(tableName, newTableName, eventId,
+        catalogTimeline);
     // Rename the table in the Catalog and get the resulting catalog object.
     // ALTER TABLE/VIEW RENAME is implemented as an ADD + DROP.
     Pair<Table, Table> result =
-        catalog_.renameTable(tableName.toThrift(), newTableName.toThrift());
+        catalog_.renameTable(tableName.toThrift(), newTableName.toThrift(), eventId);
     Preconditions.checkNotNull(result);
+    Pair<TCatalogObject, TCatalogObject> objs = handleCatalogRenameResult(
+        oldTbl, newTableName, wantMinimalResult, result, eventId, catalogTimeline);
+    response.result.addToRemoved_catalog_objects(objs.first);
+    response.result.addToUpdated_catalog_objects(objs.second);
+    response.result.setVersion(objs.second.getCatalog_version());
+    addSummary(response, "Renaming was successful.");
+  }
+
+  /**
+   * Finds the ALTER_TABLE HMS event triggered by this rename operation and updates
+   * DeleteEventLog for it. Returns the event id.
+   */
+  private long trackAlterTableRenameEvent(TableName oldTableName, TableName newTableName,
+      long startEventId, EventSequence catalogTimeline)
+      throws MetastoreNotificationException, CatalogException {
+    // the alter table event is generated on the renamed table
+    List<NotificationEvent> events = getNextMetastoreEventsForTableIfEnabled(
+        catalogTimeline, startEventId, newTableName.getDb(), newTableName.getTbl(),
+        AlterTableEvent.EVENT_TYPE);
+    Pair<Long, Pair<org.apache.hadoop.hive.metastore.api.Table,
+        org.apache.hadoop.hive.metastore.api.Table>> renamedTable =
+        getRenamedTableFromEvents(events);
+    long eventId = startEventId;
     if (renamedTable != null) {
       eventId = renamedTable.first;
       LOG.info("Got ALTER_TABLE RENAME event id {}.", eventId);
@@ -5828,16 +5849,27 @@ public class CatalogOpExecutor {
       // Using the eventId at the beginning of the operation is better than nothing.
       LOG.warn("ALTER_TABLE RENAME event not found. Using {} in createEventId of {} " +
               "and DeleteEventLog for {}.",
-          eventId, newTableName, tableName);
+          eventId, newTableName, oldTableName);
     }
+    // Update DeleteEventLog before we modify the catalog cache to avoid the table being
+    // added concurrently (by other events) during renameTable().
     if (catalog_.isEventProcessingEnabled()) {
       addToDeleteEventLog(eventId, DeleteEventLog
-          .getTblKey(tableName.getDb(), tableName.getTbl()));
-      if (result.second != null) {
-        result.second.setCreateEventId(eventId);
-      }
+          .getTblKey(oldTableName.getDb(), oldTableName.getTbl()));
     }
-    TCatalogObject oldTblDesc = null, newTblDesc = null;
+    return eventId;
+  }
+
+  /**
+   * Handles the rename results in catalog, including error handling for failures in
+   * bringing up the new table by implicitly invalidate the table.
+   * Returns TCatalogObject of the old and new tables.
+   */
+  private Pair<TCatalogObject, TCatalogObject> handleCatalogRenameResult(
+      Table oldTbl, TableName newTableName, boolean wantMinimalResult,
+      Pair<Table, Table> result, long alterTableEventId, EventSequence catalogTimeline)
+      throws ImpalaRuntimeException {
+    TCatalogObject oldTblDesc, newTblDesc;
     if (result.first == null) {
       // The old table object has been removed by a concurrent operation, e.g. INVALIDATE
       // METADATA <table>. Fetch the latest delete from deleteLog.
@@ -5848,8 +5880,8 @@ public class CatalogOpExecutor {
         oldTblDesc.setCatalog_version(version);
       } else {
         LOG.warn("Deletion update on the old table {} not found. Impalad might still "
-            + "have its metadata until the deletion update arrives from statestore.",
-            tableName);
+                + "have its metadata until the deletion update arrives from statestore.",
+            oldTbl.getFullName());
       }
     } else {
       oldTblDesc = wantMinimalResult ?
@@ -5859,7 +5891,7 @@ public class CatalogOpExecutor {
       // The rename succeeded in HMS but failed in the catalog cache. The cache is in an
       // inconsistent state, so invalidate the new table to reload it.
       newTblDesc = catalog_.invalidateTable(newTableName.toThrift(),
-          new Reference<>(), new Reference<>(), catalogTimeline, eventId);
+          new Reference<>(), new Reference<>(), catalogTimeline, alterTableEventId);
       if (newTblDesc == null) {
         throw new ImpalaRuntimeException(String.format(
             "The new table/view %s was concurrently removed during rename.",
@@ -5871,10 +5903,7 @@ public class CatalogOpExecutor {
       newTblDesc = wantMinimalResult ?
           result.second.toInvalidationObject() : result.second.toTCatalogObject();
     }
-    response.result.addToRemoved_catalog_objects(oldTblDesc);
-    response.result.addToUpdated_catalog_objects(newTblDesc);
-    response.result.setVersion(newTblDesc.getCatalog_version());
-    addSummary(response, "Renaming was successful.");
+    return new Pair<>(oldTblDesc, newTblDesc);
   }
 
   /**
@@ -5886,7 +5915,7 @@ public class CatalogOpExecutor {
    */
   public void addToDeleteEventLog(long eventId, String objectKey) {
     if (!catalog_.isEventProcessingEnabled()) {
-      LOG.trace("Not adding event {}:{} since events processing is not active", eventId,
+      LOG.trace("Not adding event {}:{} since events processing is not enabled", eventId,
           objectKey);
       return;
     }

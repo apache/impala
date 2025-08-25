@@ -531,6 +531,13 @@ public class Db extends CatalogObjectImpl implements FeDb {
   }
 
   @Override
+  public void setCatalogVersion(long newVersion) {
+    LOG.info("Setting the catalog version of Db@{} {} to {}",
+        Integer.toHexString(hashCode()), getName(), newVersion);
+    super.setCatalogVersion(newVersion);
+  }
+
+  @Override
   protected void setTCatalogObject(TCatalogObject catalogObject) {
     catalogObject.setDb(toThrift());
   }

@@ -1352,19 +1352,18 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
             oldMsTable.getTableName());
         TTableName newTTable = new TTableName(newMsTable.getDbName(),
             newMsTable.getTableName());
+        // Update DeleteEventLog before we modify the catalog cache to avoid the table
+        // being added concurrently (by other events) during renameTable().
+        catalogOpExecutor_.addToDeleteEventLog(alterEvent.getEventId(),
+            DeleteEventLog.getTblKey(oldTTable.getDb_name(), oldTTable.getTable_name()));
         // Rename the table in the Catalog and get the resulting catalog object.
         // ALTER TABLE/VIEW RENAME is implemented as an ADD + DROP.
         Pair<org.apache.impala.catalog.Table, org.apache.impala.catalog.Table> result =
-            catalog_.renameTable(oldTTable, newTTable);
+            catalog_.renameTable(oldTTable, newTTable, alterEvent.getEventId());
         if (result == null || result.first == null || result.second == null) {
           throw new CatalogException("failed to rename table " + oldTTable + " to " +
               newTTable + " for " + apiName);
         }
-        // first set the last synced event id to the alter table's event id
-        result.second.setLastSyncedEventId(alterEvent.getEventId());
-        result.second.setCreateEventId(alterEvent.getEventId());
-        catalogOpExecutor_.addToDeleteEventLog(alterEvent.getEventId(),
-            DeleteEventLog.getTblKey(oldTTable.getDb_name(), oldTTable.getTable_name()));
       } finally {
         catalog_.getLock().writeLock().unlock();
       }

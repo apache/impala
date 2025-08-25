@@ -134,7 +134,7 @@ public class TableLoader {
             "Unrecognized table type for table: " + fullTblName);
       }
       table.updateHMSLoadTableSchemaTime(hmsLoadTime);
-      table.setCreateEventId(eventId);
+      table.setCreateEventId(eventId, /*suppressLogging*/false);
       long latestEventId = -1;
       if (syncToLatestEventId) {
         // acquire write lock on table since MetastoreEventProcessor.syncToLatestEventId

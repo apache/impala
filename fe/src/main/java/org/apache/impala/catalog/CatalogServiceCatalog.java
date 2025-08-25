@@ -77,6 +77,7 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogResetManager.PrefetchedDatabaseObjects;
 import org.apache.impala.catalog.FeFsTable.Utils;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.events.DeleteEventLog;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLatestEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
@@ -2291,9 +2292,12 @@ public class CatalogServiceCatalog extends Catalog {
    * Returns the invalidated 'Db' object along with list of tables to be loaded by
    * the TableLoadingMgr. Returns null if the method encounters an exception during
    * invalidation.
+   * 'currentEventId' is set as createEventId of all tables under this db. Also used to
+   * track removed tables in EventDeleteLog.
    */
   private Pair<Db, List<TTableName>> invalidateDb(String dbName, Db existingDb,
-      PrefetchedDatabaseObjects prefetchedObjects, EventSequence catalogTimeline) {
+      PrefetchedDatabaseObjects prefetchedObjects, EventSequence catalogTimeline,
+      long currentEventId) {
     try {
       Db newDb = new Db(dbName, prefetchedObjects.getMsDb());
       // existingDb is usually null when the Catalog loads for the first time.
@@ -2323,7 +2327,7 @@ public class CatalogServiceCatalog extends Catalog {
         LOG.trace("Get {}", tblMeta);
         Table incompleteTbl = IncompleteTable.createUninitializedTable(newDb, tableName,
             MetastoreShim.mapToInternalTableType(tblMeta.getTableType()),
-            tblMeta.getComments());
+            tblMeta.getComments(), currentEventId);
         incompleteTbl.setCatalogVersion(incrementAndGetCatalogVersion());
         newDb.addTable(incompleteTbl);
         ++numTables;
@@ -2362,6 +2366,11 @@ public class CatalogServiceCatalog extends Catalog {
               existingDb, removedTableName);
           removedTable.setCatalogVersion(incrementAndGetCatalogVersion());
           deleteLog_.addRemovedObject(removedTable.toTCatalogObject());
+          if (isEventProcessingEnabled()) {
+            metastoreEventProcessor_.getDeleteEventLog().addRemovedObject(
+                currentEventId, DeleteEventLog.getTblKey(
+                    existingDb.getName(), removedTableName));
+          }
         }
       }
       return Pair.create(newDb, tblsToBackgroundLoad);
@@ -2458,7 +2467,8 @@ public class CatalogServiceCatalog extends Catalog {
         allHmsDbs = msClient.getHiveClient().getAllDatabases();
         catalogTimeline.markEvent("Got database list");
       }
-      rebuildDbCache(allHmsDbs, unlockedTimer, catalogTimeline, isSyncDdl);
+      rebuildDbCache(allHmsDbs, unlockedTimer, catalogTimeline, isSyncDdl,
+          currentEventId);
       scheduleWarmupTables();
       catalogTimeline.markEvent("Updated catalog cache");
     } catch (Exception e) {
@@ -2494,7 +2504,7 @@ public class CatalogServiceCatalog extends Catalog {
    * Entering and exiting this method should hold versionLock_.writeLock().
    */
   private void rebuildDbCache(List<String> allHmsDbs, Stopwatch unlockedTimer,
-      EventSequence catalogTimeline, boolean isSyncDdl) {
+      EventSequence catalogTimeline, boolean isSyncDdl, long currentEventId) {
     Preconditions.checkState(versionLock_.writeLock().isHeldByCurrentThread());
 
     // Not all Java UDFs are persisted to the metastore. The ones which aren't
@@ -2539,7 +2549,8 @@ public class CatalogServiceCatalog extends Catalog {
           // null.
           PrefetchedDatabaseObjects hmsObjects = resettingDbPair.second.get();
           Db oldDb = dbCache_.get(dbName);
-          invalidatedDb = invalidateDb(dbName, oldDb, hmsObjects, catalogTimeline);
+          invalidatedDb = invalidateDb(dbName, oldDb, hmsObjects, catalogTimeline,
+              currentEventId);
         } catch (Exception e) {
           LOG.warn("Error fetching HMS objects for database " + dbName, e);
         }
@@ -2711,9 +2722,8 @@ public class CatalogServiceCatalog extends Catalog {
         deleteLog_.addRemovedObject(existingTbl.toMinimalTCatalogObject());
       }
       Table incompleteTable = IncompleteTable.createUninitializedTable(
-          db, tblName, tblType, tblComment);
+          db, tblName, tblType, tblComment, createEventId);
       incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
-      incompleteTable.setCreateEventId(createEventId);
       db.addTable(incompleteTable);
       return db.getTable(tblName);
     } finally {
@@ -3045,9 +3055,10 @@ public class CatalogServiceCatalog extends Catalog {
    * 2. null, T_new: Invalid configuration
    * 3. T_old, null: Old table was removed but new table was not added.
    * 4. T_old, T_new: Old table was removed and new table was added.
+   * Updates 'createEventId' of the new table using 'alterEventId'.
    */
   public Pair<Table, Table> renameTable(
-      TTableName oldTableName, TTableName newTableName) {
+      TTableName oldTableName, TTableName newTableName, long alterEventId) {
     // Remove the old table name from the cache and add the new table.
     Db db = getDb(oldTableName.getDb_name());
     if (db == null) return Pair.create(null, null);
@@ -3059,10 +3070,16 @@ public class CatalogServiceCatalog extends Catalog {
       Table oldTable =
           removeTable(oldTableName.getDb_name(), oldTableName.getTable_name());
       if (oldTable == null) return Pair.create(null, null);
+      if (alterEventId < oldTable.getCreateEventId()) {
+        // This is usually due to alterEventId = -1, e.g. failed to fetch and check
+        // HMS events in the callers. Fallback to use the original createEventId.
+        alterEventId = oldTable.getCreateEventId();
+        LOG.warn("Reusing original createEventId {} for table {}.{}", alterEventId,
+            newTableName.getDb_name(), newTableName.getTable_name());
+      }
       return Pair.create(oldTable,
           addIncompleteTable(newTableName.getDb_name(), newTableName.getTable_name(),
-              oldTable.getTableType(), oldTable.getTableComment(),
-              oldTable.getCreateEventId()));
+              oldTable.getTableType(), oldTable.getTableComment(), alterEventId));
     } finally {
       versionLock_.writeLock().unlock();
     }
@@ -3377,9 +3394,9 @@ public class CatalogServiceCatalog extends Catalog {
       Table existingTbl = db.getTable(tblName);
       if (existingTbl == null) return null;
       incompleteTable = IncompleteTable.createUninitializedTable(db, tblName,
-          existingTbl.getTableType(), existingTbl.getTableComment());
+          existingTbl.getTableType(), existingTbl.getTableComment(),
+          existingTbl.getCreateEventId());
       incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
-      incompleteTable.setCreateEventId(existingTbl.getCreateEventId());
       db.addTable(incompleteTable);
     } finally {
       versionLock_.writeLock().unlock();

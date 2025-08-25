@@ -190,8 +190,12 @@ public class IncompleteTable extends Table implements FeIncompleteTable {
   }
 
   public static IncompleteTable createUninitializedTable(Db db, String name,
-      TImpalaTableType tableType, String tableComment) {
-    return new IncompleteTable(db, name, tableType, tableComment, null);
+      TImpalaTableType tableType, String tableComment, long createEventId) {
+    IncompleteTable tbl = new IncompleteTable(db, name, tableType, tableComment, null);
+    // Use suppressLogging=true to avoid excessive logs for all tables during catalogd
+    // startup.
+    tbl.setCreateEventId(createEventId, true);
+    return tbl;
   }
 
   public static IncompleteTable createFailedMetadataLoadTable(Db db, String name,

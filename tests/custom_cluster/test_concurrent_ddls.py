@@ -174,12 +174,27 @@ class TestConcurrentDdls(CustomClusterTestSuite):
     worker = [None] * (NUM_ITERS + 1)
     for i in range(1, NUM_ITERS + 1):
       worker[i] = pool.apply_async(run_ddls, (i,))
+    # INSERT with sync_ddl=true could hit IMPALA-9135 and hanging infinitely if there are
+    # no more catalog updates, e.g. all other threads have finished. This leads to
+    # timeout in this test. As a workaround, run a thread to keep creating new tables
+    # to trigger new catalog updates.
+    stop = False
+    if sync_ddl:
+      def create_tbls():
+        i = 0
+        while not stop:
+          tls.client.execute("create table {}.tmp_tbl{} (i int)".format(db, i))
+          time.sleep(10)
+          i += 1
+      pool.apply_async(create_tbls)
     for i in range(1, NUM_ITERS + 1):
       try:
         worker[i].get(timeout=100)
       except TimeoutError:
+        stop = True
         dump_server_stacktraces()
         assert False, "Timeout in thread run_ddls(%d)" % i
+    stop = True
 
   @classmethod
   def is_transient_error(cls, err):

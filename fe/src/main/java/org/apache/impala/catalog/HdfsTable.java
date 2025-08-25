@@ -3089,7 +3089,12 @@ public class HdfsTable extends Table implements FeFsTable {
             pendingVersionNumber_, version);
         versionToBeSet = pendingVersionNumber_;
       }
-      LOG.trace("Setting the hdfs table {} version {}", getFullName(), versionToBeSet);
+      // Log the catalog version with table name and object id to ease debugging
+      // race issues. Object id (ClassName@HexHashCode) is used to identified if we have
+      // replaced the table object.
+      LOG.info("Setting the catalog version of {}@{} {} to {}",
+          getClass().getSimpleName(), Integer.toHexString(hashCode()),
+          getFullName(), versionToBeSet);
       super.setCatalogVersion(versionToBeSet);
     }
   }

@@ -3263,7 +3263,7 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
         " to new table " + newDbName + "." + newTableName;
     LOG.debug("Renaming " + tableInfo);
     Pair<org.apache.impala.catalog.Table, org.apache.impala.catalog.Table> result =
-        catalog_.renameTable(oldTable, newTable);
+        catalog_.renameTable(oldTable, newTable, -1);
     if (result == null || result.first == null || result.second == null) {
       LOG.debug("Couldn't rename " + tableInfo);
     } else {

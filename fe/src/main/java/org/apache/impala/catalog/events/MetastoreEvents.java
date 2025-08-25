@@ -1855,6 +1855,9 @@ public class MetastoreEvents {
 
     private void processRename() throws CatalogException {
       if (!isRename_) return;
+      infoLog("Processing rename from {}.{} to {}.{}",
+          tableBefore_.getDbName(), tableBefore_.getTableName(),
+          tableAfter_.getDbName(), tableAfter_.getTableName());
       Reference<Boolean> oldTblRemoved = new Reference<>();
       Reference<Boolean> newTblAdded = new Reference<>();
       catalogOpExecutor_

@@ -537,8 +537,8 @@ public class CatalogHmsSyncToLatestEventIdTest extends AbstractCatalogMetastoreT
             createTableInHms(TEST_DB_NAME, tblName, true);
             IncompleteTable tbl =
                 IncompleteTable.createUninitializedTable(catalog_.getDb(TEST_DB_NAME),
-                    tblName, MetadataOp.getImpalaTableType(tableType_), null);
-            tbl.setCreateEventId(getLatestEventIdFromHMS());
+                    tblName, MetadataOp.getImpalaTableType(tableType_), null,
+                    getLatestEventIdFromHMS());
             catalog_.addTable(catalog_.getDb(TEST_DB_NAME), tbl);
             long prevLastSyncedEventId =
                 catalog_.getTable(TEST_DB_NAME, tblName).getLastSyncedEventId();
