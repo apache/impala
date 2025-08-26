@@ -245,9 +245,8 @@ public class LocalCatalog implements FeCatalog {
     try {
       List<DataSource> dataSrcs = metaProvider_.loadDataSources();
       return Catalog.filterCatalogObjectsByPattern(dataSrcs, matcher);
-    } catch (Exception e) {
-      LOG.info("Unable to load DataSource objects, ", e);
-      // Return empty list.
+    } catch (TException e) {
+      LOG.error("Unable to load DataSource objects. Returning empty list. ", e);
       return Lists.newArrayList();
     }
   }

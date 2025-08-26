@@ -1620,9 +1620,16 @@ public class Frontend {
    * matches all data sources.
    */
   public List<? extends FeDataSource> getDataSrcs(String pattern) {
-    // TODO: handle InconsistentMetadataException for data sources.
-    return getCatalog().getDataSources(
-        PatternMatcher.createHivePatternMatcher(pattern));
+    RetryTracker retries = new RetryTracker(
+        String.format("fetching data sources using pattern %s", pattern));
+    while (true) {
+      try {
+        return getCatalog().getDataSources(
+            PatternMatcher.createHivePatternMatcher(pattern));
+      } catch (InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
   }
 
   /**
