@@ -79,20 +79,35 @@ class TestEventProcessing(TestEventProcessingBase):
     finally:
       self.execute_query("drop database if exists {0} cascade".format(db_name))
 
+  @pytest.mark.execute_serially
   def test_hive_impala_iceberg_reloads(self, unique_database):
+    def get_refresh_count():
+      return EventProcessorUtils.get_int_metric('tables-refreshed', 0)
+
+    def run_hive_check_refresh(stmt):
+      refresh_before = get_refresh_count()
+      self.run_stmt_in_hive(stmt)
+      EventProcessorUtils.wait_for_event_processing(self)
+      refresh_after = get_refresh_count()
+      assert refresh_after - refresh_before == 1
+
     test_tbl = unique_database + ".test_events"
     self.run_stmt_in_hive("create table {} (value string) \
         partitioned by (year int) stored by iceberg".format(test_tbl))
     EventProcessorUtils.wait_for_event_processing(self)
     self.execute_query("describe {}".format(test_tbl))
 
-    self.run_stmt_in_hive("insert into {} values ('1', 2025)".format(test_tbl))
-    self.run_stmt_in_hive("select * from {}".format(test_tbl))
+    run_hive_check_refresh("insert into {} values ('1', 2025)".format(test_tbl))
 
-    EventProcessorUtils.wait_for_event_processing(self)
     res = self.execute_query("select * from {}".format(test_tbl))
-
     assert ["1\t2025"] == res.data
+    res = self.execute_query("refresh {}".format(test_tbl))
+    assert "Iceberg table reload skipped as no change detected" in res.runtime_profile
+
+    run_hive_check_refresh("alter table {} add columns (s string)".format(test_tbl))
+
+    res = self.execute_query("select * from {}".format(test_tbl))
+    assert ["1\t2025\tNULL"] == res.data
     res = self.execute_query("refresh {}".format(test_tbl))
     assert "Iceberg table reload skipped as no change detected" in res.runtime_profile
 

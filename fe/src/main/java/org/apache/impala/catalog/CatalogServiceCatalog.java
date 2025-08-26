@@ -3418,28 +3418,30 @@ public class CatalogServiceCatalog extends Catalog {
             tblName, eventId, message);
         return false;
       }
-      // Transactional table events using this method should reload the table only if the
-      // incoming committedWriteIds are different from the committedWriteIds cached in
-      // CatalogD. The if block execution is skipped for non-transactional table events.
-      HdfsTable hdfsTable = (HdfsTable) table;
-      ValidWriteIdList previousWriteIdList = hdfsTable.getValidWriteIds();
-      if (previousWriteIdList != null && committedWriteIds != null
-          && !committedWriteIds.isEmpty()) {
-        // get a copy of previous write id list
-        boolean tableNeedsRefresh = false;
-        previousWriteIdList = MetastoreShim.getValidWriteIdListFromString(
-            previousWriteIdList.toString());
-        for (Long writeId : committedWriteIds) {
-          if (!previousWriteIdList.isWriteIdValid(writeId)) {
-            tableNeedsRefresh = true;
-            break;
+      if (table instanceof HdfsTable) {
+        // Transactional table events using this method should reload the table only if the
+        // incoming committedWriteIds are different from the committedWriteIds cached in
+        // CatalogD. The if block execution is skipped for non-transactional table events.
+        HdfsTable hdfsTable = (HdfsTable) table;
+        ValidWriteIdList previousWriteIdList = hdfsTable.getValidWriteIds();
+        if (previousWriteIdList != null && committedWriteIds != null
+            && !committedWriteIds.isEmpty()) {
+          // get a copy of previous write id list
+          boolean tableNeedsRefresh = false;
+          previousWriteIdList = MetastoreShim.getValidWriteIdListFromString(
+              previousWriteIdList.toString());
+          for (Long writeId : committedWriteIds) {
+            if (!previousWriteIdList.isWriteIdValid(writeId)) {
+              tableNeedsRefresh = true;
+              break;
+            }
           }
-        }
-        if (!tableNeedsRefresh) {
-          LOG.info("Not reloading table {} for event {} since the cache is "
-              + "already up-to-date", table.getFullName(), eventId);
-          hdfsTable.setLastSyncedEventId(eventId);
-          return false;
+          if (!tableNeedsRefresh) {
+            LOG.info("Not reloading table {} for event {} since the cache is "
+                + "already up-to-date", table.getFullName(), eventId);
+            hdfsTable.setLastSyncedEventId(eventId);
+            return false;
+          }
         }
       }
       reloadTable(table, reason, eventId, isSkipFileMetadataReload,
