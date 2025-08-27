@@ -144,7 +144,7 @@ public class JwtHttpTest {
     // JWKS file.
     CustomClusterRunner.StartImpalaCluster();
     if (createJWKSForWebServer_) deleteTempJWKSFromWebServerRootDir();
-    client_.Close();
+    client_.close();
   }
 
   private void createTempJWKSInWebServerRootDir(String srcFilename) {

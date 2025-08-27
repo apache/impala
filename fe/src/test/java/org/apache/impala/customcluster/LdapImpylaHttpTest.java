@@ -89,6 +89,7 @@ public class LdapImpylaHttpTest {
   @After
   public void cleanUp() throws Exception {
     CustomClusterRunner.StartImpalaCluster();
+    client_.close();
   }
 
   private void verifyMetrics(Range<Long> expectedBasicSuccess,

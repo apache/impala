@@ -64,6 +64,7 @@ import org.apache.impala.testutil.WebClient;
 import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.ietf.jgss.*;
+import org.junit.After;
 import org.junit.ClassRule;
 import org.junit.rules.TemporaryFolder;
 import org.junit.Test;
@@ -102,6 +103,11 @@ public class SpnegoAuthTest {
         .put("ldap_bind_dn", TEST_USER_DN_1)
         .put("ldap_bind_password_cmd", passwordCommand)
         .build();
+  }
+
+  @After
+  public void cleanUp() throws IOException {
+    client_.close();
   }
 
   protected int startImpalaCluster(String args) throws IOException, InterruptedException {

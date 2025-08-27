@@ -34,6 +34,7 @@ import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.impala.testutil.WebClient;
+import org.junit.After;
 import org.junit.Assume;
 import org.junit.ClassRule;
 
@@ -63,6 +64,11 @@ public class LdapImpalaShellTest {
     int ret = startImpalaCluster(ldapArgs);
     assertEquals(ret, 0);
     verifyMetrics(zero, zero, zero, zero);
+  }
+
+  @After
+  public void cleanUp() throws Exception {
+    client_.close();
   }
 
   protected int startImpalaCluster(String args) throws IOException, InterruptedException {

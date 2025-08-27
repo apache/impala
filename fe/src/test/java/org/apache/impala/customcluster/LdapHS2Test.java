@@ -38,6 +38,7 @@ import org.apache.hive.service.rpc.thrift.*;
 import org.apache.impala.testutil.WebClient;
 import org.apache.thrift.transport.THttpClient;
 import org.apache.thrift.protocol.TBinaryProtocol;
+import org.junit.After;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -69,6 +70,11 @@ public class LdapHS2Test {
         uri, dn, extraArgs);
     int ret = CustomClusterRunner.StartImpalaCluster(ldapArgs);
     assertEquals(ret, 0);
+  }
+
+  @After
+  public void cleanUp() throws Exception {
+    client_.close();
   }
 
   static void verifySuccess(TStatus status) throws Exception {

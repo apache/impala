@@ -35,6 +35,7 @@ import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.apache.impala.testutil.WebClient;
+import org.junit.After;
 import org.junit.ClassRule;
 import org.junit.Test;
 
@@ -80,6 +81,11 @@ public class LdapJdbcTest extends JdbcTestBase {
       // There should have been one successful connection auth to create the session.
       verifyMetrics(one, zero, zero, zero);
     }
+  }
+
+  @After
+  public void cleanUp() throws Exception {
+    client_.close();
   }
 
   private void verifyMetrics(Range<Long> expectedBasicSuccess,

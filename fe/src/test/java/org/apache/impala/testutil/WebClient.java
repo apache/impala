@@ -47,7 +47,7 @@ import org.json.simple.parser.ParseException;
 /**
  * Utility class for interacting with the Impala webserver.
  */
-public class WebClient {
+public class WebClient implements AutoCloseable {
   private final static String WEBSERVER_HOST = "localhost";
   private final static int DEFAULT_WEBSERVER_PORT = 25000;
   private final static String JSON_METRICS = "/jsonmetrics?json";
@@ -74,7 +74,7 @@ public class WebClient {
     cookieStore_ = new BasicCookieStore();
   }
 
-  public void Close() throws IOException { httpClient_.close(); }
+  public void close() throws IOException { httpClient_.close(); }
 
   public List<Cookie> getCookies() { return cookieStore_.getCookies(); }
 

@@ -90,7 +90,7 @@ public class LdapWebserverTest {
 
   @After
   public void cleanUp() throws IOException {
-    client_.Close();
+    client_.close();
   }
 
   private void verifyMetrics(Range<Long> expectedBasicSuccess,
@@ -150,18 +150,20 @@ public class LdapWebserverTest {
     verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
 
     // Attempt to access the webserver without a username/password.
-    WebClient noUsername = new WebClient();
-    String result = noUsername.readContent("/");
-    assertTrue(result, result.contains("Must authenticate with Basic authentication."));
-    // Check that there is one unsuccessful auth attempt.
-    verifyMetrics(Range.atLeast(1L), Range.closed(1L, 1L), Range.atLeast(1L), zero);
+    try (WebClient noUsername = new WebClient()) {
+      String result = noUsername.readContent("/");
+      assertTrue(result, result.contains("Must authenticate with Basic authentication."));
+      // Check that there is one unsuccessful auth attempt.
+      verifyMetrics(Range.atLeast(1L), Range.closed(1L, 1L), Range.atLeast(1L), zero);
+    }
 
     // Attempt to access the webserver with invalid username/password.
-    WebClient invalidUserPass = new WebClient("invalid", "invalid");
-    result = invalidUserPass.readContent("/");
-    assertTrue(result, result.contains("Must authenticate with Basic authentication."));
-    // Check that there is now two unsuccessful auth attempts.
-    verifyMetrics(Range.atLeast(1L), Range.closed(2L, 2L), Range.atLeast(1L), zero);
+    try (WebClient invalidUserPass = new WebClient("invalid", "invalid")) {
+      String result = invalidUserPass.readContent("/");
+      assertTrue(result, result.contains("Must authenticate with Basic authentication."));
+      // Check that there is now two unsuccessful auth attempts.
+      verifyMetrics(Range.atLeast(1L), Range.closed(2L, 2L), Range.atLeast(1L), zero);
+    }
   }
 
   /**
@@ -185,26 +187,29 @@ public class LdapWebserverTest {
 
     // Access the webserver with a user that passes the group filter but not the user
     // filter, should fail.
-    WebClient user2 = new WebClient(TEST_USER_2, TEST_PASSWORD_2);
-    String result = user2.readContent("/");
-    assertTrue(result, result.contains("Must authenticate with Basic authentication."));
-    // Check that there is one unsuccessful auth attempt.
-    verifyMetrics(Range.atLeast(1L), Range.closed(1L, 1L), Range.atLeast(1L), zero);
+    try (WebClient user2 = new WebClient(TEST_USER_2, TEST_PASSWORD_2)) {
+      String result = user2.readContent("/");
+      assertTrue(result, result.contains("Must authenticate with Basic authentication."));
+      // Check that there is one unsuccessful auth attempt.
+      verifyMetrics(Range.atLeast(1L), Range.closed(1L, 1L), Range.atLeast(1L), zero);
+    }
 
     // Access the webserver with a user that passes the user filter but not the group
     // filter, should fail.
-    WebClient user3 = new WebClient(TEST_USER_3, TEST_PASSWORD_3);
-    result = user3.readContent("/");
-    assertTrue(result, result.contains("Must authenticate with Basic authentication."));
-    // Check that there is now two unsuccessful auth attempts.
-    verifyMetrics(Range.atLeast(1L), Range.closed(2L, 2L), Range.atLeast(1L), zero);
+    try (WebClient user3 = new WebClient(TEST_USER_3, TEST_PASSWORD_3)) {
+      String result = user3.readContent("/");
+      assertTrue(result, result.contains("Must authenticate with Basic authentication."));
+      // Check that there is now two unsuccessful auth attempts.
+      verifyMetrics(Range.atLeast(1L), Range.closed(2L, 2L), Range.atLeast(1L), zero);
+    }
 
     // Access the webserver with a user that doesn't pass either filter, should fail.
-    WebClient user4 = new WebClient(TEST_USER_4, TEST_PASSWORD_4);
-    result = user4.readContent("/");
-    assertTrue(result, result.contains("Must authenticate with Basic authentication."));
-    // Check that there is now three unsuccessful auth attempts.
-    verifyMetrics(Range.atLeast(1L), Range.closed(3L, 3L), Range.atLeast(1L), zero);
+    try (WebClient user4 = new WebClient(TEST_USER_4, TEST_PASSWORD_4)) {
+      String result = user4.readContent("/");
+      assertTrue(result, result.contains("Must authenticate with Basic authentication."));
+      // Check that there is now three unsuccessful auth attempts.
+      verifyMetrics(Range.atLeast(1L), Range.closed(3L, 3L), Range.atLeast(1L), zero);
+    }
   }
 
   /**
@@ -219,40 +224,43 @@ public class LdapWebserverTest {
            "--metrics_webserver_port=25011 ",
            "--metrics_webserver_port=25031 ");
     // Attempt to access the regular webserver without a username/password, should fail.
-    WebClient noUsername = new WebClient();
-    String result = noUsername.readContent("/");
-    assertTrue(result, result.contains("Must authenticate with Basic authentication."));
-
-    // Attempt to access the regular webserver with invalid username/password.
-    WebClient invalidUserPass = new WebClient("invalid", "invalid");
-    result = invalidUserPass.readContent("/");
-    assertTrue(result, result.contains("Must authenticate with Basic authentication."));
-
-    // Attempt to access the metrics webserver without a username/password.
-    WebClient noUsernameMetrics = new WebClient(25040);
-    WebClient catalogdMetrics = new WebClient(25021);
-    WebClient statestoredMetrics = new WebClient(25011);
-    WebClient admissiondMetrics = new WebClient(25031);
-    // Should succeed for the metrics endpoints.
-    for (String endpoint :
-        new String[] {"/metrics", "/jsonmetrics", "/metrics_prometheus", "/healthz"}) {
-      result = noUsernameMetrics.readContent(endpoint);
-      assertFalse(
-          result, result.contains("Must authenticate with Basic authentication."));
-      result = catalogdMetrics.readContent(endpoint);
-      assertFalse(
-          result, result.contains("Must authenticate with Basic authentication."));
-      result = statestoredMetrics.readContent(endpoint);
-      assertFalse(
-          result, result.contains("Must authenticate with Basic authentication."));
-      result = admissiondMetrics.readContent(endpoint);
-      assertFalse(
-          result, result.contains("Must authenticate with Basic authentication."));
+    try (WebClient noUsername = new WebClient()) {
+      String result = noUsername.readContent("/");
+      assertTrue(result, result.contains("Must authenticate with Basic authentication."));
     }
 
-    for (String endpoint : new String[] {"/varz", "/backends"}) {
-      result = noUsernameMetrics.readContent(endpoint);
-      assertTrue(result, result.contains("No URI handler for"));
+    // Attempt to access the regular webserver with invalid username/password.
+    try (WebClient invalidUserPass = new WebClient("invalid", "invalid")) {
+      String result = invalidUserPass.readContent("/");
+      assertTrue(result, result.contains("Must authenticate with Basic authentication."));
+    }
+
+    // Attempt to access the metrics webserver without a username/password.
+    try (WebClient noUsernameMetrics = new WebClient(25040);
+         WebClient catalogdMetrics = new WebClient(25021);
+         WebClient statestoredMetrics = new WebClient(25011);
+         WebClient admissiondMetrics = new WebClient(25031)) {
+      // Should succeed for the metrics endpoints.
+      for (String endpoint :
+          new String[] {"/metrics", "/jsonmetrics", "/metrics_prometheus", "/healthz"}) {
+        String result = noUsernameMetrics.readContent(endpoint);
+        assertFalse(
+            result, result.contains("Must authenticate with Basic authentication."));
+        result = catalogdMetrics.readContent(endpoint);
+        assertFalse(
+            result, result.contains("Must authenticate with Basic authentication."));
+        result = statestoredMetrics.readContent(endpoint);
+        assertFalse(
+            result, result.contains("Must authenticate with Basic authentication."));
+        result = admissiondMetrics.readContent(endpoint);
+        assertFalse(
+            result, result.contains("Must authenticate with Basic authentication."));
+      }
+
+      for (String endpoint : new String[] {"/varz", "/backends"}) {
+        String result = noUsernameMetrics.readContent(endpoint);
+        assertTrue(result, result.contains("No URI handler for"));
+      }
     }
   }
 
@@ -496,53 +504,60 @@ public class LdapWebserverTest {
     params.add(new BasicNameValuePair("glog", "0"));
 
     // Test POST set_glog_level fails
-    WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    String body = client.post("/set_glog_level?json", null, params, 403);
-    assertEquals("rejected POST missing X-Requested-By header", body);
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      String body = client.post("/set_glog_level?json", null, params, 403);
+      assertEquals("rejected POST missing X-Requested-By header", body);
+    }
 
     // Test POST reset_glog_level fails
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    body = client.post("/reset_glog_level?json", null, null, 403);
-    assertEquals("rejected POST missing X-Requested-By header", body);
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      String body = client.post("/reset_glog_level?json", null, null, 403);
+      assertEquals("rejected POST missing X-Requested-By header", body);
+    }
 
     // Test POST set_glog_level with X-Requested-By succeeds
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    json = client.jsonPost("/set_glog_level?json", headers, params);
-    assertEquals("0", json.get("glog_level"));
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      json = client.jsonPost("/set_glog_level?json", headers, params);
+      assertEquals("0", json.get("glog_level"));
+    }
 
     // Test POST reset_glog_level with X-Requested-By succeeds
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    json = client.jsonPost("/reset_glog_level?json", headers, null);
-    assertEquals("1", json.get("glog_level"));
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      json = client.jsonPost("/reset_glog_level?json", headers, null);
+      assertEquals("1", json.get("glog_level"));
+    }
 
     // Test POST set_glog_level with cookie gives 403
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    json = client.jsonGet("/log_level?json");
-    assertEquals("1", json.get("glog_level"));
-    body = client.post("/set_glog_level?json", null, params, 403);
-    assertEquals("", body);
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      json = client.jsonGet("/log_level?json");
+      assertEquals("1", json.get("glog_level"));
+      String body = client.post("/set_glog_level?json", null, params, 403);
+      assertEquals("", body);
+    }
 
     // Test POST reset_glog_level with cookie gives 403
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    json = client.jsonGet("/log_level?json");
-    assertEquals("1", json.get("glog_level"));
-    body = client.post("/reset_glog_level?json", null, null, 403);
-    assertEquals("", body);
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      json = client.jsonGet("/log_level?json");
+      assertEquals("1", json.get("glog_level"));
+      String body = client.post("/reset_glog_level?json", null, null, 403);
+      assertEquals("", body);
+    }
 
     // Create a new client, get a cookie, and add csrf_token based on the cookie
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    json = client.jsonGet("/log_level?json");
-    assertEquals("1", json.get("glog_level"));
-    String rand = getRandToken(client.getCookies());
-    params.add(new BasicNameValuePair("csrf_token", rand));
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      json = client.jsonGet("/log_level?json");
+      assertEquals("1", json.get("glog_level"));
+      String rand = getRandToken(client.getCookies());
+      params.add(new BasicNameValuePair("csrf_token", rand));
 
-    // Test POST set_glog_level with cookie and csrf_token succeeds
-    json = client.jsonPost("/set_glog_level?json", null, params);
-    assertEquals("0", json.get("glog_level"));
+      // Test POST set_glog_level with cookie and csrf_token succeeds
+      json = client.jsonPost("/set_glog_level?json", null, params);
+      assertEquals("0", json.get("glog_level"));
 
-    // Test POST reset_glog_level with cookie and csrf_token succeeds
-    json = client.jsonPost("/reset_glog_level?json", null, params);
-    assertEquals("1", json.get("glog_level"));
+      // Test POST reset_glog_level with cookie and csrf_token succeeds
+      json = client.jsonPost("/reset_glog_level?json", null, params);
+      assertEquals("1", json.get("glog_level"));
+    }
   }
 
   /*
@@ -572,55 +587,62 @@ public class LdapWebserverTest {
     params.add(new BasicNameValuePair("level", "WARN"));
 
     // Test POST set_java_loglevel fails
-    WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    String body = client.post("/set_java_loglevel?json", null, params, 403);
-    assertEquals("rejected POST missing X-Requested-By header", body);
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      String body = client.post("/set_java_loglevel?json", null, params, 403);
+      assertEquals("rejected POST missing X-Requested-By header", body);
+    }
 
     // Test POST reset_java_loglevel fails
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    body = client.post("/reset_java_loglevel?json", null, null, 403);
-    assertEquals("rejected POST missing X-Requested-By header", body);
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      String body = client.post("/reset_java_loglevel?json", null, null, 403);
+      assertEquals("rejected POST missing X-Requested-By header", body);
+    }
 
     // Test POST set_glog_level with X-Requested-By succeeds
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    json = client.jsonPost("/set_java_loglevel?json", headers, params);
-    assertEquals("org.apache : WARN\norg.apache.impala : DEBUG\n",
-        json.get("get_java_loglevel_result"));
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      json = client.jsonPost("/set_java_loglevel?json", headers, params);
+      assertEquals("org.apache : WARN\norg.apache.impala : DEBUG\n",
+          json.get("get_java_loglevel_result"));
+    }
 
     // Test POST reset_glog_level with X-Requested-By succeeds
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    json = client.jsonPost("/reset_java_loglevel?json", headers, null);
-    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      json = client.jsonPost("/reset_java_loglevel?json", headers, null);
+      assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+    }
 
     // Test POST set_java_loglevel with cookie gives 403
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    json = client.jsonGet("/log_level?json");
-    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
-    body = client.post("/set_java_loglevel?json", null, params, 403);
-    assertEquals("", body);
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      json = client.jsonGet("/log_level?json");
+      assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+      String body = client.post("/set_java_loglevel?json", null, params, 403);
+      assertEquals("", body);
+    }
 
     // Test POST reset_java_loglevel with cookie gives 403
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    json = client.jsonGet("/log_level?json");
-    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
-    body = client.post("/reset_java_loglevel?json", null, null, 403);
-    assertEquals("", body);
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      json = client.jsonGet("/log_level?json");
+      assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+      String body = client.post("/reset_java_loglevel?json", null, null, 403);
+      assertEquals("", body);
+    }
 
     // Create a new client, get a cookie, and add csrf_token based on the cookie
-    client = new WebClient(TEST_USER_1, TEST_PASSWORD_1);
-    json = client.jsonGet("/log_level?json");
-    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
-    String rand = getRandToken(client.getCookies());
-    params.add(new BasicNameValuePair("csrf_token", rand));
+    try (WebClient client = new WebClient(TEST_USER_1, TEST_PASSWORD_1)) {
+      json = client.jsonGet("/log_level?json");
+      assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+      String rand = getRandToken(client.getCookies());
+      params.add(new BasicNameValuePair("csrf_token", rand));
 
-    // Test POST set_java_loglevel with cookie and csrf_token succeeds
-    json = client.jsonPost("/set_java_loglevel?json", null, params);
-    assertEquals("org.apache : WARN\norg.apache.impala : DEBUG\n",
-        json.get("get_java_loglevel_result"));
+      // Test POST set_java_loglevel with cookie and csrf_token succeeds
+      json = client.jsonPost("/set_java_loglevel?json", null, params);
+      assertEquals("org.apache : WARN\norg.apache.impala : DEBUG\n",
+          json.get("get_java_loglevel_result"));
 
-    // Test POST reset_java_loglevel with cookie and csrf_token succeeds
-    json = client.jsonPost("/reset_java_loglevel?json", null, params);
-    assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+      // Test POST reset_java_loglevel with cookie and csrf_token succeeds
+      json = client.jsonPost("/reset_java_loglevel?json", null, params);
+      assertEquals("org.apache.impala : DEBUG\n", json.get("get_java_loglevel_result"));
+    }
   }
 
   private String getRandToken(List<Cookie> cookies) {

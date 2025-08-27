@@ -53,7 +53,7 @@ public class JwtWebserverTest {
   public void cleanUp() throws Exception {
     // Leave a cluster running with the default configuration.
     CustomClusterRunner.StartImpalaCluster();
-    client_.Close();
+    client_.close();
   }
 
   private void verifyAuthMetrics(
