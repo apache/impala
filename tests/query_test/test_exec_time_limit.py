@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import
 from tests.common.impala_test_suite import ImpalaTestSuite
+import pytest
 
 
 class TestQueryExecTimeLimit(ImpalaTestSuite):
@@ -39,9 +40,11 @@ class TestQueryExecTimeLimit(ImpalaTestSuite):
         "Unexpected exception: {}".format(e)
       )
 
+  @pytest.mark.execute_serially
   def test_exec_time_limit_long_plan(self):
     """Test that queries with a long planning time completing within
-    exec_time_limit_s succeed."""
+    exec_time_limit_s succeed. Run this test serially to avoid impact from other
+    concurrent tests."""
     exec_options = dict()
     exec_options['exec_time_limit_s'] = "2"
     # Set debug action to wait in the plan phase for 10s.
