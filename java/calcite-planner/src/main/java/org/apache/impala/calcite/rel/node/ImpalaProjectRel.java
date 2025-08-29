@@ -36,7 +36,9 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.calcite.rel.util.CreateExprVisitor;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.planner.PlanNodeId;
 
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -74,8 +76,13 @@ public class ImpalaProjectRel extends Project
   @Override
   public NodeWithExprs getPlanNode(ParentPlanRelContext context) throws ImpalaException {
 
+    if (isTrivialProject(context, getProjects())) {
+      return createUnionPlanNode(context, getProjects(), getRowType());
+    }
+
     // see comment in isCoercedProjectForValues method
     boolean isCoercedProjectForValues = isCoercedProjectForValues(context);
+
     NodeWithExprs inputWithExprs = getChildPlanNode(context, isCoercedProjectForValues);
 
     // If this Project is a coercedProjectForValues, then this Project has been taken
@@ -159,6 +166,12 @@ public class ImpalaProjectRel extends Project
     }
 
     List<RexNode> projects = getProjects();
+
+    // We are looking specifically for when all the columns in the project
+    // match the input columns, so return false if the sizes are different.
+    if (getInput().getRowType().getFieldNames().size() != projects.size()) {
+      return false;
+    }
     for (int i = 0; i < projects.size(); ++i) {
       RexNode project = projects.get(i);
       if (project instanceof RexInputRef) {
@@ -181,6 +194,51 @@ public class ImpalaProjectRel extends Project
       return false;
     }
     return true;
+  }
+
+  /**
+   * Returns true if this Project is trivial.  The Project is trivial if:
+   * a) The Project has no inputRefs, which means that it doesn't matter
+   *    what the underlying RelNode is, it will be ignored.
+   * b) It is a Values RelNode underneath that only returns 1 row, A multi-
+   *    row Values node is not trivial because 2 rows would be coming out of
+   *    the Values node, which means 2 rows would be coming out of the Project.
+   */
+  private boolean isTrivialProject(ParentPlanRelContext context,
+      List<RexNode> projects) {
+    if (RelOptUtil.InputFinder.bits(projects, null).size() > 0) {
+      return false;
+    }
+    ImpalaPlanRel relInput = (ImpalaPlanRel) getInput(0);
+    if (!(relInput instanceof ImpalaValuesRel)) {
+      return false;
+    }
+
+    ImpalaValuesRel values = (ImpalaValuesRel) relInput;
+    if (values.getTuples().size() != 1) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private NodeWithExprs createUnionPlanNode(ParentPlanRelContext context,
+      List<RexNode> projects, RelDataType rowType) throws ImpalaException {
+    CreateExprVisitor visitor = new CreateExprVisitor(getCluster().getRexBuilder(),
+        new ArrayList<>(), context.ctx_.getRootAnalyzer());
+    List<Expr> outputExprs = new ArrayList<>();
+    for (RexNode rexNode : projects) {
+      outputExprs.add(CreateExprVisitor.getExpr(visitor, rexNode));
+    }
+
+    PlanNodeId nodeId = context.ctx_.getNextNodeId();
+    List<NodeWithExprs> nodeWithExprsList = new ArrayList<>();
+    nodeWithExprsList.add(new NodeWithExprs(null, outputExprs,
+        getRowType().getFieldNames()));
+    NodeWithExprs retNode = NodeCreationUtils.createUnionPlanNode(nodeId,
+        context.ctx_.getRootAnalyzer(), rowType, nodeWithExprsList, true);
+    return NodeCreationUtils.wrapInSelectNodeIfNeeded(context, retNode,
+        getCluster().getRexBuilder());
   }
 
   @Override

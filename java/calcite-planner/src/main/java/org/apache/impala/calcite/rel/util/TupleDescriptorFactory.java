@@ -73,6 +73,9 @@ public class TupleDescriptorFactory {
       slotDesc.setType(impalaType);
       slotDesc.setLabel(fieldLabel);
       slotDesc.setIsMaterialized(true);
+      if (!relDataTypeField.getType().isNullable()) {
+        slotDesc.setIsNullable(false);
+      }
     }
     tupleDesc.computeMemLayout();
     return tupleDesc;
