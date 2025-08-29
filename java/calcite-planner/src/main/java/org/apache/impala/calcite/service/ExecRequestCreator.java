@@ -250,7 +250,7 @@ public class ExecRequestCreator implements CompilerStep {
     rootFragment.verifyTree();
 
     List<Expr> resultExprs = outputExprs;
-    rootFragment.setSink(new PlanRootSink(resultExprs));
+    rootFragment.setSink(PlanRootSink.create(ctx, resultExprs, true));
 
     Planner.checkForDisableCodegen(rootFragment.getPlanRoot(), ctx);
     // finalize exchanges: this ensures that for hash partitioned joins, the partitioning

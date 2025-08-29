@@ -71,7 +71,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-rese
    in pipelines: 00(GETNEXT)
 ====
 # Validate that the maximum memory reservation for PLAN-ROOT SINK is bounded by
-# MAX_PINNED_RESULT_SPOOLING_MEMORY.
+# MAX_SPILLED_RESULT_SPOOLING_MEM.
 select * from tpch.lineitem order by l_orderkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=24.00MB Threads=3

@@ -2380,7 +2380,7 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     QueryStmt queryStmt = ctx_.getQueryStmt();
     queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
     List<Expr> resultExprs = queryStmt.getResultExprs();
-    return ctx_.getAnalysisResult().getQueryStmt().createDataSink(resultExprs);
+    return PlanRootSink.create(ctx_, resultExprs, queryStmt.canSpoolResult());
   }
 
   @Override

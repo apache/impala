@@ -1128,3 +1128,13 @@ NaN,Inf
 ---- TYPES
 DOUBLE, FLOAT
 ====
+---- QUERY
+select count(*) from functional.alltypestiny;
+---- RUNTIME_PROFILE
+row_regex: .*SPOOL_QUERY_RESULTS=0.*
+====
+---- QUERY
+select * from (values(0));
+---- RUNTIME_PROFILE
+row_regex: .*SPOOL_QUERY_RESULTS=0.*
+====

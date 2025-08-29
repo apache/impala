@@ -55,10 +55,10 @@ Max Per-Host Resource Reservation: Memory=72.52MB Threads=1
 Per-Host Resource Estimates: Memory=269MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=268.97MB mem-reservation=72.52MB thread-reservation=1 runtime-filters-memory=6.00MB
-|  max-parallelism=1 segment-costs=[1440342244, 4]
+|  max-parallelism=1 segment-costs=[1440342244, 0]
 PLAN-ROOT SINK
 |  output exprs: avg(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=4
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
 |
 11:AGGREGATE [FINALIZE]
 |  output: avg(CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS BIGINT)), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
@@ -184,14 +184,14 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=40B cardinality=176.68M(filtered from 863.99M) cost=1216284982
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=404.45MB Threads=24
-Per-Host Resource Estimates: Memory=677MB
+Max Per-Host Resource Reservation: Memory=400.45MB Threads=24
+Per-Host Resource Estimates: Memory=673MB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[68, 4] cpu-comparison-result=130 [max(1 (self) vs 130 (sum children))]
+|  Per-Instance Resources: mem-estimate=68.03KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[68, 0] cpu-comparison-result=130 [max(1 (self) vs 130 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: avg(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=4
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
 |
 19:AGGREGATE [FINALIZE]
 |  output: avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
@@ -425,14 +425,14 @@ max-parallelism=150 segment-costs=[1456086510]
    tuple-ids=0 row-size=40B cardinality=176.68M(filtered from 863.99M) cost=1216284982
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=404.45MB Threads=24
-Per-Host Resource Estimates: Memory=677MB
+Max Per-Host Resource Reservation: Memory=400.45MB Threads=24
+Per-Host Resource Estimates: Memory=673MB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[68, 4] cpu-comparison-result=130 [max(1 (self) vs 130 (sum children))]
+|  Per-Instance Resources: mem-estimate=68.03KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[68, 0] cpu-comparison-result=130 [max(1 (self) vs 130 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: avg(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=4
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
 |
 19:AGGREGATE [FINALIZE]
 |  output: avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)

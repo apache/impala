@@ -27,10 +27,10 @@ Max Per-Host Resource Reservation: Memory=192.94MB Threads=1
 Per-Host Resource Estimates: Memory=52.18GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=52.18GB mem-reservation=192.94MB thread-reservation=1 runtime-filters-memory=51.00MB
-|  max-parallelism=1 segment-costs=[54918503750, 27478414018, 72455093642, 13789590829, 19351054919, 22241751, 1]
+|  max-parallelism=1 segment-costs=[54918503750, 27478414018, 72455093642, 13789590829, 19351054919, 22241751, 0]
 PLAN-ROOT SINK
 |  output exprs: count()
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
 |
 22:AGGREGATE [FINALIZE]
 |  output: count()
@@ -238,11 +238,11 @@ PLAN-ROOT SINK
 Max Per-Host Resource Reservation: Memory=4.62GB Threads=85
 Per-Host Resource Estimates: Memory=59.85GB
 F16:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[25, 1] cpu-comparison-result=360 [max(1 (self) vs 360 (sum children))]
+|  Per-Instance Resources: mem-estimate=184.84KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[25, 0] cpu-comparison-result=360 [max(1 (self) vs 360 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: count()
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
 |
 40:AGGREGATE [FINALIZE]
 |  output: count:merge()
@@ -641,11 +641,11 @@ max-parallelism=1824 segment-costs=[54881581784, 24500370827] cpu-comparison-res
 Max Per-Host Resource Reservation: Memory=4.62GB Threads=85
 Per-Host Resource Estimates: Memory=59.85GB
 F16:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[25, 1] cpu-comparison-result=360 [max(1 (self) vs 360 (sum children))]
+|  Per-Instance Resources: mem-estimate=184.84KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[25, 0] cpu-comparison-result=360 [max(1 (self) vs 360 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: count()
-|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
 |
 40:AGGREGATE [FINALIZE]
 |  output: count:merge()

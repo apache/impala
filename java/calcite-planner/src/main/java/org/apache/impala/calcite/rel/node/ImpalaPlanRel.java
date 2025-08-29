@@ -17,6 +17,8 @@
 
 package org.apache.impala.calcite.rel.node;
 
+import com.google.common.base.Preconditions;
+
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Filter;
@@ -31,8 +33,7 @@ import org.apache.impala.common.ImpalaException;
 /**
  * ImpalaPlanRel. Interface used for all Impala intermediary RelNodes
  */
-public interface ImpalaPlanRel {
-
+public interface ImpalaPlanRel extends RelNode {
   /**
    * Enum representing the type of class used in the RelNode
    * Using an enum here so that Impala Plan RelNodes can be used in
@@ -99,8 +100,8 @@ public interface ImpalaPlanRel {
    * mentioned below can be in between the Aggregate RelNode and the Table Scan
    * RelNode.
    */
-  public static boolean canPassThroughParentAggregate(ImpalaPlanRel planRel) {
-    switch (getRelNodeType((RelNode) planRel)) {
+  public static boolean canPassThroughParentAggregate(RelNode relNode) {
+    switch (getRelNodeType(relNode)) {
       case FILTER:
       case PROJECT:
         return true;

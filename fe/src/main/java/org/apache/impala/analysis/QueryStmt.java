@@ -20,7 +20,6 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.collect.Sets;
@@ -29,8 +28,6 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.SqlCastException;
-import org.apache.impala.planner.DataSink;
-import org.apache.impala.planner.PlanRootSink;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -503,9 +500,12 @@ public abstract class QueryStmt extends StatementBase {
     resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
   }
 
-  public DataSink createDataSink(List<Expr> resultExprs) {
-    return new PlanRootSink(resultExprs);
-  }
+  /**
+   * Return True if this statement is eligible for result spooling.
+   * Planner can still decide to disable result spooling if there are other factors
+   * during analysis that prevents spooling from happening.
+   */
+  public boolean canSpoolResult() { return true; }
 
   public List<OrderByElement> cloneOrderByElements() {
     if (orderByElements_ == null) return null;

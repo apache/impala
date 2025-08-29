@@ -1915,4 +1915,9 @@ public class SelectStmt extends QueryStmt {
           (sortInfo_ != null &&
            TreeNode.contains(sortInfo_.getSortExprs(), Expr.IS_AGGREGATE));
   }
+
+  @Override
+  public boolean canSpoolResult() {
+    return !returnsAtMostOneRow();
+  }
 }
