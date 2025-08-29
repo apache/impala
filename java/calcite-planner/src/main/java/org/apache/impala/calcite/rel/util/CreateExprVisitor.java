@@ -56,6 +56,8 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
 
   private final Analyzer analyzer_;
 
+  private int numExprs_ = 0;
+
   public CreateExprVisitor(RexBuilder rexBuilder, List<Expr> inputExprs,
       Analyzer analyzer) {
     super(false);
@@ -68,6 +70,14 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
     return rexBuilder_;
   }
 
+  public int getNumExprs() {
+    return numExprs_;
+  }
+
+  public void reset() {
+    numExprs_ = 0;
+  }
+
   @Override
   public Expr visitInputRef(RexInputRef rexInputRef) {
     return inputExprs_.get(rexInputRef.getIndex());
@@ -75,6 +85,7 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
 
   @Override
   public Expr visitCall(RexCall rexCall) {
+    numExprs_++;
     List<Expr> params = Lists.newArrayList();
     for (RexNode operand : rexCall.getOperands()) {
       params.add(operand.accept(this));
@@ -147,9 +158,17 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
       // be expanded.  A custom ImpalaRexUtil was made to handle
       // the IN operator and is needed until at least CALCITE-7226
       // is fixed.
+      visitor.reset();
       RexNode expandedOperand =
           ImpalaRexUtil.expandSearch(visitor.getRexBuilder(), operand);
       Expr expr = expandedOperand.accept(visitor);
+      int maxExprsAllowed =
+          visitor.analyzer_.getQueryOptions().getStatement_expression_limit();
+      if (visitor.getNumExprs() > maxExprsAllowed) {
+        String errorStr = String.format("Exceeded the statement expression limit (%d)\n" +
+          "Statement has %d expressions.", maxExprsAllowed, visitor.getNumExprs());
+        throw new AnalysisException(errorStr);
+      }
       expr.analyze(visitor.analyzer_);
       return expr;
     } catch (Exception e) {
