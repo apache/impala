@@ -21,7 +21,7 @@ from __future__ import absolute_import, division, print_function
 from builtins import range
 import time
 from copy import deepcopy
-from tests.common.impala_connection import FINISHED, RUNNING
+from tests.common.impala_connection import FINISHED, PENDING, RUNNING
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_client_protocol_dimension,
@@ -220,10 +220,11 @@ class TestAsyncLoadData(ImpalaTestSuite):
       if enable_async_load_data:
         # In async mode:
         #  The compilation of LOAD is processed in the exec step without delay. And the
-        #  processing of the LOAD plan is in wait step with delay. The wait time should
-        #  definitely take more time than 3 seconds.
-        assert (exec_end_state == RUNNING)
-        assert (wait_time >= 3)
+        #  processing of the LOAD plan is in wait step with delay. Relax the wait time
+        #  to at least 2 seconds because wait_start not strictly starts at the point
+        #  when the async_exec_thread_ starts.
+        assert (exec_end_state == PENDING or exec_end_state == RUNNING)
+        assert (wait_time > 2)
       else:
         # In sync mode:
         #  The entire LOAD is processed in the exec step with delay. exec_time should be
