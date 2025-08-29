@@ -416,11 +416,6 @@ DEFINE_int64(update_catalogd_rpc_resend_interval_ms, 100, "(Advanced) Interval (
     "with which the statestore resends the update catalogd RPC to a subscriber if the "
     "statestore has failed to send the RPC to the subscriber.");
 
-DEFINE_int32(iceberg_reload_new_files_threshold, 100, "(Advanced) If during a table "
-    "refresh the number of new files are greater than this, catalogd will use a "
-    "recursive file listing to load file metadata. If number of new files are less or "
-    "equal to this, catalogd will load the file metadata one by one.");
-
 DEFINE_bool(iceberg_allow_datafiles_in_table_location_only, true, "If true, Impala "
     "does not allow Iceberg data file locations outside of the table directory during "
     "reads");
@@ -500,6 +495,7 @@ REMOVED_FLAG(enable_partitioned_aggregation);
 REMOVED_FLAG(enable_partitioned_hash_join);
 REMOVED_FLAG(enable_phj_probe_side_filtering);
 REMOVED_FLAG(enable_rm);
+REMOVED_FLAG(iceberg_reload_new_files_threshold);
 REMOVED_FLAG(kerberos_reinit_interval);
 REMOVED_FLAG(ldap_manual_config);
 REMOVED_FLAG(llama_addresses);

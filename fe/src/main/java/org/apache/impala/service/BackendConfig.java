@@ -432,10 +432,6 @@ public class BackendConfig {
     return backendCfg_.use_jamm_weigher;
   }
 
-  public int icebergReloadNewFilesThreshold() {
-    return backendCfg_.iceberg_reload_new_files_threshold;
-  }
-
   public boolean icebergAllowDatafileInTableLocationOnly() {
     return backendCfg_.iceberg_allow_datafiles_in_table_location_only;
   }

@@ -62,7 +62,7 @@ public class ParallelFileMetadataLoader {
   private final static Logger LOG = LoggerFactory.getLogger(
       ParallelFileMetadataLoader.class);
 
-  private static final int MAX_HDFS_PARTITIONS_PARALLEL_LOAD =
+  public static final int MAX_HDFS_PARTITIONS_PARALLEL_LOAD =
       BackendConfig.INSTANCE.maxHdfsPartsParallelLoad();
   private static final int MAX_NON_HDFS_PARTITIONS_PARALLEL_LOAD =
       BackendConfig.INSTANCE.maxNonHdfsPartsParallelLoad();

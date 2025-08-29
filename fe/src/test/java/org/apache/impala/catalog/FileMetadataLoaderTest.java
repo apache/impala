@@ -212,7 +212,6 @@ public class FileMetadataLoaderTest {
         /* oldFds = */ fml1.getLoadedIcebergFds(),
         /* requiresDataFilesInTableLocation = */ true);
     fml1Refresh.load();
-    assertFalse(fml1Refresh.useParallelListing());
     assertEquals(0, fml1Refresh.getStats().loadedFiles);
     assertEquals(20, fml1Refresh.getStats().skippedFiles);
     assertEquals(20, fml1Refresh.getLoadedFds().size());
@@ -235,7 +234,6 @@ public class FileMetadataLoaderTest {
         /* oldFds = */ fml2.getLoadedIcebergFds(),
         /* requiresDataFilesInTableLocation = */ true);
     fml2Refresh.load();
-    assertFalse(fml2Refresh.useParallelListing());
     assertEquals(0, fml2Refresh.getStats().loadedFiles);
     assertEquals(20, fml2Refresh.getStats().skippedFiles);
     assertEquals(20, fml2Refresh.getLoadedFds().size());
@@ -262,7 +260,6 @@ public class FileMetadataLoaderTest {
         /* oldFds = */ fml1.getLoadedIcebergFds().subList(0, 10),
         /* requiresDataFilesInTableLocation = */ true);
     fml1Refresh.load();
-    assertFalse(fml1Refresh.useParallelListing());
     assertEquals(10, fml1Refresh.getStats().loadedFiles);
     assertEquals(10, fml1Refresh.getStats().skippedFiles);
     assertEquals(20, fml1Refresh.getLoadedFds().size());
@@ -278,73 +275,9 @@ public class FileMetadataLoaderTest {
         /* oldFds = */ fml2.getLoadedIcebergFds().subList(0, 10),
         /* requiresDataFilesInTableLocation = */ true);
     fml2Refresh.load();
-    assertFalse(fml2Refresh.useParallelListing());
     assertEquals(10, fml2Refresh.getStats().loadedFiles);
     assertEquals(10, fml2Refresh.getStats().skippedFiles);
     assertEquals(20, fml2Refresh.getLoadedFds().size());
-  }
-
-  @Test
-  public void testIcebergNewFilesThreshold() throws IOException, CatalogException {
-    CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
-    IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
-        "functional_parquet", "iceberg_partitioned",
-        /* oldFds = */ Collections.emptyList(),
-        /* requiresDataFilesInTableLocation = */ true);
-    fml1.load();
-
-    IcebergFileMetadataLoader fml1ForceRefresh = getLoaderForIcebergTable(catalog,
-        "functional_parquet", "iceberg_partitioned",
-        /* oldFds = */ fml1.getLoadedIcebergFds().subList(0, 10),
-        /* requiresDataFilesInTableLocation = */ true, 10);
-    fml1ForceRefresh.setForceRefreshBlockLocations(true);
-    fml1ForceRefresh.load();
-    assertTrue(fml1ForceRefresh.useParallelListing());
-
-    IcebergFileMetadataLoader fml1Refresh = getLoaderForIcebergTable(catalog,
-        "functional_parquet", "iceberg_partitioned",
-        /* oldFds = */ fml1.getLoadedIcebergFds().subList(0, 10),
-        /* requiresDataFilesInTableLocation = */ true, 10);
-    fml1Refresh.setForceRefreshBlockLocations(false);
-    fml1Refresh.load();
-    assertFalse(fml1Refresh.useParallelListing());
-
-    IcebergFileMetadataLoader fml1Refresh10 = getLoaderForIcebergTable(catalog,
-        "functional_parquet", "iceberg_partitioned",
-        /* oldFds = */ fml1.getLoadedIcebergFds().subList(0, 10),
-        /* requiresDataFilesInTableLocation = */ true, 10);
-    fml1Refresh10.load();
-    assertFalse(fml1Refresh10.useParallelListing());
-    IcebergFileMetadataLoader fml1Refresh9 = getLoaderForIcebergTable(catalog,
-        "functional_parquet", "iceberg_partitioned",
-        /* oldFds = */ fml1.getLoadedIcebergFds().subList(0, 10),
-        /* requiresDataFilesInTableLocation = */ true, 9);
-    fml1Refresh9.load();
-    assertTrue(fml1Refresh9.useParallelListing());
-
-
-    IcebergFileMetadataLoader fml2 = getLoaderForIcebergTable(catalog,
-        "functional_parquet", "iceberg_non_partitioned",
-        /* oldFds = */ Collections.emptyList(),
-        /* requiresDataFilesInTableLocation = */ true);
-    fml2.load();
-
-    IcebergFileMetadataLoader fml2Refresh = getLoaderForIcebergTable(catalog,
-        "functional_parquet", "iceberg_non_partitioned",
-        /* oldFds = */ fml2.getLoadedIcebergFds().subList(0, 10),
-        /* requiresDataFilesInTableLocation = */ true);
-    IcebergFileMetadataLoader fml2Refresh10 = getLoaderForIcebergTable(catalog,
-        "functional_parquet", "iceberg_non_partitioned",
-        /* oldFds = */ fml2.getLoadedIcebergFds().subList(0, 10),
-        /* requiresDataFilesInTableLocation = */ true, 10);
-    fml2Refresh10.load();
-    assertFalse(fml2Refresh10.useParallelListing());
-    IcebergFileMetadataLoader fml2Refresh9 = getLoaderForIcebergTable(catalog,
-        "functional_parquet", "iceberg_non_partitioned",
-        /* oldFds = */ fml2.getLoadedIcebergFds().subList(0, 10),
-        /* requiresDataFilesInTableLocation = */ true, 9);
-    fml2Refresh9.load();
-    assertTrue(fml2Refresh9.useParallelListing());
   }
 
   @Test
@@ -362,7 +295,6 @@ public class FileMetadataLoaderTest {
         /* oldFds = */ fml1.getLoadedIcebergFds().subList(0, 1),
         /* requiresDataFilesInTableLocation = */ false);
     fml1Refresh1.load();
-    assertFalse(fml1Refresh1.useParallelListing());
     assertEquals(5, fml1Refresh1.getStats().loadedFiles);
     assertEquals(1, fml1Refresh1.getStats().skippedFiles);
     assertEquals(6, fml1Refresh1.getLoadedFds().size());
@@ -372,7 +304,6 @@ public class FileMetadataLoaderTest {
         /* oldFds = */ fml1.getLoadedIcebergFds().subList(0, 5),
         /* requiresDataFilesInTableLocation = */ false);
     fml1Refresh5.load();
-    assertFalse(fml1Refresh5.useParallelListing());
     assertEquals(1, fml1Refresh5.getStats().loadedFiles);
     assertEquals(5, fml1Refresh5.getStats().skippedFiles);
     assertEquals(6, fml1Refresh5.getLoadedFds().size());
@@ -382,15 +313,6 @@ public class FileMetadataLoaderTest {
       CatalogServiceCatalog catalog, String dbName, String tblName,
       List<IcebergFileDescriptor> oldFds, boolean requiresDataFilesInTableLocation)
       throws CatalogException {
-    return getLoaderForIcebergTable(catalog, dbName, tblName, oldFds,
-        requiresDataFilesInTableLocation, -1);
-  }
-
-  private IcebergFileMetadataLoader getLoaderForIcebergTable(
-      CatalogServiceCatalog catalog, String dbName, String tblName,
-      List<IcebergFileDescriptor> oldFds, boolean requiresDataFilesInTableLocation,
-      int newFilesThreshold)
-      throws CatalogException {
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
     FeIcebergTable iceT = (FeIcebergTable)catalog.getOrLoadTable(
         dbName, tblName, "test", null);
@@ -398,7 +320,7 @@ public class FileMetadataLoaderTest {
     GroupedContentFiles iceFiles = IcebergUtil.getIcebergFiles(iceT,
         /*predicates=*/Collections.emptyList(), /*timeTravelSpec=*/null);
     return new IcebergFileMetadataLoader(iceT.getIcebergApiTable(),
-        oldFds, hostIndex, iceFiles, requiresDataFilesInTableLocation, newFilesThreshold);
+        oldFds, hostIndex, iceFiles, requiresDataFilesInTableLocation);
   }
 
   private FileMetadataLoader getLoaderForAcidTable(

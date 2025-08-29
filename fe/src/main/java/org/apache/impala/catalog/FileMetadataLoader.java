@@ -307,14 +307,13 @@ public class FileMetadataLoader {
   protected FileDescriptor createFd(FileSystem fs, FileStatus fileStatus,
       String relPath, Reference<Long> numUnknownDiskIds, String absPath)
       throws IOException {
-    if (!FileSystemUtil.supportsStorageIds(fs)) {
-      return FileDescriptor.createWithNoBlocks(fileStatus, relPath, absPath);
-    }
     BlockLocation[] locations;
     if (fileStatus instanceof LocatedFileStatus) {
       locations = ((LocatedFileStatus) fileStatus).getBlockLocations();
-    } else {
+    } else if (FileSystemUtil.supportsStorageIds(fs)) {
       locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+    } else {
+      return FileDescriptor.createWithNoBlocks(fileStatus, relPath, absPath);
     }
     return FileDescriptor.create(fileStatus, relPath, locations, hostIndex_,
         fileStatus.isEncrypted(), fileStatus.isErasureCoded(), numUnknownDiskIds,

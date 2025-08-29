@@ -47,6 +47,7 @@ import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
@@ -513,7 +514,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
           ((BaseTable)icebergApiTable_).operations().current().metadataFileLocation();
       GroupedContentFiles icebergFiles = IcebergUtil.getIcebergFiles(this,
           new ArrayList<>(), /*timeTravelSpec=*/null);
-      catalogTimeline.markEvent("Loaded Iceberg files");
+      catalogTimeline.markEvent("Loaded Iceberg content file list");
       // We use IcebergFileMetadataLoader directly to load file metadata, so we don't
       // want 'hdfsTable_' to do any file loading.
       hdfsTable_.setSkipIcebergFileMetadataLoading(true);
@@ -527,6 +528,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
           getHostIndex(), Preconditions.checkNotNull(icebergFiles),
           Utils.requiresDataFilesInTableLocation(this));
       loader.load();
+      catalogTimeline.markEvent("Loaded Iceberg file descriptors");
       fileStore_ = new IcebergContentFileStore(
           icebergApiTable_, loader.getLoadedIcebergFds(), icebergFiles);
       partitionStats_ = Utils.loadPartitionStats(this, icebergFiles);
@@ -539,6 +541,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
     } finally {
       storageMetadataLoadTime_ = ctxStorageLdTime.stop();
     }
+    LOG.info("Loaded file and block metadata for {}. Time taken: {}",
+        getFullName(), PrintUtils.printTimeNs(storageMetadataLoadTime_));
   }
 
   private boolean canSkipReload() {
