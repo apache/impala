@@ -1097,3 +1097,27 @@ select ndv(varchar_col, 0) from functional.chars_medium;
 ---- CATCH
 Error in NDV function, second parameter needs to be between 1 and 10.
 ====
+---- QUERY
+# Labels test
+select 2, 1 + 1;
+---- LABELS
+2,1 + 1
+---- RESULTS
+2,2
+---- TYPES
+tinyint,smallint
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+====
+---- QUERY
+# Labels test
+select length('hello')
+---- LABELS
+length('hello')
+---- RESULTS
+5
+---- TYPES
+int
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+====

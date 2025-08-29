@@ -52,6 +52,7 @@ public class CalciteSingleNodePlanner implements SingleNodePlannerIntf {
   private final PlannerContext ctx_;
   private final CalciteAnalysisResult analysisResult_;
   private NodeWithExprs rootNode_;
+  private List<String> fieldNames_;
 
   public CalciteSingleNodePlanner(PlannerContext ctx) {
     ctx_ = ctx;
@@ -63,6 +64,7 @@ public class CalciteSingleNodePlanner implements SingleNodePlannerIntf {
     CalciteRelNodeConverter relNodeConverter =
         new CalciteRelNodeConverter(analysisResult_);
     RelNode logicalPlan = relNodeConverter.convert(analysisResult_.getValidatedNode());
+    fieldNames_ = relNodeConverter.getFieldNames(analysisResult_.getValidatedNode());
 
     // Optimize the query
     CalciteOptimizer optimizer =
@@ -89,7 +91,7 @@ public class CalciteSingleNodePlanner implements SingleNodePlannerIntf {
 
   @Override
   public List<String> getColLabels() {
-    return rootNode_.fieldNames_;
+    return fieldNames_;
   }
 
   @Override
@@ -97,7 +99,7 @@ public class CalciteSingleNodePlanner implements SingleNodePlannerIntf {
     TResultSetMetadata metadata = new TResultSetMetadata();
     int colCnt = rootNode_.outputExprs_.size();
     for (int i = 0; i < colCnt; ++i) {
-      TColumn colDesc = new TColumn(rootNode_.fieldNames_.get(i).toLowerCase(),
+      TColumn colDesc = new TColumn(fieldNames_.get(i),
           rootNode_.outputExprs_.get(i).getType().toThrift());
       metadata.addToColumns(colDesc);
     }

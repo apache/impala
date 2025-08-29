@@ -17,7 +17,7 @@
 
 package org.apache.impala.calcite.service;
 
-import org.apache.calcite.rel.type.RelDataTypeFactory;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.avatica.util.Quoting;
 import org.apache.calcite.plan.ConventionTraitDef;
@@ -37,13 +37,20 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.rules.CoreRules;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.SqlWith;
+import org.apache.calcite.sql.dialect.MysqlSqlDialect;
 import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
@@ -157,6 +164,57 @@ public class CalciteRelNodeConverter implements CompilerStep {
 
     LogUtil.logDebug(decorrelatedPlan, "Plan after subquery decorrelation phase");
     return decorrelatedPlan;
+  }
+
+  /**
+   * Get the field names given the root level of an AST tree. Calcite creates some
+   * literal expressions like "1 + 1" as "$EXPR0" whereas Impala sets the field name
+   * label as "1 + 1", so this method changes the field name appropriately.
+   */
+  public List<String> getFieldNames(SqlNode validatedNode) {
+    ImmutableList.Builder<String> fieldNamesBuilder = new ImmutableList.Builder();
+
+    for (SqlNode selectItem : getSelectList(validatedNode)) {
+      String fieldName = SqlValidatorUtil.alias(selectItem, 0);
+      if (fieldName.startsWith("EXPR$")) {
+        // If it's a Calcite generated field name, it will be of the form "EXPR$"
+        // We get the actual SQL expression using the toSqlString method. There
+        // is no Impala Dialect yet, so using MySql dialect to get the field
+        // name. The language chosen is irrelevant because we only are using it
+        // to grab the expression as/is to use for the label.
+        fieldName = selectItem.toSqlString(MysqlSqlDialect.DEFAULT).getSql();
+      }
+      fieldNamesBuilder.add(fieldName.toLowerCase());
+    }
+    return fieldNamesBuilder.build();
+  }
+
+  /**
+   * Retrieve the first select list found from the root node.
+   */
+  public List<SqlNode> getSelectList(SqlNode validatedNode) {
+    // If a with clause exists, it will be on top and we need to
+    // get its child.
+    SqlNode firstSelectNode = (validatedNode instanceof SqlWith)
+        ? ((SqlWith) validatedNode).body
+        : validatedNode;
+
+    // Top level could be some kind of "except/intersect" call. Need to
+    // traverse the tree until we either find a "values" (ROW kind) node
+    // or a select node.
+    if (firstSelectNode instanceof SqlBasicCall) {
+      SqlBasicCall basicCall = (SqlBasicCall) firstSelectNode;
+      // if it's a "values" clause, there is no select list and
+      // we just return the values list.
+      if (basicCall.getOperator().getKind().equals(SqlKind.ROW)) {
+        return basicCall.getOperandList();
+      }
+      // grab the first parameter for the field list. Since it could be
+      // a "with", we call this method recursively
+      return getSelectList(basicCall.operand(0));
+    }
+    Preconditions.checkState(firstSelectNode instanceof SqlSelect);
+    return ((SqlSelect)firstSelectNode).getSelectList();
   }
 
   public RelOptCluster getCluster() {
