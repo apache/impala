@@ -928,16 +928,16 @@ PLAN-ROOT SINK
 |  partition by: functional_parquet.alltypes.month
 |  order by: id DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=16B cardinality=2.03K
+|  row-size=16B cardinality=1.99K
 |
 01:SORT
 |  order by: month ASC NULLS LAST, id DESC NULLS FIRST
-|  row-size=8B cardinality=2.03K
+|  row-size=8B cardinality=1.99K
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partition predicates: functional_parquet.alltypes.month >= 11
-   HDFS partitions=4/24 files=4 size=31.97KB
-   row-size=8B cardinality=2.03K
+   HDFS partitions=4/24 files=4 size=31.33KB
+   row-size=8B cardinality=1.99K
 ====
 # IMPALA-10229: limit can be pushed through analytic with no predicates
 # when sort orders of ORDER BY clause and OVER clause match exactly.
@@ -968,8 +968,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partition predicates: functional_parquet.alltypes.month >= 11
-   HDFS partitions=4/24 files=4 size=31.97KB
-   row-size=8B cardinality=2.03K
+   HDFS partitions=4/24 files=4 size=31.33KB
+   row-size=8B cardinality=1.99K
 ====
 # IMPALA-10229: limit can be pushed through analytic with no predicates
 # when sort orders of ORDER BY clause is a prefix of the OVER clause and
@@ -1001,8 +1001,8 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partition predicates: functional_parquet.alltypes.month >= 11
-   HDFS partitions=4/24 files=4 size=31.97KB
-   row-size=12B cardinality=2.03K
+   HDFS partitions=4/24 files=4 size=31.33KB
+   row-size=12B cardinality=1.99K
 ====
 # Limit pushdown compares equality of non-trivial order by expressions, including
 # constants and non-trivial expressions, so can push down limit in some cases.
@@ -1029,16 +1029,16 @@ PLAN-ROOT SINK
 |  partition by: 'hello', functional_parquet.alltypes.month
 |  order by: id ASC, multiply(int_col, 2) ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=32B cardinality=2.03K
+|  row-size=32B cardinality=1.99K
 |
 01:SORT
 |  order by: 'hello' ASC NULLS LAST, month ASC NULLS LAST, id ASC NULLS LAST, multiply(int_col, 2) ASC NULLS LAST
-|  row-size=24B cardinality=2.03K
+|  row-size=24B cardinality=1.99K
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partition predicates: functional_parquet.alltypes.month >= 11
-   HDFS partitions=4/24 files=4 size=31.97KB
-   row-size=24B cardinality=2.03K
+   HDFS partitions=4/24 files=4 size=31.33KB
+   row-size=24B cardinality=1.99K
 ====
 # Non-trivial order by expressions may not compare equal if the expression was
 # materialized before the sort - lower(string_col) in this case.
@@ -1062,16 +1062,16 @@ PLAN-ROOT SINK
 |  partition by: 'hello', functional_parquet.alltypes.month
 |  order by: id ASC, lower(string_col) ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=32B cardinality=2.03K
+|  row-size=32B cardinality=1.99K
 |
 01:SORT
 |  order by: 'hello' ASC NULLS LAST, month ASC NULLS LAST, id ASC NULLS LAST, lower(string_col) ASC NULLS LAST
-|  row-size=24B cardinality=2.03K
+|  row-size=24B cardinality=1.99K
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partition predicates: functional_parquet.alltypes.month >= 11
-   HDFS partitions=4/24 files=4 size=31.97KB
-   row-size=24B cardinality=2.03K
+   HDFS partitions=4/24 files=4 size=31.33KB
+   row-size=24B cardinality=1.99K
 ====
 # Very high rank() predicate is not pushed down because the limit would not fit in
 # a 32-bit integer.

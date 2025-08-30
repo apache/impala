@@ -18,6 +18,7 @@
 package org.apache.impala.calcite.functions;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.apache.calcite.rel.type.RelDataType;
@@ -93,6 +94,8 @@ public class RexCallConverter {
         return new IsNullPredicate(params.get(0), false);
       case IS_NOT_NULL:
         return new IsNullPredicate(params.get(0), true);
+      case LIKE:
+        return createLikeExpr(rexBuilder, rexCall, params, analyzer);
       case OTHER:
         if (rexCall.getOperator() instanceof ImpalaInOperator) {
           return createInExpr(rexCall, params);
@@ -180,6 +183,51 @@ public class RexCallConverter {
     }
     Preconditions.checkState(false, "Unknown type: " + rexCall.getOperator().getKind());
     return null;
+  }
+
+
+  // CALCITE-7287: Regression in Calcite 1.41. In the RexSimplify.simplifyLike()
+  // method, the string RexLiteral gets converted back into its Calcite CHAR
+  // type whereas Impala treats these literals as strings. We look for the specific
+  // case where that happens: The first parameter of the like must be of type
+  // varchar, the second parameter is a literal of type char.  When this is seen,
+  // the rexLiteral gets cast once again to a VARCHAR so that the function name
+  // can be resolved by the function resolver.
+  // XXX: If we need to commit the upgrade to 1.41 before 1.42 comes out, this
+  // commit will be needed.  This should be fixed in 1.42, and when it does, this
+  // whole method can go away. Without this fix and with the upgrade to 1.41, tpcds-q91
+  // will fail.
+  private static Expr createLikeExpr(RexBuilder rexBuilder, RexCall rexCall,
+      List<Expr> params, Analyzer analyze) throws ImpalaException {
+
+    if (rexCall.getOperands().get(1) instanceof RexLiteral) {
+      RexLiteral literal = (RexLiteral) rexCall.getOperands().get(1);
+      if (literal.getType().getSqlTypeName().equals(SqlTypeName.CHAR)) {
+        RexNode op0 = (RexNode) rexCall.getOperands().get(0);
+        if (op0.getType().getSqlTypeName().equals(SqlTypeName.VARCHAR)) {
+          RexNode varcharLiteral = rexBuilder.makeLiteral(
+              literal.getValueAs(String.class), op0.getType(), true);
+          List<RexNode> operands = ImmutableList.of(op0, varcharLiteral);
+          rexCall = (RexCall) rexBuilder.makeCall(rexCall.getOperator(), operands);
+        }
+      }
+    }
+
+    String funcName = rexCall.getOperator().getName().toLowerCase();
+    Function fn = getFunction(rexCall);
+
+    if (fn == null) {
+      List<RelDataType> argTypes =
+          Lists.transform(rexCall.getOperands(), RexNode::getType);
+      Preconditions.checkState(false, "Could not find function \"" + funcName +
+        "\" in Impala " + "with args " + argTypes + " and return type " +
+        rexCall.getType());
+      return null;
+    }
+    Type impalaRetType = ImpalaTypeConverter.createImpalaType(fn.getReturnType(),
+        rexCall.getType().getPrecision(), rexCall.getType().getScale());
+
+    return new AnalyzedFunctionCallExpr(fn, params, impalaRetType);
   }
 
   /**

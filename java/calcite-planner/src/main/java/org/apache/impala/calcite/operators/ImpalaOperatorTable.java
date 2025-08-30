@@ -100,7 +100,7 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
     ImpalaCustomOperatorTable.instance().lookupOperatorOverloads(opName, category, syntax,
         operatorList, nameMatcher);
 
-    if (operatorList.size() >= 1) {
+    if (operatorList.size() >= 1 || !opName.isSimple()) {
       return;
     }
 
@@ -127,11 +127,10 @@ public class ImpalaOperatorTable extends ReflectiveSqlOperatorTable {
       }
     }
 
-    // There shouldn't be more than one opName with our usage, so throw an exception
-    // if this happens.
+    // There shouldn't be more than one opName with our usage, so just return without
+    // adding anything to the operatorList if this happens.
     if (opName.names.size() > 1) {
-      throw new RuntimeException("Cannot handle identifier with more than one name: " +
-          opName);
+      return;
     }
 
     // Check Impala Builtins for existence: TODO: IMPALA-13095: handle UDFs

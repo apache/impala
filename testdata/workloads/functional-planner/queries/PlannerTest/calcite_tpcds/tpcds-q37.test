@@ -56,13 +56,13 @@ PLAN-ROOT SINK
 |  |
 |  |--04:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |  |     HDFS partitions=1/1 files=1 size=33.54MB
-|  |     predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=360.00K size=33.54MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=101.54K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35 AS DECIMAL(5,0))
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35.00 AS DECIMAL(7,2))
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=6 row-size=153B cardinality=476 cost=707123
 |  |     in pipelines: 04(GETNEXT)
@@ -216,13 +216,13 @@ max-parallelism=40 segment-costs=[389806012, 385740738] cpu-comparison-result=10
 |  |  max-parallelism=4 segment-costs=[707329]
 |  |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=33.54MB
-|  |     predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=360.00K size=33.54MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=101.54K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35 AS DECIMAL(5,0))
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35.00 AS DECIMAL(7,2))
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=6 row-size=153B cardinality=476 cost=707123
 |  |     in pipelines: 04(GETNEXT)
@@ -402,13 +402,13 @@ max-parallelism=40 segment-costs=[389806012, 385740738] cpu-comparison-result=10
 |  |  max-parallelism=4 segment-costs=[707329]
 |  |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=33.54MB
-|  |     predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=360.00K size=33.54MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=101.54K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35 AS DECIMAL(5,0))
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35 AS DECIMAL(5,0)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35.00 AS DECIMAL(7,2))
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id IN (CAST(715 AS INT), CAST(861 AS INT), CAST(928 AS INT), CAST(942 AS INT)), tpcds_partitioned_parquet_snap.item.i_current_price <= CAST(65.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_current_price >= CAST(35.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.item.i_item_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=6 row-size=153B cardinality=476 cost=707123
 |  |     in pipelines: 04(GETNEXT)

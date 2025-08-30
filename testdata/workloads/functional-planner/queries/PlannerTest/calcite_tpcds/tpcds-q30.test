@@ -91,7 +91,7 @@ PLAN-ROOT SINK
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state = tpcds_partitioned_parquet_snap.customer_address_0.ca_state
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1)))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
 |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.customer_address_0.ca_state, RF003[min_max] <- tpcds_partitioned_parquet_snap.customer_address_0.ca_state
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,15 row-size=64B cardinality=15.00M cost=3537076
@@ -346,7 +346,7 @@ max-parallelism=20 segment-costs=[197016296, 80817025] cpu-comparison-result=102
 |  hash-table-id=02
 |  hash predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state = tpcds_partitioned_parquet_snap.customer_address_0.ca_state
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1)))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,15 row-size=64B cardinality=15.00M cost=3537025
 |  in pipelines: 23(GETNEXT), 30(OPEN)
@@ -749,7 +749,7 @@ max-parallelism=20 segment-costs=[197016296, 80817025] cpu-comparison-result=102
 |  hash-table-id=02
 |  hash predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state = tpcds_partitioned_parquet_snap.customer_address_0.ca_state
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1)))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.web_returns.wr_return_amt) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.web_returns_0.wr_return_amt)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,15 row-size=64B cardinality=15.00M cost=3537025
 |  in pipelines: 23(GETNEXT), 30(OPEN)

@@ -70,7 +70,7 @@ PLAN-ROOT SINK
 |  in pipelines: 27(GETNEXT), 12(OPEN)
 |
 26:NESTED LOOP JOIN [INNER JOIN]
-|  join predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid)))
+|  join predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > CAST(multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid))) AS DECIMAL(38,2))
 |  mem-estimate=16B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,28 row-size=84B cardinality=79.62K cost=16314
 |  in pipelines: 12(GETNEXT), 25(OPEN)
@@ -371,7 +371,7 @@ max-parallelism=10 segment-costs=[5036796, 283918, 166680] cpu-comparison-result
 |
 26:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  join table id: 00
-|  join predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid)))
+|  join predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > CAST(multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid))) AS DECIMAL(38,2))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,28 row-size=84B cardinality=79.62K cost=16314
 |  in pipelines: 37(GETNEXT), 47(OPEN)
@@ -939,7 +939,7 @@ max-parallelism=10 segment-costs=[5036796, 283918, 166680] cpu-comparison-result
 |
 26:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  join table id: 00
-|  join predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid)))
+|  join predicates: sum(sum(tpcds_partitioned_parquet_snap.store_sales.ss_net_paid)) > CAST(multiply(CAST(0.05 AS DECIMAL(3,2)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_paid))) AS DECIMAL(38,2))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,28 row-size=84B cardinality=79.62K cost=16314
 |  in pipelines: 37(GETNEXT), 47(OPEN)

@@ -104,6 +104,9 @@ public class NumericLiteral extends LiteralExpr {
   // negative zero.
   private BigDecimal value_;
 
+  private static BigDecimal LOW_EXPONENT = new BigDecimal(Math.pow(10, -8));
+  private static BigDecimal HIGH_EXPONENT = new BigDecimal(Math.pow(10, 8));
+
   // The explicit type of the literal, which must be wider than the "natural"
   // type. Set via the constructor or as the result of pushing an explicit
   // (user-provided) CAST into this literal.
@@ -247,8 +250,16 @@ public class NumericLiteral extends LiteralExpr {
   public String getStringValue() {
     // BigDecimal returns CAST(0, DECIMAL(38, 38))
     // as 0E-38. We want just 0.
-    return value_.compareTo(BigDecimal.ZERO) == 0
-        ? "0" : value_.toString();
+    // For numbers below 10^-8 and above 10^8, return the exponent
+    // string.  Else, return a non-exponent string.
+    if (value_.compareTo(BigDecimal.ZERO) == 0) {
+      return "0";
+    } else if (value_.compareTo(LOW_EXPONENT) == -1 ||
+        value_.compareTo(HIGH_EXPONENT) == 1) {
+      return value_.toString();
+    } else {
+      return value_.toPlainString();
+    }
   }
 
   public double getDoubleValue() { return value_.doubleValue(); }

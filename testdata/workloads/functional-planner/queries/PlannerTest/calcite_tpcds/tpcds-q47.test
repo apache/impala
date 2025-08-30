@@ -171,7 +171,7 @@ PLAN-ROOT SINK
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=99(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=99(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=0 row-size=16B cardinality=427.62M(filtered from 7.88G) cost=128329183
@@ -185,7 +185,7 @@ PLAN-ROOT SINK
 |  in pipelines: 19(GETNEXT), 32(OPEN)
 |
 |--34:SELECT
-|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(3,0)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(3,0)), rank() IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_company_name IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_store_name IS NOT NULL
+|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price))) ELSE NULL END > CAST(0.100000 AS DECIMAL(38,6)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(38,6)), rank() IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_company_name IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_store_name IS NOT NULL
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=47,42 row-size=129B cardinality=4.01K cost=19900800
 |  |  in pipelines: 32(GETNEXT)
@@ -296,7 +296,7 @@ PLAN-ROOT SINK
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=99(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=99(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_1.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=30 row-size=16B cardinality=427.62M(filtered from 7.88G) cost=128329183
@@ -400,7 +400,7 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=99(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=99(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales_0.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=15 row-size=16B cardinality=427.62M(filtered from 7.88G) cost=128329183
@@ -628,7 +628,7 @@ max-parallelism=1270 segment-costs=[12655909863, 269] cpu-comparison-result=318 
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=99(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=99(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=0 row-size=16B cardinality=427.62M(filtered from 7.88G) cost=128329183
@@ -667,7 +667,7 @@ max-parallelism=10 segment-costs=[13853077, 52270199] cpu-comparison-result=198 
 |  Per-Instance Resources: mem-estimate=59.72MB mem-reservation=32.00MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[13853077, 15728442, 22389971] cpu-comparison-result=99 [max(10 (self) vs 99 (sum children))]
 |  34:SELECT
-|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(3,0)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(3,0)), rank() IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_company_name IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_store_name IS NOT NULL
+|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price))) ELSE NULL END > CAST(0.100000 AS DECIMAL(38,6)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(38,6)), rank() IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_company_name IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_store_name IS NOT NULL
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=47,42 row-size=129B cardinality=4.01K cost=19900800
 |  |  in pipelines: 32(GETNEXT)
@@ -853,7 +853,7 @@ max-parallelism=10 segment-costs=[13853077, 52270199] cpu-comparison-result=198 
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=99(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=99(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_1.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=30 row-size=16B cardinality=427.62M(filtered from 7.88G) cost=128329183
@@ -1032,7 +1032,7 @@ max-parallelism=99 segment-costs=[2305883460, 1653445199] cpu-comparison-result=
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=99(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=99(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales_0.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=15 row-size=16B cardinality=427.62M(filtered from 7.88G) cost=128329183
@@ -1260,7 +1260,7 @@ max-parallelism=1270 segment-costs=[12655909863, 269] cpu-comparison-result=318 
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=99(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=99(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=0 row-size=16B cardinality=427.62M(filtered from 7.88G) cost=128329183
@@ -1299,7 +1299,7 @@ max-parallelism=10 segment-costs=[13853077, 52270199] cpu-comparison-result=198 
 |  Per-Instance Resources: mem-estimate=59.72MB mem-reservation=32.00MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[13853077, 15728442, 22389971] cpu-comparison-result=99 [max(10 (self) vs 99 (sum children))]
 |  34:SELECT
-|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(3,0)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(3,0)), rank() IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_company_name IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_store_name IS NOT NULL
+|  |  predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year = CAST(2001 AS INT), CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price))) ELSE NULL END > CAST(0.100000 AS DECIMAL(38,6)), avg(sum(tpcds_partitioned_parquet_snap.store_sales_1.ss_sales_price)) > CAST(0 AS DECIMAL(38,6)), rank() IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_brand IS NOT NULL, tpcds_partitioned_parquet_snap.item_1.i_category IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_company_name IS NOT NULL, tpcds_partitioned_parquet_snap.store_1.s_store_name IS NOT NULL
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=47,42 row-size=129B cardinality=4.01K cost=19900800
 |  |  in pipelines: 32(GETNEXT)
@@ -1485,7 +1485,7 @@ max-parallelism=10 segment-costs=[13853077, 52270199] cpu-comparison-result=198 
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=99(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=99(filtered from 1823)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_1.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales_1.ss_item_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=30 row-size=16B cardinality=427.62M(filtered from 7.88G) cost=128329183
@@ -1664,7 +1664,7 @@ max-parallelism=99 segment-costs=[2305883460, 1653445199] cpu-comparison-result=
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=99(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=99(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_store_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales_0.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=15 row-size=16B cardinality=427.62M(filtered from 7.88G) cost=128329183

@@ -1291,3 +1291,13 @@ row_regex: .*PlannerType: CalcitePlanner.*
 row_regex:.*01:SCAN HDFS \[functional.alltypessmall\]*
 row_regex:.*00:SCAN HDFS \[functional.alltypestiny\]*
 ====
+---- QUERY
+select string_col from functional.alltypestiny where string_col like '1%';
+---- RESULTS
+'1'
+'1'
+'1'
+'1'
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====

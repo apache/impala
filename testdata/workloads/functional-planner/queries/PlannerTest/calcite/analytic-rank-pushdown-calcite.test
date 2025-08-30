@@ -1129,7 +1129,7 @@ PLAN-ROOT SINK
 |  row-size=52B cardinality=1.10K
 |
 04:ANALYTIC
-|  functions: count(tinyint_col), sum_init_zero(tinyint_col)
+|  functions: count(tinyint_col), sum(tinyint_col)
 |  partition by: functional.alltypesagg.year
 |  order by: string_col ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW

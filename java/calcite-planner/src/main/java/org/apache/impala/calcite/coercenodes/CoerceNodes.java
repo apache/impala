@@ -32,6 +32,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
@@ -143,6 +144,12 @@ public class CoerceNodes{
     }
 
     RexNode newCondition = (changedRexNodes == null) ? condition : changedRexNodes.get(0);
+
+    // need to 'flatten' before putting it back into a filter or else some
+    // tpcds queries will fail in the junit tests because of an assert statement
+    // in the Filter constructor.
+    newCondition = RexUtil.flatten(rexBuilder, newCondition);
+
     return filter.copy(filter.getTraitSet(), inputs.get(0), newCondition);
   }
 

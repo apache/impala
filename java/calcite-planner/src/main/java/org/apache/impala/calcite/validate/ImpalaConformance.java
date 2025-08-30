@@ -18,6 +18,7 @@
 package org.apache.impala.calcite.validate;
 
 import org.apache.calcite.sql.fun.SqlLibrary;
+import org.apache.calcite.sql.validate.SqlAbstractConformance;
 import org.apache.calcite.sql.validate.SqlConformance;
 
 /**
@@ -25,7 +26,7 @@ import org.apache.calcite.sql.validate.SqlConformance;
  * For more info on the description of these methods, see:
  * https://calcite.apache.org/javadocAggregate/org/apache/calcite/sql/validate/SqlConformance.html
  */
-public class ImpalaConformance implements SqlConformance {
+public class ImpalaConformance extends SqlAbstractConformance {
 
   public static final SqlConformance INSTANCE = new ImpalaConformance();
 
@@ -79,10 +80,6 @@ public class ImpalaConformance implements SqlConformance {
   }
 
   @Override public boolean isMinusAllowed() {
-    return true;
-  }
-
-  @Override public boolean isRegexReplaceCaptureGroupDollarIndexed() {
     return true;
   }
 

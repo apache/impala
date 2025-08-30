@@ -434,6 +434,9 @@ public class ImpalaTypeConverter {
     Type retType = ScalarType.getAssignmentCompatibleType(impalaType1, impalaType2,
         TypeCompatibility.DEFAULT);
 
-    return createRelDataType(factory, retType);
+    RelDataType compatibleType = createRelDataType(factory, retType);
+    return (!type1.isNullable() && !type2.isNullable())
+        ? factory.createTypeWithNullability(compatibleType, false)
+        : compatibleType;
   }
 }

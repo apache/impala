@@ -54,7 +54,7 @@ PLAN-ROOT SINK
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.web_sales.ws_item_sk = tpcds_partitioned_parquet_snap.item.i_item_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.web_sales.ws_item_sk = tpcds_partitioned_parquet_snap.item.i_item_sk
-|  other join predicates: tpcds_partitioned_parquet_snap.web_sales.ws_ext_discount_amt > multiply(CAST(1.3 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.web_sales_0.ws_ext_discount_amt))
+|  other join predicates: CAST(tpcds_partitioned_parquet_snap.web_sales.ws_ext_discount_amt AS DECIMAL(14,7)) > multiply(CAST(1.3 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.web_sales_0.ws_ext_discount_amt))
 |  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.item.i_item_sk, RF001[min_max] <- tpcds_partitioned_parquet_snap.item.i_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,9,10 row-size=40B cardinality=2.25M cost=984332
@@ -200,7 +200,7 @@ max-parallelism=90 segment-costs=[887406184, 185] cpu-comparison-result=145 [max
 |  hash-table-id=00
 |  hash predicates: tpcds_partitioned_parquet_snap.web_sales.ws_item_sk = tpcds_partitioned_parquet_snap.item.i_item_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.web_sales.ws_item_sk = tpcds_partitioned_parquet_snap.item.i_item_sk
-|  other join predicates: tpcds_partitioned_parquet_snap.web_sales.ws_ext_discount_amt > multiply(CAST(1.3 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.web_sales_0.ws_ext_discount_amt))
+|  other join predicates: CAST(tpcds_partitioned_parquet_snap.web_sales.ws_ext_discount_amt AS DECIMAL(14,7)) > multiply(CAST(1.3 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.web_sales_0.ws_ext_discount_amt))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,9,10 row-size=40B cardinality=2.25M cost=983957
 |  in pipelines: 00(GETNEXT), 15(OPEN)
@@ -429,7 +429,7 @@ max-parallelism=90 segment-costs=[887406184, 185] cpu-comparison-result=145 [max
 |  hash-table-id=00
 |  hash predicates: tpcds_partitioned_parquet_snap.web_sales.ws_item_sk = tpcds_partitioned_parquet_snap.item.i_item_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.web_sales.ws_item_sk = tpcds_partitioned_parquet_snap.item.i_item_sk
-|  other join predicates: tpcds_partitioned_parquet_snap.web_sales.ws_ext_discount_amt > multiply(CAST(1.3 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.web_sales_0.ws_ext_discount_amt))
+|  other join predicates: CAST(tpcds_partitioned_parquet_snap.web_sales.ws_ext_discount_amt AS DECIMAL(14,7)) > multiply(CAST(1.3 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.web_sales_0.ws_ext_discount_amt))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,9,10 row-size=40B cardinality=2.25M cost=983957
 |  in pipelines: 00(GETNEXT), 15(OPEN)

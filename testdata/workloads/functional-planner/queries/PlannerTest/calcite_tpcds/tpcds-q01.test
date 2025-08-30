@@ -43,7 +43,7 @@ PLAN-ROOT SINK
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.store_returns.sr_store_sk = tpcds_partitioned_parquet_snap.store_returns_0.sr_store_sk
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1)))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
 |  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.store_returns_0.sr_store_sk, RF001[min_max] <- tpcds_partitioned_parquet_snap.store_returns_0.sr_store_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,6,7,15 row-size=94B cardinality=661.28M cost=120084585
@@ -216,7 +216,7 @@ max-parallelism=10 segment-costs=[11054198439, 104] cpu-comparison-result=211 [m
 |  hash-table-id=00
 |  hash predicates: tpcds_partitioned_parquet_snap.store_returns.sr_store_sk = tpcds_partitioned_parquet_snap.store_returns_0.sr_store_sk
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1)))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,6,7,15 row-size=94B cardinality=661.28M cost=120083932
 |  in pipelines: 00(GETNEXT), 24(OPEN)
@@ -521,7 +521,7 @@ max-parallelism=10 segment-costs=[11054198439, 104] cpu-comparison-result=211 [m
 |  hash-table-id=00
 |  hash predicates: tpcds_partitioned_parquet_snap.store_returns.sr_store_sk = tpcds_partitioned_parquet_snap.store_returns_0.sr_store_sk
 |  fk/pk conjuncts: none
-|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1)))
+|  other join predicates: sum(tpcds_partitioned_parquet_snap.store_returns.sr_fee) > CAST(multiply(avg(sum(tpcds_partitioned_parquet_snap.store_returns_0.sr_fee)), CAST(1.2 AS DECIMAL(2,1))) AS DECIMAL(38,2))
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,6,7,15 row-size=94B cardinality=661.28M cost=120083932
 |  in pipelines: 00(GETNEXT), 24(OPEN)
