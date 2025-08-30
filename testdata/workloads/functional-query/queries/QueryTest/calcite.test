@@ -1261,3 +1261,33 @@ explain select id from functional.alltypes where bigint_col > sqrt(id) limit 1;
 ---- RUNTIME_PROFILE
 row_regex: PlannerType: CalcitePlanner
 ====
+---- QUERY
+# without straight join
+explain select a.bigint_col from functional.alltypestiny a
+inner join functional.alltypessmall b on a.id = b.id
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*01:SCAN HDFS \[functional.alltypestiny\]*
+row_regex:.*00:SCAN HDFS \[functional.alltypessmall\]*
+====
+---- QUERY
+# with straight join
+explain select straight_join a.bigint_col from functional.alltypestiny a
+inner join functional.alltypessmall b on a.id = b.id
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*01:SCAN HDFS \[functional.alltypessmall\]*
+row_regex:.*00:SCAN HDFS \[functional.alltypestiny\]*
+====
+---- QUERY
+# with straight join with alternative parsing
+explain select /* +straight_join */ a.bigint_col from functional.alltypestiny a
+inner join functional.alltypessmall b on a.id = b.id
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*01:SCAN HDFS \[functional.alltypessmall\]*
+row_regex:.*00:SCAN HDFS \[functional.alltypestiny\]*
+====

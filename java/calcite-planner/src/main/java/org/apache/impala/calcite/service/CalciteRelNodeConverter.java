@@ -137,7 +137,8 @@ public class CalciteRelNodeConverter implements CompilerStep {
         cluster_,
         ImpalaConvertletTable.INSTANCE,
         SqlToRelConverter.config().withCreateValuesRel(false)
-            .withRelBuilderFactory(ImpalaCoreRules.LOGICAL_BUILDER_NO_SIMPLIFY));
+            .withRelBuilderFactory(ImpalaCoreRules.LOGICAL_BUILDER_NO_SIMPLIFY)
+            .withHintStrategyTable(ImpalaCoreRules.HINT_STRATEGIES));
 
     // Convert the valid AST into a logical plan
     RelRoot root = relConverter.convertQuery(validatedNode, false, true);

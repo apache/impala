@@ -20,6 +20,9 @@ package org.apache.impala.calcite.rules;
 import org.apache.calcite.plan.Contexts;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.hint.HintPredicates;
+import org.apache.calcite.rel.hint.HintStrategy;
+import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.rules.AggregateProjectPullUpConstantsRule;
 import org.apache.calcite.rel.rules.FilterJoinRule;
 import org.apache.calcite.rel.rules.FilterAggregateTransposeRule;
@@ -39,6 +42,7 @@ import org.apache.calcite.rel.rules.UnionMergeRule;
 import org.apache.calcite.rel.rules.UnionPullUpConstantsRule;
 import org.apache.calcite.rel.rules.UnionToDistinctRule;
 import org.apache.calcite.rel.rules.ValuesReduceRule;
+import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.rules.SubQueryRemoveRule;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
@@ -213,4 +217,11 @@ public class ImpalaCoreRules {
                   rexB, adjust))
           .toRule();
 
+  // If the straight join hint is seen, we exclude applying the JOIN_TO_MULTI_JOIN
+  // rule which will ensure no join optimization is done on the join.
+  public static HintStrategyTable HINT_STRATEGIES = HintStrategyTable.builder()
+     .hintStrategy("straight_join", HintStrategy.builder(HintPredicates.JOIN)
+          .excludedRules(CoreRules.JOIN_TO_MULTI_JOIN)
+         .build())
+     .build();
 }

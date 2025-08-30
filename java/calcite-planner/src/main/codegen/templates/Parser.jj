@@ -1236,41 +1236,43 @@ SqlNodeList ParenthesizedLiteralOptionCommaList() :
     }
 }
 
+void AddStraightJoinHint(List<SqlNode> hints) :
+{
+}
+{
+    {
+    final SqlIdentifier hintName;
+    final SqlNodeList hintOptions;
+    final SqlHint.HintOptionFormat optionFormat;
+
+    hintOptions = SqlNodeList.EMPTY;
+    optionFormat = SqlHint.HintOptionFormat.EMPTY;
+    hintName = new SqlIdentifier("straight_join", getPos());
+    hints.add(
+        new SqlHint(Span.of(hintOptions).end(this), hintName, hintOptions,
+            optionFormat));
+    }
+}
+
 void AddHint(List<SqlNode> hints) :
 {
+    final String hint;
     final SqlIdentifier hintName;
     final SqlNodeList hintOptions;
     final SqlHint.HintOptionFormat optionFormat;
 }
 {
-    hintName = SimpleIdentifier()
     (
-       LOOKAHEAD(5)
-        hintOptions = ParenthesizedKeyValueOptionCommaList() {
-            optionFormat = SqlHint.HintOptionFormat.KV_LIST;
-        }
-    |
-        LOOKAHEAD(3)
-        hintOptions = ParenthesizedSimpleIdentifierList() {
-            optionFormat = SqlHint.HintOptionFormat.ID_LIST;
-        }
-    |
-        LOOKAHEAD(3)
-        hintOptions = ParenthesizedLiteralOptionCommaList() {
-            optionFormat = SqlHint.HintOptionFormat.LITERAL_LIST;
-        }
-    |
-        LOOKAHEAD(2)
-        [<LPAREN> <RPAREN>]
-        {
-            hintOptions = SqlNodeList.EMPTY;
-            optionFormat = SqlHint.HintOptionFormat.EMPTY;
-        }
+      <IDENTIFIER>  | <STRAIGHT_JOIN>
     )
     {
-        hints.add(
-           new SqlHint(Span.of(hintOptions).end(this), hintName, hintOptions,
-               optionFormat));
+    hint = getToken(0).image;
+    hintName = new SqlIdentifier(hint, getPos());
+    hintOptions = SqlNodeList.EMPTY;
+    optionFormat = SqlHint.HintOptionFormat.EMPTY;
+    hints.add(
+        new SqlHint(Span.of(hintOptions).end(this), hintName, hintOptions,
+            optionFormat));
     }
 }
 
@@ -1309,7 +1311,7 @@ SqlSelect SqlSelect() :
 {
     <SELECT> { s = span(); }
     ( <CLUSTERED> )?
-    ( <STRAIGHT_JOIN> )?
+    [ <STRAIGHT_JOIN> { AddStraightJoinHint(hints); } ]
     [ <HINT_BEG> AddHint(hints) ( <COMMA> AddHint(hints) )* <COMMENT_END> ]
     SqlSelectKeywords(keywords)
     (
@@ -8839,7 +8841,7 @@ of the 'normal states'.
 
 <DEFAULT, DQID, BTID, BQID, BQHID> TOKEN :
 {
-    < HINT_BEG: "/*+">
+    < HINT_BEG: ("/*")(" ")*("+")>
 |   < COMMENT_END: "*/" >
 }
 

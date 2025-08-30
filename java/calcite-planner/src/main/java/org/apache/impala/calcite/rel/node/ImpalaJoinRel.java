@@ -26,6 +26,7 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
@@ -75,8 +76,8 @@ public class ImpalaJoinRel extends Join
       LoggerFactory.getLogger(ImpalaJoinRel.class.getName());
 
   public ImpalaJoinRel(Join join) {
-    super(join.getCluster(), join.getTraitSet(), join.getLeft(), join.getRight(),
-        join.getCondition(), join.getJoinType(), new HashSet<>());
+    super(join.getCluster(), join.getTraitSet(), join.getHints(), join.getLeft(),
+        join.getRight(), join.getCondition(), join.getVariablesSet(), join.getJoinType());
   }
 
   public ImpalaJoinRel(RelOptCluster cluster, RelTraitSet relTraitSet,
@@ -139,10 +140,10 @@ public class ImpalaJoinRel extends Join
     // Create Impala plan node
     PlanNode joinNode = equiJoinConjuncts.size() == 0
       ? new ImpalaNestedLoopJoinNode(context.ctx_.getNextNodeId(), leftInput.planNode_,
-          rightInput.planNode_, false /* not a straight join */, distMode, joinOp,
+          rightInput.planNode_, isStraightJoin(), distMode, joinOp,
           otherJoinConjuncts, filterConjuncts, analyzer)
       : new ImpalaHashJoinNode(context.ctx_.getNextNodeId(), leftInput.planNode_,
-          rightInput.planNode_, false /* not a straight join */, distMode, joinOp,
+          rightInput.planNode_, isStraightJoin(), distMode, joinOp,
           equiJoinConjuncts, otherJoinConjuncts, filterConjuncts, analyzer);
 
     // register the equi join conjuncts with the analyzer such that
@@ -521,6 +522,11 @@ public class ImpalaJoinRel extends Join
       tableRefs.addAll(getTableRefs(child));
     }
     return tableRefs;
+  }
+
+  private boolean isStraightJoin() {
+    return getHints().stream()
+        .anyMatch(r -> r.hintName.toLowerCase().equals("straight_join"));
   }
 
   private static class ConjunctInfo {
