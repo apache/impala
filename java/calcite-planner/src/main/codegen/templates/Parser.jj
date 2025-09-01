@@ -121,10 +121,13 @@ import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.SourceStringReader;
 import org.apache.calcite.util.Util;
 import org.apache.calcite.util.trace.CalciteTrace;
+import org.apache.impala.analysis.TypesUtil;
 import org.apache.impala.calcite.type.ImpalaSqlIntervalQualifier;
 import org.apache.impala.calcite.operators.ImpalaCustomOperatorTable;
 import org.apache.impala.calcite.operators.ImpalaConcatOrOperator;
+import org.apache.impala.calcite.operators.ImpalaSqlNumericLiteral;
 import org.apache.impala.calcite.util.ParserUtil;
+import org.apache.impala.catalog.ScalarType;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -4427,7 +4430,9 @@ final String p;
     }
 |
     <APPROX_NUMERIC_LITERAL> {
-        return SqlLiteral.createApproxNumeric(token.image, getPos());
+        BigDecimal bd = new BigDecimal(token.image);
+        ScalarType t = (ScalarType) TypesUtil.computeDecimalType(bd);
+        return new ImpalaSqlNumericLiteral(bd, t, getPos());
     }
 }
 
