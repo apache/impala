@@ -287,34 +287,39 @@ StringVal UtilityFunctions::Sha2(FunctionContext* ctx, const StringVal& input_st
     return StringVal::null();
   }
 
-  StringVal sha_hash;
+  const EVP_MD* md_alg = nullptr;
+  int digest_length = 0;
 
   switch(bit_len.val) {
     case 224:
-      sha_hash = StringVal(ctx, SHA224_DIGEST_LENGTH);
-      if (UNLIKELY(sha_hash.is_null)) return StringVal::null();
-      SHA224(input_str.ptr, input_str.len, sha_hash.ptr);
+      md_alg = EVP_sha224();
+      digest_length = SHA224_DIGEST_LENGTH;
       break;
     case 256:
-      sha_hash = StringVal(ctx, SHA256_DIGEST_LENGTH);
-      if (UNLIKELY(sha_hash.is_null)) return StringVal::null();
-      SHA256(input_str.ptr, input_str.len, sha_hash.ptr);
+      md_alg = EVP_sha256();
+      digest_length = SHA256_DIGEST_LENGTH;
       break;
     case 384:
-      sha_hash = StringVal(ctx, SHA384_DIGEST_LENGTH);
-      if (UNLIKELY(sha_hash.is_null)) return StringVal::null();
-      SHA384(input_str.ptr, input_str.len, sha_hash.ptr);
+      md_alg = EVP_sha384();
+      digest_length = SHA384_DIGEST_LENGTH;
       break;
     case 512:
-      sha_hash = StringVal(ctx, SHA512_DIGEST_LENGTH);
-      if (UNLIKELY(sha_hash.is_null)) return StringVal::null();
-      SHA512(input_str.ptr, input_str.len, sha_hash.ptr);
+      md_alg = EVP_sha512();
+      digest_length = SHA512_DIGEST_LENGTH;
       break;
     default:
       // Unsupported bit length.
       ctx->SetError(Substitute("Bit Length $0 is not supported", bit_len.val).c_str());
       return StringVal::null();
   }
+
+  StringVal sha_hash(ctx, digest_length);
+  if (UNLIKELY(sha_hash.is_null)) return StringVal::null();
+
+  // Do not use low-level calls like SHA384(), which can be forbidden in FIPS mode.
+  // This is the fips-compliant hashing implementation, which uses the high-level
+  // EVP_Digest function.
+  EVP_Digest(input_str.ptr, input_str.len, sha_hash.ptr, nullptr, md_alg, nullptr);
 
   return StringFunctions::Lower(ctx, MathFunctions::HexString(ctx, sha_hash));
 }
