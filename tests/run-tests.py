@@ -45,7 +45,7 @@ VALID_TEST_DIRS = ['failure', 'query_test', 'stress', 'unittests', 'aux_query_te
 # new dir to the list of valid test dirs above. All dirs unders tests/ must be placed
 # into one of these lists, otherwise the script will throw an error. This list can be
 # removed once IMPALA-4417 has been resolved.
-TEST_HELPER_DIRS = ['aux_parquet_data_load', 'comparison', 'benchmark',
+TEST_HELPER_DIRS = ['aux_parquet_data_load', 'comparison', 'benchmark', 'build',
                      'custom_cluster', 'util', 'experiments', 'verifiers', 'common',
                      'performance', 'beeswax', 'aux_custom_cluster_tests',
                      'authorization', 'test-hive-udfs', '__pycache__', 'webui']

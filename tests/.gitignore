@@ -1,5 +1,6 @@
 results
 build
+build/
 aux_*
 .cache
 results
