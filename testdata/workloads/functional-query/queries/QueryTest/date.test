@@ -884,3 +884,32 @@ select cast(cast(NULL as date) as string format "YYYY-MM-DD");
 ---- TYPES
 STRING
 ====
+---- QUERY
+select cast('2025-08-31 06:23:24.1234567890123456789' as DATE);
+---- RESULTS
+2025-08-31
+---- TYPES
+DATE
+====
+---- QUERY
+# TODO(IMPALA-14391): support timezone offset in the string
+select cast('2025-08-31 06:23:24.9392129 +00:00' as DATE)
+---- CATCH
+UDF ERROR: String to Date parse failed. Invalid string val: '2025-08-31 06:23:24.9392129 +00:00'
+====
+---- QUERY
+select cast('2025-08-31 06:23:24.123456789abcd' as DATE)
+---- CATCH
+UDF ERROR: String to Date parse failed. Invalid string val: '2025-08-31 06:23:24.123456789abcd'
+====
+---- QUERY
+select cast('aaaa-aa-aa aa:aa:aa.123456789abcd' as DATE)
+---- CATCH
+UDF ERROR: String to Date parse failed. Invalid string val: 'aaaa-aa-aa aa:aa:aa.123456789abcd'
+====
+---- QUERY
+# TODO(IMPALA-14391): support timezone offset in the string
+select cast(timestamp_str as date) from functional_parquet.timestamp_with_tz_str where id=0;
+---- CATCH
+UDF ERROR: String to Date parse failed. Invalid string val: '2009-01-01 00:01:00 +08:00'
+====

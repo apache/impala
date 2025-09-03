@@ -4787,3 +4787,16 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
 )
 PARTITION BY HASH (tkey) PARTITIONS 3 STORED AS KUDU;
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+timestamp_with_tz_str
+---- COLUMNS
+id INT
+timestamp_str STRING
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- DEPENDENT_LOAD
+insert overwrite table {db_name}{db_suffix}.{table_name}
+select id, concat(cast(timestamp_col as string format 'YYYY-MM-DD HH24:MM:SS'), ' +08:00') from functional.alltypestiny;
+====

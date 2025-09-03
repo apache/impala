@@ -401,6 +401,7 @@ const DateTimeFormatContext* SimpleDateFormatTokenizer::GetDefaultFormatContext(
           // We will need to work out which default context to use that corresponds to
           // the fractional length in the string.
           if (LIKELY(len > DEFAULT_SHORT_DATE_TIME_FMT_LEN)
+              && LIKELY(len < DEFAULT_DATE_TIME_FMT_LEN)
               && LIKELY(str[19] == '.') && LIKELY(str[13] == ':')) {
             switch (str[10]) {
               case ' ': {

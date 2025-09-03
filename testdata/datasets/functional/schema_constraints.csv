@@ -436,3 +436,7 @@ table_name:timestamp_primary_key, constraint:restrict_to, table_format:kudu/none
 # Table where all column values are unique but have some NULLs.
 # Depends on functional.alltypessmall.
 table_name:unique_with_nulls, constraint:restrict_to, table_format:parquet/none/none
+
+# The table is used to test casting string values to date type. Don't need to test on
+# all formats.
+table_name:timestamp_with_tz_str, constraint:restrict_to, table_format:parquet/none/none
