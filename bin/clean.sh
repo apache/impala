@@ -29,9 +29,9 @@ setup_report_build_error
 # Combine the make command with the bash noop to always return true.
 "${MAKE_CMD:-make}" clean || :
 
-# clean the external data source project
-pushd "${IMPALA_HOME}/java/ext-data-source"
-rm -rf api/generated-sources/*
+# clean Java projects
+pushd "${IMPALA_HOME}/java"
+rm -rf ext-data-source/api/generated-sources/*
 ${IMPALA_HOME}/bin/mvn-quiet.sh clean
 popd
 
