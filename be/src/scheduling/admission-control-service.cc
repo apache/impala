@@ -211,7 +211,6 @@ void AdmissionControlService::GetQueryStatus(const GetQueryStatusRequestPB* req,
     }
   }
 
-  RespondAndReleaseRpc(status, resp, rpc_context);
   if (admission_state->admission_done && !admission_state->admit_status.ok()) {
     LOG(INFO) << "Query " << req->query_id()
               << " was rejected. Removing admission state to free resources.";
@@ -222,6 +221,7 @@ void AdmissionControlService::GetQueryStatus(const GetQueryStatusRequestPB* req,
     discard_result(admission_state_map_.Delete(req->query_id()));
     VLOG(3) << "Current admission state map size: " << admission_state_map_.Count();
   }
+  RespondAndReleaseRpc(status, resp, rpc_context);
 }
 
 void AdmissionControlService::ReleaseQuery(const ReleaseQueryRequestPB* req,
