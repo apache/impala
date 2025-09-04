@@ -967,7 +967,7 @@ public class CatalogOpExecutor {
             "Unable to process rename table event " + eventId, e);
       } finally {
         UnlockWriteLockIfErronouslyLocked();
-        if (beforeTblLocked) tblBefore.releaseWriteLock();
+        if (tblBefore != null && beforeTblLocked) { tblBefore.releaseWriteLock(); }
       }
     } finally {
       getMetastoreDdlLock().unlock();
@@ -2614,14 +2614,8 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Returns the latest notification event id from the Hive metastore.
-   */
-  private long getCurrentEventId(MetaStoreClient msClient) throws ImpalaRuntimeException {
-    return getCurrentEventId(msClient, null);
-  }
-
-  /**
-   * Same as the above but also update the given 'catalogTimeline'.
+   * Returns the latest notification event id from the Hive metastore and update the given
+   * 'catalogTimeline'.
    */
   private long getCurrentEventId(MetaStoreClient msClient, EventSequence catalogTimeline)
       throws ImpalaRuntimeException {
@@ -2681,6 +2675,7 @@ public class CatalogOpExecutor {
         // For persistent Java functions we extract all supported function signatures from
         // the corresponding Jar and add each signature to the catalog.
         Preconditions.checkState(fn instanceof ScalarFunction);
+        Preconditions.checkNotNull(hiveJavaFunction);
         List<ScalarFunction> funcs = hiveJavaFunction.extract();
         if (addJavaFunctionToHms(hiveJavaFunction.getHiveFunction(),
             params.if_not_exists, catalogTimeline)) {
@@ -3046,7 +3041,7 @@ public class CatalogOpExecutor {
         uncacheTable(removedDb.getTable(tableName), catalogTimeline);
       }
       removedObject = removedDb.toTCatalogObject();
-      if (authzConfig_.isEnabled()) {
+      if (authzConfig_.isEnabled() && db != null) {
         authzManager_.updateDatabaseOwnerPrivilege(params.server_name, dbName,
             db.getMetaStoreDb().getOwnerName(), db.getMetaStoreDb().getOwnerType(),
             /* newOwner */ null, /* newOwnerType */ null, resp);
@@ -4041,6 +4036,7 @@ public class CatalogOpExecutor {
       Table newTbl = catalog_
           .addIncompleteTable(newTable.getDbName(), newTable.getTableName(),
               TImpalaTableType.TABLE, params.getComment(), createEventId);
+      Preconditions.checkNotNull(newTbl);
       catalogTimeline.markEvent(CREATED_CATALOG_TABLE);
       LOG.debug("Created a Kudu table {} with create event id {}", newTbl.getFullName(),
           createEventId);
@@ -4337,6 +4333,7 @@ public class CatalogOpExecutor {
       Table newTbl = catalog_.addIncompleteTable(newTable.getDbName(),
           newTable.getTableName(), TImpalaTableType.TABLE, tblComment,
           createEventId);
+      Preconditions.checkNotNull(newTbl);
       catalogTimeline.markEvent(CREATED_CATALOG_TABLE);
       LOG.debug("Created an iceberg table {} in catalog with create event Id {} ",
           newTbl.getFullName(), createEventId);
@@ -5616,6 +5613,7 @@ public class CatalogOpExecutor {
       }
       // If cache pool name is not null, it indicates this partition should be cached.
       if (cachePoolName != null) {
+        Preconditions.checkNotNull(replication);
         long id = HdfsCachingUtil.submitCachePartitionDirective(partition,
             cachePoolName, replication);
         cacheIds.add(id);
@@ -6267,7 +6265,7 @@ public class CatalogOpExecutor {
     if (ifExists || keys.containsAll(removeProperties)) {
       keys.removeAll(removeProperties);
     } else {
-      List<String> removeCopy = new ArrayList(removeProperties);
+      List<String> removeCopy = new ArrayList<>(removeProperties);
       removeCopy.removeAll(keys);
       throw new CatalogException(
           String.format("These properties do not exist for %s: %s.\n%s",
@@ -6526,6 +6524,7 @@ public class CatalogOpExecutor {
           catalogTimeline);
       // Handle HDFS cache.
       if (cachePoolName != null) {
+        Preconditions.checkNotNull(replication);
         int numDone = 0;
         for (List<Partition> hmsSublist :
             Lists.partition(addedPartitions, MAX_PARTITION_UPDATES_PER_RPC)) {
@@ -7385,6 +7384,7 @@ public class CatalogOpExecutor {
 
       // tbl lock is held at this point.
       if (partSpecList != null) {
+        Preconditions.checkNotNull(partValsList);
         boolean partitionChanged = false;
         for (int i = 0; i < partSpecList.size(); ++i) {
           HdfsTable hdfsTbl = (HdfsTable) tbl;
@@ -7545,7 +7545,7 @@ public class CatalogOpExecutor {
         }
       } else {
         // For non-partitioned table, only single part exists
-        FeFsPartition singlePart = Iterables.getOnlyElement((List<FeFsPartition>) parts);
+        FeFsPartition singlePart = Iterables.getOnlyElement(parts);
         affectedExistingPartitions.add(singlePart);
       }
       unsetTableColStats(table.getMetaStoreTable(), tblTxn, catalogTimeline);

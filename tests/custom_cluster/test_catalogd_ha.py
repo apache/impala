@@ -551,7 +551,7 @@ class TestCatalogdHA(CustomClusterTestSuite):
     statestored_args="--use_subscriber_id_as_catalogd_priority=true",
     catalogd_args="--catalogd_ha_reset_metadata_on_failover=true "
                   "--catalog_topic_mode=minimal "
-                  "--debug_actions=TRIGGER_RESET_METADATA_DELAY:SLEEP@1000",
+                  "--debug_actions=TRIGGER_RESET_METADATA_DELAY:SLEEP@3000",
     impalad_args="--use_local_catalog=true",
     start_args="--enable_catalogd_ha",
     disable_log_buffering=True)

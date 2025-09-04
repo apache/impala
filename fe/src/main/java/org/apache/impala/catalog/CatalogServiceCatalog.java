@@ -89,10 +89,10 @@ import org.apache.impala.catalog.events.MetastoreNotificationFetchException;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.events.SelfEventContext;
 import org.apache.impala.catalog.metastore.CatalogHmsUtils;
-import org.apache.impala.catalog.monitor.CatalogMonitor;
-import org.apache.impala.catalog.monitor.CatalogTableMetrics;
 import org.apache.impala.catalog.metastore.HmsApiNameEnum;
 import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
+import org.apache.impala.catalog.monitor.CatalogMonitor;
+import org.apache.impala.catalog.monitor.CatalogTableMetrics;
 import org.apache.impala.catalog.monitor.TableLoadingTimeHistogram;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -109,11 +109,11 @@ import org.apache.impala.service.JniCatalog;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.CatalogServiceConstants;
 import org.apache.impala.thrift.TCatalog;
-import org.apache.impala.thrift.TCatalogdHmsCacheMetrics;
 import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogUpdateResult;
+import org.apache.impala.thrift.TCatalogdHmsCacheMetrics;
 import org.apache.impala.thrift.TDataSource;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TErrorCode;
@@ -171,11 +171,11 @@ import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
-import com.google.common.base.Stopwatch;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
@@ -272,6 +272,8 @@ public class CatalogServiceCatalog extends Catalog {
   public static final long LOCK_RETRY_TIMEOUT_MS = 7200000;
   // Time to sleep before retrying to acquire a table lock
   private static final int LOCK_RETRY_DELAY_MS = 10;
+  // Time to sleep before retrying to check initial reset completion.
+  private static final int INITIAL_RESET_DELAY_CHECK_MS = 100;
   // Threshold to add warning logs for slow lock acquiring.
   private static final long LOCK_ACQUIRING_DURATION_WARN_MS = 100;
   // default value of table id in the GetPartialCatalogObjectRequest
@@ -291,6 +293,7 @@ public class CatalogServiceCatalog extends Catalog {
   private final ReentrantReadWriteLock versionLock_ = new ReentrantReadWriteLock(true);
 
   // Executor service for fetching catalog objects from Metastore in the background.
+  // Most access must hold versionLock_.writeLock() unless when documented otherwise.
   private final CatalogResetManager resetManager_ = new CatalogResetManager(this);
 
   // Last assigned catalog version. Starts at INITIAL_CATALOG_VERSION and is incremented
@@ -489,6 +492,7 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * If initial reset has just begin, wait until it is completed.
+   * No-op if initial reset has already completed or has not yet started.
    * @param dbName if supplied, wait can return early if the db is found in the cache.
    */
   private void waitInitialResetCompletion(@Nullable String dbName) {
@@ -499,7 +503,6 @@ public class CatalogServiceCatalog extends Catalog {
         break;
       }
 
-      versionLock_.writeLock().lock();
       try {
         if (!resetManager_.isActive()) {
           // Catalog is not currently resetting, so we can stop wait.
@@ -514,14 +517,10 @@ public class CatalogServiceCatalog extends Catalog {
                 (dbName != null ? " for db " + dbName : ""));
             isWaiting = true;
           }
-          if (dbName != null) {
-            resetManager_.waitOngoingMetadataFetch(dbName);
-          } else {
-            resetManager_.waitFullMetadataFetch();
-          }
+          Thread.sleep(INITIAL_RESET_DELAY_CHECK_MS);
         }
-      } finally {
-        versionLock_.writeLock().unlock();
+      } catch (InterruptedException e) {
+        // ignore;
       }
     }
     if (isWaiting) {
@@ -529,12 +528,21 @@ public class CatalogServiceCatalog extends Catalog {
     }
   }
 
+  /**
+   * Gets the Db object from the Catalog using a case-insensitive lookup on the name.
+   * Returns null if no matching database is found.
+   * Caller must not hold the versionLock_.readLock() to avoid deadlock.
+   */
   @Override
-  public Db getDb(String dbName) {
+  public @Nullable Db getDb(String dbName) {
     waitInitialResetCompletion(dbName);
     return super.getDb(dbName);
   }
 
+  /**
+   * Returns all databases that match 'matcher'.
+   * Caller must not hold the versionLock_.readLock() to avoid deadlock.
+   */
   @Override
   public List<Db> getDbs(PatternMatcher matcher) {
     waitInitialResetCompletion(null);
@@ -1459,6 +1467,62 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Utillity class to facilitate simple read or write locking of versionLock_ and
+   * lookup the requested database from dbCache_. The lock is released when close()
+   * is called, which is automatically called when using try-with-resources statement.
+   * Use either the ReadLockAndLookupDb or WriteLockAndLookupDb subclass to get
+   * the desired lock type.
+   */
+  private abstract class LockCatalogAndLookupDb implements AutoCloseable {
+    private final String dbName_;
+    private final boolean forWrite_;
+
+    public LockCatalogAndLookupDb(String dbName, boolean forWrite) {
+      Preconditions.checkArgument(dbName != null && !dbName.isEmpty(),
+          "Null or empty database name given as argument to Catalog.getDb");
+
+      // The remaining constructor code must be exception-safe since this
+      // constructor is called from a try-with-resources statement.
+      dbName_ = dbName;
+      forWrite_ = forWrite;
+
+      waitInitialResetCompletion(dbName_);
+      if (forWrite_) {
+        versionLock_.writeLock().lock();
+      } else {
+        versionLock_.readLock().lock();
+      }
+    }
+
+    protected @Nullable Db getDb() {
+      if (forWrite_) {
+        // If we are holding the write lock, wait for any ongoing reset to complete
+        // before returning the Db. This ensures that writers always see the latest
+        // catalog state.
+        resetManager_.waitOngoingMetadataFetch(dbName_);
+      }
+      return dbCache_.get(dbName_);
+    }
+
+    @Override
+    public void close() {
+      if (forWrite_) {
+        versionLock_.writeLock().unlock();
+      } else {
+        versionLock_.readLock().unlock();
+      }
+    }
+  }
+
+  private class ReadLockAndLookupDb extends LockCatalogAndLookupDb {
+    public ReadLockAndLookupDb(String dbName) { super(dbName, false); }
+  }
+
+  private class WriteLockAndLookupDb extends LockCatalogAndLookupDb {
+    public WriteLockAndLookupDb(String dbName) { super(dbName, true); }
+  }
+
+  /**
    * A helper class to iterate list of Db.
    * iterator() method will return an iterator that will wait for ongoing
    * reset() if needed. Caller of iterator must still check for Db.isRemoved()
@@ -1641,17 +1705,14 @@ public class CatalogServiceCatalog extends Catalog {
    * @return value of key from the db parameter. returns null if Db is not found or key
    * does not exist in the parameters
    */
-  public String getDbProperty(String dbName, String propertyKey) {
+  public @Nullable String getDbProperty(String dbName, String propertyKey) {
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(propertyKey);
-    versionLock_.readLock().lock();
-    try {
-      Db db = getDb(dbName);
+    try (ReadLockAndLookupDb result = new ReadLockAndLookupDb(dbName)) {
+      Db db = result.getDb();
       if (db == null) return null;
       if (!db.getMetaStoreDb().isSetParameters()) return null;
       return db.getMetaStoreDb().getParameters().get(propertyKey);
-    } finally {
-      versionLock_.readLock().unlock();
     }
   }
 
@@ -1661,14 +1722,13 @@ public class CatalogServiceCatalog extends Catalog {
    * @return Value of the parameter which maps to property key, null if the table
    * doesn't exist, if it is a incomplete table or if the parameter is not found
    */
-  public List<String> getTableProperties(
+  public @Nullable List<String> getTableProperties(
       String dbName, String tblName, List<String> propertyKeys) {
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(tblName);
     Preconditions.checkNotNull(propertyKeys);
-    versionLock_.readLock().lock();
-    try {
-      Db db = getDb(dbName);
+    try (ReadLockAndLookupDb result = new ReadLockAndLookupDb(dbName)) {
+      Db db = result.getDb();
       if (db == null) return null;
       Table tbl = db.getTable(tblName);
       if (tbl == null || tbl instanceof IncompleteTable) return null;
@@ -1678,8 +1738,6 @@ public class CatalogServiceCatalog extends Catalog {
         propertyValues.add(tbl.getMetaStoreTable().getParameters().get(propertyKey));
       }
       return propertyValues;
-    } finally {
-      versionLock_.readLock().unlock();
     }
   }
 
@@ -1695,18 +1753,14 @@ public class CatalogServiceCatalog extends Catalog {
   public Db updateDb(Database msDb) throws DatabaseNotFoundException {
     Preconditions.checkNotNull(msDb);
     Preconditions.checkNotNull(msDb.getName());
-    versionLock_.writeLock().lock();
-    try {
-      resetManager_.waitOngoingMetadataFetch(msDb.getName());
-      Db db = getDb(msDb.getName());
+    try (WriteLockAndLookupDb result = new WriteLockAndLookupDb(msDb.getName())) {
+      Db db = result.getDb();
       if (db == null) {
         throw new DatabaseNotFoundException("Database " + msDb.getName() + " not found");
       }
       db.setMetastoreDb(msDb.getName(), msDb);
       db.setCatalogVersion(incrementAndGetCatalogVersion());
       return db;
-    } finally {
-      versionLock_.writeLock().unlock();
     }
   }
 
@@ -2295,7 +2349,7 @@ public class CatalogServiceCatalog extends Catalog {
    * 'currentEventId' is set as createEventId of all tables under this db. Also used to
    * track removed tables in EventDeleteLog.
    */
-  private Pair<Db, List<TTableName>> invalidateDb(String dbName, Db existingDb,
+  private @Nullable Pair<Db, List<TTableName>> invalidateDb(String dbName, Db existingDb,
       PrefetchedDatabaseObjects prefetchedObjects, EventSequence catalogTimeline,
       long currentEventId) {
     try {
@@ -2487,8 +2541,13 @@ public class CatalogServiceCatalog extends Catalog {
       // clear all txn to write ids mapping so that there is no memory leak for previous
       // events
       clearWriteIds();
-      // restart the event processing for id just before the reset
-      metastoreEventProcessor_.start(currentEventId);
+      if (isCatalogServerRequest) {
+        // start cleanly if request comes from catalog server.
+        metastoreEventProcessor_.start();
+      } else {
+        // restart the event processing for id just before the reset
+        metastoreEventProcessor_.start(currentEventId);
+      }
     }
     unlockedTimer.stop();
     resetTimer.stop();
@@ -2697,22 +2756,20 @@ public class CatalogServiceCatalog extends Catalog {
     deleteLog_.addRemovedObject(db.toTCatalogObject());
   }
 
-  public Table addIncompleteTable(String dbName, String tblName, TImpalaTableType tblType,
-      String tblComment) {
+  public @Nullable Table addIncompleteTable(
+      String dbName, String tblName, TImpalaTableType tblType, String tblComment) {
     return addIncompleteTable(dbName, tblName, tblType, tblComment, -1L);
   }
 
   /**
    * Adds a table with the given name to the catalog and returns the new table.
    */
-  public Table addIncompleteTable(String dbName, String tblName, TImpalaTableType tblType,
-      String tblComment, long createEventId) {
-    versionLock_.writeLock().lock();
-    try {
-      resetManager_.waitOngoingMetadataFetch(dbName);
+  public @Nullable Table addIncompleteTable(String dbName, String tblName,
+      TImpalaTableType tblType, String tblComment, long createEventId) {
+    try (WriteLockAndLookupDb result = new WriteLockAndLookupDb(dbName)) {
       // IMPALA-9211: get db object after holding the writeLock in case of getting stale
       // db object due to concurrent INVALIDATE METADATA
-      Db db = getDb(dbName);
+      Db db = result.getDb();
       if (db == null) return null;
       Table existingTbl = db.getTable(tblName);
       if (existingTbl instanceof HdfsTable) {
@@ -2726,8 +2783,6 @@ public class CatalogServiceCatalog extends Catalog {
       incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
       db.addTable(incompleteTable);
       return db.getTable(tblName);
-    } finally {
-      versionLock_.writeLock().unlock();
     }
   }
 
@@ -2881,10 +2936,9 @@ public class CatalogServiceCatalog extends Catalog {
    */
   private @Nullable Table replaceTableIfUnchanged(Table updatedTbl,
       long expectedCatalogVersion, long tableId) throws DatabaseNotFoundException {
-    versionLock_.writeLock().lock();
-    try {
-      resetManager_.waitOngoingMetadataFetch(updatedTbl.getDb().getName());
-      Db db = getDb(updatedTbl.getDb().getName());
+    try (WriteLockAndLookupDb result =
+             new WriteLockAndLookupDb(updatedTbl.getDb().getName())) {
+      Db db = result.getDb();
       if (db == null) {
         throw new DatabaseNotFoundException(
             "Database does not exist: " + updatedTbl.getDb().getName());
@@ -2941,8 +2995,6 @@ public class CatalogServiceCatalog extends Catalog {
       // MAX_NUM_SKIPPED_TOPIC_UPDATES limit.
       db.addTable(updatedTbl);
       return updatedTbl;
-    } finally {
-      versionLock_.writeLock().unlock();
     }
   }
 
@@ -2950,11 +3002,9 @@ public class CatalogServiceCatalog extends Catalog {
    * Removes a table from the catalog and increments the catalog version.
    * Returns the removed Table, or null if the table or db does not exist.
    */
-  public Table removeTable(String dbName, String tblName) {
-    versionLock_.writeLock().lock();
-    try {
-      resetManager_.waitOngoingMetadataFetch(dbName);
-      Db parentDb = getDb(dbName);
+  public @Nullable Table removeTable(String dbName, String tblName) {
+    try (WriteLockAndLookupDb result = new WriteLockAndLookupDb(dbName)) {
+      Db parentDb = result.getDb();
       if (parentDb == null) return null;
       Table removedTable = parentDb.removeTable(tblName);
       if (removedTable != null && !removedTable.isStoredInImpaladCatalogCache()) {
@@ -2965,8 +3015,6 @@ public class CatalogServiceCatalog extends Catalog {
         deleteLog_.addRemovedObject(removedTable.toMinimalTCatalogObject());
       }
       return removedTable;
-    } finally {
-      versionLock_.writeLock().unlock();
     }
   }
 
@@ -2997,17 +3045,13 @@ public class CatalogServiceCatalog extends Catalog {
    */
   @Override
   public boolean addFunction(Function fn) {
-    versionLock_.writeLock().lock();
-    try {
-      resetManager_.waitOngoingMetadataFetch(fn.dbName());
-      Db db = getDb(fn.getFunctionName().getDb());
+    try (WriteLockAndLookupDb result = new WriteLockAndLookupDb(fn.dbName())) {
+      Db db = result.getDb();
       if (db == null) return false;
       if (db.addFunction(fn)) {
         fn.setCatalogVersion(incrementAndGetCatalogVersion());
         return true;
       }
-    } finally {
-      versionLock_.writeLock().unlock();
     }
     return false;
   }
@@ -3031,7 +3075,7 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   @Override
-  public DataSource removeDataSource(String dataSourceName) {
+  public @Nullable DataSource removeDataSource(String dataSourceName) {
     versionLock_.writeLock().lock();
     try {
       DataSource dataSource = dataSources_.remove(dataSourceName);
@@ -3052,24 +3096,34 @@ public class CatalogServiceCatalog extends Catalog {
    * add of the new table was not successful). Depending on the return value, the catalog
    * cache is in one of the following states:
    * 1. null, null: Old table was not removed and new table was not added.
-   * 2. null, T_new: Invalid configuration
-   * 3. T_old, null: Old table was removed but new table was not added.
-   * 4. T_old, T_new: Old table was removed and new table was added.
+   * 2. T_old, null: Old table was removed but new table was not added.
+   * 3. T_old, T_new: Old table was removed and new table was added.
    * Updates 'createEventId' of the new table using 'alterEventId'.
    */
   public Pair<Table, Table> renameTable(
       TTableName oldTableName, TTableName newTableName, long alterEventId) {
-    // Remove the old table name from the cache and add the new table.
-    Db db = getDb(oldTableName.getDb_name());
-    if (db == null) return Pair.create(null, null);
     versionLock_.writeLock().lock();
     try {
+      // Make sure any ongoing metadata fetch has progress beyond oldTableName
+      // and newTableName.
       List<String> dbNames =
           ImmutableList.of(oldTableName.getDb_name(), newTableName.getDb_name());
       resetManager_.waitOngoingMetadataFetch(dbNames);
+
+      // Remove the old table name from the cache and add the new table.
+      Db db = getDb(oldTableName.getDb_name());
+      if (db == null) {
+        // Case 1 - db does not exist.
+        return Pair.create(null, null);
+      }
+
       Table oldTable =
           removeTable(oldTableName.getDb_name(), oldTableName.getTable_name());
-      if (oldTable == null) return Pair.create(null, null);
+      if (oldTable == null) {
+        // Case 1 - old table did not exist.
+        return Pair.create(null, null);
+      }
+
       if (alterEventId < oldTable.getCreateEventId()) {
         // This is usually due to alterEventId = -1, e.g. failed to fetch and check
         // HMS events in the callers. Fallback to use the original createEventId.
@@ -3077,6 +3131,8 @@ public class CatalogServiceCatalog extends Catalog {
         LOG.warn("Reusing original createEventId {} for table {}.{}", alterEventId,
             newTableName.getDb_name(), newTableName.getTable_name());
       }
+
+      // Case 2 or 3.
       return Pair.create(oldTable,
           addIncompleteTable(newTableName.getDb_name(), newTableName.getTable_name(),
               oldTable.getTableType(), oldTable.getTableComment(), alterEventId));
@@ -3261,7 +3317,7 @@ public class CatalogServiceCatalog extends Catalog {
     return hdfsTable;
   }
 
-  public TCatalogObject invalidateTable(TTableName tableName,
+  public @Nullable TCatalogObject invalidateTable(TTableName tableName,
       Reference<Boolean> tblWasRemoved, Reference<Boolean> dbWasAdded,
       EventSequence catalogTimeline) {
     return invalidateTable(tableName, tblWasRemoved, dbWasAdded, catalogTimeline, -1L);
@@ -3288,7 +3344,7 @@ public class CatalogServiceCatalog extends Catalog {
    * 'eventId' is used to update createEventId of the table which avoids the table being
    * dropped in processing older events.
    */
-  public TCatalogObject invalidateTable(TTableName tableName,
+  public @Nullable TCatalogObject invalidateTable(TTableName tableName,
       Reference<Boolean> tblWasRemoved, Reference<Boolean> dbWasAdded,
       EventSequence catalogTimeline, long eventId) {
     tblWasRemoved.setRef(false);
@@ -3338,7 +3394,7 @@ public class CatalogServiceCatalog extends Catalog {
         // The table does not exist in our cache AND it is unknown whether the
         // table exists in the Metastore. Do nothing.
         return null;
-      } else if (db == null && !metaRes.isEmpty()) {
+      } else if (db == null && metaRes != null && !metaRes.isEmpty()) {
         // The table exists in the Metastore, but our cache does not contain the parent
         // database. A new db will be added to the cache along with the new table. msDb
         // must be valid since tableExistsInMetaStore is true.
@@ -3384,12 +3440,10 @@ public class CatalogServiceCatalog extends Catalog {
    * Table.
    * @return null if the table does not exist else return the invalidated table
    */
-  public Table invalidateTableIfExists(String dbName, String tblName) {
+  public @Nullable Table invalidateTableIfExists(String dbName, String tblName) {
     Table incompleteTable;
-    versionLock_.writeLock().lock();
-    try {
-      resetManager_.waitOngoingMetadataFetch(dbName);
-      Db db = getDb(dbName);
+    try (WriteLockAndLookupDb result = new WriteLockAndLookupDb(dbName)) {
+      Db db = result.getDb();
       if (db == null) return null;
       Table existingTbl = db.getTable(tblName);
       if (existingTbl == null) return null;
@@ -3398,8 +3452,6 @@ public class CatalogServiceCatalog extends Catalog {
           existingTbl.getCreateEventId());
       incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
       db.addTable(incompleteTable);
-    } finally {
-      versionLock_.writeLock().unlock();
     }
     scheduleTableLoading(dbName, tblName);
     return incompleteTable;
@@ -3504,25 +3556,6 @@ public class CatalogServiceCatalog extends Catalog {
     return (User) user;
   }
 
-  /**
-   * Add a user to the catalog if it doesn't exist. This is necessary so privileges
-   * can be added for a user. example: owner privileges.
-   */
-  public User addUserIfNotExists(String owner, Reference<Boolean> existingUser) {
-    versionLock_.writeLock().lock();
-    try {
-      User user = getAuthPolicy().getUser(owner);
-      existingUser.setRef(Boolean.TRUE);
-      if (user == null) {
-        user = addUser(owner);
-        existingUser.setRef(Boolean.FALSE);
-      }
-      return user;
-    } finally {
-      versionLock_.writeLock().unlock();
-    }
-  }
-
   private Principal addPrincipal(String principalName, Set<String> grantGroups,
       TPrincipalType type) {
     versionLock_.writeLock().lock();
@@ -3541,7 +3574,7 @@ public class CatalogServiceCatalog extends Catalog {
    * removed role with an incremented catalog version, or null if no role with this name
    * exists.
    */
-  public Role removeRole(String roleName) {
+  public @Nullable Role removeRole(String roleName) {
     Principal role = removePrincipal(roleName, TPrincipalType.ROLE);
     if (role == null) return null;
     Preconditions.checkState(role instanceof Role);
@@ -3553,14 +3586,14 @@ public class CatalogServiceCatalog extends Catalog {
    * removed user with an incremented catalog version, or null if no user with this name
    * exists.
    */
-  public User removeUser(String userName) {
+  public @Nullable User removeUser(String userName) {
     Principal user = removePrincipal(userName, TPrincipalType.USER);
     if (user == null) return null;
     Preconditions.checkState(user instanceof User);
     return (User) user;
   }
 
-  private Principal removePrincipal(String principalName, TPrincipalType type) {
+  private @Nullable Principal removePrincipal(String principalName, TPrincipalType type) {
     versionLock_.writeLock().lock();
     try {
       Principal principal = authPolicy_.removePrincipal(principalName, type);
@@ -3659,8 +3692,8 @@ public class CatalogServiceCatalog extends Catalog {
    * matching privilege was found. Throws a CatalogException if no role exists with this
    * name.
    */
-  public PrincipalPrivilege removeRolePrivilege(String roleName, String privilegeName)
-      throws CatalogException {
+  public @Nullable PrincipalPrivilege removeRolePrivilege(
+      String roleName, String privilegeName) throws CatalogException {
     return removePrincipalPrivilege(roleName, privilegeName, TPrincipalType.ROLE);
   }
 
@@ -3670,12 +3703,12 @@ public class CatalogServiceCatalog extends Catalog {
    * matching privilege was found. Throws a CatalogException if no user exists with this
    * name.
    */
-  public PrincipalPrivilege removeUserPrivilege(String userName, String privilegeName)
-      throws CatalogException {
+  public @Nullable PrincipalPrivilege removeUserPrivilege(
+      String userName, String privilegeName) throws CatalogException {
     return removePrincipalPrivilege(userName, privilegeName, TPrincipalType.USER);
   }
 
-  private PrincipalPrivilege removePrincipalPrivilege(String principalName,
+  private @Nullable PrincipalPrivilege removePrincipalPrivilege(String principalName,
       String privilegeName, TPrincipalType type) throws CatalogException {
     versionLock_.writeLock().lock();
     try {
@@ -3717,7 +3750,7 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   @Override
-  public AuthzCacheInvalidation getAuthzCacheInvalidation(String markerName) {
+  public @Nullable AuthzCacheInvalidation getAuthzCacheInvalidation(String markerName) {
     versionLock_.readLock().lock();
     try {
       return authzCacheInvalidation_.get(markerName);
@@ -4309,22 +4342,21 @@ public class CatalogServiceCatalog extends Catalog {
       throws CatalogException {
     TCatalogObject objectDesc = Preconditions.checkNotNull(req.object_desc,
         "missing object_desc");
+    String dbName = "";
     switch (objectDesc.type) {
     case CATALOG:
       return getPartialCatalogInfo(req);
     case DATABASE:
       TDatabase dbDesc = Preconditions.checkNotNull(req.object_desc.db);
-      versionLock_.readLock().lock();
-      try {
-        Db db = getDb(dbDesc.getDb_name());
+      dbName = dbDesc.getDb_name();
+      try (ReadLockAndLookupDb result = new ReadLockAndLookupDb(dbName)) {
+        Db db = result.getDb();
         if (db == null) {
           return createGetPartialCatalogObjectError(req,
               CatalogLookupStatus.DB_NOT_FOUND);
         }
 
         return db.getPartialInfo(req);
-      } finally {
-        versionLock_.readLock().unlock();
       }
     case TABLE:
     case VIEW: {
@@ -4334,8 +4366,8 @@ public class CatalogServiceCatalog extends Catalog {
         long tableId = TABLE_ID_UNAVAILABLE;
         if (req.table_info_selector.valid_write_ids != null) {
           Preconditions.checkState(objectDesc.type.equals(TABLE));
-          String dbName = objectDesc.getTable().db_name == null ? Catalog.DEFAULT_DB
-            : objectDesc.getTable().db_name;
+          dbName = objectDesc.getTable().db_name == null ? Catalog.DEFAULT_DB :
+                                                           objectDesc.getTable().db_name;
           String tblName = objectDesc.getTable().tbl_name;
           writeIdList = MetastoreShim.getValidWriteIdListFromThrift(
               dbName + "." + tblName, req.table_info_selector.valid_write_ids);
@@ -4377,9 +4409,9 @@ public class CatalogServiceCatalog extends Catalog {
       }
     }
     case FUNCTION: {
-      versionLock_.readLock().lock();
-      try {
-        Db db = getDb(objectDesc.fn.name.db_name);
+      dbName = objectDesc.fn.name.db_name;
+      try (ReadLockAndLookupDb result = new ReadLockAndLookupDb(dbName)) {
+        Db db = result.getDb();
         if (db == null) {
           return createGetPartialCatalogObjectError(req,
               CatalogLookupStatus.DB_NOT_FOUND);
@@ -4395,8 +4427,6 @@ public class CatalogServiceCatalog extends Catalog {
         for (Function f : funcs) thriftFuncs.add(f.toThrift());
         resp.setFunctions(thriftFuncs);
         return resp;
-      } finally {
-        versionLock_.readLock().unlock();
       }
     }
     case DATA_SOURCE: {

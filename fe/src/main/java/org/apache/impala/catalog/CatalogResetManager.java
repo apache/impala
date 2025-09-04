@@ -36,6 +36,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -79,7 +80,7 @@ public class CatalogResetManager {
   // A queue of database that undergoes metadata fetch.
   // If not empty, the elements are always in lexicographic order head to tail and should
   // not contain any blacklisted Dbs. If empty, then no reset operation is currently
-  // running.
+  // running. Initialized as ConcurrentLinkedQueue in constructor.
   private final Queue<Pair<String, Future<PrefetchedDatabaseObjects>>> fetchingDbs_;
 
   // A queue of database names that are pending to be fetched.
@@ -93,7 +94,7 @@ public class CatalogResetManager {
   public CatalogResetManager(CatalogServiceCatalog catalog) {
     catalog_ = catalog;
     fetchMetadataCondition_ = catalog.getLock().writeLock().newCondition();
-    fetchingDbs_ = new LinkedList<>();
+    fetchingDbs_ = new ConcurrentLinkedQueue<>();
     pendingDbNames_ = new LinkedList<>();
   }
 
@@ -141,9 +142,10 @@ public class CatalogResetManager {
 
   /**
    * Returns True if there is an ongoing fetch operation.
+   * Does not need to hold versionLock_.writeLock() to call, but the status might change
+   * after method returns.
    */
   protected boolean isActive() {
-    Preconditions.checkState(threadIsHoldingWriteLock());
     return !fetchingDbs_.isEmpty();
   }
 
@@ -161,6 +163,7 @@ public class CatalogResetManager {
 
   /**
    * Signal all threads waiting on resetMetadataCondition_.
+   * Must hold versionLock_.writeLock().
    */
   protected void signalAllWaiters() {
     Preconditions.checkState(threadIsHoldingWriteLock());
@@ -169,14 +172,16 @@ public class CatalogResetManager {
 
   /**
    * Peek the next fetching database.
+   * Does not need to hold versionLock_.writeLock() to call, but it might change
+   * after method return if something else call {@link #pollFetchingDb()} concurrently.
    */
   protected Pair<String, Future<PrefetchedDatabaseObjects>> peekFetchingDb() {
-    Preconditions.checkState(threadIsHoldingWriteLock());
     return fetchingDbs_.peek();
   }
 
   /**
    * Poll the next fetching database and schedule the next reset task.
+   * Must hold versionLock_.writeLock().
    */
   protected Pair<String, Future<PrefetchedDatabaseObjects>> pollFetchingDb() {
     Preconditions.checkState(threadIsHoldingWriteLock());
@@ -188,6 +193,7 @@ public class CatalogResetManager {
 
   /**
    * Return a list of all currently resetting databases.
+   * Must hold versionLock_.writeLock().
    */
   protected List<String> allFetcingDbList() {
     Preconditions.checkState(threadIsHoldingWriteLock());
@@ -198,6 +204,7 @@ public class CatalogResetManager {
 
   /**
    * Wait until all parallel fetch finish.
+   * Must hold versionLock_.writeLock().
    */
   protected void waitFullMetadataFetch() {
     Preconditions.checkState(threadIsHoldingWriteLock());
@@ -216,6 +223,7 @@ public class CatalogResetManager {
   /**
    * Wait until it is ensured that given 'dbName' has been polled out.
    * This method will lower case 'dbName' for matching.
+   * Must hold versionLock_.writeLock().
    */
   protected void waitOngoingMetadataFetch(String dbName) {
     waitOngoingMetadataFetch(ImmutableList.of(dbName));
@@ -224,6 +232,7 @@ public class CatalogResetManager {
   /**
    * Wait until it is ensured that all 'dbNames' has been polled out.
    * This method will lower case 'dbNames' and sort them for matching.
+   * Must hold versionLock_.writeLock().
    */
   protected void waitOngoingMetadataFetch(List<String> dbNames) {
     Preconditions.checkState(threadIsHoldingWriteLock());

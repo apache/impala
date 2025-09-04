@@ -179,12 +179,12 @@ public class JniCatalog {
     ExternalEventsProcessor eventsProcessor =
         getEventsProcessor(metaStoreClientPool, catalogOpExecutor_);
     catalog_.setMetastoreEventProcessor(eventsProcessor);
-    catalog_.startEventsProcessor();
     catalogMetastoreServer_ = getCatalogMetastoreServer(catalogOpExecutor_);
     catalog_.setCatalogMetastoreServer(catalogMetastoreServer_);
     catalogMetastoreServer_.start();
 
     // catalog-server.cc is responsible to call catalog_.reset() for the first time.
+    // The first reset also will call startEventsProcessor().
   }
 
   /**
