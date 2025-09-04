@@ -54,7 +54,7 @@ const static int UNMASKED_VAL = -1;
 /// Returns the masked code point.
 static inline uint32_t MaskTransform(uint32_t val, int masked_upper_char,
     int masked_lower_char, int masked_digit_char, int masked_other_char,
-    std::locale* loc = nullptr) {
+    const std::locale* loc = nullptr) {
   // Fast code path for masking ascii characters only.
   if (loc == nullptr) {
     if ('A' <= val && val <= 'Z') {
@@ -146,11 +146,9 @@ static StringVal MaskSubStrUtf8(FunctionContext* ctx, const StringVal& val,
   // Collect code points at range [start, end - 1) and mask them.
   vector<uint32_t> masked_code_points;
   // Create unicode locale for checking upper/lower cases or digits.
-  // TODO(quanlong): Avoid creating this everytime if this is time/resource-consuming.
-  boost::locale::generator gen;
-  unique_ptr<std::locale> loc = make_unique<std::locale>(gen("en_US.UTF-8"));
+  static const std::locale& loc = boost::locale::generator()("en_US.UTF-8");
   // Check facet existence to avoid predicates throws exception.
-  if (!std::has_facet<std::ctype<wchar_t>>(*loc)) {
+  if (!std::has_facet<std::ctype<wchar_t>>(loc)) {
     ctx->SetError("Cannot mask unicode strings since locale en_US.UTF-8 not found!");
     return StringVal();
   }
@@ -160,7 +158,7 @@ static StringVal MaskSubStrUtf8(FunctionContext* ctx, const StringVal& val,
     uint32_t codepoint = utf8_codecvt<char>::to_unicode(cvt_state, p, p_end);
     if (CheckAndWarnCodePoint(ctx, codepoint)) return StringVal::null();
     codepoint = MaskTransform(codepoint, masked_upper_char, masked_lower_char,
-        masked_digit_char, masked_other_char, loc.get());
+        masked_digit_char, masked_other_char, &loc);
     masked_code_points.push_back(codepoint);
     result_bytes += utf::utf_traits<char>::width(codepoint);
     ++char_cnt;
