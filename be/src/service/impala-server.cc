@@ -278,6 +278,8 @@ DEFINE_validator(ssl_minimum_version, [](const char* flagname, const string& val
   return false;
 });
 
+DEFINE_bool(use_calcite_planner, false, "By default this flag is false. If true, "
+    "the Calcite planner will be used to compile queries.");
 DEFINE_int32(idle_session_timeout, 0, "The time, in seconds, that a session may be idle"
     " for before it is closed (and all running queries cancelled) by Impala. If 0, idle"
     " sessions are never expired. It can be overridden by the query option"
@@ -2018,6 +2020,7 @@ void ImpalaServer::InitializeConfigVariables() {
   // Set idle_session_timeout here to let the SET command return the value of
   // the command line option FLAGS_idle_session_timeout
   default_query_options_.__set_idle_session_timeout(FLAGS_idle_session_timeout);
+  default_query_options_.__set_use_calcite_planner(FLAGS_use_calcite_planner);
   // The next query options used to be set with flags. Setting them in
   // default_query_options_ here in order to make default_query_options
   // take precedence over the legacy flags.

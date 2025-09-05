@@ -23,7 +23,11 @@ import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.impala.calcite.parser.ImpalaSqlParserImpl;
 import org.apache.impala.calcite.validate.ImpalaConformance;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ParseException;
+import org.apache.impala.common.UnsupportedFeatureException;
+
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +63,11 @@ public class CalciteQueryParser implements CompilerStep {
       SqlNode sqlNode = parser.parseQuery();
       return sqlNode;
     } catch (SqlParseException e) {
+      try {
+        UnsupportedChecker.throwUnsupportedIfKnownException(e);
+      } catch (ImpalaException u) {
+        throw new ParseException(u.getMessage());
+      }
       throw new ParseException(e.getMessage());
     }
   }

@@ -149,6 +149,7 @@ import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.catalog.paimon.FeShowFileStmtSupport;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.common.UserCancelledException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -2399,7 +2400,7 @@ public class Frontend {
       try {
         request = getTExecRequest(compilerFactory, planCtx, timeline);
       } catch (Exception e) {
-        if (!shouldFallbackToRegularPlanner(planCtx)) {
+        if (!shouldFallbackToRegularPlanner(planCtx, e)) {
           throw e;
         }
         LOG.info("Calcite planner failed: ", e);
@@ -2417,17 +2418,20 @@ public class Frontend {
     return request;
   }
 
-  private boolean shouldFallbackToRegularPlanner(PlanCtx planCtx) {
+  private boolean shouldFallbackToRegularPlanner(PlanCtx planCtx, Exception e) {
     // TODO: Need a fallback flag for various modes. In production, we will most
     // likely want to fallback to the original planner, but in testing, we might want
     // the query to fail.
     // There are some cases where we will always want to fallback, e.g. if the statement
     // fails at parse time because it is not a select statement.
+    if (e instanceof UnsupportedFeatureException) {
+      return true;
+    }
     TQueryCtx queryCtx = planCtx.getQueryContext();
     try {
       return !(Parser.parse(queryCtx.client_request.stmt,
           queryCtx.client_request.query_options) instanceof QueryStmt);
-    } catch (Exception e) {
+    } catch (Exception f) {
       return false;
     }
   }

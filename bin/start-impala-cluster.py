@@ -703,9 +703,7 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
       args = "-allow_tuple_caching=true {args}".format(args=args)
 
     if options.use_calcite_planner.lower() == 'true':
-      args = "-jni_frontend_class={jni_frontend_class} {args}".format(
-          jni_frontend_class="org/apache/impala/calcite/service/CalciteJniFrontend",
-          args=args)
+      args = "-use_calcite_planner=true {args}".format(args=args)
       os.environ["USE_CALCITE_PLANNER"] = "true"
 
     if options.enable_ranger_authz:

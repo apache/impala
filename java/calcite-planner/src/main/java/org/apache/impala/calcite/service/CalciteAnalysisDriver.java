@@ -156,8 +156,18 @@ public class CalciteAnalysisDriver implements AnalysisDriver {
       validatedNode_ = sqlValidator_.validate(parsedStmt_.getParsedSqlNode());
       return new CalciteAnalysisResult(this);
     } catch (ImpalaException e) {
+      try {
+        UnsupportedChecker.throwUnsupportedIfKnownException(e, stmtTableCache_);
+      } catch (ImpalaException u) {
+        e = u;
+      }
       return new CalciteAnalysisResult(this, e);
     } catch (CalciteContextException e) {
+      try {
+        UnsupportedChecker.throwUnsupportedIfKnownException(e, stmtTableCache_);
+      } catch (ImpalaException u) {
+        return new CalciteAnalysisResult(this, u);
+      }
       return new CalciteAnalysisResult(this,
           new AnalysisException(e.getMessage(), e.getCause()));
     }
