@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
@@ -100,6 +101,7 @@ public class FunctionResolver {
       ImmutableSet.<String> builder()
       .add("grouping_id")
       .add("count")
+      .add("case")
       .build();
 
   public static Function getSupertypeFunction(RexCall call) {
@@ -185,6 +187,15 @@ public class FunctionResolver {
         : getImpalaFunction(lowercaseName, impalaArgTypes, exactMatch);
   }
 
+  /**
+   * getSpecialProcessingFunction handles functions that do not fit within the general
+   * getImpalaFunction retrieval of the function.  Such functions include:
+   *
+   * - grouping_id() which is grabbed from AggregateFunction
+   * - count() which can have multiple arguments, but only one argument is resolved
+   *       in the function
+   * - case() which always returns the "boolean" flavor and then gets resolved later
+   */
   private static Function getSpecialProcessingFunction(String lowercaseName,
       List<Type> impalaArgTypes, boolean exactMatch) {
     if (lowercaseName.equals("grouping_id")) {
@@ -203,6 +214,16 @@ public class FunctionResolver {
       if (impalaArgTypes.size() > 1) {
         impalaArgTypes = Lists.newArrayList(impalaArgTypes.get(0));
       }
+      return getImpalaFunction(lowercaseName, impalaArgTypes, exactMatch);
+    }
+
+    if (lowercaseName.equals("case")) {
+      // hack: Impala has a quirk in it that the function resolver always returns
+      // the boolean case signature. The CaseExpr object resolves the actual
+      // signature that should be used. We need to follow the lead of the regular
+      // planner because the varchar case does not return the right value if
+      // we try to resolve it here. It will need to be resolved by the caller.
+      impalaArgTypes = Lists.newArrayList(Type.BOOLEAN);
       return getImpalaFunction(lowercaseName, impalaArgTypes, exactMatch);
     }
 

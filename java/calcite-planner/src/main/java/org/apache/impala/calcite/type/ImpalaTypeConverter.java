@@ -27,12 +27,14 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.calcite.functions.FunctionResolver;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.thrift.TPrimitiveType;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -375,6 +377,20 @@ public class ImpalaTypeConverter {
       rdt = getRelDataType(Type.BIGINT);
     }
     return factory.createTypeWithNullability(rdt, false);
+  }
+
+  public static RelDataType getCompatibleTypeForCase(List<RelDataType> dataTypes,
+      RelDataTypeFactory factory) {
+    List<RelDataType> compatibleTypes = new ArrayList<>();
+    for (int i = 0; i < dataTypes.size(); ++i) {
+      // skip the "when" clauses which are always boolean and only evaluate the
+      // "then" and "else" clauses.
+      if (!FunctionResolver.shouldSkipOperandForCase(dataTypes.size(), i)) {
+        compatibleTypes.add(dataTypes.get(i));
+      }
+    }
+    Preconditions.checkState(compatibleTypes.size() > 0);
+    return getCompatibleType(compatibleTypes, factory);
   }
 
   public static RelDataType getCompatibleType(Collection<RelDataType> dataTypes,

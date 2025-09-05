@@ -122,7 +122,7 @@ public class RexCallConverter {
 
     switch (rexCall.getOperator().getKind()) {
       case CASE:
-        return createCaseExpr(fn, params, impalaRetType);
+        return createCaseExpr(fn, params, analyzer);
       case POSIX_REGEX_CASE_SENSITIVE:
       case POSIX_REGEX_CASE_INSENSITIVE:
         return createRegexExpr(fn, params, impalaRetType, rexCall);
@@ -192,14 +192,29 @@ public class RexCallConverter {
     return new AnalyzedCaseExpr(fn, impalaRetType, decodeExpr);
   }
 
-  private static Expr createCaseExpr(Function fn, List<Expr> params, Type retType) {
+  private static Expr createCaseExpr(Function fn, List<Expr> params,
+      Analyzer analyzer) throws ImpalaException {
     List<CaseWhenClause> caseWhenClauses = new ArrayList<>();
     Expr whenParam = null;
     // params alternate between "when" and the action expr
+    Type retType = null;
     for (Expr param : params) {
       if (whenParam == null) {
         whenParam = param;
       } else {
+        // The params are not always analyzed at this phase.
+        if (!param.isAnalyzed()) {
+          param.analyze(analyzer);
+        }
+        // The return type needs to be evaluated here since the case function
+        // resolver always returns boolean. At this point, the coercenodes module
+        // sets all the parameters to be the compatible type, and this is the type
+        // we use for the return value.
+        if (retType == null) {
+          retType = param.getType();
+        } else {
+          Preconditions.checkState(retType.equals(param.getType()));
+        }
         caseWhenClauses.add(new CaseWhenClause(whenParam, param));
         whenParam = null;
       }
