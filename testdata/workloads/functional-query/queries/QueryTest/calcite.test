@@ -1121,3 +1121,10 @@ int
 ---- RUNTIME_PROFILE
 row_regex: .*PlannerType: CalcitePlanner.*
 ====
+---- QUERY
+select cast('nan' as double), cast('inf' as float);
+---- RESULTS
+NaN,Inf
+---- TYPES
+DOUBLE, FLOAT
+====

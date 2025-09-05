@@ -35,6 +35,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,16 +57,39 @@ public class RexLiteralConverter {
       return NumericLiteral.create(
           new BigDecimal(rexLiteral.getValueAs(Long.class)), Type.BIGINT);
     }
-    switch (rexLiteral.getTypeName()) {
-      case NULL:
-        Type type = ImpalaTypeConverter.createImpalaType(rexLiteral.getType());
-        return new AnalyzedNullLiteral(type);
+
+    if (rexLiteral.isNull()) {
+      Type type = ImpalaTypeConverter.createImpalaType(rexLiteral.getType());
+      return new AnalyzedNullLiteral(type);
+    }
+
+    switch (rexLiteral.getType().getSqlTypeName()) {
       case BOOLEAN:
         Expr boolExpr = new BoolLiteral((Boolean) rexLiteral.getValueAs(Boolean.class));
         return boolExpr;
+      case DOUBLE:
+        Double d = rexLiteral.getValueAs(Double.class);
+        // NumericLiteral will throw an exception if it is a Nan or Inf, so create
+        // a cast around it.
+        if (!NumericLiteral.isImpalaDouble(d)) {
+          return createCastNanOrInf(d, Type.DOUBLE);
+        }
+        return NumericLiteral.create(rexLiteral.getValueAs(BigDecimal.class),
+            Type.DOUBLE);
+      case FLOAT:
+        Float f = rexLiteral.getValueAs(Float.class);
+        // NumericLiteral will throw an exception if it is a Nan or Inf, so create
+        // a cast around it.
+        if (!NumericLiteral.isImpalaDouble(f)) {
+          return createCastNanOrInf(f, Type.FLOAT);
+        }
+        return NumericLiteral.create(rexLiteral.getValueAs(BigDecimal.class),
+            Type.FLOAT);
+      case TINYINT:
+      case SMALLINT:
+      case INTEGER:
       case BIGINT:
       case DECIMAL:
-      case DOUBLE:
         Expr numericExpr = NumericLiteral.create(rexLiteral.getValueAs(BigDecimal.class),
             ImpalaTypeConverter.createImpalaType(rexLiteral.getType()));
         return numericExpr;
@@ -107,5 +131,17 @@ public class RexLiteralConverter {
         Lists.newArrayList(new StringLiteral(timestamp, Type.STRING, false));
     Function castFunc = FunctionResolver.getExactFunction("casttotimestamp", typeNames);
     return new AnalyzedFunctionCallExpr(castFunc, argList, Type.TIMESTAMP);
+  }
+
+  private static Expr createCastNanOrInf(Object o, Type t) {
+    List<RelDataType> typeNames =
+        ImmutableList.of(ImpalaTypeConverter.getRelDataType(Type.STRING));
+    String nanOrInf = o.toString();
+    List<Expr> argList =
+        Lists.newArrayList(new StringLiteral(nanOrInf, Type.STRING, false));
+    Preconditions.checkState(t.equals(Type.DOUBLE) || t.equals(Type.FLOAT));
+    String fnName = t.equals(Type.DOUBLE) ? "casttodouble" : "casttofloat";
+    Function castFunc = FunctionResolver.getExactFunction(fnName, typeNames);
+    return new AnalyzedFunctionCallExpr(castFunc, argList, t);
   }
 }
