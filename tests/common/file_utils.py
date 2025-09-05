@@ -171,6 +171,24 @@ def grep_file(file, search):
   return matching_lines
 
 
+def grep_file_first(file, search):
+  """
+  Searches for a pattern in a file and returns the first match. If no match is found,
+  returns None.
+
+  file: An opened file object to search within.
+  search: A string containing the regex pattern to search for.
+
+  return: The first regex search() return object if found, otherwise None.
+  """
+  matcher = re.compile(search)
+  for line in file:
+    res = matcher.search(line)
+    if res is not None:
+      return res
+  return None
+
+
 def assert_file_in_dir_contains(dir, search):
   '''Asserts that at least one file in the 'dir' contains the 'search' term.'''
   results = grep_dir(dir, search)
