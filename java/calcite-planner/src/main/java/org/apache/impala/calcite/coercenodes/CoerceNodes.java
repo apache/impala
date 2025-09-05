@@ -644,6 +644,14 @@ public class CoerceNodes{
   }
 
   private static boolean areSqlTypesEqual(RelDataType r1, RelDataType r2) {
+    if (r1.getSqlTypeName().equals(SqlTypeName.VARCHAR) &&
+        r2.getSqlTypeName().equals(SqlTypeName.VARCHAR)) {
+      // if both precisions are Integer.MAX_VALUE, they are both strings
+      // if both precisions are not INteger.MAX_VALUE, they are both varchars
+      int maxVal = Integer.MAX_VALUE;
+      return (r1.getPrecision() == maxVal && r2.getPrecision() == maxVal) ||
+          (r1.getPrecision() != maxVal && r2.getPrecision() != maxVal);
+    }
     return r1.getSqlTypeName().equals(r2.getSqlTypeName());
   }
 

@@ -252,6 +252,8 @@ public class ImpalaCustomOperatorTable extends ReflectiveSqlOperatorTable {
   public static final SqlSetOperator INTERSECT_ALL =
       new SqlSetOperator("INTERSECT ALL", SqlKind.INTERSECT, 12, true);
 
+  public static final ImpalaNdvFunction NDV = new ImpalaNdvFunction();
+
   public static ImpalaCustomOperatorTable instance() {
     return INSTANCE.get();
   }

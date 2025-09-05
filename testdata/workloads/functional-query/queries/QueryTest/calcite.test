@@ -1077,3 +1077,23 @@ where 10.1 not in (tinyint_col, smallint_col, int_col, bigint_col, float_col, do
 ---- TYPES
 bigint
 ====
+---- QUERY
+# Test for varchar ndv with both 1 and 2 parameters
+select ndv(varchar_col), ndv(varchar_col, 1) from functional.chars_medium;
+---- RESULTS
+963,1030
+---- TYPES
+bigint, bigint
+====
+---- QUERY
+# Test for varchar ndv with out of range ndv for second parameter
+select ndv(varchar_col, 11) from functional.chars_medium;
+---- CATCH
+Error in NDV function, second parameter needs to be between 1 and 10.
+====
+---- QUERY
+# Test for varchar ndv with out of range ndv for second parameter
+select ndv(varchar_col, 0) from functional.chars_medium;
+---- CATCH
+Error in NDV function, second parameter needs to be between 1 and 10.
+====

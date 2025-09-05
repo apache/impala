@@ -40,14 +40,17 @@ import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.MultiAggregateInfo;
+import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.calcite.util.SimplifiedAnalyzer;
 import org.apache.impala.catalog.AggregateFunction;
+import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -277,7 +280,7 @@ public class ImpalaAggRel extends Aggregate
    */
   public boolean hasDistinctOnly() throws ImpalaException {
     for (AggregateCall aggCall : getAggCallList()) {
-      Function fn = getFunction(aggCall);
+      Function fn = getFunction(aggCall, ImmutableList.of());
       if (fn == null) {
         return false;
       }
@@ -326,7 +329,7 @@ public class ImpalaAggRel extends Aggregate
           .map(t -> inputExprs.get(t))
           .collect(Collectors.toList());
 
-      Function fn = getFunction(aggCall);
+      Function fn = getFunction(aggCall, inputExprs);
       Preconditions.checkState(fn != null, "Could not find the Impala function for " +
           aggCall.getAggregation().getName());
 
@@ -342,8 +345,8 @@ public class ImpalaAggRel extends Aggregate
     return exprs;
   }
 
-  private Function getFunction(AggregateCall aggCall)
-      throws ImpalaException {
+  private Function getFunction(AggregateCall aggCall,
+      List<Expr> inputExprs) throws ImpalaException {
     RelDataType retType = aggCall.getType();
     SqlAggFunction aggFunction = aggCall.getAggregation();
     List<RelDataType> operandTypes = Lists.newArrayList();
@@ -352,8 +355,31 @@ public class ImpalaAggRel extends Aggregate
       RelDataType relDataType = input.getRowType().getFieldList().get(i).getType();
       operandTypes.add(relDataType);
     }
-    return FunctionResolver.getExactFunction(aggFunction.getName(), aggFunction.getKind(),
-        operandTypes);
+    Function fn = FunctionResolver.getExactFunction(aggFunction.getName(),
+         aggFunction.getKind(), operandTypes);
+    // special case for ndv which needs a little extra resolving
+    return aggFunction.getName().toLowerCase().equals("ndv")
+        ? getNdvFunction(fn, aggCall, inputExprs)
+        : fn;
+  }
+
+  private Function getNdvFunction(Function fn, AggregateCall aggCall,
+      List<Expr> inputExprs) {
+    if (aggCall.getArgList().size() < 2 || inputExprs.size() == 0) {
+      return fn;
+    }
+
+    // The second argument is the scale. It might be stuffed within
+    // some cast expressions, but there should be a literal value there
+    // which is checked at validation time.
+    Expr literalExpr = inputExprs.get(aggCall.getArgList().get(1));
+    while (literalExpr instanceof CastExpr) {
+      literalExpr = literalExpr.getChild(0);
+    }
+    int scale = ((NumericLiteral) literalExpr).getIntValue();
+    int size = FunctionCallExpr.ComputeHllLengthFromScale(scale);
+    return ((BuiltinsDb)BuiltinsDb.getInstance()).resolveNdvIntermediateType(
+        (AggregateFunction) fn, size);
   }
 
   private boolean isCardinalityCheckRelNode() {
