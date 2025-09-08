@@ -31,6 +31,7 @@ using namespace std;
 using namespace impala;
 
 DECLARE_bool(otel_trace_beeswax);
+DECLARE_string(otel_trace_collector_url);
 
 TEST(OtelTest, QueriesTraced) {
   const auto runtest = [](const string_view sql_str) -> void {
@@ -116,7 +117,7 @@ TEST(OtelTest, QueriesTraced) {
   // Beeswax queries are traced when the otel_trace_beeswax flag is set.
   {
     auto trace_beeswax_setter =
-        ScopedFlagSetter<bool>::Make(&FLAGS_otel_trace_beeswax,true);
+        ScopedFlagSetter<bool>::Make(&FLAGS_otel_trace_beeswax, true);
 
     EXPECT_TRUE(should_otel_trace_query("SELECT * FROM foo", TSessionType::BEESWAX));
   }
@@ -178,5 +179,44 @@ TEST(OtelTest, QueriesNotTraced) {
         ScopedFlagSetter<bool>::Make(&FLAGS_otel_trace_beeswax, false);
 
     EXPECT_FALSE(should_otel_trace_query("SELECT * FROM foo", TSessionType::BEESWAX));
+  }
+}
+
+TEST(OtelTest, TLSEnabled) {
+  {
+    auto ca_cert_path_setter =
+      ScopedFlagSetter<string>::Make(&FLAGS_otel_trace_collector_url, "https://foo.com");
+    // NOLINTNEXTLINE(clang-diagnostic-error-undeclared-identifier)
+    EXPECT_TRUE(test::otel_tls_enabled_for_testing());
+  }
+
+  {
+    auto ca_cert_path_setter =
+      ScopedFlagSetter<string>::Make(&FLAGS_otel_trace_collector_url, "HTTPS://foo.com");
+    // NOLINTNEXTLINE(clang-diagnostic-error-undeclared-identifier)
+    EXPECT_TRUE(test::otel_tls_enabled_for_testing());
+  }
+}
+
+TEST(OtelTest, TLSNotEnabled) {
+  {
+    auto ca_cert_path_setter =
+      ScopedFlagSetter<string>::Make(&FLAGS_otel_trace_collector_url, "");
+    // NOLINTNEXTLINE(clang-diagnostic-error-undeclared-identifier)
+    EXPECT_FALSE(test::otel_tls_enabled_for_testing());
+  }
+
+  {
+    auto ca_cert_path_setter =
+      ScopedFlagSetter<string>::Make(&FLAGS_otel_trace_collector_url, "http://foo.com");
+    // NOLINTNEXTLINE(clang-diagnostic-error-undeclared-identifier)
+    EXPECT_FALSE(test::otel_tls_enabled_for_testing());
+  }
+
+  {
+    auto ca_cert_path_setter =
+      ScopedFlagSetter<string>::Make(&FLAGS_otel_trace_collector_url, "HTTP://foo.com");
+    // NOLINTNEXTLINE(clang-diagnostic-error-undeclared-identifier)
+    EXPECT_FALSE(test::otel_tls_enabled_for_testing());
   }
 }

@@ -133,12 +133,7 @@ static unique_ptr<trace::TracerProvider> provider_;
 
 // Returns true if any TLS configuration flags are set for the OTel exporter.
 static inline bool otel_tls_enabled() {
-  return !FLAGS_otel_trace_ca_cert_path.empty()
-      || !FLAGS_otel_trace_ca_cert_string.empty()
-      || !FLAGS_otel_trace_tls_minimum_version.empty()
-      || !FLAGS_otel_trace_ssl_ciphers.empty()
-      || !FLAGS_otel_trace_tls_cipher_suites.empty()
-      || FLAGS_otel_trace_collector_url.find("https://") == 0;
+  return boost::algorithm::istarts_with(FLAGS_otel_trace_collector_url, "https://");
 } // function otel_tls_enabled
 
 bool should_otel_trace_query(std::string_view sql,
@@ -367,5 +362,11 @@ shared_ptr<SpanManager> build_span_manager(ClientRequestState* crs) {
   return make_shared<SpanManager>(
       provider_->GetTracer(SCOPE_SPAN_NAME, SCOPE_SPAN_SPEC_VERSION), crs);
 } // function build_span_manager
+
+namespace test {
+bool otel_tls_enabled_for_testing() {
+  return otel_tls_enabled();
+}
+} // namespace test
 
 } // namespace impala

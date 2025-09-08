@@ -55,4 +55,9 @@ void shutdown_otel_tracer();
 // Builds a SpanManager instance for the given query.
 std::shared_ptr<SpanManager> build_span_manager(ClientRequestState*);
 
+namespace test {
+// Testing helper function to provide access to the static otel_tls_enabled() function.
+bool otel_tls_enabled_for_testing();
+} // namespace test
+
 } // namespace impala
