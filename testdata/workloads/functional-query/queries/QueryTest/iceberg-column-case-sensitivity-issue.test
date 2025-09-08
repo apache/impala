@@ -46,9 +46,10 @@ SHOW PARTITIONS partition_case_insensitive;
 ---- LABELS
 Partition, Number Of Rows, Number Of Files
 ---- RESULTS
-'{"start_time_day":null,"end_time_month":null,"start_time_month":"646","end_time_day":"19916"}',1,1
-'{"start_time_day":null,"end_time_month":null,"start_time_month":"647","end_time_day":"19916"}',1,1
-'{"start_time_day":null,"end_time_month":null,"start_time_month":"647","end_time_day":"19947"}',2,2
+# IMPALA-14406: in newer Iceberg versions (e.g. 1.5.2), partition values with null are not shown
+regex:'{("start_time_day":null,"end_time_month":null,)?"start_time_month":"646","end_time_day":"19916"}',1,1
+regex:'{("start_time_day":null,"end_time_month":null,)?"start_time_month":"647","end_time_day":"19916"}',1,1
+regex:'{("start_time_day":null,"end_time_month":null,)?"start_time_month":"647","end_time_day":"19947"}',2,2
 ---- TYPES
 STRING, BIGINT, BIGINT
 ====
