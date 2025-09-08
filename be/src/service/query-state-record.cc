@@ -41,6 +41,8 @@
 
 using namespace std;
 
+DECLARE_bool(gen_experimental_profile);
+
 namespace impala {
 
 QueryStateRecord::QueryStateRecord(
@@ -281,9 +283,10 @@ QueryStateExpanded::QueryStateExpanded(
     // Query Profile is initialized when query execution starts. Thus, it will always be
     // non-null at this point since this code runs after the query completes.
     DCHECK(coord->query_profile() != nullptr);
-    map<string, int64_t> host_scratch_bytes;
-    map<string, int64_t> scanner_io_wait;
-    map<string, int64_t> bytes_read_cache;
+    // following maps are <instance_name, pair<counter_value, num_input_profile>>.
+    map<string, pair<int64_t, int32_t>> host_scratch_bytes;
+    map<string, pair<int64_t, int32_t>> scanner_io_wait;
+    map<string, pair<int64_t, int32_t>> bytes_read_cache;
     vector<RuntimeProfileBase*> prof_stack;
 
     // Lambda function to recursively walk through a profile.
@@ -291,38 +294,62 @@ QueryStateExpanded::QueryStateExpanded(
         &process_exec_profile, &host_scratch_bytes, &scanner_io_wait, &prof_stack,
         &bytes_read_cache, this](RuntimeProfileBase* profile) {
       prof_stack.push_back(profile);
+      bool is_aggregated = FLAGS_gen_experimental_profile;
+
+      // 'num_input_profile' is 1 for non-aggregated profiles.
+      // Note that in V1 profile, "Averaged Fragment" node is an aggregated profile.
+      int num_input_profile = profile->GetNumInputProfiles();
+
       if (const auto& cntr = profile->GetCounter("ScratchBytesWritten");
           cntr != nullptr) {
-        host_scratch_bytes.emplace(profile->name(), cntr->value());
+        host_scratch_bytes.emplace(
+            profile->name(), make_pair(cntr->value(), num_input_profile));
       }
 
       // Metrics from HDFS_SCAN_NODE entries.
       if (const string& scan = prof_stack.back()->name();
           boost::algorithm::istarts_with(scan, "HDFS_SCAN_NODE")) {
-        // Find a parent instance. If none found, assume in Averaged Fragment.
-        if (auto it = find_if(prof_stack.begin()+1, prof_stack.end()-1, find_instance);
-            it != prof_stack.end()-1) {
-          DCHECK(find_if(prof_stack.begin(), prof_stack.end(), find_averaged)
-              == prof_stack.end());
-          const string& inst = (*it)->name();
+        if (is_aggregated) {
+          // profile is a V2 AggregatedRuntimeProfile.
           if (const auto& cntr = profile->GetCounter("ScannerIoWaitTime");
               cntr != nullptr) {
-            scanner_io_wait.emplace(StrCat(inst, "::", scan), cntr->value());
+            scanner_io_wait.emplace(scan, make_pair(cntr->value(), num_input_profile));
           }
 
           if (const auto& cntr = profile->GetCounter("DataCacheHitBytes");
               cntr != nullptr) {
-            bytes_read_cache.emplace(StrCat(inst, "::", scan), cntr->value());
+            bytes_read_cache.emplace(scan, make_pair(cntr->value(), num_input_profile));
           }
         } else {
-          DCHECK(find_if(prof_stack.begin(), prof_stack.end(), find_averaged)
-              != prof_stack.end());
+          // profile is a V1 RuntimeProfile.
+          // Find a parent instance name. If none found, assume in Averaged Fragment.
+          if (auto it =
+                  find_if(prof_stack.begin() + 1, prof_stack.end() - 1, find_instance);
+              it != prof_stack.end() - 1) {
+            DCHECK(find_if(prof_stack.begin(), prof_stack.end(), find_averaged)
+                == prof_stack.end());
+            const string& inst = (*it)->name();
+            if (const auto& cntr = profile->GetCounter("ScannerIoWaitTime");
+                cntr != nullptr) {
+              scanner_io_wait.emplace(
+                  StrCat(inst, "::", scan), make_pair(cntr->value(), num_input_profile));
+            }
+
+            if (const auto& cntr = profile->GetCounter("DataCacheHitBytes");
+                cntr != nullptr) {
+              bytes_read_cache.emplace(
+                  StrCat(inst, "::", scan), make_pair(cntr->value(), num_input_profile));
+            }
+          } else {
+            DCHECK(find_if(prof_stack.begin(), prof_stack.end(), find_averaged)
+                != prof_stack.end());
+          }
         }
       }
 
       // Total Bytes Read
       if (const auto& cntr = profile->GetCounter("TotalBytesRead"); cntr != nullptr) {
-        bytes_read_total = cntr->value();
+        bytes_read_total = cntr->value() * num_input_profile;
       }
 
       // Recursively walk down through all child nodes.
@@ -338,21 +365,23 @@ QueryStateExpanded::QueryStateExpanded(
 
     // Compressed Bytes Spilled
     for (const auto& hsb : host_scratch_bytes) {
-      compressed_bytes_spilled += hsb.second;
+      compressed_bytes_spilled += (hsb.second.first * hsb.second.second);
     }
 
     // Read IO Wait Time Total and Average
     if (scanner_io_wait.size() > 0) {
+      int32_t total_profiles = 0;
       for (const auto& item : scanner_io_wait) {
-        read_io_wait_time_total += item.second;
+        read_io_wait_time_total += (item.second.first * item.second.second);
+        total_profiles += item.second.second;
       }
 
-      read_io_wait_time_mean = read_io_wait_time_total / scanner_io_wait.size();
+      read_io_wait_time_mean = read_io_wait_time_total / total_profiles;
     }
 
     // Bytes Read from Data Cache
     for (const auto& b : bytes_read_cache) {
-      bytes_read_cache_total += b.second;
+      bytes_read_cache_total += (b.second.first * b.second.second);
     }
 
     // Per-Node Peak Memory Usage

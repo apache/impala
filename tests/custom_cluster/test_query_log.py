@@ -605,6 +605,42 @@ class TestQueryLogTableHS2(WorkloadManagementTestSuite):
                                      "limit of 1s000ms".format(self.insert_query_id),
                                      expected_count=2)
 
+  @CustomClusterTestSuite.with_args(
+      cluster_size=1, log_symlinks=True,
+      impalad_args="--gen_experimental_profile",
+      workload_mgmt=True,
+      disable_log_buffering=True)
+  def test_with_experimental_profile(self):
+    """Test that impalad does not crash when gen_experimental_profile flag is True."""
+    impalad = self.cluster.get_first_impalad().service
+
+    # Run a query which should successfully be written to the query log table.
+    client = self.hs2_client
+    query = "select count(*) from functional.alltypes"
+    handle = client.execute_async(query)
+    query_id = client.handle_id(handle)
+    client.fetch(query, handle, discard_results=True)
+    client.close_query(handle)
+
+    # Wait for the query to be written to the sys.impala_query_log table.
+    impalad.wait_for_metric_value("impala-server.completed-queries.written", 1, 15)
+
+    # Validate that following columns are non-zero.
+    # BYTES_READ_CACHE_TOTAL can be 0 if the data was not cached.
+    # V2 profile counters only print stats (mean, min, max), so direct validation
+    # against query profile is not feasible yet.
+    res = client.execute(
+      "select READ_IO_WAIT_TOTAL_MS, READ_IO_WAIT_MEAN_MS, "
+      "  BYTES_READ_TOTAL, BYTES_READ_CACHE_TOTAL "
+      "from sys.impala_query_log where query_id = '{}'".format(query_id))
+    assert res.success
+    rows = res.tuples()
+    assert len(rows) == 1
+    assert float(rows[0][0]) > 0, "Expected READ_IO_WAIT_TOTAL_MS > 0"
+    assert float(rows[0][1]) > 0, "Expected READ_IO_WAIT_MEAN_MS > 0"
+    assert float(rows[0][2]) > 0, "Expected BYTES_READ_TOTAL > 0"
+    assert float(rows[0][3]) >= 0, "Expected BYTES_READ_CACHE_TOTAL >= 0"
+
 
 class TestQueryLogTableAll(WorkloadManagementTestSuite):
   """Tests to assert the query log table is correctly populated when using all the
