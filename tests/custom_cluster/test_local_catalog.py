@@ -428,6 +428,38 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
       client1.close()
       client2.close()
 
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal")
+  def test_show_dbs_retry(self, unique_name):
+    self._run_show_dbs_with_transient_db(
+        unique_name + "_db", self.create_impala_client(), self.client)
+
+  @classmethod
+  def _run_show_dbs_with_transient_db(cls, unique_database, admin_client, user_client):
+    stop = False
+
+    def create_drop_db():
+      while not stop:
+        admin_client.execute("create database " + unique_database)
+        # Sleep some time so coordinator can get the updates of it.
+        time.sleep(0.1)
+        if stop:
+          break
+        admin_client.execute("drop database " + unique_database)
+    t = threading.Thread(target=create_drop_db)
+    t.start()
+
+    try:
+      for i in range(100):
+        user_client.execute("show databases")
+        # Sleep some time so the db can be dropped.
+        time.sleep(0.2)
+    finally:
+      stop = True
+      t.join()
+      admin_client.execute("drop database if exists " + unique_database)
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true --inject_latency_after_catalog_fetch_ms=50",

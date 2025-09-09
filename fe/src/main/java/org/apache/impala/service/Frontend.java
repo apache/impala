@@ -1149,8 +1149,7 @@ public class Frontend {
    * exception. Inconsistent metadata comes up due to interleaving catalog object updates
    * with retrieving those objects. Instead of bubbling up the issue to the user, retrying
    * can get the user's operation to run on a consistent snapshot and to succeed.
-   * Retries are *not* needed for accessing top-level objects such as databases, since
-   * they do not have a parent, so cannot be inconsistent.
+   * Max number of retries is configured by local_catalog_max_fetch_retries.
    * TODO: this class is typically used in a loop at the call-site. replace with lambdas
    *       in Java 8 to simplify the looping boilerplate.
    */
@@ -1481,7 +1480,8 @@ public class Frontend {
 
   /**
    * Returns all databases in catalog cache that match the pattern of 'matcher' and are
-   * accessible to 'user'.
+   * accessible to 'user'. Callers should handle InconsistentMetadataFetchException when
+   * using these dbs.
    */
   public List<? extends FeDb> getDbs(PatternMatcher matcher, User user)
       throws UserCancelledException, InternalException {
@@ -1504,6 +1504,32 @@ public class Frontend {
     }
 
     return dbs;
+  }
+
+  /**
+   * Returns thrift representation of all databases in catalog cache that match the
+   * pattern of 'matcher' and are accessible to 'user'. Retries on
+   * InconsistentMetadataFetchException are handled in this method (see comments of
+   * RetryTracker)
+   */
+  public List<TDatabase> getThriftDbs(PatternMatcher matcher, User user)
+      throws UserCancelledException, InternalException {
+    Frontend.RetryTracker retries = new Frontend.RetryTracker(
+        String.format("Fetching db list for user %s", user.getName()));
+    while (true) {
+      try {
+        List<? extends FeDb> dbs = getDbs(matcher, user);
+        List<TDatabase> tDbs = Lists.newArrayListWithCapacity(dbs.size());
+        // LocalDb.toThrift() might trigger getPartialCatalogObject request to catalogd
+        // which could fail if the db is dropped concurrently. In this case,
+        // InconsistentMetadataFetchException will be thrown and we will retry from
+        // getting the db list.
+        for (FeDb db : dbs) tDbs.add(db.toThrift());
+        return tDbs;
+      } catch (InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
   }
 
   /**

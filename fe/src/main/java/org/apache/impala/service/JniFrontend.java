@@ -387,13 +387,9 @@ public class JniFrontend {
 
     TSessionState session = params.isSetSession() ? params.getSession() : null;
     User user = getUser(session);
-
-    List<? extends FeDb> dbs = frontend_.getDbs(
-        PatternMatcher.createHivePatternMatcher(params.pattern), user);
     TGetDbsResult result = new TGetDbsResult();
-    List<TDatabase> tDbs = Lists.newArrayListWithCapacity(dbs.size());
-    for (FeDb db: dbs) tDbs.add(db.toThrift());
-    result.setDbs(tDbs);
+    result.setDbs(frontend_.getThriftDbs(
+        PatternMatcher.createHivePatternMatcher(params.pattern), user));
     try {
       TSerializer serializer = new TSerializer(protocolFactory_);
       return serializer.serialize(result);

@@ -20,8 +20,6 @@
 from __future__ import absolute_import, division, print_function
 from getpass import getuser
 import random
-import threading
-import time
 
 import pytest
 
@@ -29,6 +27,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.file_utils import assert_file_in_dir_contains
 from tests.common.test_result_verifier import error_msg_equal
 from tests.common.test_vector import HS2
+from tests.custom_cluster.test_local_catalog import TestLocalCatalogRetries
 
 PRIVILEGES = ['all', 'alter', 'drop', 'insert', 'refresh', 'select']
 ADMIN = "admin"
@@ -192,25 +191,5 @@ class TestAuthorization(CustomClusterTestSuite):
     # Use admin user to have create+drop privileges.
     unique_database = unique_name + "_db"
     admin_client = self.create_impala_client(user=ADMIN)
-    stop = False
-
-    def create_drop_db():
-      while not stop:
-        admin_client.execute("create database " + unique_database)
-        # Sleep some time so coordinator can get the updates of it.
-        time.sleep(0.1)
-        if stop:
-          break
-        admin_client.execute("drop database " + unique_database)
-    t = threading.Thread(target=create_drop_db)
-    t.start()
-
-    try:
-      for i in range(100):
-        self.execute_query("show databases")
-        # Sleep some time so the db can be dropped.
-        time.sleep(0.2)
-    finally:
-      stop = True
-      t.join()
-      admin_client.execute("drop database if exists " + unique_database)
+    TestLocalCatalogRetries._run_show_dbs_with_transient_db(
+        unique_database, admin_client, self.client)
