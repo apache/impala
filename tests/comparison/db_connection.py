@@ -423,7 +423,12 @@ class DbCursor(object):
     '''Return a Table with table and col names always in lowercase.'''
     describe_rows = self.execute_and_fetchall(self.make_describe_table_sql(table_name))
     table = self.create_table_from_describe(table_name, describe_rows)
-    self.load_unique_col_metadata(table)
+    # IMPALA-14398: Commenting this because, testing with Python 3.8, it hit
+    #   dbm.error: db type could not be determined
+    # Commenting it does not affect any existing infra tests.
+    # Need to revisit if persist_unique_col_metadata and load_unique_col_metadata
+    # is still needed.
+    # self.load_unique_col_metadata(table)
     return table
 
   def make_describe_table_sql(self, table_name):
@@ -685,7 +690,7 @@ class DbConnection(with_metaclass(ABCMeta, object)):
 
 class ImpalaCursor(DbCursor):
 
-  PK_SEARCH_PATTERN = re.compile('PRIMARY KEY \((?P<keys>.*?)\)')
+  PK_SEARCH_PATTERN = re.compile(r'PRIMARY KEY \((?P<keys>.*?)\)')
   STORAGE_FORMATS_WITH_PRIMARY_KEYS = ('KUDU',)
 
   @classmethod
@@ -1212,12 +1217,12 @@ class OracleConnection(DbConnection):
   def _connect(self):
     try:
       import cx_Oracle
-    except:
+    except Exception:
       print('Error importing cx_Oracle. Please make sure it is installed. '
           'See the README for details.')
       raise
-    self._conn = cx_Oracle.connect('%(user)s/%(password)s@%(host)s:%(port)s/%(service)s'
-        % (self._user_name, self._password, self._host_name, self._port, self._service))
+    self._conn = cx_Oracle.connect('{}/{}@{}:{}/{}'.format(
+      self._user_name, self._password, self._host_name, self._port, self._service))
 
   def cursor(self):
     cursor = super(OracleConnection, self).cursor()
