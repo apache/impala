@@ -28,7 +28,7 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/trim.hpp>
-#include <gflags/gflags.h>
+#include <gflags/gflags_declare.h>
 #include <glog/logging.h>
 #include <gutil/strings/split.h>
 #include <opentelemetry/exporters/otlp/otlp_file_exporter.h>
@@ -39,6 +39,8 @@
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_factory.h>
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_options.h>
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_runtime_options.h>
+#include <opentelemetry/nostd/shared_ptr.h>
+#include <opentelemetry/sdk/common/global_log_handler.h>
 #include <opentelemetry/sdk/resource/resource.h>
 #include <opentelemetry/sdk/trace/batch_span_processor.h>
 #include <opentelemetry/sdk/trace/batch_span_processor_factory.h>
@@ -57,13 +59,14 @@
 #include "common/status.h"
 #include "common/version.h"
 #include "gen-cpp/Query_types.h"
-#include "observe/otel-instrument.h"
+#include "observe/otel-log-handler.h"
 #include "observe/span-manager.h"
 #include "service/client-request-state.h"
 
 using namespace boost::algorithm;
 using namespace opentelemetry;
 using namespace opentelemetry::exporter::otlp;
+using namespace opentelemetry::sdk::common::internal_log;
 using namespace opentelemetry::sdk::trace;
 using namespace std;
 
@@ -106,6 +109,9 @@ static const string SCOPE_SPAN_NAME = "org.apache.impala.impalad.query";
 static const regex query_newline(
     "(select|alter|compute|create|delete|drop|insert|invalidate|update|with)\\s*"
     "(\n|\\s*\\\\*\\/)", regex::icase | regex::optimize | regex::nosubs);
+
+// Holds the custom log handler for OpenTelemetry internal logs.
+static nostd::shared_ptr<LogHandler> otel_log_handler_;
 
 // Lambda function to check if SQL starts with relevant keywords for tracing
 static const function<bool(std::string_view)> is_traceable_sql =
@@ -255,14 +261,7 @@ static Status init_exporter_http(unique_ptr<SpanExporter>& exporter) {
     }
   }
 
-  if (FLAGS_otel_debug) {
-    opentelemetry::v1::exporter::otlp::OtlpHttpExporterRuntimeOptions runtime_opts;
-    runtime_opts.thread_instrumentation =
-        make_shared<LoggingInstrumentation>("http_exporter");
-    exporter = OtlpHttpExporterFactory::Create(opts, runtime_opts);
-  } else {
-    exporter = OtlpHttpExporterFactory::Create(opts);
-  }
+  exporter = OtlpHttpExporterFactory::Create(opts);
 
   return Status::OK();
 } // function init_exporter_http
@@ -300,6 +299,19 @@ Status init_otel_tracer() {
   VLOG(2) << "OpenTelemetry namespace: "
       << OPENTELEMETRY_STRINGIFY(OPENTELEMETRY_NAMESPACE);
 
+  otel_log_handler_ = nostd::shared_ptr<LogHandler>(new OtelLogHandler());
+  GlobalLogHandler::SetLogHandler(otel_log_handler_);
+
+  // Set the OpenTelemetry SDK internal log level based on the current glog level. The SDK
+  // does not support changing the log level once a Provider has been created.
+  if (FLAGS_otel_debug) {
+    GlobalLogHandler::SetLogLevel(LogLevel::Debug);
+  } else if (VLOG_IS_ON(1)) {
+    GlobalLogHandler::SetLogLevel(LogLevel::Info);
+  } else {
+    GlobalLogHandler::SetLogLevel(LogLevel::None);
+  }
+
   unique_ptr<SpanExporter> exporter;
 
   if(FLAGS_otel_trace_exporter == OTEL_EXPORTER_OTLP_HTTP) {
@@ -321,15 +333,7 @@ Status init_otel_tracer() {
     batch_opts.schedule_delay_millis =
         chrono::milliseconds(FLAGS_otel_trace_batch_schedule_delay_ms);
 
-    if (FLAGS_otel_debug) {
-      BatchSpanProcessorRuntimeOptions runtime_opts;
-      runtime_opts.thread_instrumentation =
-          make_shared<LoggingInstrumentation>("batch_span_processor");
-      processor = BatchSpanProcessorFactory::Create(move(exporter), batch_opts,
-          runtime_opts);
-    } else {
-      processor = BatchSpanProcessorFactory::Create(move(exporter), batch_opts);
-    }
+    processor = BatchSpanProcessorFactory::Create(move(exporter), batch_opts);
   } else {
     VLOG(2) << "Using SimpleSpanProcessor for OTel spans";
     LOG(WARNING) << "Setting --otel_trace_span_processor=simple blocks the query "

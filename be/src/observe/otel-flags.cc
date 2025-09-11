@@ -19,6 +19,7 @@
 
 #include <chrono>
 
+#include <gflags/gflags.h>
 #include <opentelemetry/exporters/otlp/otlp_file_client_options.h>
 
 #include "util/gflag-validator-util.h"
@@ -26,7 +27,8 @@
 using namespace std;
 using namespace std::chrono;
 
-DEFINE_bool(otel_debug, false, "If set to true, outputs additional debug info");
+DEFINE_bool(otel_debug, false, "If set to true, send debug logs from the "
+    "OpenTelemetry SDK to the Impala logging system.");
 
 //
 // Start of OTLP File Exporter flags

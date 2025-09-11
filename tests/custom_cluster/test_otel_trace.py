@@ -56,7 +56,7 @@ class TestOtelTraceBase(CustomClusterTestSuite):
 
 
 @CustomClusterTestSuite.with_args(
-    impalad_args="-v=2 --cluster_id=select_dml {}".format(TRACE_FLAGS),
+    impalad_args="-v=2 --cluster_id=select_dml --otel_debug {}".format(TRACE_FLAGS),
     cluster_size=1, tmp_dir_placeholders=[OUT_DIR], disable_log_buffering=True)
 class TestOtelTraceSelectsDMLs(TestOtelTraceBase):
   """Tests that exercise OpenTelemetry tracing behavior for select and dml queries."""
@@ -423,6 +423,24 @@ class TestOtelTraceSelectsDMLs(TestOtelTraceBase):
         query_profile=result.runtime_profile,
         cluster_id="select_dml",
         trace_cnt=2)
+
+  def test_debug_logs(self):
+    """Asserts OpenTelemetry SDK debug logs are written to the Impalad INFO log when
+       vlog is set to 2."""
+    result = self.execute_query_expect_success(self.client,
+        "SELECT COUNT(*) FROM functional.alltypes")
+    assert result.success
+
+    # Assert the trace exporter debug log lines were emitted.
+    self.assert_impalad_log_contains("INFO", r"otel-log-handler.cc:\d+\] \[OTLP TRACE "
+        r"FILE Exporter\] Export \d+ trace span\(s\) success file=\".*?"
+        r"\/opentelemetry-cpp-\d+.\d+.\d+\/exporters\/otlp\/src\/otlp_file_exporter.cc\" "
+        r"line=\"\d+\"", -1)
+
+    self.assert_impalad_log_contains("INFO", r"otel-log-handler.cc:\d+\] \[OTLP FILE "
+        r"Client\] Write body\(Json\).*? file=\".*?"
+        r"\/opentelemetry-cpp-\d+.\d+.\d+\/exporters\/otlp\/src\/otlp_file_client.cc\" "
+        r"line=\"\d+\"", -1)
 
 
 class TestOtelTraceSelectQueued(TestOtelTraceBase):

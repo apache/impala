@@ -24,6 +24,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/observe")
 add_library(Observe
   otel-flags.cc
   otel-flags-trace.cc
+  otel-log-handler.cc
   otel.cc
   span-manager.cc
   timed-span.cc
