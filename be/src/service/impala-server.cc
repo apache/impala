@@ -1422,10 +1422,10 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
     if (result.__isset.result_set_metadata) {
       (*query_handle)->set_result_metadata(result.result_set_metadata);
     }
+  }
 
-    if ((*query_handle)->otel_trace_query()) {
-      (*query_handle)->otel_span_manager()->EndChildSpanPlanning();
-    }
+  if ((*query_handle)->otel_trace_query()) {
+    (*query_handle)->otel_span_manager()->EndChildSpanPlanning();
   }
 
   VLOG(2) << "Execution request: "

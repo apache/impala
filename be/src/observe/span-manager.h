@@ -92,14 +92,10 @@ public:
   // client_request_state_->lock().
   void EndChildSpanInit();
   void EndChildSpanSubmitted();
+  void EndChildSpanPlanning();
   void EndChildSpanAdmissionControl(const Status& cause);
   void EndChildSpanQueryExecution();
   void EndChildSpanClose();
-
-  // Function to end the Planning child span. This function takes ownership of
-  // child_span_mu_ BUT NOT client_request_state_->lock(). The code calling this function
-  // already holds client_request_state_->lock().
-  void EndChildSpanPlanning();
 
 private:
   // Tracer instance used to construct spans.
@@ -120,6 +116,9 @@ private:
   std::shared_ptr<TimedSpan> root_;
 
   // TimedSpan instance for the current child span and the mutex to protect it.
+  // To ensure no deadlocks, locks must be acquired in the following order:
+  // 1. SpanManager::child_span_mu_
+  // 2. ClientRequestState::lock_
   std::unique_ptr<TimedSpan> current_child_;
   std::mutex child_span_mu_;
 

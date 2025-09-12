@@ -252,6 +252,7 @@ void SpanManager::StartChildSpanPlanning() {
 
 void SpanManager::EndChildSpanPlanning() {
   lock_guard<mutex> l(child_span_mu_);
+  lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
   DoEndChildSpanPlanning();
 } // function EndChildSpanPlanning
 
