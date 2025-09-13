@@ -1646,33 +1646,8 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     // try evaluating with metadata first. If not, fall back to scanning.
     TQueryOptions queryOpts = analyzer.getQueryCtx().client_request.query_options;
     if (isPartitionKeyScan && queryOpts.optimize_partition_key_scans) {
-      Set<List<Expr>> uniqueExprs = new HashSet<>();
-
-      for (FeFsPartition partition : partitions) {
-        // Ignore empty partitions to match the behavior of the scan based approach.
-        if (partition.getSize() == 0) continue;
-        List<Expr> exprs = new ArrayList<>();
-        for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
-          // UnionNode.init() will go through all the slots in the tuple descriptor so
-          // there needs to be an entry in 'exprs' for each slot. For unmaterialized
-          // slots, use dummy null values. UnionNode will filter out unmaterialized slots.
-          if (!slotDesc.isMaterialized()) {
-            exprs.add(NullLiteral.create(slotDesc.getType()));
-          } else {
-            int pos = slotDesc.getColumn().getPosition();
-            exprs.add(partition.getPartitionValue(pos));
-          }
-        }
-        uniqueExprs.add(exprs);
-      }
-
-      // Create a UNION node with all unique partition keys.
-      UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), tupleDesc.getId());
-      for (List<Expr> exprList: uniqueExprs) {
-        unionNode.addConstExprList(exprList);
-      }
-      unionNode.init(analyzer);
-      return unionNode;
+      return createOptimizedPartitionUnionNode(ctx_.getNextNodeId(), partitions,
+            tupleDesc, analyzer);
     } else if (addAcidSlotsIfNeeded(analyzer, hdfsTblRef, partitions)) {
       // We are scanning a full ACID table that has delete delta files. Let's create
       // a LEFT ANTI JOIN between the insert deltas and delete deltas.
@@ -1712,6 +1687,38 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     if (!areThereDeletedRows) return false;
     addAcidSlots(analyzer, hdfsTblRef);
     return true;
+  }
+
+  public static PlanNode createOptimizedPartitionUnionNode(PlanNodeId nodeId,
+      List<? extends FeFsPartition> partitions, TupleDescriptor tupleDesc,
+      Analyzer analyzer) {
+    Set<List<Expr>> uniqueExprs = new HashSet<>();
+
+    for (FeFsPartition partition : partitions) {
+      // Ignore empty partitions to match the behavior of the scan based approach.
+      if (partition.getSize() == 0) continue;
+      List<Expr> exprs = new ArrayList<>();
+      for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
+        // UnionNode.init() will go through all the slots in the tuple descriptor so
+        // there needs to be an entry in 'exprs' for each slot. For unmaterialized
+        // slots, use dummy null values. UnionNode will filter out unmaterialized slots.
+        if (!slotDesc.isMaterialized()) {
+          exprs.add(NullLiteral.create(slotDesc.getType()));
+        } else {
+          int pos = slotDesc.getColumn().getPosition();
+          exprs.add(partition.getPartitionValue(pos));
+        }
+      }
+      uniqueExprs.add(exprs);
+    }
+
+    // Create a UNION node with all unique partition keys.
+    UnionNode unionNode = new UnionNode(nodeId, tupleDesc.getId());
+    for (List<Expr> exprList: uniqueExprs) {
+      unionNode.addConstExprList(exprList);
+    }
+    unionNode.init(analyzer);
+    return unionNode;
   }
 
   /* Purposefully made 'public' for third party usage.*/

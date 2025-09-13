@@ -115,9 +115,17 @@ public class ImpalaHdfsScanRel extends TableScan
           baseTblRef, filterConjuncts, impalaPartitions, partitionConjuncts,
           context.ctx_);
     } else {
-      physicalNode = new ImpalaHdfsScanNode(nodeId, tupleDesc, impalaPartitions,
-          baseTblRef, null, partitionConjuncts, filterConjuncts, countStarDesc,
-          isPartitionScanOnly(context, table));
+      boolean isPartitionScanOnly = isPartitionScanOnly(context, table);
+      if (isPartitionScanOnly &&
+          context.ctx_.getQueryOptions().optimize_partition_key_scans) {
+        physicalNode =
+            SingleNodePlanner.createOptimizedPartitionUnionNode(nodeId, impalaPartitions,
+            tupleDesc, analyzer);
+      } else {
+        physicalNode = new ImpalaHdfsScanNode(nodeId, tupleDesc, impalaPartitions,
+            baseTblRef, null, partitionConjuncts, filterConjuncts, countStarDesc,
+            isPartitionScanOnly(context, table));
+      }
     }
     physicalNode.setOutputSmap(new ExprSubstitutionMap());
     physicalNode.init(analyzer);

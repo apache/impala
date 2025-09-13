@@ -1192,3 +1192,23 @@ select '\"';
 ---- RESULTS
 '"'
 ====
+---- QUERY
+# IMPALA-3334: 'optimize_partition_key_scans' is a boolean query option
+set explain_level=0;
+set optimize_partition_key_scans=true;
+explain select min(month), max(year), ndv(day) from functional.alltypesagg;
+---- RESULTS: VERIFY_IS_SUBSET
+'01:AGGREGATE [FINALIZE]'
+'00:UNION'
+'   constant-operands=11'
+====
+---- QUERY
+set explain_level=0;
+set optimize_partition_key_scans=false;
+explain select min(month), max(year), ndv(day) from functional.alltypesagg;
+---- RESULTS: VERIFY_IS_SUBSET
+'03:AGGREGATE [FINALIZE]'
+'02:EXCHANGE [UNPARTITIONED]'
+'01:AGGREGATE'
+'00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
+====
