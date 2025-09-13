@@ -148,6 +148,9 @@ public class ImpalaAggRel extends Aggregate
       simplifiedAnalyzer.setUnassignedConjuncts(converter.getImpalaConjuncts());
     }
     aggNode.init(simplifiedAnalyzer);
+    if (returnsSingleRow(this)) {
+      ((AggregationNode) aggNode).setIsNonCorrelatedScalarSubquery(true);
+    }
     simplifiedAnalyzer.clearUnassignedConjuncts();
 
     return new NodeWithExprs(aggNode, outputExprs, getRowType().getFieldNames());
@@ -444,6 +447,10 @@ public class ImpalaAggRel extends Aggregate
     }
 
     return builder.build();
+  }
+
+  public static boolean returnsSingleRow(Aggregate agg) {
+    return agg.getGroupCount() == 0 && agg.getAggCallList().size() == 1;
   }
 
   @Override

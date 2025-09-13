@@ -88,7 +88,7 @@ PLAN-ROOT SINK
 |  |  |  in pipelines: 16(GETNEXT), 12(OPEN)
 |  |  |
 |  |  15:NESTED LOOP JOIN [INNER JOIN]
-|  |  |  join predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
+|  |  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
 |  |  |  mem-estimate=12B mem-reservation=0B thread-reservation=0
 |  |  |  tuple-ids=21,25 row-size=24B cardinality=360.18K cost=73800
 |  |  |  in pipelines: 12(GETNEXT), 14(OPEN)
@@ -179,7 +179,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 06(GETNEXT), 02(OPEN)
 |  |
 |  05:NESTED LOOP JOIN [INNER JOIN]
-|  |  join predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
+|  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
 |  |  mem-estimate=12B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=5,9 row-size=24B cardinality=360.18K cost=73800
 |  |  in pipelines: 02(GETNEXT), 04(OPEN)
@@ -353,7 +353,7 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(8 (self) v
 |  |  |
 |  |  15:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  |  join table id: 02
-|  |  |  join predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
+|  |  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
 |  |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  |  tuple-ids=21,25 row-size=24B cardinality=360.18K cost=73800
 |  |  |  in pipelines: 31(GETNEXT), 33(OPEN)
@@ -531,7 +531,7 @@ max-parallelism=4 segment-costs=[241660]
 |  |
 |  05:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 04
-|  |  join predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
+|  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=5,9 row-size=24B cardinality=360.18K cost=73800
 |  |  in pipelines: 23(GETNEXT), 25(OPEN)
@@ -750,7 +750,7 @@ max-parallelism=4 segment-costs=[0, 2] cpu-comparison-result=480 [max(8 (self) v
 |  |  |
 |  |  15:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  |  join table id: 02
-|  |  |  join predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
+|  |  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_2.ss_net_profit))
 |  |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  |  tuple-ids=21,25 row-size=24B cardinality=360.18K cost=73800
 |  |  |  in pipelines: 31(GETNEXT), 33(OPEN)
@@ -928,7 +928,7 @@ max-parallelism=4 segment-costs=[241660]
 |  |
 |  05:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 04
-|  |  join predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
+|  |  predicates: CAST(avg(tpcds_partitioned_parquet_snap.store_sales.ss_net_profit) AS DECIMAL(14,7)) > multiply(CAST(0.9 AS DECIMAL(2,1)), avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_net_profit))
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=5,9 row-size=24B cardinality=360.18K cost=73800
 |  |  in pipelines: 23(GETNEXT), 25(OPEN)

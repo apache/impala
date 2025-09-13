@@ -42,8 +42,11 @@ public class ImpalaNestedLoopJoinNode extends NestedLoopJoinNode {
       List<Expr> filterConjuncts, Analyzer analyzer) throws ImpalaException {
     super(leftInput, rightInput, isStraightJoin, distMode, joinOp, joinConjuncts);
     setId(id);
-    init(analyzer);
+    for (Expr conjunct : filterConjuncts) {
+      conjunct.analyze(analyzer);
+    }
     this.conjuncts_ = filterConjuncts;
+    init(analyzer);
   }
 
   @Override
