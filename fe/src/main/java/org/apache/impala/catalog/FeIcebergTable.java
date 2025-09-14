@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -65,7 +66,6 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.PrintUtils;
-import org.apache.impala.common.Reference;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumn;
@@ -826,7 +826,7 @@ public interface FeIcebergTable extends FeFsTable {
         FileStatus fileStatus, Table iceApiTable,
         boolean requiresDataFilesInTableLocation,
         ListMap<TNetworkAddress> hostIndex) throws IOException {
-      Reference<Long> numUnknownDiskIds = new Reference<>(0L);
+      AtomicLong numUnknownDiskIds = new AtomicLong(0);
 
       String absPath = null;
       Path tableLoc = new Path(iceApiTable.location());

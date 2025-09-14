@@ -29,12 +29,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+
+import javax.annotation.Nullable;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.impala.common.Reference;
 import org.apache.impala.fb.FbCompression;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.fb.FbFileDesc;
@@ -128,8 +130,8 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
       ListMap<TNetworkAddress> hostIndex,
       boolean isEncrypted,
       boolean isEc,
-      Reference<Long> numUnknownDiskIds,
-      String absPath) throws IOException {
+      AtomicLong numUnknownDiskIds,
+      @Nullable String absPath) throws IOException {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
     int[] fbFileBlockOffsets;
     if (blockLocations == null) {
@@ -160,7 +162,7 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
    * resides in a filesystem that doesn't support the BlockLocation API (e.g. S3).
    */
   public static FileDescriptor createWithNoBlocks(
-      FileStatus fileStatus, String relPath, String absPath) {
+      FileStatus fileStatus, String relPath, @Nullable String absPath) {
     FlatBufferBuilder fbb = new FlatBufferBuilder(1);
     return new FileDescriptor(
         createFbFileDesc(fbb, fileStatus, relPath, null, false, false, absPath));
@@ -179,7 +181,7 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
       int[] fbFileBlockOffsets,
       boolean isEncrypted,
       boolean isEc,
-      String absPath) {
+      @Nullable String absPath) {
     int relPathOffset = fbb.createString(relPath == null ? StringUtils.EMPTY : relPath);
     // A negative block vector offset is used when no block offsets are specified.
     int blockVectorOffset = -1;

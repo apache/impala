@@ -51,7 +51,6 @@ import org.apache.impala.catalog.FeIcebergTable.Utils;
 import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.PrintUtils;
-import org.apache.impala.common.Reference;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -133,6 +132,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     List<ContentFile<?>> filesSupportsStorageIds = Lists.newArrayList();
     FileSystem fsForTable = FileSystemUtil.getFileSystemForPath(tablePath_);
     FileSystem defaultFs = FileSystemUtil.getDefaultFileSystem();
+    AtomicLong numUnknownDiskIds = new AtomicLong();
     for (ContentFile<?> contentFile : newContentFiles) {
       FileSystem fsForPath = fsForTable;
       // If requiresDataFilesInTableLocation_ is true, we assume that the file system
@@ -147,11 +147,11 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       if (FileSystemUtil.supportsStorageIds(fsForPath)) {
         filesSupportsStorageIds.add(contentFile);
       } else {
-        IcebergFileDescriptor fd = createNonLocatedFd(fsForPath, contentFile, tablePath_);
+        IcebergFileDescriptor fd =
+            createNonLocatedFd(fsForPath, contentFile, tablePath_, numUnknownDiskIds);
         registerNewlyLoadedFd(fd);
       }
     }
-    AtomicLong numUnknownDiskIds = new AtomicLong();
     List<IcebergFileDescriptor> newFds = parallelListing(filesSupportsStorageIds,
         numUnknownDiskIds);
     for (IcebergFileDescriptor fd : newFds) {
@@ -203,7 +203,8 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   }
 
   private IcebergFileDescriptor createNonLocatedFd(FileSystem fs,
-      ContentFile<?> contentFile, Path partPath) throws CatalogException, IOException {
+      ContentFile<?> contentFile, Path partPath, AtomicLong numUnknownDiskIds)
+      throws CatalogException, IOException {
     Path fileLoc = FileSystemUtil.createFullyQualifiedPath(
         new Path(contentFile.path().toString()));
     // For OSS service (e.g. S3A, COS, OSS, etc), we create FileStatus ourselves.
@@ -215,12 +216,12 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     int partitionId = addPartitionInfo(contentFile);
 
     return IcebergFileDescriptor.cloneWithFileMetadata(
-        createFd(fs, stat, relPath, null, absPath),
+        createFd(fs, stat, relPath, numUnknownDiskIds, absPath),
         IcebergUtil.createIcebergMetadata(iceTbl_, contentFile, partitionId));
   }
 
-  private IcebergFileDescriptor createLocatedFd(ContentFile<?> contentFile,
-      FileStatus stat, Path partPath, Reference<Long> numUnknownDiskIds)
+  private IcebergFileDescriptor createLocatedFd(FileSystem fs, ContentFile<?> contentFile,
+      FileStatus stat, Path partPath, AtomicLong numUnknownDiskIds)
       throws CatalogException, IOException {
     Preconditions.checkState(stat instanceof LocatedFileStatus);
 
@@ -230,7 +231,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     int partitionId = addPartitionInfo(contentFile);
 
     return IcebergFileDescriptor.cloneWithFileMetadata(
-        createFd(null, stat, relPath, numUnknownDiskIds, absPath),
+        createFd(fs, stat, relPath, numUnknownDiskIds, absPath),
         IcebergUtil.createIcebergMetadata(iceTbl_, contentFile, partitionId));
   }
 
@@ -332,7 +333,6 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       pathToFileStatus.put(status.getPath(), status);
     }
     List<IcebergFileDescriptor> ret = new ArrayList<>();
-    Reference<Long> localNumUnknownDiskIds = new Reference<>(0L);
     for (ContentFile<?> contentFile : contentFiles) {
       Path path = FileSystemUtil.createFullyQualifiedPath(
           new Path(contentFile.path().toString()));
@@ -343,9 +343,8 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
             contentFile.path().toString()));
         continue;
       }
-      ret.add(createLocatedFd(contentFile, stat, tablePath_, localNumUnknownDiskIds));
+      ret.add(createLocatedFd(fs, contentFile, stat, tablePath_, numUnknownDiskIds));
     }
-    numUnknownDiskIds.addAndGet(localNumUnknownDiskIds.getRef());
     return ret;
   }
 

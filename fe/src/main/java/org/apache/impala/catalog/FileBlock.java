@@ -20,6 +20,7 @@ package org.apache.impala.catalog;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -29,7 +30,6 @@ import com.google.common.collect.Sets;
 import com.google.flatbuffers.FlatBufferBuilder;
 
 import org.apache.hadoop.fs.BlockLocation;
-import org.apache.impala.common.Reference;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;
@@ -57,7 +57,7 @@ public class FileBlock {
       FlatBufferBuilder fbb,
       BlockLocation loc,
       ListMap<TNetworkAddress> hostIndex,
-      Reference<Long> numUnknownDiskIds) throws IOException {
+      AtomicLong numUnknownDiskIds) throws IOException {
     Preconditions.checkNotNull(fbb);
     Preconditions.checkNotNull(loc);
     Preconditions.checkNotNull(hostIndex);
@@ -123,8 +123,7 @@ public class FileBlock {
    */
   private static short[] createDiskIds(
       BlockLocation location,
-      Reference<Long> numUnknownDiskIds) throws IOException {
-    long unknownDiskIdCount = 0;
+      AtomicLong numUnknownDiskIds) throws IOException {
     String[] storageIds = location.getStorageIds();
     String[] hosts = location.getHosts();
     if (storageIds.length != hosts.length) {
@@ -139,13 +138,11 @@ public class FileBlock {
     for (int i = 0; i < storageIds.length; ++i) {
       if (Strings.isNullOrEmpty(storageIds[i])) {
         diskIDs[i] = (short) -1;
-        ++unknownDiskIdCount;
+        numUnknownDiskIds.incrementAndGet();
       } else {
         diskIDs[i] = DiskIdMapper.INSTANCE.getDiskId(hosts[i], storageIds[i]);
       }
     }
-    long count = numUnknownDiskIds.getRef() + unknownDiskIdCount;
-    numUnknownDiskIds.setRef(Long.valueOf(count));
     return diskIDs;
   }
 

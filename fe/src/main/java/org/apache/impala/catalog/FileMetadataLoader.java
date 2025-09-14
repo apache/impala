@@ -32,7 +32,6 @@ import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.FeFsTable.FileMetadataStats;
 import org.apache.impala.common.FileSystemUtil;
-import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.HudiUtil;
@@ -45,6 +44,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nullable;
 
@@ -206,7 +206,7 @@ public class FileMetadataLoader {
       loadedFds_ = new ArrayList<>();
       if (fileStatuses == null) return;
 
-      Reference<Long> numUnknownDiskIds = new Reference<>(0L);
+      AtomicLong numUnknownDiskIds = new AtomicLong(0);
 
       if (writeIds_ != null) {
         fileStatuses = AcidUtils.filterFilesForAcidState(fileStatuses, partPath,
@@ -243,7 +243,7 @@ public class FileMetadataLoader {
           }
         }
       }
-      loadStats_.unknownDiskIds += numUnknownDiskIds.getRef();
+      loadStats_.unknownDiskIds += numUnknownDiskIds.get();
       if (LOG.isTraceEnabled()) {
         LOG.trace(loadStats_.debugString());
       }
@@ -258,7 +258,7 @@ public class FileMetadataLoader {
    * Return fd created by the given fileStatus or from the cache(oldFdsByPath_).
    */
   protected FileDescriptor getFileDescriptor(FileSystem fs, boolean listWithLocations,
-      Reference<Long> numUnknownDiskIds, FileStatus fileStatus, Path partPath)
+      AtomicLong numUnknownDiskIds, FileStatus fileStatus, Path partPath)
       throws IOException {
     String relPath = FileSystemUtil.relativizePath(fileStatus.getPath(), partPath);
     FileDescriptor fd = oldFdsByPath_.get(relPath);
@@ -305,15 +305,16 @@ public class FileMetadataLoader {
    * Iceberg tables may not be in the table location.
    */
   protected FileDescriptor createFd(FileSystem fs, FileStatus fileStatus,
-      String relPath, Reference<Long> numUnknownDiskIds, String absPath)
+      String relPath, AtomicLong numUnknownDiskIds, @Nullable String absPath)
       throws IOException {
+    if (!FileSystemUtil.supportsStorageIds(fs)) {
+      return FileDescriptor.createWithNoBlocks(fileStatus, relPath, absPath);
+    }
     BlockLocation[] locations;
     if (fileStatus instanceof LocatedFileStatus) {
       locations = ((LocatedFileStatus) fileStatus).getBlockLocations();
-    } else if (FileSystemUtil.supportsStorageIds(fs)) {
-      locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
     } else {
-      return FileDescriptor.createWithNoBlocks(fileStatus, relPath, absPath);
+      locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
     }
     return FileDescriptor.create(fileStatus, relPath, locations, hostIndex_,
         fileStatus.isEncrypted(), fileStatus.isErasureCoded(), numUnknownDiskIds,
@@ -321,7 +322,7 @@ public class FileMetadataLoader {
   }
 
   private FileDescriptor createFd(FileSystem fs, FileStatus fileStatus,
-      String relPath, Reference<Long> numUnknownDiskIds) throws IOException {
+      String relPath, AtomicLong numUnknownDiskIds) throws IOException {
     return createFd(fs, fileStatus, relPath, numUnknownDiskIds, null);
   }
 
