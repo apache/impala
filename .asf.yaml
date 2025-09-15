@@ -16,7 +16,7 @@
 # under the License.
 
 # https://github.com/apache/infrastructure-asfyaml/blob/main/README.md
---
+---
 github:
   autolink_jira:
     - IMPALA
