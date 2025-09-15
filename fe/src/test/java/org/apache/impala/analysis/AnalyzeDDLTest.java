@@ -2037,8 +2037,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "partition(year=2010, month=1, day is NULL)");
 
     AnalysisError("compute incremental stats functional_hbase.alltypes " +
-        "partition(year=2010, month=1)", "COMPUTE INCREMENTAL ... PARTITION not " +
-        "supported for non-HDFS table functional_hbase.alltypes");
+        "partition(year=2010, month=1)", "COMPUTE INCREMENTAL STATS ... PARTITION not " +
+        "supported for non-filesystem-based table functional_hbase.alltypes");
+
+    AnalysisError("compute incremental stats functional_parquet.iceberg_partitioned "
+            + "partition(year=2010, month=1)", "COMPUTE INCREMENTAL STATS ... PARTITION "
+            + "not supported for Iceberg table functional_parquet.iceberg_partitioned");
 
     AnalysisError("compute incremental stats functional.view_view",
         "COMPUTE STATS not supported for view: functional.view_view");
@@ -2097,6 +2101,12 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError(
         "drop incremental stats functional.alltypes partition(year=9999, month=10)",
         "No matching partition(s) found.");
+    AnalysisError("drop incremental stats functional_hbase.alltypes "
+            + "partition(year=2010, month=1)", "DROP INCREMENTAL STATS ... PARTITION "
+            + "not supported for non-filesystem-based table functional_hbase.alltypes");
+    AnalysisError("drop incremental stats functional_parquet.iceberg_partitioned "
+            + "partition(year=2010, month=1)", "DROP INCREMENTAL STATS ... PARTITION "
+            + "not supported for Iceberg table functional_parquet.iceberg_partitioned");
   }
 
 

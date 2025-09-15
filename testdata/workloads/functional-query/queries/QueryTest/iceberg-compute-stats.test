@@ -387,7 +387,11 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ---- QUERY
 COMPUTE INCREMENTAL STATS ice_alltypes_part PARTITION (i=1);
 ---- CATCH
-COMPUTE INCREMENTAL ... PARTITION not supported for Iceberg table
+COMPUTE INCREMENTAL STATS ... PARTITION not supported for Iceberg table
+---- QUERY
+DROP INCREMENTAL STATS ice_alltypes_part PARTITION (i=1);
+---- CATCH
+DROP INCREMENTAL STATS ... PARTITION not supported for Iceberg table
 ====
 
 ---- QUERY

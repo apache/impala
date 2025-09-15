@@ -20,6 +20,9 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDropStatsParams;
 import org.apache.impala.thrift.TTableName;
@@ -105,6 +108,21 @@ public class DropStatsStmt extends StatementBase implements SingleTableStmt {
           String.format("DROP STATS not allowed on a nested collection: %s", tableName_));
     }
     tableRef_.analyze(analyzer);
+
+    FeTable table_ = analyzer.getTable(tableName_, Privilege.ALTER);
+    if (!(table_ instanceof FeFsTable)) {
+      if (partitionSet_ != null) {
+        throw new AnalysisException("DROP INCREMENTAL STATS ... PARTITION " +
+            "not supported for non-filesystem-based table " + tableName_);
+      }
+    }
+    if (table_ instanceof FeIcebergTable) {
+      if (partitionSet_ != null) {
+        throw new AnalysisException("DROP INCREMENTAL STATS ... PARTITION " +
+            "not supported for Iceberg table " + tableName_);
+      }
+    }
+
     // There is no transactional HMS API to drop stats at the moment (HIVE-22104).
     analyzer.ensureTableNotTransactional(tableRef_.getTable(), "DROP STATS");
     if (partitionSet_ != null) {

@@ -410,16 +410,16 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
 
     if (!(table_ instanceof FeFsTable)) {
       if (partitionSet_ != null) {
-        throw new AnalysisException("COMPUTE INCREMENTAL ... PARTITION not supported " +
-            "for non-HDFS table " + tableName_);
+        throw new AnalysisException("COMPUTE INCREMENTAL STATS ... PARTITION " +
+            "not supported for non-filesystem-based table " + tableName_);
       }
       isIncremental_ = false;
     }
 
     if (table_ instanceof FeIcebergTable) {
       if (partitionSet_ != null) {
-        throw new AnalysisException("COMPUTE INCREMENTAL ... PARTITION not supported " +
-            "for Iceberg table " + tableName_);
+        throw new AnalysisException("COMPUTE INCREMENTAL STATS ... PARTITION " +
+            "not supported for Iceberg table " + tableName_);
       }
       isIncremental_ = false;
     }
