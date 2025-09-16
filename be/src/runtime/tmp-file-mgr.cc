@@ -1475,7 +1475,7 @@ Status TmpFileGroup::AllocateRemoteSpace(int64_t num_bytes, TmpFile** tmp_file,
   const string& local_buffer_dir = tmp_file_mgr_->local_buff_dir_->path();
   string new_file_path_local = GenerateNewPath(local_buffer_dir, unique_name);
 
-  TmpFileRemote* tmp_file_r = new TmpFileRemote(
+  unique_ptr<TmpFileRemote> tmp_file_r = make_unique<TmpFileRemote>(
       this, dev_id, new_file_path, new_file_path_local, false, dir.c_str());
   if (tmp_file_r == nullptr) {
     return Status("Failed to allocate temporary file object.");
