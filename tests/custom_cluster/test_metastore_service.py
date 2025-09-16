@@ -20,25 +20,32 @@ from __future__ import absolute_import, division, print_function
 from builtins import range
 import pytest
 
+from tests.common.environ import HIVE_MAJOR_VERSION, IS_APACHE_HIVE
 from impala_thrift_gen.hive_metastore.ttypes import (
     Database,
     FieldSchema,
-    FindNextCompactRequest,
-    GetPartitionsByNamesRequest,
     GetTableRequest,
     SerDeInfo,
     StorageDescriptor,
     Table,
+)
+# The following requests are missing in Apache Hive 3
+if not (IS_APACHE_HIVE and HIVE_MAJOR_VERSION <= 3):
+  from impala_thrift_gen.hive_metastore.ttypes import (
+    FindNextCompactRequest,
+    GetPartitionsByNamesRequest,
     TruncateTableRequest,
     UpdateTransactionalStatsRequest,
     WriteNotificationLogBatchRequest,
 )
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfApacheHive
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.util.filesystem_utils import IS_HDFS, IS_OZONE
 
 
+@SkipIfApacheHive.feature_not_supported
 class TestMetastoreService(CustomClusterTestSuite):
     """
     Tests for the Catalog Metastore service. Each test in this class should

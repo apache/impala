@@ -19,6 +19,7 @@ from __future__ import absolute_import, division, print_function
 
 from thrift.protocol import TBinaryProtocol
 
+from tests.common.environ import HIVE_MAJOR_VERSION, IS_APACHE_HIVE
 from impala_thrift_gen.hive_metastore import ThriftHiveMetastore
 from impala_thrift_gen.hive_metastore.ttypes import (
     AbortTxnRequest,
@@ -33,9 +34,12 @@ from impala_thrift_gen.hive_metastore.ttypes import (
     LockType,
     OpenTxnRequest,
     ShowLocksRequest,
-    TruncateTableRequest,
     UnlockRequest,
 )
+# TruncateTableRequest is missing in Apache Hive 3
+if not (IS_APACHE_HIVE and HIVE_MAJOR_VERSION <= 3):
+  from impala_thrift_gen.hive_metastore.ttypes import TruncateTableRequest
+
 from tests.util.thrift_util import create_transport
 
 # HMS config
