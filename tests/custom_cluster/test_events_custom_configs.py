@@ -30,7 +30,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_connection import ERROR, FINISHED
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIf, SkipIfFS
+from tests.common.skip import SkipIf, SkipIfFS, SkipIfCdpHive
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.util.acid_txn import AcidTxn
 from tests.util.hive_utils import HiveDbWrapper
@@ -1339,6 +1339,7 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     # self.assert_catalogd_log_contains("INFO", "Not added ABORTED write id 1 since it's "
     #    + "not opened and might already be cleaned up")
 
+  @SkipIfCdpHive.deprecated_feature
   @CustomClusterTestSuite.with_args(
       catalogd_args="--hms_event_incremental_refresh_transactional_table=false",
       statestored_args=STATESTORED_ARGS)
@@ -1352,7 +1353,9 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       part_create = " partitioned by (p int)" if partitioned else ""
       part_insert = " partition (p = 1)" if partitioned else ""
 
-      create_stmt = "create transactional table {} (i int){}".format(fq_tbl, part_create)
+      create_stmt = ("create table {} (i int){} stored as ORC "
+                     "tblproperties ('transactional'='true',"
+                     "'transactional_properties'='default')").format(fq_tbl, part_create)
       self.run_stmt_in_hive(create_stmt)
       EventProcessorUtils.wait_for_event_processing(self)
       # Wait for StatestoreD to propagate the update.

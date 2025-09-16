@@ -276,6 +276,11 @@ class SkipIfApacheHive():
       reason="Apache Hive 3.1 or older version do not support DataConnector")
 
 
+class SkipIfCdpHive():
+  deprecated_feature = pytest.mark.skipif(
+      not IS_APACHE_HIVE, reason="Deprecated feature on CDP Hive support")
+
+
 class SkipIfExploration:
   """Exposes decorators as methods so that tests can be skipped based on exploration
      strategy"""
