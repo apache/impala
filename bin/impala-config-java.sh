@@ -15,19 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
-IMPALA_JDK_VERSION=${IMPALA_JDK_VERSION:-system}
+IMPALA_JDK_VERSION=${IMPALA_JDK_VERSION:-}
 
-# Set OS Java package variables for bootstrap_system and Docker builds
-if [[ "${IMPALA_JDK_VERSION}" == "system" || "${IMPALA_JDK_VERSION}" == "8" ]]; then
+# Set OS Java package variables for bootstrap_system and Docker builds.
+# Defaults to installing Java 8.
+if [[ "${IMPALA_JDK_VERSION}" == "" || "${IMPALA_JDK_VERSION}" == "8" ]]; then
   UBUNTU_JAVA_VERSION=8
   REDHAT_JAVA_VERSION=1.8.0
-  export IMPALA_JDK_VERSION_NUM=8
-  export IMPALA_JAVA_TARGET=1.8
 else
   UBUNTU_JAVA_VERSION="${IMPALA_JDK_VERSION}"
   REDHAT_JAVA_VERSION="${IMPALA_JDK_VERSION}"
-  export IMPALA_JDK_VERSION_NUM="${IMPALA_JDK_VERSION}"
-  export IMPALA_JAVA_TARGET="${IMPALA_JDK_VERSION}"
 fi
 
 if [[ "$(uname -p)" == 'aarch64' ]]; then
@@ -35,8 +32,3 @@ if [[ "$(uname -p)" == 'aarch64' ]]; then
 else
   UBUNTU_PACKAGE_ARCH='amd64'
 fi
-
-echo "JAVA_HOME: ${JAVA_HOME:-}"
-echo "IMPALA_JDK_VERSION: $IMPALA_JDK_VERSION"
-echo "IMPALA_JDK_VERSION_NUM: $IMPALA_JDK_VERSION_NUM"
-echo "IMPALA_JAVA_TARGET: $IMPALA_JAVA_TARGET"

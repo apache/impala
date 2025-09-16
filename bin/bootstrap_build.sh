@@ -66,8 +66,13 @@ if [[ $DISTRIB_ID == Ubuntu && $DISTRIB_RELEASE == 20.04 ]]; then
 fi
 
 JDK_VERSION=17
+if [[ "$(uname -p)" == 'aarch64' ]]; then
+  PACKAGE_ARCH='arm64'
+else
+  PACKAGE_ARCH='amd64'
+fi
 sudo apt-get --yes --quiet install openjdk-${JDK_VERSION}-jdk openjdk-${JDK_VERSION}-source
-export JAVA_HOME=/usr/lib/jvm/java-${JDK_VERSION}-openjdk-amd64
+export JAVA_HOME=/usr/lib/jvm/java-${JDK_VERSION}-openjdk-${PACKAGE_ARCH}
 
 # Download Maven since the packaged version is pretty old.
 : ${IMPALA_TOOLCHAIN_HOST:=native-toolchain.s3.amazonaws.com}

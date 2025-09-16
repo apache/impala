@@ -22,7 +22,7 @@
 
 export IMPALA_JAVA_TOOL_OPTIONS="${IMPALA_JAVA_TOOL_OPTIONS:-}"
 
-if (( IMPALA_JDK_VERSION_NUM > 8 )); then
+if (( IMPALA_JAVA_TARGET > 8 )); then
   echo "JDK >= 9 detected, adding --add-opens to IMPALA_JAVA_TOOL_OPTIONS"
   ADD_OPENS_OPTS=" --add-opens=java.base/java.io=ALL-UNNAMED"
   ADD_OPENS_OPTS+=" --add-opens=java.base/java.lang.invoke=ALL-UNNAMED"
