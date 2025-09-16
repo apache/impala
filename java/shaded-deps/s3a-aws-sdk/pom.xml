@@ -36,14 +36,12 @@ though some of them might not be necessary. The exclusions are sorted alphabetic
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-aws</artifactId>
-      <version>${hadoop.version}</version>
     </dependency>
   </dependencies>
   <build>
     <plugins>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.4.1</version>
         <configuration>
           <artifactSet>
             <includes>
@@ -173,14 +171,6 @@ though some of them might not be necessary. The exclusions are sorted alphabetic
             </filter>
           </filters>
         </configuration>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>

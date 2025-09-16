@@ -34,11 +34,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.11.0</version>
-        <configuration>
-          <source>1.8</source>
-          <target>${impala.java.target.version}</target>
-        </configuration>
       </plugin>
     </plugins>
   </build>
@@ -47,7 +42,6 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-client</artifactId>
-      <version>${hadoop.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.parquet</groupId>
@@ -56,13 +50,6 @@
     <dependency>
       <groupId>org.kitesdk</groupId>
       <artifactId>kite-data-core</artifactId>
-      <version>${kite.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.twitter</groupId>
-          <artifactId>parquet-avro</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>

@@ -31,10 +31,6 @@
   <packaging>jar</packaging>
   <url>.</url>
 
-  <properties>
-    <commons-dbcp2.version>2.9.0</commons-dbcp2.version>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>org.apache.impala</groupId>
@@ -51,7 +47,6 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-dbcp2</artifactId>
-      <version>${commons-dbcp2.version}</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -66,11 +61,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.11.0</version>
-        <configuration>
-          <source>1.8</source>
-          <target>${impala.java.target.version}</target>
-        </configuration>
       </plugin>
     </plugins>
   </build>

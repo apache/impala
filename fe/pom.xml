@@ -55,13 +55,6 @@ under the License.
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-auth</artifactId>
-      <version>${hadoop.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
@@ -86,10 +79,6 @@ under the License.
           <groupId>com.sun.jersey</groupId>
           <artifactId>jersey-server</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-        </exclusion>
       </exclusions>
     </dependency>
 
@@ -102,14 +91,6 @@ under the License.
             <!-- IMPALA-9647 (re: CVE-2014-3577, CVE-2015-5262) -->
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>fluent-hc</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.hive</groupId>
-            <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
             <!-- Avoid pulling in rocksdb, which is unneeded. -->
@@ -136,26 +117,7 @@ under the License.
         unneeded and not uploaded to toolchain. -->
         <exclusion>
           <groupId>com.cloudera</groupId>
-          <artifactId>jwtprovider-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.cloudera</groupId>
-          <artifactId>jwtprovider-knox</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.ranger</groupId>
-          <artifactId>ranger-plugins-audit</artifactId>
-        </exclusion>
-        <!-- After RANGER-3498, Ranger's ranger-plugins-common starts pulling in
-        log4j-1.2-api, which is banned by Impala's frontend. Thus we exclude the
-        dependency here.-->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-1.2-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
+          <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -170,43 +132,16 @@ under the License.
         (See IMPALA-10644 for more details. -->
         <exclusion>
           <groupId>com.cloudera</groupId>
-          <artifactId>jwtprovider-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.cloudera</groupId>
-          <artifactId>jwtprovider-knox</artifactId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.kafka</groupId>
           <artifactId>*</artifactId>
         </exclusion>
-        <!-- After RANGER-3498, Ranger's ranger-plugins-audit starts pulling in
-        log4j-1.2-api, which is banned by Impala's frontend. Thus we exclude the
-        dependency here.-->
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-1.2-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>log4j</groupId>
-          <artifactId>log4j</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>org.apache.shiro</groupId>
           <artifactId>shiro-core</artifactId>
         </exclusion>
-        <!-- RANGER-1837 causes Ranger to pull in ORC dependencies.
-        We have a much tighter coupling with the ORC version required by the Iceberg
-        dependency (which is likely to conflict), so the indirect dependency
-        through Ranger is excluded here. -->
-        <exclusion>
-          <groupId>org.apache.orc</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <!--
-        We do not explicitly exclude all artifacts in org.eclipse.jetty because
-        jetty-client is needed.
-        -->
         <!-- We exclude hive-exec which this jar includes because hive-exec
         brings with it tons of other unnecessary dependencies including thrift 0.9.3
         which can cause build failures.
@@ -235,16 +170,6 @@ under the License.
       <groupId>org.apache.impala</groupId>
       <artifactId>yarn-extras</artifactId>
       <version>${yarn-extras.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.sun.jersey</groupId>
-          <artifactId>jersey-server</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.sun.jersey</groupId>
-          <artifactId>jersey-servlet</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
@@ -263,10 +188,6 @@ under the License.
       <artifactId>orc-core</artifactId>
       <version>${orc.version}</version>
       <exclusions>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-common</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>org.apache.hive</groupId>
           <artifactId>*</artifactId>
@@ -294,7 +215,6 @@ under the License.
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libthrift</artifactId>
-      <version>${thrift.version}</version>
     </dependency>
 
     <dependency>
@@ -323,12 +243,6 @@ under the License.
     </dependency>
 
     <dependency>
-      <groupId>commons-cli</groupId>
-      <artifactId>commons-cli</artifactId>
-      <version>1.2</version>
-    </dependency>
-
-    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-reload4j</artifactId>
     </dependency>
@@ -343,7 +257,6 @@ under the License.
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-dbcp2</artifactId>
-      <version>${commons-dbcp2.version}</version>
     </dependency>
 
     <dependency>
@@ -431,20 +344,17 @@ under the License.
     <dependency>
       <groupId>org.apache.iceberg</groupId>
       <artifactId>iceberg-api</artifactId>
-      <version>${iceberg.version}</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.iceberg</groupId>
       <artifactId>iceberg-hive-runtime</artifactId>
-      <version>${iceberg.version}</version>
     </dependency>
 
     <!-- Needed for reading Iceberg Puffin files. -->
     <dependency>
       <groupId>org.apache.datasketches</groupId>
       <artifactId>datasketches-java</artifactId>
-      <version>${datasketches.version}</version>
     </dependency>
 
     <!-- Needed for tests like JdbcTest which instantiates HiveDriver -->
@@ -454,6 +364,7 @@ under the License.
       <version>${hive.version}</version>
       <scope>test</scope>
       <exclusions>
+        <!-- Exclusions needed for Hive 3.1.3 -->
         <exclusion>
           <groupId>org.apache.hbase</groupId>
           <artifactId>*</artifactId>
@@ -498,15 +409,7 @@ under the License.
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>com.sun.jersey</groupId>
-          <artifactId>jersey-server</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>com.cloudera</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.bouncycastle</groupId>
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
@@ -680,25 +583,19 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.11.0</version>
-        <configuration>
-          <source>1.8</source>
-          <target>${impala.java.target.version}</target>
-        </configuration>
       </plugin>
 
       <!-- Build fe/tests/ to jar -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-        <version>3.3.0</version>
-      <executions>
-        <execution>
-          <goals>
-            <goal>test-jar</goal>
-          </goals>
-        </execution>
-      </executions>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
 
       <plugin>
@@ -744,7 +641,6 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <version>3.5.0</version>
         <executions>
           <!-- TODO(todd): consider removing this execution or moving it to
                some kind of 'dist' profile. No need to copy all of these jars
@@ -793,11 +689,9 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.0.0</version>
         <configuration>
           <trimStackTrace>false</trimStackTrace>
           <reportsDirectory>${surefire.reports.dir}</reportsDirectory>
-          <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <argLine>${surefireJacocoArg}</argLine>
           <groups>${testcase.groups}</groups>
           <environmentVariables>
@@ -822,7 +716,6 @@ under the License.
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
-        <version>3.3.0</version>
         <executions>
           <!-- Tell maven about our generated files -->
           <execution>
@@ -898,6 +791,7 @@ under the License.
                          Jetty server -->
                     <exclude>ant:*</exclude>
                     <exclude>ant-contrib:*</exclude>
+                    <exclude>com.amazonaws:aws-java-sdk-bundle</exclude>
                     <exclude>org.apache.ant:*</exclude>
                     <exclude>org.eclipse.jetty:*</exclude>
                     <!-- We use reload4j, exclude log4j 1.x and 2.x -->
@@ -916,8 +810,6 @@ under the License.
                     <exclude>org.rocksdb:*</exclude>
                     <!-- Avoid runtime dependency on Jersey server components. -->
                     <exclude>com.sun.jersey:jersey-server</exclude>
-                    <exclude>com.sun.jersey:jersey-server</exclude>
-                    <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
                     <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
                     <!-- IMPALA-9708: Sentry is removed. -->
                     <exclude>org.apache.sentry:*</exclude>
@@ -1123,7 +1015,6 @@ under the License.
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.11.0</version>
             <configuration>
               <showWarnings>true</showWarnings>
               <compilerId>javac-with-errorprone</compilerId>
@@ -1167,7 +1058,6 @@ under the License.
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-compiler-plugin</artifactId>
-            <version>3.11.0</version>
             <configuration>
               <excludes>
                 <exclude>**/org/apache/impala/catalog/metastore/*.java</exclude>

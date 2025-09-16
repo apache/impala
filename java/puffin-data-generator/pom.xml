@@ -36,24 +36,10 @@ under the License.
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
-      <version>${hadoop.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.eclipse.jetty</groupId>
           <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
-          <groupId>io.netty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.sun.jersey</groupId>
-          <artifactId>jersey-server</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.sun.jersey</groupId>
-          <artifactId>jersey-servlet</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -61,20 +47,16 @@ under the License.
     <dependency>
       <groupId>org.apache.iceberg</groupId>
       <artifactId>iceberg-api</artifactId>
-      <version>${iceberg.version}</version>
     </dependency>
-
     <dependency>
       <groupId>org.apache.iceberg</groupId>
       <artifactId>iceberg-hive-runtime</artifactId>
-      <version>${iceberg.version}</version>
     </dependency>
 
     <!-- Needed for reading Iceberg Puffin files. -->
     <dependency>
       <groupId>org.apache.datasketches</groupId>
       <artifactId>datasketches-java</artifactId>
-      <version>${datasketches.version}</version>
     </dependency>
 
     <dependency>
@@ -88,20 +70,11 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.11.0</version>
-        <configuration>
-          <source>1.8</source>
-          <target>${impala.java.target.version}</target>
-        </configuration>
       </plugin>
 
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.0.0</version>
-        <configuration>
-          <redirectTestOutputToFile>true</redirectTestOutputToFile>
-        </configuration>
       </plugin>
     </plugins>
   </build>
