@@ -49,6 +49,10 @@ DECLARE_string(cluster_id);
 DECLARE_int32(otel_trace_retry_policy_max_attempts);
 DECLARE_int32(otel_trace_retry_policy_max_backoff_s);
 
+#ifndef NDEBUG
+DECLARE_bool(otel_trace_exhaustive_dchecks);
+#endif
+
 // Names of attributes only on Root spans.
 static constexpr char const* ATTR_ERROR_MESSAGE = "ErrorMessage";
 static constexpr char const* ATTR_QUERY_START_TIME = "QueryStartTime";
@@ -181,8 +185,12 @@ void SpanManager::AddChildSpanEvent(const nostd::string_view& name) {
     LOG(WARNING) << strings::Substitute("Attempted to add event '$0' with no active "
         "child span trace_id=\"$1\" span_id=\"$2\"\n$3", name.data(), root_->TraceId(),
         root_->SpanId(), GetStackTrace());
-    DCHECK(current_child_) << strings::Substitute("Cannot add event '$0' when child span "
-        "is not active.", name.data());
+#ifndef NDEBUG
+    if (FLAGS_otel_trace_exhaustive_dchecks) {
+      DCHECK(current_child_) << strings::Substitute("Cannot add event '$0' when child "
+          "span is not active.", name.data());
+    }
+#endif
   }
 } // function AddChildSpanEvent
 
@@ -219,7 +227,11 @@ void SpanManager::EndChildSpanInit() {
 } // function EndChildSpanInit
 
 inline void SpanManager::DoEndChildSpanInit(const Status* cause) {
-  DCHECK_CHILD_SPAN_TYPE(ChildSpanType::INIT);
+#ifndef NDEBUG
+  if (FLAGS_otel_trace_exhaustive_dchecks) {
+    DCHECK_CHILD_SPAN_TYPE(ChildSpanType::INIT);
+  }
+#endif
 
   EndChildSpan(
       cause,
@@ -241,7 +253,11 @@ void SpanManager::EndChildSpanSubmitted() {
 } // function EndChildSpanSubmitted
 
 inline void SpanManager::DoEndChildSpanSubmitted(const Status* cause) {
-  DCHECK_CHILD_SPAN_TYPE(ChildSpanType::SUBMITTED);
+#ifndef NDEBUG
+  if (FLAGS_otel_trace_exhaustive_dchecks) {
+    DCHECK_CHILD_SPAN_TYPE(ChildSpanType::SUBMITTED);
+  }
+#endif
   EndChildSpan(cause);
 } // function DoEndChildSpanSubmitted
 
@@ -257,7 +273,11 @@ void SpanManager::EndChildSpanPlanning() {
 } // function EndChildSpanPlanning
 
 inline void SpanManager::DoEndChildSpanPlanning(const Status* cause) {
-  DCHECK_CHILD_SPAN_TYPE(ChildSpanType::PLANNING);
+#ifndef NDEBUG
+  if (FLAGS_otel_trace_exhaustive_dchecks) {
+    DCHECK_CHILD_SPAN_TYPE(ChildSpanType::PLANNING);
+  }
+#endif
   EndChildSpan(
       cause,
       OtelAttributesMap{
@@ -283,7 +303,11 @@ inline void SpanManager::DoEndChildSpanAdmissionControl(const Status* cause) {
    return; // <-- EARLY RETURN
   }
 
-  DCHECK_CHILD_SPAN_TYPE(ChildSpanType::ADMISSION_CONTROL);
+#ifndef NDEBUG
+  if (FLAGS_otel_trace_exhaustive_dchecks) {
+    DCHECK_CHILD_SPAN_TYPE(ChildSpanType::ADMISSION_CONTROL);
+  }
+#endif
 
   bool queued = false;
   string adm_result;
@@ -344,7 +368,11 @@ inline void SpanManager::DoEndChildSpanQueryExecution(const Status* cause) {
    return; // <-- EARLY RETURN
   }
 
-  DCHECK_CHILD_SPAN_TYPE(ChildSpanType::QUERY_EXEC);
+#ifndef NDEBUG
+  if (FLAGS_otel_trace_exhaustive_dchecks) {
+    DCHECK_CHILD_SPAN_TYPE(ChildSpanType::QUERY_EXEC);
+  }
+#endif
   OtelAttributesMap attrs;
 
   if (client_request_state_->exec_request().stmt_type == TStmtType::QUERY) {
@@ -399,7 +427,11 @@ void SpanManager::StartChildSpanClose(const Status* cause) {
 } // function StartChildSpanClose
 
 void SpanManager::EndChildSpanClose() {
-  DCHECK_CHILD_SPAN_TYPE(ChildSpanType::CLOSE);
+#ifndef NDEBUG
+  if (FLAGS_otel_trace_exhaustive_dchecks) {
+    DCHECK_CHILD_SPAN_TYPE(ChildSpanType::CLOSE);
+  }
+#endif
 
   lock_guard<mutex> l(child_span_mu_);
 
@@ -459,9 +491,13 @@ inline void SpanManager::ChildSpanBuilder(const ChildSpanType& span_type,
         "another child span '$1' is still active trace_id=\"$2\" span_id=\"$3\"\n$4",
         to_string(span_type), to_string(child_span_type_), root_->TraceId(),
         root_->SpanId(), GetStackTrace());
-    DCHECK(false) << strings::Substitute("Should not start child span '$0' when child "
-        "span '$1' is already active.", to_string(span_type),
-        to_string(child_span_type_));
+#ifndef NDEBUG
+    if (FLAGS_otel_trace_exhaustive_dchecks) {
+      DCHECK(false) << strings::Substitute("Should not start child span '$0' when "
+          "child span '$1' is already active.", to_string(span_type),
+          to_string(child_span_type_));
+    }
+#endif
 
     {
       lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
@@ -529,7 +565,11 @@ inline void SpanManager::EndChildSpan(const Status* cause,
     LOG(WARNING) << strings::Substitute("Attempted to end a non-active child span "
         "trace_id=\"$0\" span_id=\"$1\"\n$2", root_->TraceId(), root_->SpanId(),
         GetStackTrace());
-    DCHECK(current_child_) << "Cannot end child span when one is not active.";
+#ifndef NDEBUG
+    if (FLAGS_otel_trace_exhaustive_dchecks) {
+      DCHECK(current_child_) << "Cannot end child span when one is not active.";
+    }
+#endif
   }
 } // function EndChildSpan
 
@@ -555,8 +595,12 @@ inline void SpanManager::EndActiveChildSpan(const Status* cause) {
       LOG(WARNING) << "Attempted to start Close child span while another Close child "
           "span is already active trace_id=\"$0\" span_id=\"$1\"\n$2", root_->TraceId(),
           current_child_->SpanId(), GetStackTrace();
-      DCHECK(false) << "Cannot start a new Close child span while a Close child span is "
-          "already active.";
+#ifndef NDEBUG
+      if (FLAGS_otel_trace_exhaustive_dchecks) {
+        DCHECK(false) << "Cannot start a new Close child span while a Close child span "
+            "is already active.";
+      }
+#endif
       break;
     default:
       // No-op, no active child span to end.

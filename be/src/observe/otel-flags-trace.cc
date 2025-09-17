@@ -61,6 +61,10 @@ DEFINE_validator(otel_trace_exporter, [](const char* flagname, const string& val
   return false;
 }); // flag otel_trace_exporter
 
+DEFINE_bool_hidden(otel_trace_exhaustive_dchecks, false, "Specifies whether or not to "
+    "enable exhaustive DCHECKs in OpenTelemetry code. These DCHECKs fail if spans are "
+    "not properly started and ended.");
+
 //
 // Start of HTTP related flags.
 //

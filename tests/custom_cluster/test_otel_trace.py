@@ -33,7 +33,7 @@ from tests.util.retry import retry
 OUT_DIR = "out_dir_traces"
 TRACE_FILE = "export-trace.jsonl"
 TRACE_FLAGS = "--otel_trace_enabled=true --otel_trace_exporter=file " \
-              "--otel_file_flush_interval_ms=500 " \
+              "--otel_trace_exhaustive_dchecks --otel_file_flush_interval_ms=500 " \
               "--otel_file_pattern={out_dir_traces}/" + TRACE_FILE
 
 
