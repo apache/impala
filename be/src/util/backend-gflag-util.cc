@@ -302,6 +302,10 @@ DEFINE_int32(iceberg_catalog_num_threads, 16,
     "Maximum number of threads to use for Iceberg catalog operations. These threads are "
     "shared among concurrent Iceberg catalog operation (ie., ExpireSnapshot).");
 
+DEFINE_int32(max_stmt_metadata_loader_threads, 8,
+    "Maximum number of threads to use for loading table metadata during query "
+    "compilation.");
+
 // These coefficients have not been determined empirically. The write coefficient
 // matches the coefficient for a broadcast sender in DataStreamSink. The read
 // coefficient matches the coefficient for an exchange receiver in ExchandeNode.
@@ -358,6 +362,7 @@ DEFINE_validator(query_cpu_count_divisor, &ValidatePositiveDouble);
 DEFINE_validator(min_processing_per_thread, &ValidatePositiveInt64);
 DEFINE_validator(query_cpu_root_factor, &ValidatePositiveDouble);
 DEFINE_validator(iceberg_catalog_num_threads, &ValidatePositiveInt32);
+DEFINE_validator(max_stmt_metadata_loader_threads, &ValidatePositiveInt32);
 DEFINE_validator(tuple_cache_cost_coefficient_write_bytes, &ValidateNonnegativeDouble);
 DEFINE_validator(tuple_cache_cost_coefficient_write_rows, &ValidateNonnegativeDouble);
 DEFINE_validator(tuple_cache_cost_coefficient_read_bytes, &ValidateNonnegativeDouble);
@@ -590,6 +595,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_tuple_cache_cost_coefficient_read_rows(
       FLAGS_tuple_cache_cost_coefficient_read_rows);
   cfg.__set_min_jdbc_scan_cardinality(FLAGS_min_jdbc_scan_cardinality);
+  cfg.__set_max_stmt_metadata_loader_threads(FLAGS_max_stmt_metadata_loader_threads);
   return Status::OK();
 }
 

@@ -620,4 +620,8 @@ public class BackendConfig {
   public double getTupleCacheCostCoefficientReadRows() {
     return backendCfg_.tuple_cache_cost_coefficient_read_rows;
   }
+
+  public int getMaxStmtMetadataLoaderThreads() {
+    return backendCfg_.max_stmt_metadata_loader_threads;
+  }
 }

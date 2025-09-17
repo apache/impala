@@ -92,11 +92,22 @@ public class FrontendProfile {
   /**
    * Create a new profile, setting it as the current thread-local profile for the
    * length of the current scope. This is meant to be used in a try-with-resources
-   * statement. Supports at most one scope per thread. No nested scopes are currently
-   * allowed.
+   * statement. Nested scopes are only supported if they use the same FrontendProfile
+   * instance.
    */
   public static Scope createNewWithScope() {
     return new Scope(new FrontendProfile());
+  }
+
+  /**
+   * Create a new scope with an existing profile. This is meant to be used in a
+   * try-with-resources statement. Nested scopes are only supported if they use the same
+   * FrontendProfile instance.
+   * @param profile existing profile from main thread to use in the new scope.
+   * @return the new scope.
+   */
+  public static Scope newScopeWithExistingProfile(FrontendProfile profile) {
+    return new Scope(profile);
   }
 
   /**
@@ -255,7 +266,11 @@ public class FrontendProfile {
     private Scope(FrontendProfile profile) {
       oldThreadLocalValue_ = THREAD_LOCAL.get();
       // TODO: remove when allowing nested scopes.
-      Preconditions.checkState(oldThreadLocalValue_ == null);
+      if (oldThreadLocalValue_ != null) {
+        Preconditions.checkState(oldThreadLocalValue_ == profile,
+            "Nested FrontendProfile scopes only supported if they use the same "
+                + "FrontendProfile instance");
+      }
       THREAD_LOCAL.set(profile);
     }
 

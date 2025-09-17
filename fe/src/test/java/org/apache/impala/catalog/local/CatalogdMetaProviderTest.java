@@ -34,8 +34,8 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.FileDescriptor;
-import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.local.CatalogdMetaProvider.SizeOfWeigher;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
 import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
@@ -61,7 +61,6 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TByteBuffer;
 import org.apache.thrift.TConfiguration;
-import org.apache.thrift.transport.TTransportException;
 import org.junit.Assume;
 import org.junit.Rule;
 import org.junit.Test;
@@ -385,6 +384,54 @@ public class CatalogdMetaProviderTest {
     assertTrue(counters.containsKey("CatalogFetch.RPCs.Time"));
     // 2 RPCs: one for fetching partition list, the other one for fetching partitions.
     assertEquals(2, counters.get("CatalogFetch.RPCs.Requests").getValue());
+    // Should contains StorageLoad.Time since we have loaded partitions from catalogd.
+    assertTrue(counters.containsKey("CatalogFetch.StorageLoad.Time"));
+  }
+
+  @Test
+  public void testProfileParallelLoad() throws Exception {
+    FrontendProfile profile;
+    // All of these table has not been loaded yet.
+    List<TableName> tables = new ArrayList<>();
+    tables.add(new TableName("functional", "alltypesnopart"));
+    tables.add(new TableName("functional", "alltypessmall"));
+    tables.add(new TableName("functional", "alltypestiny"));
+    tables.add(new TableName("functional", "alltypesagg"));
+    try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
+      profile = FrontendProfile.getCurrent();
+      assertNotNull(profile);
+      tables.parallelStream().forEach(t -> {
+        try (FrontendProfile.Scope s =
+                 FrontendProfile.newScopeWithExistingProfile(profile)) {
+          // Load the table. This will create a Table miss.
+          Pair<Table, TableMetaRef> pair = provider_.loadTable(t.getDb(), t.getTbl());
+          // Load all partition ids. This will create a PartitionLists miss.
+          List<PartitionRef> allRefs = provider_.loadPartitionList(pair.second);
+          // Load all partitions. This will create one partition miss per partition.
+          loadPartitions(pair.second, allRefs);
+        } catch (Exception e) { throw new RuntimeException(e); }
+      });
+    }
+    TRuntimeProfileNode prof = profile.emitAsThrift();
+    Map<String, TCounter> counters = Maps.uniqueIndex(prof.counters, TCounter::getName);
+    assertEquals(prof.counters.toString(), 16, counters.size());
+    assertEquals(0, counters.get("CatalogFetch.Tables.Hits").getValue());
+    assertEquals(4, counters.get("CatalogFetch.Tables.Misses").getValue());
+    assertEquals(4, counters.get("CatalogFetch.Tables.Requests").getValue());
+    assertTrue(counters.containsKey("CatalogFetch.Tables.Time"));
+    assertEquals(0, counters.get("CatalogFetch.PartitionLists.Hits").getValue());
+    assertEquals(4, counters.get("CatalogFetch.PartitionLists.Misses").getValue());
+    assertEquals(4, counters.get("CatalogFetch.PartitionLists.Requests").getValue());
+    assertTrue(counters.containsKey("CatalogFetch.PartitionLists.Time"));
+    assertEquals(0, counters.get("CatalogFetch.Partitions.Hits").getValue());
+    assertEquals(20, counters.get("CatalogFetch.Partitions.Misses").getValue());
+    assertEquals(20, counters.get("CatalogFetch.Partitions.Requests").getValue());
+    assertTrue(counters.containsKey("CatalogFetch.Partitions.Time"));
+    assertTrue(counters.containsKey("CatalogFetch.RPCs.Bytes"));
+    assertTrue(counters.containsKey("CatalogFetch.RPCs.Time"));
+    // 3 RPCs per table: one for fetching table, one for partition list,
+    // and the other one for fetching partitions.
+    assertEquals(12, counters.get("CatalogFetch.RPCs.Requests").getValue());
     // Should contains StorageLoad.Time since we have loaded partitions from catalogd.
     assertTrue(counters.containsKey("CatalogFetch.StorageLoad.Time"));
   }

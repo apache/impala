@@ -19,12 +19,23 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import javax.annotation.Nullable;
 
 import org.apache.impala.authorization.TableMask;
 import org.apache.impala.authorization.User;
@@ -36,11 +47,15 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
+import org.apache.impala.catalog.local.LocalCatalogException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend;
+import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.EventSequence;
@@ -50,6 +65,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
  * Loads all table and view metadata relevant for a single SQL statement and returns the
@@ -70,8 +87,9 @@ public class StmtMetadataLoader {
   private final TUniqueId queryId_;
 
   // Results of the loading process. See StmtTableCache.
-  private final Set<String> dbs_ = new HashSet<>();
-  private final Map<TableName, FeTable> loadedOrFailedTbls_ = new HashMap<>();
+  // Use thread-safe collection for parallel stream in getMissingTables().
+  private final Set<String> dbs_ = Collections.synchronizedSet(new HashSet<>());
+  private final Map<TableName, FeTable> loadedOrFailedTbls_ = new ConcurrentHashMap<>();
 
   // Metrics for the metadata load.
   // Number of prioritizedLoad() RPCs issued to the catalogd.
@@ -311,6 +329,91 @@ public class StmtMetadataLoader {
   }
 
   /**
+   * Loads the table 'tblName' from 'catalog' and returns it. If the table or its
+   * database does not exist, returns null. If the table is already in
+   * 'loadedOrFailedTbls_', returns null. Everything called from here needs to be
+   * reentrant.
+   */
+  private @Nullable Pair<TableName, FeTable> loadFeTable(
+      FeCatalog catalog, TableName tblName) {
+    if (loadedOrFailedTbls_.containsKey(tblName)) return null;
+    FeDb db = catalog.getDb(tblName.getDb());
+    if (db == null) return null;
+    dbs_.add(tblName.getDb());
+    FeTable tbl = db.getTable(tblName.getTbl());
+    if (tbl == null) return null;
+    return Pair.create(tblName, tbl);
+  }
+
+  /**
+   * Load 'tbls' serially.
+   */
+  private List<Pair<TableName, FeTable>> serialTableLoad(
+      final FeCatalog catalog, Set<TableName> tbls) {
+    LOG.trace("Serial load {}", tbls);
+    return tbls.stream()
+        .map(tblName -> loadFeTable(catalog, tblName))
+        .filter(Objects::nonNull)
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Load 'tbls' using executor service to speed up table loadings from CatalogD in case
+   * of local catalog mode.
+   */
+  private List<Pair<TableName, FeTable>> parallelTableLoad(final FeCatalog catalog,
+      Set<TableName> tbls, int maxThreads) throws InternalException {
+    LOG.trace("Parallel load {} with {} max threads", tbls, maxThreads);
+    FrontendProfile profile = FrontendProfile.getCurrentOrNull();
+    String queryIdStr =
+        queryId_ == null ? "<unknown_query_id>" : TUniqueIdUtil.PrintId(queryId_);
+    List<Pair<TableName, FeTable>> tables = new ArrayList<>();
+    ExecutorService executorService = null;
+    try {
+      executorService = Executors.newFixedThreadPool(maxThreads,
+          new ThreadFactoryBuilder()
+              .setNameFormat("MissingTableLoaderThread-" + queryIdStr + "-%d")
+              .build());
+      // Transform tbls to a list of tasks.
+      List<Callable<Pair<TableName, FeTable>>> tasks =
+          tbls.stream()
+              .map(tblName -> (Callable<Pair<TableName, FeTable>>) () -> {
+                try (FrontendProfile.Scope s =
+                         FrontendProfile.newScopeWithExistingProfile(profile)) {
+                  return loadFeTable(catalog, tblName);
+                }
+              })
+              .collect(Collectors.toList());
+      // Invoke all tasks and wait for them to finish.
+      List<Future<Pair<TableName, FeTable>>> futures = executorService.invokeAll(tasks);
+      for (Future<Pair<TableName, FeTable>> future : futures) {
+        Pair<TableName, FeTable> nameTblPair = future.get();
+        if (nameTblPair != null) tables.add(nameTblPair);
+      }
+    } catch (ExecutionException ex) {
+      // Unwrap and rethrow the cause if it is one of the declared exceptions.
+      // TODO: Any other exceptions to propagate?
+      Throwables.propagateIfPossible(ex.getCause(),
+          InconsistentMetadataFetchException.class, LocalCatalogException.class);
+      Throwables.propagateIfPossible(ex.getCause(), InternalException.class);
+      // Otherwise, wrap as InternalException and rethrow.
+      throw new InternalException(
+          "Caught exception during parallel table loading of " + tbls, ex.getCause());
+    } catch (InterruptedException ex) {
+      // Wrap as InternalException and rethrow.
+      throw new InternalException(
+          "ExecutorService interrupted during parallel table loading of " + tbls, ex);
+    } catch (RejectedExecutionException ex) {
+      // Parallel load rejected, fall back to serial load.
+      tables = serialTableLoad(catalog, tbls);
+    } finally {
+      if (executorService != null) executorService.shutdown();
+    }
+
+    return tables;
+  }
+
+  /**
    * Determines whether the 'tbls' are loaded in the given catalog or not. Adds the names
    * of referenced databases that exist to 'dbs_', and loaded tables to
    * 'loadedOrFailedTbls_'.
@@ -319,17 +422,24 @@ public class StmtMetadataLoader {
    * Path.getCandidateTables(). Non-existent tables are ignored and not returned or
    * added to 'loadedOrFailedTbls_'.
    */
-  private Set<TableName> getMissingTables(FeCatalog catalog, Set<TableName> tbls,
-      Map<TableName, FeTable> missingTblsSnapshot) {
+  private Set<TableName> getMissingTables(final FeCatalog catalog, Set<TableName> tbls,
+      Map<TableName, FeTable> missingTblsSnapshot) throws InternalException {
     Set<TableName> missingTbls = new HashSet<>();
+    if (tbls.isEmpty()) return missingTbls;
     Set<TableName> viewTbls = new HashSet<>();
-    for (TableName tblName: tbls) {
-      if (loadedOrFailedTbls_.containsKey(tblName)) continue;
-      FeDb db = catalog.getDb(tblName.getDb());
-      if (db == null) continue;
-      dbs_.add(tblName.getDb());
-      FeTable tbl = db.getTable(tblName.getTbl());
-      if (tbl == null) continue;
+
+    int maxThreads =
+        Math.min(tbls.size(), BackendConfig.INSTANCE.getMaxStmtMetadataLoaderThreads());
+    List<Pair<TableName, FeTable>> tables = null;
+    if (maxThreads > 1 && BackendConfig.INSTANCE.getBackendCfg().use_local_catalog) {
+      tables = parallelTableLoad(catalog, tbls, maxThreads);
+    } else {
+      tables = serialTableLoad(catalog, tbls);
+    }
+
+    for (Pair<TableName, FeTable> nameTblPair : tables) {
+      TableName tblName = nameTblPair.first;
+      FeTable tbl = nameTblPair.second;
       if (!tbl.isLoaded()
           || (tbl instanceof FeIncompleteTable
                  && ((FeIncompleteTable) tbl).isLoadFailedByRecoverableError())) {

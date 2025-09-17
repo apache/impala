@@ -359,4 +359,6 @@ struct TBackendGflags {
   164: required double tuple_cache_cost_coefficient_read_rows
 
   165: required i32 min_jdbc_scan_cardinality
+
+  166: required i32 max_stmt_metadata_loader_threads
 }

@@ -1568,6 +1568,10 @@ public class Analyzer {
 
       // Add paths rooted at a table with an unqualified and fully-qualified table name.
       List<TableName> candidateTbls = Path.getCandidateTables(rawPath, getDefaultDb());
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Candidate tables to lookup in catalog/cache for {} {}: {}", pathType,
+            ToSqlUtils.getPathSql(rawPath), candidateTbls);
+      }
       for (int tblNameIdx = 0; tblNameIdx < candidateTbls.size(); ++tblNameIdx) {
         TableName tblName = candidateTbls.get(tblNameIdx);
         FeTable tbl = null;

@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 
 /**
@@ -78,7 +79,8 @@ public class LocalCatalog implements FeCatalog {
   private final static Logger LOG = LoggerFactory.getLogger(LocalCatalog.class);
 
   private final MetaProvider metaProvider_;
-  private Map<String, FeDb> dbs_ = new HashMap<>();
+  // Mapping of Db name to FeDb. Not cleared once populated.
+  private ImmutableMap<String, FeDb> dbs_ = null;
   private Map<String, HdfsCachePool> hdfsCachePools_ = null;
   private String nullPartitionKeyValue_;
   // Catalog service id when MetaProvider is CatalogdMetaProvider
@@ -101,27 +103,33 @@ public class LocalCatalog implements FeCatalog {
     return Catalog.filterCatalogObjectsByPattern(dbs_.values(), matcher);
   }
 
+  /**
+   * Populate dbs_ if it is empty. This method is synchronized to avoid
+   * multiple threads trying to populate dbs_ at the same time.
+   */
   private void loadDbs() {
-    if (!dbs_.isEmpty()) return;
-    Map<String, FeDb> dbs = new HashMap<>();
-    List<String> names;
-    try {
-      names = metaProvider_.loadDbList();
-    } catch (TException e) {
-      throw new LocalCatalogException("Unable to load database names", e);
-    }
-    for (String dbName : names) {
-      dbName = dbName.toLowerCase();
-      if (dbs_.containsKey(dbName)) {
-        dbs.put(dbName, dbs_.get(dbName));
-      } else {
-        dbs.put(dbName, new LocalDb(this, dbName));
-      }
-    }
+    // Do nothing if dbs_ is already populated.
+    if (dbs_ != null) return;
 
-    Db bdb = BuiltinsDb.getInstance();
-    dbs.put(bdb.getName(), bdb);
-    dbs_ = dbs;
+    synchronized (this) {
+      // Check again to avoid redundant work.
+      if (dbs_ != null) return;
+      Map<String, FeDb> dbs = new HashMap<>();
+      List<String> names;
+      try {
+        names = metaProvider_.loadDbList();
+      } catch (TException e) {
+        throw new LocalCatalogException("Unable to load database names", e);
+      }
+      for (String dbName : names) {
+        String lowerDbName = dbName.toLowerCase();
+        dbs.putIfAbsent(lowerDbName, new LocalDb(this, lowerDbName));
+      }
+
+      Db bdb = BuiltinsDb.getInstance();
+      dbs.putIfAbsent(bdb.getName(), bdb);
+      dbs_ = ImmutableMap.copyOf(dbs);
+    }
   }
 
   @Override

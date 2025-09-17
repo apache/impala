@@ -19,11 +19,11 @@ package org.apache.impala.catalog.local;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.stream.Collectors;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
@@ -38,7 +38,6 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.TableLoadingException;
-import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TBriefTableMeta;
@@ -55,7 +54,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Database instance loaded from {@link LocalCatalog}.
@@ -74,7 +72,7 @@ public class LocalDb implements FeDb {
    * Map from lower-cased table name to table object. Values will be
    * null for tables which have not yet been loaded.
    */
-  private Map<String, FeTable> tables_;
+  private ConcurrentHashMap<String, FeTable> tables_;
 
   /**
    * Map of function name to list of signatures for that function name.
@@ -198,17 +196,21 @@ public class LocalDb implements FeDb {
    */
   private void loadTableNames() {
     if (tables_ != null) return;
-    Map<String, FeTable> newMap = new HashMap<>();
-    try {
-      MetaProvider metaProvider = catalog_.getMetaProvider();
-      for (TBriefTableMeta meta : metaProvider.loadTableList(name_)) {
-        newMap.put(meta.getName(), new LocalIncompleteTable(this, meta));
+    synchronized (this) {
+      if (tables_ != null) return;
+      ConcurrentHashMap<String, FeTable> newMap = new ConcurrentHashMap<>();
+      try {
+        MetaProvider metaProvider = catalog_.getMetaProvider();
+        for (TBriefTableMeta meta : metaProvider.loadTableList(name_)) {
+          newMap.put(meta.getName(), new LocalIncompleteTable(this, meta));
+        }
+      } catch (TException e) {
+        throw new LocalCatalogException(
+            String.format("Could not load table names for database '%s' from HMS", name_),
+            e);
       }
-    } catch (TException e) {
-      throw new LocalCatalogException(String.format(
-          "Could not load table names for database '%s' from HMS", name_), e);
+      tables_ = newMap;
     }
-    tables_ = newMap;
   }
 
   @Override
