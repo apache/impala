@@ -390,10 +390,18 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "partitioning columns: (1 vs 2). Range partition: 'PARTITION 0 < VALUES <= 1'",
         isExternalPurgeTbl);
 
+    // Test supported Kudu complex types
+    AnalyzesOk("create table tab (x int primary key, y ARRAY<INT>) "
+            + "partition by hash(x) partitions 3 stored as kudu",
+        isExternalPurgeTbl);
 
     // Test unsupported Kudu types
-    List<String> unsupportedTypes = Lists.newArrayList("CHAR(20)",
-        "STRUCT<f1:INT,f2:STRING>", "ARRAY<INT>", "MAP<STRING,STRING>");
+    List<String> unsupportedTypes = Lists.newArrayList(
+        "CHAR(20)", "STRUCT<f1:INT,f2:STRING>", "MAP<STRING,STRING>",
+        // ARRAY of any complex type or 16-byte DECIMAL is not supported yet.
+        "ARRAY<ARRAY<INT>>", "ARRAY<MAP<INT,INT>>", "ARRAY<STRUCT<a:INT,b:INT>>",
+        "ARRAY<DECIMAL(19,19)>"
+    );
     for (String t: unsupportedTypes) {
       String expectedError = String.format(
           "Cannot create table 'tab': Type %s is not supported in Kudu", t);
@@ -533,6 +541,10 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "default isnull(null, null)) partition by hash (i) partitions 3 " +
         "stored as kudu", "Default value of NULL not allowed on non-nullable column: " +
         "'x'", isExternalPurgeTbl);
+    AnalysisError("create table tab (i int primary key, a array<int> default null) " +
+        "partition by hash (i) partitions 3 stored as kudu",
+        "Default value NULL (type: NULL_TYPE) is not compatible with column " +
+        "'a' (type: ARRAY<INT>).", isExternalPurgeTbl);
     // Invalid block_size values
     AnalysisError("create table tab (i int primary key block_size 1.1) " +
         "partition by hash (i) partitions 3 stored as kudu", "Invalid value " +

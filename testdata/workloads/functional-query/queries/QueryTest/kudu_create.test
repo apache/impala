@@ -747,3 +747,8 @@ stored as kudu
 ---- CATCH
 AnalysisException: BOOLEAN type is not allowed to be part of a PRIMARY KEY therefore not allowed for range-partitioning.
 ====
+---- QUERY
+# Array primary key column
+create table tab_array_primary_key (array_int array<int> primary key) stored as kudu
+---- CATCH
+IllegalArgumentException: Array type column: array_int cannot be a key column

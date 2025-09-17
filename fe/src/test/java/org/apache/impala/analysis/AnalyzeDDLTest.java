@@ -2683,9 +2683,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select id, m from functional.complextypes_fileformat",
         "Cannot create table 't': Type MAP<STRING,BIGINT> is not supported in Kudu");
-    AnalysisError("create table t primary key (id) partition by hash partitions 3" +
-        " stored as kudu as select id, a from functional.complextypes_fileformat",
-        "Cannot create table 't': Type ARRAY<INT> is not supported in Kudu");
+    AnalysisError("create table t primary key (id) partition by hash partitions 3"
+            + " stored as kudu as select id, a from functional.complextypes_fileformat",
+        "Unable to INSERT into target table (default.t) because the column 'a' has "
+            + "a complex type 'ARRAY<INT>' and Impala doesn't support inserting into "
+            + "tables containing complex type columns");
 
     // IMPALA-6454: CTAS into Kudu tables with primary key specified in upper case.
     AnalyzesOk("create table part_kudu_tbl primary key(INT_COL, SMALLINT_COL, ID)" +

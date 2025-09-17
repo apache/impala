@@ -37,3 +37,9 @@ add_library(ExecKudu
 )
 
 add_dependencies(ExecKudu gen-deps)
+
+# kudu-array-inserter is used in tests/query_test/test_kudu.py::TestKuduArray.
+# TODO(IMPALA-14537): Implement kudu-array-inserter using Kudu's Python API.
+add_executable(kudu-array-inserter kudu-array-inserter.cc)
+target_link_libraries(kudu-array-inserter ${IMPALA_LINK_LIBS})
+

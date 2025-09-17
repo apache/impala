@@ -384,12 +384,12 @@ public class SlotDescriptor {
   }
 
   /**
-   * Returns true if this slot is of STRING type in a kudu table.
+   * Returns true if this slot is for a Kudu Slice.
    */
-  public boolean isKuduStringSlot() {
+  public boolean isKuduSliceSlot() {
     if (getParent() == null) return false;
     if (!(getParent().getTable() instanceof FeKuduTable)) return false;
-    return getType().isStringType();
+    return getType().isStringType() || getType().isArrayType();
   }
 
   /**

@@ -28,30 +28,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.annotation.Nullable;
+
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.KuduPartitionExpr;
 import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnEncoding;
-import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.THdfsCompression;
-import org.apache.impala.util.StringUtils;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.ColumnSchema.Encoding;
@@ -226,6 +224,10 @@ public class KuduUtil {
     TExprNode literal = defaultValue.getNodes().get(0);
     if (literal.getNode_type() == TExprNodeType.NULL_LITERAL) return null;
     org.apache.kudu.Type type = KuduUtil.fromImpalaType(impalaType);
+    if (type == null) {
+      throw new ImpalaRuntimeException(
+          String.format("Type %s is not supported in Kudu", impalaType.toSql()));
+    }
     switch (type) {
       case INT8:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
@@ -423,15 +425,24 @@ public class KuduUtil {
   }
 
   /**
-   * Converts a given Impala catalog type to the Kudu type. Throws an exception if the
-   * type cannot be converted.
+   * Converts a given Impala catalog type or its item type to the Kudu type.
+   * Returns null if the type cannot be converted instead of throwing an exception so
+   * that the caller can report the full type in the error message. Since this function
+   * contains recursion, only the outer-most caller has the full type info.
    */
-  public static org.apache.kudu.Type fromImpalaType(Type t)
-      throws ImpalaRuntimeException {
+  public static @Nullable org.apache.kudu.Type fromImpalaType(Type t) {
     if (!t.isScalarType()) {
-      throw new ImpalaRuntimeException(format(
-          "Type %s is not supported in Kudu", t.toSql()));
+      // Kudu does not support complex types other than ARRAY.
+      if (!t.isArrayType()) { return null; }
+      Type itemType = ((ArrayType) t).getItemType();
+      // Kudu does not support array of non-scalar types or 16-byte DECIMAL.
+      if (!itemType.isScalarType()
+          || ((ScalarType) itemType).storageBytesForDecimal() == 16) {
+        return null;
+      }
+      return KuduUtil.fromImpalaType(itemType);
     }
+
     ScalarType s = (ScalarType) t;
     switch (s.getPrimitiveType()) {
       case TINYINT: return org.apache.kudu.Type.INT8;
@@ -452,14 +463,16 @@ public class KuduUtil {
       case NULL_TYPE:
       case DATETIME:
       case CHAR:
-      default:
-        throw new ImpalaRuntimeException(format(
-            "Type %s is not supported in Kudu", s.toSql()));
+      default: return null;
     }
   }
 
-  public static Type toImpalaType(org.apache.kudu.Type t,
+  /**
+   * Converts a given Kudu scalar type to its matching Impala scalar type.
+   */
+  public static ScalarType toImpalaScalarType(org.apache.kudu.Type t,
       ColumnTypeAttributes typeAttributes) throws ImpalaRuntimeException {
+    Preconditions.checkState(t != org.apache.kudu.Type.NESTED);
     switch (t) {
       case BOOL: return Type.BOOLEAN;
       case DOUBLE: return Type.DOUBLE;
@@ -480,6 +493,25 @@ public class KuduUtil {
         throw new ImpalaRuntimeException(String.format(
             "Kudu type '%s' is not supported in Impala", t.getName()));
     }
+  }
+
+  /**
+   * Converts a given Kudu colSchema to its matching Impala type. If the Kudu type is
+   * NESTED, it must be an array and the element type is converted to the
+   * corresponding Impala type.
+   */
+  public static Type toImpalaType(org.apache.kudu.ColumnSchema colSchema)
+      throws ImpalaRuntimeException {
+    org.apache.kudu.Type t = colSchema.getType();
+    ColumnTypeAttributes typeAttributes = colSchema.getTypeAttributes();
+    if (t != org.apache.kudu.Type.NESTED) {
+      return toImpalaScalarType(t, typeAttributes);
+    }
+    Preconditions.checkState(colSchema.getNestedTypeDescriptor() != null);
+    Preconditions.checkState(colSchema.getNestedTypeDescriptor().isArray());
+    org.apache.kudu.Type kuduElementType =
+        colSchema.getNestedTypeDescriptor().getArrayDescriptor().getElemType();
+    return new ArrayType(toImpalaScalarType(kuduElementType, typeAttributes));
   }
 
   /**

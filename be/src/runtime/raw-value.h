@@ -172,7 +172,6 @@ class RawValue {
     return top_level ? "NULL" : "null";
   }
 
-private:
   /// Like Write() but 'value' must be non-NULL.
   template <bool COLLECT_VAR_LEN_VALS>
   static void WriteNonNull(const void* value, Tuple* tuple,
@@ -180,6 +179,7 @@ private:
       std::vector<StringValue*>* string_values,
       std::vector<std::pair<CollectionValue*, int64_t>>* collection_values);
 
+private:
   /// Recursive helper function for Write() to handle struct slots.
   template <bool COLLECT_VAR_LEN_VALS>
   static void WriteStruct(const void* value, Tuple* tuple,

@@ -19,6 +19,7 @@ from __future__ import absolute_import, division, print_function
 from builtins import range
 from copy import deepcopy
 
+from base64 import b64decode
 from kudu.schema import (
     BOOL,
     DOUBLE,
@@ -34,10 +35,13 @@ from kudu.schema import (
     DATE)
 from kudu.client import Partitioning
 from kudu.util import to_unixtime_micros
+import json
 import logging
 import pytest
+import os
 import random
 import re
+import subprocess
 import textwrap
 import threading
 import time
@@ -1844,3 +1848,248 @@ class TestKuduInsertWithBufferedTupleDesc(KuduTestSuite):
     except Exception as e:
       # Not expect to throw exception like "IllegalStateException: null"
       assert False, str(e)
+
+
+class TestKuduArray(KuduTestSuite):
+  """
+  Tests Kudu 1-D array suppport.
+  """
+
+  def _get_name_from_type(self, data_type):
+    return re.split("[(<)]", data_type)[0]
+
+  def _insert_arrays_into_kudu(self, kudu_table_name):
+    exec_path = os.environ["IMPALA_HOME"] + \
+        "/be/build/latest/exec/kudu/kudu-array-inserter"
+    self.client.log_client(str([exec_path, kudu_table_name]))
+    subprocess.check_call([exec_path, kudu_table_name])
+
+  def _check_table_schema(self, db, table_name, types):
+    result = self.execute_query("DESCRIBE {0}.{1}".format(db, table_name))
+    assert ("id", "tinyint") == result.tuples()[0][:2]
+    for i in range(1, len(result.tuples())):
+      (col_name, col_type) = result.tuples()[i][:2]
+      assert (col_type == "array<{0}>".format(types[i - 1].lower())
+              and col_name == "array_" + self._get_name_from_type(types[i - 1]).lower())
+
+  # See be/src/exec/kudu/kudu-array-inserter.cc for the test data
+  EXPECTED_COLUMNS = {
+      "INT": (
+          None,
+          '[-2147483648,-1,2147483647]',
+          '[]',
+          '[null,-1,2147483647]',
+          '[-2147483648,null,2147483647]',
+          '[-2147483648,-1,null]',
+          '[-2147483648,-1,2147483647,-2147483648,-1]',
+      ),
+      "TIMESTAMP": (
+          None,
+          ('["1400-01-01 00:00:00",'
+            '"1969-12-31 23:59:59.999999000",'
+            '"9999-12-31 23:59:59.999999000"]'),
+          '[]',
+          '[null,"1969-12-31 23:59:59.999999000","9999-12-31 23:59:59.999999000"]',
+          '["1400-01-01 00:00:00",null,"9999-12-31 23:59:59.999999000"]',
+          '["1400-01-01 00:00:00","1969-12-31 23:59:59.999999000",null]',
+          ('["1400-01-01 00:00:00",'
+            '"1969-12-31 23:59:59.999999000",'
+            '"9999-12-31 23:59:59.999999000",'
+            '"1400-01-01 00:00:00",'
+            '"1969-12-31 23:59:59.999999000"]'),
+      ),
+      # The output of the ARRAY<VARCHAR(1)> data are NOT valid UTF-8 strings.
+      "VARCHAR(1)": (
+          None,
+          b'["\xce","\xcf","\xce"]',
+          '[]',
+          b'[null,"\xcf","\xce"]',
+          b'["\xce",null,"\xce"]',
+          b'["\xce","\xcf",null]',
+          b'["\xce","\xcf","\xce","\xce","\xcf"]',
+      ),
+      "DECIMAL(18,18)": (
+          None,
+          '[-0.999999999999999999,-0.000000000000000001,0.999999999999999999]',
+          '[]',
+          '[null,-0.000000000000000001,0.999999999999999999]',
+          '[-0.999999999999999999,null,0.999999999999999999]',
+          '[-0.999999999999999999,-0.000000000000000001,null]',
+          ('[-0.999999999999999999,-0.000000000000000001,0.999999999999999999,'
+            '-0.999999999999999999,-0.000000000000000001]'),
+      ),
+      "DOUBLE": (
+          None,
+          '[-Infinity,NaN,Infinity]',
+          '[]',
+          '[null,NaN,Infinity]',
+          '[-Infinity,null,Infinity]',
+          '[-Infinity,NaN,null]',
+          '[-Infinity,NaN,Infinity,-Infinity,NaN]',
+      ),
+      # The output of each element in an ARRAY<BINARY> is Base64 encoded.
+      "BINARY": (
+          None,
+          '["zqM=","z4A=","zrs="]',
+          '[]',
+          '[null,"z4A=","zrs="]',
+          '["zqM=",null,"zrs="]',
+          '["zqM=","z4A=",null]',
+          '["zqM=","z4A=","zrs=","zqM=","z4A="]',
+      ),
+      "BOOLEAN": (
+          None,
+          '[true,false,true]',
+          '[]',
+          '[null,false,true]',
+          '[true,null,true]',
+          '[true,false,null]',
+          '[true,false,true,true,false]',
+      ),
+  }
+
+  def _check_table_data(self, db, table_name, types, query_options):
+    columns = ", ".join([
+        "array_{0}".format(self._get_name_from_type(item_type))
+        for item_type in types
+    ])
+    result = self.execute_query("SELECT id, {0} FROM {1}.{2}".format(
+        columns, db, table_name), query_options=query_options)
+    for i, result_column in enumerate(zip(*result.tuples())):
+      if i == 0:
+        assert result_column == tuple(range(len(result.tuples())))
+      else:
+        assert result_column == self.EXPECTED_COLUMNS[types[i - 1]]
+
+  def _unnest_expected_column(self, item_type):
+    if item_type == "VARCHAR(1)":
+      return (
+          b'\xce', b'\xcf', b'\xce',
+          None, b'\xcf', b'\xce',
+          b'\xce', None, b'\xce',
+          b'\xce', b'\xcf', None,
+          b'\xce', b'\xcf', b'\xce', b'\xce', b'\xcf',
+      )
+    result = []
+    for serialized_array in self.EXPECTED_COLUMNS[item_type]:
+      if serialized_array is not None:
+        array = json.loads(
+            serialized_array,
+            parse_float=(lambda s: s) if item_type.startswith("DECIMAL") else None)
+        if item_type == "BINARY":
+          result += [b64decode(elem) if elem is not None else None for elem in array]
+        else:
+          result += array
+    return tuple(result)
+
+  EXPECTED_ID_UNNESTED = (
+      1, 1, 1,
+      3, 3, 3,
+      4, 4, 4,
+      5, 5, 5,
+      6, 6, 6, 6, 6
+  )
+
+  def _check_unnest(self, db, table_name, types, query_options, in_select_list):
+    if in_select_list:
+      columns = ", ".join([
+          "UNNEST(array_{0})".format(self._get_name_from_type(item_type))
+          for item_type in types
+      ])
+      result = self.execute_query("SELECT id, {0} FROM {1}.{2}".format(
+          columns, db, table_name), query_options=query_options)
+    else:
+      columns = ", ".join([
+          "{0}.array_{1}".format(table_name, self._get_name_from_type(item_type))
+          for item_type in types
+      ])
+      result = self.execute_query("SELECT * FROM {1}.{2}, UNNEST({0})".format(
+          columns, db, table_name), query_options=query_options)
+    for i, result_column in enumerate(zip(*result.tuples())):
+      if i == 0:
+        assert result_column == self.EXPECTED_ID_UNNESTED
+      elif types[i - 1] == "DOUBLE":
+        # NaN cannot be compared directly.
+        assert str(result_column) == str(self._unnest_expected_column(types[i - 1]))
+      else:
+        assert result_column == self._unnest_expected_column(types[i - 1])
+
+  def _check_non_materialzied_elements(self, db, table_name, item_type, options):
+    result = self.execute_query("SELECT id FROM {0}.{1} AS t, t.array_{2}".format(
+        db, table_name, self._get_name_from_type(item_type)), query_options=options)
+    for result_column in zip(*result.tuples()):
+      assert result_column == self.EXPECTED_ID_UNNESTED
+
+  def test_supported_types(self, unique_database, vector):
+    """
+    Test array column support for kudu against [unique_database].kudu_array
+    and external table [unique_database].kudu_array_external.
+    """
+    db = unique_database
+    options = vector.get_value('exec_option')
+    SUPPORTED_ITEM_TYPES = [
+        "INT",
+        "TIMESTAMP",
+        "VARCHAR(1)",
+        "DECIMAL(18,18)",
+        "DOUBLE",
+        "BINARY",
+        "BOOLEAN",
+    ]
+    TEST_TABLE, TEST_EXTERNAL_TABLE = "kudu_array", "kudu_array_external"
+    column_defs = ", ".join([
+        "array_{0} ARRAY<{1}>".format(self._get_name_from_type(item_type), item_type)
+        for item_type in SUPPORTED_ITEM_TYPES
+    ])
+    # The table is unpartitioned to ensure the rows are read in the insertion order.
+    create_table_sql = (
+        "CREATE TABLE {0}.{1} (id TINYINT PRIMARY KEY, {2}) "
+        "STORED AS KUDU"
+    )
+
+    # Create table [unique_database].kudu_array
+    self.execute_query(create_table_sql.format(db, TEST_TABLE, column_defs))
+    self._check_table_schema(db, TEST_TABLE, SUPPORTED_ITEM_TYPES)
+
+    # Create external table [unique_database].kudu_array_external pointing to the same
+    # table as [unique_database].kudu_array and check the schema as well.
+    kudu_table_name = "impala::{0}.{1}".format(db, TEST_TABLE)
+    self.execute_query(create_external_kudu_query(
+        db, TEST_EXTERNAL_TABLE, kudu_table_name))
+    self._check_table_schema(
+        db, TEST_EXTERNAL_TABLE, SUPPORTED_ITEM_TYPES)
+
+    # Insert some rows using kudu-array-inserter and read the data back
+    # through both table.
+    self._insert_arrays_into_kudu(kudu_table_name)
+    self._check_table_data(
+      db, TEST_TABLE, SUPPORTED_ITEM_TYPES, options)
+    self._check_table_data(
+      db, TEST_EXTERNAL_TABLE, SUPPORTED_ITEM_TYPES, options)
+
+    # Check the result of UNNEST().
+    self._check_unnest(
+        db, TEST_TABLE, SUPPORTED_ITEM_TYPES, options, in_select_list=True)
+    self._check_unnest(
+        db, TEST_TABLE, SUPPORTED_ITEM_TYPES, options, in_select_list=False)
+
+    # Check the result when the array elements are not materialized.
+    self._check_non_materialzied_elements(db, TEST_TABLE, "BINARY", options)
+
+    # TODO(IMPALA-14539): Support duplicate collection slots.
+    sql = "SELECT array_{2} FROM {0}.{1}, {1}.array_{2} AS unnested"
+    exc = str(self.execute_query_expect_failure(self.client, sql.format(
+        db, TEST_TABLE, "INT")))
+    assert (
+        "Unable to deserialize scan token for node with id '0' for Kudu table "
+        "'impala::{0}.{1}': Invalid argument: Duplicate column name: array_{2}"
+    ).format(db, TEST_TABLE, "int") in exc
+
+    # TODO(IMPALA-14538): Support referencing a Kudu collection column as a table.
+    sql = "SELECT pos, item FROM {0}.{1}.array_{2}"
+    exc = str(self.execute_query_expect_failure(self.client, sql.format(
+        db, TEST_TABLE, "INT")))
+    assert (
+        "AnalysisException: "
+        "Referencing a Kudu collection column as a table is not supported."
+    ) in exc

@@ -161,4 +161,16 @@ Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
   return Status::OK();
 }
 
+size_t GetKuduArrayElementSize(const SlotDescriptor* slot) {
+  // KuduScanner::PAD_UNIXTIME_MICROS_TO_16_BYTES does not apply to array elements.
+  if (slot->type().IsTimestampType()) {
+    return sizeof(int64_t);
+  }
+  // Same as TupleDescriptor#getSlotSize()
+  constexpr auto KUDU_SLICE_PADDING = 4U;
+  if (slot->type().IsStringType()) {
+    return slot->slot_size() + KUDU_SLICE_PADDING;
+  }
+  return slot->slot_size();
+}
 }

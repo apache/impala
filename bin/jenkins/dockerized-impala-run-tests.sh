@@ -91,7 +91,8 @@ case ${IMPALA_DOCKER_JAVA:-8} in
   *)
     ;;
 esac
-make -j ${IMPALA_BUILD_THREADS} ${IMAGE_TYPE}_images parquet-reader impala-profile-tool
+make -j ${IMPALA_BUILD_THREADS} \
+    ${IMAGE_TYPE}_images parquet-reader impala-profile-tool kudu-array-inserter
 
 source_impala_config
 

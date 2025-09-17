@@ -21,6 +21,7 @@
 // TODO: Remove when toolchain callbacks.h properly defines ::tm.
 struct tm;
 
+#include <kudu/client/array_cell.h>
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
 #include <kudu/client/value.h>
@@ -28,6 +29,7 @@ struct tm;
 #include "util/kudu-status-util.h"
 #include "runtime/string-value.h"
 #include "runtime/types.h"
+#include "runtime/tuple.h"
 
 namespace impala {
 
@@ -89,6 +91,8 @@ Status ConvertTimestampValueToKudu(const TimestampValue* tv, int64_t* ts_micros)
 
 // Converts a DateValue to Kudu's representation which is returned in 'days'.
 Status ConvertDateValueToKudu(const DateValue* dv, int32_t* days);
+
+size_t IR_ALWAYS_INLINE GetKuduArrayElementSize(const SlotDescriptor* slot);
 
 } /// namespace impala
 #endif

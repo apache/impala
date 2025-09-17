@@ -86,7 +86,7 @@ public class KuduColumn extends Column {
 
   public static KuduColumn fromColumnSchema(ColumnSchema colSchema, int position)
       throws ImpalaRuntimeException {
-    Type type = KuduUtil.toImpalaType(colSchema.getType(), colSchema.getTypeAttributes());
+    Type type = KuduUtil.toImpalaType(colSchema);
     Object defaultValue = colSchema.getDefaultValue();
     LiteralExpr defaultValueExpr = null;
     if (defaultValue != null) {
@@ -144,7 +144,7 @@ public class KuduColumn extends Column {
     org.apache.kudu.Type kuduType = Schema.getAutoIncrementingColumnType();
     Preconditions.checkArgument(kuduType != org.apache.kudu.Type.DECIMAL &&
         kuduType != org.apache.kudu.Type.VARCHAR);
-    Type type = KuduUtil.toImpalaType(kuduType, null);
+    Type type = KuduUtil.toImpalaScalarType(kuduType, null);
     return new KuduColumn(Schema.getAutoIncrementingColumnName(), type,
         /* isKey */true, /* isPrimaryKeyUnique */false, /* isNullable */false,
         /* isAutoIncrementing */true, /* encoding */null, /* compression */null,

@@ -75,8 +75,8 @@ import com.google.common.base.Preconditions;
  * Offsets: 0          12      16           18       19
  */
 public class TupleDescriptor {
-  // Padding size in bytes for Kudu string slots.
-  private static final int KUDU_STRING_PADDING = 4;
+  // Padding size in bytes for Kudu Slice slots.
+  private static final int KUDU_SLICE_PADDING = 4;
 
   private final TupleId id_;
   private final String debugName_;  // debug-only
@@ -466,9 +466,7 @@ public class TupleDescriptor {
   private int getSlotSize(SlotDescriptor slotDesc) {
     int slotSize = slotDesc.getMaterializedSlotSize();
     // Add padding for a KUDU string slot.
-    if (slotDesc.isKuduStringSlot()) {
-      slotSize += KUDU_STRING_PADDING;
-    }
+    if (slotDesc.isKuduSliceSlot()) { slotSize += KUDU_SLICE_PADDING; }
     return slotSize;
   }
 
@@ -489,9 +487,9 @@ public class TupleDescriptor {
       avgSerializedSize_ += slotDesc.getMaterializedSlotSize();
     }
     // Add padding for a KUDU string slot.
-    if (slotDesc.isKuduStringSlot()) {
-      avgSerializedSize_ += KUDU_STRING_PADDING;
-      serializedPadSize_ += KUDU_STRING_PADDING;
+    if (slotDesc.isKuduSliceSlot()) {
+      avgSerializedSize_ += KUDU_SLICE_PADDING;
+      serializedPadSize_ += KUDU_SLICE_PADDING;
     }
   }
 

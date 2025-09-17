@@ -24,6 +24,7 @@
 #include "common/object-pool.h"
 #include "exec/kudu/kudu-scan-node-base.h"
 #include "runtime/descriptors.h"
+#include "util/mem-range.h"
 
 namespace impala {
 
@@ -144,6 +145,26 @@ class KuduScanner {
   /// Varchar slots in the tuple descriptor of the scan node. Used to resize Kudu
   /// VARCHAR values inline.
   vector<const SlotDescriptor*> varchar_slots_;
+
+  // Converts the UNIXTIME_MICROS value in the 'slot' of the 'kudu_tuple' to a
+  // TimestampValue in place.
+  Status ConvertTimestampFromKudu(Tuple* kudu_tuple, const SlotDescriptor* slot);
+
+  // Converts the VARCHAR value in the 'slot' of the 'kudu_table' to a StringValue
+  // with length limit in place.
+  Status ConvertVarcharFromKudu(Tuple* kudu_tuple, const SlotDescriptor* slot);
+
+  // The byte size of an element in the Kudu array for each collection slot in the tuple.
+  vector<size_t> kudu_array_element_byte_sizes_;
+
+  // Converts the ARRAY value in the 'slot' of the 'kudu_tuple' to a CollectionValue in
+  // place, using
+  // - 'buffer' to hold the item tuples, and
+  // - 'item_tuple_mem_pool' to allocate memory if 'buffer' is too small.
+  // 'kudu_array_element_byte_size' is the byte size of an element in the Kudu array
+  Status ConvertArrayFromKudu(Tuple* kudu_tuple, const SlotDescriptor* slot,
+      MemRange& buffer, MemPool* item_tuple_mem_pool,
+      size_t kudu_array_element_byte_size);
 };
 
 } /// namespace impala

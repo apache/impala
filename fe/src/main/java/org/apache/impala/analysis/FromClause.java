@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.impala.analysis.TableRef.ZippingUnnestType;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
 import org.apache.impala.common.AnalysisException;
@@ -90,6 +91,7 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
       tblRef.analyze(analyzer);
       leftTblRef = tblRef;
       if (tblRef instanceof CollectionTableRef) {
+        checkKuduCollectionSupport((CollectionTableRef)tblRef);
         checkIcebergCollectionSupport((CollectionTableRef)tblRef);
         checkTopLevelComplexAcidScan(analyzer, (CollectionTableRef)tblRef);
         if (firstZippingUnnestRef != null && tblRef.isZippingUnnest() &&
@@ -169,6 +171,15 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
     if (tblRef.getDesc().getPath().getRootTable() instanceof IcebergMetadataTable) {
       throw new AnalysisException("Querying collection types (ARRAY/MAP) in FROM " +
           "clause is not supported for Iceberg Metadata tables.");
+    }
+  }
+
+  private void checkKuduCollectionSupport(CollectionTableRef tblRef)
+      throws AnalysisException {
+    // TODO(IMPALA-14538): Support referencing a Kudu collection column as a table.
+    if (tblRef.getTable() instanceof FeKuduTable && !tblRef.isRelative()) {
+      throw new AnalysisException(
+          "Referencing a Kudu collection column as a table is not supported.");
     }
   }
 
