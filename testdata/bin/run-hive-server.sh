@@ -134,6 +134,9 @@ if [[ $ENABLE_RANGER_AUTH -eq 1 ]]; then
   # This jar file doesn't exist for Ranger 2.4 and previous versions.
   export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:\
       ${RANGER_HOME}/ews/webapp/WEB-INF/lib/hadoop-shaded-guava-*.jar"
+  # Ranger's ugsync-util module is required for the Hive plugin
+  export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:\
+      ${RANGER_HOME}/ews/webapp/WEB-INF/lib/ugsync-util-*.jar"
 fi
 
 # For Hive 3, we use Tez for execution. We have to add it to the classpath.
