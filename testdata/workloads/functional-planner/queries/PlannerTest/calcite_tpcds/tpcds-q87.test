@@ -24,7 +24,7 @@ from ((select distinct c_last_name, c_first_name, d_date
 # end query 87 in stream 0 using template query87.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=189.44MB Threads=1
-Per-Host Resource Estimates: Memory=52.18GB
+Per-Host Resource Estimates: Memory=146.23GB
 ImpalaAggRel(group=[{}], EXPR$0=[COUNT()])
   ImpalaFilterRel(condition=[AND(>($3, 0), =($4, 0))])
     ImpalaAggRel(group=[{0, 1, 2}], agg#0=[COUNT($3)], agg#1=[COUNT($4)])
@@ -81,8 +81,8 @@ ImpalaAggRel(group=[{}], EXPR$0=[COUNT()])
                     ImpalaFilterRel(condition=[IS NOT NULL($0)])
                       ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, customer]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=52.18GB mem-reservation=189.44MB thread-reservation=1 runtime-filters-memory=51.00MB
-|  max-parallelism=1 segment-costs=[50531762579, 27339416444, 67957413025, 13844381262, 18895080464, 21717663, 0]
+|  Per-Instance Resources: mem-estimate=146.23GB mem-reservation=189.44MB thread-reservation=1 runtime-filters-memory=51.00MB
+|  max-parallelism=1 segment-costs=[50531762579, 27339416444, 68380727952, 13844381262, 17009955048, 13739016, 0]
 PLAN-ROOT SINK
 |  output exprs: count()
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -90,20 +90,20 @@ PLAN-ROOT SINK
 22:AGGREGATE [FINALIZE]
 |  output: count()
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=25 row-size=8B cardinality=1 cost=21717663
+|  tuple-ids=25 row-size=8B cardinality=1 cost=13739016
 |  in pipelines: 22(GETNEXT), 21(OPEN)
 |
 21:AGGREGATE [FINALIZE]
 |  output: count(if($f3 = CAST(0 AS TINYINT), CAST(1 AS TINYINT), NULL)), count(if($f3 = CAST(1 AS TINYINT), CAST(1 AS TINYINT), NULL))
 |  group by: C_LAST_NAME, C_FIRST_NAME, D_DATE
 |  having: count(if($f3 = 0, 1, NULL)) > CAST(0 AS BIGINT), count(if($f3 = 1, 1, NULL)) = CAST(0 AS BIGINT)
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=24 row-size=44B cardinality=310.25M cost=18530130649
+|  mem-estimate=44.30GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=24 row-size=56B cardinality=196.27M cost=16578148280
 |  in pipelines: 21(GETNEXT), 14(OPEN), 20(OPEN)
 |
 00:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=23 row-size=29B cardinality=3.10G cost=364949815
+|  tuple-ids=23 row-size=41B cardinality=2.78G cost=431806768
 |  in pipelines: 14(GETNEXT), 20(GETNEXT)
 |
 |--20:AGGREGATE [FINALIZE]
@@ -172,13 +172,13 @@ PLAN-ROOT SINK
 |  output: count(if($f3 = CAST(0 AS TINYINT), CAST(1 AS TINYINT), NULL)), count(if($f3 = CAST(1 AS TINYINT), CAST(1 AS TINYINT), NULL))
 |  group by: C_LAST_NAME, C_FIRST_NAME, D_DATE
 |  having: count(if($f3 = 0, 1, NULL)) > CAST(0 AS BIGINT), count(if($f3 = 1, 1, NULL)) = CAST(0 AS BIGINT)
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=15 row-size=44B cardinality=1.12G cost=66644846752
+|  mem-estimate=50.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=15 row-size=56B cardinality=789.02M cost=66644846752
 |  in pipelines: 14(GETNEXT), 07(OPEN), 13(OPEN)
 |
 01:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=14 row-size=29B cardinality=11.16G cost=1312566273
+|  tuple-ids=14 row-size=41B cardinality=11.16G cost=1735881200
 |  in pipelines: 07(GETNEXT), 13(GETNEXT)
 |
 |--13:AGGREGATE [FINALIZE]
@@ -299,14 +299,14 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=8B cardinality=7.57G(filtered from 7.88G) cost=1182183990
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=4.57GB Threads=85
-Per-Host Resource Estimates: Memory=58.33GB
+Per-Host Resource Estimates: Memory=103.68GB
 ImpalaAggRel(group=[{}], EXPR$0=[COUNT()])
   ImpalaFilterRel(condition=[AND(>($3, 0), =($4, 0))])
     ImpalaAggRel(group=[{0, 1, 2}], agg#0=[COUNT($3)], agg#1=[COUNT($4)])
@@ -381,40 +381,40 @@ PLAN-ROOT SINK
 |  in pipelines: 22(GETNEXT)
 |
 F15:PLAN FRAGMENT [HASH(C_LAST_NAME,C_FIRST_NAME,D_DATE)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=143.62MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=1960 segment-costs=[19502771702, 21717663, 123] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
+Per-Instance Resources: mem-estimate=775.86MB mem-reservation=34.00MB thread-reservation=1
+max-parallelism=1770 segment-costs=[17601133259, 13739016, 123] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
 22:AGGREGATE
 |  output: count()
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=25 row-size=8B cardinality=120 cost=21717663
+|  tuple-ids=25 row-size=8B cardinality=120 cost=13739016
 |  in pipelines: 22(GETNEXT), 38(OPEN)
 |
 38:AGGREGATE [FINALIZE]
 |  output: count:merge(if($f3 = 0, 1, NULL)), count:merge(if($f3 = 1, 1, NULL))
 |  group by: C_LAST_NAME, C_FIRST_NAME, D_DATE
 |  having: count(if($f3 = 0, 1, NULL)) > CAST(0 AS BIGINT), count(if($f3 = 1, 1, NULL)) = CAST(0 AS BIGINT)
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=24 row-size=44B cardinality=310.25M cost=18530130649
+|  mem-estimate=758.83MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=24 row-size=56B cardinality=196.27M cost=16578148280
 |  in pipelines: 38(GETNEXT), 32(OPEN), 36(OPEN)
 |
 37:EXCHANGE [HASH(C_LAST_NAME,C_FIRST_NAME,D_DATE)]
-|  mem-estimate=15.62MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=24 row-size=44B cardinality=3.10G cost=972641053
+|  mem-estimate=17.03MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=24 row-size=56B cardinality=2.78G cost=1022984979
 |  in pipelines: 32(GETNEXT), 36(GETNEXT)
 |
 F14:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=754.78MB mem-reservation=68.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[70143014962, 12312550098, 18895080464, 10389730020] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
+Per-Instance Resources: mem-estimate=2.54GB mem-reservation=68.00MB thread-reservation=1
+max-parallelism=120 segment-costs=[70757288989, 12312550098, 17009955048, 11434506148] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
 21:AGGREGATE [STREAMING]
 |  output: count(if($f3 = CAST(0 AS TINYINT), CAST(1 AS TINYINT), NULL)), count(if($f3 = CAST(1 AS TINYINT), CAST(1 AS TINYINT), NULL))
 |  group by: C_LAST_NAME, C_FIRST_NAME, D_DATE
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=24 row-size=44B cardinality=3.10G cost=18530130649
+|  mem-estimate=665.12MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=24 row-size=56B cardinality=2.78G cost=16578148280
 |  in pipelines: 32(GETNEXT), 36(GETNEXT)
 |
 00:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=23 row-size=29B cardinality=3.10G cost=364949815
+|  tuple-ids=23 row-size=41B cardinality=2.78G cost=431806768
 |  in pipelines: 32(GETNEXT), 36(GETNEXT)
 |
 |--36:AGGREGATE [FINALIZE]
@@ -532,28 +532,28 @@ max-parallelism=120 segment-costs=[70143014962, 12312550098, 18895080464, 103897
 |  output: count:merge(if($f3 = 0, 1, NULL)), count:merge(if($f3 = 1, 1, NULL))
 |  group by: C_LAST_NAME, C_FIRST_NAME, D_DATE
 |  having: count(if($f3 = 0, 1, NULL)) > CAST(0 AS BIGINT), count(if($f3 = 1, 1, NULL)) = CAST(0 AS BIGINT)
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=15 row-size=44B cardinality=1.12G cost=66644846752
+|  mem-estimate=1.85GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=15 row-size=56B cardinality=789.02M cost=66644846752
 |  in pipelines: 32(GETNEXT), 26(OPEN), 30(OPEN)
 |
 31:EXCHANGE [HASH(C_LAST_NAME,C_FIRST_NAME,D_DATE)]
-|  mem-estimate=15.62MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=15 row-size=44B cardinality=11.16G cost=3498168210
+|  mem-estimate=17.03MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=15 row-size=56B cardinality=11.16G cost=4112442237
 |  in pipelines: 26(GETNEXT), 30(GETNEXT)
 |
 F08:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=1.27GB mem-reservation=68.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[44821945517, 24332992738, 67957413025, 37367354720] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
+Per-Instance Resources: mem-estimate=2.63GB mem-reservation=68.00MB thread-reservation=1
+max-parallelism=120 segment-costs=[44821945517, 24332992738, 68380727952, 45967191091] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
 14:AGGREGATE [STREAMING]
 |  output: count(if($f3 = CAST(0 AS TINYINT), CAST(1 AS TINYINT), NULL)), count(if($f3 = CAST(1 AS TINYINT), CAST(1 AS TINYINT), NULL))
 |  group by: C_LAST_NAME, C_FIRST_NAME, D_DATE
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=15 row-size=44B cardinality=11.16G cost=66644846752
+|  mem-estimate=1.48GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=15 row-size=56B cardinality=11.16G cost=66644846752
 |  in pipelines: 26(GETNEXT), 30(GETNEXT)
 |
 01:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=14 row-size=29B cardinality=11.16G cost=1312566273
+|  tuple-ids=14 row-size=41B cardinality=11.16G cost=1735881200
 |  in pipelines: 26(GETNEXT), 30(GETNEXT)
 |
 |--30:AGGREGATE [FINALIZE]
@@ -772,14 +772,14 @@ max-parallelism=1823 segment-costs=[50493995561, 22341022045] cpu-comparison-res
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=8B cardinality=7.57G(filtered from 7.88G) cost=1182183990
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=4.57GB Threads=85
-Per-Host Resource Estimates: Memory=58.33GB
+Per-Host Resource Estimates: Memory=103.68GB
 ImpalaAggRel(group=[{}], EXPR$0=[COUNT()])
   ImpalaFilterRel(condition=[AND(>($3, 0), =($4, 0))])
     ImpalaAggRel(group=[{0, 1, 2}], agg#0=[COUNT($3)], agg#1=[COUNT($4)])
@@ -854,40 +854,40 @@ PLAN-ROOT SINK
 |  in pipelines: 22(GETNEXT)
 |
 F15:PLAN FRAGMENT [HASH(C_LAST_NAME,C_FIRST_NAME,D_DATE)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=143.62MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=1960 segment-costs=[19502771702, 21717663, 123] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
+Per-Instance Resources: mem-estimate=775.86MB mem-reservation=34.00MB thread-reservation=1
+max-parallelism=1770 segment-costs=[17601133259, 13739016, 123] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
 22:AGGREGATE
 |  output: count()
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=25 row-size=8B cardinality=120 cost=21717663
+|  tuple-ids=25 row-size=8B cardinality=120 cost=13739016
 |  in pipelines: 22(GETNEXT), 38(OPEN)
 |
 38:AGGREGATE [FINALIZE]
 |  output: count:merge(if($f3 = 0, 1, NULL)), count:merge(if($f3 = 1, 1, NULL))
 |  group by: C_LAST_NAME, C_FIRST_NAME, D_DATE
 |  having: count(if($f3 = 0, 1, NULL)) > CAST(0 AS BIGINT), count(if($f3 = 1, 1, NULL)) = CAST(0 AS BIGINT)
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=24 row-size=44B cardinality=310.25M cost=18530130649
+|  mem-estimate=758.83MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=24 row-size=56B cardinality=196.27M cost=16578148280
 |  in pipelines: 38(GETNEXT), 32(OPEN), 36(OPEN)
 |
 37:EXCHANGE [HASH(C_LAST_NAME,C_FIRST_NAME,D_DATE)]
-|  mem-estimate=15.62MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=24 row-size=44B cardinality=3.10G cost=972641053
+|  mem-estimate=17.03MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=24 row-size=56B cardinality=2.78G cost=1022984979
 |  in pipelines: 32(GETNEXT), 36(GETNEXT)
 |
 F14:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=754.78MB mem-reservation=68.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[70143014962, 12312550098, 18895080464, 10389730020] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
+Per-Instance Resources: mem-estimate=2.54GB mem-reservation=68.00MB thread-reservation=1
+max-parallelism=120 segment-costs=[70757288989, 12312550098, 17009955048, 11434506148] cpu-comparison-result=360 [max(120 (self) vs 360 (sum children))]
 21:AGGREGATE [STREAMING]
 |  output: count(if($f3 = CAST(0 AS TINYINT), CAST(1 AS TINYINT), NULL)), count(if($f3 = CAST(1 AS TINYINT), CAST(1 AS TINYINT), NULL))
 |  group by: C_LAST_NAME, C_FIRST_NAME, D_DATE
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=24 row-size=44B cardinality=3.10G cost=18530130649
+|  mem-estimate=665.12MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=24 row-size=56B cardinality=2.78G cost=16578148280
 |  in pipelines: 32(GETNEXT), 36(GETNEXT)
 |
 00:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=23 row-size=29B cardinality=3.10G cost=364949815
+|  tuple-ids=23 row-size=41B cardinality=2.78G cost=431806768
 |  in pipelines: 32(GETNEXT), 36(GETNEXT)
 |
 |--36:AGGREGATE [FINALIZE]
@@ -1005,28 +1005,28 @@ max-parallelism=120 segment-costs=[70143014962, 12312550098, 18895080464, 103897
 |  output: count:merge(if($f3 = 0, 1, NULL)), count:merge(if($f3 = 1, 1, NULL))
 |  group by: C_LAST_NAME, C_FIRST_NAME, D_DATE
 |  having: count(if($f3 = 0, 1, NULL)) > CAST(0 AS BIGINT), count(if($f3 = 1, 1, NULL)) = CAST(0 AS BIGINT)
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=15 row-size=44B cardinality=1.12G cost=66644846752
+|  mem-estimate=1.85GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=15 row-size=56B cardinality=789.02M cost=66644846752
 |  in pipelines: 32(GETNEXT), 26(OPEN), 30(OPEN)
 |
 31:EXCHANGE [HASH(C_LAST_NAME,C_FIRST_NAME,D_DATE)]
-|  mem-estimate=15.62MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=15 row-size=44B cardinality=11.16G cost=3498168210
+|  mem-estimate=17.03MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=15 row-size=56B cardinality=11.16G cost=4112442237
 |  in pipelines: 26(GETNEXT), 30(GETNEXT)
 |
 F08:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=1.27GB mem-reservation=68.00MB thread-reservation=1
-max-parallelism=120 segment-costs=[44821945517, 24332992738, 67957413025, 37367354720] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
+Per-Instance Resources: mem-estimate=2.63GB mem-reservation=68.00MB thread-reservation=1
+max-parallelism=120 segment-costs=[44821945517, 24332992738, 68380727952, 45967191091] cpu-comparison-result=240 [max(120 (self) vs 240 (sum children))]
 14:AGGREGATE [STREAMING]
 |  output: count(if($f3 = CAST(0 AS TINYINT), CAST(1 AS TINYINT), NULL)), count(if($f3 = CAST(1 AS TINYINT), CAST(1 AS TINYINT), NULL))
 |  group by: C_LAST_NAME, C_FIRST_NAME, D_DATE
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=15 row-size=44B cardinality=11.16G cost=66644846752
+|  mem-estimate=1.48GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=15 row-size=56B cardinality=11.16G cost=66644846752
 |  in pipelines: 26(GETNEXT), 30(GETNEXT)
 |
 01:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=14 row-size=29B cardinality=11.16G cost=1312566273
+|  tuple-ids=14 row-size=41B cardinality=11.16G cost=1735881200
 |  in pipelines: 26(GETNEXT), 30(GETNEXT)
 |
 |--30:AGGREGATE [FINALIZE]
@@ -1245,7 +1245,7 @@ max-parallelism=1823 segment-costs=[50493995561, 22341022045] cpu-comparison-res
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_customer_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=8B cardinality=7.57G(filtered from 7.88G) cost=1182183990

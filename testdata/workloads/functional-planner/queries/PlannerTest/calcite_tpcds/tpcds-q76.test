@@ -25,7 +25,7 @@ limit 100
 # end query 76 in stream 0 using template query76.tpl
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=80.25MB Threads=1
-Per-Host Resource Estimates: Memory=221MB
+Per-Host Resource Estimates: Memory=139MB
 ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], dir4=[ASC], fetch=[100:TINYINT])
   ImpalaAggRel(group=[{0, 1, 2, 3, 4}], SALES_CNT=[COUNT()], SALES_AMT=[SUM($5)])
     ImpalaUnionRel(all=[true])
@@ -70,29 +70,29 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[
             ImpalaFilterRel(condition=[IS NOT NULL($0)])
               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=220.75MB mem-reservation=80.25MB thread-reservation=1 runtime-filters-memory=6.00MB
-|  max-parallelism=1 segment-costs=[6978652546, 6327582551, 700]
+|  Per-Instance Resources: mem-estimate=139.00MB mem-reservation=80.25MB thread-reservation=1 runtime-filters-memory=6.00MB
+|  max-parallelism=1 segment-costs=[5208418960, 6080736, 700]
 PLAN-ROOT SINK
 |  output exprs: CHANNEL, COL_NAME, D_YEAR, D_QOY, I_CATEGORY, count(), sum(EXT_SALES_PRICE)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=700
 |
 18:TOP-N [LIMIT=100]
 |  order by: CHANNEL ASC NULLS LAST, COL_NAME ASC NULLS LAST, D_YEAR ASC NULLS LAST, D_QOY ASC NULLS LAST, I_CATEGORY ASC NULLS LAST
-|  mem-estimate=6.64KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=21 row-size=68B cardinality=100 cost=6327582551
+|  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=21 row-size=74B cardinality=100 cost=6080736
 |  in pipelines: 18(GETNEXT), 17(OPEN)
 |
 17:AGGREGATE [FINALIZE]
 |  output: count(), sum(EXT_SALES_PRICE)
 |  group by: CHANNEL, COL_NAME, D_YEAR, D_QOY, I_CATEGORY
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=20 row-size=68B cardinality=393.10M cost=2347822406
+|  mem-estimate=46.25MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=20 row-size=74B cardinality=564.48K cost=570230348
 |  in pipelines: 17(GETNEXT), 02(OPEN), 09(OPEN), 13(OPEN)
 |
 00:UNION
 |  pass-through-operands: 01
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=19 row-size=48B cardinality=393.10M cost=3822209
+|  tuple-ids=19 row-size=54B cardinality=393.10M cost=4224483
 |  in pipelines: 02(GETNEXT), 09(GETNEXT), 13(GETNEXT)
 |
 |--16:HASH JOIN [INNER JOIN]
@@ -152,7 +152,7 @@ PLAN-ROOT SINK
 |
 01:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=48B cardinality=371.61M cost=66094358
+|  tuple-ids=12 row-size=54B cardinality=371.61M cost=73050556
 |  in pipelines: 02(GETNEXT), 09(GETNEXT)
 |
 |--11:HASH JOIN [INNER JOIN]
@@ -259,14 +259,14 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=371.26M cost=2364367980
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.82GB Threads=55
-Per-Host Resource Estimates: Memory=5.13GB
+Max Per-Host Resource Reservation: Memory=1.43GB Threads=45
+Per-Host Resource Estimates: Memory=2.19GB
 ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], dir4=[ASC], fetch=[100:TINYINT])
   ImpalaAggRel(group=[{0, 1, 2, 3, 4}], SALES_CNT=[COUNT()], SALES_AMT=[SUM($5)])
     ImpalaUnionRel(all=[true])
@@ -311,8 +311,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[
             ImpalaFilterRel(condition=[IS NOT NULL($0)])
               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.82MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[738] cpu-comparison-result=190 [max(1 (self) vs 190 (sum children))]
+|  Per-Instance Resources: mem-estimate=4.15MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[740] cpu-comparison-result=190 [max(1 (self) vs 190 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: CHANNEL, COL_NAME, D_YEAR, D_QOY, I_CATEGORY, count(), sum(EXT_SALES_PRICE)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=700
@@ -320,46 +320,46 @@ PLAN-ROOT SINK
 28:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: CHANNEL ASC NULLS LAST, COL_NAME ASC NULLS LAST, D_YEAR ASC NULLS LAST, D_QOY ASC NULLS LAST, I_CATEGORY ASC NULLS LAST
 |  limit: 100
-|  mem-estimate=844.41KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=21 row-size=68B cardinality=100 cost=38
+|  mem-estimate=152.89KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=21 row-size=74B cardinality=100 cost=40
 |  in pipelines: 18(GETNEXT)
 |
-F12:PLAN FRAGMENT [HASH(CHANNEL,COL_NAME,D_YEAR,D_QOY,I_CATEGORY)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=146.44MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=640 segment-costs=[2514457023, 6327582551, 209] cpu-comparison-result=190 [max(120 (self) vs 190 (sum children))]
+F12:PLAN FRAGMENT [HASH(CHANNEL,COL_NAME,D_YEAR,D_QOY,I_CATEGORY)] hosts=10 instances=20 (adjusted from 120)
+Per-Instance Resources: mem-estimate=29.13MB mem-reservation=4.75MB thread-reservation=1
+max-parallelism=20 segment-costs=[130542772, 6080736, 225] cpu-comparison-result=190 [max(20 (self) vs 190 (sum children))]
 18:TOP-N [LIMIT=100]
 |  order by: CHANNEL ASC NULLS LAST, COL_NAME ASC NULLS LAST, D_YEAR ASC NULLS LAST, D_QOY ASC NULLS LAST, I_CATEGORY ASC NULLS LAST
-|  mem-estimate=6.64KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=21 row-size=68B cardinality=100 cost=6327582551
+|  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=21 row-size=74B cardinality=100 cost=6080736
 |  in pipelines: 18(GETNEXT), 27(OPEN)
 |
 27:AGGREGATE [FINALIZE]
 |  output: count:merge(), sum:merge(EXT_SALES_PRICE)
 |  group by: CHANNEL, COL_NAME, D_YEAR, D_QOY, I_CATEGORY
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=20 row-size=68B cardinality=393.10M cost=2347822406
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=20 row-size=74B cardinality=564.48K cost=100080999
 |  in pipelines: 27(GETNEXT), 02(OPEN), 09(OPEN), 13(OPEN)
 |
 26:EXCHANGE [HASH(CHANNEL,COL_NAME,D_YEAR,D_QOY,I_CATEGORY)]
-|  mem-estimate=18.44MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=20 row-size=68B cardinality=393.10M cost=166634617
+|  mem-estimate=19.13MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=20 row-size=74B cardinality=67.53M cost=30461773
 |  in pipelines: 02(GETNEXT), 09(GETNEXT), 13(GETNEXT)
 |
 F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
-Per-Instance Resources: mem-estimate=177.75MB mem-reservation=34.50MB thread-reservation=1
-max-parallelism=120 segment-costs=[6358340415, 1923983187] cpu-comparison-result=190 [max(190 (self) vs 185 (sum children))]
+Per-Instance Resources: mem-estimate=68.33MB mem-reservation=34.50MB thread-reservation=1
+max-parallelism=120 segment-costs=[4891374859, 356216758] cpu-comparison-result=190 [max(190 (self) vs 185 (sum children))]
 17:AGGREGATE [STREAMING]
 |  output: count(), sum(EXT_SALES_PRICE)
 |  group by: CHANNEL, COL_NAME, D_YEAR, D_QOY, I_CATEGORY
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=20 row-size=68B cardinality=393.10M cost=2347822406
+|  mem-estimate=46.25MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=20 row-size=74B cardinality=67.53M cost=873498378
 |  in pipelines: 02(GETNEXT), 09(GETNEXT), 13(GETNEXT)
 |
 00:UNION
 |  pass-through-operands: 01
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=19 row-size=48B cardinality=393.10M cost=3822209
+|  tuple-ids=19 row-size=54B cardinality=393.10M cost=4224483
 |  in pipelines: 02(GETNEXT), 09(GETNEXT), 13(GETNEXT)
 |
 |--16:HASH JOIN [INNER JOIN, BROADCAST]
@@ -453,7 +453,7 @@ max-parallelism=120 segment-costs=[6358340415, 1923983187] cpu-comparison-result
 |
 01:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=48B cardinality=371.61M cost=66094358
+|  tuple-ids=12 row-size=54B cardinality=371.61M cost=73050556
 |  in pipelines: 02(GETNEXT), 09(GETNEXT)
 |
 |--11:HASH JOIN [INNER JOIN, BROADCAST]
@@ -637,14 +637,14 @@ max-parallelism=120 segment-costs=[6358340415, 1923983187] cpu-comparison-result
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=371.26M cost=2364367980
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=1.77GB Threads=56
-Per-Host Resource Estimates: Memory=5.03GB
+Max Per-Host Resource Reservation: Memory=1.38GB Threads=46
+Per-Host Resource Estimates: Memory=2.09GB
 ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], dir4=[ASC], fetch=[100:TINYINT])
   ImpalaAggRel(group=[{0, 1, 2, 3, 4}], SALES_CNT=[COUNT()], SALES_AMT=[SUM($5)])
     ImpalaUnionRel(all=[true])
@@ -689,8 +689,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], sort2=[$2], sort3=[$3], sort4=[$4], dir0=[
             ImpalaFilterRel(condition=[IS NOT NULL($0)])
               ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.82MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[738] cpu-comparison-result=200 [max(1 (self) vs 200 (sum children))]
+|  Per-Instance Resources: mem-estimate=4.15MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[740] cpu-comparison-result=200 [max(1 (self) vs 200 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: CHANNEL, COL_NAME, D_YEAR, D_QOY, I_CATEGORY, count(), sum(EXT_SALES_PRICE)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=700
@@ -698,46 +698,46 @@ PLAN-ROOT SINK
 29:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: CHANNEL ASC NULLS LAST, COL_NAME ASC NULLS LAST, D_YEAR ASC NULLS LAST, D_QOY ASC NULLS LAST, I_CATEGORY ASC NULLS LAST
 |  limit: 100
-|  mem-estimate=844.41KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=21 row-size=68B cardinality=100 cost=38
+|  mem-estimate=152.89KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=21 row-size=74B cardinality=100 cost=40
 |  in pipelines: 18(GETNEXT)
 |
-F13:PLAN FRAGMENT [HASH(CHANNEL,COL_NAME,D_YEAR,D_QOY,I_CATEGORY)] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=146.44MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=640 segment-costs=[2514457023, 6327582551, 209] cpu-comparison-result=200 [max(120 (self) vs 200 (sum children))]
+F13:PLAN FRAGMENT [HASH(CHANNEL,COL_NAME,D_YEAR,D_QOY,I_CATEGORY)] hosts=10 instances=20 (adjusted from 120)
+Per-Instance Resources: mem-estimate=29.13MB mem-reservation=4.75MB thread-reservation=1
+max-parallelism=20 segment-costs=[130542772, 6080736, 225] cpu-comparison-result=200 [max(20 (self) vs 200 (sum children))]
 18:TOP-N [LIMIT=100]
 |  order by: CHANNEL ASC NULLS LAST, COL_NAME ASC NULLS LAST, D_YEAR ASC NULLS LAST, D_QOY ASC NULLS LAST, I_CATEGORY ASC NULLS LAST
-|  mem-estimate=6.64KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=21 row-size=68B cardinality=100 cost=6327582551
+|  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=21 row-size=74B cardinality=100 cost=6080736
 |  in pipelines: 18(GETNEXT), 28(OPEN)
 |
 28:AGGREGATE [FINALIZE]
 |  output: count:merge(), sum:merge(EXT_SALES_PRICE)
 |  group by: CHANNEL, COL_NAME, D_YEAR, D_QOY, I_CATEGORY
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=20 row-size=68B cardinality=393.10M cost=2347822406
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=20 row-size=74B cardinality=564.48K cost=100080999
 |  in pipelines: 28(GETNEXT), 02(OPEN), 09(OPEN), 13(OPEN)
 |
 27:EXCHANGE [HASH(CHANNEL,COL_NAME,D_YEAR,D_QOY,I_CATEGORY)]
-|  mem-estimate=18.44MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=20 row-size=68B cardinality=393.10M cost=166634617
+|  mem-estimate=19.13MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=20 row-size=74B cardinality=67.53M cost=30461773
 |  in pipelines: 02(GETNEXT), 09(GETNEXT), 13(GETNEXT)
 |
 F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
-Per-Instance Resources: mem-estimate=177.75MB mem-reservation=34.50MB thread-reservation=1
-max-parallelism=120 segment-costs=[6358178549, 1923983187] cpu-comparison-result=200 [max(200 (self) vs 185 (sum children))]
+Per-Instance Resources: mem-estimate=68.33MB mem-reservation=34.50MB thread-reservation=1
+max-parallelism=120 segment-costs=[4891212993, 356216758] cpu-comparison-result=200 [max(200 (self) vs 185 (sum children))]
 17:AGGREGATE [STREAMING]
 |  output: count(), sum(EXT_SALES_PRICE)
 |  group by: CHANNEL, COL_NAME, D_YEAR, D_QOY, I_CATEGORY
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=20 row-size=68B cardinality=393.10M cost=2347822406
+|  mem-estimate=46.25MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=20 row-size=74B cardinality=67.53M cost=873498378
 |  in pipelines: 02(GETNEXT), 09(GETNEXT), 13(GETNEXT)
 |
 00:UNION
 |  pass-through-operands: 01
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=19 row-size=48B cardinality=393.10M cost=3822209
+|  tuple-ids=19 row-size=54B cardinality=393.10M cost=4224483
 |  in pipelines: 02(GETNEXT), 09(GETNEXT), 13(GETNEXT)
 |
 |--16:HASH JOIN [INNER JOIN, BROADCAST]
@@ -831,7 +831,7 @@ max-parallelism=120 segment-costs=[6358178549, 1923983187] cpu-comparison-result
 |
 01:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=12 row-size=48B cardinality=371.61M cost=66094358
+|  tuple-ids=12 row-size=54B cardinality=371.61M cost=73050556
 |  in pipelines: 02(GETNEXT), 09(GETNEXT)
 |
 |--11:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1023,7 +1023,7 @@ max-parallelism=120 segment-costs=[6358178549, 1923983187] cpu-comparison-result
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=371.26M cost=2364367980

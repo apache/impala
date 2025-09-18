@@ -129,8 +129,8 @@ select  channel, item, return_ratio, return_rank, currency_rank from
 
 # end query 49 in stream 0 using template query49.tpl
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=183.19MB Threads=1
-Per-Host Resource Estimates: Memory=3.35GB
+Max Per-Host Resource Reservation: Memory=140.94MB Threads=1
+Per-Host Resource Estimates: Memory=3.23GB
 ImpalaSortRel(sort0=[$0], sort1=[$3], sort2=[$4], sort3=[$1], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], fetch=[100:TINYINT])
   ImpalaAggRel(group=[{0, 1, 2, 3, 4}])
     ImpalaUnionRel(all=[true])
@@ -191,7 +191,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$3], sort2=[$4], sort3=[$1], dir0=[ASC], dir1=[
                         ImpalaFilterRel(condition=[AND(=($6, 2000), =($8, 11), IS NOT NULL($0))])
                           ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=3.35GB mem-reservation=183.19MB thread-reservation=1 runtime-filters-memory=54.00MB
+|  Per-Instance Resources: mem-estimate=3.23GB mem-reservation=140.94MB thread-reservation=1 runtime-filters-memory=54.00MB
 |  max-parallelism=1 segment-costs=[708844407, 961356, 1446879, 180850795, 341279, 513638, 360349665, 676758, 1018547, 994746, 1164496, 676429, 500]
 PLAN-ROOT SINK
 |  output exprs: CHANNEL, ITEM, RETURN_RATIO, RETURN_RANK, CURRENCY_RANK
@@ -205,7 +205,7 @@ PLAN-ROOT SINK
 |
 36:AGGREGATE [FINALIZE]
 |  group by: CHANNEL, ITEM, RETURN_RATIO, RETURN_RANK, CURRENCY_RANK
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=54 row-size=48B cardinality=74.16K cost=437730
 |  in pipelines: 36(GETNEXT), 24(OPEN), 33(OPEN)
 |
@@ -308,7 +308,7 @@ PLAN-ROOT SINK
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=108(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=108(filtered from 1823)
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_paid > CAST(0 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit > CAST(1.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_quantity > CAST(0 AS INT)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_paid > CAST(0 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit > CAST(1.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_quantity > CAST(0 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_ticket_number IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
@@ -317,7 +317,7 @@ PLAN-ROOT SINK
 |
 24:AGGREGATE [FINALIZE]
 |  group by: CHANNEL, ITEM, RETURN_RATIO, RETURN_RANK, CURRENCY_RANK
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=35 row-size=48B cardinality=38.14K cost=225131
 |  in pipelines: 24(GETNEXT), 10(OPEN), 21(OPEN)
 |
@@ -526,8 +526,8 @@ PLAN-ROOT SINK
    tuple-ids=2 row-size=28B cardinality=12.79M(filtered from 215.94M) cost=69517068
    in pipelines: 03(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=357.03MB Threads=36
-Per-Host Resource Estimates: Memory=1.48GB
+Max Per-Host Resource Reservation: Memory=302.28MB Threads=36
+Per-Host Resource Estimates: Memory=1.25GB
 ImpalaSortRel(sort0=[$0], sort1=[$3], sort2=[$4], sort3=[$1], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], fetch=[100:TINYINT])
   ImpalaAggRel(group=[{0, 1, 2, 3, 4}])
     ImpalaUnionRel(all=[true])
@@ -588,7 +588,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$3], sort2=[$4], sort3=[$1], dir0=[ASC], dir1=[
                         ImpalaFilterRel(condition=[AND(=($6, 2000), =($8, 11), IS NOT NULL($0))])
                           ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=280.31MB mem-reservation=82.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=44.31MB mem-reservation=27.25MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[1575427, 559272, 1109040, 994746, 1164496, 676429, 500] cpu-comparison-result=163 [max(1 (self) vs 163 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: CHANNEL, ITEM, RETURN_RATIO, RETURN_RANK, CURRENCY_RANK
@@ -602,7 +602,7 @@ PLAN-ROOT SINK
 |
 36:AGGREGATE [FINALIZE]
 |  group by: CHANNEL, ITEM, RETURN_RATIO, RETURN_RANK, CURRENCY_RANK
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=54 row-size=48B cardinality=74.16K cost=437730
 |  in pipelines: 36(GETNEXT), 24(OPEN), 33(OPEN)
 |
@@ -772,7 +772,7 @@ PLAN-ROOT SINK
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=108(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=108(filtered from 1823)
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_paid > CAST(0 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit > CAST(1.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_quantity > CAST(0 AS INT)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_paid > CAST(0 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit > CAST(1.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_quantity > CAST(0 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_ticket_number IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
@@ -781,7 +781,7 @@ PLAN-ROOT SINK
 |
 24:AGGREGATE [FINALIZE]
 |  group by: CHANNEL, ITEM, RETURN_RATIO, RETURN_RANK, CURRENCY_RANK
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=35 row-size=48B cardinality=38.14K cost=225131
 |  in pipelines: 24(GETNEXT), 10(OPEN), 21(OPEN)
 |
@@ -1124,8 +1124,8 @@ max-parallelism=20 segment-costs=[121224622]
    tuple-ids=2 row-size=28B cardinality=12.79M(filtered from 215.94M) cost=69517068
    in pipelines: 03(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=357.03MB Threads=36
-Per-Host Resource Estimates: Memory=1.48GB
+Max Per-Host Resource Reservation: Memory=302.28MB Threads=36
+Per-Host Resource Estimates: Memory=1.25GB
 ImpalaSortRel(sort0=[$0], sort1=[$3], sort2=[$4], sort3=[$1], dir0=[ASC], dir1=[ASC], dir2=[ASC], dir3=[ASC], fetch=[100:TINYINT])
   ImpalaAggRel(group=[{0, 1, 2, 3, 4}])
     ImpalaUnionRel(all=[true])
@@ -1186,7 +1186,7 @@ ImpalaSortRel(sort0=[$0], sort1=[$3], sort2=[$4], sort3=[$1], dir0=[ASC], dir1=[
                         ImpalaFilterRel(condition=[AND(=($6, 2000), =($8, 11), IS NOT NULL($0))])
                           ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, date_dim]])
 F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=280.31MB mem-reservation=82.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=44.31MB mem-reservation=27.25MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[1575427, 559272, 1109040, 994746, 1164496, 676429, 500] cpu-comparison-result=163 [max(1 (self) vs 163 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: CHANNEL, ITEM, RETURN_RATIO, RETURN_RANK, CURRENCY_RANK
@@ -1200,7 +1200,7 @@ PLAN-ROOT SINK
 |
 36:AGGREGATE [FINALIZE]
 |  group by: CHANNEL, ITEM, RETURN_RATIO, RETURN_RANK, CURRENCY_RANK
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=54 row-size=48B cardinality=74.16K cost=437730
 |  in pipelines: 36(GETNEXT), 24(OPEN), 33(OPEN)
 |
@@ -1370,7 +1370,7 @@ PLAN-ROOT SINK
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=108(filtered from 1823)
+|     extrapolated-rows=disabled max-scan-range-rows=12.31M est-scan-range=108(filtered from 1823)
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_paid > CAST(0 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit > CAST(1.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_quantity > CAST(0 AS INT)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_paid > CAST(0 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit > CAST(1.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_quantity > CAST(0 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_ticket_number IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
@@ -1379,7 +1379,7 @@ PLAN-ROOT SINK
 |
 24:AGGREGATE [FINALIZE]
 |  group by: CHANNEL, ITEM, RETURN_RATIO, RETURN_RANK, CURRENCY_RANK
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=35 row-size=48B cardinality=38.14K cost=225131
 |  in pipelines: 24(GETNEXT), 10(OPEN), 21(OPEN)
 |

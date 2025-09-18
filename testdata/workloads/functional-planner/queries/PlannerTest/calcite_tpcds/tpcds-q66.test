@@ -220,8 +220,8 @@ select
 
 # end query 66 in stream 0 using template query66.tpl
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=84.00MB Threads=1
-Per-Host Resource Estimates: Memory=656MB
+Max Per-Host Resource Reservation: Memory=51.94MB Threads=1
+Per-Host Resource Estimates: Memory=538MB
 ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
   ImpalaProjectRel(W_WAREHOUSE_NAME=[$0], W_WAREHOUSE_SQ_FT=[$1], W_CITY=[$2], W_COUNTY=[$3], W_STATE=[$4], W_COUNTRY=[$5], SHIP_CARRIERS=[CAST(_UTF-8'HARMSTORF,USPS':VARCHAR(2147483647) CHARACTER SET "UTF-8"):VARCHAR(2147483647) CHARACTER SET "UTF-8"], YEAR=[CAST(2002):INTEGER], JAN_SALES=[$6], FEB_SALES=[$7], MAR_SALES=[$8], APR_SALES=[$9], MAY_SALES=[$10], JUN_SALES=[$11], JUL_SALES=[$12], AUG_SALES=[$13], SEP_SALES=[$14], OCT_SALES=[$15], NOV_SALES=[$16], DEC_SALES=[$17], JAN_SALES_PER_SQ_FOOT=[$18], FEB_SALES_PER_SQ_FOOT=[$19], MAR_SALES_PER_SQ_FOOT=[$20], APR_SALES_PER_SQ_FOOT=[$21], MAY_SALES_PER_SQ_FOOT=[$22], JUN_SALES_PER_SQ_FOOT=[$23], JUL_SALES_PER_SQ_FOOT=[$24], AUG_SALES_PER_SQ_FOOT=[$25], SEP_SALES_PER_SQ_FOOT=[$26], OCT_SALES_PER_SQ_FOOT=[$27], NOV_SALES_PER_SQ_FOOT=[$28], DEC_SALES_PER_SQ_FOOT=[$29], JAN_NET=[$30], FEB_NET=[$31], MAR_NET=[$32], APR_NET=[$33], MAY_NET=[$34], JUN_NET=[$35], JUL_NET=[$36], AUG_NET=[$37], SEP_NET=[$38], OCT_NET=[$39], NOV_NET=[$40], DEC_NET=[$41])
     ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], JAN_SALES=[SUM($6)], FEB_SALES=[SUM($7)], MAR_SALES=[SUM($8)], APR_SALES=[SUM($9)], MAY_SALES=[SUM($10)], JUN_SALES=[SUM($11)], JUL_SALES=[SUM($12)], AUG_SALES=[SUM($13)], SEP_SALES=[SUM($14)], OCT_SALES=[SUM($15)], NOV_SALES=[SUM($16)], DEC_SALES=[SUM($17)], JAN_SALES_PER_SQ_FOOT=[SUM($18)], FEB_SALES_PER_SQ_FOOT=[SUM($19)], MAR_SALES_PER_SQ_FOOT=[SUM($20)], APR_SALES_PER_SQ_FOOT=[SUM($21)], MAY_SALES_PER_SQ_FOOT=[SUM($22)], JUN_SALES_PER_SQ_FOOT=[SUM($23)], JUL_SALES_PER_SQ_FOOT=[SUM($24)], AUG_SALES_PER_SQ_FOOT=[SUM($25)], SEP_SALES_PER_SQ_FOOT=[SUM($26)], OCT_SALES_PER_SQ_FOOT=[SUM($27)], NOV_SALES_PER_SQ_FOOT=[SUM($28)], DEC_SALES_PER_SQ_FOOT=[SUM($29)], JAN_NET=[SUM($30)], FEB_NET=[SUM($31)], MAR_NET=[SUM($32)], APR_NET=[SUM($33)], MAY_NET=[SUM($34)], JUN_NET=[SUM($35)], JUL_NET=[SUM($36)], AUG_NET=[SUM($37)], SEP_NET=[SUM($38)], OCT_NET=[SUM($39)], NOV_NET=[SUM($40)], DEC_NET=[SUM($41)])
@@ -276,7 +276,7 @@ ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
                   ImpalaFilterRel(condition=[IS NOT NULL($0)])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, warehouse]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=655.54MB mem-reservation=84.00MB thread-reservation=1 runtime-filters-memory=8.00MB
+|  Per-Instance Resources: mem-estimate=537.54MB mem-reservation=51.94MB thread-reservation=1 runtime-filters-memory=8.00MB
 |  max-parallelism=1 segment-costs=[302175214, 598433433, 367, 135, 1936]
 PLAN-ROOT SINK
 |  output exprs: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY, 'HARMSTORF,USPS', CAST(2002 AS INT), sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
@@ -284,21 +284,21 @@ PLAN-ROOT SINK
 |
 22:TOP-N [LIMIT=100]
 |  order by: W_WAREHOUSE_NAME ASC NULLS LAST
-|  mem-estimate=27.50KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=24 row-size=640B cardinality=44 cost=135
+|  mem-estimate=29.87KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=24 row-size=695B cardinality=44 cost=135
 |  in pipelines: 22(GETNEXT), 21(OPEN)
 |
 21:AGGREGATE [FINALIZE]
 |  output: sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(FEB_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(MAR_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(APR_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(MAY_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(JUN_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(JUL_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(AUG_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(SEP_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(OCT_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(NOV_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(DEC_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
 |  group by: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=23 row-size=640B cardinality=44 cost=367
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=23 row-size=695B cardinality=44 cost=367
 |  in pipelines: 21(GETNEXT), 10(OPEN), 20(OPEN)
 |
 00:UNION
 |  pass-through-operands: all
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=22 row-size=448B cardinality=44 cost=0
+|  tuple-ids=22 row-size=503B cardinality=44 cost=0
 |  in pipelines: 10(GETNEXT), 20(GETNEXT)
 |
 |--20:AGGREGATE [FINALIZE]
@@ -511,8 +511,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=28B cardinality=44.03M(filtered from 2.16G) cost=215274115
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=692.27MB Threads=34
-Per-Host Resource Estimates: Memory=3.27GB
+Max Per-Host Resource Reservation: Memory=468.20MB Threads=34
+Per-Host Resource Estimates: Memory=2.47GB
 ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
   ImpalaProjectRel(W_WAREHOUSE_NAME=[$0], W_WAREHOUSE_SQ_FT=[$1], W_CITY=[$2], W_COUNTY=[$3], W_STATE=[$4], W_COUNTRY=[$5], SHIP_CARRIERS=[CAST(_UTF-8'HARMSTORF,USPS':VARCHAR(2147483647) CHARACTER SET "UTF-8"):VARCHAR(2147483647) CHARACTER SET "UTF-8"], YEAR=[CAST(2002):INTEGER], JAN_SALES=[$6], FEB_SALES=[$7], MAR_SALES=[$8], APR_SALES=[$9], MAY_SALES=[$10], JUN_SALES=[$11], JUL_SALES=[$12], AUG_SALES=[$13], SEP_SALES=[$14], OCT_SALES=[$15], NOV_SALES=[$16], DEC_SALES=[$17], JAN_SALES_PER_SQ_FOOT=[$18], FEB_SALES_PER_SQ_FOOT=[$19], MAR_SALES_PER_SQ_FOOT=[$20], APR_SALES_PER_SQ_FOOT=[$21], MAY_SALES_PER_SQ_FOOT=[$22], JUN_SALES_PER_SQ_FOOT=[$23], JUL_SALES_PER_SQ_FOOT=[$24], AUG_SALES_PER_SQ_FOOT=[$25], SEP_SALES_PER_SQ_FOOT=[$26], OCT_SALES_PER_SQ_FOOT=[$27], NOV_SALES_PER_SQ_FOOT=[$28], DEC_SALES_PER_SQ_FOOT=[$29], JAN_NET=[$30], FEB_NET=[$31], MAR_NET=[$32], APR_NET=[$33], MAY_NET=[$34], JUN_NET=[$35], JUL_NET=[$36], AUG_NET=[$37], SEP_NET=[$38], OCT_NET=[$39], NOV_NET=[$40], DEC_NET=[$41])
     ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], JAN_SALES=[SUM($6)], FEB_SALES=[SUM($7)], MAR_SALES=[SUM($8)], APR_SALES=[SUM($9)], MAY_SALES=[SUM($10)], JUN_SALES=[SUM($11)], JUL_SALES=[SUM($12)], AUG_SALES=[SUM($13)], SEP_SALES=[SUM($14)], OCT_SALES=[SUM($15)], NOV_SALES=[SUM($16)], DEC_SALES=[SUM($17)], JAN_SALES_PER_SQ_FOOT=[SUM($18)], FEB_SALES_PER_SQ_FOOT=[SUM($19)], MAR_SALES_PER_SQ_FOOT=[SUM($20)], APR_SALES_PER_SQ_FOOT=[SUM($21)], MAY_SALES_PER_SQ_FOOT=[SUM($22)], JUN_SALES_PER_SQ_FOOT=[SUM($23)], JUL_SALES_PER_SQ_FOOT=[SUM($24)], AUG_SALES_PER_SQ_FOOT=[SUM($25)], SEP_SALES_PER_SQ_FOOT=[SUM($26)], OCT_SALES_PER_SQ_FOOT=[SUM($27)], NOV_SALES_PER_SQ_FOOT=[SUM($28)], DEC_SALES_PER_SQ_FOOT=[SUM($29)], JAN_NET=[SUM($30)], FEB_NET=[SUM($31)], MAR_NET=[SUM($32)], APR_NET=[SUM($33)], MAY_NET=[SUM($34)], JUN_NET=[SUM($35)], JUL_NET=[SUM($36)], AUG_NET=[SUM($37)], SEP_NET=[SUM($38)], OCT_NET=[SUM($39)], NOV_NET=[SUM($40)], DEC_NET=[SUM($41)])
@@ -567,8 +567,8 @@ ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
                   ImpalaFilterRel(condition=[IS NOT NULL($0)])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, warehouse]])
 F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.27MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[2003] cpu-comparison-result=104 [max(1 (self) vs 104 (sum children))]
+|  Per-Instance Resources: mem-estimate=4.30MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[2008] cpu-comparison-result=104 [max(1 (self) vs 104 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY, 'HARMSTORF,USPS', CAST(2002 AS INT), sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1936
@@ -576,45 +576,45 @@ PLAN-ROOT SINK
 37:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: W_WAREHOUSE_NAME ASC NULLS LAST
 |  limit: 100
-|  mem-estimate=279.47KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=24 row-size=640B cardinality=44 cost=67
+|  mem-estimate=303.45KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=24 row-size=695B cardinality=44 cost=72
 |  in pipelines: 22(GETNEXT)
 |
 F13:PLAN FRAGMENT [HASH(W_WAREHOUSE_NAME,W_WAREHOUSE_SQ_FT,W_CITY,W_COUNTY,W_STATE,W_COUNTRY)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=129.62MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[501, 135, 751] cpu-comparison-result=104 [max(10 (self) vs 104 (sum children))]
+Per-Instance Resources: mem-estimate=11.76MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=10 segment-costs=[512, 135, 815] cpu-comparison-result=104 [max(10 (self) vs 104 (sum children))]
 22:TOP-N [LIMIT=100]
 |  order by: W_WAREHOUSE_NAME ASC NULLS LAST
-|  mem-estimate=27.50KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=24 row-size=640B cardinality=44 cost=135
+|  mem-estimate=29.87KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=24 row-size=695B cardinality=44 cost=135
 |  in pipelines: 22(GETNEXT), 36(OPEN)
 |
 36:AGGREGATE [FINALIZE]
 |  output: sum:merge(JAN_SALES), sum:merge(FEB_SALES), sum:merge(MAR_SALES), sum:merge(APR_SALES), sum:merge(MAY_SALES), sum:merge(JUN_SALES), sum:merge(JUL_SALES), sum:merge(AUG_SALES), sum:merge(SEP_SALES), sum:merge(OCT_SALES), sum:merge(NOV_SALES), sum:merge(DEC_SALES), sum:merge(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(JAN_NET), sum:merge(FEB_NET), sum:merge(MAR_NET), sum:merge(APR_NET), sum:merge(MAY_NET), sum:merge(JUN_NET), sum:merge(JUL_NET), sum:merge(AUG_NET), sum:merge(SEP_NET), sum:merge(OCT_NET), sum:merge(NOV_NET), sum:merge(DEC_NET)
 |  group by: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=23 row-size=640B cardinality=44 cost=367
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=23 row-size=695B cardinality=44 cost=367
 |  in pipelines: 36(GETNEXT), 28(OPEN), 34(OPEN)
 |
 35:EXCHANGE [HASH(W_WAREHOUSE_NAME,W_WAREHOUSE_SQ_FT,W_CITY,W_COUNTY,W_STATE,W_COUNTRY)]
-|  mem-estimate=1.62MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=23 row-size=640B cardinality=44 cost=134
+|  mem-estimate=1.76MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=23 row-size=695B cardinality=44 cost=145
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=60 (adjusted from 120)
-Per-Instance Resources: mem-estimate=193.00MB mem-reservation=35.94MB thread-reservation=1
-max-parallelism=60 segment-costs=[14381, 14381, 367, 1836] cpu-comparison-result=104 [max(60 (self) vs 104 (sum children))]
+Per-Instance Resources: mem-estimate=77.16MB mem-reservation=3.94MB thread-reservation=1
+max-parallelism=60 segment-costs=[14381, 14381, 367, 1992] cpu-comparison-result=104 [max(60 (self) vs 104 (sum children))]
 21:AGGREGATE [STREAMING]
 |  output: sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(FEB_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(MAR_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(APR_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(MAY_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(JUN_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(JUL_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(AUG_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(SEP_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(OCT_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(NOV_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(DEC_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
 |  group by: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=23 row-size=640B cardinality=44 cost=367
+|  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=23 row-size=695B cardinality=44 cost=367
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 00:UNION
 |  pass-through-operands: all
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=22 row-size=448B cardinality=44 cost=0
+|  tuple-ids=22 row-size=503B cardinality=44 cost=0
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 |--34:AGGREGATE [FINALIZE]
@@ -995,8 +995,8 @@ max-parallelism=40 segment-costs=[302144045, 86917] cpu-comparison-result=44 [ma
    tuple-ids=0 row-size=28B cardinality=44.03M(filtered from 2.16G) cost=215274115
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=692.27MB Threads=34
-Per-Host Resource Estimates: Memory=3.27GB
+Max Per-Host Resource Reservation: Memory=468.20MB Threads=34
+Per-Host Resource Estimates: Memory=2.47GB
 ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
   ImpalaProjectRel(W_WAREHOUSE_NAME=[$0], W_WAREHOUSE_SQ_FT=[$1], W_CITY=[$2], W_COUNTY=[$3], W_STATE=[$4], W_COUNTRY=[$5], SHIP_CARRIERS=[CAST(_UTF-8'HARMSTORF,USPS':VARCHAR(2147483647) CHARACTER SET "UTF-8"):VARCHAR(2147483647) CHARACTER SET "UTF-8"], YEAR=[CAST(2002):INTEGER], JAN_SALES=[$6], FEB_SALES=[$7], MAR_SALES=[$8], APR_SALES=[$9], MAY_SALES=[$10], JUN_SALES=[$11], JUL_SALES=[$12], AUG_SALES=[$13], SEP_SALES=[$14], OCT_SALES=[$15], NOV_SALES=[$16], DEC_SALES=[$17], JAN_SALES_PER_SQ_FOOT=[$18], FEB_SALES_PER_SQ_FOOT=[$19], MAR_SALES_PER_SQ_FOOT=[$20], APR_SALES_PER_SQ_FOOT=[$21], MAY_SALES_PER_SQ_FOOT=[$22], JUN_SALES_PER_SQ_FOOT=[$23], JUL_SALES_PER_SQ_FOOT=[$24], AUG_SALES_PER_SQ_FOOT=[$25], SEP_SALES_PER_SQ_FOOT=[$26], OCT_SALES_PER_SQ_FOOT=[$27], NOV_SALES_PER_SQ_FOOT=[$28], DEC_SALES_PER_SQ_FOOT=[$29], JAN_NET=[$30], FEB_NET=[$31], MAR_NET=[$32], APR_NET=[$33], MAY_NET=[$34], JUN_NET=[$35], JUL_NET=[$36], AUG_NET=[$37], SEP_NET=[$38], OCT_NET=[$39], NOV_NET=[$40], DEC_NET=[$41])
     ImpalaAggRel(group=[{0, 1, 2, 3, 4, 5}], JAN_SALES=[SUM($6)], FEB_SALES=[SUM($7)], MAR_SALES=[SUM($8)], APR_SALES=[SUM($9)], MAY_SALES=[SUM($10)], JUN_SALES=[SUM($11)], JUL_SALES=[SUM($12)], AUG_SALES=[SUM($13)], SEP_SALES=[SUM($14)], OCT_SALES=[SUM($15)], NOV_SALES=[SUM($16)], DEC_SALES=[SUM($17)], JAN_SALES_PER_SQ_FOOT=[SUM($18)], FEB_SALES_PER_SQ_FOOT=[SUM($19)], MAR_SALES_PER_SQ_FOOT=[SUM($20)], APR_SALES_PER_SQ_FOOT=[SUM($21)], MAY_SALES_PER_SQ_FOOT=[SUM($22)], JUN_SALES_PER_SQ_FOOT=[SUM($23)], JUL_SALES_PER_SQ_FOOT=[SUM($24)], AUG_SALES_PER_SQ_FOOT=[SUM($25)], SEP_SALES_PER_SQ_FOOT=[SUM($26)], OCT_SALES_PER_SQ_FOOT=[SUM($27)], NOV_SALES_PER_SQ_FOOT=[SUM($28)], DEC_SALES_PER_SQ_FOOT=[SUM($29)], JAN_NET=[SUM($30)], FEB_NET=[SUM($31)], MAR_NET=[SUM($32)], APR_NET=[SUM($33)], MAY_NET=[SUM($34)], JUN_NET=[SUM($35)], JUL_NET=[SUM($36)], AUG_NET=[SUM($37)], SEP_NET=[SUM($38)], OCT_NET=[SUM($39)], NOV_NET=[SUM($40)], DEC_NET=[SUM($41)])
@@ -1051,8 +1051,8 @@ ImpalaSortRel(sort0=[$0], dir0=[ASC], fetch=[100:TINYINT])
                   ImpalaFilterRel(condition=[IS NOT NULL($0)])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, warehouse]])
 F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.27MB mem-reservation=4.00MB thread-reservation=1
-|  max-parallelism=1 segment-costs=[2003] cpu-comparison-result=104 [max(1 (self) vs 104 (sum children))]
+|  Per-Instance Resources: mem-estimate=4.30MB mem-reservation=4.00MB thread-reservation=1
+|  max-parallelism=1 segment-costs=[2008] cpu-comparison-result=104 [max(1 (self) vs 104 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY, 'HARMSTORF,USPS', CAST(2002 AS INT), sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1936
@@ -1060,45 +1060,45 @@ PLAN-ROOT SINK
 37:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: W_WAREHOUSE_NAME ASC NULLS LAST
 |  limit: 100
-|  mem-estimate=279.47KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=24 row-size=640B cardinality=44 cost=67
+|  mem-estimate=303.45KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=24 row-size=695B cardinality=44 cost=72
 |  in pipelines: 22(GETNEXT)
 |
 F13:PLAN FRAGMENT [HASH(W_WAREHOUSE_NAME,W_WAREHOUSE_SQ_FT,W_CITY,W_COUNTY,W_STATE,W_COUNTRY)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=129.62MB mem-reservation=34.00MB thread-reservation=1
-max-parallelism=10 segment-costs=[501, 135, 751] cpu-comparison-result=104 [max(10 (self) vs 104 (sum children))]
+Per-Instance Resources: mem-estimate=11.76MB mem-reservation=1.94MB thread-reservation=1
+max-parallelism=10 segment-costs=[512, 135, 815] cpu-comparison-result=104 [max(10 (self) vs 104 (sum children))]
 22:TOP-N [LIMIT=100]
 |  order by: W_WAREHOUSE_NAME ASC NULLS LAST
-|  mem-estimate=27.50KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=24 row-size=640B cardinality=44 cost=135
+|  mem-estimate=29.87KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=24 row-size=695B cardinality=44 cost=135
 |  in pipelines: 22(GETNEXT), 36(OPEN)
 |
 36:AGGREGATE [FINALIZE]
 |  output: sum:merge(JAN_SALES), sum:merge(FEB_SALES), sum:merge(MAR_SALES), sum:merge(APR_SALES), sum:merge(MAY_SALES), sum:merge(JUN_SALES), sum:merge(JUL_SALES), sum:merge(AUG_SALES), sum:merge(SEP_SALES), sum:merge(OCT_SALES), sum:merge(NOV_SALES), sum:merge(DEC_SALES), sum:merge(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum:merge(JAN_NET), sum:merge(FEB_NET), sum:merge(MAR_NET), sum:merge(APR_NET), sum:merge(MAY_NET), sum:merge(JUN_NET), sum:merge(JUL_NET), sum:merge(AUG_NET), sum:merge(SEP_NET), sum:merge(OCT_NET), sum:merge(NOV_NET), sum:merge(DEC_NET)
 |  group by: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=23 row-size=640B cardinality=44 cost=367
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=23 row-size=695B cardinality=44 cost=367
 |  in pipelines: 36(GETNEXT), 28(OPEN), 34(OPEN)
 |
 35:EXCHANGE [HASH(W_WAREHOUSE_NAME,W_WAREHOUSE_SQ_FT,W_CITY,W_COUNTY,W_STATE,W_COUNTRY)]
-|  mem-estimate=1.62MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=23 row-size=640B cardinality=44 cost=134
+|  mem-estimate=1.76MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=23 row-size=695B cardinality=44 cost=145
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=60 (adjusted from 120)
-Per-Instance Resources: mem-estimate=193.00MB mem-reservation=35.94MB thread-reservation=1
-max-parallelism=60 segment-costs=[14381, 14381, 367, 1836] cpu-comparison-result=104 [max(60 (self) vs 104 (sum children))]
+Per-Instance Resources: mem-estimate=77.16MB mem-reservation=3.94MB thread-reservation=1
+max-parallelism=60 segment-costs=[14381, 14381, 367, 1992] cpu-comparison-result=104 [max(60 (self) vs 104 (sum children))]
 21:AGGREGATE [STREAMING]
 |  output: sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(FEB_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(MAR_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(APR_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(MAY_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(JUN_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(JUL_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(AUG_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(SEP_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(OCT_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(NOV_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(divide(DEC_SALES, CAST(W_WAREHOUSE_SQ_FT AS DECIMAL(10,0)))), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
 |  group by: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=23 row-size=640B cardinality=44 cost=367
+|  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=23 row-size=695B cardinality=44 cost=367
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 00:UNION
 |  pass-through-operands: all
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=22 row-size=448B cardinality=44 cost=0
+|  tuple-ids=22 row-size=503B cardinality=44 cost=0
 |  in pipelines: 28(GETNEXT), 34(GETNEXT)
 |
 |--34:AGGREGATE [FINALIZE]

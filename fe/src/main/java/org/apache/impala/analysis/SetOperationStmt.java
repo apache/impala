@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
@@ -643,32 +644,11 @@ public class SetOperationStmt extends QueryStmt {
     // One slot per expr in the select blocks. Use first select block as representative.
     List<Expr> firstSelectExprs = operands_.get(0).getQueryStmt().getResultExprs();
 
-    // Compute column stats for the materialized slots from the source exprs.
-    List<ColumnStats> columnStats = new ArrayList<>();
-    List<Set<Column>> sourceColumns = new ArrayList<>();
-    for (int i = 0; i < operands_.size(); ++i) {
-      List<Expr> selectExprs = operands_.get(i).getQueryStmt().getResultExprs();
-      for (int j = 0; j < selectExprs.size(); ++j) {
-        if (i == 0) {
-          ColumnStats statsToAdd = ColumnStats.fromExpr(selectExprs.get(j));
-          columnStats.add(statsToAdd);
-          sourceColumns.add(new HashSet<>());
-        } else {
-          ColumnStats statsToAdd = columnStats.get(j).hasNumDistinctValues() ?
-              ColumnStats.fromExpr(selectExprs.get(j), sourceColumns.get(j)) :
-              ColumnStats.fromExpr(selectExprs.get(j));
-          columnStats.get(j).add(statsToAdd);
-        }
+    List<List<Expr>> resultExprsList = operands_.stream()
+        .map(o -> o.getQueryStmt().getResultExprs())
+        .collect(Collectors.toList());
 
-        if (columnStats.get(j).hasNumDistinctValues()) {
-          // Collect expr columns to keep ndv low in later stats addition.
-          SlotRef slotRef = selectExprs.get(j).unwrapSlotRef(false);
-          if (slotRef != null && slotRef.hasDesc()) {
-            slotRef.getDesc().collectColumns(sourceColumns.get(j));
-          }
-        }
-      }
-    }
+    List<ColumnStats> columnStats = getColumnStats(resultExprsList);
 
     // Create tuple descriptor and slots.
     for (int i = 0; i < firstSelectExprs.size(); ++i) {
@@ -713,6 +693,35 @@ public class SetOperationStmt extends QueryStmt {
       slotDesc.setIsNullable(isNullable);
     }
     baseTblResultExprs_ = resultExprs_;
+  }
+
+  public static List<ColumnStats> getColumnStats(List<List<Expr>> resultExprsList) {
+    List<ColumnStats> columnStats = new ArrayList<>();
+    List<Set<Column>> sourceColumns = new ArrayList<>();
+    for (int i = 0; i < resultExprsList.size(); ++i) {
+      List<Expr> selectExprs = resultExprsList.get(i);
+      for (int j = 0; j < selectExprs.size(); ++j) {
+        if (i == 0) {
+          ColumnStats statsToAdd = ColumnStats.fromExpr(selectExprs.get(j));
+          columnStats.add(statsToAdd);
+          sourceColumns.add(new HashSet<>());
+        } else {
+          ColumnStats statsToAdd = columnStats.get(j).hasNumDistinctValues() ?
+              ColumnStats.fromExpr(selectExprs.get(j), sourceColumns.get(j)) :
+              ColumnStats.fromExpr(selectExprs.get(j));
+          columnStats.get(j).add(statsToAdd);
+        }
+
+        if (columnStats.get(j).hasNumDistinctValues()) {
+          // Collect expr columns to keep ndv low in later stats addition.
+          SlotRef slotRef = selectExprs.get(j).unwrapSlotRef(false);
+          if (slotRef != null && slotRef.hasDesc()) {
+            slotRef.getDesc().collectColumns(sourceColumns.get(j));
+          }
+        }
+      }
+    }
+    return columnStats;
   }
 
   /**

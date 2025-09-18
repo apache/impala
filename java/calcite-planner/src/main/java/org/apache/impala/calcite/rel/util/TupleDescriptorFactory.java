@@ -24,6 +24,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.common.ImpalaException;
@@ -39,21 +40,24 @@ public class TupleDescriptorFactory {
   private final String tupleLabel;
   private final List<RelDataTypeField> relDataTypeFields;
   private final List<String> fieldLabels;
-
-  public TupleDescriptorFactory(String tupleLabel, List<Expr> exprList,
-      RelDataType rowType) {
-    this(tupleLabel, getLabelsFromExprs(exprList), rowType.getFieldList());
-  }
+  private final List<ColumnStats> columnStats_;
 
   public TupleDescriptorFactory(String tupleLabel, RelDataType rowType) {
-    this(tupleLabel, getLabelsFromRelDataType(rowType), rowType.getFieldList());
+    this(tupleLabel, getLabelsFromRelDataType(rowType), rowType.getFieldList(), null);
+  }
+
+  public TupleDescriptorFactory(String tupleLabel, RelDataType rowType,
+      List<ColumnStats> columnStats) {
+    this(tupleLabel, getLabelsFromRelDataType(rowType), rowType.getFieldList(),
+        columnStats);
   }
 
   private TupleDescriptorFactory(String tupleLabel, List<String> fieldLabels,
-      List<RelDataTypeField> relDataTypeFields) {
+      List<RelDataTypeField> relDataTypeFields, List<ColumnStats> columnStats) {
     this.tupleLabel = tupleLabel;
     this.fieldLabels = fieldLabels;
     this.relDataTypeFields = relDataTypeFields;
+    this.columnStats_ = columnStats;
     Preconditions.checkArgument(fieldLabels.size() == relDataTypeFields.size());
   }
 
@@ -73,20 +77,15 @@ public class TupleDescriptorFactory {
       slotDesc.setType(impalaType);
       slotDesc.setLabel(fieldLabel);
       slotDesc.setIsMaterialized(true);
+      if (columnStats_ != null) {
+        slotDesc.setStats(columnStats_.get(i));
+      }
       if (!relDataTypeField.getType().isNullable()) {
         slotDesc.setIsNullable(false);
       }
     }
     tupleDesc.computeMemLayout();
     return tupleDesc;
-  }
-
-  private static List<String> getLabelsFromExprs(List<Expr> exprs) {
-    List<String> fieldLabels = new ArrayList<>();
-    for (Expr expr : exprs) {
-      fieldLabels.add(expr.toSql());
-    }
-    return fieldLabels;
   }
 
   private static List<String> getLabelsFromRelDataType(RelDataType rowType) {

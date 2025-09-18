@@ -21,9 +21,11 @@ import com.google.common.collect.ImmutableList;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.SetOperationStmt;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.planner.EmptySetNode;
 import org.apache.impala.planner.PlanNodeId;
 import org.apache.impala.planner.SelectNode;
@@ -37,6 +39,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class NodeCreationUtils {
 
@@ -76,8 +79,11 @@ public class NodeCreationUtils {
   public static NodeWithExprs createUnionPlanNode(PlanNodeId nodeId,
       Analyzer analyzer, RelDataType rowType, List<NodeWithExprs> childrenPlanNodes,
       boolean unionAll) throws ImpalaException {
-    TupleDescriptorFactory tupleDescFactory =
-        new TupleDescriptorFactory("union", rowType);
+    List<List<Expr>> inputExprsList = childrenPlanNodes.stream()
+        .map(c -> c.outputExprs_).collect(Collectors.toList());
+    List<ColumnStats> columnStats = SetOperationStmt.getColumnStats(inputExprsList);
+    TupleDescriptorFactory tupleDescFactory = new TupleDescriptorFactory("union",
+        rowType, columnStats.size() > 0 ? columnStats : null);
     TupleDescriptor tupleDesc = tupleDescFactory.create(analyzer);
     // The outputexprs are the SlotRef exprs passed to the parent node.
     List<Expr> outputExprs = createOutputExprs(tupleDesc.getSlots());

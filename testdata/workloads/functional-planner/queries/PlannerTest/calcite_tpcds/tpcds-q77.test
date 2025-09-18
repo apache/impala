@@ -108,8 +108,8 @@ with ss as
 
 # end query 77 in stream 0 using template query77.tpl
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=113.94MB Threads=1
-Per-Host Resource Estimates: Memory=404MB
+Max Per-Host Resource Reservation: Memory=28.91MB Threads=1
+Per-Host Resource Estimates: Memory=144MB
 ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
   ImpalaAggRel(group=[{0, 1}], groups=[[{0, 1}, {0}, {}]], SALES=[SUM($2)], returns=[SUM($3)], PROFIT=[SUM($4)])
     ImpalaUnionRel(all=[true])
@@ -197,8 +197,8 @@ ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT
                   ImpalaFilterRel(condition=[IS NOT NULL($0)])
                     ImpalaHdfsScanRel(table=[[tpcds_partitioned_parquet_snap, web_page]])
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=404.00MB mem-reservation=113.94MB thread-reservation=1 runtime-filters-memory=10.00MB
-|  max-parallelism=1 segment-costs=[11885403654, 1211750192, 445258712, 4430118677, 3192342915, 295850126, 107310, 87297, 112554, 500]
+|  Per-Instance Resources: mem-estimate=143.75MB mem-reservation=28.91MB thread-reservation=1 runtime-filters-memory=10.00MB
+|  max-parallelism=1 segment-costs=[11885403654, 1211750192, 445258712, 4430118677, 3192342915, 295850126, 74614, 43669, 52232, 500]
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(40,41,42) WHEN 40 THEN CHANNEL WHEN 41 THEN CHANNEL WHEN 42 THEN NULL END, CASE valid_tid(40,41,42) WHEN 40 THEN ID WHEN 41 THEN NULL WHEN 42 THEN NULL END, aggif(valid_tid(40,41,42) IN (40, 41, 42), CASE valid_tid(40,41,42) WHEN 40 THEN sum(SALES) WHEN 41 THEN sum(SALES) WHEN 42 THEN sum(SALES) END), aggif(valid_tid(40,41,42) IN (40, 41, 42), CASE valid_tid(40,41,42) WHEN 40 THEN sum(returns) WHEN 41 THEN sum(returns) WHEN 42 THEN sum(returns) END), aggif(valid_tid(40,41,42) IN (40, 41, 42), CASE valid_tid(40,41,42) WHEN 40 THEN sum(PROFIT) WHEN 41 THEN sum(PROFIT) WHEN 42 THEN sum(PROFIT) END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=500
@@ -206,14 +206,14 @@ PLAN-ROOT SINK
 39:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(40,41,42) WHEN 40 THEN CHANNEL WHEN 41 THEN CHANNEL WHEN 42 THEN NULL END ASC NULLS LAST, CASE valid_tid(40,41,42) WHEN 40 THEN ID WHEN 41 THEN NULL WHEN 42 THEN NULL END ASC NULLS LAST
 |  mem-estimate=6.25KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=44 row-size=64B cardinality=100 cost=112554
+|  tuple-ids=44 row-size=64B cardinality=100 cost=52232
 |  in pipelines: 39(GETNEXT), 38(OPEN)
 |
 38:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(40,41,42) IN (CAST(40 AS INT), CAST(41 AS INT), CAST(42 AS INT)), CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN sum(SALES) WHEN CAST(41 AS INT) THEN sum(SALES) WHEN CAST(42 AS INT) THEN sum(SALES) END), aggif(valid_tid(40,41,42) IN (CAST(40 AS INT), CAST(41 AS INT), CAST(42 AS INT)), CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN sum(returns) WHEN CAST(41 AS INT) THEN sum(returns) WHEN CAST(42 AS INT) THEN sum(returns) END), aggif(valid_tid(40,41,42) IN (CAST(40 AS INT), CAST(41 AS INT), CAST(42 AS INT)), CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN sum(PROFIT) WHEN CAST(41 AS INT) THEN sum(PROFIT) WHEN CAST(42 AS INT) THEN sum(PROFIT) END)
 |  group by: CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN CHANNEL WHEN CAST(41 AS INT) THEN CHANNEL WHEN CAST(42 AS INT) THEN NULL END, CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN ID WHEN CAST(41 AS INT) THEN NULL WHEN CAST(42 AS INT) THEN NULL END, CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN CAST(40 AS INT) WHEN CAST(41 AS INT) THEN CAST(41 AS INT) WHEN CAST(42 AS INT) THEN CAST(42 AS INT) END
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=43 row-size=68B cardinality=14.45K cost=87297
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=43 row-size=68B cardinality=7.23K cost=43669
 |  in pipelines: 38(GETNEXT), 37(OPEN)
 |
 37:AGGREGATE [FINALIZE]
@@ -226,8 +226,8 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: sum(SALES), sum(returns), sum(PROFIT)
 |    group by: NULL, NULL
-|  mem-estimate=266.00MB mem-reservation=69.94MB thread-reservation=0
-|  tuple-ids=40N,41N,42N row-size=192B cardinality=14.45K cost=98230
+|  mem-estimate=30.00MB mem-reservation=6.75MB thread-reservation=0
+|  tuple-ids=40N,41N,42N row-size=192B cardinality=7.23K cost=65534
 |  in pipelines: 37(GETNEXT), 07(OPEN), 18(OPEN), 29(OPEN)
 |
 00:UNION
@@ -588,14 +588,14 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=7.88G cost=2132551022
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=1.37GB Threads=116
-Per-Host Resource Estimates: Memory=6.73GB
+Max Per-Host Resource Reservation: Memory=535.15MB Threads=116
+Per-Host Resource Estimates: Memory=3.63GB
 ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
   ImpalaAggRel(group=[{0, 1}], groups=[[{0, 1}, {0}, {}]], SALES=[SUM($2)], returns=[SUM($3)], PROFIT=[SUM($4)])
     ImpalaUnionRel(all=[true])
@@ -697,19 +697,19 @@ PLAN-ROOT SINK
 |  in pipelines: 39(GETNEXT)
 |
 F24:PLAN FRAGMENT [HASH(CASE valid_tid(40,41,42) WHEN 40 THEN murmur_hash(CHANNEL) WHEN 41 THEN murmur_hash(CHANNEL) WHEN 42 THEN murmur_hash(NULL) END,CASE valid_tid(40,41,42) WHEN 40 THEN murmur_hash(ID) WHEN 41 THEN murmur_hash(NULL) WHEN 42 THEN murmur_hash(NULL) END)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=394.00MB mem-reservation=103.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[103031, 87297, 112554, 199] cpu-comparison-result=650 [max(10 (self) vs 650 (sum children))]
+Per-Instance Resources: mem-estimate=54.05MB mem-reservation=7.75MB thread-reservation=1
+max-parallelism=10 segment-costs=[52615, 43669, 52232, 199] cpu-comparison-result=650 [max(10 (self) vs 650 (sum children))]
 39:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(40,41,42) WHEN 40 THEN CHANNEL WHEN 41 THEN CHANNEL WHEN 42 THEN NULL END ASC NULLS LAST, CASE valid_tid(40,41,42) WHEN 40 THEN ID WHEN 41 THEN NULL WHEN 42 THEN NULL END ASC NULLS LAST
 |  mem-estimate=6.25KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=44 row-size=64B cardinality=100 cost=112554
+|  tuple-ids=44 row-size=64B cardinality=100 cost=52232
 |  in pipelines: 39(GETNEXT), 38(OPEN)
 |
 38:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(40,41,42) IN (CAST(40 AS INT), CAST(41 AS INT), CAST(42 AS INT)), CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN sum(SALES) WHEN CAST(41 AS INT) THEN sum(SALES) WHEN CAST(42 AS INT) THEN sum(SALES) END), aggif(valid_tid(40,41,42) IN (CAST(40 AS INT), CAST(41 AS INT), CAST(42 AS INT)), CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN sum(returns) WHEN CAST(41 AS INT) THEN sum(returns) WHEN CAST(42 AS INT) THEN sum(returns) END), aggif(valid_tid(40,41,42) IN (CAST(40 AS INT), CAST(41 AS INT), CAST(42 AS INT)), CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN sum(PROFIT) WHEN CAST(41 AS INT) THEN sum(PROFIT) WHEN CAST(42 AS INT) THEN sum(PROFIT) END)
 |  group by: CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN CHANNEL WHEN CAST(41 AS INT) THEN CHANNEL WHEN CAST(42 AS INT) THEN NULL END, CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN ID WHEN CAST(41 AS INT) THEN NULL WHEN CAST(42 AS INT) THEN NULL END, CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN CAST(40 AS INT) WHEN CAST(41 AS INT) THEN CAST(41 AS INT) WHEN CAST(42 AS INT) THEN CAST(42 AS INT) END
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=43 row-size=68B cardinality=14.45K cost=87297
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=43 row-size=68B cardinality=7.23K cost=43669
 |  in pipelines: 38(GETNEXT), 64(OPEN)
 |
 64:AGGREGATE [FINALIZE]
@@ -722,18 +722,18 @@ max-parallelism=10 segment-costs=[103031, 87297, 112554, 199] cpu-comparison-res
 |  Class 2
 |    output: sum:merge(SALES), sum:merge(returns), sum:merge(PROFIT)
 |    group by: NULL, NULL
-|  mem-estimate=266.00MB mem-reservation=69.94MB thread-reservation=0
-|  tuple-ids=40N,41N,42N row-size=192B cardinality=14.45K cost=87476
+|  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
+|  tuple-ids=40N,41N,42N row-size=192B cardinality=7.23K cost=44389
 |  in pipelines: 64(GETNEXT), 43(OPEN), 50(OPEN), 58(OPEN)
 |
 63:EXCHANGE [HASH(CASE valid_tid(40,41,42) WHEN 40 THEN murmur_hash(CHANNEL) WHEN 41 THEN murmur_hash(CHANNEL) WHEN 42 THEN murmur_hash(NULL) END,CASE valid_tid(40,41,42) WHEN 40 THEN murmur_hash(ID) WHEN 41 THEN murmur_hash(NULL) WHEN 42 THEN murmur_hash(NULL) END)]
-|  mem-estimate=24.17MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=40N,41N,42N row-size=192B cardinality=14.57K cost=15555
+|  mem-estimate=24.05MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=40N,41N,42N row-size=192B cardinality=7.70K cost=8226
 |  in pipelines: 43(GETNEXT), 50(GETNEXT), 58(GETNEXT)
 |
 F23:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=290.14MB mem-reservation=71.94MB thread-reservation=1
-max-parallelism=120 segment-costs=[104611, 3806, 285519, 103043, 202618] cpu-comparison-result=650 [max(120 (self) vs 650 (sum children))]
+Per-Instance Resources: mem-estimate=54.14MB mem-reservation=7.94MB thread-reservation=1
+max-parallelism=120 segment-costs=[104611, 3806, 285519, 71964, 107151] cpu-comparison-result=650 [max(120 (self) vs 650 (sum children))]
 37:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(SALES), sum(returns), sum(PROFIT)
@@ -744,8 +744,8 @@ max-parallelism=120 segment-costs=[104611, 3806, 285519, 103043, 202618] cpu-com
 |  Class 2
 |    output: sum(SALES), sum(returns), sum(PROFIT)
 |    group by: NULL, NULL
-|  mem-estimate=266.00MB mem-reservation=70.00MB thread-reservation=0
-|  tuple-ids=40N,41N,42N row-size=192B cardinality=14.57K cost=98769
+|  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
+|  tuple-ids=40N,41N,42N row-size=192B cardinality=7.70K cost=67690
 |  in pipelines: 43(GETNEXT), 50(GETNEXT), 58(GETNEXT)
 |
 00:UNION
@@ -1406,14 +1406,14 @@ max-parallelism=1190 segment-costs=[11885789540, 448502] cpu-comparison-result=1
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=7.88G cost=2132551022
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=1.37GB Threads=116
-Per-Host Resource Estimates: Memory=6.73GB
+Max Per-Host Resource Reservation: Memory=535.15MB Threads=116
+Per-Host Resource Estimates: Memory=3.63GB
 ImpalaSortRel(sort0=[$0], sort1=[$1], dir0=[ASC], dir1=[ASC], fetch=[100:TINYINT])
   ImpalaAggRel(group=[{0, 1}], groups=[[{0, 1}, {0}, {}]], SALES=[SUM($2)], returns=[SUM($3)], PROFIT=[SUM($4)])
     ImpalaUnionRel(all=[true])
@@ -1515,19 +1515,19 @@ PLAN-ROOT SINK
 |  in pipelines: 39(GETNEXT)
 |
 F24:PLAN FRAGMENT [HASH(CASE valid_tid(40,41,42) WHEN 40 THEN murmur_hash(CHANNEL) WHEN 41 THEN murmur_hash(CHANNEL) WHEN 42 THEN murmur_hash(NULL) END,CASE valid_tid(40,41,42) WHEN 40 THEN murmur_hash(ID) WHEN 41 THEN murmur_hash(NULL) WHEN 42 THEN murmur_hash(NULL) END)] hosts=10 instances=10 (adjusted from 120)
-Per-Instance Resources: mem-estimate=394.00MB mem-reservation=103.94MB thread-reservation=1
-max-parallelism=10 segment-costs=[103031, 87297, 112554, 199] cpu-comparison-result=650 [max(10 (self) vs 650 (sum children))]
+Per-Instance Resources: mem-estimate=54.05MB mem-reservation=7.75MB thread-reservation=1
+max-parallelism=10 segment-costs=[52615, 43669, 52232, 199] cpu-comparison-result=650 [max(10 (self) vs 650 (sum children))]
 39:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(40,41,42) WHEN 40 THEN CHANNEL WHEN 41 THEN CHANNEL WHEN 42 THEN NULL END ASC NULLS LAST, CASE valid_tid(40,41,42) WHEN 40 THEN ID WHEN 41 THEN NULL WHEN 42 THEN NULL END ASC NULLS LAST
 |  mem-estimate=6.25KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=44 row-size=64B cardinality=100 cost=112554
+|  tuple-ids=44 row-size=64B cardinality=100 cost=52232
 |  in pipelines: 39(GETNEXT), 38(OPEN)
 |
 38:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(40,41,42) IN (CAST(40 AS INT), CAST(41 AS INT), CAST(42 AS INT)), CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN sum(SALES) WHEN CAST(41 AS INT) THEN sum(SALES) WHEN CAST(42 AS INT) THEN sum(SALES) END), aggif(valid_tid(40,41,42) IN (CAST(40 AS INT), CAST(41 AS INT), CAST(42 AS INT)), CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN sum(returns) WHEN CAST(41 AS INT) THEN sum(returns) WHEN CAST(42 AS INT) THEN sum(returns) END), aggif(valid_tid(40,41,42) IN (CAST(40 AS INT), CAST(41 AS INT), CAST(42 AS INT)), CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN sum(PROFIT) WHEN CAST(41 AS INT) THEN sum(PROFIT) WHEN CAST(42 AS INT) THEN sum(PROFIT) END)
 |  group by: CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN CHANNEL WHEN CAST(41 AS INT) THEN CHANNEL WHEN CAST(42 AS INT) THEN NULL END, CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN ID WHEN CAST(41 AS INT) THEN NULL WHEN CAST(42 AS INT) THEN NULL END, CASE valid_tid(40,41,42) WHEN CAST(40 AS INT) THEN CAST(40 AS INT) WHEN CAST(41 AS INT) THEN CAST(41 AS INT) WHEN CAST(42 AS INT) THEN CAST(42 AS INT) END
-|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=43 row-size=68B cardinality=14.45K cost=87297
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=43 row-size=68B cardinality=7.23K cost=43669
 |  in pipelines: 38(GETNEXT), 64(OPEN)
 |
 64:AGGREGATE [FINALIZE]
@@ -1540,18 +1540,18 @@ max-parallelism=10 segment-costs=[103031, 87297, 112554, 199] cpu-comparison-res
 |  Class 2
 |    output: sum:merge(SALES), sum:merge(returns), sum:merge(PROFIT)
 |    group by: NULL, NULL
-|  mem-estimate=266.00MB mem-reservation=69.94MB thread-reservation=0
-|  tuple-ids=40N,41N,42N row-size=192B cardinality=14.45K cost=87476
+|  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
+|  tuple-ids=40N,41N,42N row-size=192B cardinality=7.23K cost=44389
 |  in pipelines: 64(GETNEXT), 43(OPEN), 50(OPEN), 58(OPEN)
 |
 63:EXCHANGE [HASH(CASE valid_tid(40,41,42) WHEN 40 THEN murmur_hash(CHANNEL) WHEN 41 THEN murmur_hash(CHANNEL) WHEN 42 THEN murmur_hash(NULL) END,CASE valid_tid(40,41,42) WHEN 40 THEN murmur_hash(ID) WHEN 41 THEN murmur_hash(NULL) WHEN 42 THEN murmur_hash(NULL) END)]
-|  mem-estimate=24.17MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=40N,41N,42N row-size=192B cardinality=14.57K cost=15555
+|  mem-estimate=24.05MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=40N,41N,42N row-size=192B cardinality=7.70K cost=8226
 |  in pipelines: 43(GETNEXT), 50(GETNEXT), 58(GETNEXT)
 |
 F23:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-Per-Instance Resources: mem-estimate=290.14MB mem-reservation=71.94MB thread-reservation=1
-max-parallelism=120 segment-costs=[104611, 3806, 285519, 103043, 202618] cpu-comparison-result=650 [max(120 (self) vs 650 (sum children))]
+Per-Instance Resources: mem-estimate=54.14MB mem-reservation=7.94MB thread-reservation=1
+max-parallelism=120 segment-costs=[104611, 3806, 285519, 71964, 107151] cpu-comparison-result=650 [max(120 (self) vs 650 (sum children))]
 37:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(SALES), sum(returns), sum(PROFIT)
@@ -1562,8 +1562,8 @@ max-parallelism=120 segment-costs=[104611, 3806, 285519, 103043, 202618] cpu-com
 |  Class 2
 |    output: sum(SALES), sum(returns), sum(PROFIT)
 |    group by: NULL, NULL
-|  mem-estimate=266.00MB mem-reservation=70.00MB thread-reservation=0
-|  tuple-ids=40N,41N,42N row-size=192B cardinality=14.57K cost=98769
+|  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
+|  tuple-ids=40N,41N,42N row-size=192B cardinality=7.70K cost=67690
 |  in pipelines: 43(GETNEXT), 50(GETNEXT), 58(GETNEXT)
 |
 00:UNION
@@ -2224,7 +2224,7 @@ max-parallelism=1190 segment-costs=[11885789540, 448502] cpu-comparison-result=1
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M
+   extrapolated-rows=disabled max-scan-range-rows=12.31M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=7.88G cost=2132551022
