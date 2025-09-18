@@ -370,16 +370,13 @@ under the License.
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-1.2-api</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>log4j</groupId>
           <artifactId>log4j</artifactId>
+        </exclusion>
+        <!-- Exclude log4j 2.x, we use reload4j -->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
         <!-- We should exclude hive-serde since it brings along a
            different version of flatbuffers causing problems for loading tables -->
@@ -425,14 +422,10 @@ under the License.
       <artifactId>hive-standalone-metastore</artifactId>
       <version>${hive.version}</version>
       <exclusions>
-        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+        <!-- Impala uses reload4j v1; avoid pulling in log4j2 -->
         <exclusion>
           <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-slf4j-impl</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.logging.log4j</groupId>
-          <artifactId>log4j-1.2-api</artifactId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.hive</groupId>
@@ -795,8 +788,7 @@ under the License.
                     <exclude>org.apache.ant:*</exclude>
                     <exclude>org.eclipse.jetty:*</exclude>
                     <!-- We use reload4j, exclude log4j 1.x and 2.x -->
-                    <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
-                    <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
+                    <exclude>org.apache.logging.log4j:*</exclude>
                     <exclude>log4j:*</exclude>
                     <exclude>org.slf4j:slf4j-log4j12</exclude>
                     <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
