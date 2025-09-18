@@ -56,7 +56,6 @@
 #include <opentelemetry/version.h>
 
 #include "common/compiler-util.h"
-#include "common/status.h"
 #include "common/version.h"
 #include "gen-cpp/Query_types.h"
 #include "observe/otel-log-handler.h"
@@ -75,7 +74,6 @@ DECLARE_string(otel_trace_additional_headers);
 DECLARE_int32(otel_trace_batch_queue_size);
 DECLARE_int32(otel_trace_batch_max_batch_size);
 DECLARE_int32(otel_trace_batch_schedule_delay_ms);
-DECLARE_bool(otel_trace_beeswax);
 DECLARE_string(otel_trace_ca_cert_path);
 DECLARE_string(otel_trace_ca_cert_string);
 DECLARE_string(otel_trace_collector_url);
@@ -144,7 +142,7 @@ static inline bool otel_tls_enabled() {
 
 bool should_otel_trace_query(std::string_view sql,
     const TSessionType::type& session_type) {
-  if (LIKELY(!FLAGS_otel_trace_beeswax) && session_type == TSessionType::BEESWAX) {
+  if (UNLIKELY(session_type == TSessionType::BEESWAX)) {
     return false;
   }
 
@@ -198,12 +196,9 @@ bool should_otel_trace_query(std::string_view sql,
   return false;
 } // function should_otel_trace_query
 
-// Initializes an OtlpHttpExporter instance with configuration from global flags. The
-// OtlpHttpExporter instance implements the SpanExporter interface. The function parameter
-// `exporter` is an in-out parameter that will be populated with the created
-// OtlpHttpExporter instance. Returns Status::OK() on success, or an error Status if
-// configuration fails.
-static Status init_exporter_http(unique_ptr<SpanExporter>& exporter) {
+// Creates an OtlpHttpExporterOptions struct instance with configuration from global
+// startup flags.
+static OtlpHttpExporterOptions http_exporter_config() {
   // Configure OTLP HTTP exporter
   OtlpHttpExporterOptions opts;
   opts.url = FLAGS_otel_trace_collector_url;
@@ -228,15 +223,20 @@ static Status init_exporter_http(unique_ptr<SpanExporter>& exporter) {
 
   // TLS Configurations
   if (otel_tls_enabled()) {
+    // Set minimum TLS version to the value of the global ssl_minimum_version flag.
+    // Since this flag is in the format "tlv1.2" or "tlsv1.3", we need to
+    // convert it to the format expected by OtlpHttpExporterOptions by removing the
+    // "tlsv" prefix.
     if (FLAGS_otel_trace_tls_minimum_version.empty()) {
-      // Set minimum TLS version to the value of the global ssl_minimum_version flag.
-      // Since this flag is in the format "tlv1.2" or "tlsv1.3", we need to
-      // convert it to the format expected by OtlpHttpExporterOptions.
       if (!FLAGS_ssl_minimum_version.empty()) {
-        opts.ssl_min_tls = FLAGS_ssl_minimum_version.substr(4); // Remove "tlsv" prefix
+        opts.ssl_min_tls = FLAGS_ssl_minimum_version.substr(4);
+      } else {
+        LOG(WARNING) << "TLS is enabled for the OTel exporter, but neither the "
+            "'ssl_minimum_version' nor the 'otel_trace_tls_minimum_version' flags are "
+            "set.";
       }
     } else {
-      opts.ssl_min_tls = FLAGS_otel_trace_tls_minimum_version;
+      opts.ssl_min_tls = FLAGS_otel_trace_tls_minimum_version.substr(4);
     }
 
     opts.ssl_insecure_skip_verify = FLAGS_otel_trace_tls_insecure_skip_verify;
@@ -247,6 +247,10 @@ static Status init_exporter_http(unique_ptr<SpanExporter>& exporter) {
         FLAGS_otel_trace_ssl_ciphers;
     opts.ssl_cipher_suite = FLAGS_otel_trace_tls_cipher_suites.empty() ?
         FLAGS_tls_ciphersuites : FLAGS_otel_trace_tls_cipher_suites;
+
+    VLOG(2) << "OTel minimum TLS version set to '" << opts.ssl_min_tls << "'";
+    VLOG(2) << "OTel TLS 1.2 allowed ciphers set to '" << opts.ssl_cipher << "'";
+    VLOG(2) << "OTel TLS 1.3 allowed ciphers set to '" << opts.ssl_cipher_suite << "'";
   }
 
   // Additional HTTP headers
@@ -261,10 +265,21 @@ static Status init_exporter_http(unique_ptr<SpanExporter>& exporter) {
     }
   }
 
-  exporter = OtlpHttpExporterFactory::Create(opts);
+  return opts;
+} // function http_exporter_config
 
-  return Status::OK();
-} // function init_exporter_http
+// Creates a BatchSpanProcessorOptions struct instance with configuration from global
+// startup flags.
+static BatchSpanProcessorOptions batch_processor_config() {
+  BatchSpanProcessorOptions batch_opts;
+
+  batch_opts.max_queue_size = FLAGS_otel_trace_batch_queue_size;
+  batch_opts.max_export_batch_size = FLAGS_otel_trace_batch_max_batch_size;
+  batch_opts.schedule_delay_millis =
+      chrono::milliseconds(FLAGS_otel_trace_batch_schedule_delay_ms);
+
+  return batch_opts;
+} // function batch_processor_config
 
 // Initializes an OtlpFileExporter instance with configuration from global flags. The
 // OtlpFileExporter instance implements the SpanExporter interface. Returns a unique_ptr
@@ -289,10 +304,46 @@ static unique_ptr<SpanExporter> init_exporter_file() {
   return OtlpFileExporterFactory::Create(exporter_opts);
 } // function init_exporter_file
 
+// Initializes a SpanExporter instance based on the FLAGS_otel_trace_exporter flag.
+// Returns a unique_ptr which will always be initialized with the created exporter.
+static unique_ptr<SpanExporter> init_exporter() {
+  unique_ptr<SpanExporter> exporter;
+
+  if(FLAGS_otel_trace_exporter == OTEL_EXPORTER_OTLP_HTTP) {
+    exporter = OtlpHttpExporterFactory::Create(http_exporter_config());
+  } else {
+    exporter = init_exporter_file();
+  }
+  VLOG(2) << "OpenTelemetry exporter: " << FLAGS_otel_trace_exporter;
+
+  return exporter;
+} // function init_exporter
+
+// Initializes a SpanProcessor instance based on the FLAGS_otel_trace_span_processor flag.
+// Returns a unique_ptr which will always be initialized with the created processor.
+static unique_ptr<SpanProcessor> init_span_processor() {
+  unique_ptr<SpanExporter> exporter = init_exporter();
+  unique_ptr<SpanProcessor> processor;
+
+  if (boost::iequals(trim_copy(FLAGS_otel_trace_span_processor), SPAN_PROCESSOR_BATCH)) {
+    VLOG(2) << "Using BatchSpanProcessor for OpenTelemetry spans";
+    processor = BatchSpanProcessorFactory::Create(move(exporter),
+        batch_processor_config());
+  } else {
+    VLOG(2) << "Using SimpleSpanProcessor for OTel spans";
+    LOG(WARNING) << "Setting --otel_trace_span_processor=simple blocks the query "
+    "processing thread while exporting spans to the OTel collector. This will cause "
+    "significant performance degradation and is not recommended for production use.";
+    processor = make_unique<SimpleSpanProcessor>(move(exporter));
+  }
+
+  return processor;
+} // function init_span_processor
+
 // Initializes the OpenTelemetry Tracer singleton with the configuration defined in the
-// coordinator startup flags. Returns Status::OK() on success, or an error Status if
-// configuration fails.
-Status init_otel_tracer() {
+// coordinator startup flags. This tracer is stored in a static variabled defined in this
+// file.
+void init_otel_tracer() {
   LOG(INFO) << "Initializing OpenTelemetry tracing.";
   VLOG(2) << "OpenTelemetry version: " << OPENTELEMETRY_VERSION;
   VLOG(2) << "OpenTelemetry ABI version: " << OPENTELEMETRY_ABI_VERSION;
@@ -312,43 +363,11 @@ Status init_otel_tracer() {
     GlobalLogHandler::SetLogLevel(LogLevel::None);
   }
 
-  unique_ptr<SpanExporter> exporter;
-
-  if(FLAGS_otel_trace_exporter == OTEL_EXPORTER_OTLP_HTTP) {
-    RETURN_IF_ERROR(init_exporter_http(exporter));
-  } else {
-    exporter = init_exporter_file();
-  }
-  VLOG(2) << "OpenTelemetry exporter: " << FLAGS_otel_trace_exporter;
-
-  // Set up tracer provider
-  unique_ptr<SpanProcessor> processor;
-
-  if (boost::iequals(trim_copy(FLAGS_otel_trace_span_processor), SPAN_PROCESSOR_BATCH)) {
-    VLOG(2) << "Using BatchSpanProcessor for OpenTelemetry spans";
-    BatchSpanProcessorOptions batch_opts;
-
-    batch_opts.max_queue_size = FLAGS_otel_trace_batch_queue_size;
-    batch_opts.max_export_batch_size = FLAGS_otel_trace_batch_max_batch_size;
-    batch_opts.schedule_delay_millis =
-        chrono::milliseconds(FLAGS_otel_trace_batch_schedule_delay_ms);
-
-    processor = BatchSpanProcessorFactory::Create(move(exporter), batch_opts);
-  } else {
-    VLOG(2) << "Using SimpleSpanProcessor for OTel spans";
-    LOG(WARNING) << "Setting --otel_trace_span_processor=simple blocks the query "
-    "processing thread while exporting spans to the OTel collector. This will cause "
-    "significant performance degradation and is not recommended for production use.";
-    processor = make_unique<SimpleSpanProcessor>(move(exporter));
-  }
-
-  provider_ = TracerProviderFactory::Create(move(processor),
+  provider_ = TracerProviderFactory::Create(init_span_processor(),
       sdk::resource::Resource::Create({
         {"service.name", "Impala"},
         {"service.version", GetDaemonBuildVersion()}
       }));
-
-  return Status::OK();
 } // function init_otel_tracer
 
 void shutdown_otel_tracer() {
@@ -371,6 +390,23 @@ namespace test {
 bool otel_tls_enabled_for_testing() {
   return otel_tls_enabled();
 }
+
+OtlpHttpExporterOptions get_http_exporter_config() {
+  return http_exporter_config();
+}
+
+BatchSpanProcessorOptions get_batch_processor_config() {
+  return batch_processor_config();
+}
+
+unique_ptr<SpanExporter> get_exporter() {
+  return init_exporter();
+}
+
+unique_ptr<SpanProcessor> get_span_processor() {
+  return init_span_processor();
+}
+
 } // namespace test
 
 } // namespace impala

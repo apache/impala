@@ -61,10 +61,6 @@ DEFINE_validator(otel_trace_exporter, [](const char* flagname, const string& val
   return false;
 }); // flag otel_trace_exporter
 
-DEFINE_bool_hidden(otel_trace_beeswax, false, "Specifies whether or not to trace queries "
-    "submitted via the Beeswax protocol. This flag is hidden because tracing Beeswax "
-    "queries is not supported.");
-
 //
 // Start of HTTP related flags.
 //
@@ -160,7 +156,8 @@ DEFINE_validator(otel_trace_ca_cert_string, [](const char* flagname,
 
 
 DEFINE_string(otel_trace_tls_minimum_version, "", "String containing the minimum allowed "
-    "TLS version, if not specified, defaults to the overall minimum TLS version.");
+    "TLS version the OpenTelemetry SDK will use when communicating with the collector. "
+    "If empty, will use the value of the 'ssl_minimum_version' flag.");
 DEFINE_validator(otel_trace_tls_minimum_version, [](const char* flagname,
     const string& value) {
   if (value.empty() || value == impala::TLSVersions::TLSV1_2 || value == "tlsv1.3") {
@@ -172,13 +169,14 @@ DEFINE_validator(otel_trace_tls_minimum_version, [](const char* flagname,
 }); // flag otel_trace_tls_minimum_version
 
 DEFINE_string(otel_trace_ssl_ciphers, "", "List of allowed TLS cipher suites when using "
-    "TLS 1.2, default to the value of Impala’s ssl_cipher_list startup flag.");
+    "TLS 1.2. If empty, defaults to the value of the 'ssl_cipher_list' startup flag.");
 
 DEFINE_string(otel_trace_tls_cipher_suites, "", "List of allowed TLS cipher suites when "
-    "using TLS 1.3, default to the value of Impala’s tls_ciphersuites startup flag.");
+    "using TLS 1.3. If empty, defaults to the value of the 'tls_ciphersuites' startup "
+    "flag.");
 
 DEFINE_bool(otel_trace_tls_insecure_skip_verify, false, "If set to true, skips "
-    "verification of collector’s TLS certificate. This should only be set to false for "
+    "verification of collector’s TLS certificate. This should only be set to true for "
     "development / testing");
 //
 // End of TLS related flags.

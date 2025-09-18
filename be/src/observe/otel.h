@@ -21,7 +21,11 @@
 #include <string>
 #include <string_view>
 
-#include "common/status.h"
+#include <opentelemetry/exporters/otlp/otlp_http_exporter_options.h>
+#include <opentelemetry/sdk/trace/batch_span_processor_options.h>
+#include <opentelemetry/sdk/trace/exporter.h>
+#include <opentelemetry/sdk/trace/processor.h>
+
 #include "gen-cpp/Query_types.h"
 #include "observe/span-manager.h"
 #include "service/client-request-state.h"
@@ -47,7 +51,7 @@ bool should_otel_trace_query(std::string_view sql,
 // Initializes the OpenTelemetry tracer with the configuration defined in the coordinator
 // startup flags (see otel-flags.cc and otel-flags-trace.cc for the list). Does not verify
 // that OpenTelemetry tracing is enabled (otel_trace_enabled flag).
-Status init_otel_tracer();
+void init_otel_tracer();
 
 // Force flushes any buffered spans and shuts down the OpenTelemetry tracer.
 void shutdown_otel_tracer();
@@ -58,6 +62,20 @@ std::shared_ptr<SpanManager> build_span_manager(ClientRequestState*);
 namespace test {
 // Testing helper function to provide access to the static otel_tls_enabled() function.
 bool otel_tls_enabled_for_testing();
+
+// Testing helper function to provide access to the static http_exporter_config()
+// function.
+opentelemetry::exporter::otlp::OtlpHttpExporterOptions get_http_exporter_config();
+
+// Testing helper function to provide access to the static batch_processor_config()
+// function.
+opentelemetry::sdk::trace::BatchSpanProcessorOptions get_batch_processor_config();
+
+// Testing helper function to provide access to the static init_exporter() function.
+std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> get_exporter();
+
+// Testing helper function to provide access to the static init_span_processor() function.
+std::unique_ptr<opentelemetry::sdk::trace::SpanProcessor> get_span_processor();
 } // namespace test
 
 } // namespace impala

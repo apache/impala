@@ -349,7 +349,7 @@ Status ExecEnv::Init() {
 
   // Initialize OTel
   if (FLAGS_is_coordinator && FLAGS_otel_trace_enabled) {
-    RETURN_IF_ERROR(init_otel_tracer());
+    init_otel_tracer();
   }
 
   // Initialize thread pools

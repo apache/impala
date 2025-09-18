@@ -17,29 +17,23 @@
 # under the License.
 ##############################################################################
 
-version: '3.0'
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:55888
+        tls:
+          cert_file: /etc/otel/localhost.pem
+          key_file: /etc/otel/localhost.key
 
-services:
-  jaeger:
-    image: jaegertracing/jaeger:2.5.0
-    container_name: jaeger
-    ports:
-      - "16686:16686"   # Jaeger UI
-      - "5778:5778"     # Config REST API
-      - "4317:4317"     # ingest
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-      - COLLECTOR_OTLP_HTTP_ENABLED=true
+exporters:
+  otlp:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
 
-  otel-collector:
-    image: otel/opentelemetry-collector:latest
-    container_name: otel-collector
-    depends_on:
-      - jaeger
-    volumes:
-      - ./otel-config-${PROTOCOL:-http}.yml:/etc/otel/config.yml:ro
-      - ../../../be/src/testutil/localhost.pem:/etc/otel/localhost.pem:ro
-      - ../../../be/src/testutil/localhost.key:/etc/otel/localhost.key:ro
-    command: ["--config", "/etc/otel/config.yml"]
-    ports:
-      - "55888:55888"   # Expose OTLP HTTP externally
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlp]

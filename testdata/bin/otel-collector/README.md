@@ -6,7 +6,8 @@ This directory contains configuration to run an [OpenTelemetry Collector](https:
 
 ## Contents
 
-- [`otel-config.yml`](./otel-config.yml): OpenTelemetry Collector configuration file.
+- [`otel-config-http.yml`](./otel-config-http.yml): OpenTelemetry Collector configuration file with the OTLP receiver supporting http.
+- [`otel-config-https.yml`](./otel-config-https.yml): OpenTelemetry Collector configuration file with the OTLP receiver supporting https.
 - [`docker-compose.yml`](./docker-compose.yml): Alternative Docker Compose setup for both services.
 
 ---
@@ -16,7 +17,11 @@ This directory contains configuration to run an [OpenTelemetry Collector](https:
 ### Option 1: Run Interactively
 
    ```bash
+   # HTTP (default)
    docker-compose -f testdata/bin/otel-collector/docker-compose.yml up
+
+   # HTTPS
+   PROTOCOL=https docker-compose -f testdata/bin/otel-collector/docker-compose.yml up
    ```
 
    - This command:
@@ -28,7 +33,11 @@ This directory contains configuration to run an [OpenTelemetry Collector](https:
 ### Option 2: Run Detached
 
    ```bash
+   # HTTP (default)
    docker-compose -f testdata/bin/otel-collector/docker-compose.yml up -d
+
+   # HTTP (default)
+   PROTOCOL=https docker-compose -f testdata/bin/otel-collector/docker-compose.yml up -d
    ```
 
    - This command:
@@ -61,12 +70,24 @@ The collector forwards all received traces to Jaeger using OTLP/gRPC.
 To send traces from an Impala cluster to this collector, start Impala with the following arguments:
 
 ```bash
-./bin/start-impala-cluster.py \
+# HTTP (default)
+start-impala-cluster.py \
   --cluster_size=2 \
   --num_coordinators=1 \
   --use_exclusive_coordinators \
   --impalad_args="-v=2 --otel_trace_enabled=true \
     --otel_trace_collector_url=http://localhost:55888/v1/traces
+    --otel_trace_span_processor=simple \
+    --cluster_id=local_cluster"
+
+# HTTPS
+start-impala-cluster.py \
+  --cluster_size=2 \
+  --num_coordinators=1 \
+  --use_exclusive_coordinators \
+  --impalad_args="-v=2 --otel_trace_enabled=true \
+    --otel_trace_collector_url=https://localhost:55888/v1/traces \
+    --otel_trace_ca_cert_path=${IMPALA_HOME}/be/src/testutil/wildcardCA.pem \
     --otel_trace_span_processor=simple \
     --cluster_id=local_cluster"
 ```
