@@ -176,10 +176,6 @@ under the License.
           <groupId>com.cloudera</groupId>
           <artifactId>jwtprovider-knox</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>org.apache.kafka</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
         <!-- After RANGER-3498, Ranger's ranger-plugins-audit starts pulling in
         log4j-1.2-api, which is banned by Impala's frontend. Thus we exclude the
         dependency here.-->
