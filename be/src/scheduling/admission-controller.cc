@@ -1055,7 +1055,13 @@ bool AdmissionController::HasAvailableMemResources(const ScheduleState& state,
   const string& pool_name = state.request_pool();
   const int64_t pool_max_mem = GetMaxMemForPool(pool_cfg);
   // If the pool doesn't have memory resources configured, always true.
-  if (pool_max_mem < 0) return true;
+  if (pool_max_mem < 0) {
+    VLOG_QUERY << Substitute("Pool '$0' doesn't have Max Memory configured, therefore "
+        "Impala skips memory-based query admission. This can result in query failures "
+        "due to memory exhaustion, therefore we highly recommend setting Max Memory "
+        "to a positive value for you resource pools.", pool_name);
+    return true;
+  }
 
   // Otherwise, two conditions must be met:
   // 1) The memory estimated to be reserved by all queries in this pool *plus* the total
