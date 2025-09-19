@@ -1280,7 +1280,7 @@ fi
 
 # Check for minimum required Java version
 # Only issue Java version warning when running Java 7.
-if [[ $IMPALA_JAVA_TARGET -eq 1.7 ]]; then
+if [[ $IMPALA_JAVA_TARGET == 1.7 ]]; then
   cat << EOF
 
 WARNING: Your development environment is configured for Hadoop 3 and Java 7. Hadoop 3
