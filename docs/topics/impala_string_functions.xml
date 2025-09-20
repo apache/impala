@@ -140,13 +140,13 @@ under the License.
 
       <li>
         <xref href="#string_functions/jaro_winkler_distance"
-          >JARO_WINKER_DISTANCE,
+          >JARO_WINKLER_DISTANCE,
         JW_DST</xref>
       </li>
 
       <li>
         <xref href="#string_functions/jaro_winkler_similarity"
-          >JARO_WINKER_SIMILARITY,
+          >JARO_WINKLER_SIMILARITY,
         JW_SIM</xref>
       </li>
 
