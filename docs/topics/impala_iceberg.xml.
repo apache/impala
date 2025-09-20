@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<topic id="impala_iceberg">
+  <title>Using Apache Impala with Apache Iceberg Tables</title>
+
+  <p>
+    Apache Impala can query <a href="https://iceberg.apache.org/">Apache Iceberg</a>
+    tables stored in data lakes. Iceberg brings features such as schema evolution,
+    partition evolution, hidden partitioning, and snapshot isolation.
+    This page demonstrates how to create, query, and manage Iceberg tables with Impala.
+  </p>
+
+  <section>
+    <title>Creating Iceberg Tables</title>
+    <p>
+      You can create an Iceberg table in Impala using standard CREATE TABLE syntax
+      with the <code>STORED AS ICEBERG</code> clause.
+    </p>
+    <code>
+      CREATE TABLE db.clicks (
+        user_id BIGINT,
+        event_time TIMESTAMP,
+        url STRING
+      )
+      STORED AS ICEBERG;
+    </code>
+  </section>
+
+  <section>
+    <title>Inserting Data</title>
+    <p>
+      Insert data into Iceberg tables using Impala DML:
+    </p>
+    <code>
+      INSERT INTO db.clicks VALUES (1, NOW(), 'https://impala.apache.org/');
+    </code>
+  </section>
+
+  <section>
+    <title>Querying Iceberg Tables</title>
+    <p>
+      Once created, Iceberg tables appear like normal Impala tables:
+    </p>
+    <code>
+      SELECT COUNT(*) FROM db.clicks
+      WHERE event_time &gt; NOW() - INTERVAL 1 DAY;
+    </code>
+  </section>
+
+  <section>
+    <title>Time Travel</title>
+    <p>
+      Iceberg tables store multiple snapshots. You can query older versions
+      using the <code>TABLESAMPLE SYSTEM_VERSION</code> clause:
+    </p>
+    <code>
+      SELECT * FROM db.clicks TABLESAMPLE SYSTEM_VERSION AS OF 1234567890123;
+    </code>
+  </section>
+
+  <section>
+    <title>Benefits of Iceberg with Impala</title>
+    <ul>
+      <li>Schema evolution without rewriting data</li>
+      <li>Efficient metadata pruning</li>
+      <li>Hidden partitioning simplifies queries</li>
+      <li>Snapshot isolation for reliable reads</li>
+    </ul>
+  </section>
+
+  <p>
+    For advanced details, see the
+    <a href="https://impala.apache.org/docs/build/html/topics/impala_iceberg.html">
+      Impala Iceberg reference
+    </a>.
+  </p>
+</topic>
