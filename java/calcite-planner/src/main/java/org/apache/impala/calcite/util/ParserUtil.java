@@ -98,6 +98,7 @@ public class ParserUtil {
         case '{':
         case '}':
         case '|':
+        case '"':
           builder.append(nextChar);
           i++;
           break;

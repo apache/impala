@@ -1187,3 +1187,8 @@ char, char, varchar
 'NULL','b                                                                                                                                           ','NULL'
 'NULL','NULL','NULL'
 ====
+---- QUERY
+select '\"';
+---- RESULTS
+'"'
+====
