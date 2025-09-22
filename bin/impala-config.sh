@@ -566,8 +566,8 @@ fi
 # Target the Java version matching the JDK.
 export IMPALA_JAVA_TARGET=$("$JAVA" -version 2>&1 | awk -F'[\".]' '/version/ {print $2}')
 if [[ $IMPALA_JAVA_TARGET -eq 1 ]]; then
-  # Capture 1.x.
-  IMPALA_JAVA_TARGET=$("$JAVA" -version 2>&1 | awk -F'[\".]' '/version/ {print $2"."$3}')
+  # Capture x from 1.x, i.e. Java 1.8 -> 8.
+  IMPALA_JAVA_TARGET=$("$JAVA" -version 2>&1 | awk -F'[\".]' '/version/ {print $3}')
 fi
 
 # Java libraries required by executables and java tests.
@@ -1279,13 +1279,12 @@ else
 fi
 
 # Check for minimum required Java version
-# Only issue Java version warning when running Java 7.
-if [[ $IMPALA_JAVA_TARGET == 1.7 ]]; then
+if [[ $IMPALA_JAVA_TARGET -le 7 ]]; then
   cat << EOF
 
-WARNING: Your development environment is configured for Hadoop 3 and Java 7. Hadoop 3
-requires at least Java 8. Your JAVA binary currently points to $JAVA
-and reports the following version:
+WARNING: Your development environment is configured for Hadoop 3 and Java
+$IMPALA_JAVA_TARGET. Hadoop 3 requires at least Java 8. Your JAVA binary
+currently points to $JAVA and reports the following version:
 
 EOF
   $JAVA -version
