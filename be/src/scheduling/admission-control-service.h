@@ -92,7 +92,7 @@ class AdmissionControlService : public AdmissionControlServiceIf,
     // at any point after this AdmissionState has been added to 'admission_state_map_'.
     UniqueIdPB query_id;
     UniqueIdPB coord_id;
-    TQueryExecRequest query_exec_request;
+    std::unique_ptr<TQueryExecRequest> query_exec_request;
     std::unordered_set<NetworkAddressPB> blacklisted_executor_addresses;
 
     // Protects all of the following members.
