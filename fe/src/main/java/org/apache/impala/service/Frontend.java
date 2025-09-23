@@ -25,6 +25,7 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -221,6 +222,7 @@ import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
+import org.apache.impala.thrift.TPlannerType;
 import org.apache.impala.thrift.TPoolConfig;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
@@ -301,7 +303,8 @@ public class Frontend {
   private static final String CPU_ASK_BOUNDED = "CpuAskBounded";
   private static final String AVG_ADMISSION_SLOTS_PER_EXECUTOR =
       "AvgAdmissionSlotsPerExecutor";
-  private static final String CALCITE_FAILURE_REASON = "CalciteFailureReason";
+  private static final String FIRST_ATTEMPT_PLANNER = "FirstAttemptPlanner";
+  private static final String FIRST_ATTEMPT_FAILURE_REASON = "FirstAttemptFailureReason";
 
   // info about the planner used. In this code, we will always use the Original planner,
   // but other planners may set their own planner values
@@ -310,7 +313,9 @@ public class Frontend {
 
   // The Calcite compiler is loaded on demand, not linked in. The factory is a
   // singleton.
-  private static CompilerFactory calciteCompilerFactory = loadCalciteCompilerFactory();
+  private static CompilerFactory CALCITE_COMPILER_FACTORY = loadCalciteCompilerFactory();
+
+  private static CompilerFactory ORIGINAL_COMPILER_FACTORY = new CompilerFactoryImpl();
 
   /**
    * Plan-time context that allows capturing various artifacts created
@@ -2411,46 +2416,63 @@ public class Frontend {
 
   private TExecRequest getTExecRequestWithFallback(
       PlanCtx planCtx, EventSequence timeline) throws ImpalaException {
-    TExecRequest request = null;
-    CompilerFactory compilerFactory = getCalciteCompilerFactory(planCtx);
-    String exceptionClass = null;
-    if (compilerFactory != null) {
+    TQueryOptions queryOptions =
+        planCtx.getQueryContext().client_request.getQuery_options();
+    TPlannerType planner = queryOptions.getPlanner();
+    TPlannerType fallbackPlanner = queryOptions.getFallback_planner();
+    List<TPlannerType> plannerTypes =
+        (planner == fallbackPlanner || fallbackPlanner == TPlannerType.NONE)
+            ? ImmutableList.of(planner)
+            : ImmutableList.of(planner, fallbackPlanner);
+
+    LOG.info("Searching for planner to use...");
+    boolean onlyCalcite = (plannerTypes.size() == 1 && planner == TPlannerType.CALCITE);
+    Throwable error = null;
+    CompilerFactory compilerFactory;
+    String attemptedPlanner = null;
+    for (TPlannerType plannerType : plannerTypes) {
+      compilerFactory = getCompilerFactory(plannerType);
       try {
-        request = getTExecRequest(compilerFactory, planCtx, timeline);
-      } catch (Exception e) {
-        if (!shouldFallbackToRegularPlanner(planCtx, e)) {
-          throw e;
-        }
-        LOG.info("Calcite planner failed: {}", e.getClass());
-        exceptionClass = e.getClass().toString();
-        timeline.markEvent("Failing over from Calcite planner");
+        TExecRequest request = getTExecRequest(compilerFactory, planCtx, timeline);
+        addPlannerToProfile(compilerFactory.getPlannerString(), attemptedPlanner, error);
+        return request;
+      } catch (Throwable e) {
+        // If there is any kind of exception from the first planner, we hit this code.
+        error = e;
+        attemptedPlanner = compilerFactory.getPlannerString();
+        LOG.info(attemptedPlanner + " planner failed: {}", e.getClass());
       }
     }
-    if (request == null) {
-      LOG.info("Using Original Planner.");
-      // use the original planner if Calcite planner is not set or fallback
-      // for Calcite planner is enabled.
-      compilerFactory = new CompilerFactoryImpl();
-      request = getTExecRequest(compilerFactory, planCtx, timeline);
+
+    // None of the planners worked. Exceptional case: If only Calcite, fallback for
+    // unsupported SQLs
+    if (error != null && onlyCalcite && isUnsupportedCalciteSQL(planCtx, error)) {
+      compilerFactory = getCompilerFactory(TPlannerType.ORIGINAL);
+      TExecRequest request = getTExecRequest(compilerFactory, planCtx, timeline);
+      addPlannerToProfile(compilerFactory.getPlannerString(), attemptedPlanner, error);
+      return request;
     }
-    addPlannerToProfile(compilerFactory.getPlannerString(), exceptionClass);
-    return request;
+
+    if (error instanceof ImpalaException) {
+      throw (ImpalaException) error;
+    }
+    throw new RuntimeException(error);
   }
 
-  private boolean shouldFallbackToRegularPlanner(PlanCtx planCtx, Exception e) {
-    // TODO: Need a fallback flag for various modes. In production, we will most
-    // likely want to fallback to the original planner, but in testing, we might want
-    // the query to fail.
-    // There are some cases where we will always want to fallback, e.g. if the statement
-    // fails at parse time because it is not a select statement.
-    if (e instanceof UnsupportedFeatureException) {
-      return true;
-    }
+  private boolean isUnsupportedCalciteSQL(PlanCtx planCtx, Throwable e) {
     TQueryCtx queryCtx = planCtx.getQueryContext();
     try {
-      return !(Parser.parse(queryCtx.client_request.stmt,
-          queryCtx.client_request.query_options) instanceof QueryStmt);
+      // return true either if
+      // a) The UnsupportedFeatureException was explicitly thrown by the Calcite planner
+      // b) The SQL is parseable by the original planner and it's something other than
+      //    a query statememnt (e.g. DDL) which should always be run on the orignal
+      //    planner. The "Parser.parse()" method is the original planner parser.
+      return (e instanceof UnsupportedFeatureException) ||
+          !(Parser.parse(queryCtx.client_request.stmt,
+              queryCtx.client_request.query_options) instanceof QueryStmt);
     } catch (Exception f) {
+      // If an exception was thrown, it failed to parse in the original planner, so there
+      // is no reason to compile it there.
       return false;
     }
   }
@@ -2860,13 +2882,17 @@ public class Frontend {
     }
   }
 
-  public static void addPlannerToProfile(String planner, String exceptionClass) {
+  public static void addPlannerToProfile(String planner, String firstAttemptPlanner,
+      Throwable firstAttemptException) {
     TRuntimeProfileNode profile = createTRuntimeProfileNode(PLANNER_PROFILE);
     addInfoString(profile, PLANNER_TYPE, planner);
-    if (exceptionClass != null) {
-      addInfoString(profile, CALCITE_FAILURE_REASON, exceptionClass);
+    if (firstAttemptPlanner != null) {
+      addInfoString(profile, FIRST_ATTEMPT_PLANNER, firstAttemptPlanner);
+      addInfoString(profile, FIRST_ATTEMPT_FAILURE_REASON,
+          firstAttemptException.getClass().toString());
     }
     FrontendProfile.getCurrent().addChildrenProfile(profile);
+
   }
 
   /**
@@ -3788,17 +3814,21 @@ public class Frontend {
     }
   }
 
-  @Nullable
-  private CompilerFactory getCalciteCompilerFactory(PlanCtx ctx)
-      throws ImpalaException {
-    TQueryOptions queryOptions = ctx.getQueryContext().client_request.getQuery_options();
-    if (queryOptions.isUse_calcite_planner()) {
-      if (calciteCompilerFactory == null) {
-        throw new InternalException("Could not find Calcite planner");
-      }
-      return calciteCompilerFactory;
+  private CompilerFactory getCompilerFactory(TPlannerType plannerType) {
+    switch (plannerType) {
+      case ORIGINAL:
+        LOG.info("Using Original Planner.");
+        return ORIGINAL_COMPILER_FACTORY;
+      case CALCITE:
+        if (CALCITE_COMPILER_FACTORY == null) {
+          LOG.info("Could not find Calcite planner.");
+          throw new RuntimeException("Could not find Calcite Planner");
+        }
+        LOG.info("Using Calcite Planner.");
+        return CALCITE_COMPILER_FACTORY;
+      default:
+        throw new RuntimeException("Unknown planner type: [" + plannerType + "]");
     }
-    return null;
   }
 
   private static CompilerFactory loadCalciteCompilerFactory() {

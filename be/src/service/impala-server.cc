@@ -2031,7 +2031,9 @@ void ImpalaServer::InitializeConfigVariables() {
   // Set idle_session_timeout here to let the SET command return the value of
   // the command line option FLAGS_idle_session_timeout
   default_query_options_.__set_idle_session_timeout(FLAGS_idle_session_timeout);
-  default_query_options_.__set_use_calcite_planner(FLAGS_use_calcite_planner);
+  if (FLAGS_use_calcite_planner) {
+    default_query_options_.__set_planner(TPlannerType::CALCITE);
+  }
   // The next query options used to be set with flags. Setting them in
   // default_query_options_ here in order to make default_query_options
   // take precedence over the legacy flags.

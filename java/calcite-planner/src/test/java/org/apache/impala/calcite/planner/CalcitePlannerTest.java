@@ -20,6 +20,7 @@ package org.apache.impala.calcite.planner;
 import java.nio.file.Paths;
 
 import org.apache.impala.planner.PlannerTestBase;
+import org.apache.impala.thrift.TPlannerType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Test;
 
@@ -37,14 +38,16 @@ public class CalcitePlannerTest extends PlannerTestBase {
     // basic limit pushdown tests with it disabled.
     TQueryOptions options = defaultQueryOptions();
     options.setAnalytic_rank_pushdown_threshold(0);
-    options.setUse_calcite_planner(true);
+    options.setPlanner(TPlannerType.CALCITE);
+    options.setFallback_planner(TPlannerType.CALCITE);
     runPlannerTestFile("limit-pushdown-analytic-calcite", options);
   }
 
   @Test
   public void testAnalyticRankPushdown() {
     TQueryOptions options = defaultQueryOptions();
-    options.setUse_calcite_planner(true);
+    options.setPlanner(TPlannerType.CALCITE);
+    options.setFallback_planner(TPlannerType.CALCITE);
     runPlannerTestFile("analytic-rank-pushdown-calcite", options);
   }
 

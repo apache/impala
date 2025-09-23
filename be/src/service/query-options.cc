@@ -1432,6 +1432,23 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_show_create_table_partition_limit(int32_t_val);
         break;
       }
+      case TImpalaQueryOptions::PLANNER: {
+        TPlannerType::type planner_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "Planner",
+            _TPlannerType_VALUES_TO_NAMES, &planner_type));
+        if (planner_type == TPlannerType::NONE) {
+          return Status("Planner must be set to ORIGINAL or CALCITE");
+        }
+        query_options->__set_planner(planner_type);
+        break;
+      }
+      case TImpalaQueryOptions::FALLBACK_PLANNER: {
+        TPlannerType::type planner_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "Fallback Planner",
+            _TPlannerType_VALUES_TO_NAMES, &planner_type));
+        query_options->__set_fallback_planner(planner_type);
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

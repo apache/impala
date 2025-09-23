@@ -139,6 +139,12 @@ enum TRuntimeFilterType {
   IN_LIST = 2
 }
 
+enum TPlannerType {
+  ORIGINAL = 0
+  CALCITE = 1
+  NONE = 2
+}
+
 // The level of filtering of enabled min/max filters to be applied to Parquet scan nodes.
 enum TMinmaxFilteringLevel {
   ROW_GROUP = 1

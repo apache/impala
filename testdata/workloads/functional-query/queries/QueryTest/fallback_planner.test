@@ -1,0 +1,135 @@
+====
+---- QUERY
+set planner=CALCITE;
+set fallback_planner=CALCITE;
+select id from functional.alltypestiny where id = 1 limit 1;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+set planner=CALCITE;
+set fallback_planner=NONE;
+select id from functional.alltypestiny where id = 1 limit 1;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====
+---- QUERY
+set planner=ORIGINAL;
+set fallback_planner=ORIGINAL;
+create table calcite_alltypes as select * from functional.alltypes order by id limit 5;
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+set planner=ORIGINAL;
+set fallback_planner=NONE;
+create table calcite_alltypes2 as select * from functional.alltypes order by id limit 5;
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+# fallback should happen on all CTAS queries
+set planner=CALCITE;
+set fallback_planner=CALCITE;
+create table calcite_alltypes3 as select * from functional.alltypes order by id limit 5;
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+# fallback should happen on all CTAS queries
+set planner=CALCITE;
+set fallback_planner=NONE;
+create table calcite_alltypes4 as select * from functional.alltypes order by id limit 5;
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+# fallback should happen on complex types which are not supported, even though no
+# fallback planner is specified.
+set planner=CALCITE;
+set fallback_planner=CALCITE;
+select int_array_col from functional.allcomplextypes
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+# fallback should happen on complex types which are not supported, even though no
+# fallback planner is specified.
+set planner=CALCITE;
+set fallback_planner=NONE;
+select int_array_col from functional.allcomplextypes
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+set planner=CALCITE;
+set fallback_planner=CALCITE;
+# query does not compile in Calcite, Calcite currently expects ignore nulls to be
+# outside the parens.
+select id, tinyint_col,
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and 1 preceding),
+from functional.alltypesagg where id < 21
+---- CATCH
+ParseException
+====
+---- QUERY
+set planner=CALCITE;
+set fallback_planner=NONE;
+# query does not compile in Calcite, Calcite currently expects ignore nulls to be
+# outside the parens.
+select id, tinyint_col,
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and 1 preceding),
+from functional.alltypesagg where id < 21
+---- CATCH
+ParseException
+====
+---- QUERY
+set planner=CALCITE;
+set fallback_planner=ORIGINAL;
+# query does not compile in Calcite, Fallback planner kicks in
+select id, tinyint_col,
+  last_value(tinyint_col ignore nulls) over
+    (order by id rows between unbounded preceding and 1 preceding)
+from functional.alltypesagg where id < 21
+---- RUNTIME_PROFILE
+row_regex: PlannerType: OriginalPlanner
+====
+---- QUERY
+set planner=ORIGINAL;
+set fallback_planner=ORIGINAL;
+# query does not compile in Original planner
+select id, tinyint_col,
+  last_value(tinyint_col) ignore nulls over
+    (order by id rows between unbounded preceding and 1 preceding)
+from functional.alltypesagg where id < 21
+---- CATCH
+ParseException
+====
+---- QUERY
+set planner=ORIGINAL;
+set fallback_planner=NONE;
+# query does not compile in Original planner
+select id, tinyint_col,
+  last_value(tinyint_col) ignore nulls over
+    (order by id rows between unbounded preceding and 1 preceding)
+from functional.alltypesagg where id < 21
+---- CATCH
+ParseException
+====
+---- QUERY
+set planner=ORIGINAL;
+set fallback_planner=CALCITE;
+# query does not compile in Original planner, falls back to Calcite planner
+select id, tinyint_col,
+  last_value(tinyint_col) ignore nulls over
+    (order by id rows between unbounded preceding and 1 preceding)
+from functional.alltypesagg where id < 21
+---- RUNTIME_PROFILE
+row_regex: PlannerType: CalcitePlanner
+====

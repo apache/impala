@@ -1724,8 +1724,10 @@ class TestRanger(CustomClusterTestSuite):
     grantee_user = "non_owner"
     with self.create_impala_client(user=ADMIN) as admin_client, \
       self.create_impala_client(user=grantee_user) as non_owner_client:
-      # Set the query option of 'use_calcite_planner' to 1 to use the Calcite planner.
-      non_owner_client.set_configuration({"use_calcite_planner": 1})
+      # Set the query option planner to CALCITE and ensure there is no fallback to
+      # the original planner
+      non_owner_client.set_configuration({"planner": "CALCITE"})
+      non_owner_client.set_configuration({"fallback_planner": "CALCITE"})
       unique_database = unique_name + "_db"
       unique_table = unique_name + "_tbl"
       test_select_query = "select * from {0}.{1}".format(unique_database, unique_table)
@@ -1784,8 +1786,10 @@ class TestRanger(CustomClusterTestSuite):
     with self.create_impala_client(user=ADMIN) as admin_client, \
         self.create_impala_client(user=grantee_user) as non_owner_client:
       if use_calcite_planner is True:
-        # Set the query option of 'use_calcite_planner' to 1 to use the Calcite planner.
-        non_owner_client.set_configuration({"use_calcite_planner": 1})
+        # Set the query option planner to CALCITE and ensure there is no fallback to
+        # the original planner
+        non_owner_client.set_configuration({"planner": "CALCITE"})
+        non_owner_client.set_configuration({"fallback_planner": "CALCITE"})
       test_select_query = "select * from {0}".format(v2_name)
       select_error_prefix = "User '{0}' does not have privileges to execute " \
           "'SELECT' on:".format(grantee_user)
@@ -1923,7 +1927,7 @@ class TestRanger(CustomClusterTestSuite):
     grantee_user = "non_owner"
     with self.create_impala_client(user=ADMIN) as admin_client, \
         self.create_impala_client(user=grantee_user) as non_owner_client:
-      non_owner_client.set_configuration({"use_calcite_planner": 1})
+      non_owner_client.set_configuration({"planner": "CALCITE"})
       database = "functional"
       table_1 = "alltypes"
       table_2 = "alltypestiny"
@@ -4032,8 +4036,10 @@ class TestRangerWithCalcite(TestRanger):
     """
     with self.create_impala_client(user=ADMIN) as admin_client, \
         self.create_impala_client(user=NON_OWNER) as non_owner_client:
-      # Set the query option of 'use_calcite_planner' to 1 to use the Calcite planner.
-      non_owner_client.set_configuration({"use_calcite_planner": 1})
+      # Set the query option planner to CALCITE and ensure there is no fallback to
+      # the original planner
+      non_owner_client.set_configuration({"planner": "CALCITE"})
+      non_owner_client.set_configuration({"fallback_planner": "CALCITE"})
       database = "functional"
       table_1 = database + "." + "alltypes"
       table_2 = database + "." "alltypestiny"
@@ -4069,8 +4075,9 @@ class TestRangerWithCalcite(TestRanger):
         non_owner_client.execute(test_query_3)
         non_owner_client.execute(test_query_4)
 
-        # Set the query option of 'use_calcite_planner' to 0 to use the classic frontend.
-        non_owner_client.set_configuration({"use_calcite_planner": 0})
+        # Set the query option planner back to ORIGINAL
+        non_owner_client.set_configuration({"planner": "ORIGINAL"})
+        non_owner_client.set_configuration({"fallback_planner": "ORIGINAL"})
         # Impala's classic frontend supports 'test_query_3'.
         non_owner_client.execute(test_query_3)
         # Impala's classic frontend could not support 'test_query_4'.

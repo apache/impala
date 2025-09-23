@@ -17,15 +17,14 @@
 
 from __future__ import absolute_import, division, print_function
 import logging
-import pytest
 
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (add_mandatory_exec_option)
 
 LOG = logging.getLogger(__name__)
 
 
-class TestCalcitePlanner(CustomClusterTestSuite):
+class TestCalcitePlanner(ImpalaTestSuite):
 
   @classmethod
   def setup_class(cls):
@@ -36,8 +35,29 @@ class TestCalcitePlanner(CustomClusterTestSuite):
     super(TestCalcitePlanner, cls).add_test_dimensions()
     add_mandatory_exec_option(cls, 'planner', 'CALCITE')
     add_mandatory_exec_option(cls, 'fallback_planner', 'CALCITE')
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(start_args="--env_vars=USE_CALCITE_PLANNER=true")
   def test_calcite_frontend(self, vector, unique_database):
     self.run_test_case('QueryTest/calcite', vector, use_db=unique_database)
+
+  def test_semicolon(self, cursor):
+    cursor.execute("select 4;")
+
+
+class TestFallbackPlanner(ImpalaTestSuite):
+
+  @classmethod
+  def setup_class(cls):
+    super(TestFallbackPlanner, cls).setup_class()
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestFallbackPlanner, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet'
+        and v.get_value('table_format').compression_codec == 'none')
+
+  def test_fallback_planner(self, vector, unique_database):
+    self.run_test_case('QueryTest/fallback_planner', vector, use_db=unique_database)

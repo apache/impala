@@ -17,6 +17,7 @@
 
 package org.apache.impala.calcite.planner;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 
@@ -25,6 +26,7 @@ import org.apache.impala.common.ByteUnits;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlannerTestBase;
 import org.apache.impala.thrift.TExecutorGroupSet;
+import org.apache.impala.thrift.TPlannerType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TReplicaPreference;
 import org.apache.impala.thrift.TSlotCountStrategy;
@@ -77,7 +79,8 @@ public class TpcdsCpuCostPlannerTest extends PlannerTestBase {
           // Required so that output doesn't vary by whether scanned tables have stats &
           // numRows property or not.
           .setDisable_hdfs_num_rows_estimate(true)
-          .setUse_calcite_planner(true);
+          .setPlanner(TPlannerType.CALCITE)
+          .setFallback_planner(TPlannerType.CALCITE);
 
   // Database name to run this test.
   private static String testDb = "tpcds_partitioned_parquet_snap";

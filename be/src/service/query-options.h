@@ -51,7 +51,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // plus one. Thus, the second argument to the DCHECK has to be updated every
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 constexpr unsigned NUM_QUERY_OPTIONS =
-    TImpalaQueryOptions::SHOW_CREATE_TABLE_PARTITION_LIMIT + 1;
+    TImpalaQueryOptions::FALLBACK_PLANNER + 1;
 #define QUERY_OPTS_TABLE                                                                 \
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(), NUM_QUERY_OPTIONS);             \
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED) \
@@ -374,8 +374,7 @@ constexpr unsigned NUM_QUERY_OPTIONS =
       SKIP_UNNEEDED_UPDATES_COL_LIMIT, TQueryOptionLevel::ADVANCED)                      \
   QUERY_OPT_FN(mem_estimate_scale_for_spilling_operator,                                 \
       MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR, TQueryOptionLevel::DEVELOPMENT)          \
-  QUERY_OPT_FN(use_calcite_planner, USE_CALCITE_PLANNER,                                 \
-      TQueryOptionLevel::ADVANCED)                                                       \
+  REMOVED_QUERY_OPT_FN(use_calcite_planner, USE_CALCITE_PLANNER)                         \
   QUERY_OPT_FN(json_binary_format, JSON_BINARY_FORMAT, TQueryOptionLevel::REGULAR)       \
   QUERY_OPT_FN(hide_analyzed_query, HIDE_ANALYZED_QUERY, TQueryOptionLevel::ADVANCED)    \
   QUERY_OPT_FN(broadcast_cost_scale_factor, BROADCAST_COST_SCALE_FACTOR,                 \
@@ -387,6 +386,8 @@ constexpr unsigned NUM_QUERY_OPTIONS =
   TUPLE_CACHE_EXEMPT_QUERY_OPT_FN(tuple_cache_budget_bytes_per_executor,                 \
       TUPLE_CACHE_BUDGET_BYTES_PER_EXECUTOR, TQueryOptionLevel::ADVANCED)                \
   QUERY_OPT_FN(show_create_table_partition_limit, SHOW_CREATE_TABLE_PARTITION_LIMIT, TQueryOptionLevel::REGULAR)             \
+  QUERY_OPT_FN(planner, PLANNER, TQueryOptionLevel::ADVANCED)                            \
+  QUERY_OPT_FN(fallback_planner, FALLBACK_PLANNER, TQueryOptionLevel::ADVANCED)          \
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.
