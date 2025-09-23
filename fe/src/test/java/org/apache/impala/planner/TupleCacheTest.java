@@ -252,6 +252,14 @@ public class TupleCacheTest extends PlannerTestBase {
     verifyCacheIneligible("select id from functional_kudu.alltypes");
     verifyCacheIneligible("select id from functional_hbase.alltypes");
 
+    // Caching for Full Hive ACID is not implemented due to complications
+    // with valid write ids. ORC tables are loaded as Full ACID tables.
+    verifyCacheIneligible("select count(*) from functional_orc_def.alltypes");
+    // Hive ACID insert-only tables are eligible
+    verifyAllEligible(
+        "select count(*) from functional_parquet.insert_only_major_and_minor_compacted",
+        /* isDistributedPlan */ false);
+
     // Runtime filter produced by Kudu table is not implemented
     verifyCacheIneligible("select a.id from functional.alltypes a, " +
         "functional_kudu.alltypes b where a.id = b.id");

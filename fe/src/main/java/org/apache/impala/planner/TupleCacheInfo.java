@@ -45,6 +45,7 @@ import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TSlotDescriptor;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTupleDescriptor;
+import org.apache.impala.util.AcidUtils;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -107,6 +108,7 @@ public class TupleCacheInfo {
     NONDETERMINISTIC_FN,
     MERGING_EXCHANGE,
     PARTITIONED_EXCHANGE,
+    FULL_ACID,
   }
   private EnumSet<IneligibilityReason> ineligibilityReasons_;
 
@@ -531,6 +533,14 @@ public class TupleCacheInfo {
     Preconditions.checkState(!(tbl instanceof FeView),
         "registerTable() only applies to base tables");
     Preconditions.checkState(tbl != null, "Invalid null argument to registerTable()");
+
+    // IMPALA-14258: Tuple caching does not support Full Hive ACID tables, as it does
+    // not yet support handling valid write ids.
+    if (tbl.getMetaStoreTable() != null &&
+        AcidUtils.isFullAcidTable(tbl.getMetaStoreTable().getParameters())) {
+      setIneligible(IneligibilityReason.FULL_ACID);
+      return;
+    }
 
     // Right now, we only hash the database / table name.
     TTableName tblName = tbl.getTableName().toThrift();
