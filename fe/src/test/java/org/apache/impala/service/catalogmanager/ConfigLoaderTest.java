@@ -18,6 +18,7 @@ package org.apache.impala.service.catalogmanager;
 
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -123,5 +124,98 @@ public class ConfigLoaderTest {
     ConfigLoader loader = new ConfigLoader(tempDir);
     List<Properties> configs = loader.loadConfigs();
     assertTrue(configs.isEmpty());
+  }
+
+  @Test
+  public void testEnvVarResolutionResolved() throws Exception {
+    String pathValue = System.getenv("PATH");
+    createConfigFile("resolved.properties",
+        "path=${ENV:PATH}\nconnector.name=iceberg\niceberg.catalog.type=rest\n");
+    ConfigLoader loader = new ConfigLoader(tempDir);
+    List<Properties> configs = loader.loadConfigs();
+    assertEquals(1, configs.size());
+    assertNotNull(pathValue);
+    assertEquals(pathValue, configs.get(0).getProperty("path"));
+  }
+
+  @Test
+  public void testEnvVarResolutionUnresolved() throws Exception {
+    createConfigFile("unresolved.properties",
+        "secret=${ENV:FAKE_SECRET}\nconnector.name=iceberg\niceberg.catalog.type=rest\n");
+    ConfigLoader loader = new ConfigLoader(tempDir);
+    List<Properties> configs = loader.loadConfigs();
+    assertEquals(1, configs.size());
+    assertEquals("${ENV:FAKE_SECRET}", configs.get(0).getProperty("secret"));
+  }
+
+  @Test
+  public void testEnvVarInvalidSyntax() throws Exception {
+    createConfigFile("invalid.properties",
+        "invalid=${SOME_VAR}\nconnector.name=iceberg\niceberg.catalog.type=rest\n");
+    ConfigLoader loader = new ConfigLoader(tempDir);
+    List<Properties> configs = loader.loadConfigs();
+    assertEquals(1, configs.size());
+    assertEquals("${SOME_VAR}", configs.get(0).getProperty("invalid"));
+  }
+
+  @Test
+  public void testMultipleEnvVars() throws Exception {
+    String pathValue = System.getenv("PATH");
+    createConfigFile("multiple.properties",
+        "path=${ENV:PATH}/dir ${ENV:FAKE}\n"
+            + "connector.name=iceberg\niceberg.catalog.type=rest\n");
+    ConfigLoader loader = new ConfigLoader(tempDir);
+    List<Properties> configs = loader.loadConfigs();
+    assertEquals(1, configs.size());
+    String resolvedPath = configs.get(0).getProperty("path");
+    String expected = pathValue + "/dir ${ENV:FAKE}";
+    assertEquals(expected, resolvedPath);
+  }
+
+  @Test
+  public void testMultipleValidEnvVars() throws Exception {
+    String pathValue = System.getenv("PATH");
+    String userValue = System.getenv("USER");
+    String shellValue = System.getenv("SHELL");
+
+    createConfigFile("multiple_env_vars_with_specific_names.properties",
+        "path=${ENV:PATH}\n"
+            + "user=${ENV:USER}\n"
+            + "shell=${ENV:SHELL}\n"
+            + "connector.name=iceberg\niceberg.catalog.type=rest\n");
+
+    ConfigLoader loader = new ConfigLoader(tempDir);
+    List<Properties> configs = loader.loadConfigs();
+
+    assertEquals(1, configs.size());
+    Properties config = configs.get(0);
+
+    assertNotNull(pathValue);
+    assertEquals(pathValue, config.getProperty("path"));
+
+    assertNotNull(userValue);
+    assertEquals(userValue, config.getProperty("user"));
+
+    assertNotNull(shellValue);
+    assertEquals(shellValue, config.getProperty("shell"));
+  }
+
+  @Test
+  public void testEnvVarWithNewLines() throws Exception {
+    createConfigFile("newline.properties",
+        "key=${ENV:CUSTOM_VAR}\n"
+            + "connector.name=iceberg\niceberg.catalog.type=rest\n");
+
+    ConfigLoader loader = new ConfigLoader(tempDir, envVar -> {
+      if (envVar.equals("CUSTOM_VAR")) {
+        return "VALUE\nWITH\nNEWLINE";
+      }
+      return null;
+    });
+
+    List<Properties> configs = loader.loadConfigs();
+    assertEquals(1, configs.size());
+    Properties config = configs.get(0);
+    assertEquals("VALUE\nWITH\nNEWLINE", config.getProperty("key"));
   }
 }
