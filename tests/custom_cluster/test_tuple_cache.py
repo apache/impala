@@ -879,6 +879,12 @@ class TestTupleCacheFullCluster(TestTupleCacheBase):
       impalad: self.get_tuple_cache_metric(impalad.service, "entries-in-use")
       for impalad in self.cluster.impalads}
 
+    # Some modification times have coarse granularity (e.g. a second). If the insert runs
+    # too quickly, the new file could have the same modification time as an existing
+    # file. In that case, the sort may not place it last, causing unexpected changes to
+    # the cache keys. Sleep a bit to guarantee a newer modification time.
+    time.sleep(3)
+
     # Insert another row, which creates a file / scan range
     # This uses a very large seed for table_value() to get a unique row that isn't
     # already in the table.
