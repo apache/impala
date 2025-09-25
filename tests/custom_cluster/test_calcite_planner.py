@@ -41,3 +41,9 @@ class TestCalcitePlanner(CustomClusterTestSuite):
   def test_calcite_frontend(self, vector, unique_database):
     """Calcite planner does not work in local catalog mode yet."""
     self.run_test_case('QueryTest/calcite', vector, use_db=unique_database)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(start_args="--env_vars=USE_CALCITE_PLANNER=true")
+  def test_semicolon(self, cursor):
+    cursor.execute("set use_calcite_planner=true;")
+    cursor.execute("select 4;")
