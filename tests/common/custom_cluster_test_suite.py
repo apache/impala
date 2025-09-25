@@ -480,6 +480,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   @staticmethod
   def _restart_kudu_service(kudu_args=None):
     kudu_env = dict(os.environ)
+    # On some platforms, Kudu can get stuck when HEAPCHECK is set (even to an empty
+    # value). Drop any HEAPCHECK variable from the environment.
+    if "HEAPCHECK" in kudu_env:
+      del kudu_env["HEAPCHECK"]
     if kudu_args is not None:
       kudu_env["IMPALA_KUDU_STARTUP_FLAGS"] = kudu_args
     call = subprocess.Popen(
