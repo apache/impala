@@ -360,9 +360,16 @@ static Status _upgradeTable(CatalogServiceIf* svc, const string& ip_addr,
 } // function _upgradeTable
 
 /// Retrieves the schema version of the specified table by reading its table properties.
-static Status _getTableSchemaVersion(CatalogServiceIf* svc, const string& ip_addr,
-    const string& db, const string& tbl, Version* table_version) {
+static Status _getTableSchemaVersion(Catalog* catalog, CatalogServiceIf* svc,
+    const string& ip_addr, const string& db, const string& tbl, Version* table_version) {
   DCHECK_NE(nullptr, table_version);
+
+  TGetTablesResult get_table_results;
+  RETURN_IF_ERROR(catalog->GetTableNames(db, &tbl, &get_table_results));
+  if (get_table_results.tables.empty()) {
+    *table_version = NO_TABLE_EXISTS;
+    return Status::OK();
+  }
 
   // Reset the table metadata to get the full metadata so its catalog object is fully
   // populated enabling its properties to be read.
@@ -378,14 +385,7 @@ static Status _getTableSchemaVersion(CatalogServiceIf* svc, const string& ip_add
 
   svc->ResetMetadata(reset_resp, reset_req);
   if (reset_resp.result.status.status_code != TErrorCode::type::OK) {
-    Status reset_stat = Status(reset_resp.result.status);
-    if (reset_stat.code() == TErrorCode::type::GENERAL
-        && starts_with(reset_stat.msg().msg(), "TableNotFoundException")) {
-      *table_version = NO_TABLE_EXISTS;
-      return Status::OK();
-    } else {
-      return reset_stat;
-    }
+    return Status(reset_resp.result.status);
   }
 
   // Read the table's catalog object to retrieve its table properties.
@@ -458,14 +458,14 @@ static Status _getTableSchemaVersion(CatalogServiceIf* svc, const string& ip_add
 /// Manages the schema for a workload management table. If the table does not exist, it is
 /// created. If it does exist, but is not on the schema version specified via the command
 /// line flag, it is altered to bring it up to the new version.
-static Status _tableSchemaManagement(CatalogServiceIf* svc, const string& ip_addr,
-    const string& table_name, const Version& target_schema_version,
+static Status _tableSchemaManagement(Catalog* catalog, CatalogServiceIf* svc,
+    const string& ip_addr, const string& table_name, const Version& target_schema_version,
     const bool is_system_table) {
   Version parsed_actual_schema_version;
 
   // Create and/or update the table if needed.
   RETURN_IF_ERROR(_getTableSchemaVersion(
-      svc, ip_addr, WM_DB, table_name, &parsed_actual_schema_version));
+      catalog, svc, ip_addr, WM_DB, table_name, &parsed_actual_schema_version));
 
   const string full_table_name = _fullTableName(WM_DB, table_name);
 
@@ -562,12 +562,12 @@ Status CatalogServer::InitWorkloadManagement() {
 
   // Create and/or update the query log table if needed.
   // Fully qualified table name based on startup flags.
-  RETURN_IF_ERROR(_tableSchemaManagement(thrift_iface_.get(), ip_addr,
+  RETURN_IF_ERROR(_tableSchemaManagement(catalog(), thrift_iface_.get(), ip_addr,
       QueryLogTableName(false), target_schema_version, false));
 
   // Create and/or update the query live table if needed.
   // Fully qualified table name based on startup flags.;
-  RETURN_IF_ERROR(_tableSchemaManagement(thrift_iface_.get(), ip_addr,
+  RETURN_IF_ERROR(_tableSchemaManagement(catalog(), thrift_iface_.get(), ip_addr,
       QueryLiveTableName(false), target_schema_version, true));
 
   LOG(INFO) << "Completed workload management initialization";
