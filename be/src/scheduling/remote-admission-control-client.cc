@@ -139,6 +139,9 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
 
     VLOG(3) << "Retrying AdmitQuery rpc for " << request.query_id
             << ". Previous rpc failed with status: " << admit_rpc_status.ToString();
+    // Re-resolve the admissiond address on each retry to handle cases
+    // where the admissiond has restarted with a new IP.
+    RETURN_IF_ERROR(AdmissionControlService::GetProxy(&proxy));
     admit_status = TryAdmitQuery(proxy.get(), request.request, &req, &admit_rpc_status);
   }
 
