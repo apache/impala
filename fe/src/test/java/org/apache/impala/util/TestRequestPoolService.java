@@ -31,10 +31,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.log4j.AppenderSkeleton;
+import org.apache.log4j.Logger;
 import org.apache.log4j.spi.LoggingEvent;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -293,10 +291,9 @@ public class TestRequestPoolService {
   @Test
   public void testVerifyConfiguration() throws Exception {
     // Capture log messages
-    Log log = LogFactory.getLog(AllocationFileLoaderService.class.getName());
-    Log4JLogger log4JLogger = (Log4JLogger) log;
+    Logger logger = Logger.getLogger(AllocationFileLoaderService.class);
     ReadableAppender logAppender = new ReadableAppender();
-    log4JLogger.getLogger().addAppender(logAppender);
+    logger.addAppender(logAppender);
 
     try {
       List<String> expected_messages = Arrays.asList(
@@ -323,7 +320,7 @@ public class TestRequestPoolService {
         Assert.assertTrue("missing message: " + expected_warning + " in " + messages,
             containsSubstring(messages, expected_warning));
       }
-    } finally { log4JLogger.getLogger().removeAppender(logAppender); }
+    } finally { logger.removeAppender(logAppender); }
   }
 
   /**

@@ -33,8 +33,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -46,6 +44,8 @@ import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.impala.yarn.server.resourcemanager.resource.ResourceWeights;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -60,8 +60,8 @@ import com.google.common.annotations.VisibleForTesting;
 @Unstable
 public class AllocationFileLoaderService extends AbstractService {
 
-  public static final Log LOG = LogFactory.getLog(
-      AllocationFileLoaderService.class.getName());
+  public static final Logger LOG =
+      LoggerFactory.getLogger(AllocationFileLoaderService.class);
 
   /** Time to wait between checks of the allocation file */
   public static final long ALLOC_RELOAD_INTERVAL_MS = 10 * 1000;
