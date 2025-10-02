@@ -624,4 +624,12 @@ public class BackendConfig {
   public int getMaxStmtMetadataLoaderThreads() {
     return backendCfg_.max_stmt_metadata_loader_threads;
   }
+
+  public boolean isDisableHmsSyncByDefault() {
+    return backendCfg_.disable_hms_sync_by_default;
+  }
+
+  public void setDisableHmsSyncByDefault(boolean disableHmsSyncByDefault) {
+    backendCfg_.disable_hms_sync_by_default = disableHmsSyncByDefault;
+  }
 }

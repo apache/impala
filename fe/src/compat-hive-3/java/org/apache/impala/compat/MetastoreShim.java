@@ -1218,7 +1218,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
               writeEventInfoList.get(i).getTableObj(), Table.class);
           if (event.getCatalogOpExecutor().getCatalog().isHmsEventSyncDisabled(tbl)) {
             LOG.debug("Not adding write ids to table {}.{} for event {} " +
-                    "since table/db level flag {} is set to true",
+                    "since table/db level flag {} or global level flag is set to true",
                 tbl.getDbName(), tbl.getTableName(), event.getEventId(),
                 MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
             continue;

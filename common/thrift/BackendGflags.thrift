@@ -361,4 +361,6 @@ struct TBackendGflags {
   165: required i32 min_jdbc_scan_cardinality
 
   166: required i32 max_stmt_metadata_loader_threads
+
+  167: required bool disable_hms_sync_by_default
 }

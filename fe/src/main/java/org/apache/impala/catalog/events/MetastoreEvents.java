@@ -1255,9 +1255,17 @@ public class MetastoreEvents {
                 + "database {}",
             MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(),
             dbFlagVal, dbName_);
+        // flag value of null also returns false
+        return Boolean.valueOf(dbFlagVal);
       }
-      // flag value of null also returns false
-      return Boolean.valueOf(dbFlagVal);
+      boolean globalDisableHmsSync = BackendConfig.INSTANCE.isDisableHmsSyncByDefault();
+      if (globalDisableHmsSync) {
+        debugLog("Table level for table {} or Db level for db {}, flag {} is not set. " +
+                "Global flag disable_hms_sync_by_default is set to {}",
+            msTbl_.getTableName(), dbName_, MetastoreEventPropertyKey
+                .DISABLE_EVENT_HMS_SYNC.getKey(), globalDisableHmsSync);
+      }
+      return globalDisableHmsSync;
     }
 
     /**

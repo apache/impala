@@ -1820,6 +1820,73 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     # Case-IV: Truncate table from Hive is currently generating single alter_partition
     # events. HIVE-28668 will address it.
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=1 "
+                  "--disable_hms_sync_by_default=true")
+  def test_disable_hms_sync_globally(self, unique_database):
+    """Verify IMPALA-14131: hms events are synced/skipped based on global flag
+    --disable_hms_sync_by_default and the db/table property 'impala.disableHmsSync'"""
+    tbl1 = unique_database + ".test_disable_hms_sync_1"
+    tbl2 = unique_database + ".test_disable_hms_sync_2"
+    EventProcessorUtils.wait_for_event_processing(self)
+
+    # Case 1: verify global config
+    events_skipped_before = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    self.run_stmt_in_hive(
+      """create table {} (id int) partitioned by (year int);
+         create table {} (id int);""".format(tbl1, tbl2))
+    EventProcessorUtils.wait_for_event_processing(self)
+    events_skipped_after = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    assert events_skipped_after > events_skipped_before
+    table_names = self.client.execute("show tables in {}".format(unique_database))\
+      .get_data()
+    assert not table_names
+
+    def _check_insert_events(tbl, expected_val, skip_events=0, part=''):
+      EventProcessorUtils.wait_for_event_processing(self)
+      events_skipped_before = EventProcessorUtils.get_int_metric('events-skipped', 0)
+      # modify data externally
+      self.run_stmt_in_hive(
+        """insert into {tb1} {partition} values(1),(2);"""
+        .format(tb1=tbl, partition=part))
+      EventProcessorUtils.wait_for_event_processing(self)
+      events_skipped_after = EventProcessorUtils.get_int_metric('events-skipped', 0)
+      assert events_skipped_after == events_skipped_before + skip_events, \
+        "Expected {} events to be skipped, but {} events were skipped.".format(
+          skip_events, events_skipped_after - events_skipped_before)
+      data = self.client.execute("select * from {}".format(tbl))
+      assert len(data.data) == expected_val, \
+        "Expected {} rows in table {}, but found {}.".format(expected_val, tbl,
+          len(data.data))
+
+    # Case 2: Enable hms sync at database level but disabled globally
+    def validate_hms_sync(unique_database, tbl, partition=''):
+      # load tables in cache
+      self.client.execute("invalidate metadata {}".format(tbl))
+      self.client.execute("describe {}".format(tbl))
+      self.run_stmt_in_hive(
+        """ALTER DATABASE {} SET DBPROPERTIES ('impala.disableHmsSync'='false')"""
+        .format(unique_database))
+      _check_insert_events(tbl, 2, 0, partition)
+
+    validate_hms_sync(unique_database, tbl1, partition='partition(year=2024)')
+    validate_hms_sync(unique_database, tbl2)
+
+    # Case 3: disable hms sync at database level and enable it at table level
+    self.run_stmt_in_hive(
+      """ALTER DATABASE {} SET DBPROPERTIES ('impala.disableHmsSync'='true')"""
+      .format(unique_database))
+    self.client.execute(
+      """alter table {} SET TBLPROPERTIES ('impala.disableHmsSync'='false')"""
+      .format(tbl1))
+    self.client.execute(
+      """alter table {} SET TBLPROPERTIES ('impala.disableHmsSync'='false')"""
+      .format(tbl2))
+    EventProcessorUtils.wait_for_event_processing(self)
+    _check_insert_events(tbl1, 4, skip_events=1, part='partition(year=2024)')
+    _check_insert_events(tbl2, 4, skip_events=0)
+
 
 @SkipIfFS.hive
 class TestEventProcessingWithImpala(TestEventProcessingCustomConfigsBase):

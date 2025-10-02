@@ -4831,9 +4831,9 @@ public class CatalogServiceCatalog extends Catalog {
       return;
     }
     if (isHmsEventSyncDisabled(tbl.getMetaStoreTable())) {
-      LOG.debug("Not adding write ids to table {}.{} for event {} " +
-          "since table/db level flag {} is set to true", dbName, tblName, eventId,
-          MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
+      LOG.debug("Not adding write ids to table {}.{} for event {} since table/db level" +
+          " flag {} or disable_hms_sync_by_default is set to true", dbName,
+          tblName, eventId, MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
       return;
     }
     if (eventId > 0 && eventId <= tbl.getCreateEventId()) {
@@ -4902,7 +4902,10 @@ public class CatalogServiceCatalog extends Catalog {
     }
     String dbFlagVal = getDbProperty(tbl.getDbName(),
         MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey());
-    return Boolean.parseBoolean(dbFlagVal);
+    if (dbFlagVal != null) {
+      return Boolean.parseBoolean(dbFlagVal);
+    }
+    return BackendConfig.INSTANCE.isDisableHmsSyncByDefault();
   }
 
   /**
