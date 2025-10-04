@@ -17,15 +17,31 @@
 
 package org.apache.impala.analysis;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.paimon.FeShowFileStmtSupport;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.IcebergPartitionPredicateConverter;
+import org.apache.impala.common.IcebergPredicateConverter;
+import org.apache.impala.common.ImpalaException;
+
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.IcebergUtil;
 
 import com.google.common.base.Preconditions;
 
@@ -44,6 +60,9 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
 
   // Set during analysis.
   protected FeTable table_;
+
+  // File paths selected by Iceberg's partition filtering
+  private List<String> icebergFilePaths_;
 
   public ShowFilesStmt(TableName tableName, PartitionSet partitionSet) {
     tableName_ = Preconditions.checkNotNull(tableName);
@@ -72,10 +91,13 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
     // and to allow us to evaluate partition predicates.
     TableRef tableRef = new TableRef(tableName_.toPath(), null, Privilege.VIEW_METADATA);
     tableRef = analyzer.resolveTableRef(tableRef);
-    if (tableRef instanceof InlineViewRef ||
-        tableRef instanceof CollectionTableRef) {
+    if (tableRef instanceof InlineViewRef) {
       throw new AnalysisException(String.format(
-          "SHOW FILES not applicable to a non hdfs table: %s", tableName_));
+          "SHOW FILES not allowed on a view: %s", tableName_));
+    }
+    if (tableRef instanceof CollectionTableRef) {
+      throw new AnalysisException(String.format(
+          "SHOW FILES not allowed on a nested collection: %s", tableName_));
     }
     table_ = tableRef.getTable();
     Preconditions.checkNotNull(table_);
@@ -101,13 +123,84 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
       partitionSet_.setPrivilegeRequirement(Privilege.VIEW_METADATA);
       partitionSet_.analyze(analyzer);
     }
+
+    if (table_ instanceof FeIcebergTable) { analyzeIceberg(analyzer); }
+  }
+
+  public void analyzeIceberg(Analyzer analyzer) throws AnalysisException {
+    if (partitionSet_ == null) {
+      icebergFilePaths_ = null;
+      return;
+    }
+
+    FeIcebergTable table = (FeIcebergTable) table_;
+    // To rewrite transforms and column references
+    IcebergPartitionExpressionRewriter rewriter =
+        new IcebergPartitionExpressionRewriter(analyzer,
+            table.getIcebergApiTable().spec());
+    // For Impala expression to Iceberg expression conversion
+    IcebergPredicateConverter converter =
+        new IcebergPartitionPredicateConverter(table.getIcebergSchema(), analyzer);
+
+    List<Expression> icebergPartitionExprs = new ArrayList<>();
+    for (Expr expr : partitionSet_.getPartitionExprs()) {
+      expr = rewriter.rewrite(expr);
+      expr.analyze(analyzer);
+      analyzer.getConstantFolder().rewrite(expr, analyzer);
+      try {
+        icebergPartitionExprs.add(converter.convert(expr));
+      } catch (ImpalaException e) {
+        throw new AnalysisException(
+            "Invalid partition filtering expression: " + expr.toSql());
+      }
+    }
+
+    try (CloseableIterable<FileScanTask> fileScanTasks = IcebergUtil.planFiles(table,
+        icebergPartitionExprs, null, null)) {
+      // Collect file paths without sorting - sorting will be done in execution phase
+      List<String> filePaths = new ArrayList<>();
+      Set<String> uniquePaths = new HashSet<>();
+
+      for (FileScanTask fileScanTask : fileScanTasks) {
+        if (fileScanTask.residual().isEquivalentTo(Expressions.alwaysTrue())) {
+          // Add delete files
+          for (DeleteFile deleteFile : fileScanTask.deletes()) {
+            String path = deleteFile.path().toString();
+            if (uniquePaths.add(path)) {
+              filePaths.add(path);
+            }
+          }
+
+          // Add data file
+          String dataFilePath = fileScanTask.file().path().toString();
+          if (uniquePaths.add(dataFilePath)) {
+            filePaths.add(dataFilePath);
+          }
+        }
+      }
+
+      // Store unsorted file paths - lexicographic sorting will be applied in execution
+      icebergFilePaths_ = filePaths;
+
+      if (icebergFilePaths_.isEmpty()) {
+        throw new AnalysisException("No matching partition(s) found.");
+      }
+    } catch (IOException | TableLoadingException e) {
+      throw new AnalysisException("Error loading metadata for Iceberg table", e);
+    }
   }
 
   public TShowFilesParams toThrift() {
     TShowFilesParams params = new TShowFilesParams();
     params.setTable_name(new TTableName(table_.getDb().getName(), table_.getName()));
-    if (partitionSet_ != null) {
+    // For Iceberg tables, we use selected_files instead of partition_set
+    if (partitionSet_ != null && !(table_ instanceof FeIcebergTable)) {
       params.setPartition_set(partitionSet_.toThrift());
+    }
+    // For Iceberg tables: icebergFilePaths_ is null for unfiltered queries (no PARTITION
+    // clause) or contains the list of matching file paths for filtered queries.
+    if (table_ instanceof FeIcebergTable && icebergFilePaths_ != null) {
+      params.setSelected_files(icebergFilePaths_);
     }
     return params;
   }

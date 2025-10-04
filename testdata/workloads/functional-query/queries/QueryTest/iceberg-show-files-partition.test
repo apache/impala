@@ -1,0 +1,434 @@
+====
+---- QUERY
+# Creating tables for each partition transform class
+CREATE TABLE iceberg_identity_partitions_showfiles
+  (identity_boolean boolean, identity_int int, identity_bigint bigint,
+  identity_float float, identity_double double, identity_decimal decimal(20,10),
+  identity_date date, identity_timestamp timestamp, identity_string string)
+PARTITIONED BY SPEC
+  (identity(identity_boolean), identity(identity_int), identity(identity_bigint),
+  identity(identity_float), identity(identity_double), identity(identity_decimal),
+  identity(identity_date), identity(identity_string))
+STORED AS ICEBERG;
+CREATE TABLE iceberg_bucket_partitions_showfiles
+  (bucket_int int, bucket_bigint bigint, bucket_decimal decimal(20,10),
+  bucket_date date, bucket_timestamp timestamp, bucket_string string)
+PARTITIONED BY SPEC
+  (bucket(5,bucket_int), bucket(5,bucket_bigint), bucket(5,bucket_decimal),
+  bucket(5,bucket_date), bucket(5,bucket_timestamp), bucket(5,bucket_string))
+STORED AS ICEBERG;
+CREATE TABLE iceberg_truncate_partitions_showfiles
+  (truncate_int int, truncate_bigint bigint, truncate_decimal decimal(20,10),
+  truncate_string string)
+PARTITIONED BY SPEC
+  (truncate(5,truncate_int), truncate(5,truncate_bigint), truncate(5,truncate_decimal),
+  truncate(5,truncate_string))
+STORED AS ICEBERG;
+CREATE TABLE iceberg_time_partitions_showfiles
+  (year_date date, year_timestamp timestamp, month_date date, month_timestamp timestamp,
+  day_date date, day_timestamp timestamp, hour_timestamp timestamp)
+PARTITIONED BY SPEC
+  (year(year_date), year(year_timestamp),
+  month(month_date), month(month_timestamp),
+  day(day_date), day(day_timestamp),
+  hour(hour_timestamp))
+STORED AS ICEBERG;
+CREATE TABLE iceberg_mixed_partitions_showfiles
+  (identity_int int, identity_string string, hour_timestamp timestamp)
+PARTITIONED BY SPEC
+  (identity(identity_int), identity(identity_string), hour(hour_timestamp))
+STORED AS ICEBERG;
+====
+---- QUERY
+# Failing implicit string to hour cast
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (hour(hour_timestamp) = "2012-12-12");
+---- CATCH
+AnalysisException: operands of type INT and STRING are not comparable: HOUR(hour_timestamp) = '2012-12-12'
+====
+---- QUERY
+# Failing implicit string to day cast
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (day(day_date) = "2012-12");
+---- CATCH
+AnalysisException: operands of type INT and STRING are not comparable: DAY(day_date) = '2012-12'
+====
+---- QUERY
+# Failing implicit string to month cast
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (month(month_date) = "2012");
+---- CATCH
+AnalysisException: operands of type INT and STRING are not comparable: MONTH(month_date) = '2012'
+====
+---- QUERY
+# Failing implicit string to year cast
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (year(year_date) = "2012-12-12-20");
+---- CATCH
+AnalysisException: operands of type INT and STRING are not comparable: YEAR(year_date) = '2012-12-12-20'
+====
+---- QUERY
+INSERT INTO iceberg_identity_partitions_showfiles(identity_boolean) VALUES (true);
+INSERT INTO iceberg_identity_partitions_showfiles(identity_int) VALUES (1);
+INSERT INTO iceberg_identity_partitions_showfiles(identity_bigint) VALUES (1);
+INSERT INTO iceberg_identity_partitions_showfiles(identity_float) VALUES (1.0);
+INSERT INTO iceberg_identity_partitions_showfiles(identity_double) VALUES (1.0);
+INSERT INTO iceberg_identity_partitions_showfiles(identity_decimal) VALUES (1);
+INSERT INTO iceberg_identity_partitions_showfiles(identity_date) VALUES ('2000-12-12');
+INSERT INTO iceberg_identity_partitions_showfiles(identity_string) VALUES ("string-transform-omitted");
+INSERT INTO iceberg_identity_partitions_showfiles(identity_string) VALUES ("string-transform-set");
+INSERT INTO iceberg_identity_partitions_showfiles(identity_string) VALUES ("string"), ("another-string");
+INSERT INTO iceberg_identity_partitions_showfiles(identity_string) VALUES ("string"), ("another-string");
+INSERT INTO iceberg_bucket_partitions_showfiles(bucket_int) VALUES (100), (200);
+INSERT INTO iceberg_bucket_partitions_showfiles(bucket_bigint) VALUES (100);
+INSERT INTO iceberg_bucket_partitions_showfiles(bucket_decimal) VALUES (10);
+INSERT INTO iceberg_bucket_partitions_showfiles(bucket_date) VALUES ("1526-01-12");
+INSERT INTO iceberg_bucket_partitions_showfiles(bucket_string) VALUES ("string");
+INSERT INTO iceberg_bucket_partitions_showfiles(bucket_timestamp) VALUES ("1583-04-02 03:00:00");
+INSERT INTO iceberg_truncate_partitions_showfiles(truncate_int) VALUES (131072);
+INSERT INTO iceberg_truncate_partitions_showfiles(truncate_bigint) VALUES (68719476736);
+INSERT INTO iceberg_truncate_partitions_showfiles(truncate_decimal) VALUES (100000.1234567891);
+INSERT INTO iceberg_truncate_partitions_showfiles(truncate_string) VALUES ('thisisalongstring');
+INSERT INTO iceberg_time_partitions_showfiles(year_date) VALUES ('2077-05-06');
+INSERT INTO iceberg_time_partitions_showfiles(month_date) VALUES ('2023-12-01');
+INSERT INTO iceberg_time_partitions_showfiles(day_date) VALUES ('2023-12-01');
+INSERT INTO iceberg_time_partitions_showfiles(year_timestamp) VALUES ('2023-12-02 00:00:00');
+INSERT INTO iceberg_time_partitions_showfiles(month_timestamp) VALUES ('2023-12-02 00:00:00');
+INSERT INTO iceberg_time_partitions_showfiles(day_timestamp) VALUES ('2023-03-02 00:00:00');
+INSERT INTO iceberg_time_partitions_showfiles(hour_timestamp) VALUES ('2023-06-02 00:00:00');
+INSERT INTO iceberg_mixed_partitions_showfiles(identity_string, hour_timestamp) VALUES ('string-hour','2023-03-02 00:00:00');
+INSERT INTO iceberg_mixed_partitions_showfiles(identity_string, hour_timestamp) VALUES ('another-string-hour', '2023-03-02 00:00:00');
+INSERT INTO iceberg_mixed_partitions_showfiles(identity_string, hour_timestamp) VALUES ('another-string-hour', '2023-03-02 10:00:00');
+INSERT INTO iceberg_mixed_partitions_showfiles(identity_string, hour_timestamp) VALUES ('string-hour', '2023-03-02 10:00:00');
+INSERT INTO iceberg_mixed_partitions_showfiles(identity_string, identity_int) VALUES ('string-comma', 567);
+INSERT INTO iceberg_mixed_partitions_showfiles(identity_string, identity_int) VALUES ('string-comma', 568);
+INSERT INTO iceberg_mixed_partitions_showfiles(identity_int) VALUES (NULL);
+====
+---- QUERY
+# Show files for identity partitions - boolean
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity_boolean = true);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_boolean=true.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - boolean false (should return error)
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity_boolean = false);
+---- CATCH
+AnalysisException: No matching partition(s) found.
+====
+---- QUERY
+# Show files for identity partitions - int
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity_int = 1);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_int=1.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - bigint
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity_bigint = 1);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_bigint=1.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - float range
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity_float < 3.0);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_float=1.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - double range
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity_double > 0.0);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_double=1.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - decimal range
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity_decimal < 3);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_decimal=1.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - date
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity_date = '2000-12-12');
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_date=2000-12-12.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - string without transform
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity_string = "string-transform-omitted");
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_string=string-transform-omitted.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - string with transform
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity(identity_string) = "string-transform-set");
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_string=string-transform-set.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - string "another-string"
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity(identity_string) = "another-string");
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_string=another-string.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_string=another-string.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - string "string"
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity(identity_string) = "string");
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_string=string.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_string=string.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for bucket partitions - int bucket range
+SHOW FILES IN iceberg_bucket_partitions_showfiles PARTITION (bucket(5, bucket_int) in (1,2));
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_bucket_partitions_showfiles/data/.*bucket_int_bucket.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_bucket_partitions_showfiles/data/.*bucket_int_bucket.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for bucket partitions - bigint bucket
+SHOW FILES IN iceberg_bucket_partitions_showfiles PARTITION (bucket(5, bucket_bigint) = 1);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_bucket_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for bucket partitions - decimal bucket
+SHOW FILES IN iceberg_bucket_partitions_showfiles PARTITION (bucket(5, bucket_decimal) = 3);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_bucket_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for bucket partitions - date bucket
+SHOW FILES IN iceberg_bucket_partitions_showfiles PARTITION (bucket(5, bucket_date) = 0);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_bucket_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for bucket partitions - timestamp bucket
+SHOW FILES IN iceberg_bucket_partitions_showfiles PARTITION (bucket(5, bucket_timestamp) = 1);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_bucket_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for bucket partitions - string bucket
+SHOW FILES IN iceberg_bucket_partitions_showfiles PARTITION (bucket(5, bucket_string) = 1);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_bucket_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for truncate partitions - int truncate
+SHOW FILES IN iceberg_truncate_partitions_showfiles PARTITION (truncate(5, truncate_int) = 131070);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_truncate_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for truncate partitions - bigint truncate
+SHOW FILES IN iceberg_truncate_partitions_showfiles PARTITION (truncate(5, truncate_bigint) = 68719476735);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_truncate_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for truncate partitions - decimal truncate
+SHOW FILES IN iceberg_truncate_partitions_showfiles PARTITION (truncate(5, truncate_decimal) = 100000.1234567890);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_truncate_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for truncate partitions - string truncate
+SHOW FILES IN iceberg_truncate_partitions_showfiles PARTITION (truncate(5, truncate_string) = 'thisi');
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_truncate_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for time partitions - year from date
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (year(year_date) = '2077');
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_time_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for time partitions - month from date
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (month(month_date) = '2023-12');
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_time_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for time partitions - day from date
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (day(day_date) = '2023-12-01');
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_time_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for time partitions - year from timestamp
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (year(year_timestamp) = '2023');
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_time_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for time partitions - month from timestamp
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (month(month_timestamp) = '2023-12');
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_time_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for time partitions - day from timestamp
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (day(day_timestamp) = '2023-03-02');
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_time_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for time partitions - hour from timestamp
+SHOW FILES IN iceberg_time_partitions_showfiles PARTITION (hour(hour_timestamp) = '2023-06-02-0');
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_time_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for mixed partitions - complex condition with AND
+SHOW FILES IN iceberg_mixed_partitions_showfiles PARTITION (identity_string in ('string-hour', 'another-string-hour') and hour(hour_timestamp) = '2023-03-02-10');
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/.*hour_timestamp_hour=.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/.*hour_timestamp_hour=.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for mixed partitions - hour range
+SHOW FILES IN iceberg_mixed_partitions_showfiles PARTITION (hour(hour_timestamp) < '2030-03-02-10');
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/.*hour_timestamp_hour=.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/.*hour_timestamp_hour=.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/.*hour_timestamp_hour=.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/.*hour_timestamp_hour=.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for mixed partitions - multiple values with IN
+SHOW FILES IN iceberg_mixed_partitions_showfiles PARTITION (identity_string = "string-comma", identity_int in (567, 568));
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/.*identity_int=.*identity_string=string-comma.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/.*identity_int=.*identity_string=string-comma.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for mixed partitions - NULL partition
+SHOW FILES IN iceberg_mixed_partitions_showfiles PARTITION (identity_int IS NULL);
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/identity_int=__HIVE_DEFAULT_PARTITION__/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/identity_int=__HIVE_DEFAULT_PARTITION__/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/identity_int=__HIVE_DEFAULT_PARTITION__/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/identity_int=__HIVE_DEFAULT_PARTITION__/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_mixed_partitions_showfiles/data/identity_int=__HIVE_DEFAULT_PARTITION__/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+====
+---- QUERY
+# Partition evolution - testing SHOW FILES across different partition specs
+CREATE TABLE iceberg_showfiles_partition_evolution
+  (identity_int int, unpartitioned_int_to_identity_int int, year_date_col_to_month_date_col date)
+PARTITIONED BY SPEC
+  (identity(identity_int), year(year_date_col_to_month_date_col)) STORED AS ICEBERG;
+INSERT INTO iceberg_showfiles_partition_evolution VALUES (1, 2, "2023-10-11");
+ALTER TABLE iceberg_showfiles_partition_evolution SET PARTITION SPEC(
+  identity(identity_int), identity(unpartitioned_int_to_identity_int), year(year_date_col_to_month_date_col));
+INSERT INTO iceberg_showfiles_partition_evolution VALUES (1, 2, "2023-01-11");
+# Show files for the newly partitioned column
+SHOW FILES IN iceberg_showfiles_partition_evolution PARTITION (unpartitioned_int_to_identity_int = 2);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_partition_evolution/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+ALTER TABLE iceberg_showfiles_partition_evolution SET PARTITION SPEC(
+  identity(identity_int), month(year_date_col_to_month_date_col));
+# Should fail - trying to show files for a column that's no longer partitioned
+SHOW FILES IN iceberg_showfiles_partition_evolution PARTITION (unpartitioned_int_to_identity_int = 2);
+---- CATCH
+AnalysisException: Partition exprs cannot contain non-partition column(s): unpartitioned_int_to_identity_int
+====
+---- QUERY
+INSERT INTO iceberg_showfiles_partition_evolution VALUES (1, 2, "2023-11-11");
+# Show files for the evolved partition (year -> month)
+SHOW FILES IN iceberg_showfiles_partition_evolution PARTITION (month(year_date_col_to_month_date_col) = "2023-11");
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_partition_evolution/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files with delete files (format-version=2)
+CREATE TABLE iceberg_showfiles_with_deletes(identity_int int, unpartitioned_int int)
+PARTITIONED BY SPEC (identity_int) STORED AS ICEBERG TBLPROPERTIES('format-version'='2');
+INSERT INTO iceberg_showfiles_with_deletes VALUES (1,2);
+INSERT INTO iceberg_showfiles_with_deletes VALUES (2,1);
+DELETE FROM iceberg_showfiles_with_deletes WHERE identity_int = 1;
+# Show files for partition with data file (no deletes)
+SHOW FILES IN iceberg_showfiles_with_deletes PARTITION (identity_int = 2);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_with_deletes/data/identity_int=2/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for partition with both data and delete files
+SHOW FILES IN iceberg_showfiles_with_deletes PARTITION (identity_int = 1);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_with_deletes/data/identity_int=1/delete-.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_with_deletes/data/identity_int=1/[^d].*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====

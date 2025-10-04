@@ -3466,10 +3466,13 @@ public class Frontend {
     if (table instanceof FeShowFileStmtSupport) {
       return ((FeShowFileStmtSupport) table).doGetTableFiles(request);
     } else if (table instanceof FeFsTable) {
-      return FeFsTable.Utils.getFiles((FeFsTable)table, request.getPartition_set());
+      List<String> icebergFiles =
+          request.isSetSelected_files() ? request.getSelected_files() : null;
+      return FeFsTable.Utils.getFiles(
+          (FeFsTable) table, request.getPartition_set(), icebergFiles);
     } else {
-      throw new InternalException("SHOW FILES only supports Hdfs table. " +
-          "Unsupported table class: " + table.getClass());
+      throw new InternalException("SHOW FILES only supports Hdfs and Iceberg tables. "
+          + "Unsupported table class: " + table.getClass());
     }
   }
 

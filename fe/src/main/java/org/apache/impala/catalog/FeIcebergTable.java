@@ -457,8 +457,14 @@ public interface FeIcebergTable extends FeFsTable {
     /**
      * Get file info for the given fe iceberg table.
      */
-    public static TResultSet getIcebergTableFiles(FeIcebergTable table,
-        TResultSet result) {
+    public static TResultSet getIcebergTableFiles(
+        FeIcebergTable table, TResultSet result, List<String> icebergFiles) {
+      // If icebergFiles is provided (not null), use it for filtered results
+      // Note: Empty lists are handled in frontend analysis and converted to errors
+      if (icebergFiles != null) {
+        return getIcebergTableFilesFromPaths(result, icebergFiles, table);
+      }
+      // No partition filter was specified, show all files
       List<FileDescriptor> orderedFds = Lists.newArrayList(
           table.getContentFileStore().getAllFiles());
       Collections.sort(orderedFds);
@@ -471,6 +477,40 @@ public interface FeIcebergTable extends FeFsTable {
         rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(new Path(absPath)));
         result.addToRows(rowBuilder.get());
       }
+      return result;
+    }
+
+    // Method used when file paths are pre-collected during analysis
+    public static TResultSet getIcebergTableFilesFromPaths(
+        TResultSet result, List<String> filePaths, FeIcebergTable table) {
+      // Sort the file paths for consistent output
+      List<String> sortedFiles = new ArrayList<>(filePaths);
+      Collections.sort(sortedFiles);
+
+      IcebergContentFileStore contentFileStore = table.getContentFileStore();
+
+      for (String filePath : sortedFiles) {
+        TResultRowBuilder rowBuilder = new TResultRowBuilder();
+        rowBuilder.add(filePath);
+
+        // Try to get actual file size from content file store
+        String pathHash = IcebergUtil.getFilePathHash(filePath);
+        FileDescriptor fd = contentFileStore.getDataFileDescriptor(pathHash);
+        if (fd == null) {
+          fd = contentFileStore.getDeleteFileDescriptor(pathHash);
+        }
+
+        if (fd != null) {
+          rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
+        } else {
+          rowBuilder.add("Unknown");
+        }
+
+        rowBuilder.add("");         // Partition - empty for now
+        rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(new Path(filePath)));
+        result.addToRows(rowBuilder.get());
+      }
+
       return result;
     }
 

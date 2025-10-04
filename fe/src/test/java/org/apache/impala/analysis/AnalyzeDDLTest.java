@@ -4399,10 +4399,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       // Cannot show files on a non hdfs table.
       AnalysisError(String.format("show files in functional.alltypes_view %s",
           partition),
-          "SHOW FILES not applicable to a non hdfs table: functional.alltypes_view");
+          "SHOW FILES not allowed on a view: functional.alltypes_view");
       AnalysisError(String.format("show files in allcomplextypes.int_array_col %s",
           partition), createAnalysisCtx("functional"),
-          "SHOW FILES not applicable to a non hdfs table: allcomplextypes.int_array_col");
+          "SHOW FILES not allowed on a nested collection: allcomplextypes.int_array_col");
     }
 
     // Not a partition column.
@@ -4417,6 +4417,63 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Partition spec does not exist
     AnalysisError("show files in functional.alltypes partition(year=2010,month=NULL)",
         "No matching partition(s) found.");
+
+    // Iceberg SHOW FILES tests
+    String icebergPartitioned =
+        "show files in functional_parquet.iceberg_partitioned";
+    String icebergEvolution =
+        "show files in functional_parquet.iceberg_partition_evolution";
+    String icebergNonPartitioned =
+        "show files in functional_parquet.iceberg_non_partitioned";
+
+    // Non-partitioned Iceberg table
+    AnalysisError(icebergNonPartitioned + " partition (user = 'Alan')",
+        "Table is not partitioned: functional_parquet.iceberg_non_partitioned");
+
+    // Valid Iceberg partition filters
+    AnalyzesOk(icebergPartitioned + " partition (action = 'click')");
+    AnalyzesOk(
+        icebergPartitioned + " partition (action = 'click' or action = 'download')");
+    AnalyzesOk(icebergPartitioned + " partition (action in ('click', 'download'))");
+    AnalyzesOk(icebergPartitioned + " partition (hour(event_time) = '2020-01-01-9')");
+    AnalyzesOk(icebergPartitioned + " partition (hour(event_time) > '2020-01-01-01')");
+    AnalyzesOk(icebergPartitioned + " partition (hour(event_time) < '2020-02-01-01')");
+    AnalyzesOk(icebergPartitioned
+        + " partition (hour(event_time) in ('2020-01-01-9', '2020-01-01-1'))");
+    AnalyzesOk(icebergPartitioned
+        + " partition (hour(event_time) = '2020-01-01-9', action = 'click')");
+    AnalyzesOk(icebergEvolution + " partition (truncate(4,date_string_col,4) = '1231')");
+    AnalyzesOk(icebergEvolution + " partition (month = 12)");
+
+    // Error cases for Iceberg partition filters
+    // Non-existent partition should throw error (consistent with regular tables)
+    AnalysisError(icebergPartitioned + " partition (action = 'Foo')",
+        "No matching partition(s) found.");
+    AnalysisError(icebergPartitioned + " partition (user = 'Alan')",
+        "Partition exprs cannot contain non-partition column(s): `user`");
+    AnalysisError(
+        icebergPartitioned + " partition (user = 'Alan' or user = 'Lisa' and id > 10)",
+        "Partition exprs cannot contain non-partition column(s): `user`");
+    AnalysisError(icebergPartitioned + " partition (void(action) = 'click')",
+        "VOID transform is not supported for partition selection");
+    AnalysisError(icebergPartitioned + " partition (day(action) = 'Alan')",
+        "Can't filter column 'action' with transform type: 'DAY'");
+    AnalysisError(icebergPartitioned + " partition (action = action)",
+        "Invalid partition filtering expression: action = action");
+    AnalysisError(icebergPartitioned + " partition (action = action and action = 'click' "
+            + "or hour(event_time) > '2020-01-01-01')",
+        "Invalid partition filtering expression: "
+            + "action = action AND action = 'click' OR HOUR(event_time) > 438289");
+    AnalysisError(icebergPartitioned + " partition (action)",
+        "Invalid partition filtering expression: action");
+    AnalysisError(icebergPartitioned + " partition (2)",
+        "Invalid partition filtering expression: 2");
+    AnalysisError(icebergPartitioned + " partition (truncate(action))",
+        "BUCKET and TRUNCATE partition transforms should have a parameter");
+    AnalysisError(icebergPartitioned + " partition (truncate('string', action))",
+        "Invalid transform parameter value: string");
+    AnalysisError(icebergPartitioned + " partition (truncate(1, 2, action))",
+        "Invalid partition predicate: truncate(1, 2, action)");
   }
 
   @Test

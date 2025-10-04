@@ -1564,6 +1564,10 @@ class TestIcebergTable(IcebergTestSuite):
     assert snapshots[0].get_parent_id() == snapshots[2].get_parent_id()
     assert snapshots[0].get_creation_time() < snapshots[2].get_creation_time()
 
+  def test_show_files_partition(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-show-files-partition', vector,
+                       use_db=unique_database)
+
   def test_scan_metrics_in_profile_basic(self, vector):
     self.run_test_case('QueryTest/iceberg-scan-metrics-basic', vector)
 

@@ -648,7 +648,7 @@ public interface FeFsTable extends FeTable {
      * @return partition file info, ordered by partition
      */
     public static TResultSet getFiles(FeFsTable table,
-        List<List<TPartitionKeyValue>> partitionSet) {
+        List<List<TPartitionKeyValue>> partitionSet, List<String> icebergFiles) {
       TResultSet result = new TResultSet();
       TResultSetMetadata resultSchema = new TResultSetMetadata();
       result.setSchema(resultSchema);
@@ -659,7 +659,8 @@ public interface FeFsTable extends FeTable {
       result.setRows(new ArrayList<>());
 
       if (table instanceof FeIcebergTable) {
-        return FeIcebergTable.Utils.getIcebergTableFiles((FeIcebergTable) table, result);
+        return FeIcebergTable.Utils.getIcebergTableFiles(
+            (FeIcebergTable) table, result, icebergFiles);
       }
 
       List<? extends FeFsPartition> orderedPartitions;

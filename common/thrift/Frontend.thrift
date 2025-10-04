@@ -299,6 +299,10 @@ struct TShowFilesParams {
   // An optional partition set. Set if this operation should apply to a list of
   // partitions rather than the base table.
   2: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
+
+  // File paths for Iceberg tables (and potentially other formats),
+  // pre-collected during analysis phase
+  3: optional list<string> selected_files
 }
 
 // Parameters for SHOW [CURRENT] ROLES and SHOW ROLE GRANT GROUP <groupName> commands

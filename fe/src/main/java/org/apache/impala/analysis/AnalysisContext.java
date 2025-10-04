@@ -240,7 +240,7 @@ public class AnalysisContext {
     public boolean isSingleColumnPrivStmt() {
       return isDescribeTableStmt() || isResetMetadataStmt() || isUseStmt()
           || isShowTablesStmt() || isShowMetadataTablesStmt() || isShowViewsStmt()
-          || isAlterTableStmt() || isShowFunctionsStmt();
+          || isAlterTableStmt() || isShowFunctionsStmt() || isShowFilesStmt();
     }
 
     public boolean isConvertTableToIcebergStmt() {
