@@ -194,9 +194,9 @@ static bool ScanRangeOldestToNewestComparator(
   // Multiple files (or multiple splits from the same file) can have the same
   // modification time, so we need tie-breaking when they are equal.
   if (split1.mtime != split2.mtime) return split1.mtime < split2.mtime;
-  if (!split1.__isset.absolute_path && !split2.__isset.absolute_path) {
-    // If neither has an absolute path set (the common case), compare the
-    // partition hash and relative path
+  if (!split1.relative_path.empty() && !split2.relative_path.empty()) {
+    // If both have a relative path set (the common case), compare the partition hash
+    // and relative path
     if (split1.partition_path_hash != split2.partition_path_hash) {
       return split1.partition_path_hash < split2.partition_path_hash;
     }
@@ -204,10 +204,19 @@ static bool ScanRangeOldestToNewestComparator(
       return split1.relative_path < split2.relative_path;
     }
   } else {
-    // If only one has an absolute path, sort absolute paths ahead of relative paths.
-    if (split1.__isset.absolute_path && !split2.__isset.absolute_path) return true;
-    if (!split1.__isset.absolute_path && split2.__isset.absolute_path) return false;
-    // Both are absolute, so compare them
+    // If only one has a relative path, sort absolute paths ahead of relative paths.
+    if (split1.relative_path.empty()) {
+      DCHECK(split1.__isset.absolute_path && !split1.absolute_path.empty());
+      return true;
+    }
+    if (split2.relative_path.empty()) {
+      DCHECK(split2.__isset.absolute_path && !split2.absolute_path.empty());
+      return false;
+    }
+    // Both have empty relative paths, so compare the absolute paths (which must be
+    // non-empty)
+    DCHECK(split1.__isset.absolute_path && !split1.absolute_path.empty());
+    DCHECK(split2.__isset.absolute_path && !split2.absolute_path.empty());
     if (split1.absolute_path != split2.absolute_path) {
       return split1.absolute_path < split2.absolute_path;
     }
