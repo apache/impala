@@ -56,7 +56,8 @@ class ImpalaHttpClient(TTransportBase):
   MIN_REQUEST_SIZE_FOR_EXPECT = 1024
 
   def __init__(self, uri_or_host, ssl_context=None, http_cookie_names=None,
-               socket_timeout_s=None, verbose=False, reuse_connection=True):
+               socket_timeout_s=None, verbose=False, reuse_connection=True,
+               connect_timeout_ms=None):
     """To properly authenticate against an HTTPS server, provide an ssl_context created
     with ssl.create_default_context() to validate the server certificate.
 
@@ -121,7 +122,8 @@ class ImpalaHttpClient(TTransportBase):
     self.__wbuf = BytesIO()
     self.__http = None
     self.__http_response = None
-    self.__timeout = socket_timeout_s
+    self.__connect_timeout_s = connect_timeout_ms / 1000.0 if connect_timeout_ms else None
+    self.__socket_timeout_s = socket_timeout_s
     # __custom_headers is used to store HTTP headers which are generated in runtime for
     # new request.
     self.__custom_headers = None
@@ -147,14 +149,18 @@ class ImpalaHttpClient(TTransportBase):
   def open(self):
     if self.scheme == 'http':
       self.__http = http_client.HTTPConnection(self.host, self.port,
-                                               timeout=self.__timeout)
+                                               timeout=self.__connect_timeout_s)
     elif self.scheme == 'https':
       self.__http = http_client.HTTPSConnection(self.host, self.port,
-                                                timeout=self.__timeout,
+                                                timeout=self.__connect_timeout_s,
                                                 context=self.context)
     if self.using_proxy():
       self.__http.set_tunnel(self.realhost, self.realport,
                              {"Proxy-Authorization": self.proxy_auth})
+    # Initiate connection with configured timeout.
+    self.__http.connect()
+    # Set socket_timeout_s for the remainder of the session.
+    self.__http.sock.settimeout(self.__socket_timeout_s)
 
   def close(self):
     self.__http.close()
@@ -163,12 +169,6 @@ class ImpalaHttpClient(TTransportBase):
 
   def isOpen(self):
     return self.__http is not None
-
-  def setTimeout(self, ms):
-    if ms is None:
-      self.__timeout = None
-    else:
-      self.__timeout = ms / 1000.0
 
   def getCustomHeadersWithBasicAuth(self, cookie_header, has_auth_cookie):
     custom_headers = {}

@@ -1175,20 +1175,13 @@ class TestImpalaShell(ImpalaTestSuite):
        indefinitely while connecting
     """
 
-    # --connect_timeout_ms not supported with HTTP transport. Refer to the comment
-    # in ImpalaClient::_get_http_transport() for details.
-    # --http_socket_timeout_s not supported for strict_hs2_protocol.
-    if (vector.get_value('protocol') == 'hs2-http'
-        and vector.get_value('strict_hs2_protocol')):
-        pytest.skip("THRIFT-4600")
-
     with closing(socket.socket()) as s:
       s.bind(("", 0))
       # maximum number of queued connections on this socket is 1.
       s.listen(1)
       test_port = s.getsockname()[1]
-      args = ['-q', 'select foo; select bar;', '--ssl', '-t', '2000',
-              '--http_socket_timeout_s', '2', '-i', 'localhost:%d' % (test_port)]
+      args = ['-q', 'select 1', '--ssl', '-t', '1000',
+              '-i', 'localhost:%d' % (test_port)]
       run_impala_shell_cmd(vector, args, expect_success=False)
 
   def test_client_identifier(self, vector):
@@ -1409,34 +1402,27 @@ class TestImpalaShell(ImpalaTestSuite):
       rows_from_file = [line.rstrip() for line in f]
       assert rows_from_stdout == rows_from_file
 
+  @pytest.mark.execute_serially
   def test_http_socket_timeout(self, vector):
     """Test setting different http_socket_timeout_s values."""
     if (vector.get_value('strict_hs2_protocol')
         or vector.get_value('protocol') != 'hs2-http'):
         pytest.skip("http socket timeout not supported in strict hs2 mode."
                     " Only supported with hs2-http protocol.")
-    # Test http_socket_timeout_s=0, expect errors
-    args = ['--quiet', '-B', '--query', 'select 0;']
-    result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=0'],
+    # Test very short http_socket_timeout_s, expect errors. After the connection is
+    # established - which now uses connect_timeout_ms - RPCs in the minicluster appear to
+    # respond immediately, so non-blocking mode (timeout=0) does not result in an error.
+    # Instead, use a very small timeout that the RPC cannot meet.
+    args = ['--quiet', '-B', '--query', 'select 0']
+    result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=0.001'],
                                   expect_success=False)
 
-    # Outside the docker-based tests, Python 2 and Python 3 produce "Operating
-    # now in progress" with slightly different error classes. When running with
-    # docker-based tests, it results in a different error code and "Cannot
-    # assign requested address" for both Python 2 and Python 3.
-    # Tolerate all three of these variants.
-    error_template = (
-      "[Exception] type=<class '{0}'> in OpenSession. Num remaining tries: 3 "
-      "[Errno {1}] {2}")
-    expected_err_py2 = \
-        error_template.format("socket.error", 115, "Operation now in progress")
-    expected_err_py3 = \
-        error_template.format("BlockingIOError", 115, "Operation now in progress")
-    expected_err_docker = \
-        error_template.format("OSError", 99, "Cannot assign requested address")
+    # Python 2 throws socket.timeout and Python 3 throws TimeoutError.
+    error_template = "[Exception] type=<class '{0}'> in ExecuteStatement.  timed out"
+    pyver_exceptions = ["socket.timeout", "TimeoutError"]
     actual_err = result.stderr.splitlines()[0]
-    assert actual_err[TS_LEN:] in [expected_err_py2, expected_err_py3,
-                                   expected_err_docker]
+    assert actual_err[TS_LEN:] in [error_template.format(pever_exception)
+                                   for pever_exception in pyver_exceptions]
 
     # Test http_socket_timeout_s=-1, expect errors
     result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=-1'],

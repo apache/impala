@@ -415,21 +415,14 @@ class ImpalaClient(object):
     if not hasattr(ssl, "create_default_context"):
       print("Python version too old. SSLContext not supported.", file=sys.stderr)
       raise NotImplementedError()
-    # Current implementation of ImpalaHttpClient does a close() and open() of the
-    # underlying http connection on every flush() (THRIFT-4600). Due to this, setting a
-    # connect timeout does not achieve the desirable result as the subsequent open() could
-    # block similary in case of problematic remote end points.
-    # TODO: Investigate connection reuse in ImpalaHttpClient and revisit this.
-    if connect_timeout_ms > 0 and self.verbose:
-      print("Warning: --connect_timeout_ms is currently ignored with HTTP transport.",
-            file=sys.stderr)
 
-    # Notes on http socket timeout:
+    # Notes on http socket timeout
     # https://docs.python.org/3/library/socket.html#socket-timeouts
-    # Having a default timeout of 'None' (blocking mode) could result in hang like
-    # symptoms in case of a problematic remote endpoint. It's better to have a finite
-    # timeout so that in case of any connection errors, the client retries have a better
-    # chance of succeeding.
+    # We set connect_timeout_ms while establishing a connection to quickly detect problem
+    # servers, similar to other transports. After the connection is established, we set
+    # the http_socket_timeout_s (if provided) for the remainder of the session. Setting
+    # this can be more problematic because Impala HS2-HTTP can have long-running requests
+    # that may exceed a timeout, particularly during slow planning or large result sets.
     host_and_port = self._to_host_port(self.impalad_host, self.impalad_port)
     assert self.http_path
     # ImpalaHttpClient relies on the URI scheme (http vs https) to open an appropriate
@@ -444,12 +437,14 @@ class ImpalaClient(object):
       url = "https://{0}/{1}".format(host_and_port, self.http_path)
       transport = ImpalaHttpClient(url, ssl_context=ssl_ctx,
                                    http_cookie_names=self.http_cookie_names,
+                                   connect_timeout_ms=connect_timeout_ms,
                                    socket_timeout_s=self.http_socket_timeout_s,
                                    verbose=self.verbose,
                                    reuse_connection=self.reuse_http_connection)
     else:
       url = "http://{0}/{1}".format(host_and_port, self.http_path)
       transport = ImpalaHttpClient(url, http_cookie_names=self.http_cookie_names,
+                                   connect_timeout_ms=connect_timeout_ms,
                                    socket_timeout_s=self.http_socket_timeout_s,
                                    verbose=self.verbose,
                                    reuse_connection=self.reuse_http_connection)
