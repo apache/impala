@@ -193,26 +193,28 @@ if args.utility_context:
       os.path.join(IMPALA_HOME, "docker/utility_entrypoint.sh"), BIN_DIR)
 else:
   # Impala Coordinator dependencies.
+  impala_package_classpath_file = "java/impala-package/target/package-classpath.txt"
   num_jars_on_classpath = 0
-  dep_classpath = open(os.path.join(IMPALA_HOME, "fe/target/build-classpath.txt")).read()
+  num_frontend_jars = 0
+  num_calcite_jars = 0
+  dep_classpath = open(os.path.join(IMPALA_HOME, impala_package_classpath_file)).read()
   for jar in dep_classpath.split(":"):
     num_jars_on_classpath += 1
     assert os.path.exists(jar), "missing jar from classpath: {0}".format(jar)
+    if jar.find("calcite-planner") != -1:
+      assert jar.find("tests") == -1
+      num_calcite_jars += 1
+    if jar.find("impala-frontend") != -1:
+      assert jar.find("tests") == -1
+      num_frontend_jars += 1
     symlink_file_into_dir(jar, LIB_DIR)
 
   if num_jars_on_classpath == 0:
     raise Exception("No jars listed in {0}".format(os.path.join(IMPALA_HOME,
-        "fe/target/build-classpath.txt")))
+        impala_package_classpath_file)))
 
-  # Impala Coordinator jars.
-  num_frontend_jars = 0
-  for jar in glob.glob(os.path.join(IMPALA_HOME, "fe/target/impala-frontend-*.jar")):
-    # Ignore the tests jar
-    if jar.find("-tests") != -1:
-      continue
-    symlink_file_into_dir(jar, LIB_DIR)
-    num_frontend_jars += 1
-  # There must be exactly one impala-frontend jar.
+  # There must be exactly one jar for each of impala-frontend and calcite-planner
+  assert num_calcite_jars == 1
   assert num_frontend_jars == 1
 
   # Impala Executor dependencies.

@@ -18,9 +18,16 @@
 # Client tests for Query Event Hooks
 
 from __future__ import absolute_import, division, print_function
+import os
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+
+
+def add_frontend_test_jar_to_classpath():
+  """Put the impala-frontend-*-tests.jar on the classpath"""
+  os.environ["CUSTOM_CLASSPATH"] = os.path.join(os.getenv("IMPALA_HOME"), "fe",
+        "target", "impala-frontend-{0}-tests.jar".format(os.getenv("IMPALA_VERSION")))
 
 
 class TestHooks(CustomClusterTestSuite):
@@ -28,6 +35,13 @@ class TestHooks(CustomClusterTestSuite):
   Tests for FE QueryEventHook invocations.
   """
   DUMMY_HOOK = "org.apache.impala.testutil.DummyQueryEventHook"
+
+  @classmethod
+  def setup_class(cls):
+    super(TestHooks, cls).setup_class()
+    # This needs the impala-frontend-*-tests.jar on the classpath to make the test query
+    # hooks available.
+    add_frontend_test_jar_to_classpath()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -65,6 +79,9 @@ class TestHooksStartupFail(CustomClusterTestSuite):
     if cls.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
     super(TestHooksStartupFail, cls).setup_class()
+    # This needs the impala-frontend-*-tests.jar on the classpath to make the test query
+    # hooks available.
+    add_frontend_test_jar_to_classpath()
 
   FAILING_HOOK = "org.apache.impala.testutil.AlwaysErrorQueryEventHook"
   NONEXIST_HOOK = "captain.hook"
