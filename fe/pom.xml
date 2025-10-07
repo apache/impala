@@ -192,6 +192,11 @@ under the License.
           <groupId>org.apache.hive</groupId>
           <artifactId>*</artifactId>
         </exclusion>
+        <!-- Rely on unshaded jars we already include rather than client jars. -->
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-client-api</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
