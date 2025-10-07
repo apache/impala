@@ -449,6 +449,10 @@ struct TAlterTableExecuteRemoveOrphanFilesParams {
   1: required i64 older_than_millis
 }
 
+// Parameters for ALTER TABLE EXECUTE REPAIR_METADATA operations.
+struct TAlterTableExecuteRepairMetadataParams {
+}
+
 // Parameters for ALTER TABLE EXECUTE ... operations.
 struct TAlterTableExecuteParams {
   // Parameters for ALTER TABLE EXECUTE EXPIRE_SNAPSHOTS
@@ -459,6 +463,9 @@ struct TAlterTableExecuteParams {
 
   // Parameters for ALTER TABLE EXECUTE REMOVE_ORPHAN_FILES
   3: optional TAlterTableExecuteRemoveOrphanFilesParams remove_orphan_files_params
+
+  // True iff it is an ALTER TABLE EXECUTE REPAIR statement.
+  4: optional TAlterTableExecuteRepairMetadataParams repair_metadata_params
 }
 
 // Parameters for all ALTER TABLE commands.

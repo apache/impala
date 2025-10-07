@@ -1651,7 +1651,18 @@ public class CatalogOpExecutor {
           } else if (setExecuteParams.isSetRemove_orphan_files_params()) {
             throw new IllegalStateException(
                 "Alter table execute REMOVE_ORPHAN_FILES should not use "
-                + "Iceberg Transaction.");
+                    + "Iceberg Transaction.");
+          } else if (setExecuteParams.isSetRepair_metadata_params()) {
+            int numRemovedReferences =
+                IcebergCatalogOpExecutor.alterTableExecuteRepair(tbl, iceTxn);
+            // Do not commit empty transaction if there were no missing files to remove.
+            if (numRemovedReferences == 0) {
+              addSummary(response, "No missing data files detected.");
+              catalogTimeline.markEvent("Abandoned empty Iceberg transaction");
+              return false;
+            }
+            addSummary(response, "Iceberg table repaired by deleting "
+                + numRemovedReferences + " manifest entries of missing data files.");
           } else {
             // Cannot happen, but throw just in case.
             throw new IllegalStateException(

@@ -2254,6 +2254,46 @@ class TestIcebergV2Table(IcebergTestSuite):
             tbl_name, second_snapshot.get_snapshot_id()))
     assert "partitions=2/unknown" in selective_time_travel_data.runtime_profile
 
+  def test_table_repair(self, unique_database):
+    tbl_name = 'tbl_with_removed_files'
+    db_tbl = unique_database + "." + tbl_name
+    repair_query = "alter table {0} execute repair_metadata()"
+    with self.create_impala_client() as impalad_client:
+      impalad_client.execute(
+          "create table {0} (i int) stored as iceberg tblproperties('format-version'='2')"
+          .format(db_tbl))
+      insert_q = "insert into {0} values ({1})"
+      self.execute_query_expect_success(impalad_client, insert_q.format(db_tbl, 1))
+      self.execute_query_expect_success(impalad_client, insert_q.format(db_tbl, 2))
+      self.execute_query_expect_success(impalad_client, insert_q.format(db_tbl, 3))
+      self.execute_query_expect_success(impalad_client, insert_q.format(db_tbl, 4))
+      self.execute_query_expect_success(impalad_client, insert_q.format(db_tbl, 5))
+      result = impalad_client.execute('select i from {0} order by i'.format(db_tbl))
+      assert result.data == ['1', '2', '3', '4', '5']
+
+      TABLE_PATH = '{0}/{1}.db/{2}'.format(WAREHOUSE, unique_database, tbl_name)
+      DATA_PATH = os.path.join(TABLE_PATH, "data")
+
+      # Check that table remains intact if there are no missing files
+      result = self.execute_query_expect_success(
+          impalad_client, repair_query.format(db_tbl))
+      assert result.data[0] == "No missing data files detected."
+      result = impalad_client.execute('select i from {0} order by i'.format(db_tbl))
+      assert result.data == ['1', '2', '3', '4', '5']
+
+      # Delete 2 data files from the file system directly to corrupt the table.
+      data_files = self.filesystem_client.ls(DATA_PATH)
+      self.filesystem_client.delete_file_dir(DATA_PATH + "/" + data_files[0])
+      self.filesystem_client.delete_file_dir(DATA_PATH + "/" + data_files[1])
+      self.execute_query_expect_success(impalad_client, "invalidate metadata")
+      result = self.execute_query_expect_success(
+          impalad_client, repair_query.format(db_tbl))
+      assert result.data[0] == \
+          "Iceberg table repaired by deleting 2 manifest entries of missing data files."
+      result = impalad_client.execute('select * from {0} order by i'.format(db_tbl))
+      assert len(result.data) == 3
+
+
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
 # of the test coverage is in TestIcebergV2Table.test_read_position_deletes but since it
 # runs also with the V2 optimizations setting turned off, some tests were moved here.

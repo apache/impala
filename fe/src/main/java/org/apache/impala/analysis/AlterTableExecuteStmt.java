@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.common.AnalysisException;
 
 /**
@@ -70,12 +69,15 @@ public class AlterTableExecuteStmt extends AlterTableStmt {
       case "ROLLBACK": return new AlterTableExecuteRollbackStmt(tableName, fnCallExpr);
       case "REMOVE_ORPHAN_FILES":
         return new AlterTableExecuteRemoveOrphanFilesStmt(tableName, fnCallExpr);
+      case "REPAIR_METADATA":
+        return new AlterTableExecuteRepairMetadataStmt(tableName, fnCallExpr);
       default:
         throw new AnalysisException(String.format("'%s' is not supported by ALTER "
                 + "TABLE <table> EXECUTE. Supported operations are: "
                 + "EXPIRE_SNAPSHOTS(<expression>), "
                 + "ROLLBACK(<expression>), "
-                + "REMOVE_ORPHAN_FILES(<expression>).",
+                + "REMOVE_ORPHAN_FILES(<expression>)."
+                + "REPAIR_METADATA(), ",
             functionNameOrig));
     }
   }
@@ -84,14 +86,26 @@ public class AlterTableExecuteStmt extends AlterTableStmt {
       throws AnalysisException {
     // fnCallExpr_ analyzed here manually, because it is not an actual function but a
     // catalog operation.
-    String fnName = fnCallExpr_.getFnName().toString();
-    Preconditions.checkState(StringUtils.equalsAnyIgnoreCase(
-        fnName, "EXPIRE_SNAPSHOTS", "ROLLBACK", "REMOVE_ORPHAN_FILES"));
-    if (fnCallExpr_.getParams().size() != 1) {
-      throw new AnalysisException(
-          usage + " must have one parameter: " + fnCallExpr_.toSql());
+    String fnName = fnCallExpr_.getFnName().toString().toUpperCase();
+    switch (fnName) {
+      case "EXPIRE_SNAPSHOTS":
+      case "ROLLBACK":
+      case "REMOVE_ORPHAN_FILES":
+        if (fnCallExpr_.getParams().size() != 1) {
+          throw new AnalysisException(
+              usage + " must have one parameter: " + fnCallExpr_.toSql());
+        }
+        fnParamValue_ = fnCallExpr_.getParams().exprs().get(0);
+        break;
+      case "REPAIR_METADATA":
+        if (fnCallExpr_.getParams().size() != 0) {
+          throw new AnalysisException(
+              usage + " should have no parameter: " + fnCallExpr_.toSql());
+        }
+        break;
+      default:
+        Preconditions.checkState(false, "Invalid function call in ALTER TABLE EXECUTE.");
     }
-    fnParamValue_ = fnCallExpr_.getParams().exprs().get(0);
   }
 
 }

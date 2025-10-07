@@ -4883,6 +4883,22 @@ public class AnalyzeDDLTest extends FrontendTestBase {
             + "'1111' cannot be converted to a TIMESTAMP");
   }
 
+  @Test
+  public void TestAlterExecuteRepairMetadata() {
+    AnalyzesOk("alter table functional_parquet.iceberg_partitioned execute "
+        + "repair_metadata();");
+
+    // Negative tests
+    AnalysisError("alter table nodb.alltypes execute repair_metadata();",
+        "Could not resolve table reference: 'nodb.alltypes'");
+    AnalysisError("alter table functional.alltypes execute repair_metadata();",
+        "ALTER TABLE EXECUTE REPAIR_METADATA is only supported for Iceberg tables: "
+            + "functional.alltypes");
+    AnalysisError("alter table functional_parquet.iceberg_partitioned execute "
+            + "repair_metadata('2024-02-11 10:00:00');",
+        "EXECUTE REPAIR_METADATA() should have no parameter");
+  }
+
   private static String buildLongOwnerName() {
     StringBuilder comment = new StringBuilder();
     for (int i = 0; i < MetaStoreUtil.MAX_OWNER_LENGTH + 5; i++) {

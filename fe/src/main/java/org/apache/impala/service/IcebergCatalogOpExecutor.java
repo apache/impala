@@ -60,6 +60,7 @@ import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
 import org.apache.impala.catalog.iceberg.ImpalaIcebergDeleteOrphanFiles;
+import org.apache.impala.catalog.iceberg.ImpalaRepairIcebergTable;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.fb.FbIcebergColumnStats;
 import org.apache.impala.fb.FbIcebergDataFile;
@@ -266,6 +267,16 @@ public class IcebergCatalogOpExecutor {
             .executeDeleteWith(executors);
     deleteOrphan.execute();
     return "Remove orphan files executed.";
+  }
+
+  /**
+   * Executes an ALTER TABLE EXECUTE REPAIR_METADATA.
+   * @return The number of removed missing data files.
+   */
+  public static int alterTableExecuteRepair(FeIcebergTable tbl, Transaction iceTxn)
+      throws CatalogException {
+    ImpalaRepairIcebergTable repair = new ImpalaRepairIcebergTable(tbl);
+    return repair.execute(iceTxn);
   }
 
   /**
