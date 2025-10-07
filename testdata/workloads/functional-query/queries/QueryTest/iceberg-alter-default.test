@@ -323,6 +323,7 @@ TBLPROPERTIES (
 );
 DESCRIBE FORMATTED iceberg_changing_parq_tblprops;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','write.format.default','parquet             '
 '','write.parquet.row-group-size-bytes','134217728           '
 '','write.parquet.compression-codec','zstd                '
@@ -342,6 +343,7 @@ ALTER TABLE iceberg_changing_parq_tblprops set TBLPROPERTIES(
 );
 DESCRIBE FORMATTED iceberg_changing_parq_tblprops;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','write.format.default','parquet             '
 '','write.parquet.row-group-size-bytes','268435456           '
 '','write.parquet.compression-codec','snappy              '

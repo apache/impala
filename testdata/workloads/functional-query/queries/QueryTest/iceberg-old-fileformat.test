@@ -17,6 +17,7 @@ DESCRIBE FORMATTED iceberg_partitioned_orc_external_old_fileformat;
 '','iceberg.table_identifier','functional_parquet.iceberg_partitioned_orc'
 '','iceberg.file_format','orc                 '
 '','iceberg.catalog     ','hadoop.catalog      '
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 ---- RESULTS: VERIFY_IS_NOT_IN
 '','write.format.default','orc                 '
 ---- TYPES

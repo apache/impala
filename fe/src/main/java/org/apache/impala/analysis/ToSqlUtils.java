@@ -189,10 +189,10 @@ public class ToSqlUtils {
       commonProps.remove(KuduTable.KEY_TABLE_ID);
     } else if (table instanceof FeIcebergTable) {
       FeIcebergTable feIcebergTable = (FeIcebergTable) table;
-      if (feIcebergTable.getFormatVersion() == IcebergTable.ICEBERG_FORMAT_V1) {
-        commonProps.put(TableProperties.FORMAT_VERSION,
-                String.valueOf(IcebergTable.ICEBERG_FORMAT_V1));
-      }
+      // Add "format-version" property if it's not already present.
+      commonProps.putIfAbsent(IcebergTable.FORMAT_VERSION,
+          Integer.toString(feIcebergTable.getFormatVersion()));
+
       // Hide Iceberg internal metadata properties
       removeHiddenIcebergTableProperties(commonProps);
     } else if (table instanceof FePaimonTable) {

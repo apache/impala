@@ -164,6 +164,9 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Internal Iceberg table property that specifies the UUID of the table.
   public static final String UUID = "uuid";
 
+  // Internal Iceberg table property that specifies the table format version.
+  public static final String FORMAT_VERSION = "format-version";
+
   // Parquet compression codec and compression level table properties.
   public static final String PARQUET_COMPRESSION_CODEC =
       "write.parquet.compression-codec";

@@ -90,6 +90,7 @@ aggregation(SUM, NumRowGroups): 0
 describe formatted parquet_partitioned;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/parquet_partitioned','NULL'
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','iceberg.catalog     ','hadoop.tables       '
 '','external.table.purge','true                '
 '','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
@@ -177,6 +178,7 @@ describe formatted parquet_nopartitioned;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/parquet_nopartitioned','NULL'
 row_regex: '','metadata_location   ','$NAMENODE/test-warehouse/$DATABASE.db/parquet_nopartitioned/metadata/.*.metadata.json'
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','external.table.purge','true                '
 '','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
 '','write.format.default','parquet             '
@@ -237,6 +239,7 @@ describe formatted decimal_tbl;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/decimal_tbl','NULL'
 row_regex: '','metadata_location   ','$NAMENODE/test-warehouse/$DATABASE.db/decimal_tbl/metadata/.*.metadata.json'
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','external.table.purge','true                '
 '','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
 '','write.format.default','parquet             '
@@ -281,6 +284,7 @@ describe formatted table_at_random_location;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/random_location','NULL'
 row_regex: '','metadata_location   ','$NAMENODE/test-warehouse/$DATABASE.db/random_location/metadata/.*.metadata.json'
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','external.table.purge','true                '
 '','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
 '','write.format.default','parquet             '

@@ -46,7 +46,8 @@ from tests.common.base_test_suite import BaseTestSuite
 from tests.common.environ import (
     HIVE_MAJOR_VERSION,
     MANAGED_WAREHOUSE_DIR,
-    EXTERNAL_WAREHOUSE_DIR)
+    EXTERNAL_WAREHOUSE_DIR,
+    ICEBERG_DEFAULT_FORMAT_VERSION)
 from tests.common.errors import Timeout
 from tests.common.impala_connection import create_connection
 from tests.common.impala_service import ImpaladService
@@ -672,7 +673,8 @@ class ImpalaTestSuite(BaseTestSuite):
         "INTERNAL_LISTEN_HOST",
         "INTERNAL_LISTEN_IP",
         "MANAGED_WAREHOUSE_DIR",
-        "EXTERNAL_WAREHOUSE_DIR"])
+        "EXTERNAL_WAREHOUSE_DIR",
+        "ICEBERG_DEFAULT_FORMAT_VERSION"])
     repl.update({
         '$ERASURECODE_POLICY': os.getenv("ERASURECODE_POLICY", "NONE"),
         '$SECONDARY_FILESYSTEM': os.getenv("SECONDARY_FILESYSTEM", ""),
@@ -740,7 +742,9 @@ class ImpalaTestSuite(BaseTestSuite):
                                      .replace('$MANAGED_WAREHOUSE_DIR',
                                               MANAGED_WAREHOUSE_DIR) \
                                      .replace('$EXTERNAL_WAREHOUSE_DIR',
-                                              EXTERNAL_WAREHOUSE_DIR)
+                                              EXTERNAL_WAREHOUSE_DIR) \
+                                     .replace('$ICEBERG_DEFAULT_FORMAT_VERSION',
+                                              ICEBERG_DEFAULT_FORMAT_VERSION)
         if use_db:
           test_section[section_name] = test_section[section_name].replace(
               '$DATABASE', use_db)

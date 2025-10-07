@@ -30,6 +30,7 @@ import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.IcebergColumn;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
@@ -236,8 +237,13 @@ public class DescribeResultFactory {
     sb.append(MetastoreShim.getAllColumnsInformation(msTable.getSd().getCols(),
         msTable.getPartitionKeys(), true, false, true));
     if (table instanceof FeIcebergTable) {
+      FeIcebergTable feIcebergTable = (FeIcebergTable) table;
       sb.append(MetastoreShim.getPartitionTransformInformation(
-          FeIcebergTable.Utils.getPartitionTransformKeys((FeIcebergTable) table)));
+          FeIcebergTable.Utils.getPartitionTransformKeys(feIcebergTable)));
+
+      // msTable is a deep copy hence we can add the "format-version" parameter to it
+      msTable.getParameters().putIfAbsent(IcebergTable.FORMAT_VERSION,
+          Integer.toString(feIcebergTable.getFormatVersion()));
     }
     // Add the extended table metadata information.
     sb.append(MetastoreShim.getTableInformation(msTable));

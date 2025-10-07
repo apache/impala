@@ -24,7 +24,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf, SkipIfFS, SkipIfHive2
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.test_file_parser import QueryTestSectionReader, remove_comments
-from tests.common.environ import HIVE_MAJOR_VERSION
+from tests.common.environ import HIVE_MAJOR_VERSION, ICEBERG_DEFAULT_FORMAT_VERSION
 from tests.util.filesystem_utils import WAREHOUSE
 
 
@@ -139,7 +139,7 @@ class TestShowCreateTable(ImpalaTestSuite):
 
       if not test_case.existing_table:
         # create table in Impala
-        self.__exec(self.__replace_warehouse(test_case.create_table_sql))
+        self.__exec(self.__replace_variables(test_case.create_table_sql))
       # execute "SHOW CREATE TABLE ..."
       result = self.__exec(test_case.show_create_table_sql)
       create_table_result = self.__normalize(result.data[0])
@@ -149,7 +149,7 @@ class TestShowCreateTable(ImpalaTestSuite):
         self.__exec(test_case.drop_table_sql)
 
       # check the result matches the expected result
-      expected_result = self.__normalize(self.__replace_warehouse(self.__replace_uri(
+      expected_result = self.__normalize(self.__replace_variables(self.__replace_uri(
           test_case.expected_result,
           self.__get_location_uri(create_table_result))))
       self.__compare_result(expected_result, create_table_result)
@@ -176,7 +176,7 @@ class TestShowCreateTable(ImpalaTestSuite):
       test_case = ShowCreateTableTestCase(test_section, test_file_name, unique_db_name)
       if not test_case.existing_table:
         # create table in Impala (support multiple setup statements)
-        setup_sql = self.__replace_warehouse(test_case.create_table_sql)
+        setup_sql = self.__replace_variables(test_case.create_table_sql)
         for stmt in re.split(r";\s*", setup_sql.strip()):
           if not stmt:
             continue
@@ -212,7 +212,7 @@ class TestShowCreateTable(ImpalaTestSuite):
         self.__exec(test_case.drop_table_sql)
 
       # Build expected statements list and compare per-statement
-      expected_sql = self.__replace_warehouse(self.__replace_uri(
+      expected_sql = self.__replace_variables(self.__replace_uri(
           test_case.expected_result,
           self.__get_location_uri(location_source)
       ))
@@ -328,18 +328,18 @@ class TestShowCreateTable(ImpalaTestSuite):
     """
     s = ' '.join(s.split())
     for k in self.FILTER_TBL_PROPERTIES:
-      kv_regex = "'%s'\s*=\s*'[^\']+'\s*,?" % (k)
+      kv_regex = r"'%s'\s*=\s*'[^\']+'\s*,?" % (k)
       s = re.sub(kv_regex, "", s)
     # If we removed the last property, there will be a dangling comma that is not valid
     # e.g. 'k1'='v1', ) -> 'k1'='v1')
-    s = re.sub(",\s*\)", ")", s)
+    s = re.sub(r",\s*\)", ")", s)
     # Need to remove any whitespace after left parens and before right parens
-    s = re.sub("\(\s+", "(", s)
-    s = re.sub("\s+\)", ")", s)
+    s = re.sub(r"\(\s+", "(", s)
+    s = re.sub(r"\s+\)", ")", s)
     # If the only properties were removed, the properties sections may be empty, which
     # is not valid
-    s = re.sub("TBLPROPERTIES\s*\(\s*\)", "", s)
-    s = re.sub("SERDEPROPERTIES\s*\(\s*\)", "", s)
+    s = re.sub(r"TBLPROPERTIES\s*\(\s*\)", "", s)
+    s = re.sub(r"SERDEPROPERTIES\s*\(\s*\)", "", s)
     # By removing properties in the middle we might ended up having extra whitespaces,
     # let's remove them.
     s = ' '.join(s.split())
@@ -357,8 +357,9 @@ class TestShowCreateTable(ImpalaTestSuite):
   def __replace_uri(self, s, uri):
     return s if uri is None else s.replace("$$location_uri$$", uri)
 
-  def __replace_warehouse(self, s):
-    return s.replace("$$warehouse$$", WAREHOUSE)
+  def __replace_variables(self, s):
+    return s.replace("$$warehouse$$", WAREHOUSE)\
+      .replace("$$iceberg_default_format_version$$", ICEBERG_DEFAULT_FORMAT_VERSION)
 
 
 # Represents one show-create-table test case. Performs validation of the test sections

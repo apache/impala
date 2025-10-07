@@ -30,6 +30,7 @@ alter table ice_hive_ext set tblproperties ('external.table.purge'='true');
 insert into ice_hive_ext values (6,6);
 describe formatted ice_hive_ext
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','external.table.purge','true                '
 ---- TYPES
 STRING,STRING,STRING
@@ -65,6 +66,7 @@ alter table ice_hadoop_tables_ext set tblproperties ('external.table.purge'='tru
 insert into ice_hadoop_tables_ext values (6,6);
 describe formatted ice_hadoop_tables_ext
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','external.table.purge','true                '
 ---- TYPES
 STRING,STRING,STRING

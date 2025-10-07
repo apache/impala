@@ -77,6 +77,24 @@ else:
   MANAGED_WAREHOUSE_DIR = 'test-warehouse'
 EXTERNAL_WAREHOUSE_DIR = 'test-warehouse'
 
+# Set Iceberg's default format version based on version, if <1.4 it's 1, if >=1.4 then 2
+impala_iceberg_version = os.environ.get("IMPALA_ICEBERG_VERSION")
+
+ICEBERG_DEFAULT_FORMAT_VERSION = '1'
+if impala_iceberg_version:
+  # Extract the major and minor version numbers
+  version_parts = impala_iceberg_version.split('.')
+  if len(version_parts) >= 2:
+    try:
+      major = int(version_parts[0])
+      minor = int(version_parts[1])
+      # If version is 1.4 or higher, use format version 2
+      if major > 1 or (major == 1 and minor >= 4):
+        ICEBERG_DEFAULT_FORMAT_VERSION = '2'
+    except ValueError:
+      # If we can't parse the version, default to format version 1
+      pass
+
 IS_APACHE_HIVE = os.environ.get("USE_APACHE_HIVE", False) == 'true'
 
 # Resolve any symlinks in the path.

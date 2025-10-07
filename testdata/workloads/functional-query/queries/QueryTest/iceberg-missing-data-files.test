@@ -72,6 +72,7 @@ describe formatted missing_files_part
 '','default-partition-spec','{\\"spec-id\\":0,\\"fields\\":[{\\"name\\":\\"p\\",\\"transform\\":\\"identity\\",\\"source-id\\":2,\\"field-id\\":1000}]}'
 '','engine.hive.enabled ','true                '
 '','external.table.purge','TRUE                '
+'','format-version      ','2                   '
 '','numFiles            ','2                   '
 '','numRows             ','2                   '
 '','snapshot-count      ','2                   '

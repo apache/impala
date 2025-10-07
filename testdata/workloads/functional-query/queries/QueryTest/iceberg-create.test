@@ -217,6 +217,7 @@ string
 DESCRIBE FORMATTED iceberg_hadoop_cat_query;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/$DATABASE/iceberg_hadoop_cat_query','NULL'
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
@@ -234,6 +235,7 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
 DESCRIBE FORMATTED iceberg_hadoop_cat_with_ident;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/org/db/tbl','NULL'
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
@@ -256,6 +258,7 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
 DESCRIBE FORMATTED iceberg_hadoop_cat_with_ident_ext;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/org/db/tbl','NULL'
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','iceberg.catalog_location','$WAREHOUSE_LOCATION_PREFIX/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
@@ -366,6 +369,7 @@ STRING,STRING,STRING,STRING
 DESCRIBE FORMATTED iceberg_part_hive_cat;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/iceberg_part_hive_cat','NULL'
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 row_regex:'','metadata_location   ','$NAMENODE/test-warehouse/$DATABASE.db/iceberg_part_hive_cat/metadata/.*.metadata.json'
 '','table_type          ','ICEBERG             '
 '','iceberg.catalog     ','hive.catalog        '
@@ -568,6 +572,7 @@ create table iceberg_stored_by (i int, s string, ts timestamp, d date) stored by
 ---- QUERY
 describe formatted iceberg_stored_by;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','table_type          ','ICEBERG             '
 ---- TYPES
 string, string, string
@@ -580,6 +585,7 @@ create table ice_tbl (i int) stored as iceberg tblproperties('external.table.pur
 ---- QUERY
 describe formatted ice_tbl;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','external.table.purge','FALSE               '
 ---- TYPES
 string, string, string
@@ -595,6 +601,7 @@ create table ice_hive_cat_tbl (i int) stored as iceberg tblproperties(
 ---- QUERY
 describe formatted ice_hive_cat_tbl;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','external.table.purge','FALSE               '
 ---- TYPES
 string, string, string
@@ -612,6 +619,7 @@ The table property 'external.table.purge' will be set to 'TRUE' on newly created
 ---- QUERY
 describe formatted ice_hadoop_tbl;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 '','external.table.purge','TRUE                '
 ---- TYPES
 string, string, string
@@ -623,6 +631,7 @@ create table ice_tbl_with_pk
     stored as iceberg;
 describe formatted ice_tbl_with_pk;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 row_regex:'','current-schema.*','.*identifier-field-ids\\\\":\[1,3\].*'
 ---- TYPES
 string, string, string
@@ -635,6 +644,7 @@ create table ice_tbl_with_pk_partitioned
     stored as iceberg;
 describe formatted ice_tbl_with_pk_partitioned;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 row_regex:'','current-schema.*','.*identifier-field-ids\\\\":\[1,2\].*'
 ---- TYPES
 string, string, string
@@ -647,6 +657,7 @@ create table ice_tbl_with_pk_partition_transform
     stored as iceberg;
 describe formatted ice_tbl_with_pk_partition_transform;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 row_regex:'','current-schema.*','.*identifier-field-ids\\\\":\[2,3\].*'
 ---- TYPES
 string, string, string
@@ -659,6 +670,7 @@ create table ctas_pk_in_source_not_used
   as select * from ice_tbl_with_pk;
 describe formatted ctas_pk_in_source_not_used;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 row_regex:'.*','current-schema.*','.*'
 ---- RESULTS: VERIFY_IS_NOT_IN
 row_regex:'.*','current-schema.*','.*identifier-field-ids.*'
@@ -673,6 +685,7 @@ create table ctas_pk_unpartitioned
   as select * from ice_tbl_with_pk;
 describe formatted ctas_pk_unpartitioned;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 row_regex:'.*','current-schema.*','.*identifier-field-ids\\\\":\[3\].*'
 ---- TYPES
 STRING,STRING,STRING
@@ -686,6 +699,7 @@ create table ctas_pk_partitioned
   as select * from ice_tbl_with_pk;
 describe formatted ctas_pk_partitioned;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 row_regex:'.*','current-schema.*','.*identifier-field-ids\\\\":\[2,3\].*'
 ---- TYPES
 STRING,STRING,STRING
@@ -695,6 +709,7 @@ STRING,STRING,STRING
 create table ice_like_pk like ice_tbl_with_pk_partitioned;
 describe formatted ice_like_pk;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 row_regex:'.*','current-schema.*','.*identifier-field-ids\\\\":\[1,2\].*'
 ---- TYPES
 STRING,STRING,STRING

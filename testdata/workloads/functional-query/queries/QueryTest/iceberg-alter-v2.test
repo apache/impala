@@ -325,6 +325,7 @@ TBLPROPERTIES (
 );
 DESCRIBE FORMATTED iceberg_changing_parq_tblprops;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','2                   '
 '','write.format.default','parquet             '
 '','write.parquet.row-group-size-bytes','134217728           '
 '','write.parquet.compression-codec','zstd                '
@@ -344,6 +345,7 @@ ALTER TABLE iceberg_changing_parq_tblprops set TBLPROPERTIES(
 );
 DESCRIBE FORMATTED iceberg_changing_parq_tblprops;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','2                   '
 '','write.format.default','parquet             '
 '','write.parquet.row-group-size-bytes','268435456           '
 '','write.parquet.compression-codec','snappy              '
@@ -379,6 +381,7 @@ string, string, string
 ALTER TABLE iceberg_upgrade_v2_no_write_mode SET TBLPROPERTIES('format-version'='2');
 DESCRIBE FORMATTED iceberg_upgrade_v2_no_write_mode;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','2                   '
 '','write.delete.mode   ','merge-on-read       '
 '','write.update.mode   ','merge-on-read       '
 '','write.merge.mode    ','merge-on-read       '
@@ -392,6 +395,7 @@ ALTER TABLE iceberg_upgrade_v2_delete_mode
 SET TBLPROPERTIES('format-version'='2', 'write.delete.mode'='copy-on-write');
 DESCRIBE FORMATTED iceberg_upgrade_v2_delete_mode;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','2                   '
 '','write.delete.mode   ','copy-on-write       '
 ---- TYPES
 string, string, string
@@ -411,6 +415,7 @@ ALTER TABLE iceberg_upgrade_v2_update_mode
 SET TBLPROPERTIES('format-version'='2', 'write.update.mode'='copy-on-write');
 DESCRIBE FORMATTED iceberg_upgrade_v2_update_mode;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','2                   '
 '','write.update.mode   ','copy-on-write       '
 ---- TYPES
 string, string, string
@@ -430,6 +435,7 @@ ALTER TABLE iceberg_upgrade_v2_merge_mode
 SET TBLPROPERTIES('format-version'='2', 'write.merge.mode'='merge-on-read');
 DESCRIBE FORMATTED iceberg_upgrade_v2_merge_mode;
 ---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','2                   '
 '','write.merge.mode    ','merge-on-read       '
 ---- TYPES
 string, string, string

@@ -14,6 +14,7 @@ DESCRIBE FORMATTED iceberg_hadoop_catalogs;
 'Location:           ','$NAMENODE/test-warehouse/ice_hadoop_cat/$DATABASE/iceberg_hadoop_catalogs','NULL'
 '','write.format.default','parquet             '
 '','iceberg.catalog     ','ice_hadoop_cat      '
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 ---- TYPES
 string, string, string
 ====
@@ -33,6 +34,7 @@ DESCRIBE FORMATTED iceberg_hadoop_catalogs_with_id;
 '','iceberg.catalog     ','ice_hadoop_cat      '
 '','iceberg.table_identifier','org.$DATABASE.tbl'
 '','name                ','org.$DATABASE.tbl'
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 ---- TYPES
 string, string, string
 ====
@@ -67,6 +69,7 @@ DESCRIBE FORMATTED iceberg_hadoop_cat_with_id_ext;
 '','iceberg.catalog     ','ice_hadoop_cat      '
 '','iceberg.table_identifier','org.$DATABASE.tbl'
 '','name                ','org.$DATABASE.tbl'
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 ---- TYPES
 string, string, string
 ====
@@ -104,6 +107,7 @@ DESCRIBE FORMATTED iceberg_hive_catalogs;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/iceberg_hive_catalogs','NULL'
 '','write.format.default','parquet             '
+'','format-version      ','$ICEBERG_DEFAULT_FORMAT_VERSION                   '
 ---- TYPES
 string, string, string
 ====
