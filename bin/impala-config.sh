@@ -1003,7 +1003,9 @@ fi
 # Reduce the concurrency for local tests to half the number of cores in the system.
 export NUM_CONCURRENT_TESTS="${NUM_CONCURRENT_TESTS-$((CORES / 2))}"
 
-export KUDU_MASTER_HOSTS="${KUDU_MASTER_HOSTS:-${INTERNAL_LISTEN_HOST}}"
+# IMPALA-14476: Temporarily fix KUDU_MASTER_HOSTS to ipv4 address
+# export KUDU_MASTER_HOSTS="${KUDU_MASTER_HOSTS:-${INTERNAL_LISTEN_HOST}}"
+export KUDU_MASTER_HOSTS="${KUDU_MASTER_HOSTS:-127.0.0.1}"
 export KUDU_MASTER_PORT="${KUDU_MASTER_PORT:-7051}"
 export KUDU_MASTER_WEBUI_PORT="${KUDU_MASTER_WEBUI_PORT:-8051}"
 
