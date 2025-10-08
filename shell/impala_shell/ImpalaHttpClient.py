@@ -23,9 +23,7 @@ import datetime
 from io import BytesIO
 import os
 import os.path
-import ssl
 import sys
-import warnings
 
 import six
 from six.moves import http_client, urllib
@@ -55,51 +53,29 @@ class ImpalaHttpClient(TTransportBase):
   # value was chosen to match curl's behavior. See Section 8.2.3 of RFC2616.
   MIN_REQUEST_SIZE_FOR_EXPECT = 1024
 
-  def __init__(self, uri_or_host, port=None, path=None, cafile=None, cert_file=None,
-      key_file=None, ssl_context=None, http_cookie_names=None, socket_timeout_s=None,
-      verbose=False):
-    """ImpalaHttpClient supports two different types of construction:
+  def __init__(self, uri_or_host, ssl_context=None, http_cookie_names=None,
+               socket_timeout_s=None, verbose=False):
+    """To properly authenticate against an HTTPS server, provide an ssl_context created
+    with ssl.create_default_context() to validate the server certificate.
 
-    ImpalaHttpClient(host, port, path) - deprecated
-    ImpalaHttpClient(uri, [port=<n>, path=<s>, cafile=<filename>, cert_file=<filename>,
-        key_file=<filename>, ssl_context=<context>], http_cookie_names=<cookienamelist>])
-
-    Only the second supports https.  To properly authenticate against the server,
-    provide the client's identity by specifying cert_file and key_file.  To properly
-    authenticate the server, specify either cafile or ssl_context with a CA defined.
-    NOTE: if both cafile and ssl_context are defined, ssl_context will override cafile.
     http_cookie_names is used to specify a comma-separated list of possible cookie names
     used for cookie-based authentication or session management. If a cookie with one of
     these names is returned in an http response by the server or an intermediate proxy
     then it will be included in each subsequent request for the same connection. If it
     is set as wildcards, all cookies in an http response will be preserved.
     """
-    if port is not None:
-      warnings.warn(
-          "Please use the ImpalaHttpClient('http{s}://host:port/path') constructor",
-          DeprecationWarning,
-          stacklevel=2)
-      self.host = uri_or_host
-      self.port = port
-      assert path
-      self.path = path
-      self.scheme = 'http'
-    else:
-      parsed = urllib.parse.urlparse(uri_or_host)
-      self.scheme = parsed.scheme
-      assert self.scheme in ('http', 'https')
-      if self.scheme == 'http':
-        self.port = parsed.port or http_client.HTTP_PORT
-      elif self.scheme == 'https':
-        self.port = parsed.port or http_client.HTTPS_PORT
-        self.certfile = cert_file
-        self.keyfile = key_file
-        self.context = ssl.create_default_context(cafile=cafile) \
-            if (cafile and not ssl_context) else ssl_context
-      self.host = parsed.hostname
-      self.path = parsed.path
-      if parsed.query:
-        self.path += '?%s' % parsed.query
+    parsed = urllib.parse.urlparse(uri_or_host)
+    self.scheme = parsed.scheme
+    assert self.scheme in ('http', 'https')
+    if self.scheme == 'http':
+      self.port = parsed.port or http_client.HTTP_PORT
+    elif self.scheme == 'https':
+      self.port = parsed.port or http_client.HTTPS_PORT
+      self.context = ssl_context
+    self.host = parsed.hostname
+    self.path = parsed.path
+    if parsed.query:
+      self.path += '?%s' % parsed.query
     try:
       proxy = urllib.request.getproxies()[self.scheme]
     except KeyError:
@@ -166,8 +142,6 @@ class ImpalaHttpClient(TTransportBase):
                                                timeout=self.__timeout)
     elif self.scheme == 'https':
       self.__http = http_client.HTTPSConnection(self.host, self.port,
-                                                key_file=self.keyfile,
-                                                cert_file=self.certfile,
                                                 timeout=self.__timeout,
                                                 context=self.context)
     if self.using_proxy():

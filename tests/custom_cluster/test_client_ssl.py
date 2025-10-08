@@ -40,6 +40,10 @@ from tests.shell.util import run_impala_shell_cmd, run_impala_shell_cmd_no_expec
 
 CERT_DIR = "%s/be/src/testutil" % os.environ['IMPALA_HOME']
 
+# Due to THRIFT-792, SSL errors are suppressed when using OpenSSL hostname verification.
+# This is the only option on Python 3.12+, using ssl.PROTOCOL_TLS_CLIENT.
+CERT_ERR = ["doesn't match", "certificate verify failed", "Could not connect"]
+
 
 class TestClientSsl(CustomClusterTestSuite):
   """Tests for a client using SSL (particularly, the Impala Shell) """
@@ -85,7 +89,7 @@ class TestClientSsl(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args=SSL_ARGS, statestored_args=SSL_ARGS,
                                     catalogd_args=SSL_ARGS)
   def test_ssl(self, vector):
-    self._verify_negative_cases(vector)
+    self._verify_negative_cases(vector, "%s/server-cert.pem" % CERT_DIR)
     # TODO: This is really two different tests, but the custom cluster takes too long to
     # start. Make it so that custom clusters can be specified across test suites.
     self._validate_positive_cases(vector, "%s/server-cert.pem" % CERT_DIR)
@@ -170,7 +174,7 @@ class TestClientSsl(CustomClusterTestSuite):
                                     catalogd_args=TLS_ECDH_ARGS)
   @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
   def test_tls_ecdh(self, vector):
-    self._verify_negative_cases(vector)
+    self._verify_negative_cases(vector, "%s/server-cert.pem" % CERT_DIR)
     self._validate_positive_cases(vector, "%s/server-cert.pem" % CERT_DIR)
     self._verify_ssl_webserver()
 
@@ -199,7 +203,8 @@ class TestClientSsl(CustomClusterTestSuite):
     """ Test for IMPALA-3159: Test with a certificate which has a wildcard for the
     CommonName.
     """
-    self._verify_negative_cases(vector, host="ip4.impala.test")
+    self._verify_negative_cases(vector, "%s/server-cert.pem" % CERT_DIR,
+                                host="ip4.impala.test")
 
     self._validate_positive_cases(vector, "%s/wildcardCA.pem" % CERT_DIR,
                                   host="ip4.impala.test")
@@ -221,14 +226,27 @@ class TestClientSsl(CustomClusterTestSuite):
           "cannot retrieve SAN from certificate: "
           "https://bugzilla.redhat.com/show_bug.cgi?id=928390")
 
-    self._verify_negative_cases(vector, host="ip4.impala.test")
+    self._verify_negative_cases(vector, "%s/server-cert.pem" % CERT_DIR,
+                                host="ip4.impala.test")
 
     self._validate_positive_cases(vector, "%s/wildcardCA.pem" % CERT_DIR,
                                   host="ip4.impala.test")
     self.check_connections()
 
+  def _is_cert_error(self, stderr):
+    for err in CERT_ERR:
+      if err in stderr:
+        return True
+    return False
 
-  def _verify_negative_cases(self, vector, host=""):
+  def _verify_negative_cases(self, vector, ca_cert, host=""):
+    # Expect the shell to not start successfully if we connect to an endpoint that
+    # doesn't match the certificate.
+    invalid_host = "localhost" if host else "127.0.0.1"
+    args = ["--ssl", "-q", "select 1 + 2", "-i", invalid_host, "--ca_cert=%s" % ca_cert]
+    result = run_impala_shell_cmd(vector, args, expect_success=False)
+    assert self._is_cert_error(result.stderr), result.stderr
+
     # Expect the shell to not start successfully if we point --ca_cert to an incorrect
     # certificate.
     args = ["--ssl", "-q", "select 1 + 2",

@@ -50,6 +50,7 @@ from impala_shell.shell_exceptions import (
     RPCException,
 )
 from impala_shell.thrift_printer import ThriftPrettyPrinter
+from impala_shell.TSSLSocketWithFixes import TSSLSocketWithFixes
 from impala_shell.value_converter import HS2ValueConverter
 from impala_thrift_gen.beeswax import BeeswaxService
 from impala_thrift_gen.beeswax.BeeswaxService import QueryState
@@ -493,11 +494,6 @@ class ImpalaClient(object):
        is used.
        This function returns the socket and the transport object.
     """
-    if self.use_ssl:
-      # TSSLSocket needs the ssl module, which may not be standard on all Operating
-      # Systems. Only attempt to import TSSLSocket if the user wants an SSL connection.
-      from impala_shell.TSSLSocketWithWildcardSAN import TSSLSocketWithWildcardSAN
-
     # The kerberos_host_fqdn option exposes the SASL client's hostname attribute to
     # the user. impala-shell checks to ensure this host matches the host in the kerberos
     # principal. So when a load balancer is configured to be used, its hostname is
@@ -515,10 +511,10 @@ class ImpalaClient(object):
     if self.use_ssl:
       if self.ca_cert is None:
         # No CA cert means don't try to verify the certificate
-        sock = TSSLSocketWithWildcardSAN(sock_host, sock_port, validate=False)
+        sock = TSSLSocketWithFixes(sock_host, sock_port, cert_reqs=ssl.CERT_NONE)
       else:
-        sock = TSSLSocketWithWildcardSAN(
-            sock_host, sock_port, validate=True, ca_certs=self.ca_cert)
+        sock = TSSLSocketWithFixes(
+            sock_host, sock_port, cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.ca_cert)
     else:
       sock = TSocket(sock_host, sock_port)
 

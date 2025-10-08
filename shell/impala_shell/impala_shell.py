@@ -168,7 +168,7 @@ class ImpalaShell(cmd.Cmd, object):
   # Message to display when the connection failed and it is reconnecting.
   CONNECTION_LOST_MESSAGE = 'Connection lost, reconnecting...'
   # Message to display when there is an exception when connecting.
-  ERROR_CONNECTING_MESSAGE = "Error connecting"
+  ERROR_CONNECTING_MESSAGE = "Error connecting "
   # Message to display when there is a socket error.
   SOCKET_ERROR_MESSAGE = "Socket error"
   # Message to display upon successful connection to an Impalad

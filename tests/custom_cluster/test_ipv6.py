@@ -66,7 +66,9 @@ WEBUI_PORTS = [25000, 25010, 25020]
 
 # Error text can depend on both protocol and python version.
 CONN_ERR = ["Could not connect", "Connection refused"]
-CERT_ERR = ["doesn't match", "certificate verify failed"]
+# Due to THRIFT-792, SSL errors are suppressed when using OpenSSL hostname verification.
+# This is the only option on Python 3.12+, using ssl.PROTOCOL_TLS_CLIENT.
+CERT_ERR = ["doesn't match", "certificate verify failed", "Could not connect"]
 WEB_CERT_ERR = ("CertificateError" if sys.version_info.major < 3
                 else "SSLCertVerificationError")
 
