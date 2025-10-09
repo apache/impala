@@ -30,6 +30,6 @@ fi
 
 CLASSPATH=$(cat $CP_FILE):"$CLASSPATH"
 
-java -cp java/iceberg-rest-catalog-test/target/impala-iceberg-rest-catalog-test-${IMPALA_VERSION}.jar:$CLASSPATH \
+$JAVA -cp java/iceberg-rest-catalog-test/target/impala-iceberg-rest-catalog-test-${IMPALA_VERSION}.jar:$CLASSPATH \
     org.apache.iceberg.rest.IcebergRestCatalogTest $@
 
