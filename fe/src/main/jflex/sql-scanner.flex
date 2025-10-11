@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.Iterator;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Collections;
 
 import com.google.common.base.Preconditions;
 import org.apache.impala.analysis.SqlParserSymbols;
@@ -442,6 +443,11 @@ import org.apache.impala.thrift.TReservedWordsVersion;
   static boolean isKeyword(Integer tokenId) {
     String token = tokenIdMap.get(tokenId);
     return token != null && keywordMap.containsKey(token.toLowerCase());
+  }
+
+  // Returns an unmodifiable view of the current keyword names.
+  public static Set<String> getKeywords() {
+    return Collections.unmodifiableSet(keywordMap.keySet());
   }
 
   private Symbol newToken(int id, Object value) {

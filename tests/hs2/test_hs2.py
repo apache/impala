@@ -546,7 +546,154 @@ class TestHS2(HS2TestSuite):
         self.session_handle), TCLIService.TGetInfoType.CLI_DBMS_NAME)
     TestHS2.check_invalid_session(self.hs2_client.GetInfo(invalid_req))
 
-    # TODO: it would be useful to add positive tests for GetInfo().
+    # Test basic info types that were already supported
+    get_info_req = TCLIService.TGetInfoReq()
+    get_info_req.sessionHandle = self.session_handle
+
+    # Test CLI_SERVER_NAME
+    get_info_req.infoType = TCLIService.TGetInfoType.CLI_SERVER_NAME
+    get_info_resp = self.hs2_client.GetInfo(get_info_req)
+    TestHS2.check_response(get_info_resp)
+    assert get_info_resp.infoValue.stringValue == "Impala"
+
+    # Test CLI_DBMS_NAME
+    get_info_req.infoType = TCLIService.TGetInfoType.CLI_DBMS_NAME
+    get_info_resp = self.hs2_client.GetInfo(get_info_req)
+    TestHS2.check_response(get_info_resp)
+    assert get_info_resp.infoValue.stringValue == "Impala"
+
+    # Test CLI_DBMS_VER
+    get_info_req.infoType = TCLIService.TGetInfoType.CLI_DBMS_VER
+    get_info_resp = self.hs2_client.GetInfo(get_info_req)
+    TestHS2.check_response(get_info_resp)
+    assert len(get_info_resp.infoValue.stringValue) > 0  # Should have version string
+
+    # Test new length-based info types
+    length_tests = [
+        (TCLIService.TGetInfoType.CLI_MAX_COLUMN_NAME_LEN, 767),
+        (TCLIService.TGetInfoType.CLI_MAX_SCHEMA_NAME_LEN, 128),
+        (TCLIService.TGetInfoType.CLI_MAX_TABLE_NAME_LEN, 128),
+        (TCLIService.TGetInfoType.CLI_MAX_CATALOG_NAME_LEN, 128),
+        (TCLIService.TGetInfoType.CLI_MAX_CURSOR_NAME_LEN, 128),
+        (TCLIService.TGetInfoType.CLI_MAX_USER_NAME_LEN, 128),
+        (TCLIService.TGetInfoType.CLI_MAX_IDENTIFIER_LEN, 128),
+        (TCLIService.TGetInfoType.CLI_MAX_COLUMNS_IN_SELECT, 0),  # No limit
+        (TCLIService.TGetInfoType.CLI_MAX_COLUMNS_IN_TABLE, 0),  # No limit
+        (TCLIService.TGetInfoType.CLI_MAX_COLUMNS_IN_GROUP_BY, 0),  # No limit
+        (TCLIService.TGetInfoType.CLI_MAX_COLUMNS_IN_ORDER_BY, 0),  # No limit
+        (TCLIService.TGetInfoType.CLI_MAX_TABLES_IN_SELECT, 0),  # No limit
+        (TCLIService.TGetInfoType.CLI_MAX_ROW_SIZE, 524288),  # 512 KB
+    ]
+
+    for info_type, expected_value in length_tests:
+      get_info_req.infoType = info_type
+      get_info_resp = self.hs2_client.GetInfo(get_info_req)
+      TestHS2.check_response(get_info_resp)
+      assert get_info_resp.infoValue.lenValue == expected_value
+
+    # Test CLI_MAX_STATEMENT_LEN separately since it depends on query options
+    get_info_req.infoType = TCLIService.TGetInfoType.CLI_MAX_STATEMENT_LEN
+    get_info_resp = self.hs2_client.GetInfo(get_info_req)
+    TestHS2.check_response(get_info_resp)
+    # Should return 0 (no limit) if max_statement_length_bytes is not set or <= 0
+    assert get_info_resp.infoValue.lenValue >= 0
+
+    # Test small integer info types
+    small_int_tests = [
+        (TCLIService.TGetInfoType.CLI_IDENTIFIER_CASE, 2),  # Case insensitive, lowercase
+        (TCLIService.TGetInfoType.CLI_DATA_SOURCE_READ_ONLY, 0),  # Not read-only
+        (TCLIService.TGetInfoType.CLI_TXN_CAPABLE, 0),  # No transaction support
+        (TCLIService.TGetInfoType.CLI_NULL_COLLATION, 2),  # NULLs sort high
+        (TCLIService.TGetInfoType.CLI_INTEGRITY, 0),  # No integrity constraints
+        (TCLIService.TGetInfoType.CLI_DESCRIBE_PARAMETER, 0),  # No DESCRIBE PARAMETER
+        (TCLIService.TGetInfoType.CLI_ACCESSIBLE_TABLES, 1),  # Returns accessible tables
+        (TCLIService.TGetInfoType.CLI_ACCESSIBLE_PROCEDURES, 0),  # No stored procedures
+        (TCLIService.TGetInfoType.CLI_CURSOR_COMMIT_BEHAVIOR, 1),
+        (TCLIService.TGetInfoType.CLI_DEFAULT_TXN_ISOLATION, 0),
+    ]
+
+    for info_type, expected_value in small_int_tests:
+      get_info_req.infoType = info_type
+      get_info_resp = self.hs2_client.GetInfo(get_info_req)
+      TestHS2.check_response(get_info_resp)
+      assert get_info_resp.infoValue.smallIntValue == expected_value
+
+    # Test string info types
+    string_tests = [
+        (TCLIService.TGetInfoType.CLI_IDENTIFIER_QUOTE_CHAR, "`"),
+        (TCLIService.TGetInfoType.CLI_SEARCH_PATTERN_ESCAPE, "\\"),
+        (TCLIService.TGetInfoType.CLI_SPECIAL_CHARACTERS, ""),  # No special chars
+        (TCLIService.TGetInfoType.CLI_XOPEN_CLI_YEAR, "1995"),
+        (TCLIService.TGetInfoType.CLI_DATA_SOURCE_NAME, "Impala"),
+    ]
+
+    for info_type, expected_value in string_tests:
+      get_info_req.infoType = info_type
+      get_info_resp = self.hs2_client.GetInfo(get_info_req)
+      TestHS2.check_response(get_info_resp)
+      assert get_info_resp.infoValue.stringValue == expected_value
+
+    # Test CLI_ORDER_BY_COLUMNS_IN_SELECT (string type: "Y"/"N")
+    get_info_req.infoType = TCLIService.TGetInfoType.CLI_ORDER_BY_COLUMNS_IN_SELECT
+    get_info_resp = self.hs2_client.GetInfo(get_info_req)
+    TestHS2.check_response(get_info_resp)
+    assert get_info_resp.infoValue.stringValue == "N"  # Not required in SELECT
+
+    # Test CLI_ODBC_KEYWORDS (should return a comma-separated list of Impala-specific
+    # keywords excluding standard ODBC-reserved keywords)
+    get_info_req.infoType = TCLIService.TGetInfoType.CLI_ODBC_KEYWORDS
+    get_info_resp = self.hs2_client.GetInfo(get_info_req)
+    TestHS2.check_response(get_info_resp)
+    assert len(get_info_resp.infoValue.stringValue) > 0
+
+    keywords_csv = get_info_resp.infoValue.stringValue
+    tokens = set([k.strip() for k in keywords_csv.split(",") if k.strip()])
+    # Common ODBC keyword should be excluded (exact match)
+    assert "SELECT" not in tokens
+    # Impala keywords should be present
+    assert "SHOW" in tokens
+    assert "KUDU" in tokens
+    assert "ICEBERG" in tokens
+
+    # Test integer bitmask info types
+    bitmask_tests = [
+        (TCLIService.TGetInfoType.CLI_ALTER_TABLE, 3),  # ADD and DROP COLUMN
+        (TCLIService.TGetInfoType.CLI_OJ_CAPABILITIES, 127),
+        (TCLIService.TGetInfoType.CLI_TXN_ISOLATION_OPTION, 0),
+    ]
+
+    for info_type, expected_value in bitmask_tests:
+      get_info_req.infoType = info_type
+      get_info_resp = self.hs2_client.GetInfo(get_info_req)
+      TestHS2.check_response(get_info_resp)
+      assert get_info_resp.infoValue.integerBitmask == expected_value
+
+    # Test CLI_USER_NAME (should return the current user)
+    get_info_req.infoType = TCLIService.TGetInfoType.CLI_USER_NAME
+    get_info_resp = self.hs2_client.GetInfo(get_info_req)
+    TestHS2.check_response(get_info_resp)
+    assert len(get_info_resp.infoValue.stringValue) > 0  # Should have username
+
+    # Test unsupported info types (moved to default case - should return error)
+    unsupported_info_types = [
+        TCLIService.TGetInfoType.CLI_MAX_DRIVER_CONNECTIONS,
+        TCLIService.TGetInfoType.CLI_MAX_CONCURRENT_ACTIVITIES,
+        TCLIService.TGetInfoType.CLI_SCROLL_CONCURRENCY,
+        TCLIService.TGetInfoType.CLI_GETDATA_EXTENSIONS,
+        TCLIService.TGetInfoType.CLI_MAX_COLUMNS_IN_INDEX,
+        TCLIService.TGetInfoType.CLI_MAX_INDEX_SIZE,
+        TCLIService.TGetInfoType.CLI_CURSOR_SENSITIVITY,
+        TCLIService.TGetInfoType.CLI_FETCH_DIRECTION,
+        TCLIService.TGetInfoType.CLI_CATALOG_NAME,
+        TCLIService.TGetInfoType.CLI_COLLATION_SEQ,
+        99999,  # Completely invalid info type
+    ]
+
+    for info_type in unsupported_info_types:
+      get_info_req.infoType = info_type
+      get_info_resp = self.hs2_client.GetInfo(get_info_req)
+      TestHS2.check_response(get_info_resp, TCLIService.TStatusCode.ERROR_STATUS)
+      assert "Unsupported operation" in get_info_resp.status.errorMessage
 
   @needs_session()
   def test_get_schemas(self):

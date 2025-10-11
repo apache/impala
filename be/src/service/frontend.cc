@@ -156,7 +156,8 @@ Frontend::Frontend() {
     {"validateSaml2Bearer", "([B)Ljava/lang/String;", &validate_saml2_bearer_id_},
     {"abortKuduTransaction", "([B)V", &abort_kudu_txn_},
     {"commitKuduTransaction", "([B)V", &commit_kudu_txn_},
-    {"cancelExecRequest", "([B)V", &cancel_exec_request_id_}
+    {"cancelExecRequest", "([B)V", &cancel_exec_request_id_},
+    {"getNonOdbcKeywords", "([B)Ljava/lang/String;", &get_non_odbc_keywords_id_}
   };
 
   JniMethodDescriptor staticMethods[] = {
@@ -469,4 +470,10 @@ Status Frontend::HiveLegacyTimezoneConvert(
   return JniCall::static_method(fe_class_, hive_legacy_timezone_convert_)
       .with_thrift_arg(timezone_t).with_primitive_arg(utc_time_millis)
       .Call(local_time);
+}
+
+Status Frontend::GetNonOdbcKeywords(const string& odbc_keywords_csv, string* response) {
+  TStringLiteral csv;
+  csv.__set_value(odbc_keywords_csv);
+  return JniUtil::CallJniMethod(fe_, get_non_odbc_keywords_id_, csv, response);
 }

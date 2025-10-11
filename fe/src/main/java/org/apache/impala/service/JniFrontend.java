@@ -36,6 +36,7 @@ import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.ShellBasedUnixGroupsNetgroupMapping;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.ToSqlUtils;
+import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.authentication.saml.WrappedWebContext;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
@@ -125,6 +126,7 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.TimeZone;
 
 /**
@@ -350,6 +352,34 @@ public class JniFrontend {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /**
+   * Returns a comma-separated list of Impala SQL keywords that are not part of the
+   * provided ODBC-reserved keywords CSV.
+   */
+  public String getNonOdbcKeywords(byte[] odbcKeywordsCsvT) throws ImpalaException {
+    final TStringLiteral odbcCsv = new TStringLiteral();
+    JniUtil.deserializeThrift(protocolFactory_, odbcCsv, odbcKeywordsCsvT);
+    String csv = odbcCsv.isSetValue()
+        ? StandardCharsets.UTF_8.decode(odbcCsv.value).toString()
+        : "";
+    Set<String> excludes = new HashSet<>();
+    if (csv != null && !csv.isEmpty()) {
+      for (String s : csv.split(",")) {
+        if (s != null) excludes.add(s.trim().toUpperCase());
+      }
+    }
+    StringBuilder sb = new StringBuilder();
+    for (String kw : SqlScanner.getKeywords()) {
+      String upper = kw.toUpperCase();
+      // Exclude symbolic tokens like &&, ||
+      if (upper.isEmpty() || !Character.isLetter(upper.charAt(0))) continue;
+      if (excludes.contains(upper)) continue;
+      if (sb.length() > 0) sb.append(",");
+      sb.append(upper);
+    }
+    return sb.toString();
   }
 
   /**

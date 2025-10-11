@@ -41,6 +41,7 @@ add_library(Service
   impalad-main.cc
   impala-server.cc
   internal-server.cc
+  odbc-helper.cc
   query-options.cc
   query-result-set.cc
   query-state-record.cc

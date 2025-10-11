@@ -39,6 +39,7 @@
 #include "scheduling/admission-controller.h"
 #include "service/client-request-state.h"
 #include "service/hs2-util.h"
+#include "service/odbc-helper.h"
 #include "service/query-options.h"
 #include "service/query-result-set.h"
 #include "util/auth-util.h"
@@ -558,23 +559,8 @@ void ImpalaServer::GetInfo(TGetInfoResp& return_val,
       session_handle.WithSession(session_id, SecretArg::Session(secret), &session),
       SQLSTATE_GENERAL_ERROR);
 
-  switch (request.infoType) {
-    case TGetInfoType::CLI_SERVER_NAME:
-    case TGetInfoType::CLI_DBMS_NAME:
-      return_val.infoValue.__set_stringValue("Impala");
-      break;
-    case TGetInfoType::CLI_DBMS_VER:
-      return_val.infoValue.__set_stringValue(GetDaemonBuildVersion());
-      break;
-    default:
-      return_val.status.__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
-      return_val.status.__set_errorMessage(("Unsupported operation"));
-      return_val.status.__set_sqlState((SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED));
-      // 'infoValue' is a required field of TGetInfoResp
-      return_val.infoValue.__set_stringValue("");
-      return;
-  }
-  return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
+  PopulateOdbcGetInfo(return_val, request.infoType, session,
+      SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
 }
 
 void ImpalaServer::ExecuteStatementCommon(TExecuteStatementResp& return_val,
