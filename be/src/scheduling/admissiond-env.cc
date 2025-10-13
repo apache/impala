@@ -30,6 +30,7 @@
 #include "util/mem-info.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
+#include "util/pretty-printer.h"
 #include "util/uid-util.h"
 
 #include "common/names.h"
@@ -45,6 +46,10 @@ DEFINE_validator(
                  << "' must be greater than 0 and less than or equal to 1000.";
       return false;
     });
+DEFINE_bool(enable_admission_service_mem_safeguard, true,
+    "When true, enables a hard memory limit safeguard for the admission service. "
+    "This rejects new queries if the in-use process memory from tcmalloc exceeds "
+    "admission_service_mem_limit to prevent OOM.");
 
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_port);
@@ -107,6 +112,11 @@ Status AdmissiondEnv::Init() {
       new MemTracker(AggregateMemoryMetrics::TOTAL_USED, bytes_limit, "Process"));
   mem_tracker_->RegisterMetrics(
       DaemonEnv::GetInstance()->metrics(), "mem-tracker.process");
+  if (FLAGS_enable_admission_service_mem_safeguard) {
+    admission_mem_limit_ = bytes_limit;
+    LOG(INFO) << "Set admission service memory limit to "
+              << PrettyPrinter::Print(admission_mem_limit_, TUnit::BYTES);
+  }
 
   http_handler_->RegisterHandlers(DaemonEnv::GetInstance()->webserver());
   if (DaemonEnv::GetInstance()->metrics_webserver() != nullptr) {

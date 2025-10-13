@@ -61,6 +61,7 @@ class AdmissiondEnv {
   RpcMgr* rpc_mgr() { return rpc_mgr_.get(); }
   Scheduler* scheduler() { return scheduler_.get(); }
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
+  int64_t admission_service_mem_limit() { return admission_mem_limit_; }
 
  private:
   static AdmissiondEnv* admissiond_env_;
@@ -80,6 +81,11 @@ class AdmissiondEnv {
   std::unique_ptr<StatestoreSubscriber> statestore_subscriber_;
 
   MetricGroup* rpc_metrics_ = nullptr;
+
+  /// Memory limit for the admission service. If admission_mem_limit_ is set to a value
+  /// over 0, new admission requests are rejected when the tcmalloc in-use bytes are over
+  /// this limit.
+  int64_t admission_mem_limit_ = 0;
 };
 
 } // namespace impala

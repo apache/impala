@@ -1100,7 +1100,8 @@ class TestAdmissionController(TestAdmissionControllerBase):
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=10, max_queued=10,
         pool_max_mem=10 * 1024 * 1024, proc_mem_limit=2 * 1024 * 1024,
-        queue_wait_timeout_ms=1000),
+        queue_wait_timeout_ms=1000)
+      + " --enable_admission_service_mem_safeguard=false",
       statestored_args=_STATESTORED_ARGS)
   def test_timeout_reason_host_memory(self):
     self.client.set_configuration_option('enable_trivial_query_for_admission', 'false')
@@ -1134,7 +1135,8 @@ class TestAdmissionController(TestAdmissionControllerBase):
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=10, max_queued=10,
         pool_max_mem=2 * 1024 * 1024, proc_mem_limit=20 * 1024 * 1024,
-        queue_wait_timeout_ms=1000),
+        queue_wait_timeout_ms=1000)
+      + " --enable_admission_service_mem_safeguard=false",
       statestored_args=_STATESTORED_ARGS)
   def test_timeout_reason_pool_memory(self):
     self.client.set_configuration_option('enable_trivial_query_for_admission', 'false')
@@ -2296,6 +2298,23 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     # Cleanup.
     client1.close()
     client2.close()
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--vmodule admission-controller=3 --mem_limit=10MB ")
+  def test_admission_service_low_mem_limit(self):
+    EXPECTED_REASON = "Admission rejected due to memory pressure"
+    # Test whether it will fail for a normal query.
+    failed_query_handle = self.client.execute_async(
+            "select * from functional_parquet.alltypes limit 100")
+    self.client.wait_for_impala_state(failed_query_handle, ERROR, 20)
+    profile = self.client.get_runtime_profile(failed_query_handle)
+    assert EXPECTED_REASON in profile, \
+      "Expected reason '{0}' not found in profile: {1}".format(EXPECTED_REASON, profile)
+    self.client.close_query(failed_query_handle)
+    # Test it should pass all the trivial queries.
+    self._test_trivial_queries_suc()
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially

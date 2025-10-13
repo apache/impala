@@ -26,6 +26,7 @@
 #include "runtime/bufferpool/reservation-util.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "scheduling/admissiond-env.h"
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/executor-group.h"
 #include "scheduling/schedule-state.h"
@@ -36,6 +37,7 @@
 #include "util/bit-util.h"
 #include "util/collection-metrics.h"
 #include "util/debug-util.h"
+#include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
@@ -266,6 +268,9 @@ const string REASON_NO_EXECUTOR_GROUPS =
     "Waiting for executors to start. Only DDL queries and queries scheduled only on the "
     "coordinator (either NUM_NODES set to 1 or when small query optimization is "
     "triggered) can currently run.";
+const string REASON_EXCEED_MEMORY_LIMIT =
+    "Admission rejected due to memory pressure in admissiond. Current usage: $0 bytes, "
+    "limit: $1 bytes";
 
 // The name of the root pool.
 const string ROOT_POOL = "root";
@@ -1637,6 +1642,21 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
                    << " but already cancelled, query id=" << PrintId(request.query_id);
         return Status::CANCELLED;
       }
+      request.summary_profile->AddInfoString(
+          PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_REJECTED);
+      stats->metrics()->total_rejected->Increment(1);
+      const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_REJECTED,
+          queue_node->pool_name, queue_node->not_admitted_reason);
+      VLOG_QUERY << "query_id=" << PrintId(request.query_id) << " " << rejected_msg.msg();
+      return Status::Expected(rejected_msg);
+    }
+
+    int64_t bytes_inuse = TcmallocMetric::BYTES_IN_USE->GetValue();
+    if (!is_trivial && AdmissiondEnv::GetInstance() != nullptr
+        && AdmissiondEnv::GetInstance()->admission_service_mem_limit() > 0
+        && bytes_inuse > AdmissiondEnv::GetInstance()->admission_service_mem_limit()) {
+      queue_node->not_admitted_reason = Substitute(REASON_EXCEED_MEMORY_LIMIT,
+          bytes_inuse, AdmissiondEnv::GetInstance()->admission_service_mem_limit());
       request.summary_profile->AddInfoString(
           PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_REJECTED);
       stats->metrics()->total_rejected->Increment(1);
