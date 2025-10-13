@@ -3208,6 +3208,8 @@ show_pattern ::=
 show_create_tbl_stmt ::=
   KW_SHOW KW_CREATE show_create_tbl_object_type:object_type table_name:table
   {: RESULT = new ShowCreateTableStmt(table, object_type); :}
+  | KW_SHOW KW_CREATE show_create_tbl_object_type:object_type table_name:table KW_WITH KW_STATS
+  {: RESULT = new ShowCreateTableStmt(table, object_type, true); :}
   ;
 
 show_create_tbl_object_type ::=

@@ -1425,6 +1425,13 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_tuple_cache_budget_bytes_per_executor(mem_spec_val.value);
         break;
       }
+      case TImpalaQueryOptions::SHOW_CREATE_TABLE_PARTITION_LIMIT: {
+        int32_t int32_t_val = 0;
+        RETURN_IF_ERROR(QueryOptionParser::ParseAndCheckNonNegative<int32_t>(
+            option, value, &int32_t_val));
+        query_options->__set_show_create_table_partition_limit(int32_t_val);
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

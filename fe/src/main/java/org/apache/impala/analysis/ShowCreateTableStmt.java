@@ -33,7 +33,10 @@ import com.google.common.base.Preconditions;
  * "CREATE TABLE ..." string that re-creates the table or the "CREATE VIEW ..."
  * string that re-creates the view as appropriate.
  *
- * Syntax: SHOW CREATE (TABLE|VIEW) <table or view>
+ * If WITH STATS is specified, the output will include the stats and
+ * partitions of the table.
+ *
+ * Syntax: SHOW CREATE (TABLE|VIEW) <table or view> [WITH STATS]
  */
 public class ShowCreateTableStmt extends StatementBase implements SingleTableStmt {
   private TableName tableName_;
@@ -41,10 +44,22 @@ public class ShowCreateTableStmt extends StatementBase implements SingleTableStm
   // The object type keyword used, e.g. TABLE or VIEW, needed to output matching SQL.
   private final TCatalogObjectType objectType_;
 
+  // Whether to include stats and partitions in the generated output.
+  private final boolean withStats_;
+
   public ShowCreateTableStmt(TableName table, TCatalogObjectType objectType) {
     Preconditions.checkNotNull(table);
     this.tableName_ = table;
     this.objectType_ = objectType;
+    this.withStats_ = false;
+  }
+
+  public ShowCreateTableStmt(TableName table, TCatalogObjectType objectType,
+      boolean withStats) {
+    Preconditions.checkNotNull(table);
+    this.tableName_ = table;
+    this.objectType_ = objectType;
+    this.withStats_ = withStats;
   }
 
   @Override
@@ -52,7 +67,10 @@ public class ShowCreateTableStmt extends StatementBase implements SingleTableStm
 
   @Override
   public String toSql(ToSqlOptions options) {
-    return "SHOW CREATE " + objectType_.name() + " " + tableName_;
+    StringBuilder sb = new StringBuilder();
+    sb.append("SHOW CREATE ").append(objectType_.name()).append(" ").append(tableName_);
+    if (withStats_) sb.append(" WITH STATS");
+    return sb.toString();
   }
 
   @Override
@@ -88,4 +106,6 @@ public class ShowCreateTableStmt extends StatementBase implements SingleTableStm
     params.setDb_name(tableName_.getDb());
     return params;
   }
+
+  public boolean withStats() { return withStats_; }
 }

@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -36,8 +37,10 @@ import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.ql.parse.HiveLexer;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.FeDataSourceTable;
+import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -47,10 +50,12 @@ import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.paimon.FePaimonTable;
@@ -104,6 +109,22 @@ public class ToSqlUtils {
       FeTable.LAST_MODIFIED_TIME,
       FeTable.NUM_ROWS);
 
+  // Internal Iceberg metadata table properties to remove from iceberg table
+  @VisibleForTesting
+  protected static final ImmutableSet<String> HIDDEN_ICEBERG_TABLE_PROPERTIES =
+    ImmutableSet.of(
+      IcebergTable.KEY_STORAGE_HANDLER,
+      IcebergTable.METADATA_LOCATION,
+      IcebergTable.PREVIOUS_METADATA_LOCATION,
+      IcebergTable.CURRENT_SCHEMA,
+      IcebergTable.SNAPSHOT_COUNT,
+      IcebergTable.CURRENT_SNAPSHOT_ID,
+      IcebergTable.CURRENT_SNAPSHOT_SUMMARY,
+      IcebergTable.CURRENT_SNAPSHOT_TIMESTAMP_MS,
+      IcebergTable.DEFAULT_PARTITION_SPEC,
+      IcebergTable.UUID
+    );
+
   /**
    * Removes all hidden properties from the given 'tblProperties' map.
    */
@@ -113,12 +134,88 @@ public class ToSqlUtils {
   }
 
   /**
+   * Removes all hidden Iceberg table properties from the given 'tblProperties' map.
+   */
+  @VisibleForTesting
+  protected static void removeHiddenIcebergTableProperties(
+      Map<String, String> tblProperties) {
+    for (String key: HIDDEN_ICEBERG_TABLE_PROPERTIES) tblProperties.remove(key);
+  }
+
+  /**
    * Removes all hidden Kudu from the given 'tblProperties' map.
    */
   @VisibleForTesting
   protected static void removeHiddenKuduTableProperties(
       Map<String, String> tblProperties) {
     tblProperties.remove(KuduTable.KEY_TABLE_NAME);
+  }
+
+  /**
+   * Centralized filtering/masking of table properties for output. Applies a common
+   * baseline of removals and then table-format specific rules.
+   * Populates two output maps: one for CREATE TABLE (more filtered) and one for
+   * ALTER TABLE SET TBLPROPERTIES (less filtered, keeps more properties).
+   *
+   * @param rawProps The raw HMS properties to filter
+   * @param table The table
+   * @param msTbl The metastore table
+   * @param createTableProps Output map for CREATE TABLE properties (more filtered)
+   * @param alterTableProps Output map for ALTER TABLE properties (less filtered)
+   */
+  private static void filterTblProperties(Map<String, String> rawProps, FeTable table,
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      Map<String, String> createTableProps, Map<String, String> alterTableProps) {
+    if (rawProps == null || rawProps.isEmpty()) return;
+
+    // Start with all properties in a single map
+    Map<String, String> commonProps = Maps.newLinkedHashMap();
+    commonProps.putAll(rawProps);
+
+    // Common internal property we never show in either output
+    commonProps.remove(StatsSetupConst.DO_NOT_UPDATE_STATS);
+
+    // Table-format specific filtering (applies to both maps)
+    if (table instanceof FeKuduTable) {
+      // Remove storage handler and internal ids
+      commonProps.remove(KuduTable.KEY_STORAGE_HANDLER);
+      String kuduTableName = rawProps.get(KuduTable.KEY_TABLE_NAME);
+      if (kuduTableName != null &&
+        KuduUtil.isDefaultKuduTableName(kuduTableName,
+          table.getDb().getName(), table.getName())) {
+        commonProps.remove(KuduTable.KEY_TABLE_NAME);
+      }
+      commonProps.remove(KuduTable.KEY_TABLE_ID);
+    } else if (table instanceof FeIcebergTable) {
+      // Hide Iceberg internal metadata properties
+      removeHiddenIcebergTableProperties(commonProps);
+    } else if (table instanceof FePaimonTable) {
+      // Hide Paimon internals
+      commonProps.remove(CoreOptions.PRIMARY_KEY.key());
+      commonProps.remove(CoreOptions.PARTITION.key());
+      commonProps.remove(PaimonUtil.STORAGE_HANDLER);
+      commonProps.remove(CatalogOpExecutor.CAPABILITIES_KEY);
+      if (msTbl != null && PaimonUtil.isSynchronizedTable(msTbl)) {
+        commonProps.remove("TRANSLATED_TO_EXTERNAL");
+        commonProps.remove(Table.TBL_PROP_EXTERNAL_TABLE_PURGE);
+      }
+    } else if (table instanceof FeDataSourceTable) {
+      // Mask external JDBC sensitive properties (case-insensitively)
+      Set<String> keysToBeMasked = DataSourceTable.getJdbcTblPropertyMaskKeys();
+      for (String key : keysToBeMasked) {
+        if (commonProps.containsKey(key)) commonProps.put(key, "******");
+        String lower = key.toLowerCase();
+        if (commonProps.containsKey(lower)) commonProps.put(lower, "******");
+      }
+    }
+
+    // Duplicate the common properties into alterTableProps (less filtered)
+    alterTableProps.putAll(commonProps);
+
+    // Duplicate into createTableProps and remove additional properties
+    // that are materialized elsewhere in CREATE TABLE DDL
+    createTableProps.putAll(commonProps);
+    removeHiddenTableProperties(createTableProps);
   }
 
   /**
@@ -360,20 +457,44 @@ public class ToSqlUtils {
    * table.
    */
   public static String getCreateTableSql(FeTable table) throws CatalogException {
-    Preconditions.checkNotNull(table);
-    if (table instanceof FeView) return getCreateViewSql((FeView)table);
-    org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
-    // Use a LinkedHashMap to preserve the ordering of the table properties.
-    Map<String, String> properties = Maps.newLinkedHashMap(msTable.getParameters());
-    if (properties.containsKey(Table.TBL_PROP_LAST_DDL_TIME)) {
-      properties.remove(Table.TBL_PROP_LAST_DDL_TIME);
+    return renderCreateTableSql(table).createSql;
+  }
+  // Holder for CREATE TABLE SQL and filtered properties to avoid recomputation
+  private static final class CreateSqlArtifacts {
+    final String createSql;
+    final Map<String, String> createTableProperties; // Properties for CREATE TABLE
+    final Map<String, String> alterTableProperties;  // Properties for ALTER TABLE
+
+    private CreateSqlArtifacts(String createSql, Map<String, String>
+        createTableProperties, Map<String, String> alterTableProperties) {
+      this.createSql = createSql;
+      this.createTableProperties = createTableProperties;
+      this.alterTableProperties = alterTableProperties;
     }
+  }
+
+  private static CreateSqlArtifacts renderCreateTableSql(FeTable table)
+      throws CatalogException {
+    Preconditions.checkNotNull(table);
+    if (table instanceof FeView) {
+      return new CreateSqlArtifacts(getCreateViewSql((FeView)table),
+          Maps.newLinkedHashMap(), Maps.newLinkedHashMap());
+    }
+    org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
+    // Raw HMS props (preserve ordering)
+    Map<String, String> rawProps = Maps.newLinkedHashMap(msTable.getParameters());
+    rawProps.remove(Table.TBL_PROP_LAST_DDL_TIME);
     boolean isExternal = Table.isExternalTable(msTable);
 
-    List<String> sortColsSql = getSortColumns(properties);
-    TSortingOrder sortingOrder = TSortingOrder.valueOf(getSortingOrder(properties));
-    String comment = properties.get("comment");
-    removeHiddenTableProperties(properties);
+    // Values derived from raw props before filtering
+    List<String> sortColsSql = getSortColumns(rawProps);
+    TSortingOrder sortingOrder = TSortingOrder.valueOf(getSortingOrder(rawProps));
+    String comment = rawProps.get("comment");
+
+    // Filter properties into two maps: one for CREATE TABLE, one for ALTER TABLE
+    Map<String, String> createTableProps = Maps.newLinkedHashMap();
+    Map<String, String> alterTableProps = Maps.newLinkedHashMap();
+    filterTblProperties(rawProps, table, msTable, createTableProps, alterTableProps);
 
     List<String> colsSql = new ArrayList<>();
     List<String> partitionColsSql = new ArrayList<>();
@@ -411,18 +532,6 @@ public class ToSqlUtils {
       format = HdfsFileFormat.KUDU;
       // Kudu tables cannot use the Hive DDL syntax for the storage handler
       storageHandlerClassName = null;
-      properties.remove(KuduTable.KEY_STORAGE_HANDLER);
-      String kuduTableName = properties.get(KuduTable.KEY_TABLE_NAME);
-      // Remove the hidden table property 'kudu.table_name' for a synchronized Kudu table.
-      if (kuduTableName != null &&
-          KuduUtil.isDefaultKuduTableName(kuduTableName,
-              table.getDb().getName(), table.getName())) {
-        properties.remove(KuduTable.KEY_TABLE_NAME);
-      }
-      // Remove the hidden table property 'kudu.table_id'.
-      properties.remove(KuduTable.KEY_TABLE_ID);
-      // Internal property, should not be exposed to the user.
-      properties.remove(StatsSetupConst.DO_NOT_UPDATE_STATS);
 
       isPrimaryKeyUnique = kuduTable.isPrimaryKeyUnique();
       if (KuduTable.isSynchronizedTable(msTable)) {
@@ -441,18 +550,6 @@ public class ToSqlUtils {
     } else if (table instanceof FeFsTable) {
       if (table instanceof FeIcebergTable) {
         storageHandlerClassName = null;
-        // Internal properties, should not be exposed to the user.
-        properties.remove(IcebergTable.KEY_STORAGE_HANDLER);
-        properties.remove(StatsSetupConst.DO_NOT_UPDATE_STATS);
-        properties.remove(IcebergTable.METADATA_LOCATION);
-        properties.remove(IcebergTable.PREVIOUS_METADATA_LOCATION);
-        properties.remove(IcebergTable.CURRENT_SCHEMA);
-        properties.remove(IcebergTable.SNAPSHOT_COUNT);
-        properties.remove(IcebergTable.CURRENT_SNAPSHOT_ID);
-        properties.remove(IcebergTable.CURRENT_SNAPSHOT_SUMMARY);
-        properties.remove(IcebergTable.CURRENT_SNAPSHOT_TIMESTAMP_MS);
-        properties.remove(IcebergTable.DEFAULT_PARTITION_SPEC);
-        properties.remove(IcebergTable.UUID);
 
         // Fill "PARTITIONED BY SPEC" part if the Iceberg table is partitioned.
         FeIcebergTable feIcebergTable= (FeIcebergTable)table;
@@ -482,14 +579,8 @@ public class ToSqlUtils {
       format = HdfsFileFormat.fromHdfsInputFormatClass(inputFormat, serDeLib);
       storageHandlerClassName = null;
       isPrimaryKeyUnique = true;
-      properties.remove(CoreOptions.PRIMARY_KEY.key());
-      properties.remove(CoreOptions.PARTITION.key());
-      properties.remove(PaimonUtil.STORAGE_HANDLER);
-      properties.remove(CatalogOpExecutor.CAPABILITIES_KEY);
       // for synchronized table, show sql like a managed table
       if (PaimonUtil.isSynchronizedTable(msTable)) {
-        properties.remove("TRANSLATED_TO_EXTERNAL");
-        properties.remove(Table.TBL_PROP_EXTERNAL_TABLE_PURGE);
         if ((location != null)
             && location.toLowerCase().endsWith(table.getName().toLowerCase())) {
           location = null;
@@ -520,26 +611,287 @@ public class ToSqlUtils {
         throw new CatalogException("Could not get primary key/foreign keys sql.", e);
       }
     } else if (table instanceof FeDataSourceTable) {
-      // Mask sensitive table properties for external JDBC table.
-      Set<String> keysToBeMasked = DataSourceTable.getJdbcTblPropertyMaskKeys();
-      for (String key : properties.keySet()) {
-        if (keysToBeMasked.contains(key.toLowerCase())) {
-          properties.put(key, "******");
-        }
-      }
+      // masking handled by filterTblProperties(); nothing to do for CREATE
     }
 
     HdfsUri tableLocation = location == null ? null : new HdfsUri(location);
-    return getCreateTableSql(
+    String sql = getCreateTableSql(
         table.getDb().getName(), table.getName(), comment, colsSql, partitionColsSql,
         isPrimaryKeyUnique, primaryKeySql, foreignKeySql, kuduPartitionByParams,
-        new Pair<>(sortColsSql, sortingOrder), properties, serdeParameters,
+        new Pair<>(sortColsSql, sortingOrder), createTableProps, serdeParameters,
         isExternal, false, rowFormat, format, compression,
         storageHandlerClassName, tableLocation, icebergPartitions, bucketInfo);
+    return new CreateSqlArtifacts(sql, createTableProps, alterTableProps);
   }
 
   /**
-   * Returns a "CREATE TABLE" string that creates the table with the specified properties.
+   * Returns the SHOW CREATE TABLE output with WITH STATS, which includes the base
+   * CREATE statement, followed by ALTER statements to set
+   * table properties and column stats where available, and partition statements.
+   * @param table The table to generate SQL for
+   * @param partitionLimit Maximum number of partitions to output (0 = no limit)
+   */
+  public static String getCreateTableWithStatsSql(FeTable table, int partitionLimit)
+      throws CatalogException {
+    StringBuilder out = new StringBuilder();
+    StringBuilder warnings = new StringBuilder();
+
+    // CREATE statement (and get both filtered property maps)
+    CreateSqlArtifacts artifacts = renderCreateTableSql(table);
+    out.append(artifacts.createSql).append(";\n\n");
+
+    // Use the pre-filtered ALTER TABLE properties (less filtered, keeps more properties)
+    org.apache.hadoop.hive.metastore.api.Table msTbl = table.getMetaStoreTable();
+    Map<String, String> allTblProps = Maps.newLinkedHashMap(
+        artifacts.alterTableProperties);
+
+    // Add STATS_GENERATED_VIA_STATS_TASK if present in HMS parameters
+    if (msTbl != null && msTbl.getParameters() != null) {
+      String statsGenerated = msTbl.getParameters().get("STATS_GENERATED_VIA_STATS_TASK");
+      if (statsGenerated != null) {
+        allTblProps.put("STATS_GENERATED_VIA_STATS_TASK", statsGenerated);
+      }
+    }
+
+    // Emit explicit table-level TBLPROPERTIES
+    if (!allTblProps.isEmpty()) {
+      out.append("ALTER TABLE ")
+          .append(getIdentSql(table.getDb().getName())).append('.')
+          .append(getIdentSql(table.getName())).append(' ')
+          .append("SET TBLPROPERTIES ")
+          .append(propertyMapToSql(allTblProps))
+          .append(";\n\n");
+    }
+
+    // Column stats for non-partition columns
+    if (appendColumnStatsStatements(table, out)) {
+      out.append("\n");
+    }
+
+    // Add partition information if this is a partitioned table
+    appendPartitionStatements(table, partitionLimit, out, warnings);
+
+    // Append warnings at the end if any
+    if (warnings.length() > 0) {
+      out.append(warnings);
+    }
+
+    return out.toString();
+  }
+
+  /**
+   * Appends ALTER TABLE ... SET COLUMN STATS statements for all non-partition columns
+   * that have statistics.
+   * @param table The table to generate column stats for
+   * @param out StringBuilder to append the statements to
+   * @return true if any column stats were appended, false otherwise
+   */
+  private static boolean appendColumnStatsStatements(FeTable table, StringBuilder out) {
+    int numClusterCols = table.getNumClusteringCols();
+    boolean hasColumnStats = false;
+
+    for (int i = numClusterCols; i < table.getColumns().size(); i++) {
+      Column c = table.getColumns().get(i);
+      ColumnStats s = c.getStats();
+      if (s == null) continue;
+      boolean isFixed = c.getType() != null && c.getType().isFixedLengthType();
+
+      List<String> kvs = new ArrayList<>();
+      // Always include NDV and nulls (may be -1 for unknown)
+      kvs.add("'numDVs'='" + s.getNumDistinctValues() + "'");
+      kvs.add("'numNulls'='" + s.getNumNulls() + "'");
+      // Include size stats only for variable-length types
+      if (!isFixed) {
+        kvs.add("'maxSize'='" + s.getMaxSize() + "'");
+        double avg = s.getAvgSize();
+        String avgStr = (Math.rint(avg) == avg) ?
+            Long.toString((long) avg) : Double.toString(avg);
+        kvs.add("'avgSize'='" + avgStr + "'");
+      }
+      // Include boolean-specific counts (may be -1 for non-boolean types)
+      kvs.add("'numTrues'='" + s.getNumTrues() + "'");
+      kvs.add("'numFalses'='" + s.getNumFalses() + "'");
+
+      hasColumnStats = true;
+      out.append("ALTER TABLE ")
+          .append(getIdentSql(table.getDb().getName())).append('.')
+          .append(getIdentSql(table.getName())).append(' ')
+          .append("SET COLUMN STATS ")
+          .append(getIdentSql(c.getName())).append(" (")
+          .append(Joiner.on(", ").join(kvs)).append(");\n");
+    }
+
+    return hasColumnStats;
+  }
+
+  /**
+   * Appends partition-related statements (ADD PARTITION and partition properties)
+   * for partitioned tables.
+   * @param table The table to generate partition statements for
+   * @param partitionLimit Maximum number of partitions to output (0 = no limit)
+   * @param out StringBuilder to append the partition statements to
+   * @param warnings StringBuilder to append warnings to
+   */
+  private static void appendPartitionStatements(FeTable table, int partitionLimit,
+      StringBuilder out, StringBuilder warnings) {
+    if (!(table instanceof FeFsTable)) return;
+
+    FeFsTable fsTable = (FeFsTable) table;
+    Collection<? extends PrunablePartition> partitions = fsTable.getPartitions();
+    int numClusterCols = table.getNumClusteringCols();
+
+    if (partitions == null || partitions.isEmpty() || numClusterCols == 0) return;
+
+    // Optimization: First sort lightweight PrunablePartition objects,
+    // then load only the required number of full FeFsPartition objects
+    List<PrunablePartition> allPartitionRefs = new ArrayList<>(partitions);
+
+    // Sort using the same comparison logic (compares partition values)
+    Collections.sort(allPartitionRefs, (p1, p2) ->
+        HdfsPartition.comparePartitionKeyValues(
+            p1.getPartitionValues(), p2.getPartitionValues()));
+
+    // Determine how many partitions to output
+    int totalPartitions = allPartitionRefs.size();
+    int partitionsToOutput = (partitionLimit > 0 && partitionLimit < totalPartitions)
+        ? partitionLimit : totalPartitions;
+
+    // Load only the partitions we need (not all of them!)
+    List<Long> partitionIdsToLoad = new ArrayList<>(partitionsToOutput);
+    for (int i = 0; i < partitionsToOutput; i++) {
+      partitionIdsToLoad.add(allPartitionRefs.get(i).getId());
+    }
+    List<? extends FeFsPartition> sortedPartitions = fsTable.loadPartitions(
+      partitionIdsToLoad);
+
+    if (sortedPartitions.isEmpty()) return;
+
+    // Generate ADD PARTITION statements
+    appendAddPartitionStatements(table, sortedPartitions, out);
+
+    // Generate per-partition TBLPROPERTIES
+    appendPartitionPropertiesStatements(table, sortedPartitions, out);
+
+    // Add warning if partitions were skipped
+    if (partitionLimit > 0 && totalPartitions > partitionLimit) {
+      int skipped = totalPartitions - partitionLimit;
+      warnings.append("-- WARNING about partial output\n");
+      warnings.append("-- WARNING: Emitted ").append(partitionLimit)
+          .append(" of ").append(totalPartitions)
+          .append(" partitions (show_create_table_partition_limit=")
+          .append(partitionLimit)
+          .append("). ").append(skipped).append(" partitions skipped.\n")
+          .append("-- To export more partitions, re-run with ")
+          .append("SHOW_CREATE_TABLE_PARTITION_LIMIT=<n>.\n");
+    }
+  }
+
+  /**
+   * Appends ALTER TABLE ... ADD PARTITION statements for the given partitions.
+   * @param table The table the partitions belong to
+   * @param sortedPartitions List of partitions to generate ADD PARTITION statements for
+   * @param out StringBuilder to append the statements to
+   */
+  private static void appendAddPartitionStatements(FeTable table,
+      List<? extends FeFsPartition> sortedPartitions, StringBuilder out) {
+    int numClusterCols = table.getNumClusteringCols();
+
+    for (FeFsPartition partition : sortedPartitions) {
+      out.append("ALTER TABLE ")
+          .append(getIdentSql(table.getDb().getName())).append('.')
+          .append(getIdentSql(table.getName())).append(' ')
+          .append("ADD PARTITION (");
+
+      // Add partition key-value pairs
+      List<LiteralExpr> partitionValues = partition.getPartitionValues();
+      List<String> partitionCols = new ArrayList<>();
+      for (int j = 0; j < numClusterCols; j++) {
+        Column col = table.getColumns().get(j);
+        LiteralExpr value = partitionValues.get(j);
+        partitionCols.add(getIdentSql(col.getName()) + "=" + value.toSql());
+      }
+      out.append(Joiner.on(", ").join(partitionCols));
+      out.append(")");
+
+      // Add LOCATION if available
+      String location = partition.getLocation();
+      if (location != null && !location.isEmpty()) {
+        out.append(" LOCATION '").append(location).append("'");
+      }
+      out.append(";\n");
+    }
+    out.append("\n");
+  }
+
+  /**
+   * Appends ALTER TABLE ... PARTITION ... SET TBLPROPERTIES statements for partitions
+   * that have properties to set.
+   * @param table The table the partitions belong to
+   * @param sortedPartitions List of partitions to generate property statements for
+   * @param out StringBuilder to append the statements to
+   */
+  private static void appendPartitionPropertiesStatements(FeTable table,
+      List<? extends FeFsPartition> sortedPartitions, StringBuilder out) {
+    int numClusterCols = table.getNumClusteringCols();
+    boolean hasPartitionProps = false;
+
+    for (FeFsPartition partition : sortedPartitions) {
+      // Get partition statistics
+      Map<String, String> partitionProps = Maps.newLinkedHashMap();
+      long partNumRows = partition.getNumRows();
+      if (partNumRows >= 0) {
+        partitionProps.put("numRows", Long.toString(partNumRows));
+      }
+
+      // Add additional properties from HMS parameters if present
+      Map<String, String> hmsParams = partition.getParameters();
+      if (hmsParams != null) {
+        if (hmsParams.containsKey("STATS_GENERATED_VIA_STATS_TASK")) {
+          partitionProps.put("STATS_GENERATED_VIA_STATS_TASK",
+              hmsParams.get("STATS_GENERATED_VIA_STATS_TASK"));
+        }
+
+        // Add NUM_FILES if available
+        if (hmsParams.containsKey(FeFsTable.NUM_FILES)) {
+          partitionProps.put(FeFsTable.NUM_FILES, hmsParams.get(FeFsTable.NUM_FILES));
+        }
+
+        // Add TOTAL_SIZE if available
+        if (hmsParams.containsKey(FeFsTable.TOTAL_SIZE)) {
+          partitionProps.put(FeFsTable.TOTAL_SIZE, hmsParams.get(FeFsTable.TOTAL_SIZE));
+        }
+      }
+
+      if (!partitionProps.isEmpty()) {
+        hasPartitionProps = true;
+
+        out.append("ALTER TABLE ")
+            .append(getIdentSql(table.getDb().getName())).append('.')
+            .append(getIdentSql(table.getName())).append(' ')
+            .append("PARTITION (");
+
+        // Add partition key-value pairs
+        List<LiteralExpr> partitionValues = partition.getPartitionValues();
+        List<String> partitionCols = new ArrayList<>();
+        for (int j = 0; j < numClusterCols; j++) {
+          Column col = table.getColumns().get(j);
+          LiteralExpr value = partitionValues.get(j);
+          partitionCols.add(getIdentSql(col.getName()) + "=" + value.toSql());
+        }
+        out.append(Joiner.on(", ").join(partitionCols));
+        out.append(") SET TBLPROPERTIES ")
+            .append(propertyMapToSql(partitionProps))
+            .append(";\n");
+      }
+    }
+
+    if (hasPartitionProps) {
+      out.append("\n");
+    }
+  }
+
+  /**
+   * Returns a "CREATE TABLE" string that creates the table with the specified properties
    * The tableName must not be null. If columnsSql is null, the schema syntax will
    * not be generated.
    */

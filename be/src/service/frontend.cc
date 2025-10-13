@@ -220,8 +220,17 @@ Status Frontend::DescribeTable(const TDescribeTableParams& params,
   return JniUtil::CallJniMethod(fe_, describe_table_id_, tparams, response);
 }
 
-Status Frontend::ShowCreateTable(const TTableName& table_name, string* response) {
-  return JniUtil::CallJniMethod(fe_, show_create_table_id_, table_name, response);
+Status Frontend::ShowCreateTable(const TTableName& table_name, bool with_stats,
+    int32_t show_create_table_partition_limit, string* response) {
+  // Build a small struct to pass both pieces since the JNI method expects a single arg.
+  // Reuse TCatalogOpRequest fields: set show_create_table_params and
+  // show_create_table_with_stats.
+  TCatalogOpRequest req;
+  req.op_type = TCatalogOpType::SHOW_CREATE_TABLE;
+  req.__set_show_create_table_params(table_name);
+  req.__set_show_create_table_with_stats(with_stats);
+  req.__set_show_create_table_partition_limit(show_create_table_partition_limit);
+  return JniUtil::CallJniMethod(fe_, show_create_table_id_, req, response);
 }
 
 Status Frontend::ShowCreateFunction(const TGetFunctionsParams& params, string* response) {

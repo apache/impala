@@ -94,6 +94,10 @@ class TestShowCreateTable(ImpalaTestSuite):
                                            vector,
                                            unique_database)
 
+  def test_show_create_table_with_stats(self, vector, unique_database):
+    self.__run_show_create_table_with_stats_test_case(
+        'QueryTest/show-create-table-with-stats', vector, unique_database)
+
   def __run_show_create_table_test_case(self, test_file_name, vector, unique_db_name):
     """
     Runs a show-create-table test file, containing the following sections:
@@ -156,6 +160,97 @@ class TestShowCreateTable(ImpalaTestSuite):
         # drop the table
         self.__exec(test_case.drop_table_sql)
 
+  def __run_show_create_table_with_stats_test_case(
+    self, test_file_name, vector, unique_db_name):
+    sections = self.load_query_test_file(
+      self.get_workload(), test_file_name, self.VALID_SECTION_NAMES)
+    for test_section in sections:
+      test_case = ShowCreateTableTestCase(test_section, test_file_name, unique_db_name)
+      if not test_case.existing_table:
+        # create table in Impala (support multiple setup statements)
+        setup_sql = self.__replace_warehouse(test_case.create_table_sql)
+        for stmt in re.split(r";\s*", setup_sql.strip()):
+          if not stmt:
+            continue
+          self.__exec(stmt)
+
+      # Set SHOW_CREATE_TABLE_PARTITION_LIMIT=1 for WITH STATS queries to test
+      # partition limiting
+      self.__exec("SET SHOW_CREATE_TABLE_PARTITION_LIMIT=1")
+
+      # Check if the table is a Paimon table before running COMPUTE STATS.
+      # Paimon tables do not support 'COMPUTE STATS'.
+      is_paimon = False
+      if not test_case.existing_table and test_case.create_table_sql:
+          is_paimon = "STORED AS PAIMON" in test_case.create_table_sql.upper()
+
+      if not is_paimon and not test_case.existing_table:
+        # COMPUTE STATS before running SHOW CREATE TABLE WITH STATS
+        self.__exec("COMPUTE STATS " + test_case.table_name)
+
+      # execute "SHOW CREATE TABLE ... WITH STATS"; collect all statements
+      result = self.__exec(test_case.show_create_table_sql + " WITH STATS")
+      raw_rows = [row.strip() for row in result.data if row and row.strip()]
+
+      # Single row; split into statements
+      raw_sql = raw_rows[0]
+      raw_create_table_result = [s for s in re.split(r";\s*", raw_sql) if s.strip()]
+      create_table_result = [self.__normalize(self.__mask_dynamic_values(s))
+        for s in raw_create_table_result]
+      location_source = raw_sql
+
+      if not test_case.existing_table:
+        # drop the table
+        self.__exec(test_case.drop_table_sql)
+
+      # Build expected statements list and compare per-statement
+      expected_sql = self.__replace_warehouse(self.__replace_uri(
+          test_case.expected_result,
+          self.__get_location_uri(location_source)
+      ))
+      expected_statements = [
+          self.__normalize(s)
+          for s in re.split(r";\s*", expected_sql.strip())
+          if s.strip()
+      ]
+
+      assert len(expected_statements) == len(create_table_result), \
+          ("Expected {} statements, got {}".format(
+              len(expected_statements), len(create_table_result)))
+      for exp_stmt, act_stmt in zip(expected_statements, create_table_result):
+        self.__compare_result(exp_stmt, act_stmt)
+
+      if test_case.existing_table:
+        continue
+
+      # Check for warnings in the normalized output.
+      # If warnings are present, the output is partial, and we must skip the
+      # reproducibility check as it's guaranteed to fail on the partial DDL.
+      has_warnings = any(s.strip().startswith('--') for s in create_table_result)
+      if has_warnings:
+        continue
+
+      # recreate the table with the WITH STATS result from above (multiple statements)
+      # Skip comment lines (warnings) when recreating
+      for stmt in raw_create_table_result:
+        if not stmt or stmt.strip().startswith('--'):
+          continue
+        self.__exec(stmt)
+      try:
+        # we should get the same WITH STATS result again
+        result = self.__exec(test_case.show_create_table_sql + " WITH STATS")
+        new_raw_rows = [row.strip() for row in result.data if row and row.strip()]
+        new_raw_sql = new_raw_rows[0]
+        new_create_table_result = [
+            self.__normalize(self.__mask_dynamic_values(s))
+            for s in re.split(r";\s*", new_raw_sql)
+            if s.strip()
+        ]
+        assert create_table_result == new_create_table_result
+      finally:
+        # drop the table
+        self.__exec(test_case.drop_table_sql)
+
   def __exec(self, sql_str):
     return self.execute_query_expect_success(self.client, sql_str)
 
@@ -164,11 +259,29 @@ class TestShowCreateTable(ImpalaTestSuite):
     if m is not None:
       return m.group(1)
 
+  def __get_partition_properties(self, sql_str):
+    """ Extract properties from partition-level SET TBLPROPERTIES statements.
+    Handles statements like:
+    ALTER TABLE ... PARTITION (p=1) SET TBLPROPERTIES ('key'='value', ...)
+    """
+    return get_properties_map(sql_str, "SET TBLPROPERTIES", self.FILTER_TBL_PROPERTIES)
+
   def __compare_result(self, expected_sql, actual_sql):
     """ Extract all properties """
-    expected_tbl_props = self.__get_properties_map(expected_sql, "TBLPROPERTIES")
-    actual_tbl_props = self.__get_properties_map(actual_sql, "TBLPROPERTIES")
-    assert expected_tbl_props == actual_tbl_props
+    # Partition-level properties use "SET TBLPROPERTIES" syntax,
+    # while table-level properties just use "TBLPROPERTIES"
+    if 'PARTITION' in expected_sql and 'SET TBLPROPERTIES' in expected_sql:
+      # For partition statements: ALTER TABLE ... PARTITION (...) SET TBLPROPERTIES (...)
+      expected_tbl_props = self.__get_partition_properties(expected_sql)
+      actual_tbl_props = self.__get_partition_properties(actual_sql)
+    else:
+      # For regular table-level properties: CREATE TABLE ... TBLPROPERTIES (...)
+      expected_tbl_props = self.__get_properties_map(expected_sql, "TBLPROPERTIES")
+      actual_tbl_props = self.__get_properties_map(actual_sql, "TBLPROPERTIES")
+
+    assert expected_tbl_props == actual_tbl_props, \
+        ("TBLPROPERTIES mismatch:\nExpected: {} \nActual: {}".format(
+            expected_tbl_props, actual_tbl_props))
 
     expected_serde_props = self.__get_properties_map(expected_sql, "SERDEPROPERTIES")
     actual_serde_props = self.__get_properties_map(actual_sql, "SERDEPROPERTIES")
@@ -177,6 +290,29 @@ class TestShowCreateTable(ImpalaTestSuite):
     expected_sql_filtered = self.__remove_properties_maps(expected_sql)
     actual_sql_filtered = self.__remove_properties_maps(actual_sql)
     assert expected_sql_filtered == actual_sql_filtered
+
+  def __mask_dynamic_values(self, s):
+    """ Replace dynamic/volatile values with <NUM> placeholder for comparison.
+    This masks values that change between test runs or are system-generated:
+    - numFiles: file count (dynamic based on data ingestion)
+    - totalSize: total size in bytes (dynamic)
+    - impala.events.catalogVersion: catalog version number (increments)
+    - impala.events.catalogServiceId: UUID-like identifier (changes per service)
+
+    Note: numRows is NOT masked because it's typically a known test value
+    """
+    # Mask dynamic file system properties
+    s = re.sub(r"('numFiles'\s*=\s*)'[0-9]+'", r"\1'<NUM>'", s)
+    s = re.sub(r"('totalSize'\s*=\s*)'[0-9]+'", r"\1'<NUM>'", s)
+    s = re.sub(r"('numRows'\s*=\s*)'[0-9]+'", r"\1'<NUM>'", s)
+
+    # Mask Impala event system properties (catalog version and service ID)
+    s = re.sub(r"('impala\.events\.catalogVersion'\s*=\s*)'[0-9]+'", r"\1'<NUM>'", s)
+    s = re.sub(r"('impala\.events\.catalogServiceId'\s*=\s*)'[^']+'", r"\1'<NUM>'", s)
+    s = re.sub(r"('impala\.lastComputeStatsTime'\s*=\s*)'[0-9]+'", r"\1'<NUM>'", s)
+    s = re.sub(r"('impala\.computeStatsSnapshotIds'\s*=\s*)'[^']+'", r"\1'<NUM>'", s)
+
+    return s
 
   def __normalize(self, s):
     """ Normalize the string to remove extra whitespaces and remove keys
@@ -253,7 +389,13 @@ class ShowCreateTableTestCase(object):
     assert name.find(".") == -1, 'Error in test file %s. Found unexpected %s '\
         'name %s that is qualified with a database' % (table_type, test_file_name, name)
     self.table_name = test_db_name + '.' + name
-    self.create_table_sql = self.create_table_sql.replace(name, self.table_name, 1)
+    # Replace all occurrences of the unqualified table name with the qualified name
+    # This is needed for test cases with multiple statements (e.g., CREATE + ALTER)
+    self.create_table_sql = re.sub(
+        r'\b' + re.escape(name) + r'\b',
+        self.table_name,
+        self.create_table_sql
+    )
     self.show_create_table_sql = 'show create %s %s' % (table_type, self.table_name)
     self.drop_table_sql = "drop %s %s" % (table_type, self.table_name)
 

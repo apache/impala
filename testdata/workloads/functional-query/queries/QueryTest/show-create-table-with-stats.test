@@ -1,0 +1,485 @@
+====
+---- CREATE_TABLE
+# Unpartitioned HDFS table with table and column stats
+CREATE TABLE t_unpart_stats (
+  c1 STRING,
+  c2 INT
+)
+STORED AS PARQUET;
+ALTER TABLE t_unpart_stats SET TBLPROPERTIES('numRows'='10', 'numFiles'='10', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+ALTER TABLE t_unpart_stats SET COLUMN STATS c1 ('numDVs'='2','numNulls'='0','maxSize'='4','avgSize'='4');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_unpart_stats (
+  c1 STRING,
+  c2 INT
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'STATS_GENERATED_VIA_STATS_TASK'='true', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_unpart_stats SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'STATS_GENERATED_VIA_STATS_TASK'='true', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_unpart_stats SET COLUMN STATS c1 ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_unpart_stats SET COLUMN STATS c2 ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+====
+---- CREATE_TABLE
+# Partitioned HDFS table with partition and table stats
+CREATE TABLE t_part_stats (
+  c1 STRING,
+  c2 INT
+)
+PARTITIONED BY (p INT)
+STORED AS PARQUET
+TBLPROPERTIES ('transactional'='false');
+ALTER TABLE t_part_stats ADD PARTITION(p=1);
+ALTER TABLE t_part_stats SET TBLPROPERTIES('numRows'='100');
+ALTER TABLE t_part_stats PARTITION(p=1) SET TBLPROPERTIES('numRows'='5', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+ALTER TABLE t_part_stats SET COLUMN STATS c1 ('numDVs'='3','numNulls'='0','maxSize'='4','avgSize'='4');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_part_stats (
+  c1 STRING,
+  c2 INT
+)
+PARTITIONED BY (
+  p INT
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE',  'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_stats SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_stats SET COLUMN STATS c1 ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_part_stats SET COLUMN STATS c2 ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_part_stats ADD PARTITION (p=1) LOCATION '$$location_uri$$/p=1';
+ALTER TABLE show_create_table_test_db.t_part_stats PARTITION (p=1) SET TBLPROPERTIES ('STATS_GENERATED_VIA_STATS_TASK'='true', 'numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+====
+---- CREATE_TABLE
+# Iceberg table should not have ADD PARTITION or numRows in WITH STATS output
+CREATE TABLE ice_with_stats (
+  i INT,
+  s STRING
+)
+STORED AS ICEBERG;
+INSERT INTO ice_with_stats VALUES (1, 'a');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.ice_with_stats (
+  i INT NULL,
+  s STRING NULL
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'engine.hive.enabled'='true', 'external.table.purge'='TRUE', 'impala.computeStatsSnapshotIds'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'table_type'='ICEBERG', 'write.format.default'='parquet');
+ALTER TABLE show_create_table_test_db.ice_with_stats SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'engine.hive.enabled'='true', 'external.table.purge'='TRUE', 'impala.computeStatsSnapshotIds'='<NUM>', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numFiles'='<NUM>', 'numRows'='<NUM>', 'table_type'='ICEBERG', 'totalSize'='<NUM>', 'write.format.default'='parquet');
+ALTER TABLE show_create_table_test_db.ice_with_stats SET COLUMN STATS i ('numDVs'='1', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.ice_with_stats SET COLUMN STATS s ('numDVs'='1', 'numNulls'='0', 'maxSize'='1', 'avgSize'='1', 'numTrues'='-1', 'numFalses'='-1');
+====
+---- CREATE_TABLE
+# HDFS table without any stats
+CREATE TABLE t_no_stats (
+  c1 INT
+)
+PARTITIONED BY (p INT)
+STORED AS PARQUET;
+ALTER TABLE t_no_stats ADD PARTITION(p=1);
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_no_stats (
+  c1 INT
+)
+PARTITIONED BY (
+  p INT
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_no_stats SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_no_stats SET COLUMN STATS c1 ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_no_stats ADD PARTITION (p=1) LOCATION '$$location_uri$$/p=1';
+ALTER TABLE show_create_table_test_db.t_no_stats PARTITION (p=1) SET TBLPROPERTIES ('numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+====
+---- CREATE_TABLE
+# HDFS table with column stats only
+CREATE TABLE t_only_col_stats (
+  c1 INT,
+  c2 STRING
+)
+STORED AS PARQUET;
+ALTER TABLE t_only_col_stats SET COLUMN STATS c2 ('numDVs'='9','numNulls'='1','maxSize'='9','avgSize'='3');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_only_col_stats (
+  c1 INT,
+  c2 STRING
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_only_col_stats SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_only_col_stats SET COLUMN STATS c1 ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_only_col_stats SET COLUMN STATS c2 ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+====
+---- CREATE_TABLE
+# HDFS table with table stats only
+CREATE TABLE t_only_tbl_stats (
+  c1 INT
+)
+STORED AS PARQUET;
+ALTER TABLE t_only_tbl_stats SET TBLPROPERTIES('numRows'='77');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_only_tbl_stats (
+  c1 INT
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_only_tbl_stats SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_only_tbl_stats SET COLUMN STATS c1 ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+====
+---- CREATE_TABLE
+# Unpartitioned HDFS table with custom properties but no stats
+CREATE TABLE t_unpart_custom_props (
+  name STRING,
+  age INT
+)
+STORED AS PARQUET
+TBLPROPERTIES('owner'='user', 'team'='data-eng');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_unpart_custom_props (
+  name STRING,
+  age INT
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>', 'owner'='user', 'team'='data-eng');
+ALTER TABLE show_create_table_test_db.t_unpart_custom_props SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'owner'='user', 'team'='data-eng', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_unpart_custom_props SET COLUMN STATS name ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_unpart_custom_props SET COLUMN STATS age ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+====
+---- CREATE_TABLE
+# Partitioned HDFS table with partition-level stats only (tests show_create_table_partition_limit warning)
+CREATE TABLE t_part_only_part_stats (
+  id INT,
+  value STRING
+)
+PARTITIONED BY (region STRING)
+STORED AS PARQUET;
+ALTER TABLE t_part_only_part_stats ADD PARTITION(region='US');
+ALTER TABLE t_part_only_part_stats ADD PARTITION(region='EU');
+ALTER TABLE t_part_only_part_stats PARTITION(region='US') SET TBLPROPERTIES('numRows'='20', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+ALTER TABLE t_part_only_part_stats PARTITION(region='EU') SET TBLPROPERTIES('numRows'='30');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_part_only_part_stats (
+  id INT,
+  value STRING
+)
+PARTITIONED BY (
+  region STRING
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_only_part_stats SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_only_part_stats SET COLUMN STATS id ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_part_only_part_stats SET COLUMN STATS value ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_part_only_part_stats ADD PARTITION (region='EU') LOCATION '$$location_uri$$/region=EU';
+ALTER TABLE show_create_table_test_db.t_part_only_part_stats PARTITION (region='EU') SET TBLPROPERTIES ('numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+-- WARNING about partial output
+-- WARNING: Emitted 1 of 2 partitions (show_create_table_partition_limit=1). 1 partitions skipped.
+-- To export more partitions, re-run with SHOW_CREATE_TABLE_PARTITION_LIMIT=<n>.
+====
+---- CREATE_TABLE
+# Partitioned HDFS table with table, partition, and column stats, plus custom props (tests show_create_table_partition_limit warning)
+CREATE TABLE t_part_full_combo (
+  item STRING,
+  price DOUBLE
+)
+PARTITIONED BY (category STRING)
+STORED AS PARQUET
+TBLPROPERTIES('createdBy'='qa_test');
+ALTER TABLE t_part_full_combo ADD PARTITION(category='electronics');
+ALTER TABLE t_part_full_combo ADD PARTITION(category='books');
+ALTER TABLE t_part_full_combo SET TBLPROPERTIES('numRows'='500');
+ALTER TABLE t_part_full_combo PARTITION(category='electronics') SET TBLPROPERTIES('numRows'='200', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+ALTER TABLE t_part_full_combo PARTITION(category='books') SET TBLPROPERTIES('numRows'='300');
+ALTER TABLE t_part_full_combo SET COLUMN STATS item ('numDVs'='50', 'numNulls'='0', 'avgSize'='10');
+ALTER TABLE t_part_full_combo SET COLUMN STATS price ('numDVs'='100', 'numNulls'='5');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_part_full_combo (
+  item STRING,
+  price DOUBLE
+)
+PARTITIONED BY (
+  category STRING
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'createdBy'='qa_test', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_full_combo SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'createdBy'='qa_test', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_full_combo SET COLUMN STATS item ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_part_full_combo SET COLUMN STATS price ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_part_full_combo ADD PARTITION (category='books') LOCATION '$$location_uri$$/category=books';
+ALTER TABLE show_create_table_test_db.t_part_full_combo PARTITION (category='books') SET TBLPROPERTIES ('numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+-- WARNING about partial output
+-- WARNING: Emitted 1 of 2 partitions (show_create_table_partition_limit=1). 1 partitions skipped.
+-- To export more partitions, re-run with SHOW_CREATE_TABLE_PARTITION_LIMIT=<n>.
+====
+---- CREATE_TABLE
+# Unpartitioned HDFS table with TEXTFILE format and stats
+CREATE TABLE t_textfile_stats (
+  c1 INT,
+  c2 STRING
+)
+STORED AS TEXTFILE;
+ALTER TABLE t_textfile_stats SET TBLPROPERTIES('numRows'='25', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+ALTER TABLE t_textfile_stats SET COLUMN STATS c2 ('numDVs'='5','numNulls'='1','maxSize'='4','avgSize'='4');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_textfile_stats (
+  c1 INT,
+  c2 STRING
+)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'STATS_GENERATED_VIA_STATS_TASK'='true', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_textfile_stats SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'STATS_GENERATED_VIA_STATS_TASK'='true', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_textfile_stats SET COLUMN STATS c1 ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_textfile_stats SET COLUMN STATS c2 ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+====
+---- CREATE_TABLE
+# Partitioned HDFS table with TEXTFILE format and all stats
+CREATE TABLE t_part_textfile_stats (
+  c1 STRING,
+  c2 INT
+)
+PARTITIONED BY (p1 INT, p2 STRING)
+STORED AS TEXTFILE;
+ALTER TABLE t_part_textfile_stats ADD PARTITION(p1=1, p2='a');
+ALTER TABLE t_part_textfile_stats SET TBLPROPERTIES('numRows'='50', 'numFiles'='75');
+ALTER TABLE t_part_textfile_stats PARTITION(p1=1, p2='a') SET TBLPROPERTIES('numRows'='10', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+ALTER TABLE t_part_textfile_stats SET COLUMN STATS c1 ('numDVs'='7','numNulls'='2','maxSize'='10','avgSize'='5');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_part_textfile_stats (
+  c1 STRING,
+  c2 INT
+)
+PARTITIONED BY (
+  p1 INT,
+  p2 STRING
+)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_textfile_stats SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_textfile_stats SET COLUMN STATS c1 ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_part_textfile_stats SET COLUMN STATS c2 ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_part_textfile_stats ADD PARTITION (p1=1, p2='a') LOCATION '$$location_uri$$/p1=1/p2=a';
+ALTER TABLE show_create_table_test_db.t_part_textfile_stats PARTITION (p1=1, p2='a') SET TBLPROPERTIES ('STATS_GENERATED_VIA_STATS_TASK'='true', 'numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+====
+---- CREATE_TABLE
+# Partitioned table with NULL partition values (tests show_create_table_partition_limit warning)
+CREATE TABLE t_part_with_nulls (
+  c1 STRING
+)
+PARTITIONED BY (p1 INT, p2 STRING)
+STORED AS PARQUET;
+ALTER TABLE t_part_with_nulls ADD PARTITION(p1=NULL, p2='x');
+ALTER TABLE t_part_with_nulls ADD PARTITION(p1=1, p2=NULL);
+ALTER TABLE t_part_with_nulls SET TBLPROPERTIES('numRows'='20', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+ALTER TABLE t_part_with_nulls PARTITION(p1=NULL, p2='x') SET TBLPROPERTIES('numRows'='8', 'STATS_GENERATED_VIA_STATS_TASK'='true');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_part_with_nulls (
+  c1 STRING
+)
+PARTITIONED BY (
+  p1 INT,
+  p2 STRING
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'STATS_GENERATED_VIA_STATS_TASK'='true', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_with_nulls SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'STATS_GENERATED_VIA_STATS_TASK'='true', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_with_nulls SET COLUMN STATS c1 ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_part_with_nulls ADD PARTITION (p1=NULL, p2='x') LOCATION '$$location_uri$$/p1=__HIVE_DEFAULT_PARTITION__/p2=x';
+ALTER TABLE show_create_table_test_db.t_part_with_nulls PARTITION (p1=NULL, p2='x') SET TBLPROPERTIES ('STATS_GENERATED_VIA_STATS_TASK'='true', 'numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+-- WARNING about partial output
+-- WARNING: Emitted 1 of 2 partitions (show_create_table_partition_limit=1). 1 partitions skipped.
+-- To export more partitions, re-run with SHOW_CREATE_TABLE_PARTITION_LIMIT=<n>.
+====
+---- CREATE_TABLE
+# Unpartitioned table without any stats
+CREATE TABLE t_unpart_no_stats (
+  c1 INT,
+  c2 STRING
+)
+STORED AS PARQUET;
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_unpart_no_stats (
+  c1 INT,
+  c2 STRING
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_unpart_no_stats SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_unpart_no_stats SET COLUMN STATS c1 ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_unpart_no_stats SET COLUMN STATS c2 ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+====
+---- CREATE_TABLE
+# Partitioned table without any stats (no partitions added)
+CREATE TABLE t_part_no_stats_no_parts (
+  c1 INT
+)
+PARTITIONED BY (p INT)
+STORED AS PARQUET;
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_part_no_stats_no_parts (
+  c1 INT
+)
+PARTITIONED BY (
+  p INT
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_no_stats_no_parts SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_part_no_stats_no_parts SET COLUMN STATS c1 ('numDVs'='0', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+====
+---- CREATE_TABLE
+# Test case with many partitions to verify show_create_table_partition_limit warning
+CREATE TABLE t_many_partitions (
+  data_point STRING
+)
+PARTITIONED BY (year INT, month INT)
+STORED AS PARQUET;
+ALTER TABLE t_many_partitions ADD PARTITION(year=2024, month=1);
+ALTER TABLE t_many_partitions ADD PARTITION(year=2024, month=2);
+ALTER TABLE t_many_partitions ADD PARTITION(year=2024, month=3);
+ALTER TABLE t_many_partitions SET TBLPROPERTIES('numRows'='300');
+ALTER TABLE t_many_partitions PARTITION(year=2024, month=1) SET TBLPROPERTIES('numRows'='100');
+ALTER TABLE t_many_partitions PARTITION(year=2024, month=2) SET TBLPROPERTIES('numRows'='100');
+ALTER TABLE t_many_partitions PARTITION(year=2024, month=3) SET TBLPROPERTIES('numRows'='100');
+ALTER TABLE t_many_partitions SET COLUMN STATS data_point ('numDVs'='50','numNulls'='0','maxSize'='20','avgSize'='10');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.t_many_partitions (
+  data_point STRING
+)
+PARTITIONED BY (
+  year INT,
+  month INT
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_many_partitions SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE show_create_table_test_db.t_many_partitions SET COLUMN STATS data_point ('numDVs'='0', 'numNulls'='0', 'maxSize'='0', 'avgSize'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE show_create_table_test_db.t_many_partitions ADD PARTITION (`year`=2024, `month`=1) LOCATION '$$location_uri$$/year=2024/month=1';
+ALTER TABLE show_create_table_test_db.t_many_partitions PARTITION (`year`=2024, `month`=1) SET TBLPROPERTIES ('numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+-- WARNING about partial output
+-- WARNING: Emitted 1 of 3 partitions (show_create_table_partition_limit=1). 2 partitions skipped.
+-- To export more partitions, re-run with SHOW_CREATE_TABLE_PARTITION_LIMIT=<n>.
+====
+---- QUERY
+-- No need of adding WITH STATS at the end of query, as it'll be done by the test
+SHOW CREATE TABLE functional.alltypes_date_partition
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE functional.alltypes_date_partition (
+  id INT COMMENT 'Add a comment',
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  string_col STRING,
+  timestamp_col TIMESTAMP
+)
+PARTITIONED BY (
+  date_col DATE
+)
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE functional.alltypes_date_partition SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE functional.alltypes_date_partition SET COLUMN STATS id ('numDVs'='494', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE functional.alltypes_date_partition SET COLUMN STATS bool_col ('numDVs'='2', 'numNulls'='0', 'numTrues'='250', 'numFalses'='250');
+ALTER TABLE functional.alltypes_date_partition SET COLUMN STATS tinyint_col ('numDVs'='10', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE functional.alltypes_date_partition SET COLUMN STATS smallint_col ('numDVs'='10', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE functional.alltypes_date_partition SET COLUMN STATS int_col ('numDVs'='10', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE functional.alltypes_date_partition SET COLUMN STATS bigint_col ('numDVs'='10', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE functional.alltypes_date_partition SET COLUMN STATS float_col ('numDVs'='10', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE functional.alltypes_date_partition SET COLUMN STATS double_col ('numDVs'='10', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE functional.alltypes_date_partition SET COLUMN STATS string_col ('numDVs'='10', 'numNulls'='0', 'maxSize'='1', 'avgSize'='1', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE functional.alltypes_date_partition SET COLUMN STATS timestamp_col ('numDVs'='500', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE functional.alltypes_date_partition ADD PARTITION (date_col=DATE '2009-01-01') LOCATION '$$location_uri$$/date_col=2009-01-01';
+ALTER TABLE functional.alltypes_date_partition PARTITION (date_col=DATE '2009-01-01') SET TBLPROPERTIES ('numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+-- WARNING about partial output
+-- WARNING: Emitted 1 of 55 partitions (show_create_table_partition_limit=1). 54 partitions skipped.
+-- To export more partitions, re-run with SHOW_CREATE_TABLE_PARTITION_LIMIT=<n>.
+====
+---- QUERY
+SHOW CREATE TABLE tpcds_parquet.store_sales
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE tpcds_parquet.store_sales (
+  ss_sold_time_sk INT,
+  ss_item_sk BIGINT,
+  ss_customer_sk INT,
+  ss_cdemo_sk INT,
+  ss_hdemo_sk INT,
+  ss_addr_sk INT,
+  ss_store_sk INT,
+  ss_promo_sk INT,
+  ss_ticket_number BIGINT,
+  ss_quantity INT,
+  ss_wholesale_cost DECIMAL(7,2),
+  ss_list_price DECIMAL(7,2),
+  ss_sales_price DECIMAL(7,2),
+  ss_ext_discount_amt DECIMAL(7,2),
+  ss_ext_sales_price DECIMAL(7,2),
+  ss_ext_wholesale_cost DECIMAL(7,2),
+  ss_ext_list_price DECIMAL(7,2),
+  ss_ext_tax DECIMAL(7,2),
+  ss_coupon_amt DECIMAL(7,2),
+  ss_net_paid DECIMAL(7,2),
+  ss_net_paid_inc_tax DECIMAL(7,2),
+  ss_net_profit DECIMAL(7,2),
+  PRIMARY KEY (ss_item_sk, ss_ticket_number),
+  FOREIGN KEY(ss_customer_sk) REFERENCES tpcds_parquet.customer(c_customer_sk),
+  FOREIGN KEY(ss_addr_sk) REFERENCES tpcds_parquet.customer_address(ca_address_sk),
+  FOREIGN KEY(ss_cdemo_sk) REFERENCES tpcds_parquet.customer_demographics(cd_demo_sk),
+  FOREIGN KEY(ss_sold_date_sk) REFERENCES tpcds_parquet.date_dim(d_date_sk),
+  FOREIGN KEY(ss_hdemo_sk) REFERENCES tpcds_parquet.household_demographics(hd_demo_sk),
+  FOREIGN KEY(ss_item_sk) REFERENCES tpcds_parquet.item(i_item_sk),
+  FOREIGN KEY(ss_promo_sk) REFERENCES tpcds_parquet.promotion(p_promo_sk),
+  FOREIGN KEY(ss_store_sk) REFERENCES tpcds_parquet.store(s_store_sk),
+  FOREIGN KEY(ss_sold_time_sk) REFERENCES tpcds_parquet.time_dim(t_time_sk)
+)
+PARTITIONED BY (
+  ss_sold_date_sk INT
+)
+STORED AS PARQUET
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'impala.lastComputeStatsTime'='<NUM>');
+ALTER TABLE tpcds_parquet.store_sales SET TBLPROPERTIES ('EXTERNAL'='TRUE', 'OBJCAPABILITIES'='EXTREAD,EXTWRITE', 'STATS_GENERATED'='TASK', 'impala.events.catalogServiceId'='<NUM>', 'impala.events.catalogVersion'='<NUM>', 'impala.lastComputeStatsTime'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_sold_time_sk ('numDVs'='46948', 'numNulls'='129637', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_item_sk ('numDVs'='17975', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_customer_sk ('numDVs'='90632', 'numNulls'='129752', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_cdemo_sk ('numDVs'='217860', 'numNulls'='129700', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_hdemo_sk ('numDVs'='7376', 'numNulls'='129847', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_addr_sk ('numDVs'='48600', 'numNulls'='129975', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_store_sk ('numDVs'='6', 'numNulls'='130034', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_promo_sk ('numDVs'='302', 'numNulls'='129484', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_ticket_number ('numDVs'='240553', 'numNulls'='0', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_quantity ('numDVs'='99', 'numNulls'='129996', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_wholesale_cost ('numDVs'='10196', 'numNulls'='130023', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_list_price ('numDVs'='20233', 'numNulls'='130003', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_sales_price ('numDVs'='19129', 'numNulls'='129666', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_ext_discount_amt ('numDVs'='215962', 'numNulls'='129838', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_ext_sales_price ('numDVs'='421485', 'numNulls'='130327', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_ext_wholesale_cost ('numDVs'='378585', 'numNulls'='130044', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_ext_list_price ('numDVs'='607652', 'numNulls'='129933', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_ext_tax ('numDVs'='77834', 'numNulls'='130410', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_coupon_amt ('numDVs'='215962', 'numNulls'='129838', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_net_paid ('numDVs'='474273', 'numNulls'='129397', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_net_paid_inc_tax ('numDVs'='617277', 'numNulls'='130022', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales SET COLUMN STATS ss_net_profit ('numDVs'='566882', 'numNulls'='130267', 'numTrues'='-1', 'numFalses'='-1');
+ALTER TABLE tpcds_parquet.store_sales ADD PARTITION (ss_sold_date_sk=NULL) LOCATION '$$location_uri$$/ss_sold_date_sk=__HIVE_DEFAULT_PARTITION__';
+ALTER TABLE tpcds_parquet.store_sales PARTITION (ss_sold_date_sk=NULL) SET TBLPROPERTIES ('numFiles'='<NUM>', 'numRows'='<NUM>', 'totalSize'='<NUM>');
+-- WARNING about partial output
+-- WARNING: Emitted 1 of 1824 partitions (show_create_table_partition_limit=1). 1823 partitions skipped.
+-- To export more partitions, re-run with SHOW_CREATE_TABLE_PARTITION_LIMIT=<n>.
+====

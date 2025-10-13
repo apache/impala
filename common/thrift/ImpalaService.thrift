@@ -1069,6 +1069,10 @@ enum TImpalaQueryOptions {
   // for a given query execution. A higher value caches more aggressively. A lower
   // value reduces caching and thus overhead.
   TUPLE_CACHE_BUDGET_BYTES_PER_EXECUTOR = 197
+
+  // Maximum number of partitions to show in SHOW CREATE TABLE WITH STATS.
+  // 0 means no limit. Default is 1000.
+  SHOW_CREATE_TABLE_PARTITION_LIMIT = 198
 }
 
 // The summary of a DML statement.

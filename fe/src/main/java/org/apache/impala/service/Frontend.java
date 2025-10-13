@@ -679,6 +679,12 @@ public class Frontend {
     } else if (analysis.isShowCreateTableStmt()) {
       ddl.op_type = TCatalogOpType.SHOW_CREATE_TABLE;
       ddl.setShow_create_table_params(analysis.getShowCreateTableStmt().toThrift());
+      ddl.setShow_create_table_with_stats(analysis.getShowCreateTableStmt().withStats());
+      // Pass show_create_table_partition_limit from query options (default to 1000 if not set)
+      int partitionLimit = result.query_options.isSetShow_create_table_partition_limit()
+        ? result.query_options.getShow_create_table_partition_limit() :
+        (new TQueryOptions()).getShow_create_table_partition_limit();
+      ddl.setShow_create_table_partition_limit(partitionLimit);
       metadata.setColumns(Arrays.asList(
           new TColumn("result", Type.STRING.toThrift())));
     } else if (analysis.isShowCreateFunctionStmt()) {

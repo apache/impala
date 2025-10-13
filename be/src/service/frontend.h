@@ -166,7 +166,8 @@ class Frontend {
 
   /// Returns (in the output parameter) a string containing the CREATE TABLE command that
   /// creates the table specified in the params.
-  Status ShowCreateTable(const TTableName& table_name, std::string* response);
+  Status ShowCreateTable(const TTableName& table_name, bool with_stats,
+      int32_t show_create_table_partition_limit, std::string* response);
 
   /// Returns (in the output parameter) a string containing the CREATE FUNCTION command that
   /// creates the function specified in the params.

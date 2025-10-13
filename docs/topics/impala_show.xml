@@ -40,7 +40,7 @@ under the License.
 SHOW SCHEMAS [[LIKE] '<varname>pattern</varname>'] - an alias for SHOW DATABASES
 SHOW TABLES [IN <varname>database_name</varname>] [[LIKE] '<varname>pattern</varname>']
 <ph rev="1.2.0">SHOW [AGGREGATE | ANALYTIC] FUNCTIONS [IN <varname>database_name</varname>] [[LIKE] '<varname>pattern</varname>']</ph>
-<ph rev="1.2.1">SHOW CREATE TABLE [<varname>database_name</varname>].<varname>table_name</varname></ph>
+<ph rev="1.2.1">SHOW CREATE TABLE [<varname>database_name</varname>].<varname>table_name</varname> [WITH STATS]</ph>
 <ph rev="1.2.1">SHOW CREATE VIEW [<varname>database_name</varname>].<varname>view_name</varname></ph>
 <ph rev="1.2.1">SHOW TABLE STATS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
 <ph rev="1.2.1">SHOW COLUMN STATS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
@@ -761,6 +761,27 @@ show tables like '*dim*|t*';
         original table on a different system, you might need to edit the <codeph>SHOW CREATE TABLE</codeph> output
         to change things such as the database name, <codeph>LOCATION</codeph> field, and so on that might be
         different on the destination system.
+      </p>
+      <p>
+        Optionally, you can include <codeph>WITH STATS</codeph> to append additional statements that recreate
+        table statistics and partitions. For filesystem-backed, iceberg, and kudu tables, Impala emits:
+      </p>
+      <ul>
+        <li>Table-level <codeph>ALTER TABLE ... SET TBLPROPERTIES</codeph> statements to set properties like
+            <codeph>numRows</codeph> and <codeph>STATS_GENERATED_VIA_STATS_TASK</codeph></li>
+        <li><codeph>ALTER TABLE ... SET COLUMN STATS</codeph> statements for all non-partition columns,
+            including statistics like <codeph>numDVs</codeph>, <codeph>numNulls</codeph>, <codeph>maxSize</codeph>,
+            <codeph>avgSize</codeph>, <codeph>numTrues</codeph>, and <codeph>numFalses</codeph></li>
+        <li>For partitioned tables: <codeph>ALTER TABLE ... ADD PARTITION</codeph> statements to recreate partitions</li>
+        <li>For partitioned tables: Per-partition <codeph>ALTER TABLE ... PARTITION (...) SET TBLPROPERTIES</codeph>
+            statements to set partition-level properties like <codeph>numRows</codeph>, <codeph>numFiles</codeph>,
+            and <codeph>totalSize</codeph></li>
+      </ul>
+      <p>
+        The number of partitions included in the output is controlled by the <codeph>SHOW_CREATE_TABLE_PARTITION_LIMIT</codeph>
+        query option, which defaults to 1000. Set <codeph>SHOW_CREATE_TABLE_PARTITION_LIMIT=0</codeph> to include all partitions,
+        or set it to a smaller value to limit the output. If the partition limit is exceeded, a warning is
+        emitted in the output.
       </p>
       <p>
         If you specify a view name in the <codeph>SHOW CREATE TABLE</codeph>,

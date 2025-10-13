@@ -530,6 +530,12 @@ struct TCatalogOpRequest {
 
   // Parameters for DESCRIBE HISTORY
   19: optional TDescribeHistoryParams describe_history_params
+
+  // Options for SHOW CREATE TABLE
+  20: optional bool show_create_table_with_stats
+
+  // Partition limit for SHOW CREATE TABLE WITH STATS
+  21: optional i32 show_create_table_partition_limit
 }
 
 // Query options type

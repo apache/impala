@@ -568,8 +568,16 @@ Status ClientRequestState::ExecLocalCatalogOp(
     }
     case TCatalogOpType::SHOW_CREATE_TABLE: {
       string response;
-      RETURN_IF_ERROR(frontend_->ShowCreateTable(catalog_op.show_create_table_params,
-          &response));
+      bool with_stats = false;
+      if (catalog_op.__isset.show_create_table_with_stats) {
+        with_stats = catalog_op.show_create_table_with_stats;
+      }
+      int32_t partition_limit = query_options().show_create_table_partition_limit; // Default value
+      if (catalog_op.__isset.show_create_table_partition_limit) {
+        partition_limit = catalog_op.show_create_table_partition_limit;
+      }
+      RETURN_IF_ERROR(frontend_->ShowCreateTable(
+          catalog_op.show_create_table_params, with_stats, partition_limit, &response));
       SetResultSet(vector<string>(1, response));
       return Status::OK();
     }

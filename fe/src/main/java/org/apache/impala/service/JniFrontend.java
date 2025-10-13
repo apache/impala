@@ -89,6 +89,7 @@ import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowGrantPrincipalParams;
+import org.apache.impala.thrift.TCatalogOpRequest;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
@@ -564,13 +565,25 @@ public class JniFrontend {
   /**
    * Returns a SQL DDL string for creating the specified table.
    */
-  public String showCreateTable(byte[] thriftTableName)
+  public String showCreateTable(byte[] thriftParams)
       throws ImpalaException {
     Preconditions.checkNotNull(frontend_);
-    TTableName params = new TTableName();
-    JniUtil.deserializeThrift(protocolFactory_, params, thriftTableName);
-    return ToSqlUtils.getCreateTableSql(frontend_.getCatalog().getTable(
-        params.getDb_name(), params.getTable_name()));
+    TCatalogOpRequest req = new TCatalogOpRequest();
+    JniUtil.deserializeThrift(protocolFactory_, req, thriftParams);
+    Preconditions.checkState(req.isSetShow_create_table_params());
+    TTableName tname = req.getShow_create_table_params();
+    FeTable table = frontend_.getCatalog().getTable(tname.getDb_name(),
+        tname.getTable_name());
+    boolean withStats = req.isSetShow_create_table_with_stats()
+        && req.show_create_table_with_stats;
+    if (withStats) {
+      // Get show_create_table_partition_limit from request, default to 1000 if not set
+      int partitionLimit = req.isSetShow_create_table_partition_limit() ?
+          req.getShow_create_table_partition_limit() : 1000;
+      return ToSqlUtils.getCreateTableWithStatsSql(table, partitionLimit);
+    } else {
+      return ToSqlUtils.getCreateTableSql(table);
+    }
   }
 
   /**

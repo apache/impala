@@ -808,6 +808,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift (defaults to 100MB)
   198: optional i64 tuple_cache_budget_bytes_per_executor = 104857600;
+
+  // See comment in ImpalaService.thrift
+  199: optional i32 show_create_table_partition_limit = 1000
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external
