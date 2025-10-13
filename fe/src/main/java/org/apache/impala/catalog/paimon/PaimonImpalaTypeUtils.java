@@ -53,7 +53,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** Utils for converting types related classes between Paimon and Impala. */
-public class ImpalaTypeUtils {
+public class PaimonImpalaTypeUtils {
   /**
    * Convert paimon data type {@link DataType} to impala data type {@link Type}.
    *

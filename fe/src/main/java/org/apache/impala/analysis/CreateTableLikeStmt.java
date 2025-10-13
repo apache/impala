@@ -24,6 +24,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAccessEvent;
@@ -183,6 +184,10 @@ public class CreateTableLikeStmt extends StatementBase {
           + "Iceberg table because it is not an Iceberg table.");
     } else if (fileFormat_ == THdfsFileFormat.JDBC) {
       throw new AnalysisException("CREATE TABLE LIKE is not supported for JDBC tables.");
+    } else if (fileFormat_ == THdfsFileFormat.PAIMON
+        || srcTable instanceof FePaimonTable) {
+      throw new AnalysisException("CREATE TABLE LIKE is not supported for " +
+          "PAIMON tables.");
     }
 
     srcDbName_ = srcTable.getDb().getName();

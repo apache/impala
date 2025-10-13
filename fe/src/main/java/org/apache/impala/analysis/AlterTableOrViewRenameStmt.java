@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TAlterTableOrViewRenameParams;
@@ -81,6 +82,10 @@ public class AlterTableOrViewRenameStmt extends AlterTableStmt {
     if (!(table_ instanceof FeView) && !renameTable_) {
       throw new AnalysisException(String.format(
           "ALTER VIEW not allowed on a table: %s", table_.getFullName()));
+    } else if (table_ instanceof FePaimonTable) {
+      throw new AnalysisException(String.format(
+          "ALTER TABLE RENAME statement not allowed on PAIMON table: %s",
+          table_.getFullName()));
     }
     newDbName_ = analyzer.getTargetDbName(newTableName_);
     if (analyzer.dbContainsTable(newDbName_, newTableName_.getTbl(), Privilege.CREATE)) {

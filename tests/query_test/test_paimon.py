@@ -48,3 +48,7 @@ class TestCreatingPaimonTable(ImpalaTestSuite):
   def test_create_paimon_ddl_negative(self, vector, unique_database):
     self.run_test_case('QueryTest/paimon-ddl-negative',
                        vector, unique_database)
+
+  def test_paimon_negative(self, vector, unique_database):
+    self.run_test_case('QueryTest/paimon-negative',
+                       vector, unique_database)

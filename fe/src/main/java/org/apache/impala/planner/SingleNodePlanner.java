@@ -74,6 +74,7 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.iceberg.IcebergMetadataTable;
+import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -1927,6 +1928,9 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
       scanNode.addConjuncts(conjuncts);
       scanNode.init(analyzer);
       return scanNode;
+    }  else if (tblRef.getTable() instanceof FePaimonTable) {
+      // This function will be supported in the future
+      throw new NotImplementedException("Query is not supported for PAIMON table now");
     } else {
       throw new NotImplementedException(
           "Planning not implemented for table class: " + table.getClass());

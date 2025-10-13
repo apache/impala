@@ -28,7 +28,7 @@ import org.apache.impala.analysis.ShowStatsStmt;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.paimon.FePaimonTable;
-import org.apache.impala.catalog.paimon.ImpalaTypeUtils;
+import org.apache.impala.catalog.paimon.PaimonImpalaTypeUtils;
 import org.apache.impala.catalog.paimon.PaimonUtil;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TBucketType;
@@ -231,7 +231,7 @@ public class PaimonAnalyzer {
    */
   private static void throwIfColumnTypeIsNotSupported(ColumnDef columnDef)
       throws AnalysisException {
-    if (!ImpalaTypeUtils.isSupportedColumnType(columnDef.getType())) {
+    if (!PaimonImpalaTypeUtils.isSupportedColumnType(columnDef.getType())) {
       throw new AnalysisException("Tables stored by Paimon do not support the column "
           + columnDef.getColName() + " type: " + columnDef.getType().toSql());
     }

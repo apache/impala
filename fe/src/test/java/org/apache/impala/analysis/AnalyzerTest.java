@@ -964,4 +964,39 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalysisError("alter table functional.bucketed_table add columns(col3 int)",
         errorMsgBucketed);
   }
+
+  @Test
+  public void tesPaimonDML() {
+    AnalysisError("INSERT INTO functional_parquet.paimon_non_partitioned " +
+        "VALUES (101, 201, 4.5, 1640995200000)",
+        "Impala does not support INSERT into PAIMON table: " +
+            "functional_parquet.paimon_non_partitioned");
+    AnalysisError("INSERT OVERWRITE TABLE functional_parquet.paimon_non_partitioned " +
+        "VALUES (102, 202, 3.8, 1640995201000)",
+        "Impala does not support INSERT into PAIMON table: " +
+            "functional_parquet.paimon_non_partitioned");
+    AnalysisError("DELETE FROM functional_parquet.paimon_non_partitioned " +
+        "WHERE userid = 101",
+        "Impala only supports modifying Kudu and Iceberg tables, " +
+            "but the following table is neither: " +
+            "functional_parquet.paimon_non_partitioned");
+    AnalysisError("MERGE INTO functional_parquet.paimon_partitioned a USING " +
+        "functional_parquet.paimon_non_partitioned source ON " +
+            "a.userid = source.userid WHEN NOT MATCHED THEN INSERT " +
+        "VALUES(a.userid,a.movieid, source.rating,souce.ts)",
+        "Target table must be an Iceberg table: " +
+            "functional_parquet.paimon_partitioned");
+    AnalysisError("MERGE INTO functional_parquet.paimon_partitioned a USING " +
+        "functional_parquet.paimon_non_partitioned source ON a.userid = source.id " +
+        "WHEN MATCHED THEN DELETE",
+        "Target table must be an Iceberg table: " +
+            "functional_parquet.paimon_partitioned");
+    AnalysisError("MERGE INTO functional_parquet.paimon_partitioned a USING " +
+        "functional_parquet.paimon_non_partitioned source ON " +
+            "a.userid = source.userid WHEN MATCHED THEN UPDATE " +
+            "SET movieid = source.movieid",
+        "Target table must be an Iceberg table: " +
+            "functional_parquet.paimon_partitioned");
+  }
+
 }

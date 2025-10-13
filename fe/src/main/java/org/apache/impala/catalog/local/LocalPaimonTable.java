@@ -74,4 +74,10 @@ public class LocalPaimonTable extends LocalTable implements FePaimonTable {
     } catch (IOException e) { throw new RuntimeException(e); }
     return tableDescriptor;
   }
+
+  @Override
+  public String toString() {
+    return String.format("Local Paimon Table: %s", getFullName());
+  }
+
 }

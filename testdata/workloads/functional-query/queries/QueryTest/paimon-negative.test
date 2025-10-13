@@ -1,0 +1,168 @@
+====
+---- QUERY
+CREATE TABLE paimon_test(
+  level STRING
+)
+STORED AS PAIMON;
+INSERT INTO paimon_test values('1');
+---- CATCH
+AnalysisException: Impala does not support INSERT into PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+TRUNCATE paimon_test
+---- CATCH
+AnalysisException: TRUNCATE TABLE not supported on non-HDFS table: $DATABASE.paimon_test
+====
+---- QUERY
+CREATE TABLE paimon_test_ctas STORED AS PAIMON AS SELECT * FROM functional_parquet.alltypes;
+---- CATCH
+AnalysisException: CREATE TABLE AS SELECT does not support the (PAIMON) file format. Supported formats are: (PARQUET, TEXTFILE, KUDU, ICEBERG)
+====
+---- QUERY
+CREATE TABLE paimon_test_ctas LIKE functional_parquet.alltypes STORED AS PAIMON;
+---- CATCH
+AnalysisException: CREATE TABLE LIKE is not supported for PAIMON tables.
+====
+---- QUERY
+CREATE TABLE paimon_test_ctas LIKE functional_parquet.paimon_non_partitioned;
+---- CATCH
+AnalysisException: CREATE TABLE LIKE is not supported for PAIMON tables.
+====
+---- QUERY
+ALTER TABLE paimon_test ADD COLUMN event_time TIMESTAMP
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test ADD COLUMN event_time TIMESTAMP
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test ADD COLUMNS (event_time TIMESTAMP, event_type STRING)
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test DROP COLUMN event_time
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test CHANGE COLUMN old_column new_column STRING
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test SET TBLPROPERTIES ('key'='value')
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test UNSET TBLPROPERTIES ('key')
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test SET FILEFORMAT PARQUET
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test SET LOCATION '/new/location/path'
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test RECOVER PARTITIONS
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test ADD PARTITION (dt='2023-01-01')
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test DROP PARTITION (dt='2023-01-01')
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test PARTITION (dt='2023-01-01') SET FILEFORMAT TEXTFILE
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test PARTITION (dt='2023-01-01') SET LOCATION '/specific/partition/path'
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test SET CACHED IN 'pool_name'
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+ALTER TABLE paimon_test SET UNCACHED
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on PAIMON table: $DATABASE.paimon_test
+====
+---- QUERY
+COMPUTE STATS paimon_test;
+---- CATCH
+AnalysisException: COMPUTE STATS not supported for PAIMON table: paimon_test
+====
+---- QUERY
+COMPUTE INCREMENTAL STATS paimon_test(userid) ;
+---- CATCH
+AnalysisException: COMPUTE STATS not supported for PAIMON table: paimon_test
+====
+---- QUERY
+COMPUTE INCREMENTAL STATS paimon_test(userid) ;
+---- CATCH
+AnalysisException: COMPUTE STATS not supported for PAIMON table: paimon_test
+====
+---- QUERY
+INSERT INTO functional_parquet.paimon_non_partitioned VALUES (101, 201, 4.5, 1640995200000);
+---- CATCH
+AnalysisException: Impala does not support INSERT into PAIMON table: functional_parquet.paimon_non_partitioned
+====
+---- QUERY
+INSERT OVERWRITE TABLE functional_parquet.paimon_non_partitioned VALUES (102, 202, 3.8, 1640995201000);
+---- CATCH
+AnalysisException: Impala does not support INSERT into PAIMON table: functional_parquet.paimon_non_partitioned
+====
+---- QUERY
+DELETE FROM functional_parquet.paimon_non_partitioned WHERE userid = 101;
+---- CATCH
+AnalysisException: Impala only supports modifying Kudu and Iceberg tables, but the following table is neither: functional_parquet.paimon_non_partitioned
+====
+---- QUERY
+MERGE INTO functional_parquet.paimon_partitioned a
+USING functional_parquet.paimon_non_partitioned source
+ON a.userid = source.userid
+WHEN NOT MATCHED THEN INSERT VALUES(a.userid,a.movieid, source.rating,souce.ts);
+---- CATCH
+AnalysisException: Target table must be an Iceberg table: functional_parquet.paimon_partitioned
+====
+---- QUERY
+MERGE INTO functional_parquet.paimon_partitioned a
+USING functional_parquet.paimon_non_partitioned source
+ON a.userid = source.id
+WHEN MATCHED THEN DELETE;
+---- CATCH
+AnalysisException: Target table must be an Iceberg table: functional_parquet.paimon_partitioned
+====
+---- QUERY
+MERGE INTO functional_parquet.paimon_partitioned a
+USING functional_parquet.paimon_non_partitioned source
+ON a.userid = source.userid
+WHEN MATCHED THEN UPDATE SET movieid = source.movieid;
+---- CATCH
+AnalysisException: Target table must be an Iceberg table: functional_parquet.paimon_partitioned
+====
+---- QUERY
+SELECT * FROM functional_parquet.paimon_partitioned;
+---- CATCH
+NotImplementedException: Query is not supported for PAIMON table now

@@ -23,6 +23,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDropStatsParams;
 import org.apache.impala.thrift.TTableName;
@@ -106,6 +107,10 @@ public class DropStatsStmt extends StatementBase implements SingleTableStmt {
     if (tableRef_ instanceof CollectionTableRef) {
       throw new AnalysisException(
           String.format("DROP STATS not allowed on a nested collection: %s", tableName_));
+    }
+    if (tableRef_.getTable() instanceof FePaimonTable) {
+      throw new AnalysisException(
+          String.format("DROP STATS not allowed on a PAIMON table: %s", tableName_));
     }
     tableRef_.analyze(analyzer);
 

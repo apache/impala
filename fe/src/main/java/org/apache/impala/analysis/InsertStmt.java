@@ -50,6 +50,7 @@ import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
+import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
@@ -616,6 +617,11 @@ public class InsertStmt extends DmlStatementBase {
 
     if (isHBaseTable && overwrite_) {
       throw new AnalysisException("HBase doesn't have a way to perform INSERT OVERWRITE");
+    }
+
+    if (table_ instanceof FePaimonTable) {
+      throw new AnalysisException(String.format(
+          "Impala does not support INSERT into PAIMON table: %s", table_.getFullName()));
     }
   }
 

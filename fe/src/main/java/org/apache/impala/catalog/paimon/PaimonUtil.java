@@ -23,6 +23,7 @@ import static org.apache.paimon.CoreOptions.PARTITION_DEFAULT_NAME;
 import static org.apache.paimon.CoreOptions.PARTITION_GENERATE_LEGCY_NAME;
 import static org.apache.paimon.utils.HadoopUtils.HADOOP_LOAD_DEFAULT_CONFIG;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.commons.lang3.SerializationUtils;
@@ -70,7 +71,6 @@ import org.apache.paimon.data.Timestamp;
 import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.hive.HiveCatalog;
-import org.apache.paimon.hive.HiveTypeUtils;
 import org.apache.paimon.hive.LocationKeyExtractor;
 import org.apache.paimon.hive.utils.HiveUtils;
 import org.apache.paimon.options.CatalogOptions;
@@ -104,7 +104,7 @@ import org.apache.paimon.types.SmallIntType;
 import org.apache.paimon.types.TinyIntType;
 import org.apache.paimon.utils.InternalRowPartitionComputer;
 import org.apache.thrift.TException;
-import org.postgresql.shaded.com.ongres.scram.common.util.Preconditions;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,6 +123,9 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+/**
+ * Utils for common paimon related functions.
+ */
 public class PaimonUtil {
   final static Logger LOG = LoggerFactory.getLogger(PaimonUtil.class);
 
@@ -191,7 +194,7 @@ public class PaimonUtil {
     List<FieldSchema> ret = new ArrayList<>();
     for (DataField dataField : schema.getFields()) {
       ret.add(new FieldSchema(dataField.name().toLowerCase(),
-          HiveTypeUtils.toTypeInfo(dataField.type()).getTypeName(),
+          PaimonHiveTypeUtils.toTypeInfo(dataField.type()).getTypeName(),
           dataField.description()));
     }
     return ret;
@@ -205,7 +208,7 @@ public class PaimonUtil {
     List<Column> ret = new ArrayList<>();
     int pos = 0;
     for (DataField dataField : schema.getFields()) {
-      Type colType = ImpalaTypeUtils.toImpalaType(dataField.type());
+      Type colType = PaimonImpalaTypeUtils.toImpalaType(dataField.type());
       ret.add(new Column(dataField.name().toLowerCase(), colType, pos++));
     }
     return ret;
@@ -219,7 +222,7 @@ public class PaimonUtil {
     Schema.Builder schemaBuilder = Schema.newBuilder();
     for (TColumn column : columns) {
       schemaBuilder.column(column.getColumnName().toLowerCase(),
-          ImpalaTypeUtils.fromImpalaType(Type.fromThrift(column.getColumnType())));
+          PaimonImpalaTypeUtils.fromImpalaType(Type.fromThrift(column.getColumnType())));
     }
     if (!partitionKeys.isEmpty()) { schemaBuilder.partitionKeys(partitionKeys); }
     if (!options.isEmpty()) { schemaBuilder.options(options); }

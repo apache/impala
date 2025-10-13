@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TTableName;
@@ -118,6 +119,10 @@ public abstract class AlterTableStmt extends StatementBase implements SingleTabl
       throw new AnalysisException(String.format(
           "ALTER TABLE %s not allowed on a table %s: %s", getOperation(),
           (storedByJdbc ? "STORED BY JDBC": "PRODUCED BY DATA SOURCE"), tableName_));
+    }
+    if (table_ instanceof FePaimonTable) {
+      throw new AnalysisException(String.format(
+          "ALTER TABLE not allowed on PAIMON table: %s", table_.getFullName()));
     }
   }
 

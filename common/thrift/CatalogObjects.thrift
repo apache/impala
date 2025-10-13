@@ -708,6 +708,7 @@ struct TSystemTable {
   1: required TSystemTableName table_name
 }
 
+// Represents a Paimon Catalog Type
 enum TPaimonCatalog {
   HADOOP_CATALOG = 0
   HIVE_CATALOG = 1

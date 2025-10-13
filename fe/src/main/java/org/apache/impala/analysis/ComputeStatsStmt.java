@@ -42,6 +42,7 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PartitionStatsUtil;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
@@ -405,6 +406,10 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
     if (tableRef instanceof SystemTableRef) {
       throw new AnalysisException(String.format(
           "COMPUTE STATS not supported for system table: %s", tableName_));
+    }
+    if (tableRef.getTable() instanceof FePaimonTable) {
+      throw new AnalysisException(String.format(
+          "COMPUTE STATS not supported for PAIMON table: %s", tableName_));
     }
     table_ = analyzer.getTable(tableName_, Privilege.ALTER, Privilege.SELECT);
 

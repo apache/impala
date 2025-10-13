@@ -72,6 +72,9 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
     } else if (getFileFormat() == THdfsFileFormat.JDBC) {
       throw new AnalysisException("CREATE TABLE LIKE FILE statement is not supported " +
           "for JDBC tables.");
+    } else if (getFileFormat() == THdfsFileFormat.PAIMON) {
+      throw new AnalysisException("CREATE TABLE LIKE FILE statement is not supported" +
+          " for PAIMON tables.");
     }
     schemaLocation_.analyze(analyzer, Privilege.ALL, FsAction.READ);
     switch (schemaFileFormat_) {

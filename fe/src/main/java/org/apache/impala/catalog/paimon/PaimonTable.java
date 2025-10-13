@@ -263,4 +263,8 @@ public class PaimonTable extends Table implements FePaimonTable {
     return table_;
   }
 
+  @Override
+  public String toString() {
+    return String.format("Paimon Table: %s", getFullName());
+  }
 }
