@@ -24,6 +24,7 @@
 #include "common/daemon-env.h"
 #include "common/init.h"
 #include "common/status.h"
+#include "common/thread-debug-info.h"
 #include "rpc/authentication.h"
 #include "rpc/rpc-trace.h"
 #include "rpc/thrift-server.h"
@@ -103,6 +104,8 @@ int CatalogdMain(int argc, char** argv) {
   catalog_server.MarkServiceAsStarted();
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;
 
+  ThreadDebugInfo thread_debug_info;
+  thread_debug_info.SetThreadName("catalogd-main");
   if (FLAGS_enable_workload_mgmt) {
     if (catalog_server.WaitCatalogReadinessForWorkloadManagement()) {
       ABORT_IF_ERROR(catalog_server.InitWorkloadManagement());

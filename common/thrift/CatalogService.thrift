@@ -600,6 +600,9 @@ struct TPartialDbInfo {
 struct TGetPartialCatalogObjectRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V2
 
+  // Common header included in all CatalogService requests.
+  6: optional TCatalogServiceRequestHeader header
+
   // A catalog object descriptor: a TCatalogObject with the object name and type fields
   // set. This may be a TABLE, DB, CATALOG, or FUNCTION. The selectors below can
   // further restrict what information should be returned.

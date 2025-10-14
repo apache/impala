@@ -117,6 +117,11 @@ Status Catalog::GetJsonCatalogObject(const TCatalogObject& req, string* res) {
 
 Status Catalog::GetPartialCatalogObject(const TGetPartialCatalogObjectRequest& req,
     TGetPartialCatalogObjectResponse* resp) {
+  TUniqueId query_id;
+  if (req.__isset.header && req.header.__isset.query_id) {
+    query_id = req.header.query_id;
+  }
+  ScopedThreadContext scoped_tdi(DCHECK_NOTNULL(GetThreadDebugInfo()), query_id);
   return JniUtil::CallJniMethod(catalog_, get_partial_catalog_object_id_, req, resp);
 }
 
@@ -147,25 +152,31 @@ Status Catalog::GetCatalogDelta(CatalogServer* caller, int64_t from_version,
 }
 
 Status Catalog::ExecDdl(const TDdlExecRequest& req, TDdlExecResponse* resp) {
+  TUniqueId query_id;
   if (req.__isset.header && req.header.__isset.query_id) {
-    GetThreadDebugInfo()->SetQueryId(req.header.query_id);
+    query_id = req.header.query_id;
   }
+  ScopedThreadContext scoped_tdi(DCHECK_NOTNULL(GetThreadDebugInfo()), query_id);
   return JniUtil::CallJniMethod(catalog_, exec_ddl_id_, req, resp);
 }
 
 Status Catalog::ResetMetadata(const TResetMetadataRequest& req,
     TResetMetadataResponse* resp) {
+  TUniqueId query_id;
   if (req.__isset.header && req.header.__isset.query_id) {
-    GetThreadDebugInfo()->SetQueryId(req.header.query_id);
+    query_id = req.header.query_id;
   }
+  ScopedThreadContext scoped_tdi(DCHECK_NOTNULL(GetThreadDebugInfo()), query_id);
   return JniUtil::CallJniMethod(catalog_, reset_metadata_id_, req, resp);
 }
 
 Status Catalog::UpdateCatalog(const TUpdateCatalogRequest& req,
     TUpdateCatalogResponse* resp) {
+  TUniqueId query_id;
   if (req.__isset.header && req.header.__isset.query_id) {
-    GetThreadDebugInfo()->SetQueryId(req.header.query_id);
+    query_id = req.header.query_id;
   }
+  ScopedThreadContext scoped_tdi(DCHECK_NOTNULL(GetThreadDebugInfo()), query_id);
   return JniUtil::CallJniMethod(catalog_, update_metastore_id_, req, resp);
 }
 
@@ -216,9 +227,11 @@ Status Catalog::GetFunctions(const TGetFunctionsRequest& request,
 }
 
 Status Catalog::PrioritizeLoad(const TPrioritizeLoadRequest& req) {
+  TUniqueId query_id;
   if (req.__isset.header && req.header.__isset.query_id) {
-    GetThreadDebugInfo()->SetQueryId(req.header.query_id);
+    query_id = req.header.query_id;
   }
+  ScopedThreadContext scoped_tdi(DCHECK_NOTNULL(GetThreadDebugInfo()), query_id);
   return JniUtil::CallJniMethod(catalog_, prioritize_load_id_, req);
 }
 
@@ -261,8 +274,7 @@ Status Catalog::SetEventProcessorStatus(
 
 Status Catalog::WaitForHmsEvent(const TWaitForHmsEventRequest& req,
     TWaitForHmsEventResponse* resp) {
-  if (req.header.__isset.query_id) {
-    GetThreadDebugInfo()->SetQueryId(req.header.query_id);
-  }
+  ScopedThreadContext scoped_tdi(
+    DCHECK_NOTNULL(GetThreadDebugInfo()), req.header.query_id);
   return JniUtil::CallJniMethod(catalog_, wait_for_hms_event_id_, req, resp);
 }

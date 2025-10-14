@@ -27,6 +27,7 @@
 #include "common/init.h"
 #include "common/logging.h"
 #include "common/status.h"
+#include "common/thread-debug-info.h"
 #include "exec/catalog-op-executor.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
@@ -586,6 +587,17 @@ Java_org_apache_impala_service_FeSupport_NativeGetPartialCatalogObject(
   TGetPartialCatalogObjectRequest request;
   THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &request), env,
       JniUtil::internal_exc_class(), nullptr);
+
+  // Populate the request header.
+  if (!request.__isset.header) {
+    ThreadDebugInfo* tdi = GetThreadDebugInfo();
+    // TODO: After IMPALA-14447, query ids might be missing in some threads. This will
+    // be addressed in IMPALA-12870.
+    if (tdi != nullptr) {
+      request.__set_header(TCatalogServiceRequestHeader());
+      request.header.__set_query_id(tdi->GetQueryId());
+    }
+  }
 
   CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), nullptr, nullptr);
   TGetPartialCatalogObjectResponse result;
