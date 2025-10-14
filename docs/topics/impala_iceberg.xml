@@ -698,8 +698,8 @@ OPTIMIZE TABLE [<varname>db_name</varname>.]<varname>table_name</varname> [FILE_
       </p>
 
       <p>
-        We can use the <codeph>FOR SYSTEM_TIME AS OF</codeph> and <codeph>FOR SYSTEM_VERSION AS OF</codeph>
-        clauses in <codeph>SELECT</codeph> queries, e.g.:
+        We can use the clauses <codeph>FOR SYSTEM_TIME AS OF</codeph> with a timestamp and
+        <codeph>FOR SYSTEM_VERSION AS OF</codeph> with a snapshot id in <codeph>SELECT</codeph> queries, e.g.:
         <codeblock>
 SELECT * FROM ice_t FOR SYSTEM_TIME AS OF '2022-01-04 10:00:00';
 SELECT * FROM ice_t FOR SYSTEM_TIME AS OF now() - interval 5 days;
