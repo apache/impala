@@ -270,11 +270,12 @@ Status IcebergBufferedDeleteSink::FlushBufferedRecords(RuntimeState* state) {
       row_batch.Reset();
       RETURN_IF_ERROR(GetNextRowBatch(&row_batch, &it));
       row_batch.VLogRows("IcebergBufferedDeleteSink");
-      RETURN_IF_ERROR(WriteRowsToPartition(state, &row_batch, current_partition_.get()));
+      RETURN_IF_ERROR(WriteDeleteRowsToPartition(state, &row_batch,
+          current_partition_.get(), &dml_exec_state_));
     }
     DCHECK(current_partition_ != nullptr);
-    RETURN_IF_ERROR(FinalizePartitionFile(state, current_partition_.get(),
-        /*is_delete=*/true, &dml_exec_state_));
+    RETURN_IF_ERROR(FinalizeDeletePartitionFile(state, current_partition_.get(),
+        &dml_exec_state_));
     current_partition_->writer->Close();
   }
   return Status::OK();

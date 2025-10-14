@@ -2188,6 +2188,11 @@ class TestIcebergV2Table(IcebergTestSuite):
     vector.unset_exec_option('num_nodes')
     self.run_test_case('QueryTest/iceberg-merge-duplicate-check', vector, unique_database)
 
+  def test_writing_multiple_deletes_per_partition(self, vector, unique_database):
+    """Test writing multiple delete files partition in a single DELETE operation."""
+    self.run_test_case('QueryTest/iceberg-multiple-delete-per-partition', vector,
+        use_db=unique_database)
+
   def test_cleanup(self, unique_database):
       """Test that all uncommitted files written by Impala are removed from the file
       system when a DML commit to an Iceberg table fails, and that the effects of the

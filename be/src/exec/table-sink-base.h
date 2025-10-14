@@ -126,14 +126,26 @@ protected:
 
   /// Updates runtime stats of HDFS with rows written, then closes the file associated
   /// with the partition by calling ClosePartitionFile()
-  Status FinalizePartitionFile(RuntimeState* state, OutputPartition* partition,
-      bool is_delete = false, DmlExecState* dml_exec_state = nullptr) WARN_UNUSED_RESULT;
+  Status FinalizePartitionFile(RuntimeState* state, OutputPartition* partition)
+      WARN_UNUSED_RESULT;
+
+  /// Same as above, but for delete files, as such table sinks have their own
+  /// DmlExecState.
+  Status FinalizeDeletePartitionFile(RuntimeState* state, OutputPartition* partition,
+      DmlExecState* dml_exec_state) WARN_UNUSED_RESULT;
 
   /// Writes all rows in 'batch' referenced by the row index vector in 'indices' to the
   /// partition's writer. If 'indices' is empty, then it writes all rows in 'batch'.
   Status WriteRowsToPartition(
       RuntimeState* state, RowBatch* batch, OutputPartition* partition,
       const std::vector<int32_t>& indices = {})
+      WARN_UNUSED_RESULT;
+
+  /// Writes all rows to the partition's writer. It is only used for writing delete files
+  /// as such table sinks have their own DmlExecState.
+  Status WriteDeleteRowsToPartition(
+      RuntimeState* state, RowBatch* batch, OutputPartition* partition,
+      DmlExecState* dml_exec_state)
       WARN_UNUSED_RESULT;
 
   /// Closes the hdfs file for this partition as well as the writer.
@@ -204,6 +216,16 @@ protected:
   RuntimeProfile::Counter* hdfs_write_timer_;
   /// Time spent compressing data
   RuntimeProfile::Counter* compress_timer_;
+
+private:
+  /// Writes rows to the partition's writer. Sets 'new_file' to true when it cannot write
+  /// all rows to the current output file.
+  Status WriteRowsToFile(
+      RuntimeState* state, RowBatch* batch, OutputPartition* partition,
+      const std::vector<int32_t>& indices, bool *new_file) WARN_UNUSED_RESULT;
+
+  Status FinalizePartitionFileImpl(RuntimeState* state, OutputPartition* partition,
+      bool is_delete, DmlExecState* dml_exec_state) WARN_UNUSED_RESULT;
 };
 
 }

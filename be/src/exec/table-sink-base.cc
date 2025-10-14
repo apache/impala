@@ -375,21 +375,45 @@ Status TableSinkBase::WriteRowsToPartition(
   // set.
   bool new_file;
   while (true) {
-    Status status =
-        output_partition->writer->AppendRows(batch, indices, &new_file);
-    if (!status.ok()) {
-      // IMPALA-10607: Deletes partition file if staging is skipped when appending rows
-      // fails. Otherwise, it leaves the file in un-finalized state.
-      if (ShouldSkipStaging(state, output_partition)) {
-        status.MergeStatus(ClosePartitionFile(state, output_partition));
-        hdfsDelete(output_partition->hdfs_connection,
-            output_partition->current_file_name.c_str(), 0);
-      }
-      return status;
-    }
+    RETURN_IF_ERROR(WriteRowsToFile(state, batch, output_partition, indices, &new_file));
     if (!new_file) break;
     RETURN_IF_ERROR(FinalizePartitionFile(state, output_partition));
     RETURN_IF_ERROR(CreateNewTmpFile(state, output_partition));
+  }
+  return Status::OK();
+}
+
+Status TableSinkBase::WriteDeleteRowsToPartition(
+    RuntimeState* state, RowBatch* batch, OutputPartition* output_partition,
+    DmlExecState* dml_exec_state) {
+  // The rows of this batch may span multiple files. We repeatedly pass the row batch to
+  // the writer until it sets new_file to false, indicating that all rows have been
+  // written. The writer tracks where it is in the batch when it returns with new_file
+  // set.
+  bool new_file;
+  while (true) {
+    RETURN_IF_ERROR(WriteRowsToFile(state, batch, output_partition, {}, &new_file));
+    if (!new_file) break;
+    RETURN_IF_ERROR(FinalizeDeletePartitionFile(state, output_partition, dml_exec_state));
+    RETURN_IF_ERROR(CreateNewTmpFile(state, output_partition));
+  }
+  return Status::OK();
+}
+
+Status TableSinkBase::WriteRowsToFile(
+    RuntimeState* state, RowBatch* batch, OutputPartition* output_partition,
+    const std::vector<int32_t>& indices, bool *new_file) {
+  Status status =
+      output_partition->writer->AppendRows(batch, indices, new_file);
+  if (!status.ok()) {
+    // IMPALA-10607: Deletes partition file if staging is skipped when appending rows
+    // fails. Otherwise, it leaves the file in un-finalized state.
+    if (ShouldSkipStaging(state, output_partition)) {
+      status.MergeStatus(ClosePartitionFile(state, output_partition));
+      hdfsDelete(output_partition->hdfs_connection,
+          output_partition->current_file_name.c_str(), 0);
+    }
+    return status;
   }
   return Status::OK();
 }
@@ -414,9 +438,23 @@ bool TableSinkBase::ShouldSkipStaging(RuntimeState* state, OutputPartition* part
 }
 
 Status TableSinkBase::FinalizePartitionFile(
-    RuntimeState* state, OutputPartition* partition, bool is_delete,
-    DmlExecState* dml_exec_state) {
-  if (dml_exec_state == nullptr) dml_exec_state = state->dml_exec_state();
+    RuntimeState* state, OutputPartition* partition) {
+  return FinalizePartitionFileImpl(
+      state, partition, /*is_delete=*/false, state->dml_exec_state());
+}
+
+Status TableSinkBase::FinalizeDeletePartitionFile(
+    RuntimeState* state, OutputPartition* partition, DmlExecState* dml_exec_state) {
+  DCHECK(IsIceberg());
+  DCHECK(dml_exec_state != nullptr);
+  DCHECK_NE(dml_exec_state, state->dml_exec_state());
+
+  return FinalizePartitionFileImpl(state, partition, /*is_delete=*/true, dml_exec_state);
+}
+
+Status TableSinkBase::FinalizePartitionFileImpl(RuntimeState* state,
+    OutputPartition* partition, bool is_delete, DmlExecState* dml_exec_state) {
+  DCHECK(dml_exec_state != nullptr);
   if (partition->tmp_hdfs_file == nullptr && !is_overwrite()) return Status::OK();
   SCOPED_TIMER(ADD_TIMER(profile(), "FinalizePartitionFileTimer"));
 

@@ -1,0 +1,49 @@
+====
+---- QUERY
+# Regression test for IMPALA-14496 where a DELETE operation needs to write
+# multiple delete files per partition.
+CREATE TABLE multiple_deletes(
+  str STRING NULL,
+  year INT NULL,
+  last_modified TIMESTAMP NULL)
+PARTITIONED BY SPEC (year)
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='2');
+
+INSERT INTO multiple_deletes SELECT string_col, year, timestamp_col FROM functional_parquet.alltypes;
+INSERT INTO multiple_deletes SELECT * FROM multiple_deletes;
+INSERT INTO multiple_deletes SELECT * FROM multiple_deletes;
+INSERT INTO multiple_deletes SELECT * FROM multiple_deletes;
+INSERT INTO multiple_deletes SELECT * FROM multiple_deletes;
+INSERT INTO multiple_deletes SELECT * FROM multiple_deletes;
+INSERT INTO multiple_deletes SELECT * FROM multiple_deletes;
+INSERT INTO multiple_deletes SELECT * FROM multiple_deletes;
+INSERT INTO multiple_deletes SELECT * FROM multiple_deletes;
+INSERT INTO multiple_deletes SELECT * FROM multiple_deletes;
+INSERT INTO multiple_deletes SELECT * FROM multiple_deletes;
+
+SELECT count(*) FROM multiple_deletes;
+---- RESULTS
+7475200
+---- TYPES
+BIGINT
+====
+---- QUERY
+SET parquet_file_size=8m;
+DELETE FROM multiple_deletes WHERE last_modified >= '2008-12-30';
+
+SELECT count(*) FROM multiple_deletes;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Verify that the above DELETE statement wrote 4 delete files (2 per partition) in total.
+SELECT count(*) FROM $DATABASE.multiple_deletes.`files`
+WHERE content = 1;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
