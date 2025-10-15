@@ -1608,7 +1608,7 @@ public class MetastoreEvents {
     protected void process() throws MetastoreNotificationException, CatalogException {
       Timer.Context context = null;
       org.apache.impala.catalog.Table tbl = catalog_.getTableNoThrow(dbName_, tblName_);
-      if (tbl != null) {
+      if (tbl != null && !(tbl instanceof IncompleteTable)) {
         context = tbl.getMetrics().getTimer(TBL_EVENTS_PROCESS_DURATION).time();
       }
       try {

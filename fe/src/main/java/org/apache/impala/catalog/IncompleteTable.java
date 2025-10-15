@@ -26,6 +26,7 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.common.Metrics;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
@@ -216,5 +217,50 @@ public class IncompleteTable extends Table implements FeIncompleteTable {
     Preconditions.checkNotNull(cause_);
     Throwables.propagateIfPossible(cause_, TableLoadingException.class);
     throw new TableLoadingException(cause_.getMessage());
+  }
+
+  /**
+   * Don't initialize any metrics to save memory space.
+   */
+  @Override
+  public void initMetrics() {}
+
+  @Override
+  public Metrics getMetrics() {
+    Preconditions.checkState(false, "getMetrics() on IncompleteTable shouldn't be used");
+    return null;
+  }
+
+  @Override
+  public long getMedianTableLoadingTime() { return 0; }
+
+  @Override
+  public long getMaxTableLoadingTime() { return 0; }
+
+  @Override
+  public long get75TableLoadingTime() { return 0; }
+
+  @Override
+  public long get95TableLoadingTime() { return 0; }
+
+  @Override
+  public long get99TableLoadingTime() { return 0; }
+
+  @Override
+  public long getTableLoadingCounts() { return 0; }
+
+  @Override
+  public void updateHMSLoadTableSchemaTime(long hmsLoadTimeNS) {}
+
+  @Override
+  public boolean removeFromVersionsForInflightEvents(
+      boolean isInsertEvent, long versionNumber) {
+    return false;
+  }
+
+  @Override
+  public boolean addToVersionsForInflightEvents(
+      boolean isInsertEvent, long versionNumber) {
+    return false;
   }
 }

@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreEventContext;
 import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreTableEvent;
@@ -198,7 +199,7 @@ public class RenameTableBarrierEvent extends DerivedMetastoreTableEvent {
     Db db = catalog_.getDb(getDbName());
     Table table = null;
     if (db != null) table = db.getTable(getTableName());
-    if (table != null) {
+    if (table != null && !(table instanceof IncompleteTable)) {
       context = table.getMetrics().getTimer(TBL_EVENTS_PROCESS_DURATION).time();
     }
     String fqTableName = getFullyQualifiedTblName();
