@@ -20,5 +20,5 @@ add_custom_target(validate_java_pom_versions ALL
 )
 
 add_custom_target(java ALL DEPENDS gen-deps function-registry geospatial-udf-wrappers validate_java_pom_versions
-  COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B install -DskipTests
+  COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B dependency:tree install -DskipTests
 )
