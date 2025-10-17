@@ -35,7 +35,7 @@ class TestObservability(CustomClusterTestSuite):
         "select {0}.gc(int_col) from functional.alltypes limit 1000".format(
             unique_database)).runtime_profile
 
-    gc_count_regex = "GcCount:.*\((.*)\)"
+    gc_count_regex = r"GcCount:.*\((.*)\)"
     gc_count_match = re.search(gc_count_regex, profile)
     assert gc_count_match, profile
     assert int(gc_count_match.group(1)) > 0, profile
@@ -44,3 +44,39 @@ class TestObservability(CustomClusterTestSuite):
     gc_time_millis_match = re.search(gc_time_millis_regex, profile)
     assert gc_time_millis_match, profile
     assert parse_duration_string_ms(gc_time_millis_match.group(1)) > 0
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="--catalog_topic_mode=minimal",
+      impalad_args="--use_local_catalog=true",
+      disable_log_buffering=True)
+  def test_query_id_in_logs(self, unique_database):
+    res = self.execute_query("create table %s.tbl (i int)" % unique_database)
+    self.assert_catalogd_log_contains(
+        "INFO", "{}] execDdl request: CREATE_TABLE {}.tbl issued by"
+        .format(res.query_id, unique_database))
+
+    res = self.execute_query("explain select * from %s.tbl" % unique_database)
+    self.assert_catalogd_log_contains(
+        "INFO", r"{}] Loading metadata for: {}.tbl \(needed by coordinator\)"
+        .format(res.query_id, unique_database))
+
+    res = self.execute_query(
+        "create table %s.tbl2 as select * from functional.alltypes" % unique_database)
+    self.assert_catalogd_log_contains(
+        "INFO", "%s] Loading metadata for table: functional.alltypes" % res.query_id)
+    self.assert_catalogd_log_contains(
+        "INFO", "%s] Remaining items in queue: 0. Loads in progress: 1" % res.query_id,
+        expected_count=-1)
+    self.assert_catalogd_log_contains(
+        "INFO", r"{}] Loading metadata for: functional.alltypes \(needed by coordinator\)"
+        .format(res.query_id))
+    self.assert_catalogd_log_contains(
+        "INFO", "{}] execDdl request: CREATE_TABLE_AS_SELECT {}.tbl2 issued by"
+        .format(res.query_id, unique_database))
+    self.assert_catalogd_log_contains(
+        "INFO", "{}] updateCatalog request: Update catalog for {}.tbl2"
+        .format(res.query_id, unique_database))
+    self.assert_catalogd_log_contains(
+        "INFO", r"{}] Loading metadata for: {}.tbl2 \(Load for INSERT\)"
+        .format(res.query_id, unique_database))

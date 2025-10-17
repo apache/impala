@@ -31,7 +31,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.TaggedThreadFactory;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.NoOpEventSequence;
@@ -167,7 +169,7 @@ public class TableLoadingMgr {
     tblLoader_ = new TableLoader(catalog_);
     numLoadingThreads_ = numLoadingThreads;
     tblLoadingPool_ = Executors.newFixedThreadPool(numLoadingThreads_,
-        new ThreadFactoryBuilder().setNameFormat("TableLoadingThread-%d").build());
+        new TaggedThreadFactory("TableLoadingThread-%d"));
 
     // Start the background table loading submitter threads.
     startTableLoadingSubmitterThreads();
@@ -236,7 +238,7 @@ public class TableLoadingMgr {
    * loads of the same table.
    */
   public LoadRequest loadAsync(final TTableName tblName, final long createdEventId,
-      final String reason, final EventSequence catalogTimeline)
+      final String reason, final TUniqueId queryId, final EventSequence catalogTimeline)
       throws DatabaseNotFoundException {
     final Db parentDb = catalog_.getDb(tblName.getDb_name());
     if (parentDb == null) {
@@ -244,13 +246,16 @@ public class TableLoadingMgr {
           "Database '" + tblName.getDb_name() + "' was not found.");
     }
 
-    FutureTask<Table> tableLoadTask = new FutureTask<Table>(new Callable<Table>() {
-        @Override
-        public Table call() throws Exception {
-          catalogTimeline.markEvent("Start loading table");
-          return tblLoader_.load(parentDb, tblName.table_name, createdEventId, reason,
-              catalogTimeline);
-        }});
+    FutureTask<Table> tableLoadTask = new FutureTask<>(() -> {
+      try {
+        TaggedThreadFactory.updateQueryId(queryId);
+        catalogTimeline.markEvent("Start loading table");
+        return tblLoader_.load(parentDb, tblName.table_name, createdEventId, reason,
+            catalogTimeline);
+      } finally {
+        TaggedThreadFactory.resetQueryId();
+      }
+    });
 
     FutureTask<Table> existingValue = loadingTables_.putIfAbsent(tblName, tableLoadTask);
     if (existingValue == null) {

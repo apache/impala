@@ -29,6 +29,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TQueryOptions;
@@ -64,6 +65,10 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
   public AuthorizationStmtTest(AuthorizationProvider authzProvider)
       throws ImpalaException {
     super(authzProvider);
+  }
+
+  static {
+    FeSupport.loadLibrary();
   }
 
   @BeforeClass

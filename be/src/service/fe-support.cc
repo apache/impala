@@ -591,8 +591,7 @@ Java_org_apache_impala_service_FeSupport_NativeGetPartialCatalogObject(
   // Populate the request header.
   if (!request.__isset.header) {
     ThreadDebugInfo* tdi = GetThreadDebugInfo();
-    // TODO: After IMPALA-14447, query ids might be missing in some threads. This will
-    // be addressed in IMPALA-12870.
+    // Requests from WebUI don't have ThreadDebugInfo and query ids.
     if (tdi != nullptr) {
       request.__set_header(TCatalogServiceRequestHeader());
       request.header.__set_query_id(tdi->GetQueryId());
@@ -807,6 +806,50 @@ Java_org_apache_impala_service_FeSupport_NativeWaitForHmsEvents(JNIEnv* env,
   return result_bytes;
 }
 
+extern "C" JNIEXPORT jlong JNICALL
+Java_org_apache_impala_service_FeSupport_NativeInitThreadDebugInfo(JNIEnv* env,
+    jclass fe_support_class, jbyteArray thrift_query_id) {
+  TUniqueId query_id;
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_query_id, &query_id), env,
+      JniUtil::internal_exc_class(), 0);
+  ThreadDebugInfo* tdi = new ThreadDebugInfo();
+  tdi->SetQueryId(query_id);
+  return reinterpret_cast<jlong>(tdi);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_apache_impala_service_FeSupport_NativeUpdateThreadDebugInfo(JNIEnv* env,
+    jclass fe_support_class, jbyteArray thrift_query_id) {
+  TUniqueId query_id;
+  THROW_IF_ERROR(DeserializeThriftMsg(env, thrift_query_id, &query_id), env,
+      JniUtil::internal_exc_class());
+  ThreadDebugInfo* tdi = GetThreadDebugInfo();
+  DCHECK(tdi != nullptr);
+  if (tdi == nullptr) {
+    LOG(WARNING) << "ThreadDebugInfo is null. Not tagging query id " << PrintId(query_id);
+    return;
+  }
+  tdi->SetQueryId(query_id);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_apache_impala_service_FeSupport_NativeResetThreadDebugInfo(JNIEnv* env,
+    jclass fe_support_class) {
+  ThreadDebugInfo* tdi = GetThreadDebugInfo();
+  // If ThreadDebugInfo is null, no need to reset anything.
+  if (tdi == nullptr) return;
+  // A 0 unique id, which indicates that one has not been set.
+  static const TUniqueId ZERO_UNIQUE_ID;
+  tdi->SetQueryId(ZERO_UNIQUE_ID);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_apache_impala_service_FeSupport_NativeDeleteThreadDebugInfo(JNIEnv* env,
+    jclass fe_support_class, jlong tdi) {
+  if (tdi == 0) return;
+  delete (ThreadDebugInfo*)tdi;
+}
+
 namespace impala {
 
 static JNINativeMethod native_methods[] = {
@@ -901,6 +944,22 @@ static JNINativeMethod native_methods[] = {
   {
     const_cast<char*>("NativeWaitForHmsEvents"), const_cast<char*>("([B[B)[B"),
     (void*)::Java_org_apache_impala_service_FeSupport_NativeWaitForHmsEvents
+  },
+  {
+    const_cast<char*>("NativeInitThreadDebugInfo"), const_cast<char*>("([B)J"),
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeInitThreadDebugInfo
+  },
+  {
+    const_cast<char*>("NativeUpdateThreadDebugInfo"), const_cast<char*>("([B)V"),
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeUpdateThreadDebugInfo
+  },
+  {
+    const_cast<char*>("NativeResetThreadDebugInfo"), const_cast<char*>("()V"),
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeResetThreadDebugInfo
+  },
+  {
+    const_cast<char*>("NativeDeleteThreadDebugInfo"), const_cast<char*>("(J)V"),
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeDeleteThreadDebugInfo
   },
 };
 

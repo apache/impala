@@ -52,6 +52,7 @@ import org.apache.impala.catalog.local.LocalCatalogException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.TaggedThreadFactory;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend;
@@ -66,7 +67,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
  * Loads all table and view metadata relevant for a single SQL statement and returns the
@@ -370,10 +370,8 @@ public class StmtMetadataLoader {
     List<Pair<TableName, FeTable>> tables = new ArrayList<>();
     ExecutorService executorService = null;
     try {
-      executorService = Executors.newFixedThreadPool(maxThreads,
-          new ThreadFactoryBuilder()
-              .setNameFormat("MissingTableLoaderThread-" + queryIdStr + "-%d")
-              .build());
+      executorService = Executors.newFixedThreadPool(maxThreads, new TaggedThreadFactory(
+          queryId_, "MissingTableLoaderThread-" + queryIdStr + "-%d"));
       // Transform tbls to a list of tasks.
       List<Callable<Pair<TableName, FeTable>>> tasks =
           tbls.stream()

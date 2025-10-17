@@ -26,6 +26,7 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.AuthorizationTestBase;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
@@ -44,6 +45,9 @@ import static org.junit.Assert.assertTrue;
 
 public class RangerAuditLogTest extends AuthorizationTestBase {
   private static RangerAuthorizationCheckerSpy authzChecker_ = null;
+  static {
+    FeSupport.loadLibrary();
+  }
 
   private static class RangerAuthorizationCheckerSpy extends RangerAuthorizationChecker {
     private AuthorizationContext authzCtx_;

@@ -920,8 +920,9 @@ public class CatalogServiceCatalog extends Catalog {
           .toString(), request.valid_write_ids);
     }
     long tableId = request.getTable_id();
+    // This is only used in the legacy catalog mode. No query ids are sent here.
     Table table = getOrLoadTable(tableName.db_name, tableName.table_name,
-        "needed to fetch partition stats", writeIdList, tableId,
+        "needed to fetch partition stats", /*queryId*/null, writeIdList, tableId,
         NoOpEventSequence.INSTANCE);
 
     // Table could be null if it does not exist anymore.
@@ -2801,7 +2802,7 @@ public class CatalogServiceCatalog extends Catalog {
 
   public @Nullable Table getOrLoadTable(String dbName, String tblName, String reason,
       ValidWriteIdList validWriteIdList) throws CatalogException {
-    return getOrLoadTable(dbName, tblName, reason, validWriteIdList,
+    return getOrLoadTable(dbName, tblName, reason, null, validWriteIdList,
         TABLE_ID_UNAVAILABLE, NoOpEventSequence.INSTANCE);
   }
 
@@ -2815,8 +2816,8 @@ public class CatalogServiceCatalog extends Catalog {
    * (not yet loaded table) will be returned.
    */
   public @Nullable Table getOrLoadTable(String dbName, String tblName, String reason,
-      ValidWriteIdList validWriteIdList, long tableId, EventSequence catalogTimeline)
-      throws CatalogException {
+      @Nullable TUniqueId queryId, ValidWriteIdList validWriteIdList, long tableId,
+      EventSequence catalogTimeline) throws CatalogException {
     TTableName tableName = new TTableName(dbName.toLowerCase(), tblName.toLowerCase());
     Table tbl;
     TableLoadingMgr.LoadRequest loadReq = null;
@@ -2889,7 +2890,7 @@ public class CatalogServiceCatalog extends Catalog {
         previousCatalogVersion = tbl.getCatalogVersion();
         LOG.trace("Loading full table {}", tbl.getFullName());
         loadReq = tableLoadingMgr_.loadAsync(tableName, tbl.getCreateEventId(), reason,
-            catalogTimeline);
+            queryId, catalogTimeline);
       }
     } finally {
       versionLock_.readLock().unlock();
@@ -4371,9 +4372,11 @@ public class CatalogServiceCatalog extends Catalog {
               dbName + "." + tblName, req.table_info_selector.valid_write_ids);
           tableId = req.table_info_selector.getTable_id();
         }
+        TUniqueId queryId = req.isSetHeader() && req.header.isSetQuery_id() ?
+            req.header.query_id : null;
         table = getOrLoadTable(
             objectDesc.getTable().getDb_name(), objectDesc.getTable().getTbl_name(),
-            tableLoadReason, writeIdList, tableId, NoOpEventSequence.INSTANCE);
+            tableLoadReason, queryId, writeIdList, tableId, NoOpEventSequence.INSTANCE);
       } catch (DatabaseNotFoundException e) {
         return createGetPartialCatalogObjectError(req, CatalogLookupStatus.DB_NOT_FOUND);
       }

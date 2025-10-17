@@ -160,6 +160,21 @@ public class FeSupport {
   public native static byte[] NativeWaitForHmsEvents(byte[] thriftReq,
       byte[] thriftQueryOptions);
 
+  // Initialize ThreadDebugInfo for the current thread. Should only be used once for a
+  // thread.
+  public native static long NativeInitThreadDebugInfo(byte[] thriftQueryId);
+
+  // Update the ThreadDebugInfo to track a new query id. So logs of the current thread
+  // can be tagged with that query id.
+  public native static void NativeUpdateThreadDebugInfo(byte[] thriftQueryId);
+
+  // Reset the ThreadDebugInfo to not tag on any query ids.
+  public native static void NativeResetThreadDebugInfo();
+
+  // Delete the ThreadDebugInfo created in Backend. Should only be used once for a thread
+  // that has initialized ThreadDebugInfo.
+  public native static void NativeDeleteThreadDebugInfo(long ptr);
+
   /**
    * Locally caches the jar at the specified HDFS location.
    *
