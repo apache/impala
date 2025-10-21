@@ -154,7 +154,7 @@ class TestMetadataNoEventsProcessing(CustomClusterTestSuite):
         "partition (x=3) cached in 'testPool' with replication=3" % table_name)
     except Exception as e:
       exception = e
-      assert "Partition already exists" in str(e)
+      assert "Partition(s) already exist" in str(e)
     assert exception is not None, "should have triggered an error"
 
     # No partitions were added in Impala.
