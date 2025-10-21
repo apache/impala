@@ -186,3 +186,379 @@ p, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STA
 'Total',4,4,'8B','0B','','','','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - filter by year
+show partitions alltypes where year = 2009
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','2',280,1,'18.12KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=2','$ERASURECODE_POLICY'
+'2009','3',310,1,'20.06KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=3','$ERASURECODE_POLICY'
+'2009','4',300,1,'19.61KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=4','$ERASURECODE_POLICY'
+'2009','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=5','$ERASURECODE_POLICY'
+'2009','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=6','$ERASURECODE_POLICY'
+'2009','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=7','$ERASURECODE_POLICY'
+'2009','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=8','$ERASURECODE_POLICY'
+'2009','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=9','$ERASURECODE_POLICY'
+'2009','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=10','$ERASURECODE_POLICY'
+'2009','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=11','$ERASURECODE_POLICY'
+'2009','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=12','$ERASURECODE_POLICY'
+'Total','',3650,12,'238.68KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - filter by year and month
+show partitions alltypes where year = 2009 and month <= 3
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','2',280,1,'18.12KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=2','$ERASURECODE_POLICY'
+'2009','3',310,1,'20.06KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=3','$ERASURECODE_POLICY'
+'Total','',900,3,'58.14KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - filter with IN predicate
+show partitions alltypes where year = 2010 and month in (1, 6, 12)
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2010','1',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=1','$ERASURECODE_POLICY'
+'2010','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=6','$ERASURECODE_POLICY'
+'2010','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=12','$ERASURECODE_POLICY'
+'Total','',920,3,'60.43KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - no matches returns empty result
+show partitions alltypes where year = 2025
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - using BETWEEN
+show partitions alltypes where year = 2009 and month between 10 and 12
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=10','$ERASURECODE_POLICY'
+'2009','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=11','$ERASURECODE_POLICY'
+'2009','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=12','$ERASURECODE_POLICY'
+'Total','',920,3,'60.43KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - using OR
+show partitions alltypes where (year = 2009 and month = 1) or (year = 2010 and month = 12)
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2010','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=12','$ERASURECODE_POLICY'
+'Total','',620,2,'40.32KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - NOT operator
+show partitions alltypes where year = 2009 and not (month <= 2 or month >= 11)
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','3',310,1,'20.06KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=3','$ERASURECODE_POLICY'
+'2009','4',300,1,'19.61KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=4','$ERASURECODE_POLICY'
+'2009','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=5','$ERASURECODE_POLICY'
+'2009','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=6','$ERASURECODE_POLICY'
+'2009','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=7','$ERASURECODE_POLICY'
+'2009','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=8','$ERASURECODE_POLICY'
+'2009','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=9','$ERASURECODE_POLICY'
+'2009','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=10','$ERASURECODE_POLICY'
+'Total','',2450,8,'160.54KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - NOT EQUAL operator
+show partitions alltypes where year = 2009 and month != 12
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','2',280,1,'18.12KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=2','$ERASURECODE_POLICY'
+'2009','3',310,1,'20.06KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=3','$ERASURECODE_POLICY'
+'2009','4',300,1,'19.61KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=4','$ERASURECODE_POLICY'
+'2009','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=5','$ERASURECODE_POLICY'
+'2009','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=6','$ERASURECODE_POLICY'
+'2009','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=7','$ERASURECODE_POLICY'
+'2009','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=8','$ERASURECODE_POLICY'
+'2009','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=9','$ERASURECODE_POLICY'
+'2009','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=10','$ERASURECODE_POLICY'
+'2009','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=11','$ERASURECODE_POLICY'
+'Total','',3340,11,'218.32KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - using OR conditions
+show partitions alltypes where month = 1 or month = 6
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=6','$ERASURECODE_POLICY'
+'2010','1',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=1','$ERASURECODE_POLICY'
+'2010','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=6','$ERASURECODE_POLICY'
+'Total','',1220,4,'79.73KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - using OR conditions but using "||" operator
+show partitions alltypes where month = 1 || month = 6
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=6','$ERASURECODE_POLICY'
+'2010','1',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=1','$ERASURECODE_POLICY'
+'2010','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=6','$ERASURECODE_POLICY'
+'Total','',1220,4,'79.73KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - complex nested conditions
+show partitions alltypes where (year = 2009 and (month = 1 or month = 12)) or (year = 2010 and month between 6 and 7)
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=12','$ERASURECODE_POLICY'
+'2010','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=6','$ERASURECODE_POLICY'
+'2010','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=7','$ERASURECODE_POLICY'
+'Total','',1230,4,'80.39KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - testing with string partition column
+show partitions functional.part_strings_with_quotes where p = '"'
+---- LABELS
+p, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'"',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%22','$ERASURECODE_POLICY'
+'Total',1,1,'2B','0B','','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - IS NULL predicate
+show partitions alltypes where year IS NULL
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - LIKE predicate on string partition
+show partitions functional.stringpartitionkey where string_col LIKE 'p%'
+---- LABELS
+STRING_COL, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'partition1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/stringpartitionkey/string_col=partition1','$ERASURECODE_POLICY'
+'Total',0,0,'0B','0B','','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - REGEXP predicate on string partition
+show partitions functional.stringpartitionkey where string_col REGEXP '^2'
+---- LABELS
+STRING_COL, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009-01-01 00:00:00',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/stringpartitionkey/string_col=2009-01-01 00%3A00%3A00','$ERASURECODE_POLICY'
+'Total',1,1,'2B','0B','','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - arithmetic expression
+show partitions alltypes where month + 1 = 2
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2010','1',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=1','$ERASURECODE_POLICY'
+'Total','',620,2,'40.32KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - CAST to TIMESTAMP
+show partitions functional.stringpartitionkey where CAST(string_col AS TIMESTAMP) = CAST('2009-01-01 00:00:00' AS TIMESTAMP)
+---- LABELS
+STRING_COL, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009-01-01 00:00:00',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/stringpartitionkey/string_col=2009-01-01 00%3A00%3A00','$ERASURECODE_POLICY'
+'Total',1,1,'2B','0B','','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - CASE expression
+show partitions alltypes where CASE WHEN year > 2009 THEN 1 ELSE 0 END = 1
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2010','1',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=1','$ERASURECODE_POLICY'
+'2010','2',280,1,'18.39KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=2','$ERASURECODE_POLICY'
+'2010','3',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=3','$ERASURECODE_POLICY'
+'2010','4',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=4','$ERASURECODE_POLICY'
+'2010','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=5','$ERASURECODE_POLICY'
+'2010','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=6','$ERASURECODE_POLICY'
+'2010','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=7','$ERASURECODE_POLICY'
+'2010','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=8','$ERASURECODE_POLICY'
+'2010','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=9','$ERASURECODE_POLICY'
+'2010','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=10','$ERASURECODE_POLICY'
+'2010','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=11','$ERASURECODE_POLICY'
+'2010','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=12','$ERASURECODE_POLICY'
+'Total','',3650,12,'239.77KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - uuid() non-deterministic function
+show partitions alltypes where month = length(uuid()) / 3
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=12','$ERASURECODE_POLICY'
+'2010','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=12','$ERASURECODE_POLICY'
+'Total','',620,2,'40.73KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# SHOW PARTITIONS with WHERE clause - LIKE with CAST and concat
+show partitions functional.stringpartitionkey where string_col LIKE CAST(concat('2', '%') AS STRING)
+---- LABELS
+STRING_COL, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009-01-01 00:00:00',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/stringpartitionkey/string_col=2009-01-01 00%3A00%3A00','$ERASURECODE_POLICY'
+'Total',1,1,'2B','0B','','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE not supported on Iceberg tables
+show partitions functional_parquet.iceberg_int_partitioned where i = 1
+---- CATCH
+WHERE clause in SHOW PARTITIONS is only supported for HDFS tables
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE with non-partition column
+show partitions alltypes where id = 1
+---- CATCH
+SHOW PARTITIONS WHERE supports only partition columns
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE with non-existent column
+show partitions alltypes where nonexistent_col = 1
+---- CATCH
+Could not resolve column/field reference: 'nonexistent_col'
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE with non-boolean expression
+show partitions alltypes where year
+---- CATCH
+WHERE clause '`year`' requires return type 'BOOLEAN'. Actual type is 'INT'.
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE with aggregate function
+show partitions alltypes where count(year) > 0
+---- CATCH
+Aggregate functions are not allowed in SHOW PARTITIONS WHERE
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE with analytic function
+show partitions alltypes where row_number() over (order by year) = 1
+---- CATCH
+Analytic expressions are not allowed in SHOW PARTITIONS WHERE
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE on Kudu table
+show partitions functional_kudu.alltypes where year = 2009
+---- CATCH
+WHERE clause in SHOW PARTITIONS is only supported for HDFS tables
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE with subquery
+show partitions alltypes where year in (select year from alltypes limit 1)
+---- CATCH
+Subqueries are not allowed in SHOW PARTITIONS WHERE
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE on non-partitioned table
+show partitions alltypesaggmultifilesnopart where 1=1
+---- CATCH
+Table is not partitioned: functional.alltypesaggmultifilesnopart
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE with type mismatch
+show partitions alltypes where year = 'abc'
+---- CATCH
+operands of type INT and STRING are not comparable: `year` = 'abc'
+====
+---- QUERY
+# Edge case: SHOW PARTITIONS WHERE with always false predicate
+show partitions alltypes where 1 = 0
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Edge case: SHOW PARTITIONS WHERE with always true predicate (shows all partitions)
+show partitions alltypes where 1 = 1
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION, EC POLICY
+---- RESULTS
+'2009','1',310,1,'19.95KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=1','$ERASURECODE_POLICY'
+'2009','2',280,1,'18.12KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=2','$ERASURECODE_POLICY'
+'2009','3',310,1,'20.06KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=3','$ERASURECODE_POLICY'
+'2009','4',300,1,'19.61KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=4','$ERASURECODE_POLICY'
+'2009','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=5','$ERASURECODE_POLICY'
+'2009','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=6','$ERASURECODE_POLICY'
+'2009','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=7','$ERASURECODE_POLICY'
+'2009','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=8','$ERASURECODE_POLICY'
+'2009','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=9','$ERASURECODE_POLICY'
+'2009','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=10','$ERASURECODE_POLICY'
+'2009','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=11','$ERASURECODE_POLICY'
+'2009','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2009/month=12','$ERASURECODE_POLICY'
+'2010','1',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=1','$ERASURECODE_POLICY'
+'2010','2',280,1,'18.39KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=2','$ERASURECODE_POLICY'
+'2010','3',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=3','$ERASURECODE_POLICY'
+'2010','4',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=4','$ERASURECODE_POLICY'
+'2010','5',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=5','$ERASURECODE_POLICY'
+'2010','6',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=6','$ERASURECODE_POLICY'
+'2010','7',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=7','$ERASURECODE_POLICY'
+'2010','8',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=8','$ERASURECODE_POLICY'
+'2010','9',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=9','$ERASURECODE_POLICY'
+'2010','10',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=10','$ERASURECODE_POLICY'
+'2010','11',300,1,'19.71KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=11','$ERASURECODE_POLICY'
+'2010','12',310,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypes/year=2010/month=12','$ERASURECODE_POLICY'
+'Total','',7300,24,'478.45KB','0B','','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
+====

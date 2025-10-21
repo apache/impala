@@ -4506,6 +4506,88 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "SHOW PARTITIONS not applicable to a view: functional.view_view");
     AnalysisError("show partitions functional_hbase.alltypes",
         "SHOW PARTITIONS must target an HDFS or Kudu table: functional_hbase.alltypes");
+
+    // Tests for WHERE clause in SHOW PARTITIONS (IMPALA-14065)
+    // Valid WHERE clauses with partition columns on HDFS tables
+    AnalyzesOk("show partitions functional.alltypes where year = 2009");
+    AnalyzesOk("show partitions functional.alltypes where year = 2009 and month = 1");
+    AnalyzesOk("show partitions functional.alltypes where year > 2009");
+    AnalyzesOk("show partitions functional.alltypes where year >= 2009 and month < 10");
+    AnalyzesOk("show partitions functional.alltypes where year in (2009, 2010)");
+    AnalyzesOk("show partitions functional.alltypes where year between 2009 and 2010");
+    AnalyzesOk("show partitions functional.alltypes where month is null");
+    AnalyzesOk("show partitions functional.alltypes where month is not null");
+    AnalyzesOk("show partitions functional.alltypes where year = 2009 or month = 5");
+
+    // WHERE clause with non-partition columns should fail
+    AnalysisError("show partitions functional.alltypes where id = 1",
+        "SHOW PARTITIONS WHERE supports only partition columns");
+    AnalysisError("show partitions functional.alltypes where year = 2009 and id = 1",
+        "SHOW PARTITIONS WHERE supports only partition columns");
+
+    // WHERE clause with subqueries should fail
+    AnalysisError("show partitions functional.alltypes where year in " +
+        "(select year from functional.alltypes)",
+        "Subqueries are not allowed in SHOW PARTITIONS WHERE");
+
+    // WHERE clause with analytic functions should fail
+    AnalysisError("show partitions functional.alltypes where " +
+        "row_number() over (order by year) = 1",
+        "Analytic expressions are not allowed in SHOW PARTITIONS WHERE");
+
+    // WHERE clause with Kudu table should fail (non-HDFS tables don't support WHERE)
+    AnalysisError("show partitions functional_kudu.alltypes where year = 2009",
+        "WHERE clause in SHOW PARTITIONS is only supported for HDFS tables");
+
+    // WHERE clause with Iceberg table should fail
+    AnalysisError("show partitions functional_parquet.iceberg_int_partitioned " +
+        "where i = 1",
+        "WHERE clause in SHOW PARTITIONS is only supported for HDFS tables");
+
+    // WHERE clause must be a boolean expression
+    AnalysisError("show partitions functional.alltypes where year",
+        "WHERE clause '`year`' requires return type 'BOOLEAN'. Actual type is 'INT'.");
+
+    // Tests for more complex WHERE clause predicates
+    // String operations: LIKE and REGEXP
+    AnalyzesOk("show partitions functional.stringpartitionkey where " +
+        "string_col like '2%'");
+    AnalyzesOk("show partitions functional.stringpartitionkey where " +
+        "string_col regexp '^partition'");
+
+    // Arithmetic expressions
+    AnalyzesOk("show partitions functional.alltypes where month + 1 = 2");
+    AnalyzesOk("show partitions functional.alltypes where year * 2 > 4000");
+
+    // CAST expressions
+    AnalyzesOk("show partitions functional.stringpartitionkey where " +
+        "cast(string_col as timestamp) > '2009-01-01'");
+
+    // CASE expressions
+    AnalyzesOk("show partitions functional.alltypes where " +
+        "case when year > 2009 then 1 else 0 end = 1");
+    AnalyzesOk("show partitions functional.alltypes where " +
+        "case when month <= 6 then 'H1' else 'H2' end = 'H1'");
+
+    // Non-deterministic functions
+    // rand() - should evaluate per partition
+    AnalyzesOk("show partitions functional.alltypes where month = rand()");
+    AnalyzesOk("show partitions functional.alltypes where " +
+        "month <= floor(rand() * 12) + 1");
+    AnalyzesOk("show partitions functional.alltypes where rand() < 0.5");
+
+    // uuid() - should evaluate per partition
+    AnalyzesOk("show partitions functional.alltypes where month = length(uuid()) / 3");
+    AnalyzesOk("show partitions functional.alltypes where length(uuid()) > 30");
+
+    // now() - should evaluate per partition
+    AnalyzesOk("show partitions functional.alltypes where month = month(now())");
+    AnalyzesOk("show partitions functional.alltypes where year <= year(now())");
+
+    // Complex expressions with non-deterministic functions
+    AnalyzesOk("show partitions functional.stringpartitionkey where " +
+        "string_col like cast(concat(cast(floor(rand() * 10) as string), '%') " +
+        "as string)");
   }
 
   @Test

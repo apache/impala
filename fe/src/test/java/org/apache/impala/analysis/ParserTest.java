@@ -2130,6 +2130,26 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("SHOW PARTITIONS tbl");
     ParsesOk("SHOW PARTITIONS db.tbl");
     ParsesOk("SHOW PARTITIONS `db`.`tbl`");
+    ParsesOk("SHOW PARTITIONS tbl WHERE year = 2025 and month < 6");
+
+    // Show partitions with various WHERE clause expressions (IMPALA-14065)
+    ParsesOk("SHOW PARTITIONS tbl WHERE year IN (2009, 2010)");
+    ParsesOk("SHOW PARTITIONS tbl WHERE year BETWEEN 2009 AND 2010");
+    ParsesOk("SHOW PARTITIONS tbl WHERE month IS NULL");
+    ParsesOk("SHOW PARTITIONS tbl WHERE month IS NOT NULL");
+    ParsesOk("SHOW PARTITIONS tbl WHERE string_col LIKE '2%'");
+    ParsesOk("SHOW PARTITIONS tbl WHERE string_col REGEXP '^partition'");
+    ParsesOk("SHOW PARTITIONS tbl WHERE month + 1 = 2");
+    ParsesOk("SHOW PARTITIONS tbl WHERE CAST(string_col AS INT) > 0");
+    ParsesOk("SHOW PARTITIONS tbl WHERE CASE WHEN year > 2009 THEN 1 ELSE 0 END = 1");
+
+    // Show partitions with non-deterministic functions (IMPALA-14065)
+    ParsesOk("SHOW PARTITIONS tbl WHERE month = rand()");
+    ParsesOk("SHOW PARTITIONS tbl WHERE month <= floor(rand() * 12) + 1");
+    ParsesOk("SHOW PARTITIONS tbl WHERE rand() < 0.5");
+    ParsesOk("SHOW PARTITIONS tbl WHERE month = length(uuid()) / 3");
+    ParsesOk("SHOW PARTITIONS tbl WHERE year <= year(now())");
+    ParsesOk("SHOW PARTITIONS tbl WHERE month = month(now())");
 
     // Show range partitions
     ParsesOk("SHOW RANGE PARTITIONS tbl");

@@ -60,6 +60,8 @@ import org.apache.impala.util.TAccessLevelUtil;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.thrift.TException;
 
+import javax.annotation.Nullable;
+
 /**
  * Frontend interface for interacting with a filesystem-backed table.
  *
@@ -451,17 +453,17 @@ public interface FeFsTable extends FeTable {
   }
 
   /**
-   * @return statistics on this table as a tabular result set. Used for the
-   * SHOW TABLE STATS statement. The schema of the returned TResultSet is set
-   * inside this method.
+   * Helper method to build the schema for table stats result set.
+   * @param result The TResultSet to populate with schema information
+   * @return true if stats extrapolation is enabled for this table
    */
-  default TResultSet getTableStats() {
-    TResultSet result = new TResultSet();
+  default boolean buildTableStatsSchema(TResultSet result) {
     TResultSetMetadata resultSchema = new TResultSetMetadata();
     result.setSchema(resultSchema);
+    result.setRows(new ArrayList<>());
 
+    // Add partition column headers
     for (int i = 0; i < getNumClusteringCols(); ++i) {
-      // Add the partition-key values as strings for simplicity.
       Column partCol = getColumns().get(i);
       TColumn colDesc = new TColumn(partCol.getName(), Type.STRING.toThrift());
       resultSchema.addToColumns(colDesc);
@@ -469,6 +471,7 @@ public interface FeFsTable extends FeTable {
 
     boolean statsExtrap = Utils.isStatsExtrapolationEnabled(this);
 
+    // Add stats column headers
     resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
     if (statsExtrap) {
       resultSchema.addToColumns(new TColumn("Extrap #Rows", Type.BIGINT.toThrift()));
@@ -482,93 +485,170 @@ public interface FeFsTable extends FeTable {
     resultSchema.addToColumns(new TColumn("Location", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("EC Policy", Type.STRING.toThrift()));
 
-    // Pretty print partitions and their stats.
-    List<FeFsPartition> orderedPartitions = new ArrayList<>(loadAllPartitions());
+    return statsExtrap;
+  }
+
+  /**
+   * Helper method to build a stats row for a single partition.
+   * @param p The partition to build stats for
+   * @param statsExtrap Whether stats extrapolation is enabled
+   * @return An array containing [cachedBytes, totalBytes, numFiles, numRows]
+   * for aggregation
+   */
+  default long[] buildPartitionStatsRow(
+      FeFsPartition p, boolean statsExtrap, TResultSet result) {
+    long numFiles = p.getNumFileDescriptors();
+    long size = p.getSize();
+    long cachedBytes = 0L;
+    long numRows = p.getNumRows();
+
+    TResultRowBuilder rowBuilder = new TResultRowBuilder();
+
+    // Add partition key values
+    for (LiteralExpr expr: p.getPartitionValues()) {
+      rowBuilder.add(expr.getStringValue());
+    }
+
+    // Add row counts
+    rowBuilder.add(numRows);
+    // Compute and report the extrapolated row count because the set of files could
+    // have changed since we last computed stats for this partition. We also follow
+    // this policy during scan-cardinality estimation.
+    if (statsExtrap) {
+      rowBuilder.add(Utils.getExtrapolatedNumRows(this, size));
+    }
+
+    // Add file stats
+    rowBuilder.add(numFiles).addBytes(size);
+
+    // Add cache stats
+    if (!p.isMarkedCached()) {
+      // Helps to differentiate partitions that have 0B cached versus partitions
+      // that are not marked as cached.
+      rowBuilder.add("NOT CACHED");
+      rowBuilder.add("NOT CACHED");
+    } else {
+      // Calculate cached bytes
+      for (FileDescriptor fd: p.getFileDescriptors()) {
+        int numBlocks = fd.getNumFileBlocks();
+        for (int i = 0; i < numBlocks; ++i) {
+          FbFileBlock block = fd.getFbFileBlock(i);
+          if (FileBlock.hasCachedReplica(block)) {
+            cachedBytes += FileBlock.getLength(block);
+          }
+        }
+      }
+      rowBuilder.addBytes(cachedBytes);
+
+      // Extract cache replication factor from the parameters of the table
+      // if the table is not partitioned or directly from the partition.
+      Short rep = HdfsCachingUtil.getCachedCacheReplication(
+          getNumClusteringCols() == 0 ?
+              p.getTable().getMetaStoreTable().getParameters() :
+              p.getParameters());
+      rowBuilder.add(rep.toString());
+    }
+
+    // Add format, incremental stats, location, and EC policy
+    rowBuilder.add(p.getFileFormat().toString());
+    rowBuilder.add(String.valueOf(p.hasIncrementalStats()));
+    rowBuilder.add(p.getLocation());
+    rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(p.getLocationPath()));
+
+    result.addToRows(rowBuilder.get());
+    return new long[] { cachedBytes, size, numFiles, numRows };
+  }
+
+  /**
+   * Helper method to build the "Total" summary row for partitioned tables.
+   * @param totalCachedBytes Total cached bytes across all partitions
+   * @param totalBytes Total bytes across all partitions
+   * @param totalNumFiles Total number of files across all partitions
+   * @param totalNumRows Total number of rows across all partitions
+   * @param statsExtrap Whether stats extrapolation is enabled
+   * @param result The result set to add the row to
+   */
+  default void buildTotalStatsRow(long totalCachedBytes, long totalBytes,
+      long totalNumFiles, long totalNumRows, boolean statsExtrap, TResultSet result) {
+    TResultRowBuilder rowBuilder = new TResultRowBuilder();
+    int numEmptyCells = getNumClusteringCols() - 1;
+    rowBuilder.add("Total");
+    for (int i = 0; i < numEmptyCells; ++i) {
+      rowBuilder.add("");
+    }
+
+    // Total rows and extrapolated rows
+    rowBuilder.add(totalNumRows);
+    // Compute and report the extrapolated row count because the set of files could
+    // have changed since we last computed stats for this partition. We also follow
+    // this policy during scan-cardinality estimation.
+    if (statsExtrap) {
+      rowBuilder.add(Utils.getExtrapolatedNumRows(this, getTotalHdfsBytes()));
+    }
+
+    // Total files, bytes, cache stats, and empty fields for format/location/etc
+    rowBuilder.add(totalNumFiles)
+        .addBytes(totalBytes)
+        .addBytes(totalCachedBytes).add("").add("").add("").add("").add("");
+    result.addToRows(rowBuilder.get());
+  }
+
+  /**
+   * @return statistics on this table as a tabular result set. Used for the
+   * SHOW TABLE STATS statement. The schema of the returned TResultSet is set
+   * inside this method.
+   */
+  default TResultSet getTableStats() {
+    return getTableStats(null);
+  }
+
+  /**
+   * @return statistics on the specified subset of partitions of this table as a tabular
+   * result set. If partitionIds is null, returns stats for all partitions.
+   * Schema is the same as getTableStats().
+   */
+  default TResultSet getTableStats(@Nullable Collection<Long> partitionIds) {
+    TResultSet result = new TResultSet();
+    boolean statsExtrap = buildTableStatsSchema(result);
+
+    // Load and sort partitions (all or filtered based on partitionIds)
+    List<FeFsPartition> orderedPartitions = partitionIds == null ?
+        new ArrayList<>(loadAllPartitions()) :
+        new ArrayList<>(loadPartitions(partitionIds));
     orderedPartitions.sort(HdfsPartition.KV_COMPARATOR);
 
+    // Build rows for each partition and accumulate totals
     long totalCachedBytes = 0L;
     long totalBytes = 0L;
     long totalNumFiles = 0L;
+    long totalNumRows = 0L;
+    boolean hasInvalidStats = false;
     for (FeFsPartition p: orderedPartitions) {
-      long numFiles = p.getNumFileDescriptors();
-      long size = p.getSize();
-      totalNumFiles += numFiles;
-      totalBytes += size;
-
-      TResultRowBuilder rowBuilder = new TResultRowBuilder();
-
-      // Add the partition-key values (as strings for simplicity).
-      for (LiteralExpr expr: p.getPartitionValues()) {
-        rowBuilder.add(expr.getStringValue());
-      }
-
-      // Add rows, extrapolated rows, files, bytes, cache stats, and file format.
-      rowBuilder.add(p.getNumRows());
-      // Compute and report the extrapolated row count because the set of files could
-      // have changed since we last computed stats for this partition. We also follow
-      // this policy during scan-cardinality estimation.
-      if (statsExtrap) {
-        rowBuilder.add(Utils.getExtrapolatedNumRows(this, size));
-      }
-
-      rowBuilder.add(numFiles).addBytes(size);
-      if (!p.isMarkedCached()) {
-        // Helps to differentiate partitions that have 0B cached versus partitions
-        // that are not marked as cached.
-        rowBuilder.add("NOT CACHED");
-        rowBuilder.add("NOT CACHED");
-      } else {
-        // Calculate the number the number of bytes that are cached.
-        long cachedBytes = 0L;
-        for (FileDescriptor fd: p.getFileDescriptors()) {
-          int numBlocks = fd.getNumFileBlocks();
-          for (int i = 0; i < numBlocks; ++i) {
-            FbFileBlock block = fd.getFbFileBlock(i);
-            if (FileBlock.hasCachedReplica(block)) {
-              cachedBytes += FileBlock.getLength(block);
-            }
-          }
+      long[] stats = buildPartitionStatsRow(p, statsExtrap, result);
+      totalCachedBytes += stats[0];
+      totalBytes += stats[1];
+      totalNumFiles += stats[2];
+      // For filtered queries, accumulate partition-level row counts
+      if (partitionIds != null) {
+        // If any partition has -1 (no stats), mark the total as invalid
+        if (stats[3] < 0) {
+          hasInvalidStats = true;
+        } else {
+          totalNumRows += stats[3];
         }
-        totalCachedBytes += cachedBytes;
-        rowBuilder.addBytes(cachedBytes);
-
-        // Extract cache replication factor from the parameters of the table
-        // if the table is not partitioned or directly from the partition.
-        Short rep = HdfsCachingUtil.getCachedCacheReplication(
-            getNumClusteringCols() == 0 ?
-                p.getTable().getMetaStoreTable().getParameters() :
-                p.getParameters());
-        rowBuilder.add(rep.toString());
       }
-      rowBuilder.add(p.getFileFormat().toString());
-      rowBuilder.add(String.valueOf(p.hasIncrementalStats()));
-      rowBuilder.add(p.getLocation());
-      rowBuilder.add(FileSystemUtil.getErasureCodingPolicy(p.getLocationPath()));
-      result.addToRows(rowBuilder.get());
     }
 
-    // For partitioned tables add a summary row at the bottom.
-    if (getNumClusteringCols() > 0) {
-      TResultRowBuilder rowBuilder = new TResultRowBuilder();
-      int numEmptyCells = getNumClusteringCols() - 1;
-      rowBuilder.add("Total");
-      for (int i = 0; i < numEmptyCells; ++i) {
-        rowBuilder.add("");
-      }
-
-      // Total rows, extrapolated rows, files, bytes, cache stats.
-      // Leave format empty.
-      rowBuilder.add(getNumRows());
-      // Compute and report the extrapolated row count because the set of files could
-      // have changed since we last computed stats for this partition. We also follow
-      // this policy during scan-cardinality estimation.
-      if (statsExtrap) {
-        rowBuilder.add(Utils.getExtrapolatedNumRows(this, getTotalHdfsBytes()));
-      }
-      rowBuilder.add(totalNumFiles)
-          .addBytes(totalBytes)
-          .addBytes(totalCachedBytes).add("").add("").add("").add("").add("");
-      result.addToRows(rowBuilder.get());
+    // Add summary row for partitioned tables.
+    // When filtering by partitions, only show Total row if there are matching partitions
+    if (getNumClusteringCols() > 0 &&
+        (partitionIds == null || !orderedPartitions.isEmpty())) {
+      // When showing all partitions, use table-level stats.
+      // When filtering, sum partition stats.
+      long totalRows = partitionIds == null ? getNumRows() :
+          (hasInvalidStats ? -1 : totalNumRows);
+      buildTotalStatsRow(totalCachedBytes, totalBytes,
+          totalNumFiles, totalRows, statsExtrap, result);
     }
     return result;
   }

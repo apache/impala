@@ -3158,6 +3158,8 @@ show_stats_stmt ::=
 show_partitions_stmt ::=
   KW_SHOW KW_PARTITIONS table_name:table
   {: RESULT = new ShowStatsStmt(table, TShowStatsOp.PARTITIONS); :}
+  | KW_SHOW KW_PARTITIONS table_name:table KW_WHERE expr:where
+  {: RESULT = new ShowStatsStmt(table, TShowStatsOp.PARTITIONS, where); :}
   ;
 
 show_range_partitions_stmt ::=

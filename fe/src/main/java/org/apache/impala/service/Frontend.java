@@ -1737,20 +1737,22 @@ public class Frontend {
   /**
    * Generate result set and schema for a SHOW TABLE STATS command.
    */
-  public TResultSet getTableStats(String dbName, String tableName, TShowStatsOp op)
+  public TResultSet getTableStats(String dbName, String tableName, TShowStatsOp op,
+      List<Long> filteredPartitionIds)
       throws ImpalaException {
     RetryTracker retries = new RetryTracker(
         String.format("fetching table stats from %s.%s", dbName, tableName));
     while (true) {
       try {
-        return doGetTableStats(dbName, tableName, op);
+        return doGetTableStats(dbName, tableName, op, filteredPartitionIds);
       } catch(InconsistentMetadataFetchException e) {
         retries.handleRetryOrThrow(e);
       }
     }
   }
 
-  private TResultSet doGetTableStats(String dbName, String tableName, TShowStatsOp op)
+  private TResultSet doGetTableStats(String dbName, String tableName, TShowStatsOp op,
+      List<Long> filteredPartitionIds)
       throws ImpalaException {
     FeTable table = getCatalog().getTable(dbName, tableName);
     if (table instanceof FeFsTable) {
@@ -1759,6 +1761,10 @@ public class Frontend {
       }
       if (table instanceof FeIcebergTable && op == TShowStatsOp.TABLE_STATS) {
         return FeIcebergTable.Utils.getTableStats((FeIcebergTable) table);
+      }
+      if (op == TShowStatsOp.PARTITIONS && filteredPartitionIds != null) {
+        // When filteredPartitionIds is set (even if empty), use it to filter results.
+        return ((FeFsTable) table).getTableStats(filteredPartitionIds);
       }
       return ((FeFsTable) table).getTableStats();
     } else if (table instanceof FeHBaseTable) {

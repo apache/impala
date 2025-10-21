@@ -253,6 +253,8 @@ struct TShowStatsParams {
   1: TShowStatsOp op
   2: CatalogObjects.TTableName table_name
   3: optional bool show_column_minmax_stats
+  // Optional: filtered partition ids for SHOW PARTITIONS with a WHERE clause.
+  4: optional list<i64> filtered_partition_ids
 }
 
 // Parameters for DESCRIBE HISTORY command

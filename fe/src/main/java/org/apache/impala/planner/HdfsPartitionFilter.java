@@ -125,9 +125,12 @@ public class HdfsPartitionFilter {
       LOG.trace("buildPartitionPredicate: " + literalPredicate.toSql() + " " +
           literalPredicate.debugString());
     }
-    if (!literalPredicate.isConstant()) {
+    // After substitution, the predicate should not contain any SlotRefs.
+    // Non-deterministic functions are allowed and will be evaluated by the backend.
+    if (literalPredicate.contains(SlotRef.class)) {
       throw new NotImplementedException(
-          "Unsupported non-deterministic predicate: " + predicate_.toSql());
+          "Unsupported predicate with unsubstituted slot references: " +
+          predicate_.toSql());
     }
     return literalPredicate;
   }

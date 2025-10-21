@@ -110,9 +110,13 @@ public class HdfsPartitionPruner {
    * shown in the EXPLAIN output.
    *
    * If 'allowEmpty' is False, empty partitions are not returned.
+   * If 'evalAllFuncs' is True, non-deterministic functions will be evaluated
+   * per-partition instead of being skipped. Callers should ensure that all
+   * conjuncts are evaluable in the backend to avoid crashes (e.g., aggregate
+   * functions will crash the backend and must be rejected before calling this).
    */
   public Pair<List<? extends FeFsPartition>, List<Expr>> prunePartitions(
-      Analyzer analyzer, List<Expr> conjuncts, boolean allowEmpty,
+      Analyzer analyzer, List<Expr> conjuncts, boolean allowEmpty, boolean evalAllFuncs,
       TableRef hdfsTblRef)
       throws ImpalaException {
     // Start with creating a collection of partition filters for the applicable conjuncts.
@@ -129,7 +133,7 @@ public class HdfsPartitionPruner {
     Iterator<Expr> it = conjuncts.iterator();
     while (it.hasNext()) {
       Expr conjunct = it.next();
-      if (isPartitionPrunedFilterConjunct(partitionSlots_, conjunct)) {
+      if (isPartitionPrunedFilterConjunct(partitionSlots_, conjunct, evalAllFuncs)) {
         // Check if the conjunct can be evaluated from the partition metadata.
         // Use a cloned conjunct to rewrite BetweenPredicates and allow
         // canEvalUsingPartitionMd() to fold constant expressions without modifying
@@ -189,9 +193,14 @@ public class HdfsPartitionPruner {
   }
 
   public static boolean isPartitionPrunedFilterConjunct(List<SlotId> partitionSlots,
-      Expr conjunct) {
-    return conjunct.isBoundBySlotIds(partitionSlots) &&
-        !conjunct.contains(Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE);
+      Expr conjunct, boolean evalAllFuncs) {
+    if (!conjunct.isBoundBySlotIds(partitionSlots)) return false;
+    // Aggregate functions cannot be evaluated per-partition and will crash the backend.
+    if (conjunct.contains(Expr.IS_AGGREGATE)) return false;
+    // If evalAllFuncs is true, allow non-deterministic functions to be evaluated
+    // per-partition instead of skipping them.
+    if (evalAllFuncs) return true;
+    return !conjunct.contains(Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE);
   }
 
   /**

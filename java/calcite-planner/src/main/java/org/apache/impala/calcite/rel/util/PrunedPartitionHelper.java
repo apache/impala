@@ -61,8 +61,7 @@ public class PrunedPartitionHelper {
     List<Expr> conjuncts = converter.getImpalaConjuncts();
     // IMPALA-13849: tblref is null.  Tablesampling is disabled.
     Pair<List<? extends FeFsPartition>, List<Expr>> impalaPair =
-        pruner.prunePartitions(analyzer, new ArrayList<>(conjuncts), true,
-            null);
+        pruner.prunePartitions(analyzer, new ArrayList<>(conjuncts), true, false, null);
 
     prunedPartitions_ = impalaPair.first;
 
@@ -73,7 +72,8 @@ public class PrunedPartitionHelper {
     List<SlotId> partitionSlots = tupleDesc.getPartitionSlots();
 
     for (Expr conjunct : conjuncts) {
-      if (HdfsPartitionPruner.isPartitionPrunedFilterConjunct(partitionSlots, conjunct)) {
+      if (HdfsPartitionPruner.isPartitionPrunedFilterConjunct(partitionSlots, conjunct,
+          false)) {
         partitionedConjBuilder.add(conjunct);
       } else {
         nonPartitionedConjBuilder.add(conjunct);

@@ -85,7 +85,7 @@ public class PartitionSet extends PartitionSpecBase {
 
     try {
       HdfsPartitionPruner pruner = new HdfsPartitionPruner(desc);
-      partitions_ = pruner.prunePartitions(analyzer, transformedConjuncts, true,
+      partitions_ = pruner.prunePartitions(analyzer, transformedConjuncts, true, false,
           null).first;
     } catch (ImpalaException e) {
       if (e instanceof AnalysisException) throw (AnalysisException)e;

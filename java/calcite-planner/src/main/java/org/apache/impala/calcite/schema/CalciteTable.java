@@ -162,8 +162,7 @@ public class CalciteTable extends RelOptAbstractTable
     // TODO: pass in the conjuncts needed. An empty conjunct will return all partitions.
     List<Expr> conjuncts = new ArrayList<>();
     Pair<List<? extends FeFsPartition>, List<Expr>> impalaPair =
-        pruner.prunePartitions(analyzer, conjuncts, true,
-            null);
+        pruner.prunePartitions(analyzer, conjuncts, true, false, null);
     return impalaPair.first;
   }
 

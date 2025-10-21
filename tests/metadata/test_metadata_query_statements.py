@@ -20,6 +20,7 @@
 from __future__ import absolute_import, division, print_function
 import pytest
 import re
+import datetime
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfFS, SkipIfCatalogV2
@@ -65,6 +66,44 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   @SkipIfFS.incorrent_reported_ec
   def test_show_stats(self, vector):
     self.run_test_case('QueryTest/show-stats', vector, "functional")
+
+  def test_show_partitions_with_nondeterministic_functions(self):
+    """Test SHOW PARTITIONS WHERE with non-deterministic functions
+       like rand() and now().
+    """
+
+    # Test rand() - just verify the statement succeeds without errors
+    result = self.execute_query("show partitions functional.alltypes where rand() < 0.5")
+    assert result.success, "SHOW PARTITIONS with rand() should succeed"
+    # Verify we got some partitions back (rand() typically returns ~0.47 without seed)
+    assert len(result.data) > 0, "SHOW PARTITIONS with rand() should return some \
+        partitions"
+
+    # Test now() - verify the statement succeeds and returns partitions for current month
+    current_month = datetime.datetime.now().month
+    result = self.execute_query(
+        "show partitions functional.alltypes where month = month(now())")
+    assert result.success, "SHOW PARTITIONS with now() should succeed"
+
+    # Verify we got exactly the partitions for the current month
+    # alltypes has 2 years (2009, 2010) with all 12 months
+    # So we should get 2 partitions (one per year) for the current month
+    partition_months = []
+    for row in result.data:
+      # Skip the 'Total' row
+      if 'Total' not in row:
+        parts = row.split('\t')
+        if len(parts) >= 2:
+          partition_months.append(int(parts[1]))
+
+    # All returned partitions should be for the current month
+    for month in partition_months:
+      assert month == current_month, \
+          "Expected month {0}, got {1}".format(current_month, month)
+
+    # We should have 2 partitions (year=2009/month=N and year=2010/month=N)
+    assert len(partition_months) == 2, \
+        "Expected 2 partitions for current month, got {0}".format(len(partition_months))
 
   def test_describe_path(self, vector, unique_database):
     self.run_test_case('QueryTest/describe-path', vector, unique_database)

@@ -711,6 +711,11 @@ public class AnalysisContext {
       return canRewriteStatement() && isZippingUnnestInSelectList(stmt_);
     }
     public boolean requiresExprRewrite() {
+      // For ShowStatsStmt, only require rewrite if there's a WHERE clause
+      if (isShowStatsStmt()) {
+        ShowStatsStmt showStatsStmt = (ShowStatsStmt) stmt_;
+        return showStatsStmt.hasWhereClause();
+      }
       return isQueryStmt() || isInsertStmt() || isCreateTableAsSelectStmt()
           || isUpdateStmt() || isDeleteStmt() || isOptimizeStmt() || isMergeStmt();
     }
@@ -725,6 +730,7 @@ public class AnalysisContext {
     public boolean isShowCreateTableStmt() {
       return stmt_ instanceof ShowCreateTableStmt;
     }
+    public boolean isShowStatsStmt() { return stmt_ instanceof ShowStatsStmt; }
     public boolean isQueryStmt() { return stmt_ instanceof QueryStmt; }
     public boolean isInsertStmt() { return stmt_ instanceof InsertStmt; }
     public boolean isMergeStmt() { return stmt_ instanceof MergeStmt; }

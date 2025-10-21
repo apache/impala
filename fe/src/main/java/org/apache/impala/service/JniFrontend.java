@@ -486,7 +486,9 @@ public class JniFrontend {
           params.isSetShow_column_minmax_stats() && params.show_column_minmax_stats);
     } else {
       result = frontend_.getTableStats(params.getTable_name().getDb_name(),
-          params.getTable_name().getTable_name(), params.op);
+          params.getTable_name().getTable_name(), params.op,
+              params.isSetFiltered_partition_ids() ?
+              params.getFiltered_partition_ids() : null);
     }
     try {
       TSerializer serializer = new TSerializer(protocolFactory_);

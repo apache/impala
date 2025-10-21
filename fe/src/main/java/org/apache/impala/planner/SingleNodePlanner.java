@@ -1611,7 +1611,7 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     // end up removing some predicates.
     HdfsPartitionPruner pruner = new HdfsPartitionPruner(tupleDesc);
     Pair<List<? extends FeFsPartition>, List<Expr>> pair =
-        pruner.prunePartitions(analyzer, conjuncts, false, hdfsTblRef);
+        pruner.prunePartitions(analyzer, conjuncts, false, false, hdfsTblRef);
     List<? extends FeFsPartition> partitions = pair.first;
 
     // Mark all slots referenced by the remaining conjuncts as materialized.
