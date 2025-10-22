@@ -57,11 +57,13 @@ can do so through the environment variables and scripts listed below.
 
 | Environment variable | Default value | Description |
 |----------------------|---------------|-------------|
-| IMPALA_BUILD_THREADS | "8" or set to number of processors by default. | Used for make -j and distcc -j settings. |
+| IMPALA_BUILD_THREADS | Number of processors. | Used for make -j and distcc -j settings. |
+| IMPALA_LINK_THREADS  | Bounded based on available memory. | Used for ninja. |
+| IMPALA_MAKE_CMD      | "make" | Make tool to use by default, options are make or ninja. |
 | IMPALA_MAKE_FLAGS    | "" | Any extra settings to pass to make.  Also used when copying udfs / udas into HDFS. |
 | USE_SYSTEM_GCC       | "0" | If set to any other value, directs cmake to not set GCC_ROOT, CMAKE_C_COMPILER, CMAKE_CXX_COMPILER, as well as setting TOOLCHAIN_LINK_FLAGS |
 | IMPALA_CXX_COMPILER  | "default" | Used by cmake (cmake_modules/toolchain and clang_toolchain.cmake) to select gcc / clang |
-| IMPALA_LINKER.       | "gold"  | Specifies the linker to use. |
+| IMPALA_LINKER        | "gold"  | Specifies the linker to use; options are "gold", "mold", or "ld". |
 | IS_OSX               | "false" | (Experimental) currently only used to disable Kudu. |
 
 ## Dependencies

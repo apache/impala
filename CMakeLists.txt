@@ -36,6 +36,12 @@ set(IMPALA_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 # Build compile commands database
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Configure ninja build pools
+set(CMAKE_JOB_POOLS compilation_pool=$ENV{IMPALA_BUILD_THREADS}
+                    link_pool=$ENV{IMPALA_LINK_THREADS})
+set(CMAKE_JOB_POOL_COMPILE compilation_pool)
+set(CMAKE_JOB_POOL_LINK link_pool)
+
 # Codegen-dependent executables need to be linked with -rdynamic; otherwise LLVM
 # can't find dependent symbols at runtime.
 #

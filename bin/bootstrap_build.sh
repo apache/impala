@@ -36,7 +36,7 @@ sudo -E apt-get --quiet update
 # unversioned python-dev and python-setuptools are not available on newer releases
 # that don't support Python 2. Add them only when they exist for the platform,
 # otherwise set Python 3 to be the default Python version.
-PACKAGES='g++ gcc git libsasl2-dev libssl-dev make
+PACKAGES='g++ gcc git libsasl2-dev libssl-dev make ninja-build
      python3-dev python3-setuptools python3-venv libffi-dev language-pack-en
      libkrb5-dev krb5-admin-server krb5-kdc krb5-user libxml2-dev libxslt-dev wget'
 

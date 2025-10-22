@@ -27,7 +27,7 @@ setup_report_build_error
 
 # If the project was never build, no Makefile will exist and thus make clean will fail.
 # Combine the make command with the bash noop to always return true.
-"${MAKE_CMD:-make}" clean || :
+"${MAKE_CMD:-${IMPALA_MAKE_CMD}}" clean || :
 
 # clean Java projects
 pushd "${IMPALA_HOME}/java"

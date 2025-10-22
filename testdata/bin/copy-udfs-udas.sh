@@ -49,7 +49,7 @@ done
 if [ $BUILD -eq 1 ]
 then
   pushd "${IMPALA_HOME}"
-  "${MAKE_CMD:-make}" ${IMPALA_MAKE_FLAGS} "-j${IMPALA_BUILD_THREADS:-4}" \
+  "${MAKE_CMD:-${IMPALA_MAKE_CMD}}" ${IMPALA_MAKE_FLAGS} "-j${IMPALA_BUILD_THREADS:-4}" \
       TestUdas TestUdfs test-udfs-ir udfsample udasample udf-sample-ir uda-sample-ir
   cd "${IMPALA_HOME}/java/test-corrupt-hive-udfs"
   "${IMPALA_HOME}/bin/mvn-quiet.sh" package

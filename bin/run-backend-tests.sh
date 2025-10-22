@@ -28,11 +28,6 @@ export GTEST_OUTPUT="xml:$IMPALA_BE_TEST_LOGS_DIR/"
 # The backend unit tests currently do not work when HEAPCHECK is enabled.
 export HEAPCHECK=
 
-BE_TEST_ARGS=""
-if [[ -n "$SKIP_BE_TEST_PATTERN" ]]; then
-  BE_TEST_ARGS="-E ${SKIP_BE_TEST_PATTERN}"
-fi
-
 cd ${IMPALA_BE_DIR}
 . ${IMPALA_HOME}/bin/set-classpath.sh
 cd ..
@@ -44,4 +39,10 @@ export ASAN_OPTIONS="disable_coredump=0:unmap_shadow_on_exit=1"
 export UBSAN_OPTIONS="disable_coredump=0:unmap_shadow_on_exit=1"
 
 export PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
-"${MAKE_CMD:-make}" test ARGS="${BE_TEST_ARGS}"
+if [[ -n "$SKIP_BE_TEST_PATTERN" ]]; then
+  # Requires make, will fail with ninja.
+  "${MAKE_CMD:-${IMPALA_MAKE_CMD}}" test ARGS="-E ${SKIP_BE_TEST_PATTERN}"
+else
+  # Ninja doesn't accept additional parameters, so omit ARGS.
+  "${MAKE_CMD:-${IMPALA_MAKE_CMD}}" test
+fi

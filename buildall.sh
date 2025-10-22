@@ -80,7 +80,7 @@ BUILD_DEBUG_NOOPT=0
 BUILD_SHARED_LIBS=0
 UDF_DEVEL=0
 # Export MAKE_CMD so it is visible in scripts that invoke make, e.g. copy-udfs-udas.sh
-export MAKE_CMD=make
+export MAKE_CMD=${IMPALA_MAKE_CMD:-make}
 
 # Defaults that can be picked up from the environment, but are overridable through the
 # commandline.
@@ -202,6 +202,9 @@ do
       ;;
     -ninja)
       MAKE_CMD=ninja
+      ;;
+    -make)
+      MAKE_CMD=make
       ;;
     -cmake_only)
       GEN_CMAKE_ONLY=1

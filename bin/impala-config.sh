@@ -580,6 +580,9 @@ export LIB_JAVA=$(find "${JAVA_HOME}/" -name libjava.so | head -1)
 export LIB_JSIG=$(find "${JAVA_HOME}/" -name libjsig.so | head -1)
 export LIB_JVM=$(find "${JAVA_HOME}/" -name libjvm.so  | head -1)
 
+# Default to make, but allow overriding to e.g. ninja.
+export IMPALA_MAKE_CMD=${IMPALA_MAKE_CMD:-make}
+
 #########################################################################################
 # Below here are variables that can be overridden by impala-config-*.sh and environment #
 # vars, variables computed based on other variables, and variables that cannot be       #
@@ -607,6 +610,10 @@ export USE_SYSTEM_GCC=${USE_SYSTEM_GCC-0}
 # Note: This is validated in the CMake code.
 # TODO: Add support for lld as well
 export IMPALA_LINKER=${IMPALA_LINKER-gold}
+
+# Limit mold to a single job to avoid excessive memory consumption while fully utilizing
+# available CPUs.
+export MOLD_JOBS=${IMPALA_MOLD_JOBS-1}
 
 # Override the default compiler by setting a path to the new compiler. The default
 # compiler depends on USE_SYSTEM_GCC and IMPALA_GCC_VERSION. The intended use case
@@ -1023,7 +1030,7 @@ export IMPALA_DATASET_DIR="$IMPALA_HOME/testdata/datasets"
 export IMPALA_AUX_DATASET_DIR="$IMPALA_AUX_TEST_HOME/testdata/datasets"
 export IMPALA_COMMON_DIR="$IMPALA_HOME/common"
 export PATH="$IMPALA_TOOLCHAIN_PACKAGES_HOME/gdb-$IMPALA_GDB_VERSION/bin:$PATH"
-export PATH="$IMPALA_TOOLCHAIN_PACKAGES_HOME/cmake-$IMPALA_CMAKE_VERSION/bin/:$PATH"
+export PATH="$IMPALA_TOOLCHAIN_PACKAGES_HOME/cmake-$IMPALA_CMAKE_VERSION/bin:$PATH"
 export PATH="$IMPALA_HOME/bin:$PATH"
 
 export HADOOP_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
@@ -1165,16 +1172,31 @@ else
   CGROUP_MEM_LIMIT=8589934591 # max int64 bytes in GB
 fi
 AVAILABLE_MEM=$((AVAILABLE_MEM > $CGROUP_MEM_LIMIT ? $CGROUP_MEM_LIMIT : $AVAILABLE_MEM))
-BOUNDED_CONCURRENCY=$((AVAILABLE_MEM / 2))
-if [[ $AVAILABLE_MEM -lt 2 ]]; then
+if [[ $AVAILABLE_MEM -lt 5 ]]; then
   echo "Insufficient memory ($AVAILABLE_MEM GB) to build Impala"
   exit 1
-elif [[ $BOUNDED_CONCURRENCY -lt $CORES ]]; then
+fi
+BOUNDED_CONCURRENCY=$((AVAILABLE_MEM / 2))
+if [[ $BOUNDED_CONCURRENCY -lt $CORES ]]; then
   echo "Bounding concurrency for available memory ($AVAILABLE_MEM GB)"
 else
   BOUNDED_CONCURRENCY=$CORES
 fi
-export IMPALA_BUILD_THREADS=${IMPALA_BUILD_THREADS-"${BOUNDED_CONCURRENCY}"}
+export IMPALA_BUILD_THREADS=${IMPALA_BUILD_THREADS:-"${BOUNDED_CONCURRENCY}"}
+# Limit number of links; only works with ninja builds.
+# Determines number of concurrent links based on expected memory use.
+if [[ "$IMPALA_MINIMAL_DEBUG_INFO" == "true" ||
+      "$IMPALA_SPLIT_DEBUG_INFO"   == "true" ]]; then
+  MEM_PER_LINK=2
+else
+  MEM_PER_LINK=5
+fi
+BOUNDED_LINKS=$((AVAILABLE_MEM / MEM_PER_LINK))
+if [[ $BOUNDED_LINKS -gt $IMPALA_BUILD_THREADS ]]; then
+  # Avoid regressing behavior if IMPALA_BUILD_THREADS is already set to a low value.
+  BOUNDED_LINKS=${IMPALA_BUILD_THREADS}
+fi
+export IMPALA_LINK_THREADS=${IMPALA_LINK_THREADS:-"${BOUNDED_LINKS}"}
 
 # Additional flags to pass to make or ninja.
 export IMPALA_MAKE_FLAGS=${IMPALA_MAKE_FLAGS-}
@@ -1258,6 +1280,7 @@ echo "IMPALA_OBS_VERSION      = $IMPALA_OBS_VERSION"
 echo "IMPALA_SYSTEM_PYTHON2   = $IMPALA_SYSTEM_PYTHON2"
 echo "IMPALA_SYSTEM_PYTHON3   = $IMPALA_SYSTEM_PYTHON3"
 echo "IMPALA_BUILD_THREADS    = $IMPALA_BUILD_THREADS"
+echo "IMPALA_LINK_THREADS     = $IMPALA_LINK_THREADS"
 echo "NUM_CONCURRENT_TESTS    = $NUM_CONCURRENT_TESTS"
 echo "USE_CUSTOM_IMPALA_BASE_IMAGE = $USE_CUSTOM_IMPALA_BASE_IMAGE"
 echo "IMPALA_CUSTOM_DOCKER_BASE    = $IMPALA_CUSTOM_DOCKER_BASE"
