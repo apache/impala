@@ -201,7 +201,7 @@ does not have privileges to execute 'CREATE' on: grant_rev_db
 ---- QUERY
 show tables in grant_rev_db
 ---- CATCH
-does not have privileges to access: grant_rev_db.*
+does not have privileges to access: grant_rev_db
 ====
 ---- QUERY
 show functions in grant_rev_db
@@ -386,7 +386,7 @@ drop role grant_revoke_test_ALL_TEST_DB;
 # Recall that the owner of the database 'grant_rev_db' has been changed to 'admin'.
 show tables in grant_rev_db
 ---- CATCH
-does not have privileges to access: grant_rev_db.*
+does not have privileges to access: grant_rev_db
 ====
 ---- QUERY
 # The user 'getuser()' can select the data from the table 'grant_rev_db.test_tbl1'

@@ -4092,7 +4092,7 @@ public class Analyzer {
       }
       if (privilege == Privilege.ANY) {
         String dbOwner = db == null ? null : db.getOwnerUser();
-        return builder.any().onAnyColumn(dbName, dbOwner).build();
+        return builder.any().onDb(dbName, dbOwner).build();
       } else if (db == null) {
         // Db does not exist, register a privilege request based on the DB name.
         return builder.allOf(privilege).onDb(dbName, null).build();

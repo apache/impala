@@ -112,7 +112,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
         onUri("hdfs://localhost:20500/test-warehouse/new_table", TPrivilegeLevel.ALL));
 
     authzOk(events -> {
-      // Table event and 2 column events
+      // A table event and 1 consolidated column event.
       assertEquals(2, events.size());
       assertEventEquals("@table", "select", "functional/alltypes", 1, events.get(0));
       assertEventEquals("@column", "select","functional/alltypes/id,string_col", 1,
@@ -121,6 +121,18 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
           events.get(0).getRequestData());
     }, "select id, string_col from functional.alltypes",
         onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
+
+    authzOk(events -> {
+      // A table event and 1 consolidated column event.
+      assertEquals(2, events.size());
+      assertEventEquals("@table", "insert", "functional/alltypes", 1, events.get(0));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/id,string_col,year,month", 1, events.get(1));
+      assertEquals("insert into functional.alltypes (id, string_col) partition " +
+          "(year, month) values (1, \"abc\", 2026, 12)", events.get(0).getRequestData());
+    }, "insert into functional.alltypes (id, string_col) partition " +
+        "(year, month) values (1, \"abc\", 2026, 12)",
+        onTable("functional", "alltypes", TPrivilegeLevel.INSERT));
 
     // Audit log entries are not consolidated since each of them corresponds to a
     // different policy.
@@ -169,6 +181,76 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
         onColumn("functional", "alltypes", "year", TPrivilegeLevel.SELECT),
         onColumn("functional", "alltypes", "month", TPrivilegeLevel.SELECT));
 
+    // Audit log entries are not consolidated since each of them corresponds to a
+    // different policy.
+    // In this query, we insert data into each column of the table.
+    authzOk(events -> {
+      assertEquals(13, events.size());
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/id", 1, events.get(0));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/bool_col", 1, events.get(1));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/tinyint_col", 1, events.get(2));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/smallint_col", 1, events.get(3));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/int_col", 1, events.get(4));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/bigint_col", 1, events.get(5));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/float_col", 1, events.get(6));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/double_col", 1, events.get(7));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/date_string_col", 1, events.get(8));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/string_col", 1, events.get(9));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/timestamp_col", 1, events.get(10));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/year", 1, events.get(11));
+      assertEventEquals("@column", "insert",
+          "functional/alltypes/month", 1, events.get(12));
+      assertEquals("insert into functional.alltypes partition (year, month) " +
+          "values (0, true, 0, 0, 0, 0, 0.0, 0.0, '12/31/26', '0'," +
+          "'2026-12-31 00:00:00', 2026, 12)", events.get(0).getRequestData());
+    }, "insert into functional.alltypes partition (year, month) " +
+        "values (0, true, 0, 0, 0, 0, 0.0, 0.0, '12/31/26', '0'," +
+        "'2026-12-31 00:00:00', 2026, 12)",
+        onColumn("functional", "alltypes", "id", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "bool_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "tinyint_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "smallint_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "int_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "bigint_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "float_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "double_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "date_string_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "string_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "timestamp_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "year", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "month", TPrivilegeLevel.INSERT));
+
+    // Audit log entries are consolidated since every column is covered by the same
+    // policy.
+    authzOk(events -> {
+          assertEquals(1, events.size());
+          assertEventEquals("@column", "insert",
+              "functional/alltypes/id,bool_col,tinyint_col,smallint_col,int_col," +
+                  "bigint_col,float_col,double_col,date_string_col,string_col," +
+                  "timestamp_col,year,month", 1, events.get(0));
+          assertEquals("insert into functional.alltypes partition (year, month) " +
+              "values (0, true, 0, 0, 0, 0, 0.0, 0.0, '12/31/26', '0'," +
+              "'2026-12-31 00:00:00', 2026, 12)", events.get(0).getRequestData());
+        }, "insert into functional.alltypes partition (year, month) " +
+            "values (0, true, 0, 0, 0, 0, 0.0, 0.0, '12/31/26', '0'," +
+            "'2026-12-31 00:00:00', 2026, 12)",
+        // This creates one single Ranger policy covering all columns of the table.
+        onColumn("functional", "alltypes", "id,bool_col,tinyint_col,smallint_col," +
+            "int_col,bigint_col,float_col,double_col,date_string_col,string_col," +
+            "timestamp_col,year,month", TPrivilegeLevel.INSERT));
+
     authzOk(events -> {
       // Only the column events. We don't want to log the failing table event used for
       // short circuiting.
@@ -183,6 +265,30 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     }, "select id, string_col from functional.alltypes",
         onColumn("functional", "alltypes", "id", TPrivilegeLevel.SELECT),
         onColumn("functional", "alltypes", "string_col", TPrivilegeLevel.SELECT));
+
+    String insertQuery = "insert into functional.alltypes (id, string_col) partition " +
+        "(year, month) values (1, \"abc\", 2026, 12)";
+    authzOk(events -> {
+      // Only the column events. We don't want to log the failing table event used for
+      // short circuiting.
+      // In this query, we only insert data into 4 columns of the table.
+      assertEquals(4, events.size());
+      assertEventEquals("@column", "insert", "functional/alltypes/id", 1, events.get(0));
+      assertEquals(insertQuery, events.get(0).getRequestData());
+      assertEventEquals("@column", "insert", "functional/alltypes/string_col", 1,
+          events.get(1));
+      assertEquals(insertQuery, events.get(1).getRequestData());
+      assertEventEquals("@column", "insert", "functional/alltypes/year", 1,
+          events.get(2));
+      assertEquals(insertQuery, events.get(2).getRequestData());
+      assertEventEquals("@column", "insert", "functional/alltypes/month", 1,
+          events.get(3));
+      assertEquals(insertQuery, events.get(3).getRequestData());
+    }, insertQuery,
+        onColumn("functional", "alltypes", "id", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "string_col", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "year", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "month", TPrivilegeLevel.INSERT));
 
     authzOk(events -> {
       assertEquals(3, events.size());
@@ -302,6 +408,21 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       assertEventEquals(null, "_ANY", null, 1, events.get(0));
       assertEquals("show databases like 'default*'", events.get(0).getRequestData());
     }, "show databases like 'default*'");
+
+    // No audit log entry should be produced for an authorized query against a
+    // non-existing column in an existing table.
+    // Note that for this query, we only register the INSERT privileges on the columns
+    // 'id' and 'string_col' because 'non_existing_int_col' does not exist, and thus it
+    // results in an exception before we try to register the privilege requests for
+    // partitioned columns, i.e., 'year' and 'month'.
+    authzOk(events -> {
+      assertEquals(0, events.size());
+    }, "insert into " +
+            "functional.alltypes (id, string_col, non_existing_int_col) " +
+            "partition (year, month) values (1, \"abc\", 1, 2026, 12)",
+        /* expectAnalysisOk */ false,
+        onColumn("functional", "alltypes", "id", TPrivilegeLevel.INSERT),
+        onColumn("functional", "alltypes", "string_col", TPrivilegeLevel.INSERT));
   }
 
   @Test
@@ -349,6 +470,25 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     }, "select id, string_col from functional.alltypes");
 
     authzError(events -> {
+      // Only log the table event.
+      assertEquals(1, events.size());
+      assertEventEquals("@table", "insert", "functional/alltypes", 0, events.get(0));
+      assertEquals("insert into functional.alltypes (id, string_col) partition " +
+          "(year, month) values (1, \"abc\", 2026, 12)", events.get(0).getRequestData());
+    }, "insert into functional.alltypes (id, string_col) partition " +
+        "(year, month) values (1, \"abc\", 2026, 12)");
+
+    authzError(events -> {
+      // Only log the table event.
+      // Note that for UPSERT against a Kudu table, we register the ALL privilege on the
+      // target table.
+      assertEquals(1, events.size());
+      assertEventEquals("@table", "all", "functional_kudu/alltypes", 0, events.get(0));
+      assertEquals("upsert into table functional_kudu.alltypes (id, int_col) " +
+          "values (1, 1)", events.get(0).getRequestData());
+    }, "upsert into table functional_kudu.alltypes (id, int_col) values (1, 1)");
+
+    authzError(events -> {
       // Log the table event even when the table does not exist.
       assertEquals(1, events.size());
       assertEventEquals("@table", "select", "functional/non_existing_tbl", 0,
@@ -358,12 +498,61 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     }, "select * from functional.non_existing_tbl");
 
     authzError(events -> {
+      // Log the table event even when the table does not exist.
+      assertEquals(1, events.size());
+      assertEventEquals("@table", "insert", "functional/non_existing_tbl", 0,
+          events.get(0));
+      assertEquals("insert into functional.non_existing_tbl (id, string_col) " +
+          "partition (year, month) values (1, \"abc\", 2026, 12)",
+          events.get(0).getRequestData());
+    }, "insert into functional.non_existing_tbl (id, string_col) partition " +
+        "(year, month) values (1, \"abc\", 2026, 12)");
+
+    authzError(events -> {
+      // Log the table event even when a column does not exist in an existing table.
+      assertEquals(1, events.size());
+      assertEventEquals("@table", "insert", "functional/alltypes", 0,
+          events.get(0));
+      assertEquals("insert into " +
+              "functional.alltypes (id, string_col, non_existing_int_col) " +
+              "partition (year, month) values (1, \"abc\", 1, 2026, 12)",
+          events.get(0).getRequestData());
+    }, "insert into " +
+        "functional.alltypes (id, string_col, non_existing_int_col) " +
+        "partition (year, month) values (1, \"abc\", 1, 2026, 12)");
+
+    authzError(events -> {
       // Show the actual view_metadata audit log.
       assertEquals(1, events.size());
       assertEventEquals("@table", "view_metadata", "functional/alltypes", 0,
           events.get(0));
       assertEquals("show partitions functional.alltypes", events.get(0).getRequestData());
     }, "show partitions functional.alltypes");
+
+    String databaseName = "functional";
+    String tableName = "alltypes";
+    String columnName = "id";
+    String policyName = "deny_insert_column";
+    String user = user_.getShortName();
+    String accessType = "update";
+    String json = createJsonDenyPolicy(policyName, databaseName, tableName, columnName,
+        accessType, user);
+    try {
+      createRangerPolicy(policyName, json);
+      authzError(events -> {
+        // Only log the table event.
+        assertEquals(1, events.size());
+        assertEventEquals("@column", "insert", "functional/alltypes/id", 0,
+            events.get(0));
+        assertEquals("insert into functional.alltypes (id, string_col) partition " +
+            "(year, month) values (1, \"abc\", 2026, 12)",
+            events.get(0).getRequestData());
+      }, "insert into functional.alltypes (id, string_col) partition " +
+          "(year, month) values (1, \"abc\", 2026, 12)",
+          onTable("functional", "alltypes", TPrivilegeLevel.INSERT));
+    } finally {
+      deleteRangerPolicy(policyName);
+    }
   }
 
   @Test

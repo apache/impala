@@ -52,7 +52,7 @@ public class AuthorizableTable extends Authorizable {
   public String getTableName() { return tableName_; }
 
   @Override
-  public String getFullTableName() { return getName(); }
+  public String getFullTableName() { return getDbName() + "." + getTableName(); }
 
   @Override
   public String getOwnerUser() { return ownerUser_; }

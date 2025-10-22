@@ -259,12 +259,11 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         AnalysisError(String.format("%s SELECT () ON TABLE functional.alltypes " +
             "%s %s", formatArgs), "Empty column list in column privilege spec.");
         // INSERT/ALL privileges on columns
-        AnalysisError(String.format("%s INSERT (id, tinyint_col) ON TABLE " +
-            "functional.alltypes %s %s", formatArgs), "Only 'SELECT' privileges " +
-            "are allowed in a column privilege spec.");
+        AnalyzesOk(String.format("%s INSERT (id, tinyint_col) ON TABLE " +
+            "functional.alltypes %s %s", formatArgs));
         AnalysisError(String.format("%s ALL (id, tinyint_col) ON TABLE " +
-            "functional.alltypes %s %s", formatArgs), "Only 'SELECT' privileges " +
-            "are allowed in a column privilege spec.");
+            "functional.alltypes %s %s", formatArgs), "Only 'SELECT' and 'INSERT' " +
+            "privileges are allowed in a column privilege spec.");
         // Columns/table that don't exist
         AnalysisError(String.format("%s SELECT (invalid_col) ON TABLE " +
             "functional.alltypes %s %s", formatArgs), "Error setting/showing " +

@@ -270,7 +270,7 @@ public class PrivilegeSpec extends StmtNode {
    * 1. No columns are specified.
    * 2. Privilege is applied on a view or an external data source.
    * 3. Referenced table and/or columns do not exist.
-   * 4. Privilege level is not SELECT.
+   * 4. Privilege level is neither SELECT nor INSERT.
    */
   private void analyzeColumnPrivScope(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(scope_ == TPrivilegeScope.COLUMN);
@@ -278,8 +278,9 @@ public class PrivilegeSpec extends StmtNode {
     if (columnNames_.isEmpty()) {
       throw new AnalysisException("Empty column list in column privilege spec.");
     }
-    if (privilegeLevel_ != TPrivilegeLevel.SELECT) {
-      throw new AnalysisException("Only 'SELECT' privileges are allowed " +
+    if (privilegeLevel_ != (TPrivilegeLevel.SELECT) &&
+        privilegeLevel_ != (TPrivilegeLevel.INSERT)) {
+      throw new AnalysisException("Only 'SELECT' and 'INSERT' privileges are allowed " +
           "in a column privilege spec.");
     }
     FeTable table = analyzeTargetTable(analyzer);

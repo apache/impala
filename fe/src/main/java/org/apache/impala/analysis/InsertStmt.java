@@ -371,6 +371,11 @@ public class InsertStmt extends DmlStatementBase {
             "Duplicate column '" + columnName + "' in column permutation");
       }
       selectExprTargetColumns.add(column);
+
+      analyzer.registerPrivReq(builder -> builder
+          .allOf(Privilege.INSERT)
+          .onColumn(table_.getTableName().getDb(), table_.getTableName().getTbl(),
+              column.getName(), table_.getOwnerUser()).build());
     }
 
     int numStaticPartitionExprs = 0;
@@ -396,6 +401,11 @@ public class InsertStmt extends DmlStatementBase {
         } else {
           selectExprTargetColumns.add(column);
         }
+
+        analyzer.registerPrivReq(builder -> builder
+            .allOf(Privilege.INSERT)
+            .onColumn(table_.getTableName().getDb(), table_.getTableName().getTbl(),
+                column.getName(), table_.getOwnerUser()).build());
       }
     }
 

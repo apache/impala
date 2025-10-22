@@ -113,10 +113,10 @@ public class RangerAuthorizationContext extends AuthorizationContext {
         String databaseName = parsedNames[0];
         String tableName = parsedNames[1];
         String columnName = parsedNames[2];
-        // Currently the access type can only be "select" for a non-column masking audit
-        // log entry. We include the access type as part of the key to avoid accidentally
-        // combining audit log entries corresponding to the same column but of different
-        // access types in the future.
+        // Currently the access type can only be "select" or "insert" for a non-column
+        // masking audit log entry. We include the access type as part of the key to
+        // avoid accidentally combining audit log entries corresponding to the same
+        // column but of different access types in the future.
         String accessType = event.getAccessType();
         String key = policyId + "/" + databaseName + "/" + tableName + "/" + accessType;
         if (!consolidatedEvents.containsKey(key)) {

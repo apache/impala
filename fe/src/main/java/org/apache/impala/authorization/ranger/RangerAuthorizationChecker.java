@@ -25,7 +25,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.authorization.Authorizable;
 import org.apache.impala.authorization.Authorizable.Type;
-import org.apache.impala.authorization.AuthorizableTable;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationContext;
@@ -46,6 +45,7 @@ import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerServiceDef;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
+import org.apache.ranger.plugin.policyengine.RangerAccessResource;
 import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResult;
 import org.apache.ranger.plugin.policyengine.RangerPolicyEngine;
@@ -284,17 +284,24 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       throws AuthorizationException, InternalException {
     RangerAuthorizationContext originalCtx = (RangerAuthorizationContext) authzCtx;
     RangerBufferAuditHandler originalAuditHandler = originalCtx.getAuditHandler();
-    // case 1: table (select) OK, columns (select) OK --> add the table event,
-    //                                                    add the column events
-    // case 2: table (non-select) ERROR --> add the table event
-    // case 3: table (select) ERROR, columns (select) OK -> only add the column events
-    // case 4: table (select) ERROR, columns (select) ERROR --> add the table event
-    // case 5: table (select) ERROR --> add the table event
+    // For access_type in {select, insert}, the following holds.
+    // case 1: table (access_type) OK, columns (access_type) OK --> add the table event,
+    //         add the column events
+    // case 2: table (non-select and non-insert) ERROR --> add the table event
+    //         This could happen in upsert against a Kudu table if the requesting user
+    //         does not have the all privilege on the target table.
+    // case 3: table (access_type) ERROR, columns (access_type) OK -> only add the column
+    //         events
+    // case 4: table (access_type) ERROR, columns (access_type) ERROR --> add the table
+    //         event
+    // case 5: table (access_type) ERROR --> add the table event
     //         This could happen when the select request for a non-existing table fails
     //         the authorization.
-    // case 6: table (select) OK, columns (select) ERROR --> add the first column event
-    //         This could happen when the requesting user is granted the select privilege
-    //         on the table but is denied access to a column in the same table in Ranger.
+    // case 6: table (access_type) OK, columns (access_type) ERROR --> add the first
+    //         column event
+    //         This could happen when the requesting user is granted the select or insert
+    //         privileges on the table but is denied access to a column in the same table
+    //         in Ranger.
     RangerAuthorizationContext tmpCtx = new RangerAuthorizationContext(
         originalCtx.getSessionState(), originalCtx.getTimeline());
     tmpCtx.setAuditHandler(new RangerBufferAuditHandler(originalAuditHandler));
@@ -305,8 +312,10 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       authorizationException = e;
       tmpCtx.getAuditHandler().getAuthzEvents().stream()
           .filter(evt ->
-              // case 2: get the first failing non-select table
-              (!"select".equalsIgnoreCase(evt.getAccessType()) &&
+              // case 2: get the first failing table event that is neither select nor
+              // insert.
+              ((!"select".equalsIgnoreCase(evt.getAccessType()) &&
+                  !"insert".equalsIgnoreCase(evt.getAccessType())) &&
                   "@table".equals(evt.getResourceType())) ||
               // case 4 & 5 & 6: get the table or a column event
               (("@table".equals(evt.getResourceType()) ||
@@ -719,21 +728,39 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     Preconditions.checkState(accessResult.getIsAllowed(),
         "update should be allowed before checking this");
     String originalAccessType = request.getAccessType();
+    RangerAccessResource originalResource = null;
     // Row-filtering/Column-masking policies are defined only for SELECT requests.
     request.setAccessType(SELECT_ACCESS_TYPE);
+    // This if block allows us to correctly deny the INSERT request when there is any row
+    // filtering policy defined on the table against the requesting user.
+    // Recall that a user is allowed to execute the INSERT statement as long as the user
+    // is allowed to insert values into each target column, even though the user is not
+    // allowed to insert values into the entire table.
+    // Therefore, when determining whether the requesting user is allowed to insert
+    // values into a target column, we need to temporarily set the resource to the table
+    // to which the column belongs. Without us doing so,
+    // rowFilterResult.isRowFilterEnabled() will return false and thus the requesting
+    // user will not be blocked.
+    if (authorizable.getType() == Type.COLUMN) {
+      originalResource = request.getResource();
+      RangerAccessResourceImpl derivedTableResource = new RangerImpalaResourceBuilder()
+          .database(authorizable.getDbName())
+          .table(authorizable.getTableName())
+          .owner(authorizable.getOwnerUser())
+          .build();
+      request.setResource(derivedTableResource);
+    }
     // Check if row filtering is enabled for the table/view.
-    if (authorizable.getType() == Type.TABLE) {
-      RangerAccessResult rowFilterResult = plugin_.evalRowFilterPolicies(
-          request, /*resultProcessor*/null);
-      if (rowFilterResult != null && rowFilterResult.isRowFilterEnabled()) {
-        LOG.info("Deny {} on {} due to row filtering policy {}",
-            privilege, authorizable.getName(), rowFilterResult.getPolicyId());
-        accessResult.setIsAllowed(false);
-        accessResult.setPolicyId(rowFilterResult.getPolicyId());
-        accessResult.setReason("User does not have access to all rows of the table");
-      } else {
-        LOG.trace("No row filtering policy found on {}.", authorizable.getName());
-      }
+    RangerAccessResult rowFilterResult = plugin_.evalRowFilterPolicies(
+        request, /*resultProcessor*/null);
+    if (rowFilterResult != null && rowFilterResult.isRowFilterEnabled()) {
+      LOG.info("Deny {} on {} due to row filtering policy {}",
+          privilege, authorizable.getName(), rowFilterResult.getPolicyId());
+      accessResult.setIsAllowed(false);
+      accessResult.setPolicyId(rowFilterResult.getPolicyId());
+      accessResult.setReason("User does not have access to all rows of the table");
+    } else {
+      LOG.trace("No row filtering policy found on {}.", authorizable.getName());
     }
     // Check if masking is enabled for any column in the table/view.
     if (accessResult.getIsAllowed()) {
@@ -751,6 +778,9 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     // Set back the original access type. The request object is still referenced by the
     // access result.
     request.setAccessType(originalAccessType);
+    if (originalResource != null) {
+      request.setResource(originalResource);
+    }
     // Only add deny audits.
     if (!accessResult.getIsAllowed() && auditHandler != null) {
       auditHandler.processResult(accessResult);

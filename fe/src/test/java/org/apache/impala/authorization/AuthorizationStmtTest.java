@@ -166,7 +166,11 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     verifyPrivilegeReqs("select a.id from functional.alltypes a", expectedAuthorizables);
 
     // Insert.
-    expectedAuthorizables = Sets.newHashSet("functional.alltypes");
+    expectedAuthorizables = Sets.newHashSet(
+        "functional.alltypes",
+        "functional.alltypes.id",
+        "functional.alltypes.month",
+        "functional.alltypes.year");
     verifyPrivilegeReqs("insert into functional.alltypes(id) partition(month, year) " +
         "values(1, 1, 2018)", expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"),
@@ -174,7 +178,9 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         expectedAuthorizables);
 
     // Insert with constant select.
-    expectedAuthorizables = Sets.newHashSet("functional.zipcode_incomes");
+    expectedAuthorizables = Sets.newHashSet(
+        "functional.zipcode_incomes",
+        "functional.zipcode_incomes.id");
     verifyPrivilegeReqs("insert into functional.zipcode_incomes(id) select '123'",
         expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"),
@@ -210,7 +216,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         expectedAuthorizables);
 
     // Show tables.
-    expectedAuthorizables = Sets.newHashSet("functional.*.*");
+    expectedAuthorizables = Sets.newHashSet("functional");
     verifyPrivilegeReqs("show tables in functional", expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"), "show tables",
         expectedAuthorizables);
@@ -304,7 +310,10 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         "update alltypes set int_col = 1", expectedAuthorizables);
 
     // Upsert table.
-    expectedAuthorizables = Sets.newHashSet("functional_kudu.alltypes");
+    expectedAuthorizables = Sets.newHashSet(
+        "functional_kudu.alltypes",
+        "functional_kudu.alltypes.id",
+        "functional_kudu.alltypes.int_col");
     verifyPrivilegeReqs("upsert into table functional_kudu.alltypes(id, int_col) " +
         "values(1, 1)", expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional_kudu"),
@@ -920,6 +929,9 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           .ok(onTable("functional", "zipcode_incomes", TPrivilegeLevel.ALL))
           .ok(onTable("functional", "zipcode_incomes", TPrivilegeLevel.OWNER))
           .ok(onTable("functional", "zipcode_incomes", TPrivilegeLevel.INSERT))
+          .ok(onColumn("functional", "zipcode_incomes", "id", TPrivilegeLevel.ALL))
+          .ok(onColumn("functional", "zipcode_incomes", "id", TPrivilegeLevel.OWNER))
+          .ok(onColumn("functional", "zipcode_incomes", "id", TPrivilegeLevel.INSERT))
           .error(insertError("functional.zipcode_incomes"))
           .error(insertError("functional.zipcode_incomes"), onServer(allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.INSERT)))
@@ -928,7 +940,10 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
               TPrivilegeLevel.INSERT)))
           .error(insertError("functional.zipcode_incomes"), onTable("functional",
               "zipcode_incomes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
-              TPrivilegeLevel.INSERT)));
+              TPrivilegeLevel.INSERT)))
+          .error(insertError("functional.zipcode_incomes"), onColumn("functional",
+              "zipcode_incomes", "id", allExcept(TPrivilegeLevel.ALL,
+              TPrivilegeLevel.OWNER, TPrivilegeLevel.INSERT)));
     }
 
     for (AuthzTest test: new AuthzTest[]{
@@ -947,13 +962,25 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           .ok(onDatabase("functional", TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT))
           .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL),
               onTable("functional", "alltypestiny", TPrivilegeLevel.ALL))
+          .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS, TPrivilegeLevel.ALL),
+              onTable("functional", "alltypestiny", TPrivilegeLevel.ALL))
           .ok(onTable("functional", "alltypes", TPrivilegeLevel.OWNER),
               onTable("functional", "alltypestiny", TPrivilegeLevel.OWNER))
+          .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS,
+                  TPrivilegeLevel.OWNER),
+              onTable("functional", "alltypestiny", TPrivilegeLevel.OWNER))
           .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
+              onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT))
+          .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS,
+                  TPrivilegeLevel.INSERT),
               onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT))
           .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
               onColumn("functional", "alltypestiny", ALLTYPES_COLUMNS,
               TPrivilegeLevel.SELECT))
+          .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS,
+                  TPrivilegeLevel.INSERT),
+              onColumn("functional", "alltypestiny", ALLTYPES_COLUMNS,
+                  TPrivilegeLevel.SELECT))
           .error(selectError("functional.alltypestiny"))
           .error(selectError("functional.alltypestiny"), onServer(allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.INSERT,
@@ -965,6 +992,10 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
               "alltypestiny", TPrivilegeLevel.SELECT), onTable("functional",
               "alltypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
               TPrivilegeLevel.INSERT)))
+          .error(insertError("functional.alltypes"), onTable("functional",
+              "alltypestiny", TPrivilegeLevel.SELECT), onColumn("functional",
+              "alltypes", ALLTYPES_COLUMNS, allExcept(TPrivilegeLevel.ALL,
+                  TPrivilegeLevel.OWNER, TPrivilegeLevel.INSERT)))
           .error(selectError("functional.alltypestiny"), onTable("functional",
               "alltypestiny", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
               TPrivilegeLevel.SELECT)), onTable("functional", "alltypes",
@@ -982,11 +1013,20 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         .ok(onDatabase("functional", TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT))
         .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL),
             onTable("functional", "alltypes_view", TPrivilegeLevel.ALL))
+        .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS, TPrivilegeLevel.ALL),
+            onTable("functional", "alltypes_view", TPrivilegeLevel.ALL))
         .ok(onTable("functional", "alltypes", TPrivilegeLevel.OWNER),
+            onTable("functional", "alltypes_view", TPrivilegeLevel.OWNER))
+        .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS, TPrivilegeLevel.OWNER),
             onTable("functional", "alltypes_view", TPrivilegeLevel.OWNER))
         .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
             onTable("functional", "alltypes_view", TPrivilegeLevel.SELECT))
+        .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS, TPrivilegeLevel.INSERT),
+            onTable("functional", "alltypes_view", TPrivilegeLevel.SELECT))
         .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
+            onColumn("functional", "alltypes_view", ALLTYPES_COLUMNS,
+                TPrivilegeLevel.SELECT))
+        .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS, TPrivilegeLevel.INSERT),
             onColumn("functional", "alltypes_view", ALLTYPES_COLUMNS,
                 TPrivilegeLevel.SELECT))
         .error(selectError("functional.alltypes_view"))
@@ -1000,6 +1040,10 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
             "alltypes_view", TPrivilegeLevel.SELECT), onTable("functional",
             "alltypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
             TPrivilegeLevel.INSERT)))
+        .error(insertError("functional.alltypes"), onTable("functional",
+            "alltypes_view", TPrivilegeLevel.SELECT), onColumn("functional",
+            "alltypes", ALLTYPES_COLUMNS, allExcept(TPrivilegeLevel.ALL,
+                TPrivilegeLevel.OWNER, TPrivilegeLevel.INSERT)))
         .error(selectError("functional.alltypes_view"), onTable("functional",
             "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
             TPrivilegeLevel.SELECT)),
@@ -1018,10 +1062,19 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL),
             onTable("functional", "alltypesagg", TPrivilegeLevel.ALL),
             onTable("functional", "alltypestiny", TPrivilegeLevel.ALL))
+        .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS, TPrivilegeLevel.ALL),
+            onTable("functional", "alltypesagg", TPrivilegeLevel.ALL),
+            onTable("functional", "alltypestiny", TPrivilegeLevel.ALL))
         .ok(onTable("functional", "alltypes", TPrivilegeLevel.OWNER),
             onTable("functional", "alltypesagg", TPrivilegeLevel.OWNER),
             onTable("functional", "alltypestiny", TPrivilegeLevel.OWNER))
+        .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS, TPrivilegeLevel.OWNER),
+            onTable("functional", "alltypesagg", TPrivilegeLevel.OWNER),
+            onTable("functional", "alltypestiny", TPrivilegeLevel.OWNER))
         .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
+            onTable("functional", "alltypesagg", TPrivilegeLevel.SELECT),
+            onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT))
+        .ok(onColumn("functional", "alltypes", ALLTYPES_COLUMNS, TPrivilegeLevel.INSERT),
             onTable("functional", "alltypesagg", TPrivilegeLevel.SELECT),
             onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT))
         .error(selectError("functional.alltypesagg"))
@@ -1036,6 +1089,11 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
             "alltypestiny", TPrivilegeLevel.SELECT), onTable("functional",
             "alltypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
             TPrivilegeLevel.INSERT)))
+        .error(insertError("functional.alltypes"), onTable("functional",
+            "alltypesagg", TPrivilegeLevel.SELECT), onTable("functional",
+            "alltypestiny", TPrivilegeLevel.SELECT), onColumn("functional",
+            "alltypes", ALLTYPES_COLUMNS, allExcept(TPrivilegeLevel.ALL,
+                TPrivilegeLevel.OWNER, TPrivilegeLevel.INSERT)))
         .error(selectError("functional.alltypesagg"), onTable("functional",
             "alltypesagg", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
             TPrivilegeLevel.SELECT)),
@@ -1073,7 +1131,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           .ok(onTable("functional", "alltypes", privilege))
           .ok(onColumn("functional", "alltypes", "id", privilege));
     }
-    test.error(accessError("functional.*.*"));
+    test.error(accessError("functional"));
 
     // Accessing default database should always be allowed.
     authorize("use default").ok();
@@ -1082,7 +1140,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     authorize("use _impala_builtins").ok();
 
     // Use a non-existent database.
-    authorize("use nodb").error(accessError("nodb.*.*"));
+    authorize("use nodb").error(accessError("nodb"));
   }
 
   @Test
@@ -1264,7 +1322,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           .ok(onDatabase("functional", privilege))
           .ok(onTable("functional", "alltypes", privilege));
     }
-    test.error(accessError("functional.*.*"));
+    test.error(accessError("functional"));
 
     // Show metadata tables in table.
     test = authorize("show metadata tables in functional_parquet.iceberg_query_metadata");
@@ -1286,7 +1344,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           .ok(onDatabase("functional", privilege))
           .ok(onTable("functional", "alltypes_views", privilege));
     }
-    test.error(accessError("functional.*.*"));
+    test.error(accessError("functional"));
 
     // Show functions.
     test = authorize("show functions in functional");
@@ -1829,7 +1887,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           .ok(onDatabase("functional"), onDatabase("functional", TPrivilegeLevel.CREATE,
               TPrivilegeLevel.INSERT), onColumn("functional", "alltypes", "int_col",
               TPrivilegeLevel.OWNER))
-          .error(createError("functional"))
+          .error(accessError("functional"))
           .error(createError("functional"), onServer(allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE,
               TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT)))
@@ -2019,7 +2077,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       .ok(onServer(TPrivilegeLevel.OWNER))
       .ok(onDatabase("functional", TPrivilegeLevel.CREATE, TPrivilegeLevel.INSERT,
           TPrivilegeLevel.SELECT))
-      .error(createError("functional"))
+      .error(accessError("functional"))
       .error(createError("functional"), onServer(allExcept(TPrivilegeLevel.ALL,
           TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE, TPrivilegeLevel.INSERT,
           TPrivilegeLevel.SELECT)))

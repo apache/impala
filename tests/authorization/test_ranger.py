@@ -412,7 +412,7 @@ class TestRanger(CustomClusterTestSuite):
           "show grant {0} {1} on user_defined_fn {2}.{3}"
           .format(kw, id, unique_database, udf), [])
 
-      # Grant column privileges and verify
+      # Grant the select privilege on a column and verify
       self._update_privileges_and_verify(
           admin_client, "grant select(x) on table {0}.{1} to {2} {3}"
           .format(unique_database, unique_table, kw, id),
@@ -421,9 +421,25 @@ class TestRanger(CustomClusterTestSuite):
               [kw, id, unique_database, unique_table, "x", "", "", "", "", "select",
                "false"]])
 
-      # Revoke column privileges and verify
+      # Revoke the select privilege on a column and verify
       self._update_privileges_and_verify(
           admin_client, "revoke select(x) on table {0}.{1} from {2} {3}"
+          .format(unique_database, unique_table, kw, id),
+          "show grant {0} {1} on column {2}.{3}.x"
+          .format(kw, id, unique_database, unique_table), [])
+
+      # Grant the insert privilege on a column and verify
+      self._update_privileges_and_verify(
+          admin_client, "grant insert(x) on table {0}.{1} to {2} {3}"
+          .format(unique_database, unique_table, kw, id),
+          "show grant {0} {1} on column {2}.{3}.x"
+          .format(kw, id, unique_database, unique_table), [
+              [kw, id, unique_database, unique_table, "x", "", "", "", "", "insert",
+               "false"]])
+
+      # Revoke the insert privilege on a column and verify
+      self._update_privileges_and_verify(
+          admin_client, "revoke insert(x) on table {0}.{1} from {2} {3}"
           .format(unique_database, unique_table, kw, id),
           "show grant {0} {1} on column {2}.{3}.x"
           .format(kw, id, unique_database, unique_table), [])
@@ -447,6 +463,8 @@ class TestRanger(CustomClusterTestSuite):
                            .format(unique_database, udf, kw, id))
       admin_client.execute("revoke select(x) on table {0}.{1} from {2} {3}"
                            .format(unique_database, unique_table, kw, id))
+      admin_client.execute("revoke insert(x) on table {0}.{1} from {2} {3}"
+                           .format(unique_database, unique_table, kw, id))
 
   def _test_show_grant_inherited(self, admin_client, kw, id, unique_database,
                                  unique_table):
@@ -461,29 +479,30 @@ class TestRanger(CustomClusterTestSuite):
           [kw, id, "*", "", "", "", "", "", "*", "select", "false"],
           [kw, id, "*", "*", "*", "", "", "", "", "select", "false"]])
 
-      # Verify the highest level of resource that contains the specified resource could
-      # be computed when the specified resource is a database
+      # Verify the resources that contain the specified resource could be computed when
+      # the specified resource is a database.
       result = self.client.execute("show grant {0} {1} on database {2}"
           .format(kw, id, unique_database))
       TestRanger._check_privileges(result, [
           [kw, id, "*", "", "", "", "", "", "*", "select", "false"],
           [kw, id, "*", "*", "*", "", "", "", "", "select", "false"]])
 
-      # Verify the highest level of resource that contains the specified resource could
-      # be computed when the specified resource is a table
+      # Verify the resource that contains the specified resource could be computed when
+      # the specified resource is a table.
       result = self.client.execute("show grant {0} {1} on table {2}.{3}"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
           [kw, id, "*", "*", "*", "", "", "", "", "select", "false"]])
 
-      # Verify the highest level of resource that contains the specified resource could
-      # be computed when the specified resource is a column
+      # Verify the resource that contains the specified resource could be computed when
+      # the specified resource is a column.
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
           [kw, id, "*", "*", "*", "", "", "", "", "select", "false"]])
 
-      # Grant the create privilege on database and verify
+      # Grant the create privilege on database and verify that the resources that contain
+      # the specified database could be computed.
       admin_client.execute("grant create on database {0} to {1} {2}"
                            .format(unique_database, kw, id))
       result = self.client.execute("show grant {0} {1} on database {2}"
@@ -495,7 +514,8 @@ class TestRanger(CustomClusterTestSuite):
           [kw, id, unique_database, "*", "*", "", "", "", "", "create", "false"]
       ])
 
-      # Grant the insert privilege on table and verify
+      # Grant the insert privilege on table and verify that the resources that contain
+      # the specified table could be computed.
       admin_client.execute("grant insert on table {0}.{1} to {2} {3}"
                            .format(unique_database, unique_table, kw, id))
       result = self.client.execute("show grant {0} {1} on table {2}.{3}"
@@ -506,7 +526,9 @@ class TestRanger(CustomClusterTestSuite):
           [kw, id, unique_database, unique_table, "*", "", "", "", "", "insert", "false"]
       ])
 
-      # Grant the select privilege on column and verify
+      # Grant the select privilege on the column x and verify that
+      # the select privilege on the column x masks the select privilege on every
+      # database, every table, and every column.
       admin_client.execute("grant select(x) on table {0}.{1} to {2} {3}"
                            .format(unique_database, unique_table, kw, id))
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
@@ -517,7 +539,10 @@ class TestRanger(CustomClusterTestSuite):
           [kw, id, unique_database, unique_table, "x", "", "", "", "", "select", "false"]
       ])
 
-      # The insert privilege on table masks the select privilege just added
+      # Grant the select privilege on the table and verify that
+      # the select privilege on the column x masks
+      # a) the select privilege on every database, every table, and every column,
+      # b) the select privilege on the table just added.
       admin_client.execute("grant select on table {0}.{1} to {2} {3}"
                            .format(unique_database, unique_table, kw, id))
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
@@ -528,14 +553,32 @@ class TestRanger(CustomClusterTestSuite):
           [kw, id, unique_database, unique_table, "x", "", "", "", "", "select", "false"]
       ])
 
-      # The all privilege on table masks the privileges of insert and select, but not the
-      # select privilege on column.
+      # Grant the all privilege on the table and verify that
+      # a) the all privilege on a table masks the insert and select privileges
+      # on the same table,
+      # b) the all privilege on a table masks the create privilege on the resource that
+      # contains this table (a database in this case),
+      # c) the select privilege on the column x masks the select privilege on the other
+      # two with resources containing the column x.
       admin_client.execute("grant all on table {0}.{1} to {2} {3}"
                            .format(unique_database, unique_table, kw, id))
       result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
                                    .format(kw, id, unique_database, unique_table))
       TestRanger._check_privileges(result, [
           [kw, id, unique_database, unique_table, "*", "", "", "", "", "all", "false"],
+          [kw, id, unique_database, unique_table, "x", "", "", "", "", "select", "false"]
+      ])
+
+      # Grant the insert privilege on the column x and verify that
+      # the select privilege on the column x does not mask the insert privilege on the
+      # same column.
+      admin_client.execute("grant insert(x) on table {0}.{1} to {2} {3}"
+                           .format(unique_database, unique_table, kw, id))
+      result = self.client.execute("show grant {0} {1} on column {2}.{3}.x"
+                                   .format(kw, id, unique_database, unique_table))
+      TestRanger._check_privileges(result, [
+          [kw, id, unique_database, unique_table, "*", "", "", "", "", "all", "false"],
+          [kw, id, unique_database, unique_table, "x", "", "", "", "", "insert", "false"],
           [kw, id, unique_database, unique_table, "x", "", "", "", "", "select", "false"]
       ])
 
@@ -550,6 +593,8 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("revoke select on table {0}.{1} from {2} {3}"
                            .format(unique_database, unique_table, kw, id))
       admin_client.execute("revoke all on table {0}.{1} from {2} {3}"
+                           .format(unique_database, unique_table, kw, id))
+      admin_client.execute("revoke insert(x) on table {0}.{1} from {2} {3}"
                            .format(unique_database, unique_table, kw, id))
 
   @staticmethod
@@ -744,7 +789,7 @@ class TestRanger(CustomClusterTestSuite):
     return json.loads(r.content)["id"]
 
   @staticmethod
-  def _add_deny_policy(policy_name, user, db, table, column):
+  def _add_deny_policy(policy_name, user, db, table, column, access_type):
     """ Adds a deny policy and returns the policy id"""
     data = {
       "name": policy_name,
@@ -773,7 +818,7 @@ class TestRanger(CustomClusterTestSuite):
         {
           "accesses": [
             {
-              "type": "select",
+              "type": access_type,
               "isAllowed": True
             }
           ],
@@ -783,16 +828,20 @@ class TestRanger(CustomClusterTestSuite):
     }
     r = requests.post("{0}/service/public/v2/api/policy".format(RANGER_HOST),
                       auth=RANGER_AUTH, json=data, headers=REST_HEADERS)
-    assert 300 > r.status_code >= 200, r.content
+    assert 300 > r.status_code >= 200, bytes_to_str(r.content)
     return json.loads(r.content)["id"]
 
   @staticmethod
   def _remove_policy(policy_name):
+    """Removes a policy with the given name if it exists."""
     r = requests.delete(
         "{0}/service/public/v2/api/policy?servicename=test_impala&policyname={1}".format(
             RANGER_HOST, policy_name),
         auth=RANGER_AUTH, headers=REST_HEADERS)
-    assert 300 > r.status_code >= 200, bytes_to_str(r.content)
+    # We do not return an AssertionError if the policy specified by 'policy_name' is
+    # not found since this type of error should be considered benign.
+    if r.status_code != 404:
+      assert 300 > r.status_code >= 200, bytes_to_str(r.content)
 
   @staticmethod
   def _toggle_ranger_policy(self, policy_name, enable):
@@ -907,6 +956,31 @@ class TestRanger(CustomClusterTestSuite):
                 result.add(id)
                 break
     return result
+
+  @staticmethod
+  def _get_ranger_policy_names(policies, db, tbl, col):
+    """Returns the set of Ranger policy names that match the given database 'db',
+    table 'tbl', and column 'col' in the given 'policies'."""
+    result = set()
+    for policy in policies:
+      resources = policy["resources"]
+      policy_name = str(policy["name"])
+      if "database" in resources and db in resources["database"]["values"] \
+          and "table" in resources and tbl in resources["table"]["values"] \
+          and "column" in resources and col in resources["column"]["values"]:
+        result.add(policy_name)
+    return result
+
+  @staticmethod
+  def _remove_policies(db, tbl, col):
+    """Removes all policies that match the given database 'db', table 'tbl',
+    and column 'col'."""
+    policy_names = set()
+    policies = TestRanger._get_ranger_privileges()
+    policy_names = policy_names \
+        .union(TestRanger._get_ranger_policy_names(policies, db, tbl, col))
+    for name in policy_names:
+      TestRanger._remove_policy(name)
 
   def _test_grant_revoke_by_owner(self, unique_name):
     non_owner_user = NON_OWNER
@@ -1338,7 +1412,7 @@ class TestRanger(CustomClusterTestSuite):
           "alter database {0} set owner user {1}".format(test_db, ADMIN), ADMIN, True)
       result = self._run_query_as_user(
           "show tables in {0}".format(test_db), test_user, False)
-      err = "User '{0}' does not have privileges to access: {1}.*.*". \
+      err = "User '{0}' does not have privileges to access: {1}". \
           format(test_user, test_db)
       assert err in str(result)
       # test_user is still the owner of the table, so select should work fine.
@@ -1441,7 +1515,7 @@ class TestRanger(CustomClusterTestSuite):
       # the table 'test_tbl_2', on which 'grantee_user' had been granted the SELECT
       # privilege.
       TestRanger._add_deny_policy(unique_name, grantee_user, unique_database, test_tbl_2,
-          "id")
+          "id", "select")
       admin_client.execute("refresh authorization")
 
       # The query is not authorized since the SELECT privilege on the column 'id' in the
@@ -1464,6 +1538,187 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("drop database if exists {0} cascade"
           .format(unique_database))
       TestRanger._remove_policy(unique_name)
+
+  def _test_deny_insert_into_column_non_partitioned_table(self, unique_name):
+    grantee_user = "non_owner"
+    unique_database = unique_name + "_db"
+    table_prefix = "tbl"
+    tables = [table_prefix, table_prefix + "_iceberg"]
+    columns = ["id", "bigint_col"]
+    create_queries = [
+      ("create table {0}.{1} ({2} int, {3} bigint)"
+      .format(unique_database, tables[0], columns[0], columns[1]),
+       tables[0]),
+      ("create table {0}.{1} ({2} int, {3} bigint) stored as iceberg"
+      .format(unique_database, tables[1], columns[0], columns[1]),
+       tables[1])
+    ]
+    error_msg_prefix = ("User '{0}' does not have privileges to execute 'INSERT' on:"
+        .format(grantee_user))
+
+    with self.create_impala_client(user=ADMIN) as admin_client, \
+        self.create_impala_client(user=NON_OWNER) as non_owner_client:
+      try:
+        # Set up a temporary database and a table.
+        admin_client.execute("create database {0}".format(unique_database))
+
+        for create_stmt, tbl in create_queries:
+          insert_queries = [
+            ("insert into {0}.{1}({2}) values (1)"
+             .format(unique_database, tbl, columns[0])),
+            ("insert into {0}.{1}({2}) values (1)"
+             .format(unique_database, tbl, columns[1]))]
+
+          try:
+            admin_client.execute(create_stmt)
+
+            # Grant the INSERT privilege on the table to 'grantee_user'.
+            admin_client.execute("grant insert on table {0}.{1} to user {2}"
+                .format(unique_database, tbl, grantee_user))
+            # Add a deny policy on 'columns[0]' to prevent 'grantee_user' from inserting
+            # data into this column.
+            TestRanger._add_deny_policy(unique_name + "_deny_" + columns[0],
+                grantee_user, unique_database, tbl, columns[0], "update")
+            admin_client.execute("refresh authorization")
+
+            # Verify inserting into 'columns[0]' by 'grantee_user' is denied.
+            result = self.execute_query_expect_failure(non_owner_client,
+                insert_queries[0])
+            assert error_msg_prefix in str(result)
+
+            # For 'insert_queries[1]', since Impala registered the INSERT privilege on
+            # 'columns[1]' but not on 'columns[0]', inserting into 'columns[1]' by
+            # 'grantee_user' would be allowed.
+            self.execute_query_expect_success(non_owner_client, insert_queries[1])
+
+            # Add a column masking policy on 'columns[0]' to prevent 'grantee_user' from
+            # inserting data into any column of the table.
+            TestRanger._add_column_masking_policy(unique_name + "_column_masking_"
+                + columns[0], grantee_user, unique_database, tbl, columns[0], "CUSTOM",
+                "id * 100")
+            admin_client.execute("refresh authorization")
+
+            # Verify inserting into 'columns[1]' by 'grantee_user' is denied even
+            # though the column masking policy is defined on 'columns[0]'.
+            result = self.execute_query_expect_failure(non_owner_client,
+                insert_queries[1])
+            assert error_msg_prefix in str(result)
+          finally:
+            TestRanger._remove_policy(unique_name + "_deny_" + columns[0])
+            TestRanger._remove_policy(unique_name + "_column_masking_" + columns[0])
+            admin_client.execute("revoke insert on table {0}.{1} from user {2}"
+                .format(unique_database, tbl, grantee_user))
+            # This removes the empty policy on the table 'unique_database.tbl' that is
+            # not associated with any principal. This policy was added due to the GRANT
+            # statement in the try block. Recall that the REVOKE statement above
+            # could only remove the associated user but not the entire policy. We have to
+            # remove the entire policy in order to add a deny policy on the same table in
+            # the next try block.
+            TestRanger._remove_policies(unique_database, tbl, "*")
+            admin_client.execute("refresh authorization")
+
+          try:
+            TestRanger._add_deny_policy(unique_name + "_deny_" + tbl, grantee_user,
+                unique_database, tbl, "*", "update")
+            # Grant the INSERT privilege on the column 'columns[1]' to 'grantee_user'.
+            admin_client.execute("grant insert ({0}) on table {1}.{2} to user {3}"
+                .format(columns[1], unique_database, tbl, grantee_user))
+            admin_client.execute("refresh authorization")
+
+            # Verify inserting into the 'columns[1]' by 'grantee_user' is denied due to
+            # the deny policy on the table.
+            result = self.execute_query_expect_failure(non_owner_client,
+                insert_queries[1])
+            assert error_msg_prefix in str(result)
+          finally:
+            TestRanger._remove_policy(unique_name + "_deny_" + tbl)
+            admin_client.execute("revoke insert ({0}) on table {1}.{2} from user {3}"
+                .format(columns[1], unique_database, tbl, grantee_user))
+      finally:
+        admin_client.execute("drop database if exists {0} cascade"
+            .format(unique_database))
+
+  def _test_deny_insert_into_column_partitioned_table(self, unique_name):
+    grantee_user = "non_owner"
+    unique_database = unique_name + "_db"
+    unique_table = unique_name + "_tbl"
+    unique_tables = [unique_table, unique_table + "_iceberg"]
+    non_part_columns = ["id"]
+    part_columns = ["year"]
+    create_queries = [
+      ("create table {0}.{1} ({2} int) partitioned by ({3} int)"
+       .format(unique_database, unique_tables[0], non_part_columns[0], part_columns[0]),
+       unique_tables[0]),
+      ("create table {0}.{1} ({2} int) partitioned by ({3} int) stored as iceberg"
+       .format(unique_database, unique_tables[1], non_part_columns[0], part_columns[0]),
+       unique_tables[1])
+    ]
+    error_msg_prefix = ("User '{0}' does not have privileges to execute 'INSERT' on:"
+        .format(grantee_user))
+
+    with self.create_impala_client(user=ADMIN) as admin_client, \
+        self.create_impala_client(user=NON_OWNER) as non_owner_client:
+      try:
+        # Set up a temporary database and a table.
+        admin_client.execute("drop database if exists {0} cascade"
+            .format(unique_database))
+        admin_client.execute("create database {0}".format(unique_database))
+
+        for create_stmt, tbl in create_queries:
+          insert_query = (
+            "insert into {0}.{1}({2}, {3}) values (1, 2025)"
+            .format(unique_database, tbl, non_part_columns[0],
+                part_columns[0]))
+          try:
+            admin_client.execute(create_stmt)
+
+            # Grant the INSERT privilege on the table to 'grantee_user'.
+            admin_client.execute("grant insert on table {0}.{1} to user {2}"
+                .format(unique_database, tbl, grantee_user))
+            # Verify 'grantee_user' is able to insert data into the table.
+            self.execute_query_expect_success(non_owner_client, insert_query)
+
+            # Add a deny policy on 'part_columns[0]' to prevent 'grantee_user' from
+            # inserting data into this column.
+            TestRanger._add_deny_policy(unique_name + "_deny_" + part_columns[0],
+                grantee_user, unique_database, tbl, part_columns[0],
+                "update")
+            admin_client.execute("refresh authorization")
+
+            # Verify inserting into 'part_columns[0]' by 'grantee_user' is denied.
+            result = self.execute_query_expect_failure(non_owner_client, insert_query)
+            assert error_msg_prefix in str(result)
+          finally:
+            TestRanger._remove_policy(unique_name + "_deny_" + part_columns[0])
+            admin_client.execute("revoke insert on table {0}.{1} from user {2}"
+                .format(unique_database, tbl, grantee_user))
+            admin_client.execute("refresh authorization")
+
+          try:
+            # Grant the INSERT privilege on the table to 'grantee_user'.
+            admin_client.execute("grant insert on table {0}.{1} to user {2}"
+                .format(unique_database, tbl, grantee_user))
+            # Verify 'grantee_user' is able to insert data into the table.
+            self.execute_query_expect_success(non_owner_client, insert_query)
+
+            # Add a column masking policy on 'part_columns[0]' to prevent 'grantee_user'
+            # from inserting data into this column.
+            TestRanger._add_column_masking_policy(
+              unique_name + "_column_masking_" + part_columns[0], grantee_user,
+              unique_database, tbl, part_columns[0], "CUSTOM", "id * 100")
+            admin_client.execute("refresh authorization")
+
+            # Verify inserting into 'part_columns[0]' by 'grantee_user' is denied.
+            result = self.execute_query_expect_failure(non_owner_client, insert_query)
+            assert error_msg_prefix in str(result)
+          finally:
+            TestRanger._remove_policy(unique_name + "_column_masking_" + part_columns[0])
+            admin_client.execute("revoke insert on table {0}.{1} from user {2}"
+                .format(unique_database, tbl, grantee_user))
+            admin_client.execute("refresh authorization")
+      finally:
+        admin_client.execute("drop database if exists {0} cascade"
+            .format(unique_database))
 
   def _test_select_calcite_frontend(self, unique_name):
     grantee_user = "non_owner"
@@ -2569,7 +2824,7 @@ class TestRangerLocalCatalog(TestRanger):
       # Check "show functions" with no privilege granted.
       result = self._run_query_as_user("show functions in {0}".format(unique_database),
           user1, False)
-      err = "User '{0}' does not have privileges to access: {1}.*.*". \
+      err = "User '{0}' does not have privileges to access: {1}". \
           format(user1, unique_database)
       assert err in str(result)
       for privilege in privileges:
@@ -3494,6 +3749,10 @@ class TestRangerLocalCatalog(TestRanger):
       finally:
         TestRanger._toggle_ranger_policy(self, policy_name, True)
         admin_client.execute("refresh authorization")
+
+  def test_deny_insert_into_column_with_local_catalog(self, unique_name):
+    self._test_deny_insert_into_column_non_partitioned_table(unique_name)
+    self._test_deny_insert_into_column_partitioned_table(unique_name)
 
 
 class TestRangerColumnMaskingTpchNested(CustomClusterTestSuite):

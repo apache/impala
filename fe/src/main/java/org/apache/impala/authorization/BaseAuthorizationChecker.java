@@ -19,6 +19,7 @@ package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.authorization.Authorizable.Type;
@@ -47,6 +48,10 @@ import java.util.Optional;
 public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
   private final static Logger LOG = LoggerFactory.getLogger(
       BaseAuthorizationChecker.class);
+
+  private final static Set<Privilege> ALLOWED_HIER_AUTHZ_TABLE_PRIVILEGES =
+      ImmutableSet.of(Privilege.SELECT, Privilege.INSERT, Privilege.CREATE,
+          Privilege.ALL, Privilege.ALTER, Privilege.VIEW_METADATA);
 
   protected final AuthorizationConfig config_;
 
@@ -130,31 +135,50 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     // has column-level privilege request. The hierarchical nature requires special
     // logic to process correctly and efficiently.
     if (analysisResult.isHierarchicalAuthStmt()) {
-      // Map of table name to a list of privilege requests associated with that table.
-      // These include both table-level and column-level privilege requests. We use a
-      // LinkedHashMap to preserve the order in which requests are inserted.
+      // Map of table name to a list of table-level privilege requests associated with
+      // that table.
       Map<String, List<PrivilegeRequest>> tablePrivReqs = new LinkedHashMap<>();
+      // Map of table name to a list of column-level privilege requests associated with
+      // that table.
+      Map<String, List<PrivilegeRequest>> columnPrivReqs = new LinkedHashMap<>();
       // Privilege requests that are not column or table-level.
       List<PrivilegeRequest> otherPrivReqs = new ArrayList<>();
-      // Group the registered privilege requests based on the table they reference.
+      // Group the registered privilege requests based on the type of the Authorizable
+      // and the table they reference.
       for (PrivilegeRequest privReq : analyzer.getPrivilegeReqs()) {
         String tableName = privReq.getAuthorizable().getFullTableName();
         if (tableName == null) {
           otherPrivReqs.add(privReq);
         } else {
-          List<PrivilegeRequest> requests = tablePrivReqs.get(tableName);
-          if (requests == null) {
-            requests = new ArrayList<>();
-            tablePrivReqs.put(tableName, requests);
+          List<PrivilegeRequest> requests;
+          if (privReq.getAuthorizable().getType() == Authorizable.Type.TABLE) {
+            // We allow the ALL privilege because for the UPSERT operation against Kudu
+            // tables, we set the required privilege to ALL since we don't have an UPSERT
+            // privilege yet. Refer to InsertStmt#analyzeTargetTable().
+            // CREATE privilege would be registered in CreateTableAsSelectStmt#analyze().
+            // In addition, VIEW_METADATA privilege would be registered in
+            // CopyTestCaseStmt#analyze().
+            Preconditions.checkState(ALLOWED_HIER_AUTHZ_TABLE_PRIVILEGES
+                .contains(privReq.getPrivilege()));
+            requests = tablePrivReqs.computeIfAbsent(tableName, k -> new ArrayList<>());
+            requests.add(privReq);
+          } else {
+            Preconditions.checkState(privReq.getAuthorizable().getType() == Type.COLUMN);
+            requests = columnPrivReqs.computeIfAbsent(tableName, k -> new ArrayList<>());
+            requests.add(privReq);
           }
-          // The table-level SELECT must be the first table-level request, and it
-          // must precede all column-level privilege requests.
-          Preconditions.checkState((requests.isEmpty() ||
-              !(privReq.getAuthorizable().getType() == Authorizable.Type.COLUMN)) ||
-              (requests.get(0).getAuthorizable().getType() == Authorizable.Type.TABLE &&
-                  requests.get(0).getPrivilege() == Privilege.SELECT));
-          requests.add(privReq);
         }
+      }
+      // The following makes sure each column-level privilege request has at least one
+      // corresponding table-level privilege request.
+      // For each list of column-level privilege requests associated with a table, add
+      // the requests to the respective list of table-level privilege requests so that
+      // entries in 'tablePrivReqs' could be used to authorize table accesses in
+      // authorizeTableAccess() below.
+      for (Map.Entry<String, List<PrivilegeRequest>> entry : columnPrivReqs.entrySet()) {
+        List<PrivilegeRequest> privReqs = tablePrivReqs.get(entry.getKey());
+        Preconditions.checkState(privReqs != null);
+        privReqs.addAll(entry.getValue());
       }
 
       // Check any non-table, non-column privilege requests first.
@@ -238,29 +262,36 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     // not want Impala to show any information when these features are disabled.
     authorizeRowFilterAndColumnMask(analyzer.getUser(), requests);
 
-    boolean hasTableSelectPriv = true;
-    boolean hasColumnSelectPriv = false;
+    boolean hasTableAccessPriv = true;
+    boolean hasColumnAccessPriv = false;
     for (PrivilegeRequest request: requests) {
       if (request.getAuthorizable().getType() == Authorizable.Type.TABLE) {
         try {
           authorizePrivilegeRequest(authzCtx, analysisResult, catalog, request);
         } catch (AuthorizationException e) {
           // Authorization fails if we fail to authorize any table-level request that is
-          // not a SELECT privilege (e.g. INSERT).
-          if (request.getPrivilege() != Privilege.SELECT) throw e;
-          hasTableSelectPriv = false;
+          // neither the SELECT nor INSERT privileges.
+          // For UPSERT against a Kudu table, since we set the required privilege to ALL,
+          // we would throw an AuthorizationException if the requesting user does not
+          // have the ALL privilege on the Kudu table.
+          // For CTAS, the requesting user is required to have the CREATE privilege on
+          // the target table, so we would throw an AuthorizationException too if the
+          // requesting user does not have the required privilege.
+          if (request.getPrivilege() != Privilege.SELECT &&
+              request.getPrivilege() != Privilege.INSERT) throw e;
+          hasTableAccessPriv = false;
         }
       } else {
         Preconditions.checkState(
             request.getAuthorizable().getType() == Authorizable.Type.COLUMN);
         // In order to support deny policies on columns
-        if (hasTableSelectPriv &&
+        if (hasTableAccessPriv &&
                 request.getPrivilege() != Privilege.SELECT &&
                 request.getPrivilege() != Privilege.INSERT) {
           continue;
         }
         if (hasAccess(authzCtx, analyzer.getUser(), request)) {
-          hasColumnSelectPriv = true;
+          hasColumnAccessPriv = true;
           continue;
         }
         // Make sure we don't reveal any column names in the error message.
@@ -270,9 +301,10 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
             request.getAuthorizable().getFullTableName()));
       }
     }
-    if (!hasTableSelectPriv && !hasColumnSelectPriv) {
+    if (!hasTableAccessPriv && !hasColumnAccessPriv) {
       throw new AuthorizationException(String.format("User '%s' does not have " +
-              "privileges to execute 'SELECT' on: %s", analyzer.getUser().getName(),
+              "privileges to execute '%s' on: %s", analyzer.getUser().getName(),
+          requests.get(0).getPrivilege().toString(),
           requests.get(0).getAuthorizable().getFullTableName()));
     }
   }

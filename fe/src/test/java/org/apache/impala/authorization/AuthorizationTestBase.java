@@ -654,6 +654,46 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     LOG.info("Deleted ranger policy {}", policyName);
   }
 
+  protected String createJsonDenyPolicy(String policyName, String databaseName,
+      String tableName, String columnName, String accessType, String user) {
+    String json = String.format("{\n" +
+            "  \"name\": \"%s\",\n" +
+            "  \"policyType\": 0,\n" +
+            "  \"serviceType\": \"%s\",\n" +
+            "  \"service\": \"%s\",\n" +
+            "  \"resources\": {\n" +
+            "    \"database\": {\n" +
+            "      \"values\": [\"%s\"],\n" +
+            "      \"isExcludes\": false,\n" +
+            "      \"isRecursive\": false\n" +
+            "    },\n" +
+            "    \"table\": {\n" +
+            "      \"values\": [\"%s\"],\n" +
+            "      \"isExcludes\": false,\n" +
+            "      \"isRecursive\": false\n" +
+            "    },\n" +
+            "    \"column\": {\n" +
+            "      \"values\": [\"%s\"],\n" +
+            "      \"isExcludes\": false,\n" +
+            "      \"isRecursive\": false\n" +
+            "    }\n" +
+            "  },\n" +
+            "  \"denyPolicyItems\": [\n" +
+            "    {\n" +
+            "      \"accesses\": [\n" +
+            "        {\n" +
+            "          \"type\": \"%s\",\n" +
+            "          \"isAllowed\": true\n" +
+            "        }\n" +
+            "      ],\n" +
+            "      \"users\": [\"%s\"]\n" +
+            "    }\n" +
+            "  ]\n" +
+            "}", policyName, RANGER_SERVICE_TYPE, RANGER_SERVICE_NAME, databaseName,
+        tableName, columnName, accessType, user);
+    return json;
+  }
+
   // Convert TDescribeResult to list of strings.
   private static List<String> resultToStringList(TDescribeResult result) {
     List<String> list = new ArrayList<>();
