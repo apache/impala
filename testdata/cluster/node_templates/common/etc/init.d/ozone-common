@@ -16,4 +16,3 @@
 # under the License.
 
 export OZONE_LOG_DIR="$LOG_DIR/hadoop-ozone"
-export OZONE_OPTS="-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
