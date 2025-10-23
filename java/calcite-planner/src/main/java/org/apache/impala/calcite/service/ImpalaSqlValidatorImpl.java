@@ -20,6 +20,7 @@ package org.apache.impala.calcite.service;
 import com.google.common.base.Preconditions;
 
 import org.apache.calcite.prepare.RelOptTableImpl;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
 import org.apache.calcite.sql.validate.SqlQualified;
@@ -35,16 +36,22 @@ import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.SqlUtil;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.calcite.schema.ImpalaViewTable;
+import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.FeFsTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.math.BigDecimal;
 
 /**
  * The ImpalaSqlValidatorImpl is responsible for registering column-level and
@@ -63,6 +70,30 @@ public class ImpalaSqlValidatorImpl extends SqlValidatorImpl {
       SqlValidator.Config config, Analyzer analyzer) {
     super(opTab, catalogReader, typeFactory, config);
     analyzer_ = analyzer;
+  }
+
+  /**
+   * Override of deriveType needed for IMPALA-14429 and
+   * CALCITE-7120.
+   *
+   * Calcite always treats numerics like '1' as an integer, whereas
+   * Impala treats this as a tinyint. So the derived type is overridden
+   * to produce Impala's derived type rather than Calcite's derived type.
+   */
+  @Override
+  public RelDataType deriveType(
+      SqlValidatorScope scope,
+      SqlNode operand) {
+    if (operand instanceof SqlNumericLiteral) {
+      SqlNumericLiteral numeric = (SqlNumericLiteral) operand;
+      if (numeric.isInteger()) {
+        RelDataType type = ImpalaTypeConverter.getLiteralDataType(
+            new BigDecimal(numeric.toValue()), null);
+        setValidatedNodeType(operand, type);
+        return type;
+      }
+    }
+    return super.deriveType(scope, operand);
   }
 
   @Override public void validateIdentifier(SqlIdentifier id, SqlValidatorScope scope) {

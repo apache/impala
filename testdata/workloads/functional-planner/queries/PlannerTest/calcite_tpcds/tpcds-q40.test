@@ -44,7 +44,7 @@ PLAN-ROOT SINK
 |  in pipelines: 10(GETNEXT), 09(OPEN)
 |
 09:AGGREGATE [FINALIZE]
-|  output: sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '1999-02-02' THEN CAST(subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) AS DECIMAL(12,2)) ELSE CAST(0 AS DECIMAL(12,2)) END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '1999-02-02' THEN CAST(subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) AS DECIMAL(12,2)) ELSE CAST(0 AS DECIMAL(12,2)) END)
+|  output: sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '1999-02-02' THEN subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) ELSE CAST(0 AS DECIMAL(8,2)) END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '1999-02-02' THEN subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) ELSE CAST(0 AS DECIMAL(8,2)) END)
 |  group by: tpcds_partitioned_parquet_snap.warehouse.w_state, tpcds_partitioned_parquet_snap.item.i_item_id
 |  mem-estimate=197.86MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=10 row-size=74B cardinality=2.41M cost=628267210
@@ -187,7 +187,7 @@ F02:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.catalog_sales.cs_item_sk,
 Per-Instance Resources: mem-estimate=226.37MB mem-reservation=34.00MB thread-reservation=1
 max-parallelism=320 segment-costs=[3171158934, 1179595953] cpu-comparison-result=210 [max(210 (self) vs 206 (sum children))]
 09:AGGREGATE [STREAMING]
-|  output: sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '1999-02-02' THEN CAST(subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) AS DECIMAL(12,2)) ELSE CAST(0 AS DECIMAL(12,2)) END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '1999-02-02' THEN CAST(subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) AS DECIMAL(12,2)) ELSE CAST(0 AS DECIMAL(12,2)) END)
+|  output: sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '1999-02-02' THEN subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) ELSE CAST(0 AS DECIMAL(8,2)) END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '1999-02-02' THEN subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) ELSE CAST(0 AS DECIMAL(8,2)) END)
 |  group by: tpcds_partitioned_parquet_snap.warehouse.w_state, tpcds_partitioned_parquet_snap.item.i_item_id
 |  mem-estimate=197.86MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=10 row-size=74B cardinality=223.37M cost=1628893885
@@ -408,7 +408,7 @@ F02:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.catalog_sales.cs_item_sk,
 Per-Instance Resources: mem-estimate=226.37MB mem-reservation=34.00MB thread-reservation=1
 max-parallelism=320 segment-costs=[3171158934, 1179595953] cpu-comparison-result=210 [max(210 (self) vs 206 (sum children))]
 09:AGGREGATE [STREAMING]
-|  output: sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '1999-02-02' THEN CAST(subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) AS DECIMAL(12,2)) ELSE CAST(0 AS DECIMAL(12,2)) END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '1999-02-02' THEN CAST(subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) AS DECIMAL(12,2)) ELSE CAST(0 AS DECIMAL(12,2)) END)
+|  output: sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '1999-02-02' THEN subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) ELSE CAST(0 AS DECIMAL(8,2)) END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '1999-02-02' THEN subtract(tpcds_partitioned_parquet_snap.catalog_sales.cs_sales_price, coalesce(tpcds_partitioned_parquet_snap.catalog_returns.cr_refunded_cash, CAST(0 AS DECIMAL(7,2)))) ELSE CAST(0 AS DECIMAL(8,2)) END)
 |  group by: tpcds_partitioned_parquet_snap.warehouse.w_state, tpcds_partitioned_parquet_snap.item.i_item_id
 |  mem-estimate=197.86MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=10 row-size=74B cardinality=223.37M cost=1628893885

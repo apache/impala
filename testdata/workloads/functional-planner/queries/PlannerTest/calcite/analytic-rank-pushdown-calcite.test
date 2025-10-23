@@ -784,11 +784,8 @@ where rownum <= 20
 PLAN-ROOT SINK
 |
 00:UNION
+|  constant-operands=1
 |  row-size=16B cardinality=21
-|
-|--05:UNION
-|     constant-operands=1
-|     row-size=12B cardinality=1
 |
 04:SELECT
 |  predicates: row_number() <= 20

@@ -88,12 +88,13 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--22:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
 |  |  |     HDFS partitions=1/1 files=1 size=307.36MB
-|  |  |     predicates: CAST(tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=15.00M size=307.36MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=1.58M
-|  |  |     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
 |  |  |     tuple-ids=25 row-size=8B cardinality=2.43M cost=2571000
 |  |  |     in pipelines: 22(GETNEXT)
@@ -121,12 +122,13 @@ PLAN-ROOT SINK
 |  |
 |  |--19:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
-|  |     predicates: CAST(tpcds_partitioned_parquet_snap.store_0.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.store_0.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=1.35K
-|  |     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.store_0.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_0.s_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_0.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
 |  |     tuple-ids=21 row-size=8B cardinality=336 cost=231
 |  |     in pipelines: 19(GETNEXT)
@@ -212,12 +214,13 @@ PLAN-ROOT SINK
 |  |
 |  |--10:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
 |  |     HDFS partitions=1/1 files=1 size=307.36MB
-|  |     predicates: CAST(tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=15.00M size=307.36MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=1.58M
-|  |     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
 |  |     tuple-ids=12 row-size=8B cardinality=2.43M cost=2571000
 |  |     in pipelines: 10(GETNEXT)
@@ -245,12 +248,13 @@ PLAN-ROOT SINK
 |
 |--07:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |     HDFS partitions=1/1 files=1 size=119.76KB
-|     predicates: CAST(tpcds_partitioned_parquet_snap.store.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=1.35K
-|     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.store.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
 |     tuple-ids=8 row-size=8B cardinality=336 cost=231
 |     in pipelines: 07(GETNEXT)
@@ -440,12 +444,13 @@ PLAN-ROOT SINK
 |  |  |  max-parallelism=10 segment-costs=[5069764]
 |  |  |  22:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=307.36MB
-|  |  |     predicates: CAST(tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=15.00M size=307.36MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=1.58M
-|  |  |     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
 |  |  |     tuple-ids=25 row-size=8B cardinality=2.43M cost=2571000
 |  |  |     in pipelines: 22(GETNEXT)
@@ -508,12 +513,13 @@ PLAN-ROOT SINK
 |  |  max-parallelism=1 segment-costs=[245]
 |  |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
-|  |     predicates: CAST(tpcds_partitioned_parquet_snap.store_0.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.store_0.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=1.35K
-|  |     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.store_0.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_0.s_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_0.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
 |  |     tuple-ids=21 row-size=8B cardinality=336 cost=231
 |  |     in pipelines: 19(GETNEXT)
@@ -682,12 +688,13 @@ max-parallelism=60 segment-costs=[585345192, 185] cpu-comparison-result=77 [max(
 |  |  max-parallelism=10 segment-costs=[5069764]
 |  |  10:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=307.36MB
-|  |     predicates: CAST(tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=15.00M size=307.36MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=1.58M
-|  |     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
 |  |     tuple-ids=12 row-size=8B cardinality=2.43M cost=2571000
 |  |     in pipelines: 10(GETNEXT)
@@ -741,12 +748,13 @@ max-parallelism=60 segment-costs=[585345192, 185] cpu-comparison-result=77 [max(
 |  max-parallelism=1 segment-costs=[245]
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=119.76KB
-|     predicates: CAST(tpcds_partitioned_parquet_snap.store.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=1.35K
-|     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.store.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
 |     tuple-ids=8 row-size=8B cardinality=336 cost=231
 |     in pipelines: 07(GETNEXT)
@@ -987,12 +995,13 @@ PLAN-ROOT SINK
 |  |  |  max-parallelism=10 segment-costs=[5069764]
 |  |  |  22:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=307.36MB
-|  |  |     predicates: CAST(tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=15.00M size=307.36MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=1.58M
-|  |  |     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address_0.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address_0.ca_address_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
 |  |  |     tuple-ids=25 row-size=8B cardinality=2.43M cost=2571000
 |  |  |     in pipelines: 22(GETNEXT)
@@ -1055,12 +1064,13 @@ PLAN-ROOT SINK
 |  |  max-parallelism=1 segment-costs=[245]
 |  |  19:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=119.76KB
-|  |     predicates: CAST(tpcds_partitioned_parquet_snap.store_0.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.store_0.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=1.35K size=119.76KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=1.35K
-|  |     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.store_0.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_0.s_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_0.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store_0.s_store_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
 |  |     tuple-ids=21 row-size=8B cardinality=336 cost=231
 |  |     in pipelines: 19(GETNEXT)
@@ -1228,12 +1238,13 @@ max-parallelism=10 segment-costs=[23802542, 185] cpu-comparison-result=90 [max(9
 |  |  max-parallelism=10 segment-costs=[5069764]
 |  |  10:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=307.36MB
-|  |     predicates: CAST(tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=15.00M size=307.36MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=1.58M
-|  |     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address.ca_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
 |  |     tuple-ids=12 row-size=8B cardinality=2.43M cost=2571000
 |  |     in pipelines: 10(GETNEXT)
@@ -1296,12 +1307,13 @@ max-parallelism=80 segment-costs=[794436452]
 |  max-parallelism=1 segment-costs=[245]
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
 |     HDFS partitions=1/1 files=1 size=119.76KB
-|     predicates: CAST(tpcds_partitioned_parquet_snap.store.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=1.35K size=119.76KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=1.35K
-|     parquet dictionary predicates: CAST(tpcds_partitioned_parquet_snap.store.s_gmt_offset AS DECIMAL(12,2)) = CAST(-7 AS DECIMAL(12,2)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-7 AS DECIMAL(3,0))
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-7 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
 |     tuple-ids=8 row-size=8B cardinality=336 cost=231
 |     in pipelines: 07(GETNEXT)
