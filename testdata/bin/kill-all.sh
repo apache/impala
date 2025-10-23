@@ -32,7 +32,7 @@ $IMPALA_HOME/testdata/bin/kill-kudu.sh
 $IMPALA_HOME/testdata/bin/kill-mini-dfs.sh
 $IMPALA_HOME/testdata/bin/kill-ranger-server.sh
 
-for BINARY in impalad statestored catalogd mini-impalad-cluster; do
+for BINARY in impalad statestored catalogd; do
   if pgrep -U $USER $BINARY; then
     killall -9 -u $USER -q $BINARY
   fi
