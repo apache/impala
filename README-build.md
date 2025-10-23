@@ -61,7 +61,7 @@ can do so through the environment variables and scripts listed below.
 | IMPALA_MAKE_FLAGS    | "" | Any extra settings to pass to make.  Also used when copying udfs / udas into HDFS. |
 | USE_SYSTEM_GCC       | "0" | If set to any other value, directs cmake to not set GCC_ROOT, CMAKE_C_COMPILER, CMAKE_CXX_COMPILER, as well as setting TOOLCHAIN_LINK_FLAGS |
 | IMPALA_CXX_COMPILER  | "default" | Used by cmake (cmake_modules/toolchain and clang_toolchain.cmake) to select gcc / clang |
-| USE_GOLD_LINKER      | "true" | Directs backend cmake to use gold. |
+| IMPALA_LINKER.       | "gold"  | Specifies the linker to use. |
 | IS_OSX               | "false" | (Experimental) currently only used to disable Kudu. |
 
 ## Dependencies
