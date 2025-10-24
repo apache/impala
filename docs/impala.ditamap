@@ -265,6 +265,8 @@ under the License.
         <topicref href="topics/impala_spool_query_results.xml"/>
         <topicref href="topics/impala_support_start_over.xml"/>
         <topicref href="topics/impala_sync_ddl.xml"/>
+        <topicref href="topics/impala_sync_hms_events_strict_mode.xml"/>
+        <topicref href="topics/impala_sync_hms_events_wait_time_s.xml"/>
         <topicref href="topics/impala_thread_reservation_aggregate_limit.xml"/>
         <topicref href="topics/impala_thread_reservation_limit.xml"/>
         <topicref href="topics/impala_timezone.xml"/>

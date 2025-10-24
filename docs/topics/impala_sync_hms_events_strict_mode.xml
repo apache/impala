@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="5.0.0" id="impala_sync_hms_events_strict_mode">
+  <title>SYNC_HMS_EVENTS_STRICT_MODE Query Option</title>
+  <titlealts audience="PDF"><navtitle>SYNC HMS EVENTS STRICT MODE</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p id="IMPALA-12152"><indexterm audience="hidden">SYNC_HMS_EVENTS_STRICT_MODE query
+        option</indexterm>This query option controls the behavior of the query coordinator if it
+      cannot successfully sync with the latest HMS events (e.g., if the waiting time set by
+        <codeph>SYNC_HMS_EVENTS_WAIT_TIME_S</codeph> is reached, or the event processor is in an
+      error state).</p>
+    <p conref="../shared/impala_common.xml#common/type_boolean"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+    <p><b>Query Range:</b>
+      <codeph>True</codeph> or <codeph>False</codeph></p>
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>This option determines whether Impala favors consistency (failing the query) or availability
+      (starting the query planning despite potential lag).<ul id="ul_jpg_3qs_bhc">
+        <li><codeph>True</codeph> (Strict Mode): If Catalog service cannot sync the metadata with
+          the latest HMS event ID before the timeout is reached, the coordinator fails the query
+          with an error. This prioritizes correctness and metadata consistency.<p>If the coordinator
+            fails the query when <codeph>SYNC_HMS_EVENTS_STRICT_MODE</codeph> is set to
+              <codeph>TRUE</codeph> (Strict Mode), you will see an error message starting with
+              <msgph>Failed to sync events from Metastore:</msgph> and then the specific reason,
+            such as <msgph>HMS event processing is disabled</msgph>.</p></li>
+        <li><codeph>False</codeph> (Non-Strict Mode - Default): If the waiting times out, the
+          coordinator starts planning the query immediately but issues a warning message in the
+          query profile. This prioritizes availability, allowing the query to run, but risks working
+          with slightly stale metadata.</li>
+      </ul></p>
+    <note id="note_fhz_rqs_bhc">This option is only relevant if
+        <codeph>SYNC_HMS_EVENTS_WAIT_TIME_S</codeph> is set to a value greater than 0.</note>
+    <p><b>Example</b></p>
+    <p>The following example shows how to set <codeph>SYNC_HMS_EVENTS_STRICT_MODE</codeph> to
+        <codeph>TRUE</codeph> for a specific query to enforce
+      consistency:<codeblock id="codeblock_fnm_hsp_fhc">SET SYNC_HMS_EVENTS_STRICT_MODE=TRUE;
+SELECT COUNT(*) FROM functional.alltypes;</codeblock></p>
+    <p><b>Added in:</b>
+      <keyword keyref="impala50_full"/></p>
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_ddl.xml#ddl"/>
+    </p>
+  </conbody>
+</concept>

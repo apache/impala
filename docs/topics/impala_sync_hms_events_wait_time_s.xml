@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="5.0.0" id="impala_sync_hms_events_wait_time_s">
+  <title>SYNC_HMS_EVENTS_WAIT_TIME_S Query Option</title>
+  <titlealts audience="PDF"><navtitle>SYNC HMS EVENTS WAIT TIME S</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="DDL"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p id="IMPALA-12152"><indexterm audience="hidden">SYNC_HMS_EVENTS_WAIT_TIME_S query option</indexterm>This query
+      option controls the maximum time Impala will wait for the Catalog Service to sync with the
+      latest events from the Hive Metastore (HMS) before starting query planning.</p>
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+    <p><b>Query Range:</b> > = 0</p>
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+    <p>Setting this option to a positive value (in seconds) enables a new mechanism where only the
+      planning thread of that query will pause and wait for the Catalog service's event processor to
+      fully apply any outstanding metadata changes from the HMS before the query is analyzed and
+        planned.<note id="note_sxq_srs_bhc">This mechanism only guarantees that HMS modifications
+        that occurred before query planning started will be synced by the Catalog service. Any HMS
+        modifications that happen after the query begins its planning phase are not guaranteed to be
+        applied.</note><ul id="ul_bh2_vrs_bhc">
+        <li>This is typically used after an external process (like Hive or Spark) has modified a
+          dependent table, ensuring Impala's query sees the most current metadata, such as newly
+          added partitions.</li>
+        <li>The default value of 0 disables this waiting mechanism.</li>
+        <li>The wait time could be set based on the maximum observed event processing lag in your
+          cluster (visible via the Catalogd WebUI /events page).</li>
+      </ul></p>
+    <p><b>Example:</b></p>
+    <p>When a Hive table is updated by an <codeph>INSERT</codeph> operation on dynamic partitions,
+      you can use the <codeph>sync_hms_events_wait_time_s</codeph> query option in Impala to ensure
+      the metadata is synchronized before you query the table.</p>
+    <p>Impala waits up to the specified time (<codeph>sync_hms_events_wait_time_s</codeph>) for Hive
+      Metastore Service (HMS) events to synchronize automatically.</p>
+    <p>The following example demonstrates setting the option to safely query a Hive table immediately after it is updated. In this case, Impala waits up to 300 seconds for the synchronization to complete.</p>
+    <codeblock>hive> insert into tbl partition(p) select * from tbl2;
+impala> set sync_hms_events_wait_time_s=300;
+impala> select * from tbl;</codeblock>
+    <p>
+      <note id="note_q4b_dqz_ghc" type="note">You do not need to run a <codeph>REFRESH</codeph>
+        command or wait explicitly on the client side.</note>
+    </p>
+    <p>
+      <b>Added in:</b>
+      <keyword keyref="impala50_full"/>
+    </p>
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+    <p>
+      <xref href="impala_ddl.xml#ddl"/>
+    </p>
+  </conbody>
+</concept>
