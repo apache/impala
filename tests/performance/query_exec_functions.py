@@ -22,6 +22,7 @@ import re
 from datetime import datetime
 from impala.dbapi import connect
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
+from tests.common.impala_connection import build_summary_table_from_thrift
 from sys import maxsize
 from tests.performance.query import HiveQueryResult, ImpalaQueryResult
 from tests.util.shell_util import exec_process
@@ -134,7 +135,7 @@ def execute_using_impala_hs2(query, query_config):
     exec_result.data = cursor.fetchall()
     exec_result.time_taken = time() - start
     exec_result.runtime_profile = cursor.get_profile()
-    exec_result.exec_summary = str(cursor.get_summary())
+    exec_result.exec_summary = build_summary_table_from_thrift(cursor.get_summary())
     exec_result.success = True
   except Exception as e:
     LOG.error(str(e))
