@@ -229,7 +229,7 @@ def generate_profile_files(name, hash, base_dir):
   profile_dir = os.path.join(base_dir, hash + "_profiles")
   if not os.path.exists(profile_dir):
     os.makedirs(profile_dir)
-  with open(name) as fid:
+  with open(name, 'rb') as fid:
     data = json.loads(fid.read().decode("utf-8", "ignore"))
     iter_num = {}
     # For each query
