@@ -1004,7 +1004,7 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
         end_of_stripe_ = true;
         return Status::OK();
       }
-      COUNTER_ADD(scan_node_->rows_read_counter(), orc_root_batch_->numElements);
+      IncrementRowsReadAndCheckFilters(orc_root_batch_->numElements);
       num_rows_read += orc_root_batch_->numElements;
     }
 

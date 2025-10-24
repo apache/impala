@@ -45,6 +45,13 @@ using namespace strings;
 DEFINE_double(min_filter_reject_ratio, 0.1, "(Advanced) If the percentage of "
     "rows rejected by a runtime filter drops below this value, the filter is disabled.");
 
+DEFINE_int32_hidden(raw_scanner_rows_per_filter_effectiveness_check, 32 * 1024,
+    "The number of rows read by the scanner (before any filtering) between runtime "
+    "filter effectiveness checks. Checking based on raw rows read disables an "
+    "ineffective runtime filter more quickly when it is paired with a highly "
+    "effective one. This runs in addition to the regular effectiveness check based on "
+    "the number of batches produced. If <= 0, this extra check is disabled.");
+
 const char* FieldLocation::LLVM_CLASS_NAME = "struct.impala::FieldLocation";
 const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
 
@@ -967,6 +974,17 @@ void HdfsScanner::CheckFiltersEffectiveness() {
         reject_ratio < FLAGS_min_filter_reject_ratio) {
       stats->enabled_for_row = 0;
     }
+  }
+}
+
+void HdfsScanner::IncrementRowsReadAndCheckFilters(int64_t num_rows) {
+  COUNTER_ADD(scan_node_->rows_read_counter(), num_rows);
+  if (filter_ctxs_.empty()) return;
+  rows_since_filter_check_ += num_rows;
+  if (UNLIKELY(rows_since_filter_check_ >=
+      FLAGS_raw_scanner_rows_per_filter_effectiveness_check)) {
+    rows_since_filter_check_ = 0;
+    CheckFiltersEffectiveness();
   }
 }
 
