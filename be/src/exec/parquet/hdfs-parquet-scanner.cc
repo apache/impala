@@ -2498,7 +2498,19 @@ Status HdfsParquetScanner::AssembleRows(RowBatch* row_batch, bool* skip_row_grou
     }
   }
   row_group_rows_read_ += num_rows_read;
+  int64_t rows_before = scan_node_->rows_read_counter()->value();
   COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
+  int64_t rows_after = rows_before + num_rows_read;
+  // Check filter effectiveness every UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK.
+  // This helps disable ineffective filters when they are paired with a highly
+  // selective filter. The highly selective filter means that very few rows are
+  // returned and the check in HdfsScanner::GetNext() doesn't trigger.
+  // NOTE: UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK is a power of two, so this
+  // will use a right shift.
+  if (UNLIKELY((rows_after / UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK) >
+               (rows_before / UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK))) {
+    CheckFiltersEffectiveness();
+  }
   // Merge Scanner-local counter into HdfsScanNode counter and reset.
   COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
   coll_items_read_counter_ = 0;

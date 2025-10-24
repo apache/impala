@@ -1006,7 +1006,19 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
         end_of_stripe_ = true;
         return Status::OK();
       }
+      int64_t rows_before = scan_node_->rows_read_counter()->value();
       COUNTER_ADD(scan_node_->rows_read_counter(), orc_root_batch_->numElements);
+      int64_t rows_after = rows_before + orc_root_batch_->numElements;
+      // Check filter effectiveness every UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK.
+      // This helps disable ineffective filters when they are paired with a highly
+      // selective filter. The highly selective filter means that very few rows are
+      // returned and the check in HdfsScanner::GetNext() doesn't trigger.
+      // NOTE: UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK is a power of two, so this
+      // will use a right shift.
+      if (UNLIKELY((rows_after / UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK) >
+                   (rows_before / UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK))) {
+        CheckFiltersEffectiveness();
+      }
       num_rows_read += orc_root_batch_->numElements;
     }
 

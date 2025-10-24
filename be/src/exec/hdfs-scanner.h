@@ -56,6 +56,17 @@ constexpr int BATCHES_PER_FILTER_SELECTIVITY_CHECK = 16;
 static_assert(BitUtil::IsPowerOf2(BATCHES_PER_FILTER_SELECTIVITY_CHECK),
               "BATCHES_PER_FILTER_SELECTIVITY_CHECK must be a power of two");
 
+// The number of unfiltered rows between checks to see if a filter is effective and should
+// be disabled. Must be a power of two. Unlike BATCHES_PER_FILTER_SELECTIVITY_CHECK,
+// this is doing the check periodically based on the count of unfiltered rows that
+// the scanner processes. This is useful when runtime filters are being enforced at the
+// row level in the scanner and an ineffective filter is paired with a highly effective
+// filter. The highly effective filter means that very few rows are returned, so
+// the check in HdfsScanner::GetNext() doesn't trigger in a timely manner.
+const int UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK = 1 << 15;
+static_assert(BitUtil::IsPowerOf2(UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK),
+              "UNFILTERED_ROWS_PER_FILTER_SELECTIVITY_CHECK must be a power of two");
+
 /// Intermediate structure used for two pass parsing approach. In the first pass,
 /// the FieldLocation structs are filled out and contain where all the fields start and
 /// their lengths.  In the second pass, the FieldLocation is used to write out the
