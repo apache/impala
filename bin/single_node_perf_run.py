@@ -79,7 +79,6 @@ from tempfile import mkdtemp
 import json
 import os
 import pipes
-import sh
 import shutil
 import subprocess
 import sys
@@ -99,6 +98,16 @@ def configured_call(cmd):
   return subprocess.check_call(["bash", "-c", cmd])
 
 
+def run_git(args):
+  """Runs git without capturing output (stdout passes through to stdout)"""
+  subprocess.check_call(["git"] + args, text=True)
+
+
+def get_git_output(args):
+  """Runs git, capturing the output and returning it"""
+  return subprocess.check_output(["git"] + args, text=True)
+
+
 def load_data(db_to_load, table_formats, scale):
   """Loads a database with a particular scale factor."""
   all_formats = ("text/none," + table_formats if "text/none" not in table_formats
@@ -115,12 +124,12 @@ def load_data(db_to_load, table_formats, scale):
 
 
 def get_git_hash_for_name(name):
-  return sh.git("rev-parse", name).strip()
+  return get_git_output(["rev-parse", name]).strip()
 
 
 def build(git_hash, options):
   """Builds Impala in release mode; doesn't build tests."""
-  sh.git.checkout(git_hash)
+  run_git(["checkout", git_hash])
   buildall = ["{0}/buildall.sh".format(IMPALA_HOME), "-notests", "-release", "-noclean"]
   if options.ninja:
     buildall += ["-ninja"]
@@ -168,15 +177,20 @@ def run_workload(base_dir, workloads, options):
 
 def report_benchmark_results(file_a, file_b, description):
   """Wrapper around report_benchmark_result.py."""
+  performance_result = subprocess.check_output(
+    ["{0}/tests/benchmark/report_benchmark_results.py".format(IMPALA_HOME),
+     "--reference_result_file={0}".format(file_a),
+     "--input_result_file={0}".format(file_b),
+     '--report_description="{0}"'.format(description)],
+    text=True)
+
+  # Output the performance result to stdout for convenience
+  print(performance_result)
+
+  # Dump the performance result to a file to preserve
   result = os.path.join(IMPALA_PERF_RESULTS, "latest", "performance_result.txt")
   with open(result, "w") as f:
-    subprocess.check_call(
-      ["{0}/tests/benchmark/report_benchmark_results.py".format(IMPALA_HOME),
-       "--reference_result_file={0}".format(file_a),
-       "--input_result_file={0}".format(file_b),
-       '--report_description="{0}"'.format(description)],
-      stdout=f)
-  sh.cat(result, _out=sys.stdout)
+    f.write(performance_result)
 
 
 def compare(base_dir, hash_a, hash_b, options):
@@ -190,19 +204,17 @@ def compare(base_dir, hash_a, hash_b, options):
   if options.split_profiles:
     generate_profile_files(file_a, hash_a, base_dir)
     generate_profile_files(file_b, hash_b, base_dir)
-    sh.diff("-u",
-            os.path.join(base_dir, hash_a + "_profiles"),
-            os.path.join(base_dir, hash_b + "_profiles"),
-            _out=os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"),
-            _ok_code=[0, 1])
+    with open(os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"), "w") as f:
+      # This does not check that the diff command succeeds
+      subprocess.run(["diff", "-u", os.path.join(base_dir, hash_a + "_profiles"),
+        os.path.join(base_dir, hash_b + "_profiles")], stdout=f, text=True)
   else:
     generate_profile_file(file_a, hash_a, base_dir)
     generate_profile_file(file_b, hash_b, base_dir)
-    sh.diff("-u",
-            os.path.join(base_dir, hash_a + "_profile.txt"),
-            os.path.join(base_dir, hash_b + "_profile.txt"),
-            _out=os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"),
-            _ok_code=[0, 1])
+    with open(os.path.join(IMPALA_HOME, "performance_result_profile_diff.txt"), "w") as f:
+      # This does not check that the diff command succeeds
+      subprocess.run(["diff", "-u", os.path.join(base_dir, hash_a + "_profile.txt"),
+        os.path.join(base_dir, hash_b + "_profile.txt")], stdout=f, text=True)
 
 
 def generate_profile_file(name, hash, base_dir):
@@ -253,16 +265,17 @@ def backup_workloads():
   Used to keep workloads from being clobbered by git checkout.
   """
   temp_dir = mkdtemp()
-  sh.cp(os.path.join(IMPALA_HOME, "testdata", "workloads"),
-        temp_dir, R=True, _out=sys.stdout, _err=sys.stderr)
+  shutil.copytree(os.path.join(IMPALA_HOME, "testdata", "workloads"),
+                  os.path.join(temp_dir, "workloads"))
   print("Backed up workloads to {0}".format(temp_dir))
   return temp_dir
 
 
 def restore_workloads(source):
   """Restores the workload directory from source into the Impala tree."""
-  sh.cp(os.path.join(source, "workloads"), os.path.join(IMPALA_HOME, "testdata"),
-        R=True, _out=sys.stdout, _err=sys.stderr)
+  # dirs_exist_ok=True allows this to overwrite the existing files
+  shutil.copytree(os.path.join(source, "workloads"),
+                  os.path.join(IMPALA_HOME, "testdata", "workloads"), dirs_exist_ok=True)
 
 
 def perf_ab_test(options, args):
@@ -314,7 +327,7 @@ def perf_ab_test(options, args):
     hash_b = get_git_hash_for_name(args[1])
     # discard any changes created by the previous restore_workloads()
     shutil.rmtree("testdata/workloads")
-    sh.git.checkout("--", "testdata/workloads")
+    run_git(["checkout", "--", "testdata/workloads"])
     build(hash_b, options)
     restore_workloads(workload_dir)
     start_impala(options.num_impalads, options)
@@ -399,17 +412,17 @@ def main():
 
   os.chdir(IMPALA_HOME)
 
-  if sh.git("status", "--porcelain", "--untracked-files=no", _out=None).strip():
-    sh.git("status", "--porcelain", "--untracked-files=no", _out=sys.stdout)
+  if get_git_output(["status", "--porcelain", "--untracked-files=no"]).strip():
+    run_git(["status", "--porcelain", "--untracked-files=no"])
     # Something went wrong, let's dump the actual diff to make it easier to
     # track down
     print("#### Working copy is dirty, dumping the diff #####")
-    sh.git("--no-pager", "diff", _out=sys.stdout)
+    run_git(["--no-pager", "diff"])
     print("#### End of diff #####")
     raise Exception("Working copy is dirty. Consider 'git stash' and try again.")
 
   # Save the current hash to be able to return to this place in the tree when done
-  current_hash = sh.git("rev-parse", "--abbrev-ref", "HEAD").strip()
+  current_hash = get_git_output(["rev-parse", "--abbrev-ref", "HEAD"]).strip()
   if current_hash == "HEAD":
     current_hash = get_git_hash_for_name("HEAD")
 
@@ -419,8 +432,8 @@ def main():
   finally:
     # discard any changes created by the previous restore_workloads()
     shutil.rmtree("testdata/workloads")
-    sh.git.checkout("--", "testdata/workloads")
-    sh.git.checkout(current_hash)
+    run_git(["checkout", "--", "testdata/workloads"])
+    run_git(["checkout", current_hash])
     restore_workloads(workloads)
 
 
