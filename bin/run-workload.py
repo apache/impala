@@ -145,6 +145,11 @@ class CustomJSONEncoder(json.JSONEncoder):
     if isinstance(obj, datetime):
       # Convert datetime into an standard iso string
       return obj.isoformat()
+    if isinstance(obj, bytes):
+      # Impyla can leave a string value as bytes when it is unable to decode it to UTF-8.
+      # TPC-DS has queries that produce non-UTF-8 results (e.g. Q30 on scale 20)
+      # Convert bytes to strings to make JSON encoding work
+      return obj.decode(encoding="utf-8", errors="backslashreplace")
     elif isinstance(obj, (Query, HiveQueryResult, QueryExecConfig, TableFormatInfo)):
       # Serialize these objects manually by returning their __dict__ methods.
       return obj.__dict__
