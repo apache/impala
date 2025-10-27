@@ -2716,3 +2716,125 @@ select ST_AsText(ST_SetSRID(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))
 ---- RESULTS
 'MULTILINESTRING ((0 80, 0.03 80.04))'
 ====
+---- QUERY
+# NOTE: Due to HIVE-29323 ESRI returns MULTIPOLYGON EMPTY for single point
+# PostGIS would return: POINT (1 2)
+select ST_AsText(ST_ConvexHull(ST_Point(1, 2)));
+---- RESULTS
+'MULTIPOLYGON EMPTY'
+====
+---- QUERY
+# Collinear points - ESRI returns NULL instead of LINESTRING
+# ESRI behavior: Returns NULL for degenerate convex hulls
+# PostGIS would return: LINESTRING (0 0, 3 3)
+select ST_AsText(ST_ConvexHull(ST_GeomFromText('multipoint ((0 0), (1 1), (2 2), (3 3))')));
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# ESRI wraps result in MULTIPOLYGON even for simple polygons
+select ST_AsText(ST_ConvexHull(ST_GeomFromText('multipoint ((0 0), (1 0), (1 1), (0 1))')));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)))'
+====
+---- QUERY
+# Interior point (1,1) does not affect the convex hull boundary
+select ST_AsText(ST_ConvexHull(ST_GeomFromText('multipoint ((0 0), (2 0), (2 2), (0 2), (1 1))')));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 2 0, 2 2, 0 2, 0 0)))'
+====
+---- QUERY
+# Convex hull "wraps" around the concave parts to form smallest convex shape
+select ST_AsText(ST_ConvexHull(ST_GeomFromText('polygon ((0 0, 3 0, 3 2, 5 2, 5 5, 2 5, 2 3, 0 3, 0 0))')));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 3 0, 5 2, 5 5, 2 5, 0 3, 0 0)))'
+====
+---- QUERY
+# Convex hull forms polygon encompassing all line vertices
+select ST_AsText(ST_ConvexHull(ST_GeomFromText('linestring (0 0, 1 1, 2 0, 3 1, 4 0)')));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 4 0, 3 1, 1 1, 0 0)))'
+====
+---- QUERY
+# ESRI returns MULTIPOLYGON EMPTY for empty input
+select ST_AsText(ST_ConvexHull(ST_GeomFromText('point empty')));
+---- RESULTS
+'MULTIPOLYGON EMPTY'
+====
+---- QUERY
+# Two points - ESRI returns NULL instead of LINESTRING
+# PostGIS would return: LINESTRING (0 0, 3 4)
+select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(3, 4)));
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Three non-collinear points (forms a triangle)
+select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(4, 0), ST_Point(2, 3)));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 4 0, 2 3, 0 0)))'
+====
+---- QUERY
+# Four points (forms a square)
+select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(2, 0), ST_Point(2, 2), ST_Point(0, 2)));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 2 0, 2 2, 0 2, 0 0)))'
+====
+---- QUERY
+# Five points with one interior point
+# Point (2,2) is inside the square formed by the other four points
+select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(4, 0), ST_Point(4, 4), ST_Point(0, 4), ST_Point(2, 2)));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 4 0, 4 4, 0 4, 0 0)))'
+====
+---- QUERY
+# Six arguments with mixed geometry types
+# Combines points and linestring, then computes convex hull of all vertices
+# Note: Point (6,3) creates an additional vertex in the convex hull
+select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(5, 0), ST_Point(5, 5), ST_Point(0, 5), ST_LineString(1, 1, 4, 4), ST_Point(6, 3)));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 5 0, 6 3, 5 5, 0 5, 0 0)))'
+====
+---- QUERY
+# Seven points with one interior point
+select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(1, 0), ST_Point(2, 1), ST_Point(3, 0), ST_Point(3, 3), ST_Point(0, 3), ST_Point(1.5, 1.5)));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 3 0, 3 3, 0 3, 0 0)))'
+====
+---- QUERY
+# Eight arguments (maximum supported by wrapper)
+# Tests upper bound of generated wrapper methods
+select ST_AsText(ST_ConvexHull(ST_Point(0, 0), ST_Point(2, 0), ST_Point(4, 0), ST_Point(4, 2), ST_Point(4, 4), ST_Point(2, 4), ST_Point(0, 4), ST_Point(0, 2)));
+---- RESULTS
+'MULTIPOLYGON (((0 0, 4 0, 4 4, 0 4, 0 0)))'
+====
+---- QUERY
+# No arguments provided (should fail)
+select ST_ConvexHull();
+---- CATCH
+AnalysisException: No matching function with signature: st_convexhull()
+====
+---- QUERY
+# Wrong type - STRING instead of BINARY
+select ST_ConvexHull('invalid geometry');
+---- CATCH
+AnalysisException: No matching function with signature: st_convexhull(STRING)
+====
+---- QUERY
+# Wrong type - INTEGER instead of BINARY
+select ST_ConvexHull(123);
+---- CATCH
+AnalysisException: No matching function with signature: st_convexhull(TINYINT)
+====
+---- QUERY
+# Wrapper only generates overloads for 1-8 arguments
+select ST_ConvexHull(ST_Point(0,0), ST_Point(1,1), ST_Point(2,2), ST_Point(3,3), ST_Point(4,4), ST_Point(5,5), ST_Point(6,6), ST_Point(7,7), ST_Point(8,8));
+---- CATCH
+AnalysisException: No matching function with signature: st_convexhull(BINARY, BINARY, BINARY, BINARY, BINARY, BINARY, BINARY, BINARY, BINARY)
+====
+---- QUERY
+# NULL Handling
+select ST_ConvexHull(NULL);
+---- RESULTS
+'NULL'
+====

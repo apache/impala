@@ -142,7 +142,7 @@ package {package};
     return "%s.java" % self.generate_wrapper_name()
 
 
-WRAPPERS = [Wrapper("%s.ST_ConvexHull" % UDF_PACKAGE, BYTE_TYPE, list(range(2, 9, 1))),
+WRAPPERS = [Wrapper("%s.ST_ConvexHull" % UDF_PACKAGE, BYTE_TYPE, list(range(1, 9, 1))),
             Wrapper("%s.ST_LineString" % UDF_PACKAGE, DOUBLE_TYPE, list(range(2, 15, 2)),
               ARGUMENT_EXCEPTION),
             Wrapper("%s.ST_MultiPoint" % UDF_PACKAGE, DOUBLE_TYPE, list(range(2, 15, 2)),
