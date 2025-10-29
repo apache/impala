@@ -392,6 +392,29 @@ public class LdapHS2Test {
     config.put("impala.doas.user", TEST_USER_4);
     openResp = client.OpenSession(openReq);
     assertEquals(openResp.getStatus().getStatusCode(), TStatusCode.ERROR_STATUS);
+
+    // Reconnect with doAs query parameter.
+    transport.close();
+    transport = new THttpClient("http://localhost:28000/?doAs=Test1Ldap");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session with 'doAs' query parameter, should succeed.
+    config.clear();
+    openResp = client.OpenSession(openReq);
+    assertEquals(openResp.getStatus().getStatusCode(), TStatusCode.SUCCESS_STATUS);
+    // Logged in user should be the impersonated user.
+    operationHandle = execAndFetch(
+        client, openResp.getSessionHandle(), "select logged_in_user()", "Test1Ldap");
+
+    // Open a session with a 'doas' config and 'doAs' query parameter, should fail.
+    config.put("impala.doas.user", TEST_USER_3);
+    openResp = client.OpenSession(openReq);
+    assertEquals(openResp.getStatus().getStatusCode(), TStatusCode.ERROR_STATUS);
+    assertEquals(openResp.getStatus().getErrorMessage(),
+        "Cannot set 'impala.doas.user' configuration property when 'doAs' query "
+        + "parameter is set.");
   }
 
   /**
