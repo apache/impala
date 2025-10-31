@@ -2014,3 +2014,38 @@ class TestSingleFileTable(ImpalaTestSuite):
     select_stmt = "select count(*) from {db}.{tbl}".format(**params)
     res = self.execute_query_expect_success(self.client, select_stmt, options)
     assert res.data[0].split("\t")[0] == '1'
+
+
+class TestPaimonScannerWithLimit(ImpalaTestSuite):
+  """Test paimon scanners with a simple limit clause. The limit clause triggers
+   cancellation in the scanner code paths."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestPaimonScannerWithLimit, cls).add_test_dimensions()
+    # Use a small batch size so changing the limit affects the timing of cancellation
+    cls.ImpalaTestMatrix.add_dimension(
+      create_exec_option_dimension(batch_sizes=[100]))
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_limit(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = 1
+    self._test_limit(vector)
+    # IMPALA-3337: when continuing on error, the error log should not show errors
+    # (e.g. "Cancelled").
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self._test_limit(vector)
+
+  def _test_limit(self, vector):
+    iterations = 50
+    query_template = "select * from functional_parquet.alltypes_paimon limit %s"
+    for i in range(1, iterations):
+      # Vary the limit to vary the timing of cancellation
+      limit = (i * 100) % 1001 + 1
+      query = query_template % limit
+      result = self.execute_query(query, vector.get_value('exec_option'),
+                                  table_format=vector.get_value('table_format'))
+      assert len(result.data) == limit
+      # IMPALA-3337: The error log should be empty.
+      assert not result.log

@@ -1,0 +1,67 @@
+{
+  "version" : 3,
+  "id" : 0,
+  "fields" : [ {
+    "id" : 0,
+    "name" : "id",
+    "type" : "INT"
+  }, {
+    "id" : 1,
+    "name" : "struct_val",
+    "type" : {
+      "type" : "ROW",
+      "fields" : [ {
+        "id" : 2,
+        "name" : "bool_col",
+        "type" : "BOOLEAN"
+      }, {
+        "id" : 3,
+        "name" : "tinyint_col",
+        "type" : "TINYINT"
+      }, {
+        "id" : 4,
+        "name" : "smallint_col",
+        "type" : "SMALLINT"
+      }, {
+        "id" : 5,
+        "name" : "int_col",
+        "type" : "INT"
+      }, {
+        "id" : 6,
+        "name" : "bigint_col",
+        "type" : "BIGINT"
+      }, {
+        "id" : 7,
+        "name" : "float_col",
+        "type" : "FLOAT"
+      }, {
+        "id" : 8,
+        "name" : "double_col",
+        "type" : "DOUBLE"
+      }, {
+        "id" : 9,
+        "name" : "date_string_col",
+        "type" : "STRING"
+      }, {
+        "id" : 10,
+        "name" : "string_col",
+        "type" : "STRING"
+      } ]
+    }
+  }, {
+    "id" : 11,
+    "name" : "year",
+    "type" : "INT"
+  }, {
+    "id" : 12,
+    "name" : "month",
+    "type" : "INT"
+  } ],
+  "highestFieldId" : 12,
+  "partitionKeys" : [ ],
+  "primaryKeys" : [ ],
+  "options" : {
+    "owner" : "jichen"
+  },
+  "timeMillis" : 1758803654196
+}

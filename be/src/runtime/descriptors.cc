@@ -368,6 +368,16 @@ string SystemTableDescriptor::DebugString() const {
   return out.str();
 }
 
+PaimonTableDescriptor::PaimonTableDescriptor(const TTableDescriptor& tdesc)
+  : TableDescriptor(tdesc), paimon_api_table_(tdesc.paimonTable) {}
+
+string PaimonTableDescriptor::DebugString() const {
+  stringstream out;
+  out << "PaimonTable(" << TableDescriptor::DebugString();
+  out << ")";
+  return out.str();
+}
+
 TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
   : id_(tdesc.id),
     byte_size_(tdesc.byteSize),
@@ -625,6 +635,9 @@ Status DescriptorTbl::CreateTblDescriptorInternal(const TTableDescriptor& tdesc,
       break;
     case TTableType::SYSTEM_TABLE:
       *desc = pool->Add(new SystemTableDescriptor(tdesc));
+      break;
+    case TTableType::PAIMON_TABLE:
+      *desc = pool->Add(new PaimonTableDescriptor(tdesc));
       break;
     default:
       DCHECK(false) << "invalid table type: " << tdesc.tableType;

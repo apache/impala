@@ -180,8 +180,9 @@ public class PaimonImpalaTypeUtils {
           rowType.getFields()
               .stream()
               .map(dataField
-                  -> new StructField(
-                      dataField.name().toLowerCase(), dataField.type().accept(this)))
+                  -> new PaimonStructField(dataField.name().toLowerCase(),
+                      dataField.type().accept(this), dataField.description(),
+                      dataField.id(), dataField.type().isNullable()))
               .collect(Collectors.toList());
 
       return new StructType(structFields);
@@ -254,12 +255,12 @@ public class PaimonImpalaTypeUtils {
   public static boolean isSupportedPrimitiveType(PrimitiveType primitiveType) {
     Preconditions.checkNotNull(primitiveType);
     switch (primitiveType) {
+      case DOUBLE:
+      case FLOAT:
       case BIGINT:
       case INT:
       case SMALLINT:
       case TINYINT:
-      case DOUBLE:
-      case FLOAT:
       case BOOLEAN:
       case STRING:
       case TIMESTAMP:
@@ -267,7 +268,6 @@ public class PaimonImpalaTypeUtils {
       case DATE:
       case BINARY:
       case CHAR:
-      case DATETIME:
       case VARCHAR: return true;
       default: return false;
     }

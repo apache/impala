@@ -334,6 +334,11 @@ struct TColumn {
   // Key and value field id for Iceberg column with Map type.
   22: optional i32 iceberg_field_map_key_id
   23: optional i32 iceberg_field_map_value_id
+  // The followings are Paimon-specific column properties,
+  // will reuse the iceberg_field_id, is_key, is_nullable
+  // for Paimon table.
+  26: optional bool is_paimon_column
+
 }
 
 // Represents an HDFS file in a partition.

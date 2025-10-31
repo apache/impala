@@ -63,11 +63,11 @@ import org.apache.paimon.types.VariantType;
  * Utils for paimon and hive Type conversions, the class is from
  * org.apache.paimon.hive.HiveTypeUtils, refactor to fix the
  * following incompatible conversion issue:
- * paimon type LocalZonedTimestampType will convert to
- * org.apache.hadoop.hive.serde2.typeinfo.TimestampLocalTZTypeInfo
+ * paimon type ${@link LocalZonedTimestampType} will convert to
+ * ${@link org.apache.hadoop.hive.serde2.typeinfo.TimestampLocalTZTypeInfo}
  * however, it is not supported in impala, TableLoadingException
  * will raise while loading the table in method:
- * apache.impala.catalog.FeCatalogUtils#parseColumnType
+ * ${@link org.apache.impala.catalog.FeCatalogUtils#parseColumnType}
  * To fix the issue LocalZonedTimestampType will be converted to
  * hive timestamp type.
  */
@@ -206,31 +206,26 @@ public class PaimonHiveTypeUtils {
     }
 
     static DataType visit(TypeInfo type, HiveToPaimonTypeVisitor visitor) {
-      if (!(type instanceof StructTypeInfo)) {
-        if (type instanceof MapTypeInfo) {
-          MapTypeInfo mapTypeInfo = (MapTypeInfo)type;
-          return DataTypes.MAP(visit(mapTypeInfo.getMapKeyTypeInfo(), visitor),
-              visit(mapTypeInfo.getMapValueTypeInfo(), visitor));
-        } else if (type instanceof ListTypeInfo) {
-          ListTypeInfo listTypeInfo = (ListTypeInfo)type;
-          return DataTypes.ARRAY(
-              visit(listTypeInfo.getListElementTypeInfo(), visitor));
-        } else {
-          return visitor.atomic(type);
-        }
-      } else {
+      if (type instanceof StructTypeInfo) {
         StructTypeInfo structTypeInfo = (StructTypeInfo)type;
         ArrayList<String> fieldNames = structTypeInfo.getAllStructFieldNames();
         ArrayList<TypeInfo> typeInfos = structTypeInfo
             .getAllStructFieldTypeInfos();
         RowType.Builder builder = RowType.builder();
-
         for(int i = 0; i < fieldNames.size(); ++i) {
           builder.field((String)fieldNames.get(i),
               visit((TypeInfo)typeInfos.get(i), visitor));
         }
-
         return builder.build();
+      } else if (type instanceof MapTypeInfo) {
+        MapTypeInfo mapTypeInfo = (MapTypeInfo) type;
+        return DataTypes.MAP(visit(mapTypeInfo.getMapKeyTypeInfo(), visitor),
+            visit(mapTypeInfo.getMapValueTypeInfo(), visitor));
+      } else if (type instanceof ListTypeInfo) {
+        ListTypeInfo listTypeInfo = (ListTypeInfo) type;
+        return DataTypes.ARRAY(visit(listTypeInfo.getListElementTypeInfo(), visitor));
+      } else {
+        return visitor.atomic(type);
       }
     }
 

@@ -161,8 +161,4 @@ ON a.userid = source.userid
 WHEN MATCHED THEN UPDATE SET movieid = source.movieid;
 ---- CATCH
 AnalysisException: Target table must be an Iceberg table: functional_parquet.paimon_partitioned
-====
----- QUERY
-SELECT * FROM functional_parquet.paimon_partitioned;
----- CATCH
-NotImplementedException: Query is not supported for PAIMON table now
+

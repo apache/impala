@@ -49,6 +49,8 @@ import org.apache.impala.catalog.SystemTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.VirtualColumn;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
+import org.apache.impala.catalog.paimon.PaimonColumn;
+import org.apache.impala.catalog.paimon.PaimonStructField;
 import org.apache.impala.catalog.paimon.PaimonUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
@@ -451,6 +453,10 @@ abstract class LocalTable implements FeTable {
           IcebergColumn iCol = (IcebergColumn) col;
           fields.add(new IcebergStructField(iCol.getName(), iCol.getType(),
               iCol.getComment(), iCol.getFieldId()));
+        } else if (col instanceof PaimonColumn) {
+          PaimonColumn pCol = (PaimonColumn) col;
+          fields.add(new PaimonStructField(pCol.getName(), pCol.getType(),
+              pCol.getComment(), pCol.getFieldId(), pCol.isNullable()));
         } else {
           fields.add(new StructField(col.getName(), col.getType(), col.getComment()));
         }

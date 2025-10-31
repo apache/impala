@@ -57,6 +57,7 @@ enum TPlanNodeType {
   TUPLE_CACHE_NODE = 20
   SYSTEM_TABLE_SCAN_NODE = 21
   ICEBERG_MERGE_NODE = 22
+  PAIMON_SCAN_NODE=23
 }
 
 // phases of an execution node
@@ -415,6 +416,28 @@ struct TKuduScanNode {
 struct TSystemTableScanNode {
   1: required Types.TTupleId tuple_id
   2: required CatalogObjects.TSystemTableName table_name
+}
+
+struct TPaimonJniScanParam {
+  // Serialized paimon api table object.
+  1: required binary paimon_table_obj
+  // Thrift serialized splits for the Jni Scanner.
+  2: required list<binary> splits
+  // Field id list for projection.
+  3: required list<i32> projection
+  // mem limit from backend.
+  // not set means no limit.
+  4: optional i64 mem_limit_bytes
+  // arrow batch size
+  5: optional i32 batch_size
+  // fragment id
+  6: Types.TUniqueId fragment_id;
+}
+
+struct TPaimonScanNode {
+  1: required Types.TTupleId tuple_id
+  2: required binary paimon_table_obj
+  3: required string table_name;
 }
 
 struct TEqJoinCondition {
@@ -838,6 +861,7 @@ struct TPlanNode {
   28: optional TTupleCacheNode tuple_cache_node
 
   29: optional TSystemTableScanNode system_table_scan_node
+  31: optional TPaimonScanNode paimon_table_scan_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

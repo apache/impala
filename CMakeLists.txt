@@ -435,6 +435,9 @@ include_directories(${OPENTELEMETRY_CPP_INCLUDE_DIR})
 # See be/src/kudu/security/krb5_realm_override.cc for more information.
 set(KRB5_REALM_OVERRIDE -Wl,--undefined=krb5_realm_override_loaded krb5_realm_override)
 
+# find Arrow headers and libs
+find_package(Arrow REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(arrow ${ARROW_INCLUDE_DIR} ${ARROW_STATIC_LIB} "")
 ###################################################################
 
 # System dependencies

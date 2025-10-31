@@ -22,6 +22,8 @@ import java.util.List;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.impala.catalog.paimon.PaimonColumn;
+import org.apache.impala.catalog.paimon.PaimonStructField;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnDescriptor;
@@ -102,6 +104,10 @@ public class Column {
       col = new IcebergColumn(columnDesc.getColumnName(), type, comment, position,
           columnDesc.getIceberg_field_id(), columnDesc.getIceberg_field_map_key_id(),
           columnDesc.getIceberg_field_map_value_id(), columnDesc.isIs_nullable());
+    } else if (columnDesc.isIs_paimon_column()) {
+      Preconditions.checkState(columnDesc.isSetIceberg_field_id());
+      col = new PaimonColumn(columnDesc.getColumnName(), type, comment, position,
+          columnDesc.getIceberg_field_id(), columnDesc.isIs_nullable());
     } else if (columnDesc.isIs_hbase_column()) {
       // HBase table column. The HBase column qualifier (column name) is not be set for
       // the HBase row key, so it being set in the thrift struct is not a precondition.
@@ -159,6 +165,10 @@ public class Column {
         IcebergColumn iCol = (IcebergColumn) col;
         fields.add(new IcebergStructField(iCol.getName(), iCol.getType(),
             iCol.getComment(), iCol.getFieldId()));
+      } else if (col instanceof PaimonColumn) {
+        PaimonColumn pCol = (PaimonColumn) col;
+        fields.add(new PaimonStructField(pCol.getName(), pCol.getType(),
+            pCol.getComment(), pCol.getFieldId(), pCol.isNullable()));
       } else {
         fields.add(new StructField(col.getName(), col.getType(), col.getComment()));
       }

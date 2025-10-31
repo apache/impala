@@ -1910,6 +1910,10 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
           conjuncts);
       scanNode.init(analyzer);
       return scanNode;
+    } else if (table instanceof FePaimonTable) {
+      PaimonScanPlanner paimonScanPlanner =
+          new PaimonScanPlanner(analyzer, ctx_, tblRef, conjuncts, aggInfo);
+      return paimonScanPlanner.createPaimonScanPlan();
     } else if (table instanceof FeHBaseTable) {
       // HBase table
       scanNode = new HBaseScanNode(ctx_.getNextNodeId(), tblRef.getDesc());

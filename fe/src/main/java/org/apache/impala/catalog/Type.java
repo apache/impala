@@ -25,6 +25,7 @@ import org.apache.impala.analysis.CreateTableStmt;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.TypeDef;
+import org.apache.impala.catalog.paimon.PaimonStructField;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TColumnType;
@@ -527,9 +528,16 @@ public abstract class Type {
           Pair<Type, Integer> res = fromThrift(col, nodeIdx);
           nodeIdx = res.second.intValue();
           if (thriftField.isSetField_id()) {
-            // We create 'IcebergStructField' for Iceberg tables which have field id.
-            structFields.add(new IcebergStructField(name, res.first, comment,
-                thriftField.getField_id()));
+            if (!thriftField.isSetIs_nullable()) {
+              // We create 'IcebergStructField' for Iceberg tables which have field id.
+              // if nullable is not set.
+              structFields.add(new IcebergStructField(
+                  name, res.first, comment, thriftField.getField_id()));
+            } else {
+              // nullable is set, it is a PaimonStructField
+              structFields.add(new PaimonStructField(name, res.first, comment,
+                  thriftField.getField_id(), thriftField.isIs_nullable()));
+            }
           } else {
             structFields.add(new StructField(name, res.first, comment));
           }

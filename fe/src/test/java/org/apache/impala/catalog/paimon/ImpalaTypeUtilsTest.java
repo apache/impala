@@ -97,11 +97,11 @@ public class ImpalaTypeUtilsTest {
     // Test row type
     RowType rowType = new RowType(Arrays.asList(new DataField(0, "id", new IntType()),
         new DataField(1, "name", DataTypes.STRING())));
-    StructType expectedStructType = new StructType(Arrays.asList(
-        new StructField("id", Type.INT,
-            rowType.getField(0).description()),
-        new StructField("name", Type.STRING,
-            rowType.getField(1).description())));
+    StructType expectedStructType = new StructType(
+        Arrays.asList(new PaimonStructField("id", Type.INT,
+                          rowType.getField(0).description(), rowType.getField(0).id()),
+            new PaimonStructField("name", Type.STRING, rowType.getField(1).description(),
+                rowType.getField(1).id())));
     assertEquals(expectedStructType, PaimonImpalaTypeUtils.toImpalaType(rowType));
 
     // doesn't support time

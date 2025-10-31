@@ -40,6 +40,8 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.events.InFlightEvents;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
+import org.apache.impala.catalog.paimon.PaimonColumn;
+import org.apache.impala.catalog.paimon.PaimonStructField;
 import org.apache.impala.catalog.paimon.PaimonTable;
 import org.apache.impala.catalog.paimon.PaimonUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -667,6 +669,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       IcebergColumn iCol = (IcebergColumn) col;
       return new IcebergStructField(iCol.getName(), iCol.getType(),
           iCol.getComment(), iCol.getFieldId());
+    } else if (col instanceof PaimonColumn) {
+      PaimonColumn pCol = (PaimonColumn) col;
+      return new PaimonStructField(pCol.getName(), pCol.getType(), pCol.getComment(),
+          pCol.getFieldId(), pCol.isNullable());
     } else {
       return new StructField(col.getName(), col.getType(), col.getComment());
     }

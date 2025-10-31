@@ -44,6 +44,7 @@
 #include "exec/kudu/kudu-scan-node.h"
 #include "exec/kudu/kudu-util.h"
 #include "exec/nested-loop-join-node.h"
+#include "exec/paimon/paimon-scan-plan-node.h"
 #include "exec/partial-sort-node.h"
 #include "exec/partitioned-hash-join-node.h"
 #include "exec/select-node.h"
@@ -239,6 +240,9 @@ Status PlanNode::CreatePlanNode(
     case TPlanNodeType::ICEBERG_MERGE_NODE:
       *node = pool->Add(new IcebergMergePlanNode());
       break;
+    case TPlanNodeType::PAIMON_SCAN_NODE:
+      *node = pool->Add(new PaimonScanPlanNode());
+      break;
     default:
       map<int, const char*>::const_iterator i =
           _TPlanNodeType_VALUES_TO_NAMES.find(tnode.node_type);
@@ -432,6 +436,7 @@ void ExecNode::CollectScanNodes(vector<ExecNode*>* nodes) {
   CollectNodes(TPlanNodeType::HDFS_SCAN_NODE, nodes);
   CollectNodes(TPlanNodeType::HBASE_SCAN_NODE, nodes);
   CollectNodes(TPlanNodeType::KUDU_SCAN_NODE, nodes);
+  CollectNodes(TPlanNodeType::PAIMON_SCAN_NODE, nodes);
 }
 
 Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* state) {

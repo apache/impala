@@ -604,6 +604,16 @@ class SystemTableDescriptor : public TableDescriptor {
   TSystemTableName::type table_name_;
 };
 
+// Descriptor for a Paimon Table
+class PaimonTableDescriptor : public TableDescriptor {
+ public:
+  PaimonTableDescriptor(const TTableDescriptor& tdesc);
+  virtual std::string DebugString() const;
+
+ private:
+  impala::TPaimonTable paimon_api_table_;
+};
+
 class TupleDescriptor {
  public:
   int byte_size() const { return byte_size_; }

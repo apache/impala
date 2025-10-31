@@ -445,3 +445,7 @@ table_name:timestamp_with_tz_str, constraint:restrict_to, table_format:parquet/n
 # Paimon tests are executed in the PARQUET file format dimension
 table_name:paimon_partitioned, constraint:restrict_to, table_format:parquet/none/none
 table_name:paimon_non_partitioned, constraint:restrict_to, table_format:parquet/none/none
+table_name:paimon_primitive_alltypes, constraint:restrict_to, table_format:parquet/none/none
+table_name:paimon_decimal_tbl, constraint:restrict_to, table_format:parquet/none/none
+table_name:alltypes_paimon, constraint:restrict_to, table_format:parquet/none/none
+table_name:alltypes_structs_paimon, constraint:restrict_to, table_format:parquet/none/none

@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.VirtualColumn;
@@ -135,7 +136,8 @@ public class PaimonTable extends Table implements FePaimonTable {
   public void loadSchemaFromPaimon()
       throws TableLoadingException, ImpalaRuntimeException {
     loadSchema();
-    addVirtualColumns();
+    // TODO: add virtual column later if it is supported.
+    // addVirtualColumns();
   }
 
   /**
@@ -211,6 +213,17 @@ public class PaimonTable extends Table implements FePaimonTable {
     addVirtualColumn(VirtualColumn.FILE_POSITION);
     addVirtualColumn(VirtualColumn.PARTITION_VALUE_SERIALIZED);
     addVirtualColumn(VirtualColumn.BUCKET_ID);
+  }
+
+  @Override
+  public void addColumn(Column col) {
+    Preconditions.checkState(col instanceof PaimonColumn);
+    PaimonColumn pCol = (PaimonColumn) col;
+    colsByPos_.add(pCol);
+    colsByName_.put(pCol.getName().toLowerCase(), col);
+    ((StructType) type_.getItemType())
+        .addField(new PaimonStructField(col.getName(), col.getType(), col.getComment(),
+            pCol.getFieldId(), pCol.isNullable()));
   }
 
   /**

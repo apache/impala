@@ -19,7 +19,7 @@ package org.apache.impala.catalog.local;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.catalog.paimon.PaimonUtil;
@@ -29,6 +29,7 @@ import org.apache.log4j.Logger;
 import org.apache.paimon.table.Table;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -45,18 +46,28 @@ public class LocalPaimonTable extends LocalTable implements FePaimonTable {
     Preconditions.checkNotNull(msTbl);
     Preconditions.checkNotNull(ref);
     try {
-      LocalPaimonTable localPaimonTable = new LocalPaimonTable(db, msTbl, ref);
+      Table table = PaimonUtil.createFileStoreTable(msTbl);
+      List<Column> paimonColumns = PaimonUtil.toImpalaColumn(table);
+      ColumnMap colMap = new ColumnMap(paimonColumns,
+          /*numClusteringCols=*/table.partitionKeys().size(),
+          db.getName() + "." + msTbl.getTableName(),
+          /*isFullAcidSchema=*/false);
+      LocalPaimonTable localPaimonTable =
+          new LocalPaimonTable(db, msTbl, ref, colMap, table);
       return localPaimonTable;
-    } catch (MetaException ex) {
+    } catch (Exception ex) {
       throw new TableLoadingException("Failed to load table" + msTbl.getTableName(), ex);
     }
   }
 
   protected LocalPaimonTable(LocalDb db, org.apache.hadoop.hive.metastore.api.Table msTbl,
-      MetaProvider.TableMetaRef ref) throws MetaException {
-    super(db, msTbl, ref);
-    table_ = PaimonUtil.createFileStoreTable(msTbl);
+      MetaProvider.TableMetaRef ref, ColumnMap columnMap, Table table) {
+    super(db, msTbl, ref, columnMap);
+    table_ = table;
+    /// TODO: add virtual column later if it is supported.
+    /// addVirtualColumns(ref.getVirtualColumns());
     applyPaimonTableStatsIfPresent();
+    applyPaimonColumnStatsIfPresent();
   }
 
   @Override

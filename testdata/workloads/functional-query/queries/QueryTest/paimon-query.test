@@ -1,0 +1,168 @@
+====
+---- QUERY
+# Test the Paimon DataSource
+# count(*) with a predicate evaluated by Impala
+select count(*) from functional_parquet.paimon_primitive_alltypes
+where float_value = 0 and varchar_value is not NULL
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# count(*) with no predicates has no materialized slots
+select count(*) from functional_parquet.paimon_primitive_alltypes
+---- RESULTS
+7
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Gets all types including a row with a NULL value. The predicate pushed to
+# the DataSource.
+select bool_value,tiny_value,small_value,int_value,big_value,float_value,double_value,decimal_value,char_value,varchar_value,binary_value,date_value,ts_value
+from functional_parquet.paimon_primitive_alltypes
+where int_value > 12 limit 5;
+---- RESULTS
+true,127,32767,2147483647,9223372036854775807,3.402823466385289e+38,1.797693134862316e+308,1234567.89,'char      ','varchar','\x01\x02\x03',2023-03-01,2025-08-11 18:17:27.653000000
+true,3,3,13,30,3.299999952316284,30.3,345.67,'char3     ','varchar3','NULL',2009-01-02,2009-01-02 00:13:00.480000000
+false,4,4,14,40,4.400000095367432,40.4,456.78,'char4     ','varchar4','NULL',2009-01-02,2009-01-02 00:14:00.510000000
+true,0,0,20,0,0.0,0.0,0.00,'char0     ','varchar0','NULL',2009-01-03,2009-01-03 00:20:00.900000000
+---- TYPES
+BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, DECIMAL, CHAR, VARCHAR, BINARY, DATE, TIMESTAMP
+====
+---- QUERY
+# Gets specified columns.
+select int_value, bool_value, small_value, float_value, double_value, date_value
+from functional_parquet.paimon_primitive_alltypes
+where int_value > 12 limit 5;
+---- RESULTS
+2147483647,true,32767,3.402823466385289e+38,1.797693134862316e+308,2023-03-01
+13,true,3,3.299999952316284,30.3,2009-01-02
+14,false,4,4.400000095367432,40.4,2009-01-02
+20,true,0,0.0,0.0,2009-01-03
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
+====
+---- QUERY
+# Inner join with a non Paimon table
+select a.int_value, b.int_col
+from functional_parquet.paimon_primitive_alltypes a inner join functional.alltypes b on (a.int_value = b.id)
+where a.int_value = 11
+---- RESULTS
+11,1
+---- TYPES
+INT, INT
+====
+---- QUERY
+# Gets specified columns based on date predicate with operator '='.
+select int_value, bool_value, small_value, float_value, double_value, date_value
+from functional_parquet.paimon_primitive_alltypes
+where date_value = DATE '2009-01-02' order by int_value limit 5;
+---- RESULTS
+11,true,1,1.100000023841858,10.1,2009-01-02
+12,false,2,2.200000047683716,20.2,2009-01-02
+13,true,3,3.299999952316284,30.3,2009-01-02
+14,false,4,4.400000095367432,40.4,2009-01-02
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, DATE
+====
+---- QUERY
+select * from functional_parquet.paimon_decimal_tbl;
+---- RESULTS
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900
+2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100
+12345,333,123.4567890000,0.12345678900000000000000000000000000000,11.22000
+12345,333,1234.5678900000,0.12345678900000000000000000000000000000,0.10000
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select * from functional_parquet.paimon_decimal_tbl where d3 < 10.00;
+---- RESULTS
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select * from functional_parquet.paimon_decimal_tbl where d3 <= 123.45678900;
+---- RESULTS
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900
+2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100
+12345,333,123.4567890000,0.12345678900000000000000000000000000000,11.22000
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select * from functional_parquet.paimon_decimal_tbl where d3 = 123.45678900;
+---- RESULTS
+12345,333,123.4567890000,0.12345678900000000000000000000000000000,11.22000
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select * from functional_parquet.paimon_decimal_tbl where d3 != 123.45678900;
+---- RESULTS
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900
+2345,111,12.3456789000,0.12345678900000000000000000000000000000,3.14100
+12345,333,1234.5678900000,0.12345678900000000000000000000000000000,0.10000
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select * from functional_parquet.paimon_decimal_tbl where d3 >= 123.45678900;
+---- RESULTS
+12345,333,123.4567890000,0.12345678900000000000000000000000000000,11.22000
+12345,333,1234.5678900000,0.12345678900000000000000000000000000000,0.10000
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select * from functional_parquet.paimon_decimal_tbl where d3 > 123.45678900;
+---- RESULTS
+12345,333,1234.5678900000,0.12345678900000000000000000000000000000,0.10000
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+select * from functional_parquet.paimon_decimal_tbl where d3 >= 123.45678900 and d5 < 10.0;
+---- RESULTS
+12345,333,1234.5678900000,0.12345678900000000000000000000000000000,0.10000
+132842,333,12345.6789000000,0.12345678900000000000000000000000000000,0.77889
+---- TYPES
+DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+====
+---- QUERY
+SELECT * FROM functional_parquet.alltypes_structs_paimon WHERE year=2009 AND month=1 AND id > 300
+---- RESULTS
+301,2009,1
+302,2009,1
+303,2009,1
+304,2009,1
+305,2009,1
+306,2009,1
+307,2009,1
+308,2009,1
+309,2009,1
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+select struct_val from functional_parquet.alltypes_structs_paimon where year=2009 and month=1 and id > 300
+---- CATCH
+AnalysisException: Local Paimon Table: functional_parquet.alltypes_structs_paimon is not supported when querying STRUCT type STRUCT<bool_col:BOOLEAN,tinyint_col:TINYINT,smallint_col:SMALLINT,int_col:INT,bigint_col:BIGINT,float_col:FLOAT,double_col:DOUBLE,date_string_col:STRING,string_col:STRING>
+====
+---- QUERY
+select struct_val.bool_col from functional_parquet.alltypes_structs_paimon where year=2009 and month=1 and id > 300
+---- CATCH
+AnalysisException: Paimon Scanner doesn't support nested columns.
+====
+---- QUERY
+select INPUT__FILE__NAME from functional_parquet.alltypes_structs_paimon where year=2009 and month=1 and id > 300
+---- CATCH
+AnalysisException: Could not resolve column/field reference: 'input__file__name'
+

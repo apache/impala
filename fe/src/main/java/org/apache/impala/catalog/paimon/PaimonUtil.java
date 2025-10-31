@@ -104,7 +104,6 @@ import org.apache.paimon.types.SmallIntType;
 import org.apache.paimon.types.TinyIntType;
 import org.apache.paimon.utils.InternalRowPartitionComputer;
 import org.apache.thrift.TException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -201,6 +200,17 @@ public class PaimonUtil {
   }
 
   /**
+   * function to close autoClosable object quitely.
+   */
+  public static void closeQuitely(AutoCloseable closeable) {
+    if (closeable != null) {
+      try {
+        closeable.close();
+      } catch (Exception e) { LOG.warn("Error closing " + closeable, e); }
+    }
+  }
+
+  /**
    * Converts Paimon schema to an Impala schema.
    */
   public static List<Column> convertToImpalaSchema(RowType schema)
@@ -209,7 +219,8 @@ public class PaimonUtil {
     int pos = 0;
     for (DataField dataField : schema.getFields()) {
       Type colType = PaimonImpalaTypeUtils.toImpalaType(dataField.type());
-      ret.add(new Column(dataField.name().toLowerCase(), colType, pos++));
+      ret.add(new PaimonColumn(dataField.name().toLowerCase(), colType,
+          dataField.description(), pos++, dataField.id(), dataField.type().isNullable()));
     }
     return ret;
   }
@@ -860,5 +871,44 @@ public class PaimonUtil {
       }
     }
     return result;
+  }
+
+  /**
+   * convert paimon api table schema to impala columns
+   */
+  public static List<Column> toImpalaColumn(Table table) throws ImpalaRuntimeException {
+    RowType rowType = table.rowType();
+    List<DataField> dataFields = rowType.getFields();
+    List<String> partitionKeys = table.partitionKeys()
+                                     .stream()
+                                     .map(String::toLowerCase)
+                                     .collect(Collectors.toList());
+    List<Column> impalaFields = convertToImpalaSchema(rowType);
+    List<Column> impalaNonPartitionedFields = Lists.newArrayList();
+    List<Column> impalaPartitionedFields = Lists.newArrayList();
+    List<Column> columns = Lists.newArrayList();
+    // lookup the clustering columns
+    for (String name : partitionKeys) {
+      int colIndex = PaimonUtil.getFieldIndexByNameIgnoreCase(rowType, name);
+      Preconditions.checkArgument(colIndex >= 0);
+      impalaPartitionedFields.add(impalaFields.get(colIndex));
+    }
+    // put non-clustering columns in natural order
+    for (int i = 0; i < dataFields.size(); i++) {
+      if (!partitionKeys.contains(dataFields.get(i).name().toLowerCase())) {
+        impalaNonPartitionedFields.add(impalaFields.get(i));
+      }
+    }
+
+    int colPos = 0;
+    for (Column col : impalaPartitionedFields) {
+      col.setPosition(colPos++);
+      columns.add(col);
+    }
+    for (Column col : impalaNonPartitionedFields) {
+      col.setPosition(colPos++);
+      columns.add(col);
+    }
+    return columns;
   }
 }

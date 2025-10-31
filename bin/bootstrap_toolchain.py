@@ -473,7 +473,7 @@ def get_toolchain_downloads():
   gcc_package = ToolchainPackage("gcc")
   toolchain_packages += [llvm_package, llvm_package_asserts, gcc_package]
   toolchain_packages += [ToolchainPackage(p) for p in
-      ["avro", "binutils", "boost", "breakpad", "bzip2", "calloncehack", "cctz",
+      ["arrow", "avro", "binutils", "boost", "breakpad", "bzip2", "calloncehack", "cctz",
        "cloudflarezlib", "cmake", "crcutil", "curl", "flatbuffers", "gdb", "gflags",
        "glog", "gperftools", "jwt-cpp", "libev", "libunwind", "lz4", "mold",
        "openldap", "opentelemetry-cpp", "orc", "protobuf", "python", "rapidjson", "re2",
