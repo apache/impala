@@ -116,7 +116,7 @@ under the License.
       </p>
 
       <table>
-        <tgroup cols="3" rowsep="1" colsep="1">
+        <tgroup cols="4" rowsep="1" colsep="1">
           <colspec colname="1" colwidth = "6*" />
           <colspec colname="1" colwidth = "3*" />
           <colspec colname="1" colwidth = "20*" />
@@ -614,7 +614,7 @@ under the License.
       </p>
 
       <table>
-        <tgroup cols="3" rowsep="1" colsep="1">
+        <tgroup cols="4" rowsep="1" colsep="1">
           <colspec colname="1" colwidth = "10*" />
           <colspec colname="1" colwidth = "5*" />
           <colspec colname="1" colwidth = "5*" />
@@ -768,7 +768,7 @@ under the License.
       </p>
 
       <table>
-        <tgroup cols="3" rowsep="1" colsep="1">
+        <tgroup cols="4" rowsep="1" colsep="1">
           <colspec colname="1" colwidth = "5*" />
           <colspec colname="1" colwidth = "3*" />
           <colspec colname="1" colwidth = "20*" />
