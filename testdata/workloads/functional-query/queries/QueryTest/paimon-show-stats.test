@@ -25,11 +25,11 @@ SHOW PARTITIONS functional_parquet.paimon_partitioned;
 ---- LABELS
 Partition,Number Of Rows,Number Of Files,Number Of Bytes,Last Creation Time
 ---- RESULTS
-'userId=3',51,1,1301,1748992355131
-'userId=2',129,1,1657,1748992355155
-'userId=5',198,1,1922,1748992355177
-'userId=1',53,1,1301,1748992355201
-'userId=4',21,1,1101,1748992355224
+'userId=3',51,1,1301,regex:\d*
+'userId=2',129,1,1657,regex:\d*
+'userId=5',198,1,1922,regex:\d*
+'userId=1',53,1,1301,regex:\d*
+'userId=4',21,1,1101,regex:\d*
 ---- TYPES
 STRING, BIGINT, BIGINT, BIGINT, BIGINT
 ====
