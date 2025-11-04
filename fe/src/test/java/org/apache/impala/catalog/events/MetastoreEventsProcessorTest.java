@@ -3748,20 +3748,16 @@ public class MetastoreEventsProcessorTest {
           "analyze table %s.%s compute statistics for columns", TEST_DB_NAME, tblName));
     }
     // All the new events are:
-    // OPEN_TXN
     // ADD_PARTITION one for adding 2 partitions
-    // COMMIT_TXN
-    // OPEN_TXN
     // ALTER_PARTITION
     // ALTER_PARTITION
-    // UPDATE_PART_COL_STAT_EVENT
-    // UPDATE_PART_COL_STAT_EVENT
-    // COMMIT_TXN
     // Fetch all events with the default skip list.
     List<NotificationEvent> events =
         MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
             eventsProcessor_.catalog_, createEventId, null);
-    assertEquals(5, events.size());
+    // HMS emits fewer events after we upgrade CDP Hive from 7.3.1.600-337 to
+    // 7.3.2.20000-221. This may be related to HIVE-27481, HIVE-29077, and HIVE-29571.
+    assertEquals(3, events.size()); // ADD_PARTITION, ALTER_PARTITION, ALTER_PARTITION
 
     // Fetch events with a null filter but specifying the wanted event type.
     events = MetastoreEventsProcessor.getNextMetastoreEventsInBatches(
@@ -3949,7 +3945,14 @@ public class MetastoreEventsProcessorTest {
     // Process commit compaction event should skip the event because
     // DISABLE_EVENT_HMS_SYNC is set to true
     event = filteredEvents.get(filteredEvents.size() - 1);
-    assertEquals(MetastoreEventType.COMMIT_COMPACTION_EVENT, event.getEventType());
+    if (event.getEventType() != MetastoreEventType.COMMIT_COMPACTION_EVENT) {
+      StringBuilder sb = new StringBuilder();
+      sb.append("The last event must be a COMMIT_COMPACTION_EVENT. Filtered events:\n");
+      for (MetastoreEvent filteredEvent : filteredEvents) {
+        sb.append("  ").append(filteredEvent).append('\n');
+      }
+      fail(sb.toString());
+    }
     long skipCount = eventsProcessor_.getMetrics()
                          .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
                          .getCount();
