@@ -40,6 +40,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.calcite.functions.RexCallConverter;
 import org.apache.impala.calcite.functions.RexLiteralConverter;
+import org.apache.impala.calcite.operators.ImpalaRexUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,6 +62,10 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
     this.inputExprs_ = inputExprs;
     this.rexBuilder_ = rexBuilder;
     this.analyzer_ = analyzer;
+  }
+
+  public RexBuilder getRexBuilder() {
+    return rexBuilder_;
   }
 
   @Override
@@ -138,7 +143,13 @@ public class CreateExprVisitor extends RexVisitorImpl<Expr> {
   public static Expr getExpr(CreateExprVisitor visitor, RexNode operand)
       throws ImpalaException {
     try {
-      Expr expr = operand.accept(visitor);
+      // Impala cannot handle the SEARCH operand so this needs to
+      // be expanded.  A custom ImpalaRexUtil was made to handle
+      // the IN operator and is needed until at least CALCITE-7226
+      // is fixed.
+      RexNode expandedOperand =
+          ImpalaRexUtil.expandSearch(visitor.getRexBuilder(), operand);
+      Expr expr = expandedOperand.accept(visitor);
       expr.analyze(visitor.analyzer_);
       return expr;
     } catch (Exception e) {

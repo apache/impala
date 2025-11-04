@@ -26,7 +26,6 @@ import org.apache.calcite.plan.RelOptCostImpl;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
@@ -35,15 +34,11 @@ import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.prepare.PlannerImpl;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.rel.core.RelFactories;
-import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.SqlBasicCall;
-import org.apache.calcite.sql.SqlExplainFormat;
-import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
@@ -53,12 +48,11 @@ import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
-import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.impala.calcite.operators.ImpalaConvertletTable;
-import org.apache.impala.calcite.operators.ImpalaRexBuilder;
+import org.apache.impala.calcite.rules.ImpalaCoreRules;
 import org.apache.impala.calcite.schema.ImpalaRelMetadataProvider;
 import org.apache.impala.calcite.util.LogUtil;
 
@@ -94,7 +88,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
     this.planner_ = new VolcanoPlanner();
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
     cluster_ =
-        RelOptCluster.create(planner_, new ImpalaRexBuilder(typeFactory_));
+        RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
     viewExpander_ = createViewExpander(
         analysisResult.getSqlValidator().getCatalogReader().getRootSchema().plus());
     cluster_.setMetadataProvider(ImpalaRelMetadataProvider.DEFAULT);
@@ -107,7 +101,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
     this.planner_ = new VolcanoPlanner();
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
     cluster_ =
-        RelOptCluster.create(planner_, new ImpalaRexBuilder(typeFactory_));
+        RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
     viewExpander_ = createViewExpander(validator.getCatalogReader()
         .getRootSchema().plus());
     cluster_.setMetadataProvider(ImpalaRelMetadataProvider.DEFAULT);
@@ -134,13 +128,20 @@ public class CalciteRelNodeConverter implements CompilerStep {
   }
 
   public RelNode convert(SqlNode validatedNode) {
+    // Use the NO_SIMPLIFY RelBuilderFactory. Starting around Calcite 1.40, there
+    // are cases where Calcite finds a common type for literal strings that do not
+    // have the same length to the higher CHAR type. Impala treats literal strings
+    // as STRING type. The simplify() method removes some vital information needed
+    // to convert the CHAR to a STRING type later in coerce nodes, so we avoid the
+    // simplify step until after coerce nodes is complete.
     SqlToRelConverter relConverter = new SqlToRelConverter(
         viewExpander_,
         sqlValidator_,
         reader_,
         cluster_,
         ImpalaConvertletTable.INSTANCE,
-        SqlToRelConverter.config().withCreateValuesRel(false));
+        SqlToRelConverter.config().withCreateValuesRel(false)
+            .withRelBuilderFactory(ImpalaCoreRules.LOGICAL_BUILDER_NO_SIMPLIFY));
 
     // Convert the valid AST into a logical plan
     RelRoot root = relConverter.convertQuery(validatedNode, false, true);
@@ -150,15 +151,16 @@ public class CalciteRelNodeConverter implements CompilerStep {
     RelNode subQueryRemovedPlan =
         runProgram(
             ImmutableList.of(
-                CoreRules.JOIN_SUB_QUERY_TO_CORRELATE,
-                CoreRules.PROJECT_SUB_QUERY_TO_CORRELATE,
-                CoreRules.FILTER_SUB_QUERY_TO_CORRELATE
+                ImpalaCoreRules.JOIN_SUB_QUERY_TO_CORRELATE,
+                ImpalaCoreRules.PROJECT_SUB_QUERY_TO_CORRELATE,
+                ImpalaCoreRules.FILTER_SUB_QUERY_TO_CORRELATE
             ),
             relNode);
     LogUtil.logDebug(subQueryRemovedPlan, "Plan after subquery removal phase");
 
-    RelBuilder relBuilder = RelFactories.LOGICAL_BUILDER.create(cluster_,
-        reader_);
+    RelBuilder relBuilder =
+        ImpalaCoreRules.LOGICAL_BUILDER_NO_SIMPLIFY.create(cluster_, reader_);
+
     RelNode decorrelatedPlan =
         RelDecorrelator.decorrelateQuery(subQueryRemovedPlan, relBuilder);
 

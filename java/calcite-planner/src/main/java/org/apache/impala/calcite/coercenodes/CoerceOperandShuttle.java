@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import org.apache.calcite.plan.Strong;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
@@ -96,9 +97,9 @@ public class CoerceOperandShuttle extends RexShuttle {
   @Override
   public RexNode visitCall(RexCall call) {
 
-    // Eliminate the "Sarg" function which is unknown to Impala.
-    // TODO: this is kinda hacky. It would be better if Impala can handle this
-    // directly, so this needs investigation.
+    // Eliminate the SEARCH operator while coercing. This is an internal Calcite
+    // operator used in simplifications. It will be brought back after the coercing
+    // is complete.
     if (call.getOperator().getKind().equals(SqlKind.SEARCH)) {
       return visitCall((RexCall) RexUtil.expandSearch(rexBuilder, null, call));
     }
@@ -135,7 +136,8 @@ public class CoerceOperandShuttle extends RexShuttle {
           call);
     }
 
-    RelDataType retType = getReturnType(castedOperandsCall, fn.getReturnType());
+    RelDataType retType =
+        getReturnType(rexBuilder, castedOperandsCall, fn.getReturnType());
 
     // This code does not handle changes in the return type when the Calcite
     // function is not a decimal but the function resolves to a function that
@@ -144,12 +146,6 @@ public class CoerceOperandShuttle extends RexShuttle {
     // necessary, this code should be added later.
     Preconditions.checkState(!SqlTypeUtil.isDecimal(retType) ||
         SqlTypeUtil.isDecimal(castedOperandsCall.getType()));
-
-    // So if the original return type is Decimal and the function resolves to
-    // decimal, the precision and scale are saved from the original function.
-    if (SqlTypeUtil.isDecimal(retType)) {
-      retType = castedOperandsCall.getType();
-    }
 
     List<RexNode> newOperands = getCastedArgTypes(fn, castedOperandsCall.getOperands(),
         retType, factory, rexBuilder);
@@ -174,7 +170,7 @@ public class CoerceOperandShuttle extends RexShuttle {
           over);
     }
 
-    RelDataType retType = getReturnType(castedOver, fn.getReturnType());
+    RelDataType retType = getReturnType(rexBuilder, castedOver, fn.getReturnType());
 
     List<RexNode> newOperands =
         getCastedArgTypes(fn, castedOver.getOperands(), retType, factory, rexBuilder);
@@ -219,7 +215,8 @@ public class CoerceOperandShuttle extends RexShuttle {
   }
 
 
-  private RelDataType getReturnType(RexCall rexCall, Type impalaReturnType) {
+  private RelDataType getReturnType(RexBuilder rexBuilder, RexCall rexCall,
+      Type impalaReturnType) {
     // Case is a special case. Currently, there is a quirk in the Impala function
     // resolver where it always returns the BOOLEAN signature. So the return type
     // is evaluated here by finding the compatible type amongst the "then" clauses.
@@ -229,7 +226,9 @@ public class CoerceOperandShuttle extends RexShuttle {
         return ImpalaTypeConverter.getCompatibleTypeForCase(argTypes, factory);
     }
 
-    RelDataType retType = ImpalaTypeConverter.getRelDataType(impalaReturnType);
+    boolean isNullable = isNullable(rexCall);
+    RelDataType retType =
+        ImpalaTypeConverter.getRelDataType(impalaReturnType, isNullable);
 
     // This code does not handle changes in the return type when the Calcite
     // function is not a decimal but the function resolves to a function that
@@ -242,7 +241,8 @@ public class CoerceOperandShuttle extends RexShuttle {
     // So if the original return type is Decimal and the function resolves to
     // decimal, the precision and scale are saved from the original function.
     if (SqlTypeUtil.isDecimal(retType)) {
-      retType = rexCall.getType();
+      retType = rexBuilder.getTypeFactory().createTypeWithNullability(rexCall.getType(),
+          isNullable);
     }
 
     return retType;
@@ -343,7 +343,8 @@ public class CoerceOperandShuttle extends RexShuttle {
       Type toImpalaType = fn.getArgs()[indexToUse];
       RelDataType toType = useReturnTypeForCastingArg(fn, argTypes.get(indexToUse))
           ? retType
-          : getCastedToType(argTypes.get(i), toImpalaType, factory);
+          : getCastedToType(argTypes.get(i), toImpalaType, factory,
+              isNullable(operands.get(i)));
 
       RexNode operand = castOperand(operands.get(i), toType,
           factory, rexBuilder);
@@ -355,6 +356,28 @@ public class CoerceOperandShuttle extends RexShuttle {
     }
 
     return castedOperand ? newOperands : operands;
+  }
+
+  /**
+   * Returns true if RexNode is nullable. Literals are only nullable if they contain
+   * the null value. Operators need to match what Calcite expects for RexSimplify to
+   * work properly. Any operators not found in Calcite are assumed to be nullable.
+   */
+  private static boolean isNullable(RexNode rexNode) {
+    if (rexNode instanceof RexLiteral) {
+      return ((RexLiteral) rexNode).isNull();
+    }
+    switch (Strong.policy(rexNode)) {
+      case NOT_NULL:
+        return false;
+      case ANY:
+        List<RexNode> operands = ((RexCall) rexNode).getOperands();
+        return ((RexCall) rexNode).getOperands().stream()
+            .map(RexNode::getType)
+            .anyMatch(RelDataType::isNullable);
+      default:
+        return true;
+    }
   }
 
   private static boolean useReturnTypeForCastingArg(Function fn, RelDataType argType) {
@@ -374,7 +397,7 @@ public class CoerceOperandShuttle extends RexShuttle {
   }
 
   private static RelDataType getCastedToType(RelDataType fromType,
-      Type toImpalaType, RelDataTypeFactory factory) {
+      Type toImpalaType, RelDataTypeFactory factory, boolean isNullable) {
 
     // Special case: If the "to" type is a generic CHAR (where len = -1),
     // there is no casting needed if the "from" type is also a CHAR.
@@ -392,7 +415,7 @@ public class CoerceOperandShuttle extends RexShuttle {
     }
 
     if (!toImpalaType.isDecimal() || SqlTypeUtil.isNull(fromType)) {
-      return ImpalaTypeConverter.getRelDataType(toImpalaType);
+      return ImpalaTypeConverter.getRelDataType(toImpalaType, isNullable);
     }
 
     // Integer based type needs special conversion to Decimal types based on the
@@ -400,8 +423,9 @@ public class CoerceOperandShuttle extends RexShuttle {
     // the type if the from type is also DECIMAL.
     ScalarType impalaType = (ScalarType) ImpalaTypeConverter.createImpalaType(fromType);
     ScalarType decimalType = impalaType.getMinResolutionDecimal();
-    return factory.createSqlType(SqlTypeName.DECIMAL,
+    RelDataType relDataType = factory.createSqlType(SqlTypeName.DECIMAL,
         decimalType.decimalPrecision(), decimalType.decimalScale());
+    return factory.createTypeWithNullability(relDataType, isNullable);
   }
 
   /**

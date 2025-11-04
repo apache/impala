@@ -35,7 +35,9 @@ import org.apache.impala.analysis.CaseWhenClause;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
+import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.TimestampArithmeticExpr;
+import org.apache.impala.calcite.operators.ImpalaInOperator;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
@@ -79,6 +81,16 @@ public class RexCallConverter {
         return createCompoundExpr(rexCall, params);
       case CAST:
         return createCastExpr(rexCall, params, analyzer);
+      case NOT_IN:
+        return createInExpr(rexCall, params, analyzer);
+      case IS_NULL:
+        return new IsNullPredicate(params.get(0), false);
+      case IS_NOT_NULL:
+        return new IsNullPredicate(params.get(0), true);
+      case OTHER:
+        if (rexCall.getOperator() instanceof ImpalaInOperator) {
+          return createInExpr(rexCall, params, analyzer);
+        }
     }
 
     if (rexCall.getOperator().getName().toLowerCase().equals("explicit_cast")) {
@@ -162,6 +174,14 @@ public class RexCallConverter {
     }
     Preconditions.checkState(false, "Unknown type: " + rexCall.getOperator().getKind());
     return null;
+  }
+
+  /**
+   * Create In Expr
+   */
+  private static Expr createInExpr(RexCall call, List<Expr> params, Analyzer analyzer
+      ) throws ImpalaException {
+    return new AnalyzedInPredicate(call, params, analyzer);
   }
 
   private static Expr createCastExpr(RexCall call, List<Expr> params, Analyzer analyzer)

@@ -417,7 +417,8 @@ public class ImpalaJoinRel extends Join
    * of the Expr conjuncts (and whether it is an EQUALS conjunct).
    */
   private List<ConjunctInfo> getConditionConjuncts(RexNode condition,
-      NodeWithExprs leftInput, NodeWithExprs rightInput, Analyzer analyzer) {
+      NodeWithExprs leftInput, NodeWithExprs rightInput, Analyzer analyzer)
+      throws ImpalaException {
 
     List<ConjunctInfo> conjunctInfos = new ArrayList<>();
     CreateExprVisitor visitor = new CreateExprVisitor(getCluster().getRexBuilder(),
@@ -429,7 +430,7 @@ public class ImpalaJoinRel extends Join
     for (RexNode conj : conjuncts) {
       // get a canonicalized representation
       conj = getCanonical(conj, leftInput.outputExprs_.size());
-      Expr impalaConjunct = conj.accept(visitor);
+      Expr impalaConjunct = CreateExprVisitor.getExpr(visitor, conj);
       conjunctInfos.add(
           new ConjunctInfo(impalaConjunct, isEquijoinConjunct(conj, leftInput)));
     }

@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarFunction;
@@ -149,27 +150,30 @@ public class InPredicate extends Predicate {
           break;
         }
       }
-      boolean useSetLookup = allConstant;
-      // Threshold based on InPredicateBenchmark results
-      int setLookupThreshold = children_.get(0).getType().isStringType() ? 2 : 6;
-      if (children_.size() - 1 < setLookupThreshold) useSetLookup = false;
 
       // Only lookup fn_ if all subqueries have been rewritten. If the second child is a
       // subquery, it will have type ArrayType, which cannot be resolved to a builtin
       // function and will fail analysis.
-      Type[] argTypes = {getChild(0).type_, getChild(1).type_};
-      if (useSetLookup) {
-        fn_ = getBuiltinFunction(analyzer, isNotIn_ ? NOT_IN_SET_LOOKUP : IN_SET_LOOKUP,
-            argTypes, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
-      } else {
-        fn_ = getBuiltinFunction(analyzer, isNotIn_ ? NOT_IN_ITERATE : IN_ITERATE,
-            argTypes, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
-      }
+      fn_ = getFunction(analyzer, allConstant);
       Preconditions.checkNotNull(fn_);
       Preconditions.checkState(fn_.getReturnType().isBoolean());
       castForFunctionCall(false, analyzer.getRegularCompatibilityLevel());
     }
     computeSelectivity();
+  }
+
+  protected Function getFunction(Analyzer analyzer, boolean isAllConstant)
+      throws AnalysisException {
+    // Threshold based on InPredicateBenchmark results
+    int setLookupThreshold = children_.get(0).getType().isStringType() ? 2 : 6;
+    boolean useSetLookup = isAllConstant && (children_.size() - 1 >= setLookupThreshold);
+
+    Type[] argTypes = {getChild(0).type_, getChild(1).type_};
+    return useSetLookup
+        ? getBuiltinFunction(analyzer, isNotIn_ ? NOT_IN_SET_LOOKUP : IN_SET_LOOKUP,
+            argTypes, CompareMode.IS_NONSTRICT_SUPERTYPE_OF)
+        : getBuiltinFunction(analyzer, isNotIn_ ? NOT_IN_ITERATE : IN_ITERATE,
+            argTypes, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
   }
 
   protected void computeSelectivity() {

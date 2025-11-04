@@ -31,8 +31,10 @@ import org.apache.calcite.rex.RexVisitor;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.calcite.operators.ImpalaRexUtil;
 import org.apache.impala.common.ImpalaException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,7 +60,9 @@ public class ExprConjunctsConverter {
       CreateExprVisitor visitor =
           new CreateExprVisitor(rexBuilder, inputExprs, analyzer);
 
-      List<RexNode> andOperands = getAndConjuncts(conjunct);
+      RexNode expandedConjunct = ImpalaRexUtil.expandSearch(rexBuilder, conjunct);
+
+      List<RexNode> andOperands = getAndConjuncts(expandedConjunct);
       for (RexNode andOperand : andOperands) {
         Expr convertedExpr = CreateExprVisitor.getExpr(visitor, andOperand);
         builder.add(convertedExpr);
@@ -95,7 +99,11 @@ public class ExprConjunctsConverter {
       return ImmutableList.of(conjunct);
     }
     // If it's an AND conjunct, then all the operands represent individual
-    // AND clauses.
-    return rexCallConjunct.getOperands();
+    // AND clauses.  Call recursively to catch nested ANDs.
+    List<RexNode> andOperands = new ArrayList<>();
+    for (RexNode operand : rexCallConjunct.getOperands()) {
+      andOperands.addAll(getAndConjuncts(operand));
+    }
+    return andOperands;
   }
 }

@@ -34,19 +34,19 @@ import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.rules.JoinProjectTransposeRule;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql2rel.RelFieldTrimmer;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.impala.calcite.coercenodes.CoerceNodes;
+import org.apache.impala.calcite.operators.ImpalaRexSimplify;
 import org.apache.impala.calcite.rel.node.ConvertToImpalaRelRules;
 import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
-import org.apache.impala.calcite.rules.CombineValuesNodesRule;
-import org.apache.impala.calcite.rules.ExtractLiteralAgg;
-import org.apache.impala.calcite.rules.ImpalaJoinProjectTransposeRule;
-import org.apache.impala.calcite.rules.ImpalaMinusToDistinctRule;
-import org.apache.impala.calcite.rules.RewriteRexOverRule;
+import org.apache.impala.calcite.rules.ImpalaCoreRules;
+import org.apache.impala.calcite.rules.ImpalaFilterSimplifyRule;
+import org.apache.impala.calcite.rules.ImpalaProjectSimplifyRule;
 import org.apache.impala.calcite.util.LogUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.util.EventSequence;
@@ -104,15 +104,17 @@ public class CalciteOptimizer implements CompilerStep {
   }
 
   public ImpalaPlanRel optimize(RelNode logPlan) throws ImpalaException {
-    RelBuilder relBuilder = RelFactories.LOGICAL_BUILDER.create(logPlan.getCluster(),
-        reader_);
+    RelBuilder relBuilder = ImpalaCoreRules.LOGICAL_BUILDER_NO_SIMPLIFY.create(
+        logPlan.getCluster(), reader_);
 
     RexBuilder rexBuilder = logPlan.getCluster().getRexBuilder();
+
+    ImpalaRexSimplify simplifier = new ImpalaRexSimplify(rexBuilder, RexUtil.EXECUTOR);
 
     // Run some essential rules needed to create working RelNodes before doing
     // optimization
     timeline_.markEvent("Starting optimization");
-    RelNode expandedNodesPlan = runExpandNodesProgram(logPlan);
+    RelNode expandedNodesPlan = runExpandNodesProgram(logPlan, simplifier);
     timeline_.markEvent("Expanded plan");
     LogUtil.logDebug(expandedNodesPlan, "Plan after expanded plan phase.");
 
@@ -127,20 +129,21 @@ public class CalciteOptimizer implements CompilerStep {
     LogUtil.logDebug(coercedNodesPlan, "Plan after it has been coerced.");
 
     // Run rules that swap RelNodes and optimize the expressions within a RelNode
-    RelNode preJoinOptimizedPlan = runOptimizeNodesProgram(relBuilder, coercedNodesPlan);
+    RelNode preJoinOptimizedPlan = runOptimizeNodesProgram(relBuilder, rexBuilder,
+        coercedNodesPlan, simplifier);
     timeline_.markEvent("Created optimized plan pre join");
     LogUtil.logDebug(preJoinOptimizedPlan, "Optimized plan before join rules " +
         "have been applied.");
 
     // Run join optimization
-    RelNode optimizedJoinPlan = runJoinProgram(preJoinOptimizedPlan);
+    RelNode optimizedJoinPlan = runJoinProgram(preJoinOptimizedPlan, simplifier);
     timeline_.markEvent("Created optimized join plan");
     LogUtil.logDebug(optimizedJoinPlan, "Optimized plan after join optimization.");
 
     // rerun rules that swap RelNodes and optimize the expressions within a RelNode,
     // since the join optimization may have enabled some more rules that can be applied.
     RelNode postOptimizedJoinPlan =
-        runOptimizeNodesProgram(relBuilder, optimizedJoinPlan);
+        runOptimizeNodesProgram(relBuilder, rexBuilder, optimizedJoinPlan, simplifier);
     timeline_.markEvent("Created optimized plan post join");
     LogUtil.logDebug(postOptimizedJoinPlan, "Optimized plan after a second pass of "
         + "rules applied after join optimization.");
@@ -148,41 +151,42 @@ public class CalciteOptimizer implements CompilerStep {
     // Run some essential rules needed to create working RelNodes after
     // optimization
     RelNode preImpalaConvertPlan =
-        runPreImpalaConvertProgram(postOptimizedJoinPlan);
+        runPreImpalaConvertProgram(postOptimizedJoinPlan, simplifier);
     LogUtil.logDebug(preImpalaConvertPlan, "Optimized plan after final "
         + "preparation done before conversion to physical nodes.");
 
     // Change the Calcite RelNodes into ImpalaPlanRel RelNodes, all of which
     // contain a method that converts the RelNodes into Impala PlanNodes.
     ImpalaPlanRel finalOptimizedPlan =
-        runImpalaConvertProgram(preImpalaConvertPlan);
+        runImpalaConvertProgram(preImpalaConvertPlan, simplifier);
     timeline_.markEvent("Created final Impala convert plan");
     LogUtil.logDebug(finalOptimizedPlan, "Final Impala optimized plan");
 
     return finalOptimizedPlan;
   }
 
-  private RelNode runExpandNodesProgram(RelNode plan) throws ImpalaException {
+  private RelNode runExpandNodesProgram(RelNode plan,
+      ImpalaRexSimplify simplifier) throws ImpalaException {
 
     HepProgramBuilder builder = new HepProgramBuilder();
 
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     builder.addRuleCollection(ImmutableList.of(
-        CoreRules.INTERSECT_TO_DISTINCT,
-        CoreRules.UNION_TO_DISTINCT,
-        ImpalaMinusToDistinctRule.Config.DEFAULT.toRule(),
-        new CombineValuesNodesRule(),
-        new ExtractLiteralAgg(),
-        CoreRules.SORT_REMOVE_CONSTANT_KEYS
+        ImpalaCoreRules.INTERSECT_TO_DISTINCT,
+        ImpalaCoreRules.UNION_TO_DISTINCT,
+        ImpalaCoreRules.IMPALA_MINUS_TO_DISTINCT,
+        ImpalaCoreRules.COMBINE_VALUES_NODES,
+        ImpalaCoreRules.EXTRACT_LITERAL_AGG,
+        ImpalaCoreRules.SORT_REMOVE_CONSTANT_KEYS
         ));
 
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
 
-    return runProgram(plan, builder.build());
+    return runProgram(plan, builder.build(), simplifier);
   }
 
-  private RelNode runOptimizeNodesProgram(RelBuilder relBuilder,
-      RelNode plan) throws ImpalaException {
+  private RelNode runOptimizeNodesProgram(RelBuilder relBuilder, RexBuilder rexBuilder,
+      RelNode plan, ImpalaRexSimplify simplifier) throws ImpalaException {
 
     RelFieldTrimmer trimmer =
         new RelFieldTrimmer(validator_, relBuilder);
@@ -191,19 +195,21 @@ public class CalciteOptimizer implements CompilerStep {
     HepProgramBuilder builder = new HepProgramBuilder();
 
     List<RelOptRule> interRules = ImmutableList.of(
-        CoreRules.UNION_PULL_UP_CONSTANTS,
-        CoreRules.AGGREGATE_ANY_PULL_UP_CONSTANTS,
-        CoreRules.FILTER_PROJECT_TRANSPOSE,
-        CoreRules.FILTER_SET_OP_TRANSPOSE,
-        CoreRules.JOIN_CONDITION_PUSH,
-        CoreRules.FILTER_INTO_JOIN,
-        CoreRules.FILTER_AGGREGATE_TRANSPOSE,
-        CoreRules.PROJECT_JOIN_TRANSPOSE,
-        CoreRules.UNION_REMOVE,
-        CoreRules.PROJECT_TO_SEMI_JOIN,
-        CoreRules.FILTER_VALUES_MERGE,
-        CoreRules.FILTER_MERGE,
-        CoreRules.PROJECT_MERGE,
+        new ImpalaFilterSimplifyRule(simplifier),
+        new ImpalaProjectSimplifyRule(simplifier),
+        ImpalaCoreRules.UNION_PULL_UP_CONSTANTS,
+        ImpalaCoreRules.AGGREGATE_ANY_PULL_UP_CONSTANTS,
+        ImpalaCoreRules.FILTER_PROJECT_TRANSPOSE,
+        ImpalaCoreRules.FILTER_SET_OP_TRANSPOSE,
+        ImpalaCoreRules.JOIN_CONDITION_PUSH,
+        ImpalaCoreRules.FILTER_INTO_JOIN,
+        ImpalaCoreRules.FILTER_AGGREGATE_TRANSPOSE,
+        ImpalaCoreRules.UNION_REMOVE,
+        ImpalaCoreRules.PROJECT_TO_SEMI_JOIN,
+        ImpalaCoreRules.FILTER_VALUES_MERGE,
+        ImpalaCoreRules.FILTER_MERGE,
+        ImpalaCoreRules.PROJECT_MERGE,
+        ImpalaCoreRules.JOIN_PUSH_EXPRESSIONS,
         PruneEmptyRules.PROJECT_INSTANCE,
         PruneEmptyRules.AGGREGATE_INSTANCE,
         PruneEmptyRules.SORT_INSTANCE,
@@ -215,18 +221,20 @@ public class CalciteOptimizer implements CompilerStep {
     builder.addMatchOrder(HepMatchOrder.TOP_DOWN);
     builder.addRuleCollection(interRules);
 
-    return trimmer.trim(runProgram(plan, builder.build()));
+    return trimmer.trim(runProgram(trimmedPlan, builder.build(), simplifier));
   }
 
   /**
    * Run the rules specifically for join ordering.
    *
    */
-  private RelNode runJoinProgram(RelNode plan) throws ImpalaException {
+  private RelNode runJoinProgram(RelNode plan,
+      ImpalaRexSimplify simplifier) throws ImpalaException {
 
     HepProgramBuilder builder = new HepProgramBuilder();
     // has to be in a separate program or else there is an infinite loop
-    builder.addRuleInstance(CoreRules.JOIN_PUSH_TRANSITIVE_PREDICATES);
+    builder.addRuleInstance(ImpalaCoreRules.JOIN_PUSH_TRANSITIVE_PREDICATES);
+    builder.addRuleInstance(CoreRules.JOIN_DERIVE_IS_NOT_NULL_FILTER_RULE);
 
     // XXX: add comment about project
     // Merge the filter nodes into the Join. Also include
@@ -236,11 +244,11 @@ public class CalciteOptimizer implements CompilerStep {
     // joins next to each other if possible for the join
     // optimization step.
     builder.addRuleCollection(ImmutableList.of(
-        ImpalaJoinProjectTransposeRule.LEFT_OUTER,
-        ImpalaJoinProjectTransposeRule.RIGHT_OUTER,
-        CoreRules.FILTER_PROJECT_TRANSPOSE,
-        CoreRules.PROJECT_MERGE,
-        CoreRules.FILTER_INTO_JOIN
+        ImpalaCoreRules.JOIN_PROJECT_TRANSPOSE_LEFT_OUTER,
+        ImpalaCoreRules.JOIN_PROJECT_TRANSPOSE_RIGHT_OUTER,
+        ImpalaCoreRules.FILTER_PROJECT_TRANSPOSE,
+        ImpalaCoreRules.PROJECT_MERGE,
+        ImpalaCoreRules.FILTER_INTO_JOIN
         ));
 
     // Join rules work in a two step process.  The first step
@@ -249,11 +257,11 @@ public class CalciteOptimizer implements CompilerStep {
     // MULTI_JOIN_OPTIMIZE rule is used to determine the join
     // ordering.
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
-    builder.addRuleInstance(CoreRules.JOIN_CONDITION_PUSH);
-    builder.addRuleInstance(CoreRules.JOIN_TO_MULTI_JOIN);
+    builder.addRuleInstance(ImpalaCoreRules.JOIN_CONDITION_PUSH);
+    builder.addRuleInstance(ImpalaCoreRules.JOIN_TO_MULTI_JOIN);
     builder.addRuleInstance(CoreRules.MULTI_JOIN_OPTIMIZE);
 
-    return runProgram(plan, builder.build());
+    return runProgram(plan, builder.build(), simplifier);
   }
 
   /**
@@ -267,22 +275,24 @@ public class CalciteOptimizer implements CompilerStep {
    * FILTER_PROJECT_TRANSPOSE: One last transpose is done since the physical
    * conversion needs the Logical RelNodes ordered in this way.
    */
-  private RelNode runPreImpalaConvertProgram(RelNode plan) throws ImpalaException {
+  private RelNode runPreImpalaConvertProgram(RelNode plan,
+      ImpalaRexSimplify simplifier) throws ImpalaException {
 
     HepProgramBuilder builder = new HepProgramBuilder();
 
     RelNode retRelNode = plan;
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     builder.addRuleCollection(ImmutableList.of(
-        RewriteRexOverRule.INSTANCE,
-        CoreRules.FILTER_PROJECT_TRANSPOSE
+        ImpalaCoreRules.REWRITE_REX_OVER,
+        ImpalaCoreRules.FILTER_PROJECT_TRANSPOSE
         ));
 
 
-    return runProgram(retRelNode, builder.build());
+    return runProgram(retRelNode, builder.build(), simplifier);
   }
 
-  private ImpalaPlanRel runImpalaConvertProgram(RelNode plan) throws ImpalaException {
+  private ImpalaPlanRel runImpalaConvertProgram(RelNode plan,
+      ImpalaRexSimplify simplifier) throws ImpalaException {
     HepProgramBuilder builder = new HepProgramBuilder();
 
     builder.addRuleCollection(ImmutableList.of(
@@ -296,14 +306,16 @@ public class CalciteOptimizer implements CompilerStep {
         new ConvertToImpalaRelRules.ImpalaValuesRule()
         ));
 
-    return (ImpalaPlanRel) runProgram(plan, builder.build());
+    return (ImpalaPlanRel) runProgram(plan, builder.build(), simplifier);
   }
 
-  private RelNode runProgram(RelNode currentNode, HepProgram program) {
+  private RelNode runProgram(RelNode currentNode, HepProgram program,
+      ImpalaRexSimplify simplifier) {
     HepPlanner planner = new HepPlanner(program,
         currentNode.getCluster().getPlanner().getContext(), true, null,
         RelOptCostImpl.FACTORY);
     planner.setRoot(currentNode);
+    planner.setExecutor(simplifier.getRexExecutor());
 
     return planner.findBestExp();
   }

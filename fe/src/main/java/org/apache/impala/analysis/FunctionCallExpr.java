@@ -455,7 +455,7 @@ public class FunctionCallExpr extends Expr {
   }
 
   @Override
-  protected boolean isConstantImpl() {
+  public boolean isConstantImpl() {
     // TODO: we can't correctly determine const-ness before analyzing 'fn_'. We should
     // rework logic so that we do not call this function on unanalyzed exprs.
     // Aggregate functions are never constant.

@@ -95,12 +95,8 @@ public class RexLiteralConverter {
         return numericExpr;
       case CHAR:
       case VARCHAR:
-        ScalarType charType = rexLiteral.getType().getSqlTypeName() == SqlTypeName.VARCHAR
-            ? Type.STRING
-            : ScalarType.createCharType(rexLiteral.getValueAs(String.class).length());
-        Expr charExpr = new StringLiteral(rexLiteral.getValueAs(String.class),
-            charType, false);
-        return charExpr;
+        // Always treat all string literals as type STRING
+        return new StringLiteral(rexLiteral.getValueAs(String.class), Type.STRING, false);
       case DATE:
         DateString dateStringClass = rexLiteral.getValueAs(DateString.class);
         String dateString = (dateStringClass == null) ? null : dateStringClass.toString();

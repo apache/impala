@@ -61,9 +61,9 @@ public class ImpalaCastFunction extends ImpalaOperator {
 
     List<RelDataType> castFromList = operandTypes.subList(0, 1);
 
-    return CommonOperatorFunctions.isNullable(castFromList)
-        ? factory.createTypeWithNullability(operandTypes.get(1), true)
-        : operandTypes.get(1);
+    // Cast function always has the potential to return null, so set the
+    // nullability to true to be consistent for all casts.
+    return factory.createTypeWithNullability(operandTypes.get(1), true);
   }
 
   private String getCastToName(RelDataType type) {

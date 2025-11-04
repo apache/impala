@@ -65,6 +65,8 @@ public class ImpalaTypeConverter {
   // Maps Impala default types to Calcite default types.
   private static Map<Type, RelDataType> impalaToCalciteMap;
 
+  private static Map<Type, RelDataType> nonNullImpalaToCalciteMap;
+
   static {
     RexBuilder rexBuilder =
         new RexBuilder(new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl()));
@@ -87,10 +89,13 @@ public class ImpalaTypeConverter {
     map.put(Type.NULL, factory.createSqlType(SqlTypeName.NULL));
 
     ImmutableMap.Builder<Type, RelDataType> builder = ImmutableMap.builder();
+    ImmutableMap.Builder<Type, RelDataType> nonNullBuilder = ImmutableMap.builder();
     for (Type t : map.keySet()) {
       RelDataType r = map.get(t);
+      nonNullBuilder.put(t, r);
       builder.put(t, factory.createTypeWithNullability(r, true));
     }
+    nonNullImpalaToCalciteMap = nonNullBuilder.build();
     impalaToCalciteMap = builder.build();
   }
 
@@ -127,12 +132,21 @@ public class ImpalaTypeConverter {
    * Get the normalized RelDataType given an impala type.
    */
   public static RelDataType getRelDataType(Type impalaType) {
+    return getRelDataType(impalaType, true);
+  }
+
+  /**
+   * Get the normalized RelDataType given an impala type.
+   */
+  public static RelDataType getRelDataType(Type impalaType, boolean nullable) {
     if (impalaType == null) {
       return null;
     }
     TPrimitiveType primitiveType = impalaType.getPrimitiveType().toThrift();
     Type normalizedImpalaType = getImpalaType(primitiveType);
-    return impalaToCalciteMap.get(normalizedImpalaType);
+    return nullable
+        ? impalaToCalciteMap.get(normalizedImpalaType)
+        : nonNullImpalaToCalciteMap.get(normalizedImpalaType);
   }
 
   /**

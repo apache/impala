@@ -26,10 +26,12 @@ import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.calcite.util.Sarg;
 import org.apache.impala.calcite.rel.util.RexInputRefCollector;
 import org.apache.impala.calcite.schema.JoinRelationInfo.EqualityConjunction;
 import org.apache.impala.catalog.Column;
@@ -136,8 +138,8 @@ public class FilterSelectivityEstimator {
       case BETWEEN:
         // TODO: Impala has better logic than this
         return BETWEEN_SELECTIVITY;
-      case IN:
-        return computeInSelectivity(call);
+      case SEARCH:
+        return computeSearchSelectivity(call);
       default:
         return computeEqualsSelectivity(call);
     }
@@ -206,10 +208,26 @@ public class FilterSelectivityEstimator {
     return computeNotEqualitySelectivity(call);
   }
 
-  private Double computeInSelectivity(RexCall call) {
-    Double selectivity = computeEqualsSelectivity(call);
-    selectivity = selectivity * (call.operands.size() - 1);
-    return Math.min(selectivity, 1.0);
+  private Double computeSearchSelectivity(RexCall call) {
+    try {
+      RexLiteral literal = (RexLiteral) call.getOperands().get(1);
+      Sarg<?> sarg = literal.getValueAs(Sarg.class);
+      if (sarg.isPoints() || sarg.isComplementedPoints()) {
+        Double selectivity = computeEqualsSelectivity(call);
+        selectivity = selectivity * sarg.pointCount;
+        return sarg.isPoints()
+            ? Math.min(selectivity, 1.0)
+            : Math.max(1.0 - selectivity, 0.0);
+      } else {
+        // TODO: Impala has better logic than this
+        return BETWEEN_SELECTIVITY;
+      }
+    } catch (Exception e) {
+      LOG.warn("Warning: Bug found when trying to calculate selectivity for search " +
+          "operator, but instead of throwing an exception, a default selectivity will " +
+          "be used.");
+      return computeEqualsSelectivity(call);
+    }
   }
 
   /**

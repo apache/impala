@@ -722,7 +722,7 @@ PLAN-ROOT SINK
 |  row-size=22B cardinality=10
 |
 03:SELECT
-|  predicates: rank() = 10 OR rank() = 20 OR rank() = 30
+|  predicates: rank() IN (10, 20, 30)
 |  row-size=22B cardinality=11.00K
 |
 02:ANALYTIC

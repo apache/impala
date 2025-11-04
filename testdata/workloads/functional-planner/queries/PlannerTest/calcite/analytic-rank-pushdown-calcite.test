@@ -8,7 +8,7 @@ where rnk < 100 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 100
+|  predicates: int_col IS NOT NULL, row_number() < 100
 |  row-size=31B cardinality=10
 |
 02:ANALYTIC
@@ -29,7 +29,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 100
+|  predicates: int_col IS NOT NULL, row_number() < 100
 |  row-size=31B cardinality=10
 |
 02:ANALYTIC
@@ -176,7 +176,7 @@ where rnk < 100 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 100
+|  predicates: int_col IS NOT NULL, row_number() < 100
 |  row-size=31B cardinality=10
 |
 02:ANALYTIC
@@ -197,7 +197,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 100
+|  predicates: int_col IS NOT NULL, row_number() < 100
 |  row-size=31B cardinality=10
 |
 02:ANALYTIC
@@ -230,7 +230,7 @@ where rnk < 100 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), rank() < 100
+|  predicates: int_col IS NOT NULL, rank() < 100
 |  row-size=31B cardinality=10
 |
 02:ANALYTIC
@@ -252,7 +252,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), rank() < 100
+|  predicates: int_col IS NOT NULL, rank() < 100
 |  row-size=31B cardinality=10
 |
 02:ANALYTIC
@@ -288,7 +288,7 @@ where rnk < 5 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: int_col IS NOT NULL, row_number() < 5
 |  row-size=31B cardinality=383
 |
 02:ANALYTIC
@@ -314,7 +314,7 @@ PLAN-ROOT SINK
 06:EXCHANGE [UNPARTITIONED]
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: int_col IS NOT NULL, row_number() < 5
 |  row-size=31B cardinality=383
 |
 02:ANALYTIC
@@ -353,7 +353,7 @@ where rnk < 5 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: int_col IS NOT NULL, row_number() < 5
 |  row-size=31B cardinality=383
 |
 02:ANALYTIC
@@ -379,7 +379,7 @@ PLAN-ROOT SINK
 06:EXCHANGE [UNPARTITIONED]
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: int_col IS NOT NULL, row_number() < 5
 |  row-size=31B cardinality=383
 |
 02:ANALYTIC
@@ -517,7 +517,7 @@ where 99 >= rnk and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() <= 99
+|  predicates: int_col IS NOT NULL, row_number() <= 99
 |  row-size=31B cardinality=10
 |
 02:ANALYTIC
@@ -538,7 +538,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() <= 99
+|  predicates: int_col IS NOT NULL, row_number() <= 99
 |  row-size=31B cardinality=10
 |
 02:ANALYTIC
@@ -570,7 +570,7 @@ where rnk < 5 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: int_col IS NOT NULL, row_number() < 5
 |  row-size=32B cardinality=1
 |
 02:ANALYTIC
@@ -596,7 +596,7 @@ PLAN-ROOT SINK
 06:EXCHANGE [UNPARTITIONED]
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: int_col IS NOT NULL, row_number() < 5
 |  row-size=32B cardinality=1
 |
 02:ANALYTIC
@@ -635,7 +635,7 @@ where rnk < 100 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: dense_rank() < 100, is_not_null_pred(int_col)
+|  predicates: dense_rank() < 100, int_col IS NOT NULL
 |  row-size=31B cardinality=1.10K
 |
 02:ANALYTIC
@@ -666,7 +666,7 @@ where rnk < 5 and int_col is not null
 PLAN-ROOT SINK
 |
 05:SELECT
-|  predicates: is_not_null_pred(first_value(functional.alltypes.int_col)), row_number() < 5
+|  predicates: first_value(functional.alltypes.int_col) IS NOT NULL, row_number() < 5
 |  row-size=33B cardinality=4
 |
 04:ANALYTIC
@@ -702,7 +702,7 @@ PLAN-ROOT SINK
 09:EXCHANGE [UNPARTITIONED]
 |
 05:SELECT
-|  predicates: is_not_null_pred(first_value(functional.alltypes.int_col)), row_number() < 5
+|  predicates: first_value(functional.alltypes.int_col) IS NOT NULL, row_number() < 5
 |  row-size=33B cardinality=4
 |
 04:ANALYTIC
@@ -754,7 +754,7 @@ where rnk < 100 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 100
+|  predicates: row_number() < 100, int_col IS NOT NULL
 |  row-size=31B cardinality=1.10K
 |
 02:ANALYTIC
@@ -819,7 +819,7 @@ where rnk <= 100 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() <= 100
+|  predicates: int_col IS NOT NULL, row_number() <= 100
 |  row-size=31B cardinality=10
 |
 02:ANALYTIC
@@ -840,7 +840,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() <= 100
+|  predicates: int_col IS NOT NULL, row_number() <= 100
 |  row-size=31B cardinality=10
 |
 02:ANALYTIC
@@ -872,7 +872,7 @@ where rnk = 42 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() = 42
+|  predicates: int_col IS NOT NULL, row_number() = 42
 |  row-size=31B cardinality=4
 |
 02:ANALYTIC
@@ -893,7 +893,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() = 42
+|  predicates: int_col IS NOT NULL, row_number() = 42
 |  row-size=31B cardinality=4
 |
 02:ANALYTIC
@@ -1061,7 +1061,7 @@ where rnk < 5 and int_col is not null
 PLAN-ROOT SINK
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: int_col IS NOT NULL, row_number() < 5
 |  row-size=37B cardinality=1
 |
 02:ANALYTIC
@@ -1087,7 +1087,7 @@ PLAN-ROOT SINK
 06:EXCHANGE [UNPARTITIONED]
 |
 03:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: int_col IS NOT NULL, row_number() < 5
 |  row-size=37B cardinality=1
 |
 02:ANALYTIC
@@ -1128,7 +1128,7 @@ where rnk < 5 and int_col is not null
 PLAN-ROOT SINK
 |
 05:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: row_number() < 5, int_col IS NOT NULL
 |  row-size=52B cardinality=1.10K
 |
 04:ANALYTIC
@@ -1170,7 +1170,7 @@ where rnk < 5 and int_col is not null
 PLAN-ROOT SINK
 |
 05:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: int_col IS NOT NULL, row_number() < 5
 |  row-size=37B cardinality=383
 |
 04:ANALYTIC
@@ -1207,7 +1207,7 @@ PLAN-ROOT SINK
 09:EXCHANGE [UNPARTITIONED]
 |
 05:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: int_col IS NOT NULL, row_number() < 5
 |  row-size=37B cardinality=383
 |
 04:ANALYTIC
@@ -1262,7 +1262,7 @@ where rnk < 5 and int_col is not null
 PLAN-ROOT SINK
 |
 04:SELECT
-|  predicates: is_not_null_pred(int_col), row_number() < 5
+|  predicates: row_number() < 5, int_col IS NOT NULL
 |  row-size=37B cardinality=1.10K
 |
 03:ANALYTIC
@@ -1657,11 +1657,11 @@ PLAN-ROOT SINK
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypesagg.id = id
 |  runtime filters: RF000 <- id
-|  row-size=31B cardinality=106
+|  row-size=31B cardinality=11
 |
 |--04:SELECT
-|  |  predicates: row_number() < 100
-|  |  row-size=27B cardinality=99
+|  |  predicates: id IS NOT NULL, row_number() < 100
+|  |  row-size=27B cardinality=10
 |  |
 |  03:ANALYTIC
 |  |  functions: row_number()
@@ -1680,6 +1680,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.id IS NOT NULL
    runtime filters: RF000 -> functional.alltypesagg.id
    row-size=4B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
@@ -1690,13 +1691,13 @@ PLAN-ROOT SINK
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypesagg.id = id
 |  runtime filters: RF000 <- id
-|  row-size=31B cardinality=106
+|  row-size=31B cardinality=11
 |
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  04:SELECT
-|  |  predicates: row_number() < 100
-|  |  row-size=27B cardinality=99
+|  |  predicates: id IS NOT NULL, row_number() < 100
+|  |  row-size=27B cardinality=10
 |  |
 |  03:ANALYTIC
 |  |  functions: row_number()
@@ -1719,6 +1720,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.id IS NOT NULL
    runtime filters: RF000 -> functional.alltypesagg.id
    row-size=4B cardinality=11.00K
 ====
@@ -1733,11 +1735,11 @@ PLAN-ROOT SINK
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypesagg.id = id
 |  runtime filters: RF000 <- id
-|  row-size=31B cardinality=106
+|  row-size=31B cardinality=11
 |
 |--04:SELECT
-|  |  predicates: row_number() < 100
-|  |  row-size=27B cardinality=99
+|  |  predicates: id IS NOT NULL, row_number() < 100
+|  |  row-size=27B cardinality=10
 |  |
 |  03:ANALYTIC
 |  |  functions: row_number()
@@ -1756,6 +1758,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.id IS NOT NULL
    runtime filters: RF000 -> functional.alltypesagg.id
    row-size=4B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
@@ -1766,13 +1769,13 @@ PLAN-ROOT SINK
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypesagg.id = id
 |  runtime filters: RF000 <- id
-|  row-size=31B cardinality=106
+|  row-size=31B cardinality=11
 |
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  04:SELECT
-|  |  predicates: row_number() < 100
-|  |  row-size=27B cardinality=99
+|  |  predicates: id IS NOT NULL, row_number() < 100
+|  |  row-size=27B cardinality=10
 |  |
 |  03:ANALYTIC
 |  |  functions: row_number()
@@ -1795,6 +1798,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.id IS NOT NULL
    runtime filters: RF000 -> functional.alltypesagg.id
    row-size=4B cardinality=11.00K
 ====
@@ -1817,14 +1821,14 @@ PLAN-ROOT SINK
 |
 |--10:AGGREGATE [FINALIZE]
 |  |  group by: ID, RNK
-|  |  row-size=12B cardinality=198
+|  |  row-size=12B cardinality=20
 |  |
 |  01:UNION
-|  |  row-size=12B cardinality=198
+|  |  row-size=12B cardinality=20
 |  |
 |  |--09:SELECT
-|  |  |  predicates: row_number() < 100
-|  |  |  row-size=27B cardinality=99
+|  |  |  predicates: id IS NOT NULL, row_number() < 100
+|  |  |  row-size=27B cardinality=10
 |  |  |
 |  |  08:ANALYTIC
 |  |  |  functions: row_number()
@@ -1842,8 +1846,8 @@ PLAN-ROOT SINK
 |  |     row-size=19B cardinality=11.00K
 |  |
 |  05:SELECT
-|  |  predicates: row_number() < 100
-|  |  row-size=27B cardinality=99
+|  |  predicates: id IS NOT NULL, row_number() < 100
+|  |  row-size=27B cardinality=10
 |  |
 |  04:ANALYTIC
 |  |  functions: row_number()
@@ -1862,6 +1866,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.id IS NOT NULL
    runtime filters: RF000 -> functional.alltypesagg.id
    row-size=95B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
@@ -1878,14 +1883,14 @@ PLAN-ROOT SINK
 |  |
 |  10:AGGREGATE [FINALIZE]
 |  |  group by: ID, RNK
-|  |  row-size=12B cardinality=198
+|  |  row-size=12B cardinality=20
 |  |
 |  01:UNION
-|  |  row-size=12B cardinality=198
+|  |  row-size=12B cardinality=20
 |  |
 |  |--09:SELECT
-|  |  |  predicates: row_number() < 100
-|  |  |  row-size=27B cardinality=99
+|  |  |  predicates: id IS NOT NULL, row_number() < 100
+|  |  |  row-size=27B cardinality=10
 |  |  |
 |  |  08:ANALYTIC
 |  |  |  functions: row_number()
@@ -1907,8 +1912,8 @@ PLAN-ROOT SINK
 |  |     row-size=19B cardinality=11.00K
 |  |
 |  05:SELECT
-|  |  predicates: row_number() < 100
-|  |  row-size=27B cardinality=99
+|  |  predicates: id IS NOT NULL, row_number() < 100
+|  |  row-size=27B cardinality=10
 |  |
 |  04:ANALYTIC
 |  |  functions: row_number()
@@ -1931,6 +1936,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.id IS NOT NULL
    runtime filters: RF000 -> functional.alltypesagg.id
    row-size=95B cardinality=11.00K
 ====
@@ -1947,11 +1953,11 @@ PLAN-ROOT SINK
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypesagg.id = id
 |  runtime filters: RF000 <- id
-|  row-size=126B cardinality=106
+|  row-size=126B cardinality=11
 |
 |--06:SELECT
-|  |  predicates: row_number() < 100
-|  |  row-size=31B cardinality=99
+|  |  predicates: id IS NOT NULL, row_number() < 100
+|  |  row-size=31B cardinality=10
 |  |
 |  05:ANALYTIC
 |  |  functions: row_number()
@@ -1978,6 +1984,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.id IS NOT NULL
    runtime filters: RF000 -> functional.alltypesagg.id
    row-size=95B cardinality=11.00K
 ---- DISTRIBUTEDPLAN
@@ -1988,13 +1995,13 @@ PLAN-ROOT SINK
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: functional.alltypesagg.id = id
 |  runtime filters: RF000 <- id
-|  row-size=126B cardinality=106
+|  row-size=126B cardinality=11
 |
 |--11:EXCHANGE [BROADCAST]
 |  |
 |  06:SELECT
-|  |  predicates: row_number() < 100
-|  |  row-size=31B cardinality=99
+|  |  predicates: id IS NOT NULL, row_number() < 100
+|  |  row-size=31B cardinality=10
 |  |
 |  05:ANALYTIC
 |  |  functions: row_number()
@@ -2029,6 +2036,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.id IS NOT NULL
    runtime filters: RF000 -> functional.alltypesagg.id
    row-size=95B cardinality=11.00K
 ====
