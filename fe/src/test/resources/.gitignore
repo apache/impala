@@ -7,10 +7,12 @@ sentry-site*.xml
 yarn-site.xml
 copy-mem-limit-test-*.xml
 hive-site-events-cleanup/
+hive-site-events-config/
 hive-site-ranger-auth/
 hive-site-housekeeping-on/
 hive-site-without-hms/
 hive-site_events_cleanup.xml
+hive-site_events_config.xml
 hive-site_ranger_auth.xml
 hive-site_housekeeping_on.xml
 hive-site_without_hms.xml
