@@ -29,6 +29,9 @@ set -euo pipefail
 setup_report_build_error
 
 export IMPALA_MAVEN_OPTIONS="-U"
+# Minimize debug info because we don't use it and it significantly increases link memory
+# usage, which is causing OOM issues on Jenkins.
+export IMPALA_MINIMAL_DEBUG_INFO=true
 
 . bin/impala-config.sh > /dev/null 2>&1
 
