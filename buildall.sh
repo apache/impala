@@ -424,7 +424,7 @@ bootstrap_dependencies() {
 
   # Populate necessary thirdparty components unless it's set to be skipped.
   if [[ "${SKIP_TOOLCHAIN_BOOTSTRAP}" = true ]]; then
-    if ! [ -z "${NATIVE_TOOLCHAIN_HOME}" ]; then
+    if ! [ -z "${NATIVE_TOOLCHAIN_HOME-}" ]; then
       if ! [ -d "${NATIVE_TOOLCHAIN_HOME}" ]; then
         mkdir -p "${NATIVE_TOOLCHAIN_HOME}"
         pushd "${NATIVE_TOOLCHAIN_HOME}"
