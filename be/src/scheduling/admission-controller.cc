@@ -1651,19 +1651,29 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
       return Status::Expected(rejected_msg);
     }
 
-    int64_t bytes_inuse = TcmallocMetric::BYTES_IN_USE->GetValue();
-    if (!is_trivial && AdmissiondEnv::GetInstance() != nullptr
-        && AdmissiondEnv::GetInstance()->admission_service_mem_limit() > 0
-        && bytes_inuse > AdmissiondEnv::GetInstance()->admission_service_mem_limit()) {
-      queue_node->not_admitted_reason = Substitute(REASON_EXCEED_MEMORY_LIMIT,
-          bytes_inuse, AdmissiondEnv::GetInstance()->admission_service_mem_limit());
-      request.summary_profile->AddInfoString(
-          PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_REJECTED);
-      stats->metrics()->total_rejected->Increment(1);
-      const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_REJECTED,
-          queue_node->pool_name, queue_node->not_admitted_reason);
-      VLOG_QUERY << "query_id=" << PrintId(request.query_id) << " " << rejected_msg.msg();
-      return Status::Expected(rejected_msg);
+    if (AdmissiondEnv::GetInstance() != nullptr) {
+      // See RegisterMemoryMetrics() in memory-metrics.cc for where the relevant metrics
+      // are registered.
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+      DCHECK(SanitizerMallocMetric::BYTES_ALLOCATED != nullptr);
+      int64_t bytes_inuse = SanitizerMallocMetric::BYTES_ALLOCATED->GetValue();
+#else
+      DCHECK(TcmallocMetric::BYTES_IN_USE != nullptr);
+      int64_t bytes_inuse = TcmallocMetric::BYTES_IN_USE->GetValue();
+#endif
+      if (!is_trivial && AdmissiondEnv::GetInstance()->admission_service_mem_limit() > 0
+          && bytes_inuse > AdmissiondEnv::GetInstance()->admission_service_mem_limit()) {
+        queue_node->not_admitted_reason = Substitute(REASON_EXCEED_MEMORY_LIMIT,
+            bytes_inuse, AdmissiondEnv::GetInstance()->admission_service_mem_limit());
+        request.summary_profile->AddInfoString(
+            PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_REJECTED);
+        stats->metrics()->total_rejected->Increment(1);
+        const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_REJECTED,
+            queue_node->pool_name, queue_node->not_admitted_reason);
+        VLOG_QUERY << "query_id=" << PrintId(request.query_id) << " "
+                   << rejected_msg.msg();
+        return Status::Expected(rejected_msg);
+      }
     }
 
     string user;
