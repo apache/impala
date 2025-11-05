@@ -177,12 +177,19 @@ public class CalciteRelNodeConverter implements CompilerStep {
     for (SqlNode selectItem : getSelectList(validatedNode)) {
       String fieldName = SqlValidatorUtil.alias(selectItem, 0);
       if (fieldName.startsWith("EXPR$")) {
-        // If it's a Calcite generated field name, it will be of the form "EXPR$"
-        // We get the actual SQL expression using the toSqlString method. There
-        // is no Impala Dialect yet, so using MySql dialect to get the field
-        // name. The language chosen is irrelevant because we only are using it
-        // to grab the expression as/is to use for the label.
-        fieldName = selectItem.toSqlString(MysqlSqlDialect.DEFAULT).getSql();
+        try {
+          // If it's a Calcite generated field name, it will be of the form "EXPR$"
+          // We get the actual SQL expression using the toSqlString method. There
+          // is no Impala Dialect yet, so using MySql dialect to get the field
+          // name. The language chosen is irrelevant because we only are using it
+          // to grab the expression as/is to use for the label.
+          fieldName = selectItem.toSqlString(MysqlSqlDialect.DEFAULT).getSql();
+        } catch (Error e) {
+          // The MysqlDialect may throw an exception if the column name is not
+          // compatible with Mysql.  So we catch the exception and just use the
+          // EXPR$ column name.
+          LOG.debug("Could not use label for {}, using default.", selectItem);
+        }
       }
       fieldNamesBuilder.add(fieldName.toLowerCase());
     }

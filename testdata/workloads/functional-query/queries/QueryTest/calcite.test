@@ -1122,6 +1122,14 @@ int
 row_regex: .*PlannerType: CalcitePlanner.*
 ====
 ---- QUERY
+# IMPALA-14561: Should not be using MySqlDialect to capture labels
+select timestamp_col + interval 3 milliseconds from functional.alltypestiny;
+---- LABELS
+expr$0
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+====
+---- QUERY
 select cast('nan' as double), cast('inf' as float);
 ---- RESULTS
 NaN,Inf
