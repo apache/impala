@@ -21,14 +21,14 @@ INT,INT
 create table tab (x int, y boolean, primary key(x, y))
   partition by hash (x) partitions 3 stored as kudu
 ---- CATCH
-NonRecoverableException: key column may not have type of BOOL, FLOAT, or DOUBLE
+NonRecoverableException: key column may not have type of BOOL, FLOAT, DOUBLE, or NESTED
 ====
 ---- QUERY
 # Float primary key column
 create table tab (x int, y float, primary key(x, y))
   partition by hash (x) partitions 3 stored as kudu
 ---- CATCH
-NonRecoverableException: key column may not have type of BOOL, FLOAT, or DOUBLE
+NonRecoverableException: key column may not have type of BOOL, FLOAT, DOUBLE, or NESTED
 ====
 ---- QUERY
 # Primary keys should be declared first
@@ -631,21 +631,21 @@ ImpalaRuntimeException: Kudu NON UNIQUE PRIMARY KEY columns must be specified as
 create table non_unique_key_create_tbl10 (x boolean non unique primary key)
   partition by hash(x) partitions 8 stored as kudu
 ---- CATCH
-NonRecoverableException: key column may not have type of BOOL, FLOAT, or DOUBLE
+NonRecoverableException: key column may not have type of BOOL, FLOAT, DOUBLE, or NESTED
 ====
 ---- QUERY
 # Non unique primary key cannot be float type
 create table non_unique_key_create_tbl11 (x float non unique primary key)
   partition by hash(x) partitions 8 stored as kudu
 ---- CATCH
-NonRecoverableException: key column may not have type of BOOL, FLOAT, or DOUBLE
+NonRecoverableException: key column may not have type of BOOL, FLOAT, DOUBLE, or NESTED
 ====
 ---- QUERY
 # Non unique primary key cannot be double type
 create table non_unique_key_create_tbl12 (x double non unique primary key)
   partition by hash(x) partitions 8 stored as kudu
 ---- CATCH
-NonRecoverableException: key column may not have type of BOOL, FLOAT, or DOUBLE
+NonRecoverableException: key column may not have type of BOOL, FLOAT, DOUBLE, or NESTED
 ====
 ---- QUERY
 # Cannot create a Kudu table without any key and partition
