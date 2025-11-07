@@ -21,6 +21,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.impala.calcite.operators.ImpalaRexSimplify;
@@ -33,6 +34,7 @@ import java.util.List;
  * ImpalaProjectSimplifyRule calls the given ImpalaRexSimplify.simplify()
  * method (derived from Calcite's RexSimplify) for all the columns in the
  * Project RelNode.
+ * It also calls ImpalaRexExecutor.reduce() which does constant folding.
  */
 public class ImpalaProjectSimplifyRule extends RelOptRule {
 
@@ -48,6 +50,7 @@ public class ImpalaProjectSimplifyRule extends RelOptRule {
     Project projectRel = call.rel(0);
     RelOptCluster cluster = projectRel.getCluster();
     RexBuilder rexBuilder = cluster.getRexBuilder();
+    RexExecutor executor = simplifier_.getRexExecutor();
 
     List<RexNode> newProjects = new ArrayList<>();
     boolean projectChanged = false;
@@ -66,13 +69,17 @@ public class ImpalaProjectSimplifyRule extends RelOptRule {
       newProjects.add(newProject);
     }
 
-    if (!projectChanged) {
+    List<RexNode> reducedExprs = new ArrayList<>();
+    executor.reduce(rexBuilder, newProjects, reducedExprs);
+
+    if (!projectChanged &&
+        RexUtil.strings(projectRel.getProjects()).equals(RexUtil.strings(reducedExprs))) {
       return;
     }
 
     // only create the new project if any projects changed.
     Project newProjectRel = projectRel.copy(projectRel.getTraitSet(),
-        projectRel.getInput(0), newProjects, projectRel.getRowType());
+        projectRel.getInput(0), reducedExprs, projectRel.getRowType());
     call.transformTo(newProjectRel);
   }
 }

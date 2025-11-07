@@ -226,7 +226,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=655.54MB mem-reservation=84.00MB thread-reservation=1 runtime-filters-memory=8.00MB
 |  max-parallelism=1 segment-costs=[302290304, 598660544, 367, 135, 1936]
 PLAN-ROOT SINK
-|  output exprs: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY, concat(concat('HARMSTORF', ','), 'USPS'), CAST(2002 AS INT), sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
+|  output exprs: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY, 'HARMSTORF,USPS', CAST(2002 AS INT), sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1936
 |
 22:TOP-N [LIMIT=100]
@@ -306,13 +306,13 @@ PLAN-ROOT SINK
 |  |
 |  |--14:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
-|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
 |  |     tuple-ids=15 row-size=8B cardinality=8.64K cost=17236
 |  |     in pipelines: 14(GETNEXT)
@@ -411,13 +411,13 @@ PLAN-ROOT SINK
 |
 |--04:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |     HDFS partitions=1/1 files=1 size=1.31MB
-|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
 |     tuple-ids=4 row-size=8B cardinality=8.64K cost=17236
 |     in pipelines: 04(GETNEXT)
@@ -464,7 +464,7 @@ F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.27MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[2003] cpu-comparison-result=104 [max(1 (self) vs 104 (sum children))]
 PLAN-ROOT SINK
-|  output exprs: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY, concat(concat('HARMSTORF', ','), 'USPS'), CAST(2002 AS INT), sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
+|  output exprs: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY, 'HARMSTORF,USPS', CAST(2002 AS INT), sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1936
 |
 37:MERGING-EXCHANGE [UNPARTITIONED]
@@ -636,13 +636,13 @@ max-parallelism=60 segment-costs=[14381, 14381, 367, 1836] cpu-comparison-result
 |  |  max-parallelism=1 segment-costs=[17609]
 |  |  14:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
-|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
 |  |     tuple-ids=15 row-size=8B cardinality=8.64K cost=17236
 |  |     in pipelines: 14(GETNEXT)
@@ -825,13 +825,13 @@ max-parallelism=40 segment-costs=[302259135, 86917] cpu-comparison-result=44 [ma
 |  max-parallelism=1 segment-costs=[17609]
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.31MB
-|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
 |     tuple-ids=4 row-size=8B cardinality=8.64K cost=17236
 |     in pipelines: 04(GETNEXT)
@@ -895,7 +895,7 @@ F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.27MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[2003] cpu-comparison-result=104 [max(1 (self) vs 104 (sum children))]
 PLAN-ROOT SINK
-|  output exprs: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY, concat(concat('HARMSTORF', ','), 'USPS'), CAST(2002 AS INT), sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
+|  output exprs: W_WAREHOUSE_NAME, W_WAREHOUSE_SQ_FT, W_CITY, W_COUNTY, W_STATE, W_COUNTRY, 'HARMSTORF,USPS', CAST(2002 AS INT), sum(JAN_SALES), sum(FEB_SALES), sum(MAR_SALES), sum(APR_SALES), sum(MAY_SALES), sum(JUN_SALES), sum(JUL_SALES), sum(AUG_SALES), sum(SEP_SALES), sum(OCT_SALES), sum(NOV_SALES), sum(DEC_SALES), sum(divide(JAN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(FEB_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(APR_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(MAY_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUN_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(JUL_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(AUG_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(SEP_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(OCT_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(NOV_SALES, W_WAREHOUSE_SQ_FT)), sum(divide(DEC_SALES, W_WAREHOUSE_SQ_FT)), sum(JAN_NET), sum(FEB_NET), sum(MAR_NET), sum(APR_NET), sum(MAY_NET), sum(JUN_NET), sum(JUL_NET), sum(AUG_NET), sum(SEP_NET), sum(OCT_NET), sum(NOV_NET), sum(DEC_NET)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=1936
 |
 37:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1067,13 +1067,13 @@ max-parallelism=60 segment-costs=[14381, 14381, 367, 1836] cpu-comparison-result
 |  |  max-parallelism=1 segment-costs=[17609]
 |  |  14:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
-|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
 |  |     tuple-ids=15 row-size=8B cardinality=8.64K cost=17236
 |  |     in pipelines: 14(GETNEXT)
@@ -1256,13 +1256,13 @@ max-parallelism=40 segment-costs=[302259135, 86917] cpu-comparison-result=44 [ma
 |  max-parallelism=1 segment-costs=[17609]
 |  04:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.31MB
-|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= add(CAST(24285 AS INT), CAST(28800 AS INT)), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_time <= CAST(53085 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time >= CAST(24285 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
 |     tuple-ids=4 row-size=8B cardinality=8.64K cost=17236
 |     in pipelines: 04(GETNEXT)

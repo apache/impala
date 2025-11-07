@@ -116,27 +116,27 @@ PLAN-ROOT SINK
 |  |
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
 |     HDFS partitions=1/1 files=1 size=33.54MB
-|     predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.item_1.i_manufact, RF000[bloom] -> tpcds_partitioned_parquet_snap.item_1.i_manufact
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=101.54K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=4 row-size=27B cardinality=35.95K cost=109623
 |     in pipelines: 02(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.item]
    HDFS partitions=1/1 files=1 size=33.54MB
-   predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
+   predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
    stored statistics:
      table: rows=360.00K size=33.54MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=101.54K
-   parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
-   parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
+   parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
+   parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=62B cardinality=36.00K cost=217970
    in pipelines: 00(GETNEXT)
@@ -278,27 +278,27 @@ max-parallelism=4 segment-costs=[1336328, 993469] cpu-comparison-result=12 [max(
 |  |
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
-|     predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.item_1.i_manufact, RF000[bloom] -> tpcds_partitioned_parquet_snap.item_1.i_manufact
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=101.54K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=4 row-size=27B cardinality=35.95K cost=109623
 |     in pipelines: 02(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
    HDFS partitions=1/1 files=1 size=33.54MB
-   predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
+   predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
    stored statistics:
      table: rows=360.00K size=33.54MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=101.54K
-   parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
-   parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
+   parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
+   parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=62B cardinality=36.00K cost=217970
    in pipelines: 00(GETNEXT)
@@ -440,27 +440,27 @@ max-parallelism=4 segment-costs=[1336328, 993469] cpu-comparison-result=12 [max(
 |  |
 |  02:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=33.54MB
-|     predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
 |     runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.item_1.i_manufact, RF000[bloom] -> tpcds_partitioned_parquet_snap.item_1.i_manufact
 |     stored statistics:
 |       table: rows=360.00K size=33.54MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=101.54K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.item_1.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact_id >= CAST(732 AS INT), tpcds_partitioned_parquet_snap.item_1.i_manufact IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=4 row-size=27B cardinality=35.95K cost=109623
 |     in pipelines: 02(GETNEXT)
 |
 00:SCAN HDFS [tpcds_partitioned_parquet_snap.item, RANDOM]
    HDFS partitions=1/1 files=1 size=33.54MB
-   predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
+   predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
    stored statistics:
      table: rows=360.00K size=33.54MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=101.54K
-   parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
-   parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= add(CAST(732 AS INT), CAST(40 AS INT)), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
+   parquet statistics predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
+   parquet dictionary predicates: tpcds_partitioned_parquet_snap.item.i_manufact_id <= CAST(772 AS INT), tpcds_partitioned_parquet_snap.item.i_manufact_id >= CAST(732 AS INT)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=62B cardinality=36.00K cost=217970
    in pipelines: 00(GETNEXT)

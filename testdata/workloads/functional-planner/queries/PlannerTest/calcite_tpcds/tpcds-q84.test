@@ -54,13 +54,13 @@ PLAN-ROOT SINK
 |  |
 |  |--08:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band]
 |  |     HDFS partitions=1/1 files=1 size=1.22KB
-|  |     predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= add(CAST(55019 AS BIGINT), CAST(50000 AS BIGINT)), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= CAST(105019 AS BIGINT), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= add(CAST(55019 AS BIGINT), CAST(50000 AS BIGINT)), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= CAST(105019 AS BIGINT), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
 |  |     tuple-ids=10 row-size=12B cardinality=2 cost=5
 |  |     in pipelines: 08(GETNEXT)
@@ -234,13 +234,13 @@ max-parallelism=30 segment-costs=[252437311, 199] cpu-comparison-result=51 [max(
 |  |  max-parallelism=1 segment-costs=[5]
 |  |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.22KB
-|  |     predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= add(CAST(55019 AS BIGINT), CAST(50000 AS BIGINT)), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= CAST(105019 AS BIGINT), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= add(CAST(55019 AS BIGINT), CAST(50000 AS BIGINT)), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= CAST(105019 AS BIGINT), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
 |  |     tuple-ids=10 row-size=12B cardinality=2 cost=5
 |  |     in pipelines: 08(GETNEXT)
@@ -467,13 +467,13 @@ max-parallelism=30 segment-costs=[252437311, 199] cpu-comparison-result=51 [max(
 |  |  max-parallelism=1 segment-costs=[5]
 |  |  08:SCAN HDFS [tpcds_partitioned_parquet_snap.income_band, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.22KB
-|  |     predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= add(CAST(55019 AS BIGINT), CAST(50000 AS BIGINT)), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= CAST(105019 AS BIGINT), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=20 size=1.22KB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=20
 |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= add(CAST(55019 AS BIGINT), CAST(50000 AS BIGINT)), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.income_band.ib_lower_bound >= CAST(55019 AS INT), CAST(tpcds_partitioned_parquet_snap.income_band.ib_upper_bound AS BIGINT) <= CAST(105019 AS BIGINT), tpcds_partitioned_parquet_snap.income_band.ib_income_band_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
 |  |     tuple-ids=10 row-size=12B cardinality=2 cost=5
 |  |     in pipelines: 08(GETNEXT)

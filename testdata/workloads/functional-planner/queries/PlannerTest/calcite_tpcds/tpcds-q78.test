@@ -261,7 +261,7 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=373(filtered from 1823)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=32B cardinality=1.69G(filtered from 8.25G) cost=777383559
    in pipelines: 00(GETNEXT)
@@ -671,7 +671,7 @@ max-parallelism=373 segment-costs=[13637417386, 6084106052] cpu-comparison-resul
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=373(filtered from 1823)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=32B cardinality=1.69G(filtered from 8.25G) cost=777383559
    in pipelines: 00(GETNEXT)
@@ -1105,7 +1105,7 @@ max-parallelism=373 segment-costs=[5123173596]
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=373(filtered from 1823)
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=32B cardinality=1.69G(filtered from 8.25G) cost=777383559
    in pipelines: 00(GETNEXT)

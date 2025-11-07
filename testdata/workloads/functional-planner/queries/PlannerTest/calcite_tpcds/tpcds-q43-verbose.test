@@ -114,7 +114,7 @@ SumCost: cost-total=3058023158 max-instances=306 adj-instances=120 cost/inst=254
        table: rows=8.64G size=389.90GB
        partitions: 1823/1823 rows=8.25G
        columns: all
-     extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=373(filtered from 1823)
+     extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=373(filtered from 1823)
      parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
      file formats: [PARQUET]
      mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0

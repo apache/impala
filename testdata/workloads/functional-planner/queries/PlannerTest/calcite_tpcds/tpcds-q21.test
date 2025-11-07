@@ -36,7 +36,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=338.11MB mem-reservation=44.00MB thread-reservation=1 runtime-filters-memory=3.00MB
 |  max-parallelism=1 segment-costs=[598909237, 4080496, 400]
 PLAN-ROOT SINK
-|  output exprs: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id, sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END)
+|  output exprs: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id, sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=400
 |
 08:TOP-N [LIMIT=100]
@@ -46,9 +46,9 @@ PLAN-ROOT SINK
 |  in pipelines: 08(GETNEXT), 07(OPEN)
 |
 07:AGGREGATE [FINALIZE]
-|  output: sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < CAST('2000-05-22' AS DATE) THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
+|  output: sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
 |  group by: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id
-|  having: CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END <= CAST(divide(CAST(3.0 AS DECIMAL(2,1)), CAST(2.0 AS DECIMAL(2,1))) AS DOUBLE), CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END >= CAST(divide(CAST(2.0 AS DECIMAL(2,1)), CAST(3.0 AS DECIMAL(2,1))) AS DOUBLE)
+|  having: CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END <= CAST(1.500000 AS DOUBLE), CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END >= CAST(0.666667 AS DOUBLE)
 |  mem-estimate=312.36MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=8 row-size=72B cardinality=389.70K cost=166829332
 |  in pipelines: 07(GETNEXT), 00(OPEN)
@@ -83,13 +83,13 @@ PLAN-ROOT SINK
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
-|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= CAST('2000-05-22' AS DATE) + INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) - INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= DATE '2000-06-21', tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-04-22', tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= CAST('2000-05-22' AS DATE) + INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) - INTERVAL CAST(30 AS INT) DAY
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= CAST('2000-05-22' AS DATE) + INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) - INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= DATE '2000-06-21', tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-04-22'
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= DATE '2000-06-21', tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-04-22', tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
 |     tuple-ids=4 row-size=8B cardinality=7.30K cost=14573
 |     in pipelines: 03(GETNEXT)
@@ -124,7 +124,7 @@ PLAN-ROOT SINK
      table: rows=1.03G size=5.10GB
      partitions: 261/261 rows=1.03G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=3.99M
+   extrapolated-rows=disabled max-scan-range-rows=3.98M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.inventory.inv_item_sk IS NOT NULL, tpcds_partitioned_parquet_snap.inventory.inv_warehouse_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=103.30M(filtered from 1.03G) cost=296218296
@@ -136,7 +136,7 @@ F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.15MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[439] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
 PLAN-ROOT SINK
-|  output exprs: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id, sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END)
+|  output exprs: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id, sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=400
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -156,9 +156,9 @@ max-parallelism=20 segment-costs=[192518093, 4080496, 220] cpu-comparison-result
 |  in pipelines: 08(GETNEXT), 13(OPEN)
 |
 13:AGGREGATE [FINALIZE]
-|  output: sum:merge(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END), sum:merge(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END)
+|  output: sum:merge(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END), sum:merge(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END)
 |  group by: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id
-|  having: CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END <= CAST(divide(CAST(3.0 AS DECIMAL(2,1)), CAST(2.0 AS DECIMAL(2,1))) AS DOUBLE), CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END >= CAST(divide(CAST(2.0 AS DECIMAL(2,1)), CAST(3.0 AS DECIMAL(2,1))) AS DOUBLE)
+|  having: CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END <= CAST(1.500000 AS DOUBLE), CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END >= CAST(0.666667 AS DOUBLE)
 |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=8 row-size=72B cardinality=389.70K cost=151501037
 |  in pipelines: 13(GETNEXT), 00(OPEN)
@@ -173,7 +173,7 @@ Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-res
 Per-Instance Resources: mem-estimate=78.40MB mem-reservation=34.25MB thread-reservation=1
 max-parallelism=110 segment-costs=[1000795346, 477822738] cpu-comparison-result=110 [max(110 (self) vs 36 (sum children))]
 07:AGGREGATE [STREAMING]
-|  output: sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < CAST('2000-05-22' AS DATE) THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
+|  output: sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
 |  group by: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id
 |  mem-estimate=56.46MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=8 row-size=72B cardinality=92.69M cost=568928111
@@ -243,13 +243,13 @@ max-parallelism=110 segment-costs=[1000795346, 477822738] cpu-comparison-result=
 |  max-parallelism=1 segment-costs=[14888]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
-|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= CAST('2000-05-22' AS DATE) + INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) - INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= DATE '2000-06-21', tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-04-22', tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= CAST('2000-05-22' AS DATE) + INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) - INTERVAL CAST(30 AS INT) DAY
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= CAST('2000-05-22' AS DATE) + INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) - INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= DATE '2000-06-21', tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-04-22'
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= DATE '2000-06-21', tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-04-22', tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
 |     tuple-ids=4 row-size=8B cardinality=7.30K cost=14573
 |     in pipelines: 03(GETNEXT)
@@ -301,7 +301,7 @@ max-parallelism=110 segment-costs=[1000795346, 477822738] cpu-comparison-result=
      table: rows=1.03G size=5.10GB
      partitions: 261/261 rows=1.03G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=3.99M
+   extrapolated-rows=disabled max-scan-range-rows=3.98M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.inventory.inv_item_sk IS NOT NULL, tpcds_partitioned_parquet_snap.inventory.inv_warehouse_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=103.30M(filtered from 1.03G) cost=296218296
@@ -313,7 +313,7 @@ F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.15MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=1 segment-costs=[439] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
 PLAN-ROOT SINK
-|  output exprs: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id, sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END)
+|  output exprs: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id, sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END), sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0 cost=400
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -333,9 +333,9 @@ max-parallelism=20 segment-costs=[192518093, 4080496, 220] cpu-comparison-result
 |  in pipelines: 08(GETNEXT), 13(OPEN)
 |
 13:AGGREGATE [FINALIZE]
-|  output: sum:merge(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END), sum:merge(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END)
+|  output: sum:merge(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END), sum:merge(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END)
 |  group by: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id
-|  having: CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END <= CAST(divide(CAST(3.0 AS DECIMAL(2,1)), CAST(2.0 AS DECIMAL(2,1))) AS DOUBLE), CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END >= CAST(divide(CAST(2.0 AS DECIMAL(2,1)), CAST(3.0 AS DECIMAL(2,1))) AS DOUBLE)
+|  having: CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END <= CAST(1.500000 AS DOUBLE), CASE WHEN sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) > CAST(0 AS BIGINT) THEN divide(CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE), CAST(sum(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE 0 END) AS DOUBLE)) ELSE NULL END >= CAST(0.666667 AS DOUBLE)
 |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=8 row-size=72B cardinality=389.70K cost=151501037
 |  in pipelines: 13(GETNEXT), 00(OPEN)
@@ -350,7 +350,7 @@ Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-res
 Per-Instance Resources: mem-estimate=78.40MB mem-reservation=34.25MB thread-reservation=1
 max-parallelism=110 segment-costs=[1000795346, 477822738] cpu-comparison-result=110 [max(110 (self) vs 36 (sum children))]
 07:AGGREGATE [STREAMING]
-|  output: sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < CAST('2000-05-22' AS DATE) THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
+|  output: sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date < DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT)), sum(CAST(CASE WHEN tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-05-22' THEN tpcds_partitioned_parquet_snap.inventory.inv_quantity_on_hand ELSE CAST(0 AS INT) END AS BIGINT))
 |  group by: tpcds_partitioned_parquet_snap.warehouse.w_warehouse_name, tpcds_partitioned_parquet_snap.item.i_item_id
 |  mem-estimate=56.46MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=8 row-size=72B cardinality=92.69M cost=568928111
@@ -420,13 +420,13 @@ max-parallelism=110 segment-costs=[1000795346, 477822738] cpu-comparison-result=
 |  max-parallelism=1 segment-costs=[14888]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
-|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= CAST('2000-05-22' AS DATE) + INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) - INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= DATE '2000-06-21', tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-04-22', tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= CAST('2000-05-22' AS DATE) + INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) - INTERVAL CAST(30 AS INT) DAY
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= CAST('2000-05-22' AS DATE) + INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date >= CAST('2000-05-22' AS DATE) - INTERVAL CAST(30 AS INT) DAY, tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= DATE '2000-06-21', tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-04-22'
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_date <= DATE '2000-06-21', tpcds_partitioned_parquet_snap.date_dim.d_date >= DATE '2000-04-22', tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
 |     tuple-ids=4 row-size=8B cardinality=7.30K cost=14573
 |     in pipelines: 03(GETNEXT)
@@ -478,7 +478,7 @@ max-parallelism=110 segment-costs=[1000795346, 477822738] cpu-comparison-result=
      table: rows=1.03G size=5.10GB
      partitions: 261/261 rows=1.03G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=3.99M
+   extrapolated-rows=disabled max-scan-range-rows=3.98M
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.inventory.inv_item_sk IS NOT NULL, tpcds_partitioned_parquet_snap.inventory.inv_warehouse_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=103.30M(filtered from 1.03G) cost=296218296

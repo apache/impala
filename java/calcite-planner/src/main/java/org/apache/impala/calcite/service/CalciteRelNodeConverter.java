@@ -53,6 +53,8 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.impala.calcite.operators.ImpalaConvertletTable;
 import org.apache.impala.calcite.rules.ImpalaCoreRules;
+import org.apache.impala.calcite.rules.ImpalaRexExecutor;
+import org.apache.impala.calcite.rules.RemoveUnraggedCharCastRexExecutor;
 import org.apache.impala.calcite.schema.ImpalaRelMetadataProvider;
 import org.apache.impala.calcite.util.LogUtil;
 
@@ -87,6 +89,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
     this.sqlValidator_ = analysisResult.getSqlValidator();
     this.planner_ = new VolcanoPlanner();
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
+    planner_.setExecutor(new RemoveUnraggedCharCastRexExecutor());
     cluster_ =
         RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
     viewExpander_ = createViewExpander(
@@ -100,6 +103,7 @@ public class CalciteRelNodeConverter implements CompilerStep {
     this.sqlValidator_ = validator.getSqlValidator();
     this.planner_ = new VolcanoPlanner();
     planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
+    planner_.setExecutor(new RemoveUnraggedCharCastRexExecutor());
     cluster_ =
         RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
     viewExpander_ = createViewExpander(validator.getCatalogReader()

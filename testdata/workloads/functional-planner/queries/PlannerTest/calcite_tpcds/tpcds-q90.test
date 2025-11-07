@@ -79,13 +79,13 @@ PLAN-ROOT SINK
 |  |
 |  |--11:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
-|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(add(CAST(19 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(add(CAST(19 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(add(CAST(19 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=13 row-size=8B cardinality=8.64K cost=17236
 |  |     in pipelines: 11(GETNEXT)
@@ -162,13 +162,13 @@ PLAN-ROOT SINK
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim]
 |     HDFS partitions=1/1 files=1 size=1.31MB
-|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(add(CAST(8 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(9 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(add(CAST(8 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(add(CAST(8 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(9 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(9 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=4 row-size=8B cardinality=8.64K cost=17236
 |     in pipelines: 03(GETNEXT)
@@ -330,13 +330,13 @@ PLAN-ROOT SINK
 |  |  max-parallelism=1 segment-costs=[17609]
 |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
-|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(add(CAST(19 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(add(CAST(19 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(add(CAST(19 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=13 row-size=8B cardinality=8.64K cost=17236
 |  |     in pipelines: 11(GETNEXT)
@@ -479,13 +479,13 @@ max-parallelism=80 segment-costs=[711368690, 123] cpu-comparison-result=80 [max(
 |  max-parallelism=1 segment-costs=[17609]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.31MB
-|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(add(CAST(8 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(9 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(add(CAST(8 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(add(CAST(8 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(9 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(9 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=4 row-size=8B cardinality=8.64K cost=17236
 |     in pipelines: 03(GETNEXT)
@@ -664,13 +664,13 @@ PLAN-ROOT SINK
 |  |  max-parallelism=1 segment-costs=[17609]
 |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=1.31MB
-|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(add(CAST(19 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=86.40K size=1.31MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(add(CAST(19 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(add(CAST(19 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim_0.t_hour <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_hour >= CAST(19 AS INT), tpcds_partitioned_parquet_snap.time_dim_0.t_time_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=13 row-size=8B cardinality=8.64K cost=17236
 |  |     in pipelines: 11(GETNEXT)
@@ -813,13 +813,13 @@ max-parallelism=80 segment-costs=[711368690, 123] cpu-comparison-result=80 [max(
 |  max-parallelism=1 segment-costs=[17609]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.time_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.31MB
-|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(add(CAST(8 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(9 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=86.40K size=1.31MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=86.40K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(add(CAST(8 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(add(CAST(8 AS SMALLINT), CAST(1 AS SMALLINT)) AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(9 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.time_dim.t_hour <= CAST(9 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_hour >= CAST(8 AS INT), tpcds_partitioned_parquet_snap.time_dim.t_time_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=4 row-size=8B cardinality=8.64K cost=17236
 |     in pipelines: 03(GETNEXT)

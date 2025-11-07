@@ -178,13 +178,13 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  |--130:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=146 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 130(GETNEXT)
@@ -215,13 +215,13 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  |--127:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=141 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 127(GETNEXT)
@@ -247,13 +247,13 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--124:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=137 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 124(GETNEXT)
@@ -265,7 +265,7 @@ PLAN-ROOT SINK
 |  |       table: rows=8.64G size=389.90GB
 |  |       partitions: 1823/1823 rows=8.25G
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=135 row-size=12B cardinality=8.25G cost=1425550548
 |  |     in pipelines: 123(GETNEXT)
@@ -369,13 +369,13 @@ PLAN-ROOT SINK
 |  |  |  |  |
 |  |  |  |  |--105:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
+|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
 |  |  |  |  |     stored statistics:
 |  |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |  |       columns: all
 |  |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT)
-|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
+|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT)
+|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
 |  |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |  |     tuple-ids=118 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |  |     in pipelines: 105(GETNEXT)
@@ -431,13 +431,13 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  |--99:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=111 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 99(GETNEXT)
@@ -451,7 +451,7 @@ PLAN-ROOT SINK
 |  |  |       table: rows=8.64G size=389.90GB
 |  |  |       partitions: 1823/1823 rows=8.25G
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_4.ss_item_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=109 row-size=8B cardinality=8.21G(filtered from 8.25G) cost=1182183990
@@ -493,13 +493,13 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--112:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=127 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 112(GETNEXT)
@@ -550,13 +550,13 @@ PLAN-ROOT SINK
 |  |
 |  |--91:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=103 row-size=12B cardinality=108 cost=18780
 |  |     in pipelines: 91(GETNEXT)
@@ -609,13 +609,13 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  |--86:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=95 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 86(GETNEXT)
@@ -646,13 +646,13 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  |--83:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=90 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 83(GETNEXT)
@@ -678,13 +678,13 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--80:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=86 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 80(GETNEXT)
@@ -696,7 +696,7 @@ PLAN-ROOT SINK
 |  |       table: rows=8.64G size=389.90GB
 |  |       partitions: 1823/1823 rows=8.25G
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=84 row-size=12B cardinality=8.25G cost=1425550548
 |  |     in pipelines: 79(GETNEXT)
@@ -800,13 +800,13 @@ PLAN-ROOT SINK
 |  |  |  |  |
 |  |  |  |  |--61:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
+|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
 |  |  |  |  |     stored statistics:
 |  |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |  |       columns: all
 |  |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT)
-|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
+|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT)
+|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
 |  |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |  |     tuple-ids=67 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |  |     in pipelines: 61(GETNEXT)
@@ -862,13 +862,13 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  |--55:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=60 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 55(GETNEXT)
@@ -882,7 +882,7 @@ PLAN-ROOT SINK
 |  |  |       table: rows=8.64G size=389.90GB
 |  |  |       partitions: 1823/1823 rows=8.25G
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_2.ss_item_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=58 row-size=8B cardinality=8.21G(filtered from 8.25G) cost=1182183990
@@ -924,13 +924,13 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--68:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=76 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 68(GETNEXT)
@@ -981,13 +981,13 @@ PLAN-ROOT SINK
 |  |
 |  |--47:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=52 row-size=12B cardinality=108 cost=18780
 |  |     in pipelines: 47(GETNEXT)
@@ -1035,13 +1035,13 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--42:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=45 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 42(GETNEXT)
@@ -1072,13 +1072,13 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--39:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=40 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 39(GETNEXT)
@@ -1104,13 +1104,13 @@ PLAN-ROOT SINK
 |  |
 |  |--36:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=36 row-size=8B cardinality=7.30K cost=14573
 |  |     in pipelines: 36(GETNEXT)
@@ -1122,7 +1122,7 @@ PLAN-ROOT SINK
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=34 row-size=12B cardinality=8.25G cost=1425550548
 |     in pipelines: 35(GETNEXT)
@@ -1226,13 +1226,13 @@ PLAN-ROOT SINK
 |  |  |  |
 |  |  |  |--17:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=17 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 17(GETNEXT)
@@ -1288,13 +1288,13 @@ PLAN-ROOT SINK
 |  |  |
 |  |  |--11:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=10 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 11(GETNEXT)
@@ -1308,7 +1308,7 @@ PLAN-ROOT SINK
 |  |       table: rows=8.64G size=389.90GB
 |  |       partitions: 1823/1823 rows=8.25G
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_item_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=8 row-size=8B cardinality=8.21G(filtered from 8.25G) cost=1182183990
@@ -1350,13 +1350,13 @@ PLAN-ROOT SINK
 |  |
 |  |--24:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=26 row-size=8B cardinality=7.30K cost=14573
 |  |     in pipelines: 24(GETNEXT)
@@ -1407,13 +1407,13 @@ PLAN-ROOT SINK
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.17MB
-|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=2 row-size=12B cardinality=108 cost=18780
 |     in pipelines: 03(GETNEXT)
@@ -1427,7 +1427,7 @@ PLAN-ROOT SINK
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=108(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=108(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=488.47M(filtered from 8.25G) cost=126269468
@@ -1594,13 +1594,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  130:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=146 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 130(GETNEXT)
@@ -1648,13 +1648,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  127:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=141 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 127(GETNEXT)
@@ -1697,13 +1697,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  124:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=137 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 124(GETNEXT)
@@ -1715,7 +1715,7 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |       table: rows=8.64G size=389.90GB
 |  |       partitions: 1823/1823 rows=8.25G
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=135 row-size=12B cardinality=8.25G cost=1425550548
 |  |     in pipelines: 123(GETNEXT)
@@ -1948,13 +1948,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  |  105:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
+|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
 |  |  |  |  |     stored statistics:
 |  |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |  |       columns: all
 |  |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT)
-|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
+|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT)
+|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
 |  |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |  |     tuple-ids=118 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |  |     in pipelines: 105(GETNEXT)
@@ -2059,13 +2059,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  99:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=111 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 99(GETNEXT)
@@ -2079,7 +2079,7 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |       table: rows=8.64G size=389.90GB
 |  |  |       partitions: 1823/1823 rows=8.25G
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_4.ss_item_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=109 row-size=8B cardinality=8.21G(filtered from 8.25G) cost=1182183990
@@ -2170,13 +2170,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  112:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=127 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 112(GETNEXT)
@@ -2261,13 +2261,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  max-parallelism=1 segment-costs=[18785]
 |  |  91:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=103 row-size=12B cardinality=108 cost=18780
 |  |     in pipelines: 91(GETNEXT)
@@ -2367,13 +2367,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  86:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=95 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 86(GETNEXT)
@@ -2421,13 +2421,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  83:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=90 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 83(GETNEXT)
@@ -2470,13 +2470,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  80:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=86 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 80(GETNEXT)
@@ -2488,7 +2488,7 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |       table: rows=8.64G size=389.90GB
 |  |       partitions: 1823/1823 rows=8.25G
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=84 row-size=12B cardinality=8.25G cost=1425550548
 |  |     in pipelines: 79(GETNEXT)
@@ -2721,13 +2721,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  |  61:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
+|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
 |  |  |  |  |     stored statistics:
 |  |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |  |       columns: all
 |  |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT)
-|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
+|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT)
+|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
 |  |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |  |     tuple-ids=67 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |  |     in pipelines: 61(GETNEXT)
@@ -2832,13 +2832,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  55:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=60 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 55(GETNEXT)
@@ -2852,7 +2852,7 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |       table: rows=8.64G size=389.90GB
 |  |  |       partitions: 1823/1823 rows=8.25G
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_2.ss_item_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=58 row-size=8B cardinality=8.21G(filtered from 8.25G) cost=1182183990
@@ -2943,13 +2943,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  68:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=76 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 68(GETNEXT)
@@ -3034,13 +3034,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  max-parallelism=1 segment-costs=[18785]
 |  |  47:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=52 row-size=12B cardinality=108 cost=18780
 |  |     in pipelines: 47(GETNEXT)
@@ -3135,13 +3135,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  42:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=45 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 42(GETNEXT)
@@ -3189,13 +3189,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  39:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=40 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 39(GETNEXT)
@@ -3238,13 +3238,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  max-parallelism=1 segment-costs=[14888]
 |  |  36:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=36 row-size=8B cardinality=7.30K cost=14573
 |  |     in pipelines: 36(GETNEXT)
@@ -3256,7 +3256,7 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=34 row-size=12B cardinality=8.25G cost=1425550548
 |     in pipelines: 35(GETNEXT)
@@ -3489,13 +3489,13 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=17 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 17(GETNEXT)
@@ -3600,13 +3600,13 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=10 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 11(GETNEXT)
@@ -3620,7 +3620,7 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
 |  |       table: rows=8.64G size=389.90GB
 |  |       partitions: 1823/1823 rows=8.25G
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_item_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=8 row-size=8B cardinality=8.21G(filtered from 8.25G) cost=1182183990
@@ -3711,13 +3711,13 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
 |  |  max-parallelism=1 segment-costs=[14888]
 |  |  24:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=26 row-size=8B cardinality=7.30K cost=14573
 |  |     in pipelines: 24(GETNEXT)
@@ -3802,13 +3802,13 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
 |  max-parallelism=1 segment-costs=[18785]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
-|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=2 row-size=12B cardinality=108 cost=18780
 |     in pipelines: 03(GETNEXT)
@@ -3822,7 +3822,7 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=108(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=108(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=488.47M(filtered from 8.25G) cost=126269468
@@ -3989,13 +3989,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  130:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_19.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_19.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=146 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 130(GETNEXT)
@@ -4043,13 +4043,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  127:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_18.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_18.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=141 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 127(GETNEXT)
@@ -4092,13 +4092,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  124:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_17.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_17.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=137 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 124(GETNEXT)
@@ -4110,7 +4110,7 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |       table: rows=8.64G size=389.90GB
 |  |       partitions: 1823/1823 rows=8.25G
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=135 row-size=12B cardinality=8.25G cost=1425550548
 |  |     in pipelines: 123(GETNEXT)
@@ -4343,13 +4343,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  |  105:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
+|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
 |  |  |  |  |     stored statistics:
 |  |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |  |       columns: all
 |  |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT)
-|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
+|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT)
+|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_15.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_15.d_date_sk IS NOT NULL
 |  |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |  |     tuple-ids=118 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |  |     in pipelines: 105(GETNEXT)
@@ -4454,13 +4454,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  99:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_14.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_14.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=111 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 99(GETNEXT)
@@ -4474,7 +4474,7 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |       table: rows=8.64G size=389.90GB
 |  |  |       partitions: 1823/1823 rows=8.25G
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_4.ss_item_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=109 row-size=8B cardinality=8.21G(filtered from 8.25G) cost=1182183990
@@ -4565,13 +4565,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  112:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_16.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_16.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=127 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 112(GETNEXT)
@@ -4656,13 +4656,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  max-parallelism=1 segment-costs=[18785]
 |  |  91:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_13.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_13.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=103 row-size=12B cardinality=108 cost=18780
 |  |     in pipelines: 91(GETNEXT)
@@ -4762,13 +4762,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  86:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_12.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_12.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=95 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 86(GETNEXT)
@@ -4816,13 +4816,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  83:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_11.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_11.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=90 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 83(GETNEXT)
@@ -4865,13 +4865,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  80:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_10.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_10.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=86 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 80(GETNEXT)
@@ -4883,7 +4883,7 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |       table: rows=8.64G size=389.90GB
 |  |       partitions: 1823/1823 rows=8.25G
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=84 row-size=12B cardinality=8.25G cost=1425550548
 |  |     in pipelines: 79(GETNEXT)
@@ -5116,13 +5116,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  |  61:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
+|  |  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
 |  |  |  |  |     stored statistics:
 |  |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |  |       columns: all
 |  |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT)
-|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
+|  |  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT)
+|  |  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_8.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_8.d_date_sk IS NOT NULL
 |  |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |  |     tuple-ids=67 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |  |     in pipelines: 61(GETNEXT)
@@ -5227,13 +5227,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  55:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_7.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_7.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=60 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 55(GETNEXT)
@@ -5247,7 +5247,7 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |       table: rows=8.64G size=389.90GB
 |  |  |       partitions: 1823/1823 rows=8.25G
 |  |  |       columns: all
-|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_2.ss_item_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=58 row-size=8B cardinality=8.21G(filtered from 8.25G) cost=1182183990
@@ -5338,13 +5338,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  68:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_9.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_9.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=76 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 68(GETNEXT)
@@ -5429,13 +5429,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  max-parallelism=1 segment-costs=[18785]
 |  |  47:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_6.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim_6.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=52 row-size=12B cardinality=108 cost=18780
 |  |     in pipelines: 47(GETNEXT)
@@ -5530,13 +5530,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  42:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_5.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_5.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=45 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 42(GETNEXT)
@@ -5584,13 +5584,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  39:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_4.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_4.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=40 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 39(GETNEXT)
@@ -5633,13 +5633,13 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |  |  max-parallelism=1 segment-costs=[14888]
 |  |  36:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_3.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_3.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=36 row-size=8B cardinality=7.30K cost=14573
 |  |     in pipelines: 36(GETNEXT)
@@ -5651,7 +5651,7 @@ max-parallelism=108 segment-costs=[31467972, 31467972, 31442780, 1151027, 322888
 |       table: rows=8.64G size=389.90GB
 |       partitions: 1823/1823 rows=8.25G
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=34 row-size=12B cardinality=8.25G cost=1425550548
 |     in pipelines: 35(GETNEXT)
@@ -5884,13 +5884,13 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
 |  |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  |  17:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
+|  |  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
 |  |  |  |     stored statistics:
 |  |  |  |       table: rows=73.05K size=2.17MB
 |  |  |  |       columns: all
 |  |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT)
-|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
+|  |  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT)
+|  |  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_1.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_1.d_date_sk IS NOT NULL
 |  |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |  |     tuple-ids=17 row-size=8B cardinality=7.30K cost=14573
 |  |  |  |     in pipelines: 17(GETNEXT)
@@ -5995,13 +5995,13 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
 |  |  |  max-parallelism=1 segment-costs=[14888]
 |  |  |  11:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
+|  |  |     predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
 |  |  |     stored statistics:
 |  |  |       table: rows=73.05K size=2.17MB
 |  |  |       columns: all
 |  |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT)
-|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
+|  |  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT)
+|  |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_0.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_0.d_date_sk IS NOT NULL
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |  |     tuple-ids=10 row-size=8B cardinality=7.30K cost=14573
 |  |  |     in pipelines: 11(GETNEXT)
@@ -6015,7 +6015,7 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
 |  |       table: rows=8.64G size=389.90GB
 |  |       partitions: 1823/1823 rows=8.25G
 |  |       columns: all
-|  |     extrapolated-rows=disabled max-scan-range-rows=12.22M
+|  |     extrapolated-rows=disabled max-scan-range-rows=12.24M
 |  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales_0.ss_item_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=8 row-size=8B cardinality=8.21G(filtered from 8.25G) cost=1182183990
@@ -6106,13 +6106,13 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
 |  |  max-parallelism=1 segment-costs=[14888]
 |  |  24:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.17MB
-|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
+|  |     predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.17MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT)
-|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
+|  |     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT)
+|  |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim_2.d_year <= CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_year >= CAST(1998 AS INT), tpcds_partitioned_parquet_snap.date_dim_2.d_date_sk IS NOT NULL
 |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |  |     tuple-ids=26 row-size=8B cardinality=7.30K cost=14573
 |  |     in pipelines: 24(GETNEXT)
@@ -6197,13 +6197,13 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
 |  max-parallelism=1 segment-costs=[18785]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.17MB
-|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     stored statistics:
 |       table: rows=73.05K size=2.17MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = add(CAST(1998 AS INT), CAST(2 AS INT)), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2000 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_moy = CAST(11 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
 |     tuple-ids=2 row-size=12B cardinality=108 cost=18780
 |     in pipelines: 03(GETNEXT)
@@ -6217,7 +6217,7 @@ max-parallelism=108 segment-costs=[1549560555, 50705571] cpu-comparison-result=3
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=12.22M est-scan-range=108(filtered from 1823)
+   extrapolated-rows=disabled max-scan-range-rows=12.24M est-scan-range=108(filtered from 1823)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_item_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=488.47M(filtered from 8.25G) cost=126269468

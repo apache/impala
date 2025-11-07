@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlPosixRegexOperator;
@@ -36,8 +37,10 @@ import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.IsNullPredicate;
+import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.TimestampArithmeticExpr;
 import org.apache.impala.calcite.operators.ImpalaInOperator;
+import org.apache.impala.calcite.rules.ImpalaRexExecutor;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
@@ -45,6 +48,7 @@ import org.apache.impala.common.ImpalaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -194,6 +198,15 @@ public class RexCallConverter {
     // no need for redundant cast.
     if (params.get(0).getType().equals(impalaRetType)) {
       return params.get(0);
+    }
+
+    // Hack logic: Partition pruning needs the exact number when the column
+    // is decimal. We need to keep the cast(<some decimal> as double) so the
+    // partition pruner can keep the right value.
+    if (ImpalaRexExecutor.isImplicitCastDecimalToInexact(call)) {
+      RexLiteral literal = (RexLiteral) call.getOperands().get(0);
+      BigDecimal value = (BigDecimal) RexLiteral.value(literal);
+      return new NumericLiteral(value, impalaRetType);
     }
 
     // Small hack: Most cast expressions have "isImplicit" set to true. If this

@@ -1212,3 +1212,15 @@ explain select min(month), max(year), ndv(day) from functional.alltypesagg;
 '01:AGGREGATE'
 '00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====
+---- QUERY
+# values test with different sized columns.
+# result should have no trailing spaces.
+values ('abc'), ('defg')
+---- RESULTS
+'abc'
+'defg'
+---- TYPES
+string
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+====

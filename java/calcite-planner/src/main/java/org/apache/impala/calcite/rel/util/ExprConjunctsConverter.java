@@ -55,16 +55,29 @@ public class ExprConjunctsConverter {
 
   public ExprConjunctsConverter(RexNode conjunct, List<Expr> inputExprs,
       RexBuilder rexBuilder, Analyzer analyzer) throws ImpalaException {
+    this(conjunct, inputExprs, rexBuilder, analyzer, true);
+  }
+
+  public ExprConjunctsConverter(RexNode conjunct, List<Expr> inputExprs,
+      RexBuilder rexBuilder, Analyzer analyzer, boolean splitAndConjuncts)
+      throws ImpalaException {
     ImmutableList.Builder<Expr> builder = new ImmutableList.Builder();
     if (conjunct != null) {
       CreateExprVisitor visitor =
           new CreateExprVisitor(rexBuilder, inputExprs, analyzer);
 
       RexNode expandedConjunct = ImpalaRexUtil.expandSearch(rexBuilder, conjunct);
-
-      List<RexNode> andOperands = getAndConjuncts(expandedConjunct);
-      for (RexNode andOperand : andOperands) {
-        Expr convertedExpr = CreateExprVisitor.getExpr(visitor, andOperand);
+      // if splitAndConjuncts is false, there will be only one operand containing
+      // all the 'and' conjuncts. If it is true, each top level 'and' will be
+      // a member in the list. Separating out the 'and' clauses is needed for partition
+      // pruning, because if the 'and' conjunct meets pruning conditions, the
+      // clause is used to remove directories and not needed when checking
+      // on each individual row.
+      List<RexNode> operands = splitAndConjuncts
+          ? getAndConjuncts(expandedConjunct)
+          : Lists.newArrayList(expandedConjunct);
+      for (RexNode operand : operands) {
+        Expr convertedExpr = CreateExprVisitor.getExpr(visitor, operand);
         builder.add(convertedExpr);
       }
     }

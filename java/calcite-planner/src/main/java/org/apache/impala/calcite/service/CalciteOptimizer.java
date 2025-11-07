@@ -40,6 +40,7 @@ import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql2rel.RelFieldTrimmer;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.calcite.coercenodes.CoerceNodes;
 import org.apache.impala.calcite.operators.ImpalaRexSimplify;
 import org.apache.impala.calcite.rel.node.ConvertToImpalaRelRules;
@@ -47,8 +48,10 @@ import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.calcite.rules.ImpalaCoreRules;
 import org.apache.impala.calcite.rules.ImpalaFilterSimplifyRule;
 import org.apache.impala.calcite.rules.ImpalaProjectSimplifyRule;
+import org.apache.impala.calcite.rules.ImpalaRexExecutor;
 import org.apache.impala.calcite.util.LogUtil;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.util.EventSequence;
 
 import java.util.List;
@@ -70,6 +73,10 @@ public class CalciteOptimizer implements CompilerStep {
   private final SqlValidator validator_;
 
   private final EventSequence timeline_;
+
+  private final Analyzer analyzer_;
+
+  private final TQueryCtx queryCtx_;
 
   JoinProjectTransposeRule.Config JOIN_PROJECT_LEFT =
       JoinProjectTransposeRule.Config.LEFT_OUTER
@@ -95,12 +102,17 @@ public class CalciteOptimizer implements CompilerStep {
     this.reader_ = analysisResult.getCatalogReader();
     this.validator_ = analysisResult.getSqlValidator();
     this.timeline_ = timeline;
+    this.analyzer_ = analysisResult.getAnalyzer();
+    this.queryCtx_ = analyzer_.getQueryCtx();
   }
 
-  public CalciteOptimizer(CalciteValidator validator, EventSequence timeline) {
+  public CalciteOptimizer(CalciteValidator validator, Analyzer analyzer,
+      EventSequence timeline, TQueryCtx queryCtx) {
     this.reader_ = validator.getCatalogReader();
     this.validator_ = validator.getSqlValidator();
     this.timeline_ = timeline;
+    this.queryCtx_ = queryCtx;
+    this.analyzer_ = analyzer;
   }
 
   public ImpalaPlanRel optimize(RelNode logPlan) throws ImpalaException {
@@ -109,7 +121,9 @@ public class CalciteOptimizer implements CompilerStep {
 
     RexBuilder rexBuilder = logPlan.getCluster().getRexBuilder();
 
-    ImpalaRexSimplify simplifier = new ImpalaRexSimplify(rexBuilder, RexUtil.EXECUTOR);
+    ImpalaRexExecutor rexExecutor = new ImpalaRexExecutor(analyzer_, queryCtx_,
+        new ImpalaRexExecutor.ReducerImpl());
+    ImpalaRexSimplify simplifier = new ImpalaRexSimplify(rexBuilder, rexExecutor);
 
     // Run some essential rules needed to create working RelNodes before doing
     // optimization
