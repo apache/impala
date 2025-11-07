@@ -144,6 +144,11 @@ class ThreadMgr {
   //        ]
   void ThreadGroupUrlCallback(const Webserver::WebRequest& req, Document* output);
 
+  // Looks up a thread name by its system TID. Returns true and sets 'name' if found,
+  // returns false if the thread is not managed by ThreadMgr (e.g., JVM threads or
+  // threads created by libraries).
+  bool GetThreadNameByTid(int64_t tid, string* name);
+
  private:
   // Container class for any details we want to capture about a thread
   // TODO: Add start-time.
@@ -294,6 +299,20 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::WebRequest& req,
   document->AddMember("threads", lst, document->GetAllocator());
 }
 
+bool ThreadMgr::GetThreadNameByTid(int64_t tid, string* name) {
+  DCHECK(name != nullptr);
+  lock_guard<mutex> l(lock_);
+  for (const ThreadCategoryMap::value_type& category : thread_categories_) {
+    for (const auto& thread : category.second.threads_by_id) {
+      if (thread.second.thread_id() == tid) {
+        *name = thread.second.name();
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 Status Thread::StartThread(const std::string& category, const std::string& name,
     const ThreadFunctor& functor, unique_ptr<Thread>* thread,
     bool fault_injection_eligible) {
@@ -372,6 +391,13 @@ void ThreadGroup::JoinAll() {
 
 int ThreadGroup::Size() const {
   return threads_.size();
+}
+
+bool GetThreadNameByTid(int64_t tid, string* name) {
+  if (thread_manager) {
+    return thread_manager->GetThreadNameByTid(tid, name);
+  }
+  return false;
 }
 
 namespace {

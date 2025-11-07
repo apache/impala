@@ -41,6 +41,7 @@
 #include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
 #include "service/impala-server.h"
+#include "kudu/util/debug-util.h"
 #include "util/cgroup-util.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -583,6 +584,33 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
           "--enable_reload_events should be true when "
           "--catalogd_ha_reset_metadata_on_failover is false"));
     }
+  }
+
+  // Initialize the signal handler for stack trace collection BEFORE
+  // InitGoogleLoggingSafe. This must happen before
+  // google::InstallFailureSignalHandler() is called (which happens
+  // inside InitGoogleLoggingSafe), otherwise that might block our signal.
+  //
+  // We use SIGRTMIN+10 instead of SIGUSR1/SIGUSR2 because:
+  //   - SIGUSR1 is used by minidump handling
+  //   - SIGUSR2 crashes the embedded JVM
+  //
+  // IMPORTANT: This signal handler is used INTERNALLY by the /stacks web endpoint.
+  // It is NOT meant to be triggered manually via kill/pkill. The handler expects
+  // specific data structures to be set up when triggered, which only happens during
+  // a web request to /stacks. Manually sending this signal will crash the process.
+  // If you want to see thread stacks, visit the /stacks web UI page instead.
+  const int stack_trace_signal = SIGRTMIN + 10;
+  kudu::Status stack_trace_status = kudu::SetStackTraceSignal(stack_trace_signal);
+  if (!stack_trace_status.ok()) {
+    // Using fprintf since LOG isn't available yet
+    fprintf(stderr, "WARNING: Failed to initialize stack trace signal handler with "
+            "signal %d: %s. The /stacks endpoint will not work.\n", stack_trace_signal,
+            stack_trace_status.ToString().c_str());
+  } else {
+    fprintf(stderr, "INFO: Stack trace signal handler initialized with signal %d "
+            "(SIGRTMIN+10). Access thread stacks via the /stacks web UI (DO NOT manually "
+            "send this signal).\n", stack_trace_signal);
   }
 
   impala::InitGoogleLoggingSafe(argv[0]);

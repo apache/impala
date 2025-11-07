@@ -27,7 +27,13 @@
 
 #include "common/daemon-env.h"
 #include "common/logging.h"
+#include "kudu/gutil/strings/strip.h"
+#include "kudu/util/array_view.h"
+#include "kudu/util/debug-util.h"
+#include "kudu/util/env.h"
+#include "kudu/util/faststring.h"
 #include "kudu/util/flags.h"
+#include "kudu/util/monotime.h"
 #include "rpc/jni-thrift-util.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
@@ -44,6 +50,7 @@
 #include "util/pprof-path-handlers.h"
 #include "util/process-state-info.h"
 #include "util/runtime-profile-counters.h"
+#include "util/thread.h"
 
 #include "common/names.h"
 
@@ -175,6 +182,81 @@ void ProfileDocsHandler(const Webserver::WebRequest& req, Document* document) {
 
   document->AddMember("significance_docs", significance_def, document->GetAllocator());
   document->AddMember("profile_docs", profile_docs, document->GetAllocator());
+}
+
+// Registered to handle "/stacks", and produces a plain text dump of all thread stacks.
+void StacksHandler(const Webserver::WebRequest& req, Document* document) {
+  // Tell the webserver to render as plain text instead of HTML
+  document->AddMember(rapidjson::StringRef(Webserver::ENABLE_RAW_HTML_KEY), true,
+      document->GetAllocator());
+
+  // Use MonoTime to measure elapsed time
+  kudu::StackTraceSnapshot snapshot;
+  // Disable automatic thread name collection - we'll use Impala's ThreadMgr instead
+  // to get consistent names with the /thread-group page
+  snapshot.set_capture_thread_names(false);
+
+  kudu::MonoTime start = kudu::MonoTime::Now();
+  kudu::Status status = snapshot.SnapshotAllStacks();
+
+  stringstream output;
+  if (!status.ok()) {
+    output << "Error collecting stack traces: " << status.ToString() << "\n";
+  } else {
+    kudu::MonoDelta elapsed = kudu::MonoTime::Now() - start;
+    output << "Collected stacks from " << snapshot.num_threads() << " threads in "
+      << elapsed.ToSeconds() << "s\n";
+
+    if (snapshot.num_failed() > 0) {
+      output << "Failed to collect stacks for " << snapshot.num_failed() << " threads "
+        << "(they may have exited while we were iterating over the threads)\n";
+    }
+    output << "\n";
+
+    // Visit groups of threads with the same stack trace
+    snapshot.VisitGroups(
+      [&output](kudu::ArrayView<kudu::StackTraceSnapshot::ThreadInfo> group) {
+      // Print the thread count if there are multiple threads with the same stack
+      if (group.size() > 1) {
+        output << group.size() << " threads with same stack:\n";
+      }
+
+      // Print thread IDs and names
+      for (auto& info : group) {
+        // Try to get the thread name from Impala's ThreadMgr first for consistency
+        // with the /thread-group page. If not found (e.g., JVM threads or library
+        // threads), fall back to reading from /proc.
+        string thread_name;
+        if (!GetThreadNameByTid(info.tid, &thread_name)) {
+          // Thread not managed by Impala - read from /proc/self/task/[tid]/comm
+          kudu::faststring buf;
+          kudu::Status s = kudu::ReadFileToString(kudu::Env::Default(),
+              strings::Substitute("/proc/self/task/$0/comm", info.tid), &buf);
+          if (!s.ok()) {
+            thread_name = "<unknown>";
+          } else {
+            thread_name = buf.ToString();
+            StripTrailingNewline(&thread_name);
+          }
+        }
+        output << "TID " << info.tid << " (" << thread_name << "):\n";
+      }
+
+      // Print the stack trace (or error if collection failed)
+      if (group[0].status.ok() && group[0].stack.HasCollected()) {
+        output << group[0].stack.Symbolize();
+      } else if (!group[0].status.ok()) {
+        output << "    <stack trace collection failed: " << group[0].status.ToString()
+          << ">\n";
+      } else {
+        output << "    <stack trace not collected>\n";
+      }
+      output << "\n\n";
+    });
+  }
+
+  Value contents(output.str().c_str(), document->GetAllocator());
+  document->AddMember("contents", contents, document->GetAllocator());
 }
 
 void JmxHandler(const Webserver::WebRequest& req, Document* document) {
@@ -344,6 +426,7 @@ void AddDefaultUrlCallbacks(Webserver* webserver, MetricGroup* metric_group,
   webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler, true);
   webserver->RegisterUrlCallback(
       "/profile_docs", "profile_docs.tmpl", ProfileDocsHandler, true);
+  webserver->RegisterUrlCallback("/stacks", "raw_text.tmpl", StacksHandler, false);
   if (JniUtil::is_jvm_inited()) {
     // JmxHandler outputs a plain JSON string and does not require a template to
     // render. However RawUrlCallback only supports PLAIN content type.

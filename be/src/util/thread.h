@@ -225,6 +225,11 @@ void InitThreading();
 /// live JVM threads in the web UI.
 Status StartThreadInstrumentation(MetricGroup* metrics, Webserver* webserver,
     bool include_jvm_threads) WARN_UNUSED_RESULT;
+
+/// Looks up a thread name by its system TID (thread ID). Returns true and sets 'name'
+/// to the thread's full descriptive name if the thread is managed by Impala's ThreadMgr.
+/// Returns false if the thread is not found (e.g., JVM threads, library threads)
+bool GetThreadNameByTid(int64_t tid, std::string* name);
 }
 
 #endif

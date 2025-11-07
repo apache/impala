@@ -66,6 +66,7 @@ class TestWebPage(ImpalaTestSuite):
   EVENT_PROCESSOR_URL = "http://localhost:{0}/events"
   HADOOP_VARZ_URL = "http://localhost:{0}/hadoop-varz"
   JVM_THREADZ_URL = "http://localhost:{0}/jvm-threadz"
+  STACKS_URL = "http://localhost:{0}/stacks"
 
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -199,6 +200,77 @@ class TestWebPage(ImpalaTestSuite):
         assert "beans" in jmx_json.keys(), "Ill formatted JSON returned: %s" % jmx_json
       except ValueError:
         assert False, "Invalid JSON returned from /jmx endpoint: %s" % jmx_json
+
+  def test_stacks_endpoint(self):
+    """Tests that the /stacks endpoint on all daemons returns valid stack traces."""
+    for port in self.TEST_PORTS_WITH_SS:
+      input_url = self.STACKS_URL.format(port)
+      response = requests.get(input_url)
+      assert response.status_code == requests.codes.ok
+      # The /stacks endpoint returns plain text
+      assert "text/plain" in response.headers['Content-Type']
+
+      # Verify the response contains expected stack trace elements
+      stack_text = response.text
+      assert "Collected stacks from" in stack_text, \
+          "Missing collection summary in response from port %s" % port
+      assert "threads in" in stack_text, \
+          "Missing thread count in response from port %s" % port
+      assert "TID" in stack_text, \
+          "Missing thread IDs in response from port %s" % port
+
+      # Verify it contains at least one thread with a stack trace
+      # Stack traces should have lines starting with '@' for frame information
+      assert "@" in stack_text, \
+          "Missing stack frames in response from port %s" % port
+
+  def test_stacks_endpoint_format(self):
+    """Tests that the /stacks endpoint returns properly formatted stack traces."""
+    for port in self.TEST_PORTS_WITH_SS:
+      input_url = self.STACKS_URL.format(port)
+      response = requests.get(input_url)
+      assert response.status_code == requests.codes.ok
+
+      stack_text = response.text
+      lines = stack_text.split('\n')
+
+      # Verify the header line format
+      header_pattern = re.compile(r'Collected stacks from \d+ threads in \d+\.\d+s')
+      assert any(header_pattern.match(line) for line in lines), \
+          "Missing or malformed collection summary header"
+
+      # Verify thread ID format (e.g., "TID 1911294 (statestored):" or
+      # "TID 262192 (subscriber-priority-update-worker(2:10)):" with nested parens)
+      # Use a greedy match that captures everything between "TID <num> (" and "):"
+      tid_pattern = re.compile(r'TID \d+ \(.+\):')
+      assert any(tid_pattern.match(line) for line in lines), \
+          "Missing or malformed thread ID lines"
+
+      # Verify stack frame format (lines starting with '@' and containing addresses)
+      frame_pattern = re.compile(r'^\s*@\s+0x[0-9a-f]+\s+.*')
+      assert any(frame_pattern.match(line) for line in lines), \
+          "Missing or malformed stack frame lines"
+
+      # Check for thread grouping format (e.g., "3 threads with same stack:")
+      # This may or may not be present depending on whether there are duplicate stacks
+      group_pattern = re.compile(r'^\d+ threads with same stack:')
+      has_grouped_threads = any(group_pattern.match(line) for line in lines)
+
+      # If there are grouped threads, verify that the TIDs are listed before the stack
+      if has_grouped_threads:
+        # Find a group header
+        for i, line in enumerate(lines):
+          if group_pattern.match(line):
+            # The next few lines should be TID lines
+            assert i + 1 < len(lines), "Group header at end of output"
+            # At least one TID should follow
+            found_tid = False
+            for j in range(i + 1, min(i + 10, len(lines))):
+              if tid_pattern.match(lines[j]):
+                found_tid = True
+                break
+            assert found_tid, "No TID found after group header"
+            break
 
   def get_and_check_status(
       self, url, string_to_search="", ports_to_test=None, regex=False, headers=None):
