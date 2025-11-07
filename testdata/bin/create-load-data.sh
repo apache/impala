@@ -499,9 +499,14 @@ function copy-and-load-ext-data-source {
   ${IMPALA_HOME}/testdata/bin/copy-ext-data-sources.sh
   # Load the underlying data of the data source
   ${IMPALA_HOME}/testdata/bin/load-ext-data-sources.sh
+  # Fill in the create-ext-data-source-table.sql.template to replace
+  # $WAREHOUSE_LOCATION_PREFIX
+  cat ${IMPALA_HOME}/testdata/bin/create-ext-data-source-table.sql.template \
+      | sed "s#\$WAREHOUSE_LOCATION_PREFIX#${WAREHOUSE_LOCATION_PREFIX}#" \
+      > ${IMPALA_DATA_LOADING_LOGS_DIR}/create-ext-data-source-table.sql
   # Create data sources table.
   ${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD} -f\
-      ${IMPALA_HOME}/testdata/bin/create-ext-data-source-table.sql
+      ${IMPALA_DATA_LOADING_LOGS_DIR}/create-ext-data-source-table.sql
   # Create external JDBC tables for TPCH/TPCDS queries.
   ${IMPALA_HOME}/testdata/bin/create-tpc-jdbc-tables.py --jdbc_db_name=tpch_jdbc \
       --workload=tpch --database_type=impala --clean

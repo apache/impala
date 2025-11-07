@@ -22,7 +22,7 @@ USE functional;
 
 DROP DATA SOURCE IF EXISTS AllTypesDataSource;
 CREATE DATA SOURCE AllTypesDataSource
-LOCATION '/test-warehouse/data-sources/test-data-source.jar'
+LOCATION '$WAREHOUSE_LOCATION_PREFIX/test-warehouse/data-sources/test-data-source.jar'
 CLASS 'org.apache.impala.extdatasource.AllTypesDataSource'
 API_VERSION 'V1';
 
@@ -64,7 +64,7 @@ TBLPROPERTIES (
 "database.type"="POSTGRES",
 "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
 "jdbc.driver"="org.postgresql.Driver",
-"driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+"driver.url"="$WAREHOUSE_LOCATION_PREFIX/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
 "dbcp.username"="hiveuser",
 "dbcp.password"="password",
 "table"="alltypes");
@@ -87,7 +87,7 @@ TBLPROPERTIES (
 "database.type"="POSTGRES",
 "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
 "jdbc.driver"="org.postgresql.Driver",
-"driver.url"="hdfs://localhost:20500/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+"driver.url"="$WAREHOUSE_LOCATION_PREFIX/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
 "dbcp.username"="hiveuser",
 "dbcp.password"="password",
 "table"="AllTypesWithQuote",
@@ -105,7 +105,7 @@ TBLPROPERTIES (
 "database.type"="POSTGRES",
 "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
 "jdbc.driver"="org.postgresql.Driver",
-"driver.url"="hdfs://localhost:20500/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+"driver.url"="$WAREHOUSE_LOCATION_PREFIX/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
 "dbcp.username"="hiveuser",
 "dbcp.password"="password",
 "table"="decimal_tbl");
@@ -125,7 +125,7 @@ TBLPROPERTIES (
 "database.type"="POSTGRES",
 "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
 "jdbc.driver"="org.postgresql.Driver",
-"driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+"driver.url"="$WAREHOUSE_LOCATION_PREFIX/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
 "dbcp.username"="hiveuser",
 "dbcp.password"="password",
 "table"="test_strategy");
@@ -145,7 +145,7 @@ TBLPROPERTIES (
 "database.type"="POSTGRES",
 "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
 "jdbc.driver"="org.postgresql.Driver",
-"driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+"driver.url"="$WAREHOUSE_LOCATION_PREFIX/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
 "dbcp.username"="hiveuser",
 "dbcp.password"="password",
 "table"="test_strategy");
