@@ -301,6 +301,11 @@ redhat sudo yum install -y file gawk gcc gcc-c++ git krb5-devel krb5-server \
         net-tools langpacks-en glibc-langpack-en libxml2-devel libxslt-devel \
         java-${REDHAT_JAVA_VERSION}-openjdk-src java-${REDHAT_JAVA_VERSION}-openjdk-devel
 
+redhat sudo alternatives --set java java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
+redhat sudo alternatives --set javac java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
+redhat sudo alternatives --set java_sdk_openjdk java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
+redhat sudo alternatives --set jre_openjdk java-${REDHAT_JAVA_VERSION}-openjdk.${ARCH_NAME}
+
 # update-java-alternatives may not take effect if there is a Java in PATH
 which java
 java -version
