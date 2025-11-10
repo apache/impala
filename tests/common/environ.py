@@ -41,7 +41,7 @@ IMPALA_LOCAL_VERSION_INFO = os.path.join(IMPALA_HOME, "bin/version.info")
 if os.path.isfile(IMPALA_LOCAL_VERSION_INFO):
   with open(IMPALA_LOCAL_VERSION_INFO) as f:
     for line in f:
-      match = re.match("VERSION: ([^\s]*)\n", line)
+      match = re.match(r"VERSION: ([^\s]*)\n", line)
       if match:
         IMPALA_LOCAL_BUILD_VERSION = match.group(1)
   if IMPALA_LOCAL_BUILD_VERSION is None:
