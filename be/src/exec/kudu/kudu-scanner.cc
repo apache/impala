@@ -564,7 +564,6 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
       }
     }
 
-    item_tuple_mem_pool.Clear();
     for (int i = 0; i < scan_node_->tuple_desc()->collection_slots().size(); ++i) {
       auto slot = scan_node_->tuple_desc()->collection_slots()[i];
       Status status = ConvertArrayFromKudu(kudu_tuple, slot, item_tuple_buffers[i],
