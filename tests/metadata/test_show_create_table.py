@@ -41,8 +41,16 @@ def get_properties_map(sql, properties_map_name, exclusions=None):
   map_match = re.search(properties_map_regex(properties_map_name), sql)
   if map_match is None:
     return dict()
-  kv_regex = "'([^\']+)'\\s*=\\s*'([^\']+)'"
-  kv_results = dict(re.findall(kv_regex, map_match.group(1)))
+  tbl_props_contents = map_match.group(1).strip()
+  kv_regex = r"'([^']*)'\s*=\s*'([^']*)'\s*(?:,|$)"
+  kv_results = dict(re.findall(kv_regex, tbl_props_contents))
+
+  # Verify [TBL|SERDE]PROPERTIES contents
+  stripped_sql = re.sub(r'\s+', '', tbl_props_contents)
+  reconstructed = ",".join("'{}'='{}'".format(k, v) for k, v in kv_results.items())
+  stripped_reconstructed = re.sub(r'\s+', '', reconstructed.strip())
+  assert stripped_sql == stripped_reconstructed, \
+      "[TBL|SERDE]PROPERTIES contents are not valid SQL: " + tbl_props_contents
 
   if exclusions is not None:
     for filtered_key in exclusions:
