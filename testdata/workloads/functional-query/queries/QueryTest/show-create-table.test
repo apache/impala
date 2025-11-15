@@ -968,7 +968,7 @@ PARTITIONED BY SPEC (VOID(i), VOID(j))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
-'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.parquet.compression-codec'='snappy'
+'engine.hive.enabled'='true', 'table_type'='ICEBERG', 'write.parquet.compression-codec'='snappy',
 'write.delete.mode'='merge-on-read', 'write.update.mode'='merge-on-read',
 'write.merge.mode'='merge-on-read')
 ====
