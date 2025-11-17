@@ -135,10 +135,6 @@ under the License.
           <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.apache.kafka</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>org.apache.shiro</groupId>
           <artifactId>shiro-core</artifactId>
         </exclusion>
