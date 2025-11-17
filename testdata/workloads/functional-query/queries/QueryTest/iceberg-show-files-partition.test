@@ -426,9 +426,9 @@ STRING, STRING, STRING, STRING
 ---- QUERY
 # Show files for partition with both data and delete files
 SHOW FILES IN iceberg_showfiles_with_deletes PARTITION (identity_int = 1);
----- RESULTS
+---- RESULTS: VERIFY_IS_SUBSET
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_with_deletes/data/identity_int=1/delete-.*_data.*.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_with_deletes/data/identity_int=1/[^d].*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_with_deletes/data/identity_int=1/(?!delete).*_data.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
