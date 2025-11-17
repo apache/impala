@@ -41,9 +41,9 @@ class TestAcidStress(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestAcidStress, cls).add_test_dimensions()
-    # Could be moved to exhaustive tests due to the long execution time, but this only
-    # runs with Hive3, where the main goal currently is to make ACID work, so it is better
-    # to run this frequently.
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip("Should only run in exhaustive due to long execution time.")
+
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: (v.get_value('table_format').file_format == 'text' and
                    v.get_value('table_format').compression_codec == 'none'))
