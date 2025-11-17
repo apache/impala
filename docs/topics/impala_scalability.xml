@@ -202,6 +202,23 @@ Memory Usage: Additional Notes
     </conbody>
 
   </concept>
+  <concept id="catalog_file_metadata" rev="5.0.0_IMPALA-11402">
+    <title>Limiting file metadata fetched in Catalog requests (<keyword keyref="impala50_full"/> and
+      higher)</title>
+    <conbody>
+      <p>To prevent Catalog service (Catalogd) Out-of-Memory (OOM) errors when coordinator fetching metadata for
+        tables with millions of files, the new configuration flag
+          <codeph>catalog_partial_fetch_max_files</codeph> has been introduced.</p>
+      <p>This flag limits the maximum number of file descriptors returned in a single Catalog fetch
+        response. This response is for the <codeph>GetPartialCatalogObject</codeph> RPC, which is
+        used in local catalog mode. See <xref href="impala_metadata.xml"/></p>
+      <p><b>Default:</b> 1,000,000 files</p>
+      <p>If a request exceeds this limit, Catalogd truncates the response at the partition level.
+        The Impala coordinator then automatically sends subsequent requests to fetch the remaining
+        metadata, and it detects any version changes to force a query replan, ensuring metadata
+        consistency.</p>
+    </conbody>
+  </concept>
 
   <concept rev="2.1.0" id="statestore_scalability">
 
