@@ -37,6 +37,12 @@ under the License.
       <groupId>org.apache.impala</groupId>
       <artifactId>impala-frontend</artifactId>
       <version>5.0.0-SNAPSHOT</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.impala</groupId>
+          <artifactId>impala-iceberg-runtime</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 

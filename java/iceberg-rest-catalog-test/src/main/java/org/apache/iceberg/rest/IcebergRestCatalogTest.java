@@ -92,17 +92,13 @@ public class IcebergRestCatalogTest {
     RESTCatalogAdapter adapter = new RESTCatalogAdapter(catalog) {
       @Override
       public <T extends RESTResponse> T execute(
-          RESTCatalogAdapter.HTTPMethod method,
-          String path,
-          Map<String, String> queryParams,
-          Object body,
+          HTTPRequest request,
           Class<T> responseType,
-          Map<String, String> headers,
-          Consumer<ErrorResponse> errorHandler) {
-        Object request = roundTripSerialize(body, "request");
-        T response =
-            super.execute(
-                method, path, queryParams, request, responseType, headers, errorHandler);
+          Consumer<ErrorResponse> errorHandler,
+          Consumer<Map<String, String>> responseHeaders) {
+        Object body = roundTripSerialize(request.body(), "request");
+        HTTPRequest req = ImmutableHTTPRequest.builder().from(request).body(body).build();
+        T response = super.execute(req, responseType, errorHandler, responseHeaders);
         return roundTripSerialize(response, "response");
       }
     };

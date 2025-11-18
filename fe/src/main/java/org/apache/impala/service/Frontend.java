@@ -2944,6 +2944,9 @@ public class Frontend {
 
     String positionalDeleteFiles = Long.toString(metrics.positionalDeleteFiles().value());
     addInfoString(profile, ScanMetrics.POSITIONAL_DELETE_FILES, positionalDeleteFiles);
+
+    String deleteVectors = Long.toString(metrics.dvs().value());
+    addInfoString(profile, ScanMetrics.DVS, deleteVectors);
   }
 
   private TExecRequest doCreateExecRequest(CompilerFactory compilerFactory,

@@ -21,28 +21,28 @@ INT,BIGINT,BIGINT,BIGINT,STRING,STRING
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.`files`;
 ---- RESULTS
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,NULL,'NULL',NULL,NULL,'{.*}'
 ---- TYPES
-INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,BIGINT,STRING,BIGINT,BIGINT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.data_files;
 ---- RESULTS
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
 ---- TYPES
-INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,BIGINT,STRING,BIGINT,BIGINT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.delete_files;
 ---- RESULTS
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,NULL,'NULL',NULL,NULL,'{.*}'
 ---- TYPES
-INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,BIGINT,STRING,BIGINT,BIGINT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.history;
@@ -75,7 +75,7 @@ select * from functional_parquet.iceberg_query_metadata.snapshots;
 row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,NULL,'append','$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro','{.*}'
 row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,'append','$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro','{.*}'
 row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,'append','$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro','{.*}'
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,'overwrite','$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro','{.*}'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,'delete','$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro','{.*}'
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,STRING,STRING,STRING
 ====
@@ -108,28 +108,28 @@ BIGINT, INT, BIGINT, BIGINT, INT, BIGINT, INT, TIMESTAMP, BIGINT
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.all_data_files;
 ---- RESULTS
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
 ---- TYPES
-INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,BIGINT,STRING,BIGINT,BIGINT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.all_delete_files;
 ---- RESULTS
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,NULL,'NULL',NULL,NULL,'{.*}'
 ---- TYPES
-INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,BIGINT,STRING,BIGINT,BIGINT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.all_files;
 ---- RESULTS
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,'{.*}'
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL,'{.*}'
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,NULL,'NULL',NULL,NULL,'{.*}'
 ---- TYPES
-INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,BIGINT,STRING,BIGINT,BIGINT,STRING
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.all_manifests;
@@ -221,11 +221,11 @@ BIGINT
 ---- QUERY
 # Test BIGINT
 select * from functional_parquet.iceberg_query_metadata.history
-where snapshot_id = $OVERWRITE_SNAPSHOT_ID;
+where snapshot_id = $DELETE_SNAPSHOT_ID;
 ---- RESULTS
 # Example:
 # 2023-08-16 12:18:15.523000000,9046920472784493998,8491702501245661704,true
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,$OVERWRITE_SNAPSHOT_ID,\d+,true
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,$DELETE_SNAPSHOT_ID,\d+,true
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ====
@@ -246,38 +246,38 @@ TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ---- QUERY
 # Test STRING
 select * from functional_parquet.iceberg_query_metadata.snapshots
-where operation = 'overwrite';
+where operation = 'delete';
 ---- RESULTS
 # Example:
 # 2023-08-16 12:18:15.322000000,8491702501245661704,NULL,'append','hdfs://localhost:20500/test-warehouse/functional_parquet.db/iceberg_test_metadata/metadata/snap-8491702501245661704-1-88a39285-529f-41a4-bd69-6d2560fac64e.avro',NULL
-row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,'overwrite','$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro','{.*}'
+row_regex:\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?,\d+,\d+,'delete','$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/metadata/.*.avro','{.*}'
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,STRING,STRING,STRING
 ====
 ---- QUERY
 # Test TIMESTAMP
 select * from functional_parquet.iceberg_query_metadata.history
-where made_current_at = cast("$OVERWRITE_SNAPSHOT_TS" as timestamp);
+where made_current_at = cast("$DELETE_SNAPSHOT_TS" as timestamp);
 ---- RESULTS
-row_regex:$OVERWRITE_SNAPSHOT_TS,$OVERWRITE_SNAPSHOT_ID,\d+,true
+row_regex:$DELETE_SNAPSHOT_TS,$DELETE_SNAPSHOT_ID,\d+,true
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ====
 ---- QUERY
 # Test conjunct slot materialization
 select snapshot_id from functional_parquet.iceberg_query_metadata.snapshots
-where operation = 'overwrite';
+where operation = 'delete';
 ---- RESULTS
-$OVERWRITE_SNAPSHOT_ID
+$DELETE_SNAPSHOT_ID
 ---- TYPES
 BIGINT
 ====
 ---- QUERY
 # Test an expression rewrite: OR -> IN ()
 select * from functional_parquet.iceberg_query_metadata.history
-where snapshot_id = $OVERWRITE_SNAPSHOT_ID or snapshot_id = 1;
+where snapshot_id = $DELETE_SNAPSHOT_ID or snapshot_id = 1;
 ---- RESULTS
-row_regex:$OVERWRITE_SNAPSHOT_TS,$OVERWRITE_SNAPSHOT_ID,\d+,true
+row_regex:$DELETE_SNAPSHOT_TS,$DELETE_SNAPSHOT_ID,\d+,true
 ---- TYPES
 TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ====
@@ -339,9 +339,9 @@ BIGINT
 ---- QUERY
 select a.snapshot_id from functional_parquet.iceberg_query_metadata.history a
 join functional_parquet.iceberg_query_metadata.snapshots b on a.snapshot_id = b.snapshot_id
-where a.snapshot_id = $OVERWRITE_SNAPSHOT_ID;
+where a.snapshot_id = $DELETE_SNAPSHOT_ID;
 ---- RESULTS
-$OVERWRITE_SNAPSHOT_ID
+$DELETE_SNAPSHOT_ID
 ---- TYPES
 BIGINT
 
@@ -380,7 +380,7 @@ TIMESTAMP,BIGINT,BIGINT,BOOLEAN
 ####
 ====
 ---- QUERY
-select * from functional_parquet.iceberg_query_metadata.snapshots FOR SYSTEM_VERSION AS OF $OVERWRITE_SNAPSHOT_ID;
+select * from functional_parquet.iceberg_query_metadata.snapshots FOR SYSTEM_VERSION AS OF $DELETE_SNAPSHOT_ID;
 ---- CATCH
 AnalysisException: FOR SYSTEM_VERSION AS OF clause is only supported for Iceberg tables. functional_parquet.iceberg_query_metadata.SNAPSHOTS is not an Iceberg table.
 ====
@@ -749,10 +749,10 @@ join functional_parquet.iceberg_query_metadata.snapshots s
   on h.snapshot_id = s.snapshot_id
 order by made_current_at;
 ---- RESULTS
-'append',true,regex:'{"added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"1","total-files-size":"[1-9][0-9]*","total-data-files":"1","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0"}'
-'append',true,regex:'{"added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"2","total-files-size":"[1-9][0-9]*","total-data-files":"2","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0"}'
-'append',true,regex:'{"added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"3","total-files-size":"[1-9][0-9]*","total-data-files":"3","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0"}'
-'overwrite',true,regex:'{"added-position-delete-files":"1","added-delete-files":"1","added-files-size":"[1-9][0-9]*","added-position-deletes":"1","changed-partition-count":"1","total-records":"3","total-files-size":"[1-9][0-9]*","total-data-files":"3","total-delete-files":"1","total-position-deletes":"1","total-equality-deletes":"0"}'
+'append',true,regex:'{"added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"1","total-files-size":"[1-9][0-9]*","total-data-files":"1","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
+'append',true,regex:'{"added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"2","total-files-size":"[1-9][0-9]*","total-data-files":"2","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
+'append',true,regex:'{"added-data-files":"1","added-records":"1","added-files-size":"[1-9][0-9]*","changed-partition-count":"1","total-records":"3","total-files-size":"[1-9][0-9]*","total-data-files":"3","total-delete-files":"0","total-position-deletes":"0","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
+'delete',true,regex:'{"added-position-delete-files":"1","added-delete-files":"1","added-files-size":"[1-9][0-9]*","added-position-deletes":"1","changed-partition-count":"1","total-records":"3","total-files-size":"[1-9][0-9]*","total-data-files":"3","total-delete-files":"1","total-position-deletes":"1","total-equality-deletes":"0","iceberg-version":"Apache Iceberg.*"}'
 ---- TYPES
 STRING,BOOLEAN,STRING
 ====
@@ -797,9 +797,9 @@ STRING,STRING
 # Filter out position delete files because they contain filenames that vary by dataload.
 select data_file from functional_parquet.iceberg_query_metadata.entries where data_file.content != 1;
 ---- RESULTS : VERIFY_IS_SUBSET
-row_regex:'{"content":0,"file_path":".*/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*_data.0.parq","file_format":"PARQUET","spec_id":0,"record_count":1,"file_size_in_bytes":[1-9][0-9]*,"column_sizes":{1:47},"value_counts":{1:1},"null_value_counts":{1:0},"nan_value_counts":null,"lower_bounds":{1:"AwAAAA=="},"upper_bounds":{1:"AwAAAA=="},"key_metadata":null,"split_offsets":null,"equality_ids":null,"sort_order_id":0}'
-row_regex:'{"content":0,"file_path":".*/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*_data.0.parq","file_format":"PARQUET","spec_id":0,"record_count":1,"file_size_in_bytes":[1-9][0-9]*,"column_sizes":{1:47},"value_counts":{1:1},"null_value_counts":{1:0},"nan_value_counts":null,"lower_bounds":{1:"AgAAAA=="},"upper_bounds":{1:"AgAAAA=="},"key_metadata":null,"split_offsets":null,"equality_ids":null,"sort_order_id":0}'
-row_regex:'{"content":0,"file_path":".*/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*_data.0.parq","file_format":"PARQUET","spec_id":0,"record_count":1,"file_size_in_bytes":[1-9][0-9]*,"column_sizes":{1:47},"value_counts":{1:1},"null_value_counts":{1:0},"nan_value_counts":null,"lower_bounds":{1:"AQAAAA=="},"upper_bounds":{1:"AQAAAA=="},"key_metadata":null,"split_offsets":null,"equality_ids":null,"sort_order_id":0}'
+row_regex:'{"content":0,"file_path":".*/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*_data.0.parq","file_format":"PARQUET","spec_id":0,"record_count":1,"file_size_in_bytes":[1-9][0-9]*,"column_sizes":{1:47},"value_counts":{1:1},"null_value_counts":{1:0},"nan_value_counts":null,"lower_bounds":{1:"AwAAAA=="},"upper_bounds":{1:"AwAAAA=="},"key_metadata":null,"split_offsets":null,"equality_ids":null,"sort_order_id":0,"first_row_id":null,"referenced_data_file":null,"content_offset":null,"content_size_in_bytes":null}'
+row_regex:'{"content":0,"file_path":".*/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*_data.0.parq","file_format":"PARQUET","spec_id":0,"record_count":1,"file_size_in_bytes":[1-9][0-9]*,"column_sizes":{1:47},"value_counts":{1:1},"null_value_counts":{1:0},"nan_value_counts":null,"lower_bounds":{1:"AgAAAA=="},"upper_bounds":{1:"AgAAAA=="},"key_metadata":null,"split_offsets":null,"equality_ids":null,"sort_order_id":0,"first_row_id":null,"referenced_data_file":null,"content_offset":null,"content_size_in_bytes":null}'
+row_regex:'{"content":0,"file_path":".*/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*_data.0.parq","file_format":"PARQUET","spec_id":0,"record_count":1,"file_size_in_bytes":[1-9][0-9]*,"column_sizes":{1:47},"value_counts":{1:1},"null_value_counts":{1:0},"nan_value_counts":null,"lower_bounds":{1:"AQAAAA=="},"upper_bounds":{1:"AQAAAA=="},"key_metadata":null,"split_offsets":null,"equality_ids":null,"sort_order_id":0,"first_row_id":null,"referenced_data_file":null,"content_offset":null,"content_size_in_bytes":null}'
 ---- TYPES
 STRING
 ====
@@ -807,12 +807,12 @@ STRING
 # Filter out position delete files because they contain filenames that vary by dataload.
 select * from functional_parquet.iceberg_v2_delete_both_eq_and_pos.all_files where content != 1;
 ---- RESULTS
-2,'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-38a471ff-46f4-4350-85cc-2e7ba946b34c-00002.parquet','PARQUET',0,2,697,'{1:40,3:66}','{1:2,3:2}','{1:0,3:0}','{}','{1:"AQAAAA==",3:"+EwAAA=="}','{1:"AgAAAA==",3:"+EwAAA=="}','NULL','[4]','[1,3]',0,'{"d":{"column_size":66,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"2023-12-13","upper_bound":"2023-12-13"},"i":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":1,"upper_bound":2},"s":{"column_size":null,"value_count":null,"null_value_count":null,"nan_value_count":null,"lower_bound":null,"upper_bound":null}}'
-0,'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-72709aba-fb15-4bd6-9758-5f39eb9bdcb7-00001.parquet','PARQUET',0,2,885,'{1:40,2:62,3:40}','{1:2,2:2,3:2}','{1:0,2:0,3:0}','{}','{1:"AgAAAA==",2:"c3RyMl91cGRhdGVk",3:"+EwAAA=="}','{1:"AwAAAA==",2:"c3RyMw==",3:"Ak0AAA=="}','NULL','[4]','NULL',0,'{"d":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"2023-12-13","upper_bound":"2023-12-23"},"i":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":2,"upper_bound":3},"s":{"column_size":62,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"str2_updated","upper_bound":"str3"}}'
-0,'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-38a471ff-46f4-4350-85cc-2e7ba946b34c-00001.parquet','PARQUET',0,2,898,'{1:40,2:54,3:66}','{1:2,2:2,3:2}','{1:0,2:0,3:0}','{}','{1:"AQAAAA==",2:"c3RyMQ==",3:"+EwAAA=="}','{1:"AgAAAA==",2:"c3RyMg==",3:"+EwAAA=="}','NULL','[4]','NULL',0,'{"d":{"column_size":66,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"2023-12-13","upper_bound":"2023-12-13"},"i":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":1,"upper_bound":2},"s":{"column_size":54,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"str1","upper_bound":"str2"}}'
-2,'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-72709aba-fb15-4bd6-9758-5f39eb9bdcb7-00002.parquet','PARQUET',0,2,657,'{1:40,3:40}','{1:2,3:2}','{1:0,3:0}','{}','{1:"AgAAAA==",3:"+EwAAA=="}','{1:"AwAAAA==",3:"Ak0AAA=="}','NULL','[4]','[1,3]',0,'{"d":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"2023-12-13","upper_bound":"2023-12-23"},"i":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":2,"upper_bound":3},"s":{"column_size":null,"value_count":null,"null_value_count":null,"nan_value_count":null,"lower_bound":null,"upper_bound":null}}'
+2,'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-38a471ff-46f4-4350-85cc-2e7ba946b34c-00002.parquet','PARQUET',0,2,697,'{1:40,3:66}','{1:2,3:2}','{1:0,3:0}','{}','{1:"AQAAAA==",3:"+EwAAA=="}','{1:"AgAAAA==",3:"+EwAAA=="}','NULL','[4]','[1,3]',0,NULL,'NULL',NULL,NULL,'{"d":{"column_size":66,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"2023-12-13","upper_bound":"2023-12-13"},"i":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":1,"upper_bound":2},"s":{"column_size":null,"value_count":null,"null_value_count":null,"nan_value_count":null,"lower_bound":null,"upper_bound":null}}'
+0,'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-72709aba-fb15-4bd6-9758-5f39eb9bdcb7-00001.parquet','PARQUET',0,2,885,'{1:40,2:62,3:40}','{1:2,2:2,3:2}','{1:0,2:0,3:0}','{}','{1:"AgAAAA==",2:"c3RyMl91cGRhdGVk",3:"+EwAAA=="}','{1:"AwAAAA==",2:"c3RyMw==",3:"Ak0AAA=="}','NULL','[4]','NULL',0,NULL,'NULL',NULL,NULL,'{"d":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"2023-12-13","upper_bound":"2023-12-23"},"i":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":2,"upper_bound":3},"s":{"column_size":62,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"str2_updated","upper_bound":"str3"}}'
+0,'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-38a471ff-46f4-4350-85cc-2e7ba946b34c-00001.parquet','PARQUET',0,2,898,'{1:40,2:54,3:66}','{1:2,2:2,3:2}','{1:0,2:0,3:0}','{}','{1:"AQAAAA==",2:"c3RyMQ==",3:"+EwAAA=="}','{1:"AgAAAA==",2:"c3RyMg==",3:"+EwAAA=="}','NULL','[4]','NULL',0,NULL,'NULL',NULL,NULL,'{"d":{"column_size":66,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"2023-12-13","upper_bound":"2023-12-13"},"i":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":1,"upper_bound":2},"s":{"column_size":54,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"str1","upper_bound":"str2"}}'
+2,'/test-warehouse/iceberg_test/hadoop_catalog/ice/iceberg_v2_delete_both_eq_and_pos/data/00000-0-72709aba-fb15-4bd6-9758-5f39eb9bdcb7-00002.parquet','PARQUET',0,2,657,'{1:40,3:40}','{1:2,3:2}','{1:0,3:0}','{}','{1:"AgAAAA==",3:"+EwAAA=="}','{1:"AwAAAA==",3:"Ak0AAA=="}','NULL','[4]','[1,3]',0,NULL,'NULL',NULL,NULL,'{"d":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":"2023-12-13","upper_bound":"2023-12-23"},"i":{"column_size":40,"value_count":2,"null_value_count":0,"nan_value_count":null,"lower_bound":2,"upper_bound":3},"s":{"column_size":null,"value_count":null,"null_value_count":null,"nan_value_count":null,"lower_bound":null,"upper_bound":null}}'
 ---- TYPES
-INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,STRING
+INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,BIGINT,STRING,BIGINT,BIGINT,STRING
 ====
 
 ####
@@ -877,6 +877,10 @@ describe functional_parquet.iceberg_query_metadata.`files`;
 'split_offsets','array<bigint>','Splittable offsets','true'
 'equality_ids','array<int>','Equality comparison field IDs','true'
 'sort_order_id','int','Sort order ID','true'
+'first_row_id','bigint','The first row ID assigned to the first row in the data file','true'
+'referenced_data_file','string','Fully qualified location (URI with FS scheme) of a data file that all deletes reference','true'
+'content_offset','bigint','The offset in the file where the content starts','true'
+'content_size_in_bytes','bigint','The length of referenced content stored in the file','true'
 'readable_metrics','struct<\n  i:struct<\n    column_size:bigint comment ''total size on disk'',\n    value_count:bigint comment ''total count, including null and nan'',\n    null_value_count:bigint comment ''null value count'',\n    nan_value_count:bigint comment ''nan value count'',\n    lower_bound:int comment ''lower bound'',\n    upper_bound:int comment ''upper bound''\n  > comment ''metrics for column i''\n>','Column metrics in readable form','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
@@ -900,6 +904,10 @@ describe functional_parquet.iceberg_query_metadata.data_files;
 'split_offsets','array<bigint>','Splittable offsets','true'
 'equality_ids','array<int>','Equality comparison field IDs','true'
 'sort_order_id','int','Sort order ID','true'
+'first_row_id','bigint','The first row ID assigned to the first row in the data file','true'
+'referenced_data_file','string','Fully qualified location (URI with FS scheme) of a data file that all deletes reference','true'
+'content_offset','bigint','The offset in the file where the content starts','true'
+'content_size_in_bytes','bigint','The length of referenced content stored in the file','true'
 'readable_metrics','struct<\n  i:struct<\n    column_size:bigint comment ''total size on disk'',\n    value_count:bigint comment ''total count, including null and nan'',\n    null_value_count:bigint comment ''null value count'',\n    nan_value_count:bigint comment ''nan value count'',\n    lower_bound:int comment ''lower bound'',\n    upper_bound:int comment ''upper bound''\n  > comment ''metrics for column i''\n>','Column metrics in readable form','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
@@ -923,6 +931,10 @@ describe functional_parquet.iceberg_query_metadata.delete_files;
 'split_offsets','array<bigint>','Splittable offsets','true'
 'equality_ids','array<int>','Equality comparison field IDs','true'
 'sort_order_id','int','Sort order ID','true'
+'first_row_id','bigint','The first row ID assigned to the first row in the data file','true'
+'referenced_data_file','string','Fully qualified location (URI with FS scheme) of a data file that all deletes reference','true'
+'content_offset','bigint','The offset in the file where the content starts','true'
+'content_size_in_bytes','bigint','The length of referenced content stored in the file','true'
 'readable_metrics','struct<\n  i:struct<\n    column_size:bigint comment ''total size on disk'',\n    value_count:bigint comment ''total count, including null and nan'',\n    null_value_count:bigint comment ''null value count'',\n    nan_value_count:bigint comment ''nan value count'',\n    lower_bound:int comment ''lower bound'',\n    upper_bound:int comment ''upper bound''\n  > comment ''metrics for column i''\n>','Column metrics in readable form','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
@@ -1024,6 +1036,10 @@ describe functional_parquet.iceberg_query_metadata.all_data_files;
 'split_offsets','array<bigint>','Splittable offsets','true'
 'equality_ids','array<int>','Equality comparison field IDs','true'
 'sort_order_id','int','Sort order ID','true'
+'first_row_id','bigint','The first row ID assigned to the first row in the data file','true'
+'referenced_data_file','string','Fully qualified location (URI with FS scheme) of a data file that all deletes reference','true'
+'content_offset','bigint','The offset in the file where the content starts','true'
+'content_size_in_bytes','bigint','The length of referenced content stored in the file','true'
 'readable_metrics','struct<\n  i:struct<\n    column_size:bigint comment ''total size on disk'',\n    value_count:bigint comment ''total count, including null and nan'',\n    null_value_count:bigint comment ''null value count'',\n    nan_value_count:bigint comment ''nan value count'',\n    lower_bound:int comment ''lower bound'',\n    upper_bound:int comment ''upper bound''\n  > comment ''metrics for column i''\n>','Column metrics in readable form','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
@@ -1047,6 +1063,10 @@ describe functional_parquet.iceberg_query_metadata.all_delete_files;
 'split_offsets','array<bigint>','Splittable offsets','true'
 'equality_ids','array<int>','Equality comparison field IDs','true'
 'sort_order_id','int','Sort order ID','true'
+'first_row_id','bigint','The first row ID assigned to the first row in the data file','true'
+'referenced_data_file','string','Fully qualified location (URI with FS scheme) of a data file that all deletes reference','true'
+'content_offset','bigint','The offset in the file where the content starts','true'
+'content_size_in_bytes','bigint','The length of referenced content stored in the file','true'
 'readable_metrics','struct<\n  i:struct<\n    column_size:bigint comment ''total size on disk'',\n    value_count:bigint comment ''total count, including null and nan'',\n    null_value_count:bigint comment ''null value count'',\n    nan_value_count:bigint comment ''nan value count'',\n    lower_bound:int comment ''lower bound'',\n    upper_bound:int comment ''upper bound''\n  > comment ''metrics for column i''\n>','Column metrics in readable form','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
@@ -1070,6 +1090,10 @@ describe functional_parquet.iceberg_query_metadata.all_files;
 'split_offsets','array<bigint>','Splittable offsets','true'
 'equality_ids','array<int>','Equality comparison field IDs','true'
 'sort_order_id','int','Sort order ID','true'
+'first_row_id','bigint','The first row ID assigned to the first row in the data file','true'
+'referenced_data_file','string','Fully qualified location (URI with FS scheme) of a data file that all deletes reference','true'
+'content_offset','bigint','The offset in the file where the content starts','true'
+'content_size_in_bytes','bigint','The length of referenced content stored in the file','true'
 'readable_metrics','struct<\n  i:struct<\n    column_size:bigint comment ''total size on disk'',\n    value_count:bigint comment ''total count, including null and nan'',\n    null_value_count:bigint comment ''null value count'',\n    nan_value_count:bigint comment ''nan value count'',\n    lower_bound:int comment ''lower bound'',\n    upper_bound:int comment ''upper bound''\n  > comment ''metrics for column i''\n>','Column metrics in readable form','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
@@ -1100,7 +1124,7 @@ describe functional_parquet.iceberg_query_metadata.all_entries;
 'snapshot_id','bigint','','true'
 'sequence_number','bigint','','true'
 'file_sequence_number','bigint','','true'
-'data_file','struct<\n  content:int comment ''contents of the file: 0=data, 1=position deletes, 2=equality deletes'',\n  file_path:string comment ''location uri with fs scheme'',\n  file_format:string comment ''file format name: avro, orc, or parquet'',\n  spec_id:int comment ''partition spec id'',\n  record_count:bigint comment ''number of records in the file'',\n  file_size_in_bytes:bigint comment ''total file size in bytes'',\n  column_sizes:map<int,bigint> comment ''map of column id to total size on disk'',\n  value_counts:map<int,bigint> comment ''map of column id to total count, including null and nan'',\n  null_value_counts:map<int,bigint> comment ''map of column id to null value count'',\n  nan_value_counts:map<int,bigint> comment ''map of column id to number of nan values in the column'',\n  lower_bounds:map<int,binary> comment ''map of column id to lower bound'',\n  upper_bounds:map<int,binary> comment ''map of column id to upper bound'',\n  key_metadata:binary comment ''encryption key metadata blob'',\n  split_offsets:array<bigint> comment ''splittable offsets'',\n  equality_ids:array<int> comment ''equality comparison field ids'',\n  sort_order_id:int comment ''sort order id''\n>','','true'
+'data_file','struct<\n  content:int comment ''contents of the file: 0=data, 1=position deletes, 2=equality deletes'',\n  file_path:string comment ''location uri with fs scheme'',\n  file_format:string comment ''file format name: avro, orc, or parquet'',\n  spec_id:int comment ''partition spec id'',\n  record_count:bigint comment ''number of records in the file'',\n  file_size_in_bytes:bigint comment ''total file size in bytes'',\n  column_sizes:map<int,bigint> comment ''map of column id to total size on disk'',\n  value_counts:map<int,bigint> comment ''map of column id to total count, including null and nan'',\n  null_value_counts:map<int,bigint> comment ''map of column id to null value count'',\n  nan_value_counts:map<int,bigint> comment ''map of column id to number of nan values in the column'',\n  lower_bounds:map<int,binary> comment ''map of column id to lower bound'',\n  upper_bounds:map<int,binary> comment ''map of column id to upper bound'',\n  key_metadata:binary comment ''encryption key metadata blob'',\n  split_offsets:array<bigint> comment ''splittable offsets'',\n  equality_ids:array<int> comment ''equality comparison field ids'',\n  sort_order_id:int comment ''sort order id'',\n  first_row_id:bigint comment ''the first row id assigned to the first row in the data file'',\n  referenced_data_file:string comment ''fully qualified location (uri with fs scheme) of a data file that all deletes reference'',\n  content_offset:bigint comment ''the offset in the file where the content starts'',\n  content_size_in_bytes:bigint comment ''the length of referenced content stored in the file''\n>','','true'
 'readable_metrics','struct<\n  i:struct<\n    column_size:bigint comment ''total size on disk'',\n    value_count:bigint comment ''total count, including null and nan'',\n    null_value_count:bigint comment ''null value count'',\n    nan_value_count:bigint comment ''nan value count'',\n    lower_bound:int comment ''lower bound'',\n    upper_bound:int comment ''upper bound''\n  > comment ''metrics for column i''\n>','Column metrics in readable form','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
@@ -1141,12 +1165,12 @@ AnalysisException: The SHOW METADATA TABLES statement is only valid for Iceberg 
 # Expand a struct column using 'path.*' syntax.
 select data_file.* from functional_parquet.iceberg_query_metadata.`entries`;
 ---- RESULTS
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0
-row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0
-row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL
+row_regex:0,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',0,NULL,'NULL',NULL,NULL
+row_regex:1,'$NAMENODE/test-warehouse/iceberg_test/metadata/iceberg_query_metadata/data/.*.parq','PARQUET',0,1,\d+,'{.*}','{.*}','{.*}','NULL','{.*}','{.*}','NULL','NULL','NULL',NULL,NULL,'NULL',NULL,NULL
 ---- TYPES
-INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT
+INT,STRING,STRING,INT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,BINARY,STRING,STRING,INT,BIGINT,STRING,BIGINT,BIGINT
 ====
 ---- QUERY
 # Join a metadata table with a random other table that has complex columns and check that

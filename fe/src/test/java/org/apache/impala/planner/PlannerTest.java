@@ -1713,7 +1713,7 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testIcebergScanMetricsResultCardinality() {
-    final int expectedMethodNumber = 16;
+    final int expectedMethodNumber = 17;
 
     Method[] methods = ScanMetricsResult.class.getDeclaredMethods();
 

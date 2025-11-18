@@ -45,12 +45,9 @@ under the License.
     </dependency>
 
     <dependency>
-      <groupId>org.apache.iceberg</groupId>
-      <artifactId>iceberg-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.iceberg</groupId>
-      <artifactId>iceberg-hive-runtime</artifactId>
+      <groupId>org.apache.impala</groupId>
+      <artifactId>impala-iceberg-runtime</artifactId>
+      <version>${project.version}</version>
     </dependency>
 
     <!-- Needed for reading Iceberg Puffin files. -->

@@ -1707,16 +1707,16 @@ class TestIcebergV2Table(IcebergTestSuite):
     # Revisit this if 'batch_size' dimension size increase.
     vector.unset_exec_option('batch_size')
     with self.create_impala_client() as impalad_client:
-      overwrite_snapshot_id = impalad_client.execute("select snapshot_id from "
+      delete_snapshot_id = impalad_client.execute("select snapshot_id from "
                              "functional_parquet.iceberg_query_metadata.snapshots "
-                             "where operation = 'overwrite';")
-      overwrite_snapshot_ts = impalad_client.execute("select committed_at from "
+                             "where operation = 'delete';")
+      delete_snapshot_ts = impalad_client.execute("select committed_at from "
                              "functional_parquet.iceberg_query_metadata.snapshots "
-                             "where operation = 'overwrite';")
+                             "where operation = 'delete';")
       self.run_test_case('QueryTest/iceberg-metadata-tables', vector,
           unique_database,
-          test_file_vars={'$OVERWRITE_SNAPSHOT_ID': str(overwrite_snapshot_id.data[0]),
-                          '$OVERWRITE_SNAPSHOT_TS': str(overwrite_snapshot_ts.data[0])})
+          test_file_vars={'$DELETE_SNAPSHOT_ID': str(delete_snapshot_id.data[0]),
+                          '$DELETE_SNAPSHOT_TS': str(delete_snapshot_ts.data[0])})
 
   @SkipIf.not_hdfs
   def test_missing_data_files(self, vector, unique_database):

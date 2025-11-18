@@ -482,14 +482,9 @@ under the License.
       </dependency>
 
       <dependency>
-        <groupId>org.apache.iceberg</groupId>
-        <artifactId>iceberg-api</artifactId>
-        <version>${iceberg.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.iceberg</groupId>
-        <artifactId>iceberg-hive-runtime</artifactId>
-        <version>${iceberg.version}</version>
+        <groupId>org.apache.impala</groupId>
+        <artifactId>impala-iceberg-runtime</artifactId>
+        <version>${project.version}</version>
       </dependency>
 
       <dependency>
@@ -611,6 +606,7 @@ under the License.
     <module>impala-package</module>
     <module>query-event-hook-api</module>
     <module>shaded-deps/hive-exec</module>
+    <module>shaded-deps/impala-iceberg-runtime</module>
     <module>shaded-deps/s3a-aws-sdk</module>
     <module>TableFlattener</module>
     <module>test-hive-udfs</module>
