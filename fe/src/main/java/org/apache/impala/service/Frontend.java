@@ -299,6 +299,7 @@ public class Frontend {
   private static final String CPU_ASK_BOUNDED = "CpuAskBounded";
   private static final String AVG_ADMISSION_SLOTS_PER_EXECUTOR =
       "AvgAdmissionSlotsPerExecutor";
+  private static final String CALCITE_FAILURE_REASON = "CalciteFailureReason";
 
   // info about the planner used. In this code, we will always use the Original planner,
   // but other planners may set their own planner values
@@ -2396,6 +2397,7 @@ public class Frontend {
       PlanCtx planCtx, EventSequence timeline) throws ImpalaException {
     TExecRequest request = null;
     CompilerFactory compilerFactory = getCalciteCompilerFactory(planCtx);
+    String exceptionClass = null;
     if (compilerFactory != null) {
       try {
         request = getTExecRequest(compilerFactory, planCtx, timeline);
@@ -2403,7 +2405,8 @@ public class Frontend {
         if (!shouldFallbackToRegularPlanner(planCtx, e)) {
           throw e;
         }
-        LOG.info("Calcite planner failed: ", e);
+        LOG.info("Calcite planner failed: {}", e.getClass());
+        exceptionClass = e.getClass().toString();
         timeline.markEvent("Failing over from Calcite planner");
       }
     }
@@ -2414,7 +2417,7 @@ public class Frontend {
       compilerFactory = new CompilerFactoryImpl();
       request = getTExecRequest(compilerFactory, planCtx, timeline);
     }
-    addPlannerToProfile(compilerFactory.getPlannerString());
+    addPlannerToProfile(compilerFactory.getPlannerString(), exceptionClass);
     return request;
   }
 
@@ -2841,9 +2844,12 @@ public class Frontend {
     }
   }
 
-  public static void addPlannerToProfile(String planner) {
+  public static void addPlannerToProfile(String planner, String exceptionClass) {
     TRuntimeProfileNode profile = createTRuntimeProfileNode(PLANNER_PROFILE);
     addInfoString(profile, PLANNER_TYPE, planner);
+    if (exceptionClass != null) {
+      addInfoString(profile, CALCITE_FAILURE_REASON, exceptionClass);
+    }
     FrontendProfile.getCurrent().addChildrenProfile(profile);
   }
 

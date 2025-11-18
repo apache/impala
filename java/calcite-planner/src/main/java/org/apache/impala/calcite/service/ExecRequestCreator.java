@@ -169,7 +169,7 @@ public class ExecRequestCreator implements CompilerStep {
 
     TRuntimeProfileNode calciteProfile =
         this.queryCtx.getFrontend().createTRuntimeProfileNode(Frontend.PLANNER_PROFILE);
-    this.queryCtx.getFrontend().addPlannerToProfile("CalcitePlanner");
+    this.queryCtx.getFrontend().addPlannerToProfile("CalcitePlanner", null);
     result.setProfile(FrontendProfile.getCurrent().emitAsThrift());
     result.setProfile_children(FrontendProfile.getCurrent().emitChildrenAsThrift());
     if (isExplain) {
