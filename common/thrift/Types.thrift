@@ -115,6 +115,7 @@ enum TStmtType {
   CONVERT = 8
   UNKNOWN = 9
   KILL = 10
+  NO_OP = 11
 }
 
 enum TIcebergOperation {

@@ -750,6 +750,10 @@ struct TExecRequest {
 
   // Request for "KILL QUERY" statements.
   26: optional TKillQueryReq kill_query_request
+
+  // Result of statements which end up being NO_OP. Set iff stmt_type is NO_OP. E.g.,
+  // "ALTER TABLE ... CONVERT TO ICEBERG" when the table is already an Iceberg table.
+  27: optional list<string> noop_result
 }
 
 // Parameters to FeSupport.cacheJar().

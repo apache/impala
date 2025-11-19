@@ -78,6 +78,11 @@ alter table parquet_partitioned convert to iceberg tblproperties('iceberg.catalo
 'Table has been migrated.'
 ====
 ---- QUERY
+alter table parquet_partitioned convert to iceberg tblproperties('iceberg.catalog' = 'hadoop.tables');
+---- RESULTS
+'Table has already been migrated.'
+====
+---- QUERY
 select count(*) from parquet_partitioned;
 ---- RESULTS
 7301

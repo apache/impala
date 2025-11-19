@@ -76,6 +76,7 @@ import org.apache.impala.analysis.AlterDbStmt;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.CommentOnStmt;
+import org.apache.impala.analysis.ConvertTableToIcebergStmt;
 import org.apache.impala.analysis.CopyTestCaseStmt;
 import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
@@ -3097,11 +3098,17 @@ public class Frontend {
         result.setAdmin_request(analysisResult.getAdminFnStmt().toThrift());
         return result;
       } else if (analysisResult.isConvertTableToIcebergStmt()) {
-        result.stmt_type = TStmtType.CONVERT;
         result.setResult_set_metadata(new TResultSetMetadata(
             Collections.singletonList(new TColumn("summary", Type.STRING.toThrift()))));
-        result.setConvert_table_request(
-            analysisResult.getConvertTableToIcebergStmt().toThrift());
+        ConvertTableToIcebergStmt stmt = analysisResult.getConvertTableToIcebergStmt();
+        if (stmt.isNoOp()) {
+          result.setStmt_type(TStmtType.NO_OP);
+          result.setNoop_result(stmt.getNoopSummary());
+        } else {
+          result.setStmt_type(TStmtType.CONVERT);
+          result.setConvert_table_request(
+              analysisResult.getConvertTableToIcebergStmt().toThrift());
+        }
         return result;
       } else if (analysisResult.isTestCaseStmt()) {
         CopyTestCaseStmt testCaseStmt = ((CopyTestCaseStmt) analysisResult.getStmt());

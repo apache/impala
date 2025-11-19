@@ -44,6 +44,9 @@ public abstract class StatementBase extends StmtNode {
   // True if this Stmt is the top level of an explain stmt.
   protected boolean isExplain_ = false;
 
+  // True if the statement is noop.
+  protected boolean isNoOp_ = false;
+
   /////////////////////////////////////////
   // BEGIN: Members that need to be reset()
 
@@ -61,6 +64,7 @@ public abstract class StatementBase extends StmtNode {
   protected StatementBase(StatementBase other) {
     analyzer_ = other.analyzer_;
     isExplain_ = other.isExplain_;
+    isNoOp_ = other.isNoOp_;
   }
 
   /**
@@ -166,6 +170,14 @@ public abstract class StatementBase extends StmtNode {
 
   public void setIsExplain() { isExplain_ = true; }
   public boolean isExplain() { return isExplain_; }
+
+  public void setIsNoOp() { isNoOp_ = true; }
+  public boolean isNoOp() { return isNoOp_; }
+
+  public List<String> getNoopSummary() throws AnalysisException {
+    throw new IllegalStateException(
+        "getNoopSummary() not implemented for this stmt: " + getClass().getSimpleName());
+  }
 
   /**
    * Returns a deep copy of this node including its analysis state. Some members such as

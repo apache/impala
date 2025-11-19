@@ -5234,5 +5234,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("alter table functional_parquet.tinytable convert to iceberg"
             + " tblproperties('metadata.generator.threads'='a1')",
         "CONVERT TO ICEBERG doesn't accept 'metadata.generator.threads' as TBLPROPERTY.");
+    AnalyzesOk("alter table functional_parquet.iceberg_alltypes_part convert to iceberg");
   }
 }

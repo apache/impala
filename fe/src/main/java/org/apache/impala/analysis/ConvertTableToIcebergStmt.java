@@ -20,6 +20,8 @@ package org.apache.impala.analysis;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
+
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -32,6 +34,7 @@ import org.apache.impala.analysis.QueryStringBuilder.Rename;
 import org.apache.impala.analysis.QueryStringBuilder.SetTblProps;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.Table;
@@ -88,6 +91,13 @@ public class ConvertTableToIcebergStmt extends StatementBase implements SingleTa
     // table. Once it's fixed, ALL privileges on the table are enough.
     analyzer.getDb(tableName_.getDb(), Privilege.ALL);
     FeTable table = analyzer.getTable(tableName_, Privilege.ALL);
+
+    // Do nothing if the table is already an Iceberg table.
+    if (table instanceof FeIcebergTable) {
+      setIsNoOp();
+      return;
+    }
+
     if (!(table instanceof FeFsTable)) {
       throw new AnalysisException("CONVERT TO ICEBERG is not supported for " +
           table.getClass().getSimpleName());
@@ -207,6 +217,11 @@ public class ConvertTableToIcebergStmt extends StatementBase implements SingleTa
     String tmpTableNameStr = QueryStringBuilder.createTmpTableName(
         tableName_.getDb(), tableName_.getTbl());
     return TableName.parse(tmpTableNameStr);
+  }
+
+  @Override
+  public List<String> getNoopSummary() throws AnalysisException {
+    return Collections.singletonList("Table has already been migrated.");
   }
 
   public TConvertTableRequest toThrift() {

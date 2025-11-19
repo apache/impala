@@ -388,6 +388,12 @@ Status ClientRequestState::Exec() {
       DCHECK(exec_req.__isset.kill_query_request);
       LOG_AND_RETURN_IF_ERROR(ExecKillQueryRequest());
       break;
+    case TStmtType::NO_OP:
+      if (exec_req.__isset.noop_result) {
+        SetResultSet(exec_req.noop_result);
+      }
+      return Status::OK();
+      break;
     default:
       return Status(Substitute("Unknown exec request stmt type: $0", exec_req.stmt_type));
   }
@@ -1464,8 +1470,11 @@ void ClientRequestState::UpdateNonErrorExecState(ExecState new_state) {
       // valid to transition from ERROR to FINISHED, so skip any attempt to do so.
       if (old_state != ExecState::ERROR) {
         // A query can transition from PENDING to FINISHED if it is cancelled by the
-        // client.
-        DCHECK(old_state == ExecState::PENDING || old_state == ExecState::RUNNING)
+        // client. NO_OP statements can also transition from INITIALIZED to FINISHED.
+        bool valid_transition =
+            old_state == ExecState::PENDING || old_state == ExecState::RUNNING
+            || (stmt_type() == TStmtType::NO_OP && old_state == ExecState::INITIALIZED);
+        DCHECK(valid_transition)
             << Substitute(error_msg, ExecStateToString(old_state),
                 ExecStateToString(new_state), PrintId(query_id()));
         UpdateExecState(new_state);
