@@ -258,7 +258,7 @@ DEFINE_string(common_hms_event_types, "ADD_PARTITION,ALTER_PARTITION,DROP_PARTIT
     "ALTER_SCHEMA_VERSION, DROP_SCHEMA_VERSION, CREATE_CATALOG, ALTER_CATALOG,"
     "DROP_CATALOG, CREATE_DATACONNECTOR, ALTER_DATACONNECTOR, DROP_DATACONNECTOR.");
 
-DEFINE_bool(enable_hierarchical_event_processing, false,
+DEFINE_bool(enable_hierarchical_event_processing, true,
     "This configuration is used to enable hierarchical event processing. The default "
     "value is false. When enabled, events are fetched, dispatched and processed in "
     "different threads.");
