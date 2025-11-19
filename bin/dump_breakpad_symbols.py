@@ -178,7 +178,7 @@ def is_regular_file(path):
 
 def is_elf_file(path):
   """Check whether 'path' is an ELF file."""
-  return is_regular_file(path) and 'ELF' in magic.from_file(path)
+  return is_regular_file(path) and b'ELF' in magic.from_file(path)
 
 
 def find_elf_files(path):
@@ -213,7 +213,7 @@ def extract_pkg(pkg, out_dir):
 
 def assert_file_exists(path):
   if not os.path.isfile(path):
-    die('File does not exists: %s' % path)
+    die('File does not exist: %s' % path)
 
 
 def enumerate_pkg_files(pkg, symbol_pkg):
@@ -254,6 +254,29 @@ def enumerate_pkg_files(pkg, symbol_pkg):
       yield BinarySymbolInfo(binary_path, debug_dir)
   finally:
     shutil.rmtree(tmp_dir)
+
+
+def assert_binaries_exist(args):
+  """Validate the arguments specifying the location of binaries to assert that
+     they exist"""
+  if args.binary_files:
+    # Each binary file specified should exist
+    for f in args.binary_files:
+      assert_file_exists(f)
+  elif args.stdin_files:
+    # Each binary file specified on stdin should exist
+    for f in sys.stdin.read().splitlines():
+      assert_file_exists(f)
+  elif args.pkg:
+    assert_file_exists(args.pkg)
+    if args.symbol_pkg:
+      assert_file_exists(args.symbol_pkg)
+  elif args.build_dir:
+    # Specifying a non-existant directory should produce an error
+    if not os.path.isdir(args.build_dir):
+      die("Build directory (-b) does not exist: {0}".format(args.build_dir))
+    if len(list(find_elf_files(args.build_dir))) == 0:
+      die("No ELF files found in {0}".format(args.build_dir))
 
 
 def enumerate_binaries(args):
@@ -314,7 +337,8 @@ def process_binary(dump_syms, objcopy, binary, out_dir):
 
     if binary.debug_path:
       args.append(binary.debug_path)
-    proc = subprocess.Popen(args, stdout=os.fdopen(tmp_fd, 'wb'), stderr=subprocess.PIPE)
+    proc = subprocess.Popen(args, stdout=os.fdopen(tmp_fd, 'wb'), stderr=subprocess.PIPE,
+                            universal_newlines=True)
     _, stderr = proc.communicate()
     if proc.returncode != 0:
       sys.stderr.write('dump_syms: Failed to dump symbols from %s, return code %s\n' %
@@ -353,6 +377,7 @@ def main():
   assert objcopy
   status = 0
   ensure_dir_exists(args.dest_dir)
+  assert_binaries_exist(args)
   # The logic for handling DEB/RPM packages does not currently work with
   # parallelism, so disable parallelism if using the -r/--pkg option.
   if args.num_processes > 1 and not bool(args.pkg):
