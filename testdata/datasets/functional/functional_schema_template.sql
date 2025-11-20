@@ -4834,7 +4834,7 @@ paimon_non_partitioned
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 STORED AS PAIMON
-LOCATION '/test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/paimon_non_partitioned'
+LOCATION '/test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db/paimon_non_partitioned';
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db && \
 hadoop fs -put -f ${IMPALA_HOME}//testdata/data/paimon_test/paimon_catalog/warehouse/functional.db/paimon_non_partitioned /test-warehouse/paimon_test/paimon_catalog/warehouse/functional.db
