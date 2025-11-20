@@ -167,6 +167,9 @@ public class TableRef extends StmtNode {
   // Used only in PARTIAL optimization mode, otherwise it is null.
   private List<IcebergFileDescriptor> selectedDataFilesWithoutDeletesForOptimize_;
 
+  // True if IcebergScanPlanner can do count(*) optimization for this table ref.
+  private boolean optimizeCountStarForIcebergV2_ = false;
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -271,6 +274,7 @@ public class TableRef extends StmtNode {
     zippingUnnestType_ = other.zippingUnnestType_;
     selectedDataFilesWithoutDeletesForOptimize_ =
         other.selectedDataFilesWithoutDeletesForOptimize_;
+    optimizeCountStarForIcebergV2_ = other.optimizeCountStarForIcebergV2_;
   }
 
   @Override
@@ -391,6 +395,14 @@ public class TableRef extends StmtNode {
   }
   public boolean exposeNestedColumnsByTableMaskView() {
     return exposeNestedColumnsByTableMaskView_;
+  }
+
+  public void setOptimizeCountStarForIcebergV2(boolean b) {
+    optimizeCountStarForIcebergV2_ = b;
+  }
+
+  public boolean optimizeCountStarForIcebergV2() {
+    return optimizeCountStarForIcebergV2_;
   }
 
   public void setHidden(boolean isHidden) { isHidden_ = isHidden; }
@@ -812,6 +824,7 @@ public class TableRef extends StmtNode {
     desc_ = null;
     if (timeTravelSpec_ != null) timeTravelSpec_.reset();
     selectedDataFilesWithoutDeletesForOptimize_ = null;
+    optimizeCountStarForIcebergV2_ = false;
   }
 
   public boolean isTableMaskingView() { return false; }

@@ -18,12 +18,10 @@
 package org.apache.impala.rewrite;
 
 import org.apache.impala.analysis.Analyzer;
-import org.apache.impala.analysis.ArithmeticExpr;
-import org.apache.impala.analysis.ArithmeticExpr.Operator;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
+import org.apache.impala.analysis.IcebergV2CountStarAccumulator;
 import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 
@@ -55,7 +53,7 @@ import org.apache.impala.common.AnalysisException;
  *          ||
  *          \/
  *
- *    ArithmeticExpr(ADD)
+ * IcebergV2CountStarAccumulator(ADD)
  *    /             \
  *   /               \
  *  /                 \
@@ -82,8 +80,7 @@ public enum CountStarToConstRule implements ExprRewriteRule {
           analyzer.getTotalRecordsNumV1()), Type.BIGINT);
     } else if (analyzer.canRewriteCountStartForV2()) {
       expr.setRewritten(true);
-      return new ArithmeticExpr(Operator.ADD, expr, NumericLiteral.create(
-          analyzer.getTotalRecordsNumV2()));
+      return new IcebergV2CountStarAccumulator(expr, analyzer.getTotalRecordsNumV2());
     } else {
       return expr;
     }

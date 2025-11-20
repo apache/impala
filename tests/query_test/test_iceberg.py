@@ -1597,6 +1597,10 @@ class TestIcebergV2Table(IcebergTestSuite):
       self.run_test_case('QueryTest/iceberg-v2-plain-count-star-optimization',
                          vector)
 
+  def test_count_star_optimization_in_complex_query(self, vector, unique_database):
+      self.run_test_case('QueryTest/iceberg-v2-count-star-optimization-in-complex-query',
+                         vector, unique_database)
+
   @SkipIfDockerizedCluster.internal_hostname
   @SkipIf.hardcoded_uris
   def test_read_position_deletes(self, vector):

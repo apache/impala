@@ -247,8 +247,7 @@ public class IcebergScanPlanner {
 
   private PlanNode createIcebergScanPlanImpl() throws ImpalaException {
     if (noDeleteFiles()) {
-      Preconditions.checkState(
-          !ctx_.getQueryCtx().isOptimize_count_star_for_iceberg_v2());
+      Preconditions.checkState(!tblRef_.optimizeCountStarForIcebergV2());
       // If there are no delete files we can just create a single SCAN node.
       Preconditions.checkState(dataFilesWithDeletes_.isEmpty());
       PlanNode ret = new IcebergScanNode(ctx_.getNextNodeId(), tblRef_, conjuncts_,
@@ -269,7 +268,7 @@ public class IcebergScanPlanner {
     // If the count star query can be optimized for Iceberg V2 table, the number of rows
     // of all DataFiles without corresponding DeleteFiles can be calculated by Iceberg
     // meta files, it's added using ArithmeticExpr.
-    if (ctx_.getQueryCtx().isOptimize_count_star_for_iceberg_v2()) return joinNode;
+    if (tblRef_.optimizeCountStarForIcebergV2()) return joinNode;
 
     // All data files has corresponding delete files, so we just return an ANTI JOIN
     // between all data files and all delete files.

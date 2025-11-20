@@ -1,0 +1,135 @@
+====
+---- QUERY
+-- Reference table
+CREATE TABLE expected_merge_exclude_columns (id integer,msg string,color string)
+STORED AS PARQUET;
+
+INSERT INTO expected_merge_exclude_columns VALUES
+    (1, 'hello',   'blue'),
+    (2, 'goodbye', 'green'),
+    (3, 'anyway',  'purple');
+
+-- base table
+CREATE TABLE merge_exclude_columns STORED BY ICEBERG AS
+  SELECT CAST(1 as integer) as id, 'hello' as msg, 'blue' as color
+  UNION ALL
+  SELECT CAST(2 as integer) as id, 'goodbye' as msg, 'red' as color;
+
+-- incremental update table
+CREATE TABLE merge_exclude_columns_tmp STORED BY ICEBERG as
+  select CAST(1 as integer) as id, 'hey' as msg, 'blue' as color
+  union all
+  select CAST(2 as integer) as id, 'yo' as msg, 'green' as color
+  union all
+  select CAST(3 as integer) as id, 'anyway' as msg, 'purple' as color;
+
+-- Do the MERGE
+MERGE INTO merge_exclude_columns as dest
+  USING merge_exclude_columns_tmp as source
+  ON (source.id = dest.id)
+  WHEN MATCHED THEN UPDATE SET
+    id = source.id, color = source.color
+  WHEN NOT MATCHED THEN INSERT
+    (id, msg, color)
+  VALUES
+    (source.id, source.msg, source.color);
+====
+---- QUERY
+-- Table merge_exclude_columns and table expected_merge_exclude_columns should
+-- have the same data so this query should return 0, 0
+-- First 0:  With the help of the EXCEPT set operator we calculate the number of
+--           records that differ.
+-- Second 0: With plain count(*) queries verify that the tables have the same number
+--           of records.
+-- In the RUNTIME_PROFILE we expect:
+--  "output exprs: count(*) - count(*) + CAST(3 AS BIGINT), count(*)'"
+--  Let's break them down:
+--    "count(*) - count(*) + CAST(3 AS BIGINT)":
+--      "count(*)                     : count(*) of expected_merge_exclude_columns.
+--      "count(*) + CAST(3 AS BIGINT)": adjusted count(*) expr for table merge_exclude_columns,
+--                                      this table has 3 rows in a data file without deletes, it
+--                                      is the data file added by the MERGE statement.
+--    "count(*)": count(*) in view 'diff_count'.
+with diff_count as (
+    SELECT
+        1 as id,
+        COUNT(*) as num_missing FROM (
+            (SELECT color, id, msg FROM expected_merge_exclude_columns EXCEPT
+             SELECT color, id, msg FROM merge_exclude_columns)
+             UNION ALL
+            (SELECT color, id, msg FROM merge_exclude_columns EXCEPT
+             SELECT color, id, msg FROM expected_merge_exclude_columns)
+        ) as a
+), table_a as (
+    SELECT COUNT(*) as num_rows FROM expected_merge_exclude_columns
+), table_b as (
+    SELECT COUNT(*) as num_rows FROM merge_exclude_columns
+), row_count_diff as (
+    select
+        1 as id,
+        table_a.num_rows - table_b.num_rows as difference
+    from table_a, table_b
+)
+select
+    row_count_diff.difference as row_count_difference,
+    diff_count.num_missing as num_mismatched
+from row_count_diff
+join diff_count using (id);
+---- RESULTS
+0,0
+---- TYPES
+BIGINT,BIGINT
+---- RUNTIME_PROFILE:
+  |  output exprs: count(*) - count(*) + CAST(3 AS BIGINT), count(*)
+====
+---- QUERY
+-- Let's have modifications in the reference table as well.
+ALTER TABLE expected_merge_exclude_columns CONVERT TO ICEBERG;
+UPDATE expected_merge_exclude_columns SET color = 'GREEN' WHERE id = 2;
+UPDATE expected_merge_exclude_columns SET color = 'green' WHERE id = 2;
+
+-- Verify that the results are still correct when the different count(*) exprs
+-- need different adjustments.
+-- In the RUNTIME_PROFILE we expect:
+--  "output exprs: count(*) + CAST(1 AS BIGINT) - count(*) + CAST(3 AS BIGINT), count(*)'"
+--  Let's break them down:
+--    "count(*) + CAST(1 AS BIGINT) - count(*) + CAST(3 AS BIGINT)":
+--      "count(*) + CAST(1 AS BIGINT)": adjusted count(*) expr for expected_merge_exclude_columns,
+--                                      this table has 1 row in a data file without deletes, it
+--                                      is the data file added by the last UPDATE.
+--      "count(*) + CAST(3 AS BIGINT)": adjusted count(*) expr for table merge_exclude_columns,
+--                                      this table has 3 rows in a data file without deletes, it
+--                                      is the data file added by the MERGE statement.
+--    "count(*)": count(*) in view 'diff_count'.
+with diff_count as (
+    SELECT
+        1 as id,
+        COUNT(*) as num_missing FROM (
+            (SELECT color, id, msg FROM expected_merge_exclude_columns EXCEPT
+             SELECT color, id, msg FROM merge_exclude_columns)
+             UNION ALL
+            (SELECT color, id, msg FROM merge_exclude_columns EXCEPT
+             SELECT color, id, msg FROM expected_merge_exclude_columns)
+        ) as a
+), table_a as (
+    SELECT COUNT(*) as num_rows FROM expected_merge_exclude_columns
+), table_b as (
+    SELECT COUNT(*) as num_rows FROM merge_exclude_columns
+), row_count_diff as (
+    select
+        1 as id,
+        table_a.num_rows - table_b.num_rows as difference
+    from table_a, table_b
+)
+select
+    row_count_diff.difference as row_count_difference,
+    diff_count.num_missing as num_mismatched
+from row_count_diff
+join diff_count using (id);
+---- RESULTS
+0,0
+---- TYPES
+BIGINT,BIGINT
+---- RUNTIME_PROFILE:
+  |  output exprs: count(*) + CAST(1 AS BIGINT) - count(*) + CAST(3 AS BIGINT), count(*)
+====
