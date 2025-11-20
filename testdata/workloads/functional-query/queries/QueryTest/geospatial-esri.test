@@ -2717,6 +2717,7 @@ select ST_AsText(ST_SetSRID(ST_GeomFromText('MultiLineString((0 80, 0.03 80.04))
 'MULTILINESTRING ((0 80, 0.03 80.04))'
 ====
 ---- QUERY
+# TODO: move these new tests to geospatial-esri-extra?
 # NOTE: Due to HIVE-29323 ESRI returns MULTIPOLYGON EMPTY for single point
 # PostGIS would return: POINT (1 2)
 select ST_AsText(ST_ConvexHull(ST_Point(1, 2)));

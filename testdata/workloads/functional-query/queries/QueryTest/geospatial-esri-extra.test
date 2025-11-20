@@ -1,0 +1,394 @@
+=====
+---- QUERY
+select st_bin(1, "point empty")
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+select st_bin(1, "point(10 10)")
+---- TYPES
+BIGINT
+---- RESULTS
+4611685985093119520
+====
+---- QUERY
+select st_bin(1.0, st_point(10, 10))
+---- TYPES
+BIGINT
+---- RESULTS
+4611685985093119520
+====
+---- QUERY
+select st_bin(1.0, "point(-200 50)")
+---- TYPES
+BIGINT
+---- RESULTS
+4611685863613099350
+====
+---- QUERY
+select st_bin(1, st_point(-200, 50))
+---- TYPES
+BIGINT
+---- RESULTS
+4611685863613099350
+====
+---- QUERY
+select st_bin(1, "point(-500 -1000)")
+---- TYPES
+BIGINT
+---- RESULTS
+4611689052463623000
+====
+---- QUERY
+select st_bin(1.0, st_point(-500, -1000))
+---- TYPES
+BIGINT
+---- RESULTS
+4611689052463623000
+====
+---- QUERY
+select st_bin(1.0, "point(800 -5000)")
+---- TYPES
+BIGINT
+---- RESULTS
+4611701200465620300
+====
+---- QUERY
+select st_bin(1, st_point(800, -5000))
+---- TYPES
+BIGINT
+---- RESULTS
+4611701200465620300
+====
+
+---- QUERY
+select st_astext(st_binenvelope(1, 4611685985093119520));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((9.5 9.5, 10.5 9.5, 10.5 10.5, 9.5 10.5, 9.5 9.5))'
+====
+---- QUERY
+select st_astext(st_binenvelope(1.0, 4611685985093119520));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((9.5 9.5, 10.5 9.5, 10.5 10.5, 9.5 10.5, 9.5 9.5))'
+====
+
+---- QUERY
+select st_astext(st_binenvelope(1, 4611685863613099350));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((-200.5 49.5, -199.5 49.5, -199.5 50.5, -200.5 50.5, -200.5 49.5))'
+====
+---- QUERY
+select st_astext(st_binenvelope(1.0, 4611685863613099350));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((-200.5 49.5, -199.5 49.5, -199.5 50.5, -200.5 50.5, -200.5 49.5))'
+====
+
+---- QUERY
+select st_astext(st_binenvelope(1, 4611689052463623000));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((-500.5 -1000.5, -499.5 -1000.5, -499.5 -999.5, -500.5 -999.5, -500.5 -1000.5))'
+====
+---- QUERY
+select st_astext(st_binenvelope(1.0, 4611689052463623000));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((-500.5 -1000.5, -499.5 -1000.5, -499.5 -999.5, -500.5 -999.5, -500.5 -1000.5))'
+====
+
+---- QUERY
+select st_astext(st_binenvelope(1, 4611701200465620300));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((799.5 -5000.5, 800.5 -5000.5, 800.5 -4999.5, 799.5 -4999.5, 799.5 -5000.5))'
+====
+---- QUERY
+select st_astext(st_binenvelope(1.0, 4611701200465620300));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((799.5 -5000.5, 800.5 -5000.5, 800.5 -4999.5, 799.5 -4999.5, 799.5 -5000.5))'
+====
+
+---- QUERY
+select st_astext(st_binenvelope(1, st_point(1, 2)));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((1 1, 2 1, 2 2, 1 2, 1 1))'
+====
+---- QUERY
+select st_astext(st_binenvelope(1.0, st_point(1, 2)));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((1 1, 2 1, 2 2, 1 2, 1 1))'
+====
+
+---- QUERY
+select st_astext(st_binenvelope(1, "point(1 2)"));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((1 1, 2 1, 2 2, 1 2, 1 1))'
+====
+---- QUERY
+select st_astext(st_binenvelope(1.0, "point(1 2)"));
+---- TYPES
+STRING
+---- RESULTS
+'POLYGON ((1 1, 2 1, 2 2, 1 2, 1 1))'
+====
+---- QUERY
+# ST_Intersects(BINARY, STRING)
+select ST_Intersects(st_polygon(2,0, 2,3, 3,0), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Intersects(st_polygon(0,0, 0,1, 0.5,1), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Intersects(st_polygon(0,0, 0,1, 1,1), "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,true
+====
+---- QUERY
+# ST_Intersects(STRING, BINARY)
+select ST_Intersects("POLYGON ((2 0, 2 3, 3 0))",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Intersects("POLYGON ((0 0, 0 1, 0.5 1))",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Intersects("POLYGON ((0 0, 0 1, 1 1))",  ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,true
+====
+---- QUERY
+# ST_Intersects(STRING, STRING)
+select ST_Intersects("POLYGON ((2 0, 2 3, 3 0))", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Intersects("POLYGON ((0 0, 0 1, 0.5 1))", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Intersects("POLYGON ((0 0, 0 1, 1 1))", "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,true
+====
+---- QUERY
+# ST_Overlaps(BINARY, STRING)
+select ST_Overlaps(st_polygon(2,0, 2,3, 3,0), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Overlaps(st_polygon(0,0, 0,1, 0.5,1), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Overlaps(st_polygon(0,0, 0,1, 1,1), "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false
+====
+---- QUERY
+# ST_Overlaps(STRING, BINARY)
+select ST_Overlaps("POLYGON ((2 0, 2 3, 3 0))",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Overlaps("POLYGON ((0 0, 0 1, 0.5 1))",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Overlaps("POLYGON ((0 0, 0 1, 1 1))",  ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false
+====
+---- QUERY
+# ST_Overlaps(STRING, STRING)
+select ST_Overlaps("POLYGON ((2 0, 2 3, 3 0))", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Overlaps("POLYGON ((0 0, 0 1, 0.5 1))", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Overlaps("POLYGON ((0 0, 0 1, 1 1))", "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false
+====
+---- QUERY
+# ST_Touches(BINARY, STRING)
+select ST_Touches(st_polygon(2,0, 2,3, 3,0), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Touches(st_polygon(0,0, 0,1, 0.5,1), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Touches(st_polygon(0,0, 0,1, 1,1), "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,true
+====
+---- QUERY
+# ST_Touches(STRING, BINARY)
+select ST_Touches("POLYGON ((2 0, 2 3, 3 0))",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Touches("POLYGON ((0 0, 0 1, 0.5 1))",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Touches("POLYGON ((0 0, 0 1, 1 1))",  ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,true
+====
+---- QUERY
+# ST_Touches(STRING, STRING)
+select ST_Touches("POLYGON ((2 0, 2 3, 3 0))", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Touches("POLYGON ((0 0, 0 1, 0.5 1))", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Touches("POLYGON ((0 0, 0 1, 1 1))", "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,true
+====
+---- QUERY
+# ST_Contains(BINARY, STRING)
+select ST_Contains(st_polygon(2,2, 2,3, 3,2), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Contains(st_polygon(0,0, 2,3, 3,2), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Contains(st_polygon(0,0, 10,0, 0, 10), "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,true
+====
+---- QUERY
+# ST_Contains(STRING, BINARY)
+select ST_Contains("POLYGON ((2 0, 2 3, 3 2))",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Contains("POLYGON ((0 0, 2 3, 3 2))",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Contains("POLYGON ((0 0, 10 0, 0 10))",  ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,true
+====
+---- QUERY
+# ST_Contains(STRING, STRING)
+select ST_Contains("POLYGON ((2 0, 2 3, 3 2))", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Contains("POLYGON ((0 0, 2 3, 3 2))", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Contains("POLYGON ((0 0, 10 0, 0 10))", "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,true
+====
+---- QUERY
+# ST_Within(BINARY, STRING)
+select ST_Within(st_polygon(2,2, 2,3, 3,2), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Within(st_polygon(0,0, 2,3, 3,2), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Within(st_polygon(0,0, 10,0, 0, 10), "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false
+====
+---- QUERY
+# ST_Within(STRING, BINARY)
+select ST_Within("POLYGON ((2 2, 2 3, 3 2))",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Within("POLYGON ((0 0, 2 3, 3 2))",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Within("POLYGON ((0 0, 10 0, 0 10))",  ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false
+====
+---- QUERY
+# ST_Within(STRING, STRING)
+select ST_Within("POLYGON ((2 2, 2 3, 3 2))", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Within("POLYGON ((0 0, 2 3, 3 2))", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Within("POLYGON ((0 0, 10 0, 0 10))", "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+true,false,false
+====
+---- QUERY
+# ST_Crosses(BINARY, STRING)
+select ST_Crosses(st_linestring(2,2, 3,3), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Crosses(st_linestring(0,0, 1,1), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Crosses(st_linestring(0,0, 3,3), "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,true
+====
+---- QUERY
+# ST_Crosses(STRING, BINARY)
+select ST_Crosses("LINESTRING (2 2, 3 3)",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Crosses("LINESTRING (0 0, 1 1)",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Crosses("LINESTRING (0 0, 3 3)",  ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,true
+====
+---- QUERY
+# ST_Crosses(STRING, STRING)
+select ST_Crosses("LINESTRING (2 2, 3 3)", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Crosses("LINESTRING (0 0, 1 1)", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Crosses("LINESTRING (0 0, 3 3)", "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,false,true
+====
+---- QUERY
+# ST_Disjoint(BINARY, STRING)
+select ST_Disjoint(st_linestring(2,2, 3,3), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Disjoint(st_linestring(1,0, 0,1), "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Disjoint(st_linestring(0,0, 3,3), "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,true,false
+====
+---- QUERY
+# ST_Disjoint(STRING, BINARY)
+select ST_Disjoint("LINESTRING (2 2, 3 3)",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Disjoint("LINESTRING (1 0, 0 1)",  ST_Polygon(1,1, 1,4, 4,4, 4,1)),
+       ST_Disjoint("LINESTRING (0 0, 3 3)",  ST_Polygon(1,1, 1,4, 4,4, 4,1));
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,true,false
+====
+---- QUERY
+# ST_Disjoint(STRING, STRING)
+select ST_Disjoint("LINESTRING (2 2, 3 3)", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Disjoint("LINESTRING (1 0, 0 1)", "POLYGON ((1 1, 1 4, 4 4, 4 1))"),
+       ST_Disjoint("LINESTRING (0 0, 3 3)", "POLYGON ((1 1, 1 4, 4 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,true,false
+====
+---- QUERY
+# ST_Equals(BINARY, STRING)
+select ST_Equals(st_polygon(2,0, 2,3, 3,0), "POLYGON ((1 1, 1 4, 4 1))"),
+       ST_Equals(st_polygon(1,1, 1,4, 4,1), "POLYGON ((1 1, 1 4, 4 1))"),
+       ST_Equals(st_polygon(0,0, 0,1, 1,0), "POLYGON ((1 1, 1 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,true,false
+====
+---- QUERY
+# ST_Equals(STRING, BINARY)
+select ST_Equals("POLYGON ((2 0, 2 3, 3 0))",  ST_Polygon(1,1, 1,4, 4,1)),
+       ST_Equals("POLYGON ((1 1, 1 4, 4 1))",  ST_Polygon(1,1, 1,4, 4,1)),
+       ST_Equals("POLYGON ((0 0, 0 1, 1 0))",  ST_Polygon(1,1, 1,4, 4,1));
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,true,false
+====
+---- QUERY
+# ST_Equals(STRING, STRING)
+select ST_Equals("POLYGON ((2 0, 2 3, 3 0))", "POLYGON ((1 1, 1 4, 4 1))"),
+       ST_Equals("POLYGON ((1 1, 1 4, 4 1))", "POLYGON ((1 1, 1 4, 4 1))"),
+       ST_Equals("POLYGON ((0 0, 0 1, 1 0))", "POLYGON ((1 1, 1 4, 4 1))");
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN
+---- RESULTS
+false,true,false
+====

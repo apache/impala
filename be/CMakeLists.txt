@@ -531,6 +531,7 @@ set (IMPALA_LIBS
   ExecPaimon
   Exprs
   ExprsIr
+  ExprsGeoIr
   GlobalFlags
   histogram_proto
   ImpalaThrift

@@ -77,7 +77,7 @@ function(COMPILE_TO_IR_C_ARRAY IR_C_FILE VARNAME)
             ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_TMP_OUTPUT_FILE}
     COMMAND ${LLVM_OPT_EXECUTABLE} ${LLVM_OPT_IR_FLAGS} < ${IR_TMP_OUTPUT_FILE} > ${IR_OUTPUT_FILE}
     COMMAND rm ${IR_TMP_OUTPUT_FILE}
-    DEPENDS ExecIr ExecAvroIr ExecKuduIr ExprsIr RuntimeIr UdfIr UtilIr ${IR_INPUT_FILES}
+    DEPENDS ExecIr ExecAvroIr ExprsGeoIr ExecKuduIr ExprsIr RuntimeIr UdfIr UtilIr ${IR_INPUT_FILES}
   )
 
   # Convert LLVM bytecode to C array.

@@ -22,6 +22,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfApacheHive
 
 ST_POINT_SIGNATURE = "BINARY\tst_point(STRING)\tJAVA\ttrue"
+ST_X_SIGNATURE_BUILTIN = "DOUBLE\tst_x(BINARY)\tBUILTIN\ttrue"
 SHOW_FUNCTIONS = "show functions in _impala_builtins"
 
 
@@ -34,9 +35,11 @@ class TestGeospatialLibrary(CustomClusterTestSuite):
   def test_disabled(self):
     result = self.execute_query(SHOW_FUNCTIONS)
     assert ST_POINT_SIGNATURE not in result.data
+    assert ST_X_SIGNATURE_BUILTIN not in result.data
 
   @SkipIfApacheHive.feature_not_supported
   @pytest.mark.execute_serially
   def test_enabled(self):
     result = self.execute_query(SHOW_FUNCTIONS)
     assert ST_POINT_SIGNATURE in result.data
+    assert ST_X_SIGNATURE_BUILTIN in result.data

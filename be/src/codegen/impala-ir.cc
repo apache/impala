@@ -49,6 +49,7 @@
 #include "exprs/date-functions-ir.cc"
 #include "exprs/decimal-functions-ir.cc"
 #include "exprs/decimal-operators-ir.cc"
+#include "exprs/geo/geospatial-functions-ir.cc"
 #include "exprs/hive-udf-call-ir.cc"
 #include "exprs/iceberg-functions-ir.cc"
 #include "exprs/in-predicate-ir.cc"

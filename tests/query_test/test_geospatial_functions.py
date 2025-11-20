@@ -18,14 +18,29 @@
 from __future__ import absolute_import, division, print_function
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfApacheHive
+from tests.common.test_dimensions import create_single_exec_option_dimension
 
 
 class TestGeospatialFuctions(ImpalaTestSuite):
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestGeospatialFuctions, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    # Tests do not use tables at the moment, skip other fileformats than Parquet.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet')
+
   """Tests the geospatial builtin functions"""
   @SkipIfApacheHive.feature_not_supported
   def test_esri_geospatial_functions(self, vector):
+    # tests generated from
+    # https://github.com/Esri/spatial-framework-for-hadoop/tree/master/hive/test
     self.run_test_case('QueryTest/geospatial-esri', vector)
+    # manual tests added
+    self.run_test_case('QueryTest/geospatial-esri-extra', vector)
 
+  @SkipIfApacheHive.feature_not_supported
   def test_esri_geospatial_planner(self, vector):
     # These tests are not among planner tests because with default flags
     # geospatial builtin functions are not loaded.

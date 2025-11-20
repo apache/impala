@@ -48,42 +48,67 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.hive.executor.BinaryToBinaryHiveLegacyFunctionExtractor;
 import org.apache.impala.hive.executor.HiveJavaFunction;
 import org.apache.impala.hive.executor.HiveLegacyJavaFunction;
+import org.apache.impala.service.BackendConfig;
 
 import com.google.common.base.Preconditions;
 
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TGeospatialLibrary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HiveEsriGeospatialBuiltins {
+  private final static Logger LOG = LoggerFactory.getLogger(
+      HiveEsriGeospatialBuiltins.class);
+
   /**
    * Initializes Hive's ESRI geospatial UDFs as builtins.
    */
   public static void initBuiltins(Db db) {
-    addLegacyUDFs(db);
+    TGeospatialLibrary lib = BackendConfig.INSTANCE.getGeospatialLibrary();
+    // Currently all native functions are expected to be 100% compatible with the Java
+    // version. This is not true for the full function set of
+    // https://gerrit.cloudera.org/#/c/20602/ , which sets based on a flag to allow
+    // full compatibility with Hive.
+    boolean addNatives = true;
+    addLegacyUDFs(db, addNatives);
     addGenericUDFs(db);
     addVarargsUDFs(db);
+    if(addNatives) {
+      addNatives(db);
+    }
   }
 
-  private static void addLegacyUDFs(Db db) {
+  private static void addLegacyUDFs(Db db, boolean addNatives) {
     List<UDF> legacyUDFs = Arrays.asList(new ST_Area(), new ST_AsBinary(),
         new ST_AsGeoJson(), new ST_AsJson(), new ST_AsShape(), new ST_AsText(),
         new ST_Boundary(), new ST_Buffer(), new ST_Centroid(), new ST_CoordDim(),
         new ST_Difference(), new ST_Dimension(), new ST_Distance(), new ST_EndPoint(),
-        new ST_Envelope(), new ST_EnvIntersects(), new ST_ExteriorRing(),
+        new ST_Envelope(), new ST_ExteriorRing(),
         new ST_GeodesicLengthWGS84(), new ST_GeomCollection(), new ST_GeometryN(),
-        new ST_GeometryType(), new ST_GeomFromShape(), new ST_GeomFromText(),
+        new ST_GeomFromShape(), new ST_GeomFromText(),
         new ST_GeomFromWKB(), new ST_InteriorRingN(), new ST_Intersection(),
         new ST_Is3D(), new ST_IsClosed(), new ST_IsEmpty(), new ST_IsMeasured(),
         new ST_IsRing(), new ST_IsSimple(), new ST_Length(), new ST_LineFromWKB(),
-        new ST_M(), new ST_MaxM(), new ST_MaxX(), new ST_MaxY(), new ST_MaxZ(),
-        new ST_MinM(), new ST_MinX(), new ST_MinY(), new ST_MinZ(), new ST_MLineFromWKB(),
+        new ST_M(), new ST_MaxM(), new ST_MaxZ(),
+        new ST_MinM(), new ST_MinZ(), new ST_MLineFromWKB(),
         new ST_MPointFromWKB(), new ST_MPolyFromWKB(), new ST_NumGeometries(),
         new ST_NumInteriorRing(), new ST_NumPoints(), new ST_Point(),
         new ST_PointFromWKB(), new ST_PointN(), new ST_PointZ(), new ST_PolyFromWKB(),
-        new ST_Relate(), new ST_SRID(), new ST_StartPoint(), new ST_SymmetricDiff(),
-        new ST_X(), new ST_Y(), new ST_Z(), new ST_SetSRID());
+        new ST_Relate(),  new ST_StartPoint(), new ST_SymmetricDiff(),
+        new ST_Z());
+
+    List<UDF> legacyUDFsWithNativeImplementation = Arrays.asList(
+        new ST_EnvIntersects(), new ST_GeometryType(),
+        new ST_MaxX(), new ST_MaxY(),
+        new ST_MinX(), new ST_MinY(),
+        new ST_SRID(), new ST_SetSRID(),
+        new ST_X(), new ST_Y()
+    );
+    if (!addNatives) {
+      legacyUDFs.addAll(legacyUDFsWithNativeImplementation);
+    }
 
     for (UDF udf : legacyUDFs) {
       for (Function fn : extractFromLegacyHiveBuiltin(udf, db.getName())) {
@@ -205,5 +230,36 @@ public class HiveEsriGeospatialBuiltins {
           return createScalarFunction(genericUDF, returnType, arguments);
         })
         .collect(Collectors.toList());
+  }
+
+  private static void addNative(Db db, String fnNameBase, String fnNameSuffix,
+      boolean varArgs, Type retType, Type... argTypes) {
+    String udfName = fnNameBase.toLowerCase();
+    String geospatialFnPrefix = "impala::geo::GeospatialFunctions::";
+    String cppSymbolName = geospatialFnPrefix + fnNameBase + fnNameSuffix;
+
+    db.addScalarBuiltin(udfName, cppSymbolName, true, varArgs, retType, argTypes);
+  }
+
+  private static void addNative(Db db, String fnName, boolean varArgs, Type retType,
+      Type... argTypes) {
+    addNative(db, fnName, "", varArgs, retType, argTypes);
+  }
+
+  private static void addNatives(Db db) {
+    // Legacy UDFs.
+    // Accessors.
+    addNative(db, "st_MinX", false, Type.DOUBLE, Type.BINARY);
+    addNative(db, "st_MaxX", false, Type.DOUBLE, Type.BINARY);
+    addNative(db, "st_MinY", false, Type.DOUBLE, Type.BINARY);
+    addNative(db, "st_MaxY", false, Type.DOUBLE, Type.BINARY);
+    addNative(db, "st_X", false, Type.DOUBLE, Type.BINARY);
+    addNative(db, "st_Y", false, Type.DOUBLE, Type.BINARY);
+    addNative(db, "st_Srid", false, Type.INT, Type.BINARY);
+    addNative(db, "st_SetSrid", false, Type.BINARY, Type.BINARY, Type.INT);
+    addNative(db, "st_GeometryType", false, Type.STRING, Type.BINARY);
+
+    // Predicates.
+    addNative(db, "st_EnvIntersects", false, Type.BOOLEAN, Type.BINARY, Type.BINARY);
   }
 }

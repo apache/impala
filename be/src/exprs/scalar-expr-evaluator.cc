@@ -33,6 +33,7 @@
 #include "exprs/date-functions.h"
 #include "exprs/decimal-functions.h"
 #include "exprs/decimal-operators.h"
+#include "exprs/geo/geospatial-functions.h"
 #include "exprs/hive-udf-call.h"
 #include "exprs/iceberg-functions.h"
 #include "exprs/in-predicate.h"
@@ -459,6 +460,7 @@ void ScalarExprEvaluator::InitBuiltinsDummy() {
   DataSketchesFunctions::DsHllEstimate(nullptr, StringVal::null());
   DecimalFunctions::Precision(nullptr, DecimalVal::null());
   DecimalOperators::CastToDecimalVal(nullptr, DecimalVal::null());
+  geo::GeospatialFunctions::st_MaxX(nullptr, StringVal::null());
   IcebergFunctions::TruncatePartitionTransform(nullptr, IntVal::null(), IntVal::null());
   InPredicate::InIterate(nullptr, BigIntVal::null(), 0, nullptr);
   IsNullPredicate::IsNull(nullptr, BooleanVal::null());
