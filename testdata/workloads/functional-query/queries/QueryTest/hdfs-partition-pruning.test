@@ -1,0 +1,17 @@
+====
+---- QUERY
+# IMPALA-14569: failing partition pruning due to mismatchig partition types
+create table a(id int) partitioned by (date_stored_as_string string);
+create table b(id int) partitioned by (date_stored_as_date date);
+insert into a(id, date_stored_as_string) values(1, '2025-12-12');
+insert into a(id, date_stored_as_string) values(1, '2025-12-10');
+insert into b(id, date_stored_as_date) values(1, '2025-12-12');
+select * from b
+left outer join a on date_stored_as_date = date_stored_as_string
+where date_stored_as_date in ( '2025-12-12');
+---- RESULTS
+1,2025-12-12,1,'2025-12-12'
+---- TYPES
+INT,DATE,INT,STRING
+---- RUNTIME_PROFILE
+row_regex:.*HDFS partitions=1/2 files=1 size=2B

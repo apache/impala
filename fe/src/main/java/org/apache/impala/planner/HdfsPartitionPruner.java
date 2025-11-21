@@ -285,6 +285,9 @@ public class HdfsPartitionPruner {
       if (slot == null) return false;
       for (int i = 1; i < expr.getChildren().size(); ++i) {
         if (!Expr.IS_LITERAL.apply(expr.getChild(i))) return false;
+        // Mismatched types should be evaluated with their respective casts
+        // in the backend.
+        if (!slot.getType().equals(expr.getChild(i).getType())) return false;
       }
       return true;
     }

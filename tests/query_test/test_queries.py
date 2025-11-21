@@ -358,6 +358,10 @@ class TestHdfsQueries(ImpalaTestSuite):
   def test_file_partitions(self, vector):
     self.run_test_case('QueryTest/hdfs-partitions', vector)
 
+  def test_partition_pruning(self, vector, unique_database):
+    self.run_test_case('QueryTest/hdfs-partition-pruning',
+        vector, unique_database)
+
 
 class TestPartitionKeyScans(ImpalaTestSuite):
   """Tests for queries that exercise partition key scan optimisation. These
