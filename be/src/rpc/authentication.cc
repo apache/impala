@@ -1237,6 +1237,41 @@ Status InitAuth(const string& appname) {
   return Status::OK();
 }
 
+// Helper function to format file permissions as a string (e.g., "drwxrwxrwt").
+string FormatPermissions(mode_t mode) {
+  string result(10, '-');
+
+  // File type
+  if (S_ISDIR(mode)) result[0] = 'd';
+  else if (S_ISLNK(mode)) result[0] = 'l';
+  else if (S_ISBLK(mode)) result[0] = 'b';
+  else if (S_ISCHR(mode)) result[0] = 'c';
+  else if (S_ISFIFO(mode)) result[0] = 'p';
+  else if (S_ISSOCK(mode)) result[0] = 's';
+
+  // Owner permissions
+  if (mode & S_IRUSR) result[1] = 'r';
+  if (mode & S_IWUSR) result[2] = 'w';
+  if (mode & S_IXUSR) result[3] = 'x';
+
+  // Group permissions
+  if (mode & S_IRGRP) result[4] = 'r';
+  if (mode & S_IWGRP) result[5] = 'w';
+  if (mode & S_IXGRP) result[6] = 'x';
+
+  // Other permissions
+  if (mode & S_IROTH) result[7] = 'r';
+  if (mode & S_IWOTH) result[8] = 'w';
+  if (mode & S_IXOTH) result[9] = 'x';
+
+  // Special bits (setuid, setgid, sticky)
+  if (mode & S_ISUID) result[3] = (mode & S_IXUSR) ? 's' : 'S';
+  if (mode & S_ISGID) result[6] = (mode & S_IXGRP) ? 's' : 'S';
+  if (mode & S_ISVTX) result[9] = (mode & S_IXOTH) ? 't' : 'T';
+
+  return result;
+}
+
 // Ensure that /var/tmp (the location of the Kerberos replay cache) has drwxrwxrwt
 // permissions.  If it doesn't, Kerberos will be unhappy in a way that's very difficult
 // to debug.  We do this using direct stat() calls because boost doesn't support the
@@ -1254,9 +1289,10 @@ Status CheckReplayCacheDirPermissions() {
   }
 
   if ((st.st_mode & 01777) != 01777) {
-    return Status("Error: The permissions on /var/tmp must precisely match "
-        "\"drwxrwxrwt\". This directory is used by the Kerberos replay cache. To "
-        "rectify this issue, run \"chmod 01777 /var/tmp\" as root.");
+    return Status(Substitute("Error: The permissions on /var/tmp must precisely match "
+        "\"drwxrwxrwt\". This directory is used by the Kerberos replay cache. "
+        "Current permissions: \"$0\". To rectify this issue, run "
+        "\"chmod 01777 /var/tmp\" as root.", FormatPermissions(st.st_mode)));
   }
 
   return Status::OK();

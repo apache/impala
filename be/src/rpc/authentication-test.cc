@@ -61,6 +61,9 @@ int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
     const char* def_realm, unsigned urlen,
     struct propctx* propctx);
 
+// Expose the FormatPermissions function for testing
+string FormatPermissions(mode_t mode);
+
 TEST(Auth, PrincipalSubstitution) {
   string hostname;
   ASSERT_OK(GetHostname(&hostname));
@@ -386,6 +389,73 @@ TEST(Auth, UserUtilities) {
     ss << "Could not parse Kerberos name " << bad_name;
     ASSERT_ERROR_MSG(GetEffectiveShortUser(session, &unused), ss.str());
   }
+}
+
+// Test for IMPALA-13941: FormatPermissions correctly formats file permissions
+TEST(Auth, FormatPermissions) {
+  // Test directory with standard /var/tmp permissions (01777 = drwxrwxrwt)
+  mode_t mode = S_IFDIR | 01777;
+  ASSERT_EQ("drwxrwxrwt", FormatPermissions(mode));
+
+  // Test directory with common permissions (0755 = drwxr-xr-x)
+  mode = S_IFDIR | 0755;
+  ASSERT_EQ("drwxr-xr-x", FormatPermissions(mode));
+
+  // Test directory with restricted permissions (0700 = drwx------)
+  mode = S_IFDIR | 0700;
+  ASSERT_EQ("drwx------", FormatPermissions(mode));
+
+  // Test directory with sticky bit but not world-writable (01755 = drwxr-xr-t)
+  mode = S_IFDIR | 01755;
+  ASSERT_EQ("drwxr-xr-t", FormatPermissions(mode));
+
+  // Test regular file with common permissions (0644 = -rw-r--r--)
+  mode = S_IFREG | 0644;
+  ASSERT_EQ("-rw-r--r--", FormatPermissions(mode));
+
+  // Test executable file (0755 = -rwxr-xr-x)
+  mode = S_IFREG | 0755;
+  ASSERT_EQ("-rwxr-xr-x", FormatPermissions(mode));
+
+  // Test file with setuid bit (04755 = -rwsr-xr-x)
+  mode = S_IFREG | S_ISUID | 0755;
+  ASSERT_EQ("-rwsr-xr-x", FormatPermissions(mode));
+
+  // Test file with setgid bit (02755 = -rwxr-sr-x)
+  mode = S_IFREG | S_ISGID | 0755;
+  ASSERT_EQ("-rwxr-sr-x", FormatPermissions(mode));
+
+  // Test file with setuid but no execute (04644 = -rwSr--r--)
+  mode = S_IFREG | S_ISUID | 0644;
+  ASSERT_EQ("-rwSr--r--", FormatPermissions(mode));
+
+  // Test symbolic link (0777 = lrwxrwxrwx)
+  mode = S_IFLNK | 0777;
+  ASSERT_EQ("lrwxrwxrwx", FormatPermissions(mode));
+
+  // Test block device (0660 = brw-rw----)
+  mode = S_IFBLK | 0660;
+  ASSERT_EQ("brw-rw----", FormatPermissions(mode));
+
+  // Test character device (0666 = crw-rw-rw-)
+  mode = S_IFCHR | 0666;
+  ASSERT_EQ("crw-rw-rw-", FormatPermissions(mode));
+
+  // Test FIFO/pipe (0644 = prw-r--r--)
+  mode = S_IFIFO | 0644;
+  ASSERT_EQ("prw-r--r--", FormatPermissions(mode));
+
+  // Test socket (0755 = srwxr-xr-x)
+  mode = S_IFSOCK | 0755;
+  ASSERT_EQ("srwxr-xr-x", FormatPermissions(mode));
+
+  // Test no permissions (0000 = d---------)
+  mode = S_IFDIR | 0000;
+  ASSERT_EQ("d---------", FormatPermissions(mode));
+
+  // Test sticky bit without execute (01776 = drwxrwxrwT)
+  mode = S_IFDIR | 01776;
+  ASSERT_EQ("drwxrwxrwT", FormatPermissions(mode));
 }
 
 }
