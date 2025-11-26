@@ -20,7 +20,7 @@ package org.apache.impala.catalog.paimon;
 
 import static org.apache.impala.catalog.Table.isExternalPurgeTable;
 import static org.apache.paimon.CoreOptions.PARTITION_DEFAULT_NAME;
-import static org.apache.paimon.CoreOptions.PARTITION_GENERATE_LEGCY_NAME;
+import static org.apache.paimon.CoreOptions.PARTITION_GENERATE_LEGACY_NAME;
 import static org.apache.paimon.utils.HadoopUtils.HADOOP_LOAD_DEFAULT_CONFIG;
 
 import com.google.common.base.Preconditions;
@@ -825,7 +825,7 @@ public class PaimonUtil {
     InternalRowPartitionComputer computer =
         new InternalRowPartitionComputer(options.get(PARTITION_DEFAULT_NAME),
             table.rowType(), table.partitionKeys().toArray(new String[0]),
-            options.get(PARTITION_GENERATE_LEGCY_NAME));
+            options.get(PARTITION_GENERATE_LEGACY_NAME));
 
     for (Split split : plan.splits()) {
       if (!(split instanceof DataSplit)) continue;
