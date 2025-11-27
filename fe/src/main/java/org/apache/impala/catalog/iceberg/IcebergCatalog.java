@@ -79,13 +79,13 @@ public interface IcebergCatalog {
 
   /**
    * Renames Iceberg table.
-   * For HadoopTables, Iceberg does not supported 'renameTable' method
+   * For HadoopTables, Iceberg does not support 'renameTable' method
    * For HadoopCatalog, Iceberg implement 'renameTable' method with Exception threw
    */
   void renameTable(FeIcebergTable feTable, TableIdentifier newTableId);
 
   /**
-   * Some of the implemetation methods might be running on native threads as they might
+   * Some of the implementation methods might be running on native threads as they might
    * be invoked via JNI. In that case the context class loader for those threads are
    * null. 'Catalogs' dynamically loads catalog implementations, e.g. HadoopCatalog or
    * HiveCatalog. It uses the context class loader, but as it is null it falls back

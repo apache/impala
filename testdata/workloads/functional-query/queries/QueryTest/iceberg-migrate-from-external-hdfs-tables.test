@@ -304,11 +304,25 @@ select * from table_at_random_location;
 int, string
 ====
 ---- QUERY
-# Currently not feasible to convert directly into a V2 Iceberg table.
-create table converted_into_v2 (i int) partitioned by (s string) stored as parquet;
-alter table converted_into_v2 convert to iceberg tblproperties ('format-version'='2');
+# Convert to non-default format-version 1, it should work.
+create table converted_into_v1 (i int) partitioned by (s string) stored as parquet;
+alter table converted_into_v1 convert to iceberg tblproperties ('format-version'='1');
+---- RESULTS
+'Table has been migrated.'
+====
+---- QUERY
+describe formatted converted_into_v1;
+---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','1                   '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Currently not feasible to convert directly into a V3 Iceberg table.
+create table converted_into_v3 (i int) partitioned by (s string) stored as parquet;
+alter table converted_into_v3 convert to iceberg tblproperties ('format-version'='3');
 ---- CATCH
-AnalysisException: CONVERT TO ICEBERG only accepts 'iceberg.catalog' as TBLPROPERTY.
+AnalysisException: Unsupported Iceberg format version '3'.
 ====
 ---- QUERY
 create table simple_tbl (i int) stored as parquet;

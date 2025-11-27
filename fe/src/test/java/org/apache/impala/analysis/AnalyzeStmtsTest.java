@@ -5221,8 +5221,18 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("alter table functional.tinytable convert to iceberg",
         "CONVERT TO ICEBERG is not supported for " +
         "org.apache.hadoop.mapred.TextInputFormat");
+    AnalyzesOk("alter table functional_parquet.tinytable convert to iceberg"
+        + " tblproperties('format-version'='1')");
+    AnalyzesOk("alter table functional_parquet.tinytable convert to iceberg"
+        + " tblproperties('format-version'='2')");
+    AnalysisError("alter table functional_parquet.tinytable convert to iceberg"
+            + " tblproperties('format-version'='3')",
+        "Unsupported Iceberg format version '3'");
+    AnalysisError("alter table functional_parquet.tinytable convert to iceberg"
+            + " tblproperties('format-version'='unknown')",
+        "Invalid Iceberg format version 'unknown'");
     AnalysisError("alter table functional_parquet.tinytable convert to iceberg"
             + " tblproperties('metadata.generator.threads'='a1')",
-        "CONVERT TO ICEBERG only accepts 'iceberg.catalog' as TBLPROPERTY.");
+        "CONVERT TO ICEBERG doesn't accept 'metadata.generator.threads' as TBLPROPERTY.");
   }
 }
