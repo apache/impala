@@ -842,6 +842,43 @@ ALTER TABLE ice_tbl EXECUTE remove_orphan_files(now() - interval 5 days);
     </conbody>
   </concept>
 
+  <concept id="iceberg_repair_metadata">
+    <title>Repair table metadata</title>
+    <conbody>
+      <p>
+        Users should always use the engine/Iceberg API to interact with Iceberg tables;
+        e.g. to remove a partition, use Impala and issue the DROP PARTITION statement
+        instead of deleting the partition directory.
+        Deleting files directly from storage without going through the Iceberg API
+        corrupts the table, and makes queries that try to read the missing files fail
+        with the following error message:
+        <codeph>Iceberg table [...] cannot be fully loaded due to unavailable
+        files</codeph>.
+     </p>
+     <p>
+        This happens because the metadata files are still referencing the missing data
+        files. This erroneous state can be fixed by restoring the deleted files on the
+        file system.
+        If this is not intended or not possible, the dangling references can be removed
+        from the Iceberg metadata with the
+        <codeph>ALTER TABLE ... EXECUTE repair_metadata()</codeph>
+        statement, so that the table becomes functional again.
+        <codeblock>
+-- Use the statement simply without parameters:
+ALTER TABLE ice_tbl EXECUTE repair_metadata();
+        </codeblock>
+      </p>
+      <note>
+        This operation does not restore the deleted content. Execute only if
+        there is no intention to restore the missing data.
+        <p>
+          Impala can repair the table only if the missing files are data files,
+          but it cannot repair the table if there are missing delete files.
+        </p>
+      </note>
+    </conbody>
+  </concept>
+
   <concept id="iceberg_metadata_tables">
     <title>Iceberg metadata tables</title>
     <conbody>
