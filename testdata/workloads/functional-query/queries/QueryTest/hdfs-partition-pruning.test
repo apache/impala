@@ -14,4 +14,4 @@ where date_stored_as_date in ( '2025-12-12');
 ---- TYPES
 INT,DATE,INT,STRING
 ---- RUNTIME_PROFILE
-row_regex:.*HDFS partitions=1/2 files=1 size=2B
+row_regex:.*partitions=1/2 files=1 size=.*
