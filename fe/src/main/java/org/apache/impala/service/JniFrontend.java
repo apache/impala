@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -42,7 +41,6 @@ import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.FeDataSource;
-import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.common.UserCancelledException;
@@ -57,7 +55,6 @@ import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TBuildTestDescriptorTableParams;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCivilTime;
-import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDescribeDbParams;
 import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TDescribeResult;
@@ -120,7 +117,6 @@ import java.io.IOException;
 import java.lang.IllegalArgumentException;
 import java.nio.charset.StandardCharsets;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.Enumeration;
 import java.util.List;
@@ -602,18 +598,14 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, req, thriftParams);
     Preconditions.checkState(req.isSetShow_create_table_params());
     TTableName tname = req.getShow_create_table_params();
-    FeTable table = frontend_.getCatalog().getTable(tname.getDb_name(),
-        tname.getTable_name());
     boolean withStats = req.isSetShow_create_table_with_stats()
         && req.show_create_table_with_stats;
-    if (withStats) {
-      // Get show_create_table_partition_limit from request, default to 1000 if not set
-      int partitionLimit = req.isSetShow_create_table_partition_limit() ?
-          req.getShow_create_table_partition_limit() : 1000;
-      return ToSqlUtils.getCreateTableWithStatsSql(table, partitionLimit);
-    } else {
-      return ToSqlUtils.getCreateTableSql(table);
-    }
+    // Get show_create_table_partition_limit from request, default to 1000 if not
+    // set.
+    int partitionLimit = req.isSetShow_create_table_partition_limit() ?
+        req.getShow_create_table_partition_limit() :
+        1000;
+    return frontend_.getShowCreateTable(tname, withStats, partitionLimit);
   }
 
   /**

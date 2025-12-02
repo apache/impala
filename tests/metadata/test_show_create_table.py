@@ -78,35 +78,33 @@ class TestShowCreateTable(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
     cls.ImpalaTestMatrix.add_constraint(
-        lambda v: v.get_value('table_format').file_format == 'text' and
-        v.get_value('table_format').compression_codec == 'none')
+        lambda v: (v.get_value('table_format').file_format == 'text'
+                   and v.get_value('table_format').compression_codec == 'none'))
 
-  def test_show_create_table(self, vector, unique_database):
-    self.__run_show_create_table_test_case('QueryTest/show-create-table', vector,
+  def test_show_create_table(self, unique_database):
+    self.__run_show_create_table_test_case('QueryTest/show-create-table',
                                            unique_database)
 
   @SkipIfFS.hbase
-  def test_show_create_table_hbase(self, vector, unique_database):
-    self.__run_show_create_table_test_case('QueryTest/show-create-table-hbase', vector,
+  def test_show_create_table_hbase(self, unique_database):
+    self.__run_show_create_table_test_case('QueryTest/show-create-table-hbase',
                                            unique_database)
 
   @SkipIfHive2.acid
-  def test_show_create_table_full_acid(self, vector, unique_database):
+  def test_show_create_table_full_acid(self, unique_database):
     self.__run_show_create_table_test_case('QueryTest/show-create-table-full-acid',
-                                           vector,
                                            unique_database)
 
   @SkipIf.not_hdfs
-  def test_show_create_table_paimon(self, vector, unique_database):
+  def test_show_create_table_paimon(self, unique_database):
     self.__run_show_create_table_test_case('QueryTest/show-create-table-paimon',
-                                           vector,
                                            unique_database)
 
-  def test_show_create_table_with_stats(self, vector, unique_database):
+  def test_show_create_table_with_stats(self, unique_database):
     self.__run_show_create_table_with_stats_test_case(
-        'QueryTest/show-create-table-with-stats', vector, unique_database)
+        'QueryTest/show-create-table-with-stats', unique_database)
 
-  def __run_show_create_table_test_case(self, test_file_name, vector, unique_db_name):
+  def __run_show_create_table_test_case(self, test_file_name, unique_db_name):
     """
     Runs a show-create-table test file, containing the following sections:
 
@@ -169,7 +167,7 @@ class TestShowCreateTable(ImpalaTestSuite):
         self.__exec(test_case.drop_table_sql)
 
   def __run_show_create_table_with_stats_test_case(
-    self, test_file_name, vector, unique_db_name):
+    self, test_file_name, unique_db_name):
     sections = self.load_query_test_file(
       self.get_workload(), test_file_name, self.VALID_SECTION_NAMES)
     for test_section in sections:
@@ -451,8 +449,8 @@ class TestInfraCompat(ImpalaTestSuite):
   def test_primary_key_parse(self, impala_testinfra_cursor, table_primary_keys_map):
     """
     Test the query generator's Impala -> Postgres data migrator's ability to parse primary
-    keys via SHOW CREATE TABLE. If this test fails, update _fetch_primary_key_names, or fix
-    the SHOW CREATE TABLE defect.
+    keys via SHOW CREATE TABLE. If this test fails, update _fetch_primary_key_names, or
+    fix the SHOW CREATE TABLE defect.
     """
     assert impala_testinfra_cursor._fetch_primary_key_names(
         table_primary_keys_map['table']) == table_primary_keys_map['primary_keys']
@@ -510,7 +508,7 @@ class TestShowCreateTableIcebergProperties(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format == 'parquet'
         and v.get_value('table_format').compression_codec == 'none')
 
-  def test_iceberg_properties(self, vector, unique_database):
+  def test_iceberg_properties(self, unique_database):
     """
     Test that the SHOW CREATE TABLE statement does not contain irrelevant Iceberg-related
     table properties.

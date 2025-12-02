@@ -108,6 +108,7 @@ import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TableRef;
+import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.analysis.TruncateStmt;
 import org.apache.impala.authentication.saml.ImpalaSamlClient;
 import org.apache.impala.authorization.AuthorizationChecker;
@@ -3783,5 +3784,21 @@ public class Frontend {
       }
     }
     return null;
+  }
+
+  public String getShowCreateTable(
+      TTableName tname, boolean withStats, int partitionLimit) throws ImpalaException {
+    Frontend.RetryTracker retries = new Frontend.RetryTracker(
+        String.format("show create table %s.%s", tname.db_name, tname.table_name));
+    while (true) {
+      try {
+        FeTable table = getCatalog().getTable(tname.getDb_name(), tname.getTable_name());
+        if (withStats) {
+          return ToSqlUtils.getCreateTableWithStatsSql(table, partitionLimit);
+        } else {
+          return ToSqlUtils.getCreateTableSql(table);
+        }
+      } catch (InconsistentMetadataFetchException e) { retries.handleRetryOrThrow(e); }
+    }
   }
 }
