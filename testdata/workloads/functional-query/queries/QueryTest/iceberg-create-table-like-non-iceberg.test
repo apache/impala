@@ -1,0 +1,349 @@
+====
+---- QUERY
+# Test creating Iceberg table from non-Iceberg table (non-partitioned)
+# Create source table with various types
+CREATE TABLE non_ice_src (
+  id INT COMMENT 'id column',
+  name STRING,
+  age BIGINT,
+  score DOUBLE,
+  active BOOLEAN,
+  created_date DATE,
+  created_ts TIMESTAMP,
+  price DECIMAL(10,2),
+  `data` BINARY
+) STORED AS PARQUET;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Create Iceberg table from non-Iceberg source
+CREATE TABLE ice_from_non_ice LIKE non_ice_src STORED BY ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Verify the Iceberg table schema matches source
+DESCRIBE ice_from_non_ice;
+---- RESULTS
+'id','int','id column','true'
+'name','string','','true'
+'age','bigint','','true'
+'score','double','','true'
+'active','boolean','','true'
+'created_date','date','','true'
+'created_ts','timestamp','','true'
+'price','decimal(10,2)','','true'
+'data','binary','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Verify it's an Iceberg table
+DESCRIBE FORMATTED ice_from_non_ice;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','id column'
+'name','string','NULL'
+'age','bigint','NULL'
+'score','double','NULL'
+'active','boolean','NULL'
+'created_date','date','NULL'
+'created_ts','timestamp','NULL'
+'price','decimal(10,2)','NULL'
+'data','binary','NULL'
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/ice_from_non_ice','NULL'
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+'SerDe Library:      ','org.apache.iceberg.mr.hive.HiveIcebergSerDe','NULL'
+'InputFormat:        ','org.apache.iceberg.mr.hive.HiveIcebergInputFormat','NULL'
+'OutputFormat:       ','org.apache.iceberg.mr.hive.HiveIcebergOutputFormat','NULL'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Insert data into the Iceberg table to verify it works
+INSERT INTO ice_from_non_ice VALUES (1, 'Alice', 30, 95.5, true, '2024-01-01', '2024-01-01 10:00:00', 100.50, cast('test' as binary));
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
+---- LABELS
+====
+---- QUERY
+# Query the data back
+SELECT id, name, age, score, active FROM ice_from_non_ice ORDER BY id;
+---- RESULTS
+1,'Alice',30,95.5,true
+---- TYPES
+INT,STRING,BIGINT,DOUBLE,BOOLEAN
+====
+---- QUERY
+# Test with partitioned source table
+CREATE TABLE part_src (
+  id INT,
+  name STRING,
+  value DOUBLE
+) PARTITIONED BY (year INT, month INT)
+STORED AS PARQUET;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Insert data to create partitions
+INSERT INTO part_src PARTITION(year=2024, month=1) VALUES (1, 'Q1', 100.0);
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
+---- LABELS
+====
+---- QUERY
+# Create Iceberg table from partitioned source
+CREATE TABLE part_ice LIKE part_src STORED BY ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Verify schema - note that partition columns become regular columns
+DESCRIBE part_ice;
+---- RESULTS
+'id','int','','true'
+'name','string','','true'
+'value','double','','true'
+'year','int','','true'
+'month','int','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Verify partition transform information (should have identity transforms for year and month)
+DESCRIBE FORMATTED part_ice;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','NULL'
+'name','string','NULL'
+'value','double','NULL'
+'year','int','NULL'
+'month','int','NULL'
+'# Partition Transform Information','NULL','NULL'
+'# col_name            ','transform_type      ','NULL'
+'year','IDENTITY','NULL'
+'month','IDENTITY','NULL'
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Insert data into partitioned Iceberg table
+INSERT INTO part_ice VALUES (2, 'Q2', 200.0, 2024, 2);
+---- RUNTIME_PROFILE
+row_regex: .*NumModifiedRows: 1.*
+---- LABELS
+====
+---- QUERY
+# Query partitioned data
+SELECT id, name, value, year, month FROM part_ice ORDER BY id;
+---- RESULTS
+2,'Q2',200,2024,2
+---- TYPES
+INT,STRING,DOUBLE,INT,INT
+====
+---- QUERY
+# Test with external table
+CREATE EXTERNAL TABLE ext_ice LIKE non_ice_src STORED BY ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Verify external table properties
+DESCRIBE FORMATTED ext_ice;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','int','id column'
+'Table Type:         ','EXTERNAL_TABLE      ','NULL'
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test with complex types from functional_parquet.complextypestbl
+CREATE TABLE complex_ice LIKE functional_parquet.complextypestbl STORED BY ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Verify complex types are preserved in the schema
+DESCRIBE complex_ice;
+---- RESULTS
+'id','bigint','','true'
+'int_array','array<int>','','true'
+'int_array_array','array<array<int>>','','true'
+'int_map','map<string,int>','','true'
+'int_map_array','array<map<string,int>>','','true'
+'nested_struct','struct<\n  a:int,\n  b:array<int>,\n  c:struct<\n    d:array<array<struct<\n      e:int,\n      f:string\n    >>>\n  >,\n  g:map<string,struct<\n    h:struct<\n      i:array<double>\n    >\n  >>\n>','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Verify Iceberg table properties
+DESCRIBE FORMATTED complex_ice;
+---- RESULTS: VERIFY_IS_SUBSET
+'# col_name            ','data_type           ','comment             '
+'','NULL','NULL'
+'id','bigint','NULL'
+'','storage_handler     ','org.apache.iceberg.mr.hive.HiveIcebergStorageHandler'
+---- TYPES
+string, string, string
+====
+---- HIVE_QUERY
+use $DATABASE;
+INSERT INTO complex_ice (id, int_array, int_map) VALUES
+  (1, array(1,2,3), map('k1', 10)),
+  (2, array(4,5,6), map('k2', 20)),
+  (3, array(7,8,9), map('k3', 30));
+====
+---- QUERY
+# Refresh metadata to see Hive changes
+REFRESH complex_ice;
+====
+---- QUERY
+# Verify Impala can query the actual complex type data inserted via Hive
+SELECT id, int_array, int_map FROM complex_ice ORDER BY id;
+---- RESULTS
+1,'[1,2,3]','{"k1":10}'
+2,'[4,5,6]','{"k2":20}'
+3,'[7,8,9]','{"k3":30}'
+---- TYPES
+BIGINT,STRING,STRING
+====
+---- QUERY
+# Test IF NOT EXISTS
+CREATE TABLE IF NOT EXISTS ice_from_non_ice LIKE non_ice_src STORED BY ICEBERG;
+---- RESULTS
+'Table already exists.'
+====
+---- QUERY
+# Negative test: Kudu to Iceberg should fail
+CREATE TABLE ice_from_kudu LIKE functional_kudu.alltypes STORED BY ICEBERG;
+---- CATCH
+functional_kudu.alltypes cannot be cloned into a ICEBERG table: CREATE TABLE LIKE is not supported between Kudu tables and non-Kudu tables.
+====
+---- QUERY
+# Test with table that has comments
+CREATE TABLE commented_src (
+  col1 INT COMMENT 'first column',
+  col2 STRING COMMENT 'second column'
+) COMMENT 'source table comment' STORED AS PARQUET;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Create Iceberg table and verify comments are preserved
+CREATE TABLE commented_ice LIKE commented_src STORED BY ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Verify column comments are preserved
+DESCRIBE commented_ice;
+---- RESULTS
+'col1','int','first column','true'
+'col2','string','second column','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Test with ORC source format
+CREATE TABLE orc_src (
+  id INT,
+  name STRING,
+  score DOUBLE
+) STORED AS ORC;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Create Iceberg table from ORC source
+CREATE TABLE ice_from_orc LIKE orc_src STORED BY ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Verify schema from ORC source
+DESCRIBE ice_from_orc;
+---- RESULTS
+'id','int','','true'
+'name','string','','true'
+'score','double','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Test with Avro source format - create a simple Avro table
+CREATE TABLE avro_src (
+  id INT,
+  value BIGINT,
+  description STRING
+) STORED AS AVRO;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Create Iceberg table from Avro source
+CREATE TABLE ice_from_avro LIKE avro_src STORED BY ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Verify schema from Avro source
+DESCRIBE ice_from_avro;
+---- RESULTS
+'id','int','from deserializer','true'
+'value','bigint','from deserializer','true'
+'description','string','from deserializer','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Test with Text source format - create a simple Text table
+CREATE TABLE text_src (
+  id INT,
+  name STRING,
+  age INT
+) STORED AS TEXTFILE;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Create Iceberg table from Text source
+CREATE TABLE ice_from_text LIKE text_src STORED BY ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Verify schema from Text source
+DESCRIBE ice_from_text;
+---- RESULTS
+'id','int','','true'
+'name','string','','true'
+'age','int','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Negative test: Creating non-Iceberg table from Iceberg source should fail
+CREATE TABLE parquet_from_ice LIKE ice_from_non_ice STORED AS PARQUET;
+---- CATCH
+CREATE TABLE LIKE is not supported for creating PARQUET table from Iceberg table
+====
+---- QUERY
+# Negative test: Creating ORC table from Iceberg source should fail
+CREATE TABLE orc_from_ice LIKE ice_from_non_ice STORED AS ORC;
+---- CATCH
+CREATE TABLE LIKE is not supported for creating ORC table from Iceberg table
+====
+---- QUERY
+# Negative test: Creating Text table from Iceberg source should fail
+CREATE TABLE text_from_ice LIKE ice_from_non_ice STORED AS TEXTFILE;
+---- CATCH
+CREATE TABLE LIKE is not supported for creating TEXT table from Iceberg table
+====

@@ -1054,15 +1054,53 @@ ORDER BY made_current_at;
     <conbody>
       <p>
         Use <codeph>CREATE TABLE ... LIKE ...</codeph> to create an empty Iceberg table
-        based on the definition of another Iceberg table, including any column attributes in
-        the original table:
+        based on the definition of another table, including any column attributes in
+        the original table. When cloning from an Iceberg table, the <codeph>STORED BY
+        ICEBERG</codeph> clause is optional (the format is inherited). When cloning from
+        a non-Iceberg table, you must explicitly specify <codeph>STORED BY ICEBERG</codeph>:
         <codeblock>
+          -- From an Iceberg table (format inherited)
           CREATE TABLE new_ice_tbl LIKE orig_ice_tbl;
+
+          -- From a non-Iceberg table (must specify format)
+          CREATE TABLE new_ice_tbl LIKE parquet_tbl STORED BY ICEBERG;
         </codeblock>
       </p>
       <p>
-        Because of the Data Types of Iceberg and Impala do not correspond one by one, Impala
-        can only clone between Iceberg tables.
+        When creating from a non-Iceberg source table, Impala automatically converts
+        the schema to Iceberg's format. All supported Impala types (including complex
+        types like STRUCT, ARRAY, and MAP) are converted to their Iceberg equivalents.
+        If the source table has partition columns, they are converted to identity-partitioned
+        columns in the new Iceberg table.
+      </p>
+      <p>
+        Example creating an Iceberg table from a Parquet table:
+        <codeblock>
+          CREATE TABLE my_ice_tbl LIKE functional_parquet.complextypestbl STORED BY ICEBERG;
+        </codeblock>
+      </p>
+      <p>
+        <b>Limitations for CREATE TABLE LIKE with Iceberg:</b>
+      </p>
+      <p>
+        <b>Unsupported table types:</b>
+        <ul>
+          <li><b>Kudu tables:</b> CREATE TABLE LIKE is not supported between Kudu and
+            Iceberg tables because Kudu-specific features (hash partitioning, range
+            partitioning, primary key uniqueness constraints) do not have direct equivalents
+            in Iceberg's partitioning model.</li>
+          <li><b>JDBC tables:</b> Cannot be created as target tables with CREATE TABLE LIKE.</li>
+          <li><b>Paimon tables:</b> Cannot be used as source or target for CREATE TABLE LIKE.</li>
+          <li><b>Iceberg to non-Iceberg:</b> Creating non-Iceberg tables (Parquet, ORC, Text, etc.)
+            from Iceberg sources is not currently supported.</li>
+        </ul>
+      </p>
+      <p>
+        <b>Unsupported data types:</b>
+        <ul>
+          <li><b>TINYINT:</b> Iceberg does not support TINYINT type. Use INT instead.</li>
+          <li><b>SMALLINT:</b> Iceberg does not support SMALLINT type. Use INT instead.</li>
+        </ul>
       </p>
     </conbody>
   </concept>

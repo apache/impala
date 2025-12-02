@@ -1287,6 +1287,12 @@ class TestIcebergTable(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-create-table-like-table', vector,
                        use_db=unique_database)
 
+  @SkipIfFS.hive
+  def test_create_table_like_non_iceberg(self, vector, unique_database):
+    """Test creating Iceberg table from non-Iceberg source"""
+    self.run_test_case('QueryTest/iceberg-create-table-like-non-iceberg', vector,
+                       use_db=unique_database)
+
   def test_table_owner(self, vector, unique_database):
     self.run_table_owner_test(vector, unique_database, "some_random_user")
     self.run_table_owner_test(vector, unique_database, "another_random_user")

@@ -233,7 +233,10 @@ import org.apache.impala.thrift.THdfsCachingOp;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TImpalaTableType;
+import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
+import org.apache.impala.thrift.TIcebergPartitionTransform;
+import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TKuduPartitionParam;
 import org.apache.impala.thrift.TPaimonCatalog;
 import org.apache.impala.thrift.TPartitionDef;
@@ -4662,6 +4665,46 @@ public class CatalogOpExecutor {
           params.if_not_exists, columns, partitionSpec,
           Lists.newArrayList(srcIceTable.getIcebergSchema().identifierFieldNames()),
           tableProperties, params.getComment(), debugAction);
+    } else if (!IcebergTable.isIcebergTable(srcTable.getMetaStoreTable())
+        && IcebergTable.isIcebergTable(tbl)) {
+      // Creating an Iceberg table from a non-Iceberg source table
+      // Kudu tables should have been rejected during analysis
+      // in validateCreateKuduTableParams()
+      Preconditions.checkState(!(srcTable instanceof KuduTable),
+          "Kudu tables should be rejected in analysis phase");
+
+      // For Iceberg, all columns (including partition columns) must be in the schema
+      // Column order matters: non-partitioning columns first, then partitioning columns
+      // This matches Hive's convention for INSERT and Iceberg's flat schema model
+      List<TColumn> columns = new ArrayList<>();
+      for (Column col: srcTable.getColumnsInHiveOrder()) {
+        TColumn tcol = col.toThrift();
+        // Default to nullable for Iceberg (optional fields) if not explicitly set
+        if (!tcol.isSetIs_nullable()) {
+          tcol.setIs_nullable(true);
+        }
+        columns.add(tcol);
+      }
+
+      // Convert partition keys to Iceberg partition spec with identity transforms
+      TIcebergPartitionSpec partitionSpec = null;
+      if (srcTable.getMetaStoreTable().isSetPartitionKeys()
+          && !srcTable.getMetaStoreTable().getPartitionKeys().isEmpty()) {
+        partitionSpec = createIdentityPartitionSpec(
+            srcTable.getMetaStoreTable().getPartitionKeys());
+      }
+
+      // Clear partition keys from the HMS table - Iceberg uses partition transforms
+      // instead. The partition columns are already included in the schema above
+      tbl.getPartitionKeys().clear();
+
+      // Use empty table properties since we're creating from a non-Iceberg source
+      Map<String, String> tableProperties = new HashMap<>();
+
+      createIcebergTable(tbl, wantMinimalResult, response, catalogTimeline,
+          params.if_not_exists, columns, partitionSpec,
+          new ArrayList<>(), // No primary keys for non-Iceberg source
+          tableProperties, params.getComment(), debugAction);
     } else if (srcTable instanceof KuduTable && KuduTable.isKuduTable(tbl)) {
       TCreateTableParams createTableParams =
           extractKuduCreateTableParams(params, tblName, (KuduTable) srcTable, tbl);
@@ -4672,6 +4715,32 @@ public class CatalogOpExecutor {
       createTable(tbl, params.if_not_exists, null, params.server_name, null, null,
           wantMinimalResult, response, catalogTimeline);
     }
+  }
+
+  /**
+   * Creates a TIcebergPartitionSpec with IDENTITY transforms
+   * for the given partition keys. This is used when creating an
+   * Iceberg table from a non-Iceberg source table.
+   */
+  private TIcebergPartitionSpec createIdentityPartitionSpec(
+      List<FieldSchema> partitionKeys) {
+    TIcebergPartitionSpec partitionSpec = new TIcebergPartitionSpec();
+    List<TIcebergPartitionField> partitionFields = new ArrayList<>();
+
+    for (FieldSchema partitionKey : partitionKeys) {
+      TIcebergPartitionField field = new TIcebergPartitionField();
+      field.setOrig_field_name(partitionKey.getName());
+      field.setField_name(partitionKey.getName());
+
+      TIcebergPartitionTransform transform = new TIcebergPartitionTransform();
+      transform.setTransform_type(TIcebergPartitionTransformType.IDENTITY);
+      field.setTransform(transform);
+
+      partitionFields.add(field);
+    }
+
+    partitionSpec.setPartition_fields(partitionFields);
+    return partitionSpec;
   }
 
   /**

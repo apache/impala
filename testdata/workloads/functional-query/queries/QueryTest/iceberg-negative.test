@@ -678,9 +678,10 @@ ALTER TABLE iceberg_alter_part SET PARTITION SPEC (HOUR(d));
 ImpalaRuntimeException: Failed to ALTER table 'iceberg_alter_part': Cannot bind: hour cannot transform date values from 'd'
 ====
 ---- QUERY
+# TINYINT, SMALLINT not supported in Iceberg
 CREATE TABLE clone_ice LIKE functional_parquet.alltypestiny STORED AS ICEBERG;
 ---- CATCH
-functional_parquet.alltypestiny cannot be cloned into an Iceberg table because it is not an Iceberg table.
+Type TINYINT is not supported in Iceberg
 ====
 ---- QUERY
 select * from functional_parquet.iceberg_alltypes_part for system_time as of '2000-01-01 01:02:03';

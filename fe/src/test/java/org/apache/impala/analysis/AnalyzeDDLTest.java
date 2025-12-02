@@ -2905,6 +2905,25 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table test_like like functional_parquet.paimon_partitioned" +
             " STORED BY PAIMON",
         "CREATE TABLE LIKE is not supported for PAIMON tables.");
+
+    // Test creating Iceberg tables from non-Iceberg sources
+    // Non-partitioned table to Iceberg
+    AnalyzesOk("create table functional.ice_tbl like " +
+        "functional_parquet.complextypestbl stored by iceberg");
+    // Partitioned table to Iceberg
+    AnalyzesOk("create table functional.ice_part_tbl like " +
+        "functional.alltypes stored by iceberg");
+    // With IF NOT EXISTS
+    AnalyzesOk("create table if not exists functional.ice_tbl2 like " +
+        "functional_parquet.complextypestbl stored by iceberg");
+    // External Iceberg table from non-Iceberg source
+    AnalyzesOk("create external table functional.ice_external like " +
+        "functional.alltypes stored by iceberg");
+    // Kudu to Iceberg should fail (not supported)
+    AnalysisError("create table ice_from_kudu like functional_kudu.alltypes " +
+        "stored by iceberg",
+        "functional_kudu.alltypes cannot be cloned into a ICEBERG table: CREATE TABLE " +
+        "LIKE is not supported between Kudu tables and non-Kudu tables.");
   }
 
   @Test

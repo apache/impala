@@ -175,19 +175,21 @@ public class CreateTableLikeStmt extends StatementBase {
 
     validateCreateKuduTableParams(srcTable);
 
-    // Only clone between Iceberg tables because the Data Types of Iceberg and Impala
-    // do not correspond one by one, the transformation logic is in
-    // org.apache.impala.util.IcebergSchemaConverter.fromImpalaType method.
-    if (fileFormat_ == THdfsFileFormat.ICEBERG && !IcebergTable.isIcebergTable(
-        srcTable.getMetaStoreTable())) {
-      throw new AnalysisException(srcTable.getFullName() + " cannot be cloned into an "
-          + "Iceberg table because it is not an Iceberg table.");
-    } else if (fileFormat_ == THdfsFileFormat.JDBC) {
+    // Validate table format restrictions:
+    // - JDBC tables cannot be created with CREATE TABLE LIKE (target restriction)
+    // - Paimon tables cannot be used as source or target
+    // - Iceberg tables cannot be used to create non-Iceberg tables
+    if (fileFormat_ == THdfsFileFormat.JDBC) {
       throw new AnalysisException("CREATE TABLE LIKE is not supported for JDBC tables.");
     } else if (fileFormat_ == THdfsFileFormat.PAIMON
         || srcTable instanceof FePaimonTable) {
       throw new AnalysisException("CREATE TABLE LIKE is not supported for " +
           "PAIMON tables.");
+    } else if (IcebergTable.isIcebergTable(srcTable.getMetaStoreTable())
+        && fileFormat_ != null && fileFormat_ != THdfsFileFormat.ICEBERG) {
+      throw new AnalysisException(String.format(
+          "CREATE TABLE LIKE is not supported for creating %s table from Iceberg " +
+          "table %s.", fileFormat_.toString(), srcTable.getFullName()));
     }
 
     srcDbName_ = srcTable.getDb().getName();
