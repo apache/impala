@@ -61,8 +61,8 @@ from tests.util.shell_util import dump_server_stacktraces
 
 def get_trash_path(bucket, path):
   if IS_OZONE:
-    return get_fs_path('/{0}/.Trash/{1}/Current{2}/{0}/{3}'.format(bucket,
-        getpass.getuser(), WAREHOUSE_PREFIX, path))
+    return get_fs_path('/{0}/.Trash/{1}/Current/{2}'.format(
+      bucket, getpass.getuser(), path))
   return '/user/{0}/.Trash/Current/{1}/{2}'.format(getpass.getuser(), bucket, path)
 
 
