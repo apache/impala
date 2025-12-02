@@ -35,6 +35,8 @@ class AggregationPlanNode : public PlanNode {
   /// Configuration for generating aggregators that will be eventually used to aggregate
   /// input rows by the exec node.
   std::vector<AggregatorConfig*> aggs_;
+  /// Total fragment instances executing the same aggregation node across all backends.
+  int32_t total_finstances_;
 };
 
 /// Base class containing common code for the ExecNodes that do aggregation,
@@ -75,6 +77,11 @@ class AggregationNodeBase : public ExecNode {
   /// It is expected that all rows of 'batch' have exactly 1 non-null tuple.
   Status SplitMiniBatches(
       RowBatch* batch, std::vector<std::unique_ptr<RowBatch>>* mini_batches);
+private:
+  /// Scale the input cardinality by dividing it by the total fragment instances
+  int64_t ScaledEstimatedInputCardinality();
+  /// Total fragment instances executing the same aggregation node across all backends.
+  int32_t total_finstances_;
 };
 } // namespace impala
 

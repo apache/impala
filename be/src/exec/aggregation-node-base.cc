@@ -24,6 +24,7 @@
 #include "runtime/fragment-state.h"
 #include "runtime/runtime-state.h"
 #include "util/runtime-profile-counters.h"
+#include "util/pretty-printer.h"
 
 #include "common/names.h"
 
@@ -46,6 +47,7 @@ Status AggregationPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   }
   DCHECK(aggs_.size() > 0);
   state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
+  total_finstances_ = state->instance_ctxs()[0]->num_instances;
   return Status::OK();
 }
 
@@ -67,7 +69,8 @@ Status AggregationPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node)
 AggregationNodeBase::AggregationNodeBase(
     ObjectPool* pool, const AggregationPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
-    replicate_input_(pnode.tnode_->agg_node.replicate_input) {
+    replicate_input_(pnode.tnode_->agg_node.replicate_input),
+    total_finstances_(pnode.total_finstances_) {
   // Create the Aggregator nodes from their configs.
   int num_aggs = pnode.aggs_.size();
   for (int i = 0; i < num_aggs; ++i) {
@@ -82,12 +85,28 @@ AggregationNodeBase::AggregationNodeBase(
           static_cast<const GroupingAggregatorConfig*>(agg);
       DCHECK(grouping_config != nullptr);
       node.reset(new GroupingAggregator(this, pool_, *grouping_config,
-          pnode.tnode_->agg_node.estimated_input_cardinality));
+          ScaledEstimatedInputCardinality()));
     }
     aggs_.push_back(std::move(node));
     runtime_profile_->AddChild(aggs_[i]->runtime_profile());
   }
   fast_limit_check_ = pnode.tnode_->agg_node.fast_limit_check;
+}
+
+int64_t AggregationNodeBase::ScaledEstimatedInputCardinality() {
+  const AggregationPlanNode& pnode = static_cast<const AggregationPlanNode&>(plan_node_);
+  const TAggregationNode& agg_node = pnode.tnode_->agg_node;
+  int64_t estimated_input_cardinality = -1;
+  if (agg_node.estimated_input_cardinality >= 0) {
+    estimated_input_cardinality =
+        agg_node.estimated_input_cardinality / total_finstances_;
+  }
+
+  VLOG(3) << Substitute("Agg estimation: total estimated_input_cardinality=$0 "
+                        "total_finstances=$1 scaled estimated_input_cardinality=$2",
+      PrettyPrinter::Print(agg_node.estimated_input_cardinality, TUnit::UNIT),
+      total_finstances_, PrettyPrinter::Print(estimated_input_cardinality, TUnit::UNIT));
+  return estimated_input_cardinality;
 }
 
 Status AggregationNodeBase::Prepare(RuntimeState* state) {

@@ -115,6 +115,10 @@ struct TPlanFragmentInstanceCtx {
   // Number of backends executing the same fragment plan. Can be used by executors to do
   // some estimations.
   11: optional i32 num_backends;
+
+  // Number of fragment instances executing across all Impalads for this fragment. Like
+  // num_backends, this can be used for some estimations.
+  12: optional i32 num_instances;
 }
 
 
