@@ -104,7 +104,7 @@ Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs, HdfsFsMap* loc
               hdfs_builder, "fs.s3a.secret.key", s3a_secret_key_.c_str());
         }
         if (options != nullptr) {
-          for (auto option : *options) {
+          for (const auto& option : *options) {
             hdfsBuilderConfSetStr(
                 hdfs_builder, option.first.c_str(), option.second.c_str());
           }
