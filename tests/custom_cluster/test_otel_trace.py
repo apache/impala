@@ -495,8 +495,9 @@ class TestOtelTraceSelectQueued(TestOtelTraceBase):
     """Tests that a query that is queued in admission control can be cancelled and
        the trace is created with the expected spans and events."""
     # Start a long-running query that will take up the only admission control slot.
-    self.client.execute_async("SELECT * FROM functional.alltypes WHERE id = "
+    handle1 = self.client.execute_async("SELECT * FROM functional.alltypes WHERE id = "
         "SLEEP(5000)")
+    self.client.wait_for_impala_state(handle1, RUNNING, 60)
 
     # Start a second query that will be queued and then cancelled.
     handle2 = self.client.execute_async("SELECT * FROM functional.alltypes")
