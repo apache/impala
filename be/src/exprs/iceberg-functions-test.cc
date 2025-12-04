@@ -78,6 +78,8 @@ public:
   static void TestString();
 
   static void TestDecimal();
+
+  static void TestBinary();
 private:
   template<typename T>
   static void TestIntegerNumbersHelper();
@@ -158,6 +160,33 @@ void IcebergTruncatePartitionTransformTests::TestIntegerNumbersHelper() {
   TestIncorrectWidthParameter<T, T>(T(0));
 }
 
+template<>
+void IcebergTruncatePartitionTransformTests::TestIncorrectWidthParameter
+    <StringVal, IntVal>(const StringVal& input) {
+  // Check for error when width is zero.
+  FunctionContext* ctx = CreateFunctionContext();
+  StringVal ret_val =
+      IcebergFunctions::TruncatePartitionTransform<false>(ctx, input, IntVal(0));
+  EXPECT_TRUE(ret_val.is_null);
+  EXPECT_EQ(strcmp("Width parameter should be greater than zero.", ctx->error_msg()), 0);
+  ctx->impl()->Close();
+
+  // Check for error when width is negative.
+  ctx = CreateFunctionContext();
+  ret_val = IcebergFunctions::TruncatePartitionTransform<false>(ctx, input, IntVal(-1));
+  EXPECT_TRUE(ret_val.is_null);
+  EXPECT_EQ(strcmp("Width parameter should be greater than zero.", ctx->error_msg()), 0);
+  ctx->impl()->Close();
+
+  // Check for error when width is null.
+  ctx = CreateFunctionContext();
+  ret_val =
+      IcebergFunctions::TruncatePartitionTransform<false>(ctx, input, IntVal::null());
+  EXPECT_TRUE(ret_val.is_null);
+  EXPECT_EQ(strcmp("Width parameter should be greater than zero.", ctx->error_msg()), 0);
+  ctx->impl()->Close();
+}
+
 void IcebergTruncatePartitionTransformTests::TestString() {
   MemTracker m;
   MemPool pool(&m);
@@ -165,32 +194,67 @@ void IcebergTruncatePartitionTransformTests::TestString() {
   FunctionContext* ctx = CreateFunctionContext(&pool);
 
   int width = 10;
-  StringVal ret_val = IcebergFunctions::TruncatePartitionTransform(
+  StringVal ret_val = IcebergFunctions::TruncatePartitionTransform<false>(
       ctx, input, IntVal(width));
   EXPECT_EQ(ret_val.len, width);
   EXPECT_EQ(strncmp((char*)input.ptr, (char*)ret_val.ptr, width), 0);
 
   // Truncate width is longer than the input string.
-  ret_val = IcebergFunctions::TruncatePartitionTransform(ctx, input, 100);
+  ret_val = IcebergFunctions::TruncatePartitionTransform<false>(ctx, input, 100);
   EXPECT_EQ(ret_val.len, input.len);
   EXPECT_EQ(strncmp((char*)input.ptr, (char*)ret_val.ptr, input.len), 0);
 
   // Truncate width is the same as the the input string length.
-  ret_val = IcebergFunctions::TruncatePartitionTransform(ctx, input, input.len);
+  ret_val = IcebergFunctions::TruncatePartitionTransform<false>(ctx, input, input.len);
   EXPECT_EQ(ret_val.len, input.len);
   EXPECT_EQ(strncmp((char*)input.ptr, (char*)ret_val.ptr, input.len), 0);
 
   // Test NULL input.
-  ret_val = IcebergFunctions::TruncatePartitionTransform(
+  ret_val = IcebergFunctions::TruncatePartitionTransform<false>(
       nullptr, StringVal::null(), IntVal(10));
   EXPECT_TRUE(ret_val.is_null);
 
   // Test empty string input.
   ctx = CreateFunctionContext(&pool);
-  ret_val = IcebergFunctions::TruncatePartitionTransform(ctx, "", 10);
+  ret_val = IcebergFunctions::TruncatePartitionTransform<false>(ctx, "", 10);
   EXPECT_EQ(ret_val.len, 0);
 
   TestIncorrectWidthParameter<StringVal, IntVal>(StringVal("input"));
+
+  pool.FreeAll();
+}
+
+void IcebergTruncatePartitionTransformTests::TestBinary() {
+  MemTracker m;
+  MemPool pool(&m);
+
+  // UTF-8 compatible bytes: "Hello " + UTF-8 encoded "世界" (world in Chinese) + "!"
+  uint8_t binary_data[] = {0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0xE4, 0xB8,
+                           0x96, 0xE7, 0x95, 0x8C, 0x21};
+  StringVal input(binary_data, sizeof(binary_data));
+  FunctionContext* ctx = CreateFunctionContext(&pool);
+
+  for (size_t width = 1; width <= sizeof(binary_data); ++width) {
+    StringVal ret_val = IcebergFunctions::TruncatePartitionTransform<true>(
+        ctx, input, IntVal(width));
+    EXPECT_EQ(ret_val.len, width);
+    EXPECT_EQ(memcmp((char*)input.ptr, (char*)ret_val.ptr, width), 0);
+  }
+
+  // Truncate width is longer than the input binary.
+  StringVal ret_val = IcebergFunctions::TruncatePartitionTransform<true>(ctx, input, 100);
+  EXPECT_EQ(ret_val.len, input.len);
+  EXPECT_EQ(memcmp((char*)input.ptr, (char*)ret_val.ptr, input.len), 0);
+
+  // Test NULL input.
+  ret_val = IcebergFunctions::TruncatePartitionTransform<true>(
+      nullptr, StringVal::null(), IntVal(10));
+  EXPECT_TRUE(ret_val.is_null);
+
+  // Test empty string input.
+  ctx = CreateFunctionContext(&pool);
+  ret_val = IcebergFunctions::TruncatePartitionTransform<true>(ctx, "", 10);
+  EXPECT_EQ(ret_val.len, 0);
 
   pool.FreeAll();
 }
@@ -580,6 +644,7 @@ TEST(TestIcebergFunctions, TruncateTransform) {
   IcebergTruncatePartitionTransformTests::TestIntegerNumbers();
   IcebergTruncatePartitionTransformTests::TestString();
   IcebergTruncatePartitionTransformTests::TestDecimal();
+  IcebergTruncatePartitionTransformTests::TestBinary();
 }
 
 TEST(TestIcebergFunctions, BucketTransform) {

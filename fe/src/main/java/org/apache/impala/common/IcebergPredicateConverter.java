@@ -19,6 +19,7 @@ package org.apache.impala.common;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -168,6 +169,9 @@ public class IcebergPredicateConverter {
       case TIMESTAMP: return getIcebergTsValue(literal, column, schema_);
       case DATE: return ((DateLiteral) literal).getValue();
       case DECIMAL: return getIcebergDecimalValue(column, (NumericLiteral) literal);
+      // Wrapping the byte array into a ByteBuffer,
+      // so Iceberg handles it as a BinaryLiteral instead of FixedLiteral.
+      case BINARY: return ByteBuffer.wrap(((StringLiteral) literal).getBinValue());
       default: {
         throw new ImpalaRuntimeException(
             String.format("Unable to parse Iceberg value '%s' for type %s",

@@ -60,6 +60,10 @@ table FbIcebergColumnStats {
   upper_bound: [ubyte];
 }
 
+table FbIcebergPartitionField {
+  field_value: [ubyte];
+}
+
 table FbIcebergDataFile {
   path: string;
   format: FbIcebergDataFileFormat = PARQUET;
@@ -67,7 +71,7 @@ table FbIcebergDataFile {
   file_size_in_bytes: long = 0;
   spec_id: ushort;
   partition_path: string;
-  raw_partition_fields: [string];
+  raw_partition_fields: [FbIcebergPartitionField];
   per_column_stats: [FbIcebergColumnStats];
 }
 

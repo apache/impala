@@ -46,6 +46,7 @@ public:
       const DecimalVal& input, const IntVal& width);
   static DecimalVal TruncatePartitionTransform(FunctionContext* ctx,
       const DecimalVal& input, const BigIntVal& width);
+  template<bool is_binary>
   static StringVal TruncatePartitionTransform(FunctionContext* ctx,
       const StringVal& input, const IntVal& width);
 

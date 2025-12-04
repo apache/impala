@@ -27,6 +27,8 @@ import com.google.common.primitives.Longs;
 import com.google.flatbuffers.FlatBufferBuilder;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -35,6 +37,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -140,6 +143,11 @@ public class IcebergUtil {
   public static final String ICEBERG_REST_USER_SECRET = "iceberg_rest_user_secret";
   public static final String ICEBERG_REST_WAREHOUSE_LOCATION =
       "iceberg_rest_warehouse_location";
+
+  /**
+   * For BINARY type, we use ISO-8859-1 to preserve the byte values.
+   */
+  private static final Charset CHARSET_FOR_BINARY = StandardCharsets.ISO_8859_1;
 
   /**
    * Returns the corresponding catalog implementation for 'feTable'.
@@ -767,9 +775,37 @@ public class IcebergUtil {
       return values.length;
     }
 
+    /**
+     * Copied from
+     * https://github.com/apache/iceberg/blob/ccb8bc43/core/src/main/java/org/apache/iceberg/PartitionData.java#L119
+     */
     @Override
     public <T> T get(int pos, Class<T> javaClass) {
-      return javaClass.cast(values[pos]);
+      Object value = get(pos);
+      if (value == null || javaClass.isInstance(value)) {
+        return javaClass.cast(value);
+      }
+
+      throw new IllegalArgumentException(
+          String.format(
+              "Wrong class, expected %s, but was %s, for object: %s",
+              javaClass.getName(), value.getClass().getName(), value));
+    }
+
+    /**
+     * Copied from
+     * https://github.com/apache/iceberg/blob/ccb8bc43/core/src/main/java/org/apache/iceberg/PartitionData.java#L132
+     */
+    public Object get(int pos) {
+      if (pos >= values.length) {
+        return null;
+      }
+
+      if (values[pos] instanceof byte[]) {
+        return ByteBuffer.wrap((byte[]) values[pos]);
+      }
+
+      return values[pos];
     }
 
     @Override
@@ -816,14 +852,22 @@ public class IcebergUtil {
     int path_i = 0;
     for (int i = 0; i < spec.getIcebergPartitionFieldsSize(); ++i) {
       IcebergPartitionField field = spec.getIcebergPartitionFields().get(i);
-      if (field.getTransformType() == TIcebergPartitionTransformType.VOID) continue;
+      TIcebergPartitionTransformType transformType = field.getTransformType();
+      if (transformType == TIcebergPartitionTransformType.VOID) continue;
 
       Preconditions.checkState(path_i < dataFile.rawPartitionFieldsLength());
-      String[] parts = dataFile.rawPartitionFields(path_i).split("=", 2);
+      ByteBuffer fieldByteBuffer =
+          dataFile.rawPartitionFields(path_i).fieldValueAsByteBuffer();
+
+      Charset charset = StandardCharsets.UTF_8;
+      if (field.getType() == org.apache.impala.catalog.Type.BINARY) {
+        charset = CHARSET_FOR_BINARY;
+      }
+      String partValueString = StringUtils.fromByteBuffer(fieldByteBuffer, charset);
+      String[] parts = partValueString.split("=", 2);
       Preconditions.checkArgument(parts.length == 2 && parts[0] != null &&
           field.getFieldName().equals(parts[0]), "Invalid partition: %s",
-          dataFile.rawPartitionFields(path_i));
-      TIcebergPartitionTransformType transformType = field.getTransformType();
+          partValueString);
       data.set(i, getPartitionValue(
           partitionType.fields().get(i).type(), transformType, parts[1]));
       ++path_i;
@@ -847,7 +891,11 @@ public class IcebergUtil {
         transformType == TIcebergPartitionTransformType.BUCKET ||
         transformType == TIcebergPartitionTransformType.DAY) {
       // These partition transforms are handled successfully by Iceberg's API.
-      return Conversions.fromPartitionString(type, stringValue);
+      if (type.typeId() == Type.TypeID.BINARY) {
+        return stringValue.getBytes(CHARSET_FOR_BINARY);
+      } else {
+        return Conversions.fromPartitionString(type, stringValue);
+      }
     }
     switch (transformType) {
       case YEAR: return parseYearToTransformYear(stringValue);
@@ -1070,7 +1118,13 @@ public class IcebergUtil {
     for (int i = 0; i < spec.fields().size(); ++i) {
       Object partValue = cf.partition().get(i, Object.class);
       if (partValue != null) {
-        partitionKeys.add(partValue.toString());
+        if (partValue instanceof ByteBuffer) {
+          String partValueString =
+              StringUtils.fromByteBuffer((ByteBuffer) partValue, CHARSET_FOR_BINARY);
+          partitionKeys.add(partValueString);
+        } else {
+          partitionKeys.add(partValue.toString());
+        }
       } else {
         partitionKeys.add("NULL");
       }
@@ -1161,7 +1215,17 @@ public class IcebergUtil {
       Object partValue = cf.partition().get(fieldIndex, Object.class);
       String partValueString;
       if (partValue != null) {
-        partValueString = partValue.toString();
+        if (partValue instanceof ByteBuffer) {
+          // For BINARY type, we need to encode the byte buffer to base64 string, so
+          // TextConverter::WriteSlot in be/src/exec/text-converter.inline.h can decode
+          // it back correctly.
+          ByteBuffer buffer = (ByteBuffer) partValue;
+          byte[] bytes = new byte[buffer.remaining()];
+          buffer.duplicate().get(bytes);
+          partValueString = Base64.getEncoder().encodeToString(bytes);
+        } else {
+          partValueString = partValue.toString();
+        }
       } else {
         // This needs to be consistent with getPartitionValue().
         partValueString = MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE;

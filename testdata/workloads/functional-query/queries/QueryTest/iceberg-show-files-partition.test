@@ -4,25 +4,28 @@
 CREATE TABLE iceberg_identity_partitions_showfiles
   (identity_boolean boolean, identity_int int, identity_bigint bigint,
   identity_float float, identity_double double, identity_decimal decimal(20,10),
-  identity_date date, identity_timestamp timestamp, identity_string string)
+  identity_date date, identity_timestamp timestamp, identity_string string,
+  identity_binary binary)
 PARTITIONED BY SPEC
   (identity(identity_boolean), identity(identity_int), identity(identity_bigint),
   identity(identity_float), identity(identity_double), identity(identity_decimal),
-  identity(identity_date), identity(identity_string))
+  identity(identity_date), identity(identity_string), identity(identity_binary))
 STORED AS ICEBERG;
 CREATE TABLE iceberg_bucket_partitions_showfiles
   (bucket_int int, bucket_bigint bigint, bucket_decimal decimal(20,10),
-  bucket_date date, bucket_timestamp timestamp, bucket_string string)
+  bucket_date date, bucket_timestamp timestamp, bucket_string string,
+  bucket_binary binary)
 PARTITIONED BY SPEC
   (bucket(5,bucket_int), bucket(5,bucket_bigint), bucket(5,bucket_decimal),
-  bucket(5,bucket_date), bucket(5,bucket_timestamp), bucket(5,bucket_string))
+  bucket(5,bucket_date), bucket(5,bucket_timestamp), bucket(5,bucket_string),
+  bucket(5,bucket_binary))
 STORED AS ICEBERG;
 CREATE TABLE iceberg_truncate_partitions_showfiles
   (truncate_int int, truncate_bigint bigint, truncate_decimal decimal(20,10),
-  truncate_string string)
+  truncate_string string, truncate_binary binary)
 PARTITIONED BY SPEC
   (truncate(5,truncate_int), truncate(5,truncate_bigint), truncate(5,truncate_decimal),
-  truncate(5,truncate_string))
+  truncate(5,truncate_string), truncate(5,truncate_binary))
 STORED AS ICEBERG;
 CREATE TABLE iceberg_time_partitions_showfiles
   (year_date date, year_timestamp timestamp, month_date date, month_timestamp timestamp,
@@ -75,16 +78,20 @@ INSERT INTO iceberg_identity_partitions_showfiles(identity_string) VALUES ("stri
 INSERT INTO iceberg_identity_partitions_showfiles(identity_string) VALUES ("string-transform-set");
 INSERT INTO iceberg_identity_partitions_showfiles(identity_string) VALUES ("string"), ("another-string");
 INSERT INTO iceberg_identity_partitions_showfiles(identity_string) VALUES ("string"), ("another-string");
+INSERT INTO iceberg_identity_partitions_showfiles(identity_binary) VALUES (CAST('你好hello' AS BINARY));
+INSERT INTO iceberg_identity_partitions_showfiles(identity_binary) VALUES (CAST(UNHEX('FF4433221100') AS BINARY));
 INSERT INTO iceberg_bucket_partitions_showfiles(bucket_int) VALUES (100), (200);
 INSERT INTO iceberg_bucket_partitions_showfiles(bucket_bigint) VALUES (100);
 INSERT INTO iceberg_bucket_partitions_showfiles(bucket_decimal) VALUES (10);
 INSERT INTO iceberg_bucket_partitions_showfiles(bucket_date) VALUES ("1526-01-12");
 INSERT INTO iceberg_bucket_partitions_showfiles(bucket_string) VALUES ("string");
 INSERT INTO iceberg_bucket_partitions_showfiles(bucket_timestamp) VALUES ("1583-04-02 03:00:00");
+INSERT INTO iceberg_bucket_partitions_showfiles(bucket_binary) VALUES (CAST(UNHEX('FF4433221100') AS BINARY));
 INSERT INTO iceberg_truncate_partitions_showfiles(truncate_int) VALUES (131072);
 INSERT INTO iceberg_truncate_partitions_showfiles(truncate_bigint) VALUES (68719476736);
 INSERT INTO iceberg_truncate_partitions_showfiles(truncate_decimal) VALUES (100000.1234567891);
 INSERT INTO iceberg_truncate_partitions_showfiles(truncate_string) VALUES ('thisisalongstring');
+INSERT INTO iceberg_truncate_partitions_showfiles(truncate_binary) VALUES (CAST('你好hello' AS BINARY));
 INSERT INTO iceberg_time_partitions_showfiles(year_date) VALUES ('2077-05-06');
 INSERT INTO iceberg_time_partitions_showfiles(month_date) VALUES ('2023-12-01');
 INSERT INTO iceberg_time_partitions_showfiles(day_date) VALUES ('2023-12-01');
@@ -197,6 +204,22 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_sho
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
+# Show files for identity partitions - binary "CAST('你好hello' AS BINARY)"
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity(identity_binary) = CAST('你好hello' AS BINARY));
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_binary=%E4%BD%A0%E5%A5%BDhello.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for identity partitions - binary "CAST(UNHEX('FF4433221100') AS BINARY)"
+SHOW FILES IN iceberg_identity_partitions_showfiles PARTITION (identity(identity_binary) = CAST(UNHEX('FF4433221100') AS BINARY));
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_identity_partitions_showfiles/data/.*identity_binary=%FFD3%22%11%00.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
 # Show files for bucket partitions - int bucket range
 SHOW FILES IN iceberg_bucket_partitions_showfiles PARTITION (bucket(5, bucket_int) in (1,2));
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
@@ -246,6 +269,14 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_bucket_partitions_showf
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
+# Show files for bucket partitions - binary bucket
+SHOW FILES IN iceberg_bucket_partitions_showfiles PARTITION (bucket(5, bucket_binary) = 1);
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_bucket_partitions_showfiles/data/.*bucket_binary_bucket=1.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
 # Show files for truncate partitions - int truncate
 SHOW FILES IN iceberg_truncate_partitions_showfiles PARTITION (truncate(5, truncate_int) = 131070);
 ---- RESULTS
@@ -274,6 +305,14 @@ STRING, STRING, STRING, STRING
 SHOW FILES IN iceberg_truncate_partitions_showfiles PARTITION (truncate(5, truncate_string) = 'thisi');
 ---- RESULTS
 row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_truncate_partitions_showfiles/data/.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show files for truncate partitions - string truncate
+SHOW FILES IN iceberg_truncate_partitions_showfiles PARTITION (truncate(5, truncate_binary) = CAST(UNHEX("E4BDA0E5A5") AS BINARY));
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_truncate_partitions_showfiles/data/.*truncate_binary_trunc=%E4%BD%A0%E5%A5.*_data.*.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====

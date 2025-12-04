@@ -133,7 +133,7 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
       if (!text_converter.WriteSlot(slot_desc, *template_tuple,
                                     (const char*)transform->transform_value()->data(),
                                     transform->transform_value()->size(),
-                                    true, false,
+                                    /* copy_string = */ true, /* need_escape = */ false,
                                     mem_pool)) {
         ErrorMsg error_msg(TErrorCode::GENERAL,
             Substitute("Could not parse partition value for "

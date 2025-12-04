@@ -20,6 +20,7 @@ package org.apache.impala.util;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 import com.google.common.base.Preconditions;
@@ -50,6 +51,15 @@ public class StringUtils {
       Preconditions.checkState(canFail, "UTF8 decoding failed: %s", ex.getMessage());
       return null;
     }
+  }
+
+  /**
+   * Converts a ByteBuffer to a String using the given charset.
+  */
+  public static String fromByteBuffer(ByteBuffer buf, Charset charset) {
+    byte[] bytes = new byte[buf.remaining()];
+    buf.duplicate().get(bytes);
+    return new String(bytes, charset);
   }
 
 }

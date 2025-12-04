@@ -206,7 +206,8 @@ create table alltypes_part (
   double_col DOUBLE,
   date_col DATE,
   string_col STRING,
-  timestamp_col TIMESTAMP)
+  timestamp_col TIMESTAMP,
+  binary_col BINARY)
 partitioned by spec (
   id,
   bool_col,
@@ -215,7 +216,8 @@ partitioned by spec (
   float_col,
   double_col,
   date_col,
-  string_col)
+  string_col,
+  binary_col)
 stored as iceberg;
 ---- RESULTS
 'Table has been created.'
@@ -223,7 +225,8 @@ stored as iceberg;
 ---- QUERY
 insert into alltypes_part
 select id, bool_col, int_col, bigint_col, float_col, double_col,
-       CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+       CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col,
+       CAST(string_col as BINARY)
 from functional.alltypestiny;
 select count(*) from alltypes_part;
 ---- RESULTS
@@ -236,28 +239,28 @@ show files in alltypes_part;
 ---- LABELS
 Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=0/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=1/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=2/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=3/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=4/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=5/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=6/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=7/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=0/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/binary_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=1/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/binary_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=2/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/binary_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=3/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/binary_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=4/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/binary_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=5/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/binary_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=6/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/binary_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=7/bool_col=false/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/binary_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 SHOW PARTITIONS alltypes_part;
 ---- RESULTS
-'{"id":"0","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14245","string_col":"0"}',1,1
-'{"id":"1","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14245","string_col":"1"}',1,1
-'{"id":"2","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14276","string_col":"0"}',1,1
-'{"id":"3","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14276","string_col":"1"}',1,1
-'{"id":"4","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14304","string_col":"0"}',1,1
-'{"id":"5","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14304","string_col":"1"}',1,1
-'{"id":"6","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14335","string_col":"0"}',1,1
-'{"id":"7","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14335","string_col":"1"}',1,1
+'{"id":"0","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14245","string_col":"0","binary_col":"30"}',1,1
+'{"id":"1","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14245","string_col":"1","binary_col":"31"}',1,1
+'{"id":"2","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14276","string_col":"0","binary_col":"30"}',1,1
+'{"id":"3","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14276","string_col":"1","binary_col":"31"}',1,1
+'{"id":"4","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14304","string_col":"0","binary_col":"30"}',1,1
+'{"id":"5","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14304","string_col":"1","binary_col":"31"}',1,1
+'{"id":"6","bool_col":"true","int_col":"0","bigint_col":"0","float_col":"0.0","double_col":"0.0","date_col":"14335","string_col":"0","binary_col":"30"}',1,1
+'{"id":"7","bool_col":"false","int_col":"1","bigint_col":"10","float_col":"1.1","double_col":"10.1","date_col":"14335","string_col":"1","binary_col":"31"}',1,1
 ---- TYPES
 STRING, BIGINT, BIGINT
 ====
@@ -265,7 +268,8 @@ STRING, BIGINT, BIGINT
 # INSERTs with wrong value orderings are rejected.
 insert into alltypes_part
 select bool_col, id, int_col, bigint_col, float_col, double_col,
-       CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+       CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col,
+       CAST(string_col as BINARY)
 from functional.alltypestiny;
 select count(*) from alltypes_part;
 ---- CATCH
@@ -274,7 +278,8 @@ Expression 'id' (type: INT) would need to be cast to BOOLEAN for column 'bool_co
 ---- QUERY
 insert into alltypes_part
 select id, bool_col, int_col, bigint_col, float_col, double_col,
-       CAST(date_string_col as date FORMAT 'MM/DD/YY'), timestamp_col, string_col
+       CAST(date_string_col as date FORMAT 'MM/DD/YY'), timestamp_col, string_col,
+       CAST(string_col as BINARY)
 from functional.alltypestiny;
 select count(*) from alltypes_part;
 ---- CATCH
@@ -336,6 +341,17 @@ aggregation(SUM, NumRowGroups): 0
 aggregation(SUM, NumFileMetadataRead): 4
 ====
 ---- QUERY
+select count(*) from alltypes_part
+where binary_col = CAST('0' AS BINARY);
+---- RESULTS
+4
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, NumFileMetadataRead): 4
+====
+---- QUERY
 # 'timestamp_col' is not a partitioning column, so min/max stats will not be used to
 # eliminate row groups
 select count(*) from alltypes_part
@@ -362,7 +378,8 @@ insert into
     double_col,
     date_col,
     string_col,
-    timestamp_col
+    timestamp_col,
+    binary_col
   )
 select
   id,
@@ -372,7 +389,8 @@ select
   double_col,
   CAST(date_string_col as date FORMAT 'MM/DD/YY'),
   string_col,
-  timestamp_col
+  timestamp_col,
+  CAST(string_col as BINARY)
 from
   functional.alltypestiny;
 select count(*) from alltypes_part;
@@ -386,14 +404,14 @@ show files in alltypes_part_2;
 ---- LABELS
 Path,Size,Partition,EC Policy
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=0/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=1/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=2/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=3/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=4/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=5/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=6/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=7/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=0/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/binary_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=1/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-01-01/string_col=1/binary_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=2/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-02-01/string_col=0/binary_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=3/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-02-01/string_col=1/binary_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=4/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-03-01/string_col=0/binary_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=5/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-03-01/string_col=1/binary_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=6/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-04-01/string_col=0/binary_col=0/.*.0.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part_2/data/id=7/bool_col=__HIVE_DEFAULT_PARTITION__/int_col=1/bigint_col=10/float_col=1.100000023841858/double_col=10.1/date_col=2009-04-01/string_col=1/binary_col=1/.*.0.parq','.*','','$ERASURECODE_POLICY'
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====

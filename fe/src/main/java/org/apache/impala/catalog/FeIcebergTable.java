@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,6 +37,7 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
@@ -949,7 +951,12 @@ public interface FeIcebergTable extends FeFsTable {
         Object partValue = contentFile.partition().get(i, Object.class);
         String partValueString = null;
         if (partValue != null) {
-          partValueString = partValue.toString();
+          if (partValue instanceof ByteBuffer) {
+            // For binary value, convert to hexadecimal string according to Iceberg spec.
+            partValueString = Hex.encodeHexString((ByteBuffer) partValue);
+          } else {
+            partValueString = partValue.toString();
+          }
         }
         fieldNameToPartitionValue.put(spec.fields().get(i).name(), partValueString);
       }

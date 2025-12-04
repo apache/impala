@@ -151,7 +151,7 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
         icebergPartitionExprs.add(converter.convert(expr));
       } catch (ImpalaException e) {
         throw new AnalysisException(
-            "Invalid partition filtering expression: " + expr.toSql());
+            "Invalid partition filtering expression: " + expr.toSql(), e);
       }
     }
 

@@ -99,14 +99,25 @@ DecimalVal IcebergFunctions::TruncatePartitionTransformDecimalImpl(const T& deci
   return decimal_val - (((decimal_val % width) + width) % width);
 }
 
+template<bool is_binary>
 StringVal IcebergFunctions::TruncatePartitionTransform(FunctionContext* ctx,
     const StringVal& input, const IntVal& width) {
   if (!CheckInputsAndSetError(ctx, input, width)) return StringVal::null();
   if (input.len <= width.val) return input;
-  // String handled as UTF8 regardless of utf8_mode, because Iceberg spec states that
-  // character strings must be stored as UTF-8 encoded byte arrays.
-  return StringFunctions::Utf8Substring(ctx, input, 1, width.val);
+  if constexpr (is_binary) {
+    // String handled as binary data.
+    return StringVal::CopyFrom(ctx, input.ptr, width.val);
+  } else {
+    // String handled as UTF8 regardless of utf8_mode, because Iceberg spec states that
+    // character strings must be stored as UTF-8 encoded byte arrays.
+    return StringFunctions::Utf8Substring(ctx, input, 1, width.val);
+  }
 }
+
+template StringVal IcebergFunctions::TruncatePartitionTransform<true>(
+    FunctionContext*, const StringVal&, const IntVal&);
+template StringVal IcebergFunctions::TruncatePartitionTransform<false>(
+    FunctionContext*, const StringVal&, const IntVal&);
 
 template<typename T, typename W>
 T IcebergFunctions::TruncatePartitionTransformNumericImpl(FunctionContext* ctx,

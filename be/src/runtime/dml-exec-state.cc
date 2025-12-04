@@ -585,9 +585,12 @@ string createIcebergDataFileString(
     ice_col_stats_vec.push_back(createIcebergColumnStats(fbb, it->first, it->second));
   }
 
-  vector<flatbuffers::Offset<flatbuffers::String>> raw_partition_fields;
+  vector<flatbuffers::Offset<FbIcebergPartitionField>> raw_partition_fields;
+
   for (const string& partition_name : partition.raw_partition_names) {
-    raw_partition_fields.push_back(fbb.CreateString(partition_name));
+    auto data = reinterpret_cast<const uint8_t*>(partition_name.data());
+    auto fb_vector = fbb.CreateVector(data, partition_name.size());
+    raw_partition_fields.push_back(CreateFbIcebergPartitionField(fbb, fb_vector));
   }
 
   flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
