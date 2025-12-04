@@ -18,7 +18,7 @@
 #pragma once
 
 #include <limits>
-#include "common/logging.h"
+#include "common/status.h"
 
 #include "thirdparty/roaring/roaring.h"
 
@@ -152,12 +152,24 @@ public:
   };
 
   RoaringBitmap64() = default;
-  ~RoaringBitmap64() { roaring64_bitmap_free(rbitmap_); }
+  ~RoaringBitmap64() { Cleanup(); }
 
   RoaringBitmap64(const RoaringBitmap64 &) = delete;
   RoaringBitmap64 &operator=(const RoaringBitmap64 &) = delete;
-  RoaringBitmap64(RoaringBitmap64 &&) noexcept = delete;
-  RoaringBitmap64 &operator=(RoaringBitmap64 &&) noexcept = delete;
+
+  RoaringBitmap64(RoaringBitmap64&& other) noexcept {
+    rbitmap_ = other.rbitmap_;
+    other.rbitmap_ = nullptr;
+  }
+
+  RoaringBitmap64& operator=(RoaringBitmap64&& other) noexcept {
+    if (this != &other) {
+      Cleanup();
+      rbitmap_ = other.rbitmap_;
+      other.rbitmap_ = nullptr;
+    }
+    return *this;
+  }
 
   void AddElements(const std::vector<uint64_t>& elements) {
     roaring64_bitmap_add_many(rbitmap_, elements.size(), elements.data());
@@ -171,7 +183,49 @@ public:
   uint64_t Min() const { return roaring64_bitmap_minimum(rbitmap_); }
   uint64_t Max() const { return roaring64_bitmap_maximum(rbitmap_); }
 
+  /// Returns serialized size in bytes.
+  uint64_t BitmapSizeInBytes() const {
+    return roaring64_bitmap_portable_size_in_bytes(rbitmap_);
+  }
+
+  /// Serializes this bitmap to 'buf'.
+  /// Caller must ensure that 'buf' has at least 'BitmapSizeInBytes()' bytes.
+  uint64_t Serialize(uint8_t* buf) {
+    return roaring64_bitmap_portable_serialize(rbitmap_, reinterpret_cast<char*>(buf));
+  }
+
+  /// Deserializes roaring bitmap from 'buf' up to 'max_bytes'. It returns non-OK
+  /// status on deserialization errors, in which case 'result' remains untouched.
+  /// On success, 'result' contains the deserialized bitmap.
+  static Status Deserialize(const uint8_t* buf, uint64_t max_bytes,
+      RoaringBitmap64* result) {
+    roaring64_bitmap_t* bitmap = roaring64_bitmap_portable_deserialize_safe(
+        reinterpret_cast<const char*>(buf), max_bytes);
+    if (bitmap == nullptr) {
+      return Status("Deserialization of roaring bitmap failed.");
+    }
+    const char* error_msg = nullptr;
+    if (!roaring64_bitmap_internal_validate(bitmap, &error_msg)) {
+      roaring64_bitmap_free(bitmap);
+      return Status("Deserialization of roaring bitmap failed with reason: " +
+          std::string(error_msg == nullptr ? "unknown" : error_msg));
+    }
+    DCHECK(result != nullptr);
+    *result = RoaringBitmap64(bitmap);
+    return Status::OK();
+  }
+
 private:
+  RoaringBitmap64(roaring64_bitmap_t* native_bitmap) noexcept {
+    rbitmap_ = native_bitmap;
+  }
+
+  void Cleanup() {
+    // Our CRoaring's roaring64_bitmap_free crashes on nullptrs. This is fixed in
+    // newer versions.
+    if (rbitmap_) roaring64_bitmap_free(rbitmap_);
+  }
+
   roaring64_bitmap_t* rbitmap_ = roaring64_bitmap_create();
 };
 
