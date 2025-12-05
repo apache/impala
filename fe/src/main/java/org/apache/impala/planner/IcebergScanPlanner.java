@@ -23,6 +23,7 @@ import static org.apache.impala.util.IcebergUtil.getFilePathHash;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -95,7 +96,6 @@ import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TIcebergDeletionVector;
-import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TVirtualColumnType;
@@ -954,9 +954,9 @@ public class IcebergScanPlanner {
 
     Integer partitionId = 0;
 
-    TIcebergPartition partition =
-        IcebergUtil.createIcebergPartitionInfo(getIceTable().getIcebergApiTable(), cf);
-    Map<TIcebergPartition, Integer> partitions = fileStore.getPartitionMap();
+    ByteBuffer partition =
+        IcebergUtil.createFbIcebergPartition(getIceTable().getIcebergApiTable(), cf);
+    Map<ByteBuffer, Integer> partitions = fileStore.getPartitionMap();
     partitionId = partitions.get(partition);
     // If we do not find the partition among the current partitions cached by catalog, try
     // looking it up among the old descriptors' partitions.

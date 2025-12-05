@@ -27,6 +27,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,7 +54,6 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Pair;
 import org.apache.impala.fb.FbIcebergMetadata;
-import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
@@ -75,15 +75,16 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   private final Path tablePath_;
   private final String tablePathStr_;
   private final GroupedContentFiles icebergFiles_;
-  private final List<TIcebergPartition> oldIcebergPartitions_;
+  // Partitions that were already loaded before the incremental refresh.
+  private final List<ByteBuffer> oldIcebergPartitions_;
   private AtomicInteger nextPartitionId_ = new AtomicInteger(0);
   // Map of the freshly loaded Iceberg partitions and their corresponding ids.
-  private ConcurrentHashMap<TIcebergPartition, Integer> loadedIcebergPartitions_;
+  private ConcurrentHashMap<ByteBuffer, Integer> loadedIcebergPartitions_;
   private final boolean requiresDataFilesInTableLocation_;
   // When non-null, these partitions are pre-loaded into loadedIcebergPartitions_ at the
   // start of loadInternal(). Used for incremental file loading to assign new partition
   // IDs that do not conflict with already-existing ones.
-  private final Map<TIcebergPartition, Integer> initialPartitions_;
+  private final Map<ByteBuffer, Integer> initialPartitions_;
 
   /**
    * 'existingPartitions', when non-null, is pre-loaded into the partition map so that
@@ -92,9 +93,9 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
    */
   public IcebergFileMetadataLoader(org.apache.iceberg.Table iceTbl,
         Iterable<IcebergFileDescriptor> oldFds, ListMap<TNetworkAddress> hostIndex,
-        GroupedContentFiles icebergFiles, List<TIcebergPartition> partitions,
+        GroupedContentFiles icebergFiles, List<ByteBuffer> partitions,
         boolean requiresDataFilesInTableLocation,
-        Map<TIcebergPartition, Integer> existingPartitions) {
+        Map<ByteBuffer, Integer> existingPartitions) {
     super(iceTbl.location(), true, oldFds, hostIndex, null, null,
         HdfsFileFormat.ICEBERG);
     iceTbl_ = iceTbl;
@@ -125,13 +126,9 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
         .collect(Collectors.toList());
   }
 
-  public Map<TIcebergPartition, Integer> getIcebergPartitions() {
+  public Map<ByteBuffer, Integer> getIcebergPartitions() {
     Preconditions.checkNotNull(loadedIcebergPartitions_);
     return Collections.unmodifiableMap(loadedIcebergPartitions_);
-  }
-
-  public List<TIcebergPartition> getIcebergPartitionList() {
-    return IcebergContentFileStore.convertPartitionMapToList(getIcebergPartitions());
   }
 
   private void loadInternal() throws CatalogException, IOException {
@@ -201,26 +198,39 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     }
     List<ContentFile<?>> newContentFiles = Lists.newArrayList();
     for (ContentFile<?> contentFile : icebergFiles_.getAllContentFiles()) {
-      IcebergFileDescriptor fd = getOldFd(contentFile);
-      if (fd == null) {
+      IcebergFileDescriptor originalFd = getOldFd(contentFile);
+      if (originalFd == null) {
         newContentFiles.add(contentFile);
       } else {
-        int oldPartId = fd.getFbFileMetadata().icebergMetadata().partId();
-        TIcebergPartition partition = oldIcebergPartitions_.get(oldPartId);
+        FbIcebergMetadata originalIceMetadata =
+            originalFd.getFbFileMetadata().icebergMetadata();
+        // Look up the partition info in this old file descriptor from the partition list.
+        // Put the partition info in the new partitions map and get the new id.
+        int oldPartId = originalIceMetadata.partId();
+        ByteBuffer partition = oldIcebergPartitions_.get(oldPartId);
         Integer newPartId = loadedIcebergPartitions_.computeIfAbsent(
             partition, k -> nextPartitionId_.getAndIncrement());
-        FbIcebergMetadata icebergMetadata = fd.getFbFileMetadata().icebergMetadata();
-        // Look up the partition info in this old file descriptor from the partition list.
-        // Put the partition info in the new partitions map and write the new partition id
-        // to the file metadata of the fd.
-        if (!icebergMetadata.mutatePartId(newPartId)) {
-          throw new TableLoadingException(
-              "Error modifying the partition id of the Iceberg file descriptor.");
-        }
-        if (icebergMetadata.firstRowId() == -1 && contentFile.firstRowId() != null) {
-          if (!icebergMetadata.mutateFirstRowId(contentFile.firstRowId())) {
-            throw new TableLoadingException(
-                "Error modifying the first-row-id Iceberg file descriptor.");
+
+        IcebergFileDescriptor fd = originalFd;
+        boolean needToUpdatePartId = !newPartId.equals(oldPartId);
+        boolean needToUpdateFirstRowId =
+            originalIceMetadata.firstRowId() == -1 && contentFile.firstRowId() != null;
+        if (needToUpdatePartId || needToUpdateFirstRowId) {
+          // If we need to modify the metadata, first create a deep copy of the
+          // file descriptor for cache consistency.
+          fd = originalFd.deepCopy();
+          FbIcebergMetadata icebergMetadata = fd.getFbFileMetadata().icebergMetadata();
+          if (needToUpdatePartId) {
+            if (!icebergMetadata.mutatePartId(newPartId)) {
+              throw new TableLoadingException(
+                  "Error modifying the partition id of the Iceberg file descriptor.");
+            }
+          }
+          if (needToUpdateFirstRowId) {
+            if (!icebergMetadata.mutateFirstRowId(contentFile.firstRowId())) {
+              throw new TableLoadingException(
+                  "Error modifying the first-row-id Iceberg file descriptor.");
+            }
           }
         }
         ++loadStats_.skippedFiles;
@@ -265,8 +275,8 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
   }
 
   private int addPartitionInfo(ContentFile<?> contentFile) {
-    TIcebergPartition partition =
-        IcebergUtil.createIcebergPartitionInfo(iceTbl_, contentFile);
+    ByteBuffer partition =
+        IcebergUtil.createFbIcebergPartition(iceTbl_, contentFile);
     return loadedIcebergPartitions_.computeIfAbsent(
         partition, k -> nextPartitionId_.getAndIncrement());
   }

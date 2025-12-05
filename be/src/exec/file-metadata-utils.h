@@ -25,7 +25,7 @@
 #include <memory>
 
 namespace org::apache::impala::fb {
-  struct FbIcebergMetadata;
+  struct FbIcebergSplitMetadata;
 }
 
 namespace impala {
@@ -91,15 +91,15 @@ public:
 private:
   void AddFileLevelVirtualColumns(MemPool* mem_pool, Tuple* template_tuple);
 
-  /// Writes the Iceberg columns from FbIcebergMetadata into template_tuple. Updates the
-  /// slot_descs_written map with the SlotDescriptors that were written into the
+  /// Writes the Iceberg columns from FbIcebergSplitMetadata into template_tuple. Updates
+  /// the slot_descs_written map with the SlotDescriptors that were written into the
   /// template_tuple.
   void AddIcebergColumns(MemPool* mem_pool, Tuple** template_tuple,
       std::map<const SlotId, const SlotDescriptor*>* slot_descs_written);
 
   /// Writes Iceberg-related virtual column values to the template tuple.
   void AddVirtualIcebergColumn(MemPool* mem_pool, Tuple* template_tuple,
-      const org::apache::impala::fb::FbIcebergMetadata& ice_metadata,
+      const org::apache::impala::fb::FbIcebergSplitMetadata& ice_metadata,
       const SlotDescriptor* slot_desc);
 
   /// Returns a pointer to the container of partition transforms. Only valid to call

@@ -26,6 +26,7 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.nio.ByteBuffer;
 
 import org.apache.iceberg.Snapshot;
 import org.apache.impala.analysis.Analyzer;
@@ -317,13 +318,17 @@ public class IcebergScanNode extends HdfsScanNode {
   protected void decorateScanRange(FileDescriptor fileDesc, TScanRange scanRange) {
     IcebergFileDescriptor iceFd = applyDeletionVector(fileDesc,
         scanRange::setIceberg_deletion_vector);
-    scanRange.setFile_metadata(iceFd.getFbFileMetadata().getByteBuffer());
+    scanRange.setFile_metadata(getIcebergSplitFileMetadata(iceFd));
   }
 
   @Override
   protected void decorateSplitSpec(FileDescriptor fileDesc,
       TFileSplitGeneratorSpec splitSpec) {
-    applyDeletionVector(fileDesc, splitSpec::setIceberg_deletion_vector);
+    IcebergFileDescriptor iceFd = applyDeletionVector(fileDesc,
+        splitSpec::setIceberg_deletion_vector);
+    // Overwrite the raw FbFileMetadata (which only contains a part_id reference)
+    // with the denormalized FbSplitFileMetadata that includes the actual partition keys.
+    splitSpec.getFile_desc().setFile_metadata(getIcebergSplitFileMetadata(iceFd));
   }
 
   private IcebergFileDescriptor applyDeletionVector(FileDescriptor fileDesc,
@@ -344,5 +349,12 @@ public class IcebergScanNode extends HdfsScanNode {
       }
     }
     return iceFd;
+  }
+
+  private ByteBuffer getIcebergSplitFileMetadata(IcebergFileDescriptor fileDesc) {
+    int partId = fileDesc.getFbFileMetadata().icebergMetadata().partId();
+    ByteBuffer partitionBuf =
+        ((FeIcebergTable) tbl_).getContentFileStore().getPartitionById(partId);
+    return IcebergUtil.transformFileMetadata(fileDesc, partitionBuf).getByteBuffer();
   }
 }

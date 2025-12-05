@@ -20,9 +20,11 @@ package org.apache.impala.catalog;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -35,7 +37,6 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
-import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
@@ -193,7 +194,7 @@ public class FileMetadataLoaderTest {
     CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
     IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_partitioned",
-        /* oldFds = */ Collections.emptyList(), Collections.emptyList(),
+        /* oldFds = */ Collections.emptyList(), Collections.emptyMap(),
         /* requiresDataFilesInTableLocation = */ true);
     fml1.load();
     assertEquals(20, fml1.getStats().loadedFiles);
@@ -208,7 +209,7 @@ public class FileMetadataLoaderTest {
 
     IcebergFileMetadataLoader fml2 =  getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_non_partitioned",
-        /* oldFds = */ Collections.emptyList(), Collections.emptyList(),
+        /* oldFds = */ Collections.emptyList(), Collections.emptyMap(),
         /* requiresDataFilesInTableLocation = */ true);
     fml2.load();
     assertEquals(20, fml2.getStats().loadedFiles);
@@ -233,7 +234,7 @@ public class FileMetadataLoaderTest {
       CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
       IcebergFileMetadataLoader fml = getLoaderForIcebergTable(catalog,
           "functional_parquet", "iceberg_partitioned",
-          /* oldFds = */ Collections.emptyList(), Collections.emptyList(),
+          /* oldFds = */ Collections.emptyList(), Collections.emptyMap(),
           /* requiresDataFilesInTableLocation = */ true);
       fml.load();
       List<IcebergFileDescriptor> fileDescs = fml.getLoadedIcebergFds();
@@ -251,18 +252,20 @@ public class FileMetadataLoaderTest {
     CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
     IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_partitioned",
-        /* oldFds = */ Collections.emptyList(), Collections.emptyList(),
+        /* oldFds = */ Collections.emptyList(), Collections.emptyMap(),
         /* requiresDataFilesInTableLocation = */ true);
     fml1.load();
+    assertEquals(3, fml1.getIcebergPartitions().size());
 
     IcebergFileMetadataLoader fml1Refresh = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_partitioned",
-        /* oldFds = */ fml1.getLoadedIcebergFds(), fml1.getIcebergPartitionList(),
+        /* oldFds = */ fml1.getLoadedIcebergFds(), fml1.getIcebergPartitions(),
         /* requiresDataFilesInTableLocation = */ true);
     fml1Refresh.load();
     assertEquals(0, fml1Refresh.getStats().loadedFiles);
     assertEquals(20, fml1Refresh.getStats().skippedFiles);
     assertEquals(20, fml1Refresh.getLoadedFds().size());
+    assertEquals(3, fml1Refresh.getIcebergPartitions().size());
 
     List<String> relPaths = new ArrayList<>(
         Collections2.transform(fml1Refresh.getLoadedFds(),
@@ -273,18 +276,20 @@ public class FileMetadataLoaderTest {
 
     IcebergFileMetadataLoader fml2 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_non_partitioned",
-        /* oldFds = */ Collections.emptyList(), Collections.emptyList(),
+        /* oldFds = */ Collections.emptyList(), Collections.emptyMap(),
         /* requiresDataFilesInTableLocation = */ true);
     fml2.load();
+    assertEquals(1, fml2.getIcebergPartitions().size());
 
     IcebergFileMetadataLoader fml2Refresh = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_non_partitioned",
-        /* oldFds = */ fml2.getLoadedIcebergFds(),  fml1.getIcebergPartitionList(),
+        /* oldFds = */ fml2.getLoadedIcebergFds(),  fml2.getIcebergPartitions(),
         /* requiresDataFilesInTableLocation = */ true);
     fml2Refresh.load();
     assertEquals(0, fml2Refresh.getStats().loadedFiles);
     assertEquals(20, fml2Refresh.getStats().skippedFiles);
     assertEquals(20, fml2Refresh.getLoadedFds().size());
+    assertEquals(1, fml2Refresh.getIcebergPartitions().size());
 
     relPaths = new ArrayList<>(
         Collections2.transform(fml2Refresh.getLoadedFds(),
@@ -299,35 +304,39 @@ public class FileMetadataLoaderTest {
     CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
     IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_partitioned",
-        /* oldFds = */ Collections.emptyList(), Collections.emptyList(),
+        /* oldFds = */ Collections.emptyList(), Collections.emptyMap(),
         /* requiresDataFilesInTableLocation = */ true);
     fml1.load();
+    assertEquals(3, fml1.getIcebergPartitions().size());
 
     IcebergFileMetadataLoader fml1Refresh = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_partitioned",
         /* oldFds = */ fml1.getLoadedIcebergFds().subList(0, 10),
-        fml1.getIcebergPartitionList(),
+        fml1.getIcebergPartitions(),
         /* requiresDataFilesInTableLocation = */ true);
     fml1Refresh.load();
     assertEquals(10, fml1Refresh.getStats().loadedFiles);
     assertEquals(10, fml1Refresh.getStats().skippedFiles);
     assertEquals(20, fml1Refresh.getLoadedFds().size());
+    assertEquals(3, fml1Refresh.getIcebergPartitions().size());
 
     IcebergFileMetadataLoader fml2 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_non_partitioned",
-        /* oldFds = */ Collections.emptyList(), Collections.emptyList(),
+        /* oldFds = */ Collections.emptyList(), Collections.emptyMap(),
         /* requiresDataFilesInTableLocation = */ true);
     fml2.load();
+    assertEquals(1, fml2.getIcebergPartitions().size());
 
     IcebergFileMetadataLoader fml2Refresh = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_non_partitioned",
         /* oldFds = */ fml2.getLoadedIcebergFds().subList(0, 10),
-        fml1.getIcebergPartitionList(),
+        fml2.getIcebergPartitions(),
         /* requiresDataFilesInTableLocation = */ true);
     fml2Refresh.load();
     assertEquals(10, fml2Refresh.getStats().loadedFiles);
     assertEquals(10, fml2Refresh.getStats().skippedFiles);
     assertEquals(20, fml2Refresh.getLoadedFds().size());
+    assertEquals(1, fml2Refresh.getIcebergPartitions().size());
   }
 
   @Test
@@ -336,14 +345,14 @@ public class FileMetadataLoaderTest {
     BackendConfig.INSTANCE.setIcebergAllowDatafileInTableLocationOnly(false);
     IcebergFileMetadataLoader fml1 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_multiple_storage_locations",
-        /* oldFds = */ Collections.emptyList(), Collections.emptyList(),
+        /* oldFds = */ Collections.emptyList(), Collections.emptyMap(),
         /* requiresDataFilesInTableLocation = */ false);
     fml1.load();
 
     IcebergFileMetadataLoader fml1Refresh1 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_multiple_storage_locations",
         /* oldFds = */ fml1.getLoadedIcebergFds().subList(0, 1),
-        fml1.getIcebergPartitionList(),
+        fml1.getIcebergPartitions(),
         /* requiresDataFilesInTableLocation = */ false);
     fml1Refresh1.load();
     assertEquals(5, fml1Refresh1.getStats().loadedFiles);
@@ -353,7 +362,7 @@ public class FileMetadataLoaderTest {
     IcebergFileMetadataLoader fml1Refresh5 = getLoaderForIcebergTable(catalog,
         "functional_parquet", "iceberg_multiple_storage_locations",
         /* oldFds = */ fml1.getLoadedIcebergFds().subList(0, 5),
-        fml1.getIcebergPartitionList(),
+        fml1.getIcebergPartitions(),
         /* requiresDataFilesInTableLocation = */ false);
     fml1Refresh5.load();
     assertEquals(1, fml1Refresh5.getStats().loadedFiles);
@@ -363,7 +372,7 @@ public class FileMetadataLoaderTest {
 
   private IcebergFileMetadataLoader getLoaderForIcebergTable(
       CatalogServiceCatalog catalog, String dbName, String tblName,
-      List<IcebergFileDescriptor> oldFds, List<TIcebergPartition> oldPartitions,
+      List<IcebergFileDescriptor> oldFds, Map<ByteBuffer, Integer> oldPartitionMap,
       boolean requiresDataFilesInTableLocation)
       throws CatalogException {
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
@@ -372,8 +381,10 @@ public class FileMetadataLoaderTest {
     Path location = new Path(iceT.getLocation());
     GroupedContentFiles iceFiles = IcebergUtil.getIcebergFiles(iceT,
         /*predicates=*/Collections.emptyList(), /*timeTravelSpec=*/null);
+    List<ByteBuffer> oldPartitionList =
+        IcebergContentFileStore.convertPartitionMapToList(oldPartitionMap, 0);
     return new IcebergFileMetadataLoader(iceT.getIcebergApiTable(),
-        oldFds, hostIndex, iceFiles, oldPartitions,
+        oldFds, hostIndex, iceFiles, oldPartitionList,
         requiresDataFilesInTableLocation, null);
   }
 

@@ -101,6 +101,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.IcebergColumn;
+import org.apache.impala.catalog.IcebergFileDescriptor;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.IcebergTableLoadingException;
 import org.apache.impala.catalog.TableLoadingException;
@@ -115,11 +116,14 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.fb.FbFileMetadata;
+import org.apache.impala.fb.FbSplitFileMetadata;
 import org.apache.impala.fb.FbIcebergDataFile;
 import org.apache.impala.fb.FbIcebergPartitionField;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.fb.FbIcebergDeletionVector;
 import org.apache.impala.fb.FbIcebergMetadata;
+import org.apache.impala.fb.FbIcebergSplitMetadata;
+import org.apache.impala.fb.FbIcebergPartition;
 import org.apache.impala.fb.FbIcebergPartitionTransformValue;
 import org.apache.impala.fb.FbIcebergTransformType;
 import org.apache.impala.thrift.TCompressionCodec;
@@ -128,7 +132,6 @@ import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergDeletionVector;
 import org.apache.impala.thrift.TIcebergFileFormat;
-import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
@@ -1186,28 +1189,82 @@ public class IcebergUtil {
     return ret;
   }
 
-  public static TIcebergPartition createIcebergPartitionInfo(
+  public static ByteBuffer createFbIcebergPartition(
       Table iceApiTbl, ContentFile cf) {
-    TIcebergPartition partInfo = new TIcebergPartition(cf.specId(), new ArrayList<>());
+    FlatBufferBuilder fbb = new FlatBufferBuilder();
     PartitionSpec spec = iceApiTbl.specs().get(cf.specId());
-    Preconditions.checkState(spec.fields().size() == cf.partition().size());
-    List<String> partitionKeys = new ArrayList<>();
-    for (int i = 0; i < spec.fields().size(); ++i) {
-      Object partValue = cf.partition().get(i, Object.class);
-      if (partValue != null) {
-        if (partValue instanceof ByteBuffer) {
-          String partValueString =
-              StringUtils.fromByteBuffer((ByteBuffer) partValue, CHARSET_FOR_BINARY);
-          partitionKeys.add(partValueString);
-        } else {
-          partitionKeys.add(partValue.toString());
-        }
-      } else {
-        partitionKeys.add("NULL");
-      }
+    int partKeysOffset = -1;
+    if (spec != null && !spec.fields().isEmpty()) {
+      partKeysOffset = createPartitionKeys(fbb, spec, cf);
     }
-    partInfo.setPartition_values(partitionKeys);
-    return partInfo;
+    FbIcebergPartition.startFbIcebergPartition(fbb);
+    FbIcebergPartition.addSpecId(fbb, cf.specId());
+    if (partKeysOffset != -1) {
+      FbIcebergPartition.addPartitionKeys(fbb, partKeysOffset);
+    }
+    int iceOffset = FbIcebergPartition.endFbIcebergPartition(fbb);
+    fbb.finish(iceOffset);
+    ByteBuffer bb = fbb.dataBuffer().slice();
+    ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
+    compressedBb.put(bb);
+    return (ByteBuffer)compressedBb.flip();
+  }
+
+  /**
+   * Creates a FbSplitFileMetadata object that contains Iceberg file metadata in a
+   * denormalized way: it includes the partition metadata as well in the file descriptor.
+   */
+  public static FbSplitFileMetadata transformFileMetadata(IcebergFileDescriptor fileDesc,
+        ByteBuffer partitionBuf) {
+    FbIcebergPartition partition =
+        FbIcebergPartition.getRootAsFbIcebergPartition(partitionBuf.duplicate());
+    FbIcebergMetadata iceMetadata = fileDesc.getFbFileMetadata().icebergMetadata();
+    FlatBufferBuilder fbb = new FlatBufferBuilder();
+    int partitionKeysOffset = copyPartitionKeys(fbb, partition);
+
+    FbIcebergSplitMetadata.startFbIcebergSplitMetadata(fbb);
+    FbIcebergSplitMetadata.addFileFormat(fbb, iceMetadata.fileFormat());
+    FbIcebergSplitMetadata.addDataSequenceNumber(fbb, iceMetadata.dataSequenceNumber());
+    FbIcebergSplitMetadata.addFirstRowId(fbb, iceMetadata.firstRowId());
+    FbIcebergSplitMetadata.addSpecId(fbb, partition.specId());
+    if (partitionKeysOffset != -1) {
+      FbIcebergSplitMetadata.addPartitionKeys(fbb, partitionKeysOffset);
+    }
+    int iceOffset = FbIcebergSplitMetadata.endFbIcebergSplitMetadata(fbb);
+    fbb.finish(FbSplitFileMetadata.createFbSplitFileMetadata(fbb, iceOffset));
+    ByteBuffer bb = fbb.dataBuffer().slice();
+    ByteBuffer resultBb = ByteBuffer.allocate(bb.capacity());
+    resultBb.put(bb);
+    return FbSplitFileMetadata.getRootAsFbSplitFileMetadata((ByteBuffer)resultBb.flip());
+  }
+
+  private static int copyPartitionKeys(FlatBufferBuilder fbb,
+      FbIcebergPartition partition) {
+    if (partition.partitionKeysLength() == 0) {
+      return -1;
+    }
+    int[] partitionKeyOffsets = new int[partition.partitionKeysLength()];
+    for (int i = 0; i < partition.partitionKeysLength(); i++) {
+      FbIcebergPartitionTransformValue origKey = partition.partitionKeys(i);
+
+      int transformValueOffset = -1;
+      ByteBuffer buf = origKey.transformValueAsByteBuffer();
+      if (buf != null) {
+        byte[] bytes = new byte[buf.remaining()];
+        buf.get(bytes);
+        transformValueOffset = FbIcebergPartitionTransformValue
+            .createTransformValueVector(fbb, bytes);
+      }
+
+      partitionKeyOffsets[i] =
+          FbIcebergPartitionTransformValue.createFbIcebergPartitionTransformValue(
+              fbb,
+              origKey.transformType(),
+              origKey.transformParam(),
+              transformValueOffset,
+              origKey.sourceId());
+    }
+    return FbIcebergSplitMetadata.createPartitionKeysVector(fbb, partitionKeyOffsets);
   }
 
   /**
@@ -1229,11 +1286,6 @@ public class IcebergUtil {
 
   private static int createIcebergMetadata(Table iceApiTbl, FlatBufferBuilder fbb,
       ContentFile cf, int partId) {
-    int partKeysOffset = -1;
-    PartitionSpec spec = iceApiTbl.specs().get(cf.specId());
-    if (spec != null && !spec.fields().isEmpty()) {
-      partKeysOffset = createPartitionKeys(fbb, spec, cf);
-    }
     int eqFieldIdsOffset = -1;
     List<Integer> eqFieldIds = cf.equalityFieldIds();
     if (eqFieldIds != null && !eqFieldIds.isEmpty()) {
@@ -1250,11 +1302,7 @@ public class IcebergUtil {
     if (fileFormat != -1) {
       FbIcebergMetadata.addFileFormat(fbb, fileFormat);
     }
-    FbIcebergMetadata.addSpecId(fbb, cf.specId());
     FbIcebergMetadata.addRecordCount(fbb, cf.recordCount());
-    if (partKeysOffset != -1) {
-      FbIcebergMetadata.addPartitionKeys(fbb, partKeysOffset);
-    }
     if (cf.dataSequenceNumber() != null) {
       FbIcebergMetadata.addDataSequenceNumber(fbb, cf.dataSequenceNumber());
     } else {
@@ -1283,7 +1331,7 @@ public class IcebergUtil {
       partitionKeyOffsets[i] =
           createPartitionTransformValue(fbb, spec, cf, i);
     }
-    return FbIcebergMetadata.createPartitionKeysVector(fbb, partitionKeyOffsets);
+    return FbIcebergPartition.createPartitionKeysVector(fbb, partitionKeyOffsets);
   }
 
   private static int createPartitionTransformValue(

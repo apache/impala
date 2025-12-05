@@ -44,7 +44,7 @@
 #include "util/unique-id-hash.h"
 
 namespace org { namespace apache { namespace impala { namespace fb {
-struct FbFileMetadata;
+struct FbSplitFileMetadata;
 }}}}
 
 namespace impala {
@@ -95,7 +95,7 @@ struct HdfsFileDesc {
   std::vector<io::ScanRange*> splits;
 
   /// Extra file metadata, e.g. Iceberg-related file-level info.
-  const ::org::apache::impala::fb::FbFileMetadata* file_metadata;
+  const ::org::apache::impala::fb::FbSplitFileMetadata* file_metadata;
 
   /// Whether file is encrypted.
   bool is_encrypted = false;

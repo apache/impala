@@ -63,6 +63,21 @@ public class IcebergFileDescriptor extends FileDescriptor {
     return new IcebergFileDescriptor(fd.getFbFileDescriptor(), fileMetadata);
   }
 
+  public IcebergFileDescriptor deepCopy() {
+    ByteBuffer newDescBuf = deepCopyByteBuffer(getFbFileDescriptor().getByteBuffer());
+    ByteBuffer newMetadataBuf = deepCopyByteBuffer(fbFileMetadata_.getByteBuffer());
+
+    return new IcebergFileDescriptor(
+        FbFileDesc.getRootAsFbFileDesc(newDescBuf),
+        FbFileMetadata.getRootAsFbFileMetadata(newMetadataBuf));
+  }
+
+  private static ByteBuffer deepCopyByteBuffer(ByteBuffer original) {
+    ByteBuffer newBuf = ByteBuffer.allocate(original.remaining()).put(original).flip();
+    original.rewind();
+    return newBuf;
+  }
+
   @Override
   public IcebergFileDescriptor cloneWithNewHostIndex(
       List<TNetworkAddress> origIndex, ListMap<TNetworkAddress> dstIndex) {

@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -34,7 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.lang.ref.SoftReference;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.ContentFile;
 import org.apache.iceberg.DataFile;
@@ -50,7 +50,6 @@ import org.apache.impala.thrift.THash128;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.TIcebergContentFileStore;
 import org.apache.impala.thrift.TIcebergDeletionVector;
-import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.Hash128;
 import org.apache.impala.util.IcebergUtil;
@@ -219,7 +218,10 @@ public class IcebergContentFileStore {
   private Set<String> missingFiles_ = new HashSet<>();
   // Partitions with their corresponding ids that are used to refer to the partition info
   // from the IcebergFileDescriptors.
-  private Map<TIcebergPartition, Integer> partitions_;
+  private Map<ByteBuffer, Integer> partitionMap_;
+  // Current partitions in the order of their corresponding ids. Initialized and used to
+  // look up partitions only on the Frontend.
+  private List<ByteBuffer> partitionList_ = null;
 
   // Flags to indicate file formats used in the table.
   private boolean hasAvro_ = false;
@@ -236,8 +238,13 @@ public class IcebergContentFileStore {
   private final ConcurrentMap<Hash128, EncodedFileDescriptor> oldFileDescMap_ =
       new ConcurrentHashMap<>();
   // Caches the partitions of file descriptors loaded during time-travel queries.
-  private final ConcurrentMap<TIcebergPartition, Integer> oldPartitionMap_ =
+  private final ConcurrentMap<ByteBuffer, Integer> oldPartitionMap_ =
       new ConcurrentHashMap<>();
+  // Old partitions in order of their corresponding ids offseted by the number of current
+  // partitions, e.g. first old partition in the list has the following id:
+  // [number_of_current_partitions + 0] where 0 is the index.
+  // Initialized and used to look up old partitions only on the Frontend.
+  private List<ByteBuffer> oldPartitionList_ = null;
 
   // END: mutable members
   /////////////////////////////////////////
@@ -246,13 +253,13 @@ public class IcebergContentFileStore {
 
   public IcebergContentFileStore(
       Table iceApiTable, List<IcebergFileDescriptor> fileDescriptors,
-      GroupedContentFiles icebergFiles, Map<TIcebergPartition, Integer> partitions) {
+      GroupedContentFiles icebergFiles, Map<ByteBuffer, Integer> partitions) {
     Preconditions.checkNotNull(iceApiTable);
     Preconditions.checkNotNull(fileDescriptors);
     Preconditions.checkNotNull(icebergFiles);
     Preconditions.checkNotNull(partitions);
 
-    partitions_ = partitions;
+    partitionMap_ = partitions;
 
     Map<String, IcebergFileDescriptor> fileDescMap = new HashMap<>();
     String apiTableLocation = iceApiTable.location();
@@ -291,7 +298,8 @@ public class IcebergContentFileStore {
     ret.equalityDeleteFiles_ = equalityDeleteFiles_;
     ret.dataFileToDV_ = dataFileToDV_;
     ret.missingFiles_ = missingFiles_;
-    ret.partitions_ = partitions_;
+    ret.partitionMap_ = partitionMap_;
+    ret.partitionList_ = partitionList_;
     ret.hasAvro_ = hasAvro_;
     ret.hasOrc_ = hasOrc_;
     ret.hasParquet_ = hasParquet_;
@@ -312,7 +320,7 @@ public class IcebergContentFileStore {
   public void mergeWithNewFiles(
       GroupedContentFiles newIcebergFiles,
       List<IcebergFileDescriptor> newFds,
-      Map<TIcebergPartition, Integer> mergedPartitions,
+      Map<ByteBuffer, Integer> mergedPartitions,
       String apiTableLocation) {
     Preconditions.checkState(newIcebergFiles.dataFilesWithDeletes.isEmpty()
         && newIcebergFiles.positionDeleteFiles.isEmpty()
@@ -330,7 +338,7 @@ public class IcebergContentFileStore {
     for (DataFile dataFile : newIcebergFiles.dataFilesWithoutDeletes) {
       storeFile(dataFile, newFdMap, dataFilesWithoutDeletes_);
     }
-    partitions_ = mergedPartitions;
+    partitionMap_ = mergedPartitions;
   }
 
   private void storeFile(ContentFile<?> contentFile,
@@ -352,7 +360,8 @@ public class IcebergContentFileStore {
 
   // This is only invoked during time travel, when we are querying a snapshot that has
   // partitions which have been removed since.
-  public void addOldPartition(TIcebergPartition partition, Integer id) {
+  public void addOldPartition(ByteBuffer partition, Integer id) {
+    Preconditions.checkState(partition.position() == 0);
     oldPartitionMap_.put(partition, id);
   }
 
@@ -373,12 +382,46 @@ public class IcebergContentFileStore {
     return decode(oldFileDescMap_.get(pathHash));
   }
 
-  public Integer getOldPartition(TIcebergPartition partition) {
+  public Integer getOldPartition(ByteBuffer partition) {
     return oldPartitionMap_.get(partition);
   }
 
   public int getOldPartitionsSize() {
     return oldPartitionMap_.size();
+  }
+
+  public int getNumPartitions() {
+    return partitionMap_.size();
+  }
+
+  public Map<ByteBuffer, Integer> getPartitionMap() {
+    return partitionMap_;
+  }
+
+  public List<ByteBuffer> getPartitionList() {
+    if (partitionList_ == null || partitionList_.size() < partitionMap_.size()) {
+      partitionList_ = convertPartitionMapToList(partitionMap_, 0);
+    }
+    return partitionList_;
+  }
+
+  public synchronized List<ByteBuffer> getOldPartitionList() {
+    //check size for freshness
+    if (oldPartitionList_ == null
+        || oldPartitionList_.size() != oldPartitionMap_.size()) {
+      // Old partition ids are offseted by the number of current partitions.
+      oldPartitionList_ = convertPartitionMapToList(oldPartitionMap_, getNumPartitions());
+    }
+    return oldPartitionList_;
+  }
+
+  public ByteBuffer getPartitionById(int id) {
+    // The old partitions are only loaded in the Coordinator in case of time travel.
+    // Their ids are greater than (offseted by) the ids of the current partitions.
+    if (id >= getNumPartitions()) {
+      return getOldPartitionList().get(id - getNumPartitions());
+    }
+    return getPartitionList().get(id);
   }
 
   public List<IcebergFileDescriptor> getDataFilesWithoutDeletes() {
@@ -440,18 +483,6 @@ public class IcebergContentFileStore {
     return Iterables.concat(
         positionDeleteFiles_.getList(),
         equalityDeleteFiles_.getList());
-  }
-
-  public Map<TIcebergPartition, Integer> getPartitionMap() {
-    return partitions_;
-  }
-
-  public List<TIcebergPartition> getPartitionList() {
-    return convertPartitionMapToList(partitions_);
-  }
-
-  public int getNumPartitions() {
-    return partitions_.size();
   }
 
   public boolean hasAvro() { return hasAvro_; }
@@ -533,7 +564,7 @@ public class IcebergContentFileStore {
     ret.setHas_orc(hasOrc_);
     ret.setHas_parquet(hasParquet_);
     ret.setMissing_files(new ArrayList<>(missingFiles_));
-    ret.setPartitions(convertPartitionMapToList(partitions_));
+    ret.setPartitions(convertPartitionMapToList(partitionMap_, 0));
     Map<THash128, TIcebergDeletionVector> tdeletion_vectors = new HashMap<>();
     for (Map.Entry<Hash128, TIcebergDeletionVector> entry : dataFileToDV_.entrySet()) {
       tdeletion_vectors.put(entry.getKey().toThrift(), entry.getValue());
@@ -600,7 +631,7 @@ public class IcebergContentFileStore {
       ret.setHas_orc(hasOrc_);
       ret.setHas_parquet(hasParquet_);
       ret.setMissing_files(new ArrayList<>(missingFiles_));
-      ret.setPartitions(convertPartitionMapToList(partitions_));
+      ret.setPartitions(convertPartitionMapToList(partitionMap_, 0));
       Map<THash128, TIcebergDeletionVector> tdeletion_vectors = new HashMap<>();
       for (Map.Entry<Hash128, TIcebergDeletionVector> entry : dataFileToDV_.entrySet()) {
         tdeletion_vectors.put(entry.getKey().toThrift(), entry.getValue());
@@ -646,29 +677,32 @@ public class IcebergContentFileStore {
     ret.hasParquet_ = tFileStore.isSetHas_parquet() ? tFileStore.isHas_parquet() : false;
     ret.missingFiles_ = tFileStore.isSetMissing_files() ?
         new HashSet<>(tFileStore.getMissing_files()) : Collections.emptySet();
-    ret.partitions_ = tFileStore.isSetPartitions() ?
+    ret.partitionList_ = tFileStore.isSetPartitions() ?
+        tFileStore.getPartitions() : new ArrayList<>();
+    ret.partitionMap_ = tFileStore.isSetPartitions() ?
         convertPartitionListToMap(tFileStore.getPartitions()) : new HashMap<>();
     return ret;
   }
 
-  static List<TIcebergPartition> convertPartitionMapToList(
-      Map<TIcebergPartition, Integer> partitionMap) {
-    List<TIcebergPartition> partitionList = new ArrayList<>(partitionMap.size());
+  @VisibleForTesting
+  static List<ByteBuffer> convertPartitionMapToList(
+      Map<ByteBuffer, Integer> partitionMap, int offset) {
+    List<ByteBuffer> partitionList = new ArrayList<>(partitionMap.size());
     for (int i = 0; i < partitionMap.size(); i++) {
       partitionList.add(null);
     }
-    for (Map.Entry<TIcebergPartition, Integer> partition : partitionMap.entrySet()) {
-      partitionList.set(partition.getValue(), partition.getKey());
+    for (Map.Entry<ByteBuffer, Integer> partition : partitionMap.entrySet()) {
+      partitionList.set(partition.getValue() - offset, partition.getKey());
     }
     return partitionList;
   }
 
-  private static ImmutableMap<TIcebergPartition, Integer> convertPartitionListToMap(
-      List<TIcebergPartition> partitionList) {
+  private static ImmutableMap<ByteBuffer, Integer> convertPartitionListToMap(
+      List<ByteBuffer> partitionList) {
     Preconditions.checkState(partitionList != null);
-    ImmutableMap.Builder<TIcebergPartition, Integer> builder = ImmutableMap.builder();
+    ImmutableMap.Builder<ByteBuffer, Integer> builder = ImmutableMap.builder();
     for (int i = 0; i < partitionList.size(); ++i) {
-      builder.put(partitionList.get(i), i);
+      builder.put(org.apache.thrift.TBaseHelper.copyBinary(partitionList.get(i)), i);
     }
     return builder.build();
   }

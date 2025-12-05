@@ -357,7 +357,7 @@ struct THdfsFileDesc {
   // TODO: Put this in a KRPC sidecar to avoid serialization cost.
   1: required binary file_desc_data
 
-  // Additional file metadata serialized into a FlatBuffer
+  // Additional file metadata serialized into a FlatBuffer (FbSplitFileMetadata)
   // TODO: Put this in a KRPC sidecar to avoid serialization cost.
   2: optional binary file_metadata
 }
@@ -655,11 +655,6 @@ struct TIcebergPartitionSpec {
   2: optional list<TIcebergPartitionField> partition_fields
 }
 
-struct TIcebergPartition {
-  1: required i32 spec_id
-  2: required list<string> partition_values
-}
-
 struct TIcebergPartitionStats {
   1: required i64 num_files;
   2: required i64 num_rows;
@@ -683,7 +678,9 @@ struct TIcebergContentFileStore {
   6: optional bool has_orc
   7: optional bool has_parquet
   8: optional list<string> missing_files
-  9: optional list<TIcebergPartition> partitions
+  // Partition metadata serialized into a FlatBuffer
+  // (FbIcebergPartition defined in common/fbs/IcebergObjects.fbs).
+  9: optional list<binary> partitions
   10: optional map<THash128, Types.TIcebergDeletionVector> data_path_hash_to_dv
   // Total number of files in this content file store. Only set in the first partial
   // response (offset 0) so the coordinator knows upfront how many pages to expect.

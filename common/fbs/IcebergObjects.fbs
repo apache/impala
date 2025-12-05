@@ -42,15 +42,30 @@ table FbIcebergPartitionTransformValue {
   source_id: int;
 }
 
+table FbIcebergPartition {
+  spec_id : ushort;
+  partition_keys : [FbIcebergPartitionTransformValue];
+}
+
+// From Catalog to Coordinator
+// first_row_id cannot have -1 as default value here because it is not safe to mutate.
 table FbIcebergMetadata {
   file_format : FbIcebergDataFileFormat;
   record_count : long;
   data_sequence_number : long;
-  spec_id : ushort;
-  partition_keys : [FbIcebergPartitionTransformValue];
   equality_field_ids : [int];
   part_id : int = -1;
   first_row_id : long;
+}
+
+// From FE to BE. Included in ScanRanges.
+// For V1 and V2 tables, the first_row_id is -1. Setting it as default value saves space.
+table FbIcebergSplitMetadata {
+  file_format : FbIcebergDataFileFormat;
+  data_sequence_number : long;
+  spec_id : ushort;
+  partition_keys : [FbIcebergPartitionTransformValue];
+  first_row_id : long = -1;
 }
 
 table FbIcebergColumnStats {
@@ -66,6 +81,7 @@ table FbIcebergPartitionField {
   field_value: [ubyte];
 }
 
+// From Coordinator to Catalog. Used when committing Iceberg DML operations.
 table FbIcebergDataFile {
   path: string;
   format: FbIcebergDataFileFormat = PARQUET;

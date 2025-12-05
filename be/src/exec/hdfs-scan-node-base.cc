@@ -264,10 +264,11 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
     for (const ScanRangeParamsPB& params : ranges->second.scan_ranges()) {
       DCHECK(params.scan_range().has_hdfs_file_split());
       const HdfsFileSplitPB& split = params.scan_range().hdfs_file_split();
-      const org::apache::impala::fb::FbFileMetadata* file_metadata = nullptr;
+      const org::apache::impala::fb::FbSplitFileMetadata* file_metadata = nullptr;
       if (params.scan_range().has_file_metadata()) {
-        file_metadata = flatbuffers::GetRoot<org::apache::impala::fb::FbFileMetadata>(
-            params.scan_range().file_metadata().c_str());
+        file_metadata =
+            flatbuffers::GetRoot<org::apache::impala::fb::FbSplitFileMetadata>(
+                params.scan_range().file_metadata().c_str());
       }
       HdfsPartitionDescriptor* partition_desc =
           hdfs_table_->GetPartition(split.partition_id());
@@ -911,10 +912,11 @@ Status HdfsScanNodeBase::CreateAndOpenScannerHelper(HdfsPartitionDescriptor* par
   DCHECK(context != nullptr);
   DCHECK(scanner->get() == nullptr);
 
-  const FbFileMetadata* file_metadata = context->GetStream(0)->file_desc()->file_metadata;
+  const FbSplitFileMetadata* file_metadata =
+      context->GetStream(0)->file_desc()->file_metadata;
   if (file_metadata) {
     // Iceberg tables can have different file format for each data file:
-    const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
+    const FbIcebergSplitMetadata* ice_metadata = file_metadata->iceberg_metadata();
     DCHECK(ice_metadata != nullptr);
     switch (ice_metadata->file_format()) {
       case FbIcebergDataFileFormat::FbIcebergDataFileFormat_PARQUET:

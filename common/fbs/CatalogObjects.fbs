@@ -90,6 +90,12 @@ table FbFileDesc {
 
 // Additional file-related metadata
 table FbFileMetadata {
-  // Iceberg-related metadata about the data file
+  // Iceberg-related metadata about the data file without partition information
   iceberg_metadata : FbIcebergMetadata;
+}
+
+// Additional file-related metadata for scan ranges
+table FbSplitFileMetadata {
+  // Iceberg-related metadata about the data file with partition information
+  iceberg_metadata : FbIcebergSplitMetadata;
 }

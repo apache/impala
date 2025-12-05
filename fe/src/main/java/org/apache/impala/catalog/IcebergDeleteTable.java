@@ -105,7 +105,7 @@ public abstract class IcebergDeleteTable extends VirtualTable implements FeIcebe
 
     @Override
     public IcebergContentFileStore getContentFileStore() {
-      throw new NotImplementedException("This should never be called.");
+      return baseTable_.getContentFileStore();
     }
 
     @Override

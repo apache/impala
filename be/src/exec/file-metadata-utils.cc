@@ -115,7 +115,7 @@ void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
     } else if (slot_desc->virtual_column_type() ==
         TVirtualColumnType::ICEBERG_DATA_SEQUENCE_NUMBER) {
       using namespace org::apache::impala::fb;
-      const FbIcebergMetadata* ice_metadata =
+      const FbIcebergSplitMetadata* ice_metadata =
           file_desc_->file_metadata->iceberg_metadata();
       DCHECK(ice_metadata != nullptr);
 
@@ -130,7 +130,7 @@ void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
     } else if (slot_desc->virtual_column_type() ==
         TVirtualColumnType::ICEBERG_FIRST_ROW_ID) {
       using namespace org::apache::impala::fb;
-      const FbIcebergMetadata* ice_metadata =
+      const FbIcebergSplitMetadata* ice_metadata =
           file_desc_->file_metadata->iceberg_metadata();
       DCHECK(ice_metadata != nullptr);
 
@@ -151,9 +151,9 @@ auto FileMetadataUtils::IcebergPartitionTransforms() const {
   DCHECK(scan_node_->hdfs_table()->IsIcebergTable());
 
   using namespace org::apache::impala::fb;
-  const FbFileMetadata* file_metadata = file_desc_->file_metadata;
+  const FbSplitFileMetadata* file_metadata = file_desc_->file_metadata;
   DCHECK(file_metadata != nullptr);
-  const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
+  const FbIcebergSplitMetadata* ice_metadata = file_metadata->iceberg_metadata();
   DCHECK(ice_metadata != nullptr);
   return ice_metadata->partition_keys();
 }
@@ -174,8 +174,8 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
     std::map<const SlotId, const SlotDescriptor*>* slot_descs_written) {
   using namespace org::apache::impala::fb;
   TextConverter text_converter = CreateTextConverter();
-  const FbFileMetadata* file_metadata = file_desc_->file_metadata;
-  const FbIcebergMetadata* ice_metadata = file_metadata->iceberg_metadata();
+  const FbSplitFileMetadata* file_metadata = file_desc_->file_metadata;
+  const FbIcebergSplitMetadata* ice_metadata = file_metadata->iceberg_metadata();
   auto transforms = ice_metadata->partition_keys();
 
   const TupleDescriptor* tuple_desc = scan_node_->tuple_desc();
@@ -238,7 +238,7 @@ void FileMetadataUtils::AddIcebergColumns(MemPool* mem_pool, Tuple** template_tu
 }
 
 void FileMetadataUtils::AddVirtualIcebergColumn(MemPool* mem_pool, Tuple* template_tuple,
-      const org::apache::impala::fb::FbIcebergMetadata& ice_metadata,
+      const org::apache::impala::fb::FbIcebergSplitMetadata& ice_metadata,
       const SlotDescriptor* slot_desc) {
   DCHECK(slot_desc->IsVirtual());
   if (slot_desc->virtual_column_type() == TVirtualColumnType::PARTITION_SPEC_ID) {
