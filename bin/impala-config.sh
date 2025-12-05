@@ -224,7 +224,8 @@ unset IMPALA_MOLD_URL
 export IMPALA_SIMBA_JDBC_DRIVER_VERSION=42-2.6.32.1041
 
 # Find system python versions for testing
-export IMPALA_SYSTEM_PYTHON2="${IMPALA_SYSTEM_PYTHON2_OVERRIDE-$(command -v python2)}"
+# IMPALA-14606: Stop building impala_python (Python 2) by default.
+export IMPALA_SYSTEM_PYTHON2="${IMPALA_SYSTEM_PYTHON2_OVERRIDE-}"
 export IMPALA_SYSTEM_PYTHON3="${IMPALA_SYSTEM_PYTHON3_OVERRIDE-$(command -v python3)}"
 
 # Additional Python versions to use when building the impala-shell prebuilt tarball

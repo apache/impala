@@ -530,9 +530,10 @@ add_custom_target(cscope ALL DEPENDS gen-deps
   COMMAND "${CMAKE_SOURCE_DIR}/bin/gen-cscope.sh"
 )
 
-add_custom_target(impala_python ALL
-  COMMAND "${CMAKE_SOURCE_DIR}/bin/init-impala-python.sh"
-)
+# IMPALA-14606: Stop building impala_python (Python 2) by default.
+# add_custom_target(impala_python ALL
+#   COMMAND "${CMAKE_SOURCE_DIR}/bin/init-impala-python.sh"
+# )
 
 add_custom_target(impala_python3 ALL
   COMMAND "${CMAKE_SOURCE_DIR}/bin/init-impala-python.sh" "-python3"
@@ -548,7 +549,7 @@ endif()
 add_custom_target(impala_shell_pypi ALL DEPENDS ${IMPALA_PYTHON_INSTALLS})
 
 add_custom_target(notests_independent_targets DEPENDS
-  java cscope tarballs impala_python impala_python3 impala_shell_pypi
+  java cscope tarballs impala_python3 impala_shell_pypi
 )
 add_custom_target(notests_regular_targets DEPENDS
   impalad statestored catalogd admissiond fesupport loggingsupport ImpalaUdf udasample udfsample impala-profile-tool

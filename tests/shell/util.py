@@ -381,10 +381,10 @@ def create_impala_shell_executable_dimension(dev_only=False):
   _, include_pypi = get_dev_impala_shell_executable()
   dimensions = []
   python3_pytest = (os.getenv("IMPALA_USE_PYTHON3_TESTS", "false") == "true")
+  assert os.getenv("IMPALA_SYSTEM_PYTHON3"), "Must set env var IMPALA_SYSTEM_PYTHON3!"
+  dimensions.append('dev3')
   if os.getenv("IMPALA_SYSTEM_PYTHON2") and not python3_pytest:
     dimensions.append('dev')
-  if os.getenv("IMPALA_SYSTEM_PYTHON3"):
-    dimensions.append('dev3')
   if include_pypi and not dev_only:
     if os.getenv("IMPALA_SYSTEM_PYTHON2") and not python3_pytest:
       dimensions.append('python2')
@@ -395,16 +395,17 @@ def create_impala_shell_executable_dimension(dev_only=False):
 
 def get_impala_shell_executable(vector):
   # impala-shell is invoked some places where adding a test vector may not make sense;
-  # use 'dev' as the default.
+  # use 'dev3' as the default.
   impala_shell_executable, _ = get_dev_impala_shell_executable()
-  return {
+  executable_map = {
     'dev': ['env', 'IMPALA_PYTHON_EXECUTABLE=python',
             'IMPALA_SHELL_PYTHON_FALLBACK=false', impala_shell_executable],
     'dev3': ['env', 'IMPALA_PYTHON_EXECUTABLE=python3',
              'IMPALA_SHELL_PYTHON_FALLBACK=false', impala_shell_executable],
     'python2': [os.path.join(IMPALA_HOME, 'shell/build/python2_venv/bin/impala-shell')],
     'python3': [os.path.join(IMPALA_HOME, 'shell/build/python3_venv/bin/impala-shell')]
-  }[vector.get_value_with_default('impala_shell', 'dev')]
+  }
+  return executable_map[vector.get_value_with_default('impala_shell', 'dev3')]
 
 
 def stderr_get_first_error_msg(stderr):
