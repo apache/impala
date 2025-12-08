@@ -114,11 +114,24 @@ Status AdmissionControlService::Init() {
           bind<void>(&AdmissionControlService::AdmitFromThreadPool, this, _2)));
   ABORT_IF_ERROR(admission_thread_pool_->Init());
 
+  RETURN_IF_ERROR(Thread::Create("admission-control-service",
+      "admission-state-map-cleanup",
+      &AdmissionControlService::AdmissionStateMapCleanupLoop, this, &cleanup_thread_));
+
   return Status::OK();
 }
 
 void AdmissionControlService::Join() {
   admission_thread_pool_->Join();
+  shutdown_.store(true);
+  {
+    // Signal the cleanup thread to exit.
+    std::lock_guard<std::mutex> l(cleanup_queue_lock_);
+    cleanup_queue_cv_.notify_all();
+  }
+  DCHECK(cleanup_thread_ != nullptr);
+  // Wait for the cleanup thread to finish clearing the queue.
+  cleanup_thread_->Join();
 }
 
 Status AdmissionControlService::GetProxy(
@@ -389,6 +402,31 @@ bool AdmissionControlService::CheckAndUpdateHeartbeat(
     return true;
   }
   return false;
+}
+
+void AdmissionControlService::CleanupAdmissionStateMapAsync(const UniqueIdPB& query_id) {
+  {
+    std::lock_guard<std::mutex> lock(cleanup_queue_lock_);
+    admission_state_cleanup_queue_.push_back(query_id);
+  }
+  cleanup_queue_cv_.notify_all();
+}
+
+void AdmissionControlService::AdmissionStateMapCleanupLoop() {
+  std::unique_lock<std::mutex> lock(cleanup_queue_lock_);
+  while (true) {
+    cleanup_queue_cv_.wait(lock,
+        [&] { return !admission_state_cleanup_queue_.empty() || shutdown_.load(); });
+    if (admission_state_cleanup_queue_.empty() && shutdown_.load()) return;
+    std::deque<UniqueIdPB> local_queue;
+    std::swap(local_queue, admission_state_cleanup_queue_);
+    lock.unlock();
+    for (const UniqueIdPB& query_id : local_queue) {
+      discard_result(admission_state_map_.Delete(query_id));
+      VLOG_QUERY << "Cleaned up admission state map for query=" << PrintId(query_id);
+    }
+    lock.lock();
+  }
 }
 
 } // namespace impala

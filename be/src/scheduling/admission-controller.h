@@ -484,6 +484,14 @@ class AdmissionController {
     bool track_per_user;
   };
 
+  // Callback type for cleaning up the admission map.
+  using AdmissionMapCleanupCb = std::function<void(const UniqueIdPB&)>;
+
+  // Register the callback function for admission map cleanup.
+  void RegisterAdmissionMapCleanupCallback(AdmissionMapCleanupCb cb) {
+    admission_map_cleanup_cb_ = std::move(cb);
+  }
+
  private:
   class PoolStats;
   friend class PoolStats;
@@ -1038,6 +1046,9 @@ class AdmissionController {
   NumReleasedBackends num_released_backends_;
 
   std::string request_queue_topic_name_;
+
+  /// The callback function for admission map cleanup.
+  AdmissionMapCleanupCb admission_map_cleanup_cb_;
 
   /// Resolves the resource pool name in 'query_ctx.request_pool' and stores the resulting
   /// name in 'pool_name' the resulting config in 'pool_config', and the

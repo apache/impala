@@ -209,6 +209,15 @@ kudu::Status ImpalaServicePool::QueueInboundCall(
         return kudu::Status::OK();
       }
     }
+    if (UNLIKELY(!FLAGS_debug_actions.empty())) {
+      Status status = DebugAction(FLAGS_debug_actions, "INBOUND_GETQUERYSTATUS_REJECT");
+      if (!status.ok() && c->remote_method().method_name() == "GetQueryStatus") {
+        mem_tracker_lock.unlock();
+        c->DiscardTransfer();
+        RejectTooBusy(c);
+        return kudu::Status::OK();
+      }
+    }
     service_mem_tracker_->Consume(transfer_size);
   }
 

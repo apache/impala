@@ -134,6 +134,12 @@ Status AdmissiondEnv::Init() {
   admission_control_svc_.reset(
       new AdmissionControlService(DaemonEnv::GetInstance()->metrics()));
   RETURN_IF_ERROR(admission_control_svc_->Init());
+  DCHECK(admission_control_svc_);
+  DCHECK(admission_controller_);
+  admission_controller_->RegisterAdmissionMapCleanupCallback(
+      [&](const UniqueIdPB& query_id) {
+        admission_control_svc_->CleanupAdmissionStateMapAsync(query_id);
+      });
 
   RETURN_IF_ERROR(cluster_membership_mgr_->Init());
   cluster_membership_mgr_->RegisterUpdateCallbackFn(

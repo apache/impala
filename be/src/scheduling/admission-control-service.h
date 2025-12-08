@@ -79,6 +79,10 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   /// related RPCs.
   bool IsHealthy() { return service_started_.load(); }
 
+  /// Asyncly queues a request to remove the query from admission_state_map_.
+  /// This is non-blocking, thread-safe, and avoids deadlocks with the caller.
+  void CleanupAdmissionStateMapAsync(const UniqueIdPB& query_id);
+
  private:
   friend class ImpalaHttpHandler;
   friend class AdmissiondEnv;
@@ -161,8 +165,26 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   /// was successful.
   bool CheckAndUpdateHeartbeat(const UniqueIdPB& coord_id, int64_t update_version);
 
+  /// Background thread loop that removes entries from admission_state_map_.
+  void AdmissionStateMapCleanupLoop();
+
   /// Indicates whether the admission control service is ready.
   std::atomic_bool service_started_{false};
+
+  /// Flag to signal to exit.
+  std::atomic_bool shutdown_{false};
+
+  /// Thread handle for the background cleanup worker.
+  std::unique_ptr<Thread> cleanup_thread_;
+
+  /// Protecting the cleanup queue.
+  std::mutex cleanup_queue_lock_;
+
+  /// Condition variable to wake up the cleanup thread.
+  std::condition_variable cleanup_queue_cv_;
+
+  /// Queue of query ids waiting to be removed from the map.
+  std::deque<UniqueIdPB> admission_state_cleanup_queue_;
 };
 
 } // namespace impala

@@ -2425,6 +2425,64 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+      impalad_args=("--debug_actions=INBOUND_GETQUERYSTATUS_REJECT:FAIL@0.2 "
+                    "--vmodule=admission-control-service=3 "
+                    "--default_pool_max_requests=1 --queue_wait_timeout_ms=1"),
+      disable_log_buffering=True
+  )
+  def test_admission_state_map_leak_in_dequeue(self):
+    """
+    Regression test for IMPALA-14605.
+    We verify that cancellations of dequeued queries when there are dropped due to
+    backpressure errors do not leak memory in the admission_state_map.
+    """
+
+    # Log patterns to verify.
+    LOG_PATTERN_LEAK_FIX = "Dequeued cancelled query"
+    LOG_PATTERN_INJECTION = "dropped due to backpressure"
+
+    ac_service = self.cluster.admissiond.service
+
+    # The workload for concurrent clients.
+    def run_client_workload(client_index):
+        impalad = self.cluster.impalads[client_index % len(self.cluster.impalads)]
+        client = impalad.service.create_hs2_client()
+        query = "select sleep(1000)"
+        # Run multiple iterations to maximize race condition probability.
+        for i in range(10):
+          try:
+            handle = client.execute_async(query)
+            client.wait_for_finished_timeout(handle, 3000)
+            client.close_query(handle)
+          except Exception:
+            pass
+        try:
+          client.close()
+        except Exception:
+          pass
+    threads = []
+    # Use multiple clients to do the queries concurrently.
+    num_clients = 5
+    for i in range(num_clients):
+        t = threading.Thread(target=run_client_workload, args=(i,))
+        t.start()
+        threads.append(t)
+
+    for t in threads:
+        t.join()
+
+    # Verify the logs and metrics.
+    ac_service.wait_for_metric_value(
+      "admission-control-service.num-queries", 0)
+    num_queries_hwm = \
+      ac_service.get_metric_value("admission-control-service.num-queries-high-water-mark")
+    assert num_queries_hwm > 1
+    self.assert_log_contains_multiline("admissiond", "INFO", LOG_PATTERN_INJECTION)
+    self.assert_log_contains_multiline("admissiond", "INFO", LOG_PATTERN_LEAK_FIX)
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
       impalad_args="--vmodule admission-controller=3 "
       "--debug_actions=IMPALA_SERVICE_POOL:127.0.0.1:29500:ReleaseQueryBackends:FAIL@1.0 "
       "--admission_control_slots=1 --executor_groups=default-pool-group1")
