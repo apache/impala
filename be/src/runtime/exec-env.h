@@ -79,6 +79,7 @@ class TCatalogRegistration;
 
 namespace io {
   class DiskIoMgr;
+  class FooterCache;
 }
 
 /// Execution environment for Impala daemon. Contains all required global structures, and

@@ -80,6 +80,66 @@
     "key": "impala.codegen-cache.entry-sizes"
   },
   {
+    "description": "The total number of cache hits in the Footer Cache",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Footer Cache Hits",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.footer-cache.hits"
+  },
+  {
+    "description": "The total number of cache misses in the Footer Cache",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Footer Cache Misses",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.footer-cache.misses"
+  },
+  {
+    "description": "The number of in-use Footer Cache Entries",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "In-use Footer Cache Entries",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.footer-cache.entries-in-use"
+  },
+  {
+    "description": "The total bytes of in-use Footer Cache Entries",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "In-use Footer Cache Entries total bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.footer-cache.entries-in-use-bytes"
+  },
+  {
+    "description": "The number of evicted Footer Cache Entries",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Evicted Footer Cache Entries",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.footer-cache.entries-evicted"
+  },
+  {
+    "description": "Statistics for footer cache entry sizes allocated from the system.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Footer Cache Entry Sizes.",
+    "units": "BYTES",
+    "kind": "HISTOGRAM",
+    "key": "impala-server.io-mgr.footer-cache.entry-sizes"
+  },
+  {
     "description": "The total number of cache hits in the Tuple Cache",
     "contexts": [
       "IMPALAD"

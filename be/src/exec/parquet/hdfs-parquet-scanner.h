@@ -444,8 +444,8 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Column readers among 'column_readers_' not used for filtering
   std::vector<ParquetColumnReader*> non_filter_readers_;
 
-  /// File metadata thrift object
-  parquet::FileMetaData file_metadata_;
+  /// File metadata thrift object (shared_ptr for efficient caching)
+  std::shared_ptr<parquet::FileMetaData> file_metadata_;
 
   /// Version of the application that wrote this file.
   ParquetFileVersion file_version_;
@@ -547,6 +547,12 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// that includes the number of filtered row groups as a result of evaluating conjuncts
   /// and runtime bloom filters on the dictionary entries.
   RuntimeProfile::Counter* num_dict_filtered_row_groups_counter_;
+
+  /// Number of times the footer was found in the footer cache.
+  RuntimeProfile::Counter* num_footer_cache_hits_counter_;
+
+  /// Number of times the footer was not found in the footer cache.
+  RuntimeProfile::Counter* num_footer_cache_misses_counter_;
 
   /// Tracks the size of any compressed pages read. If no compressed pages are read, this
   /// counter is empty
@@ -803,6 +809,32 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Process the file footer and parse file_metadata_.  This should be called with the
   /// last PARQUET_FOOTER_SIZE bytes in context_.
   Status ProcessFooter() WARN_UNUSED_RESULT;
+
+  /// Helper functions for ProcessFooter() to reduce complexity:
+  
+  /// Try to get footer from cache. Returns true if cache hit, false otherwise.
+  /// On cache hit, 'file_metadata_' is populated with cached data.
+  bool TryGetFooterFromCache();
+
+  /// Read footer from disk into 'file_metadata_'. Returns OK on success.
+  Status ReadFooterFromDisk() WARN_UNUSED_RESULT;
+
+  /// Validate the footer buffer and extract metadata pointer and size.
+  /// 'scan_range_len' is the length of the scan range.
+  /// 'buffer' points to the buffer containing footer data.
+  /// On success, sets 'metadata_ptr' to point to metadata and 'metadata_size' to its size.
+  /// 'metadata_start' is set to the file offset where metadata starts.
+  Status ValidateFooterBuffer(int64_t scan_range_len, uint8_t* buffer,
+      uint8_t** metadata_ptr, uint32_t* metadata_size, int64_t* metadata_start)
+      WARN_UNUSED_RESULT;
+
+  /// Deserialize footer metadata from 'metadata_ptr' of size 'metadata_size'.
+  /// Populates 'file_metadata_' on success.
+  Status DeserializeFooterMetadata(uint8_t* metadata_ptr, uint32_t metadata_size,
+      int64_t metadata_start) WARN_UNUSED_RESULT;
+
+  /// Validate the deserialized file metadata in 'file_metadata_'.
+  Status ValidateFileMetadata() WARN_UNUSED_RESULT;
 
   /// Populates 'column_readers' for the slots in 'tuple_desc', including creating child
   /// readers for any collections. Schema resolution is handled in this function as

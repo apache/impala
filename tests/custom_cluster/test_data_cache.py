@@ -43,6 +43,8 @@ class TestDataCache(CustomClusterTestSuite):
   def get_impalad_args(eviction_policy, high_write_concurrency=True,
                        force_single_shard=True, keep_across_restarts=False):
     impalad_args = ["--always_use_data_cache=true"]
+    # Disable footer cache to avoid interference with data cache.
+    impalad_args.append("--footer_cache_capacity=0")
     if (high_write_concurrency):
       impalad_args.append("--data_cache_write_concurrency=64")
     if (force_single_shard):

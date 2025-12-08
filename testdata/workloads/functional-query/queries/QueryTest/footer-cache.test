@@ -1,0 +1,61 @@
+====
+---- QUERY
+create table test_parquet stored as parquet as select * from tpch_parquet.lineitem;
+---- RUNTIME_PROFILE
+# Expect all cache misses for tpch_parquet.lineitem.
+row_regex: .*ParquetFooterCacheHits: 0 \(0\).*
+row_regex: .*ParquetFooterCacheMisses: 3 \(3\).*
+====
+---- QUERY
+select count(*) from tpch_parquet.lineitem t1, test_parquet t2 where t1.l_orderkey = t2.l_orderkey;
+---- RESULTS
+30012985
+---- RUNTIME_PROFILE
+# Expect cache hits for t1 and cache misses for t2.
+row_regex: .*ParquetFooterCacheHits: 3 \(3\).*
+row_regex: .*ParquetFooterCacheMisses: 0 \(0\).*
+row_regex: .*ParquetFooterCacheHits: 0 \(0\).*
+row_regex: .*ParquetFooterCacheMisses: 1 \(1\).*
+====
+---- QUERY
+select count(distinct l_orderkey) from test_parquet;
+---- RESULTS
+1500000
+---- RUNTIME_PROFILE
+# Expect all cache hits.
+row_regex: .*ParquetFooterCacheHits: 1 \(1\).*
+row_regex: .*ParquetFooterCacheMisses: 0 \(0\).*
+====
+---- QUERY
+# Overwrite temp table with subset of data.
+insert overwrite test_parquet select * from tpch_parquet.lineitem where l_shipmode = 'AIR';
+====
+---- QUERY
+# Verifies that stale data from the cache is not used.
+select count(distinct l_orderkey) from test_parquet;
+---- RESULTS
+652393
+---- RUNTIME_PROFILE
+# Expect all cache misses due to change in mtime.
+row_regex: .*ParquetFooterCacheHits: 0 \(0\).*
+row_regex: .*ParquetFooterCacheMisses: 1 \(1\).*
+====
+---- QUERY
+# Test footer cache with ORC format
+select count(distinct l_orderkey) from tpch_orc_def.lineitem;
+---- RESULTS
+1500000
+---- RUNTIME_PROFILE
+# Expect all cache misses.
+row_regex: .*OrcFooterCacheHits: 0 \(0\).*
+row_regex: .*OrcFooterCacheMisses: 4 \(4\).*
+====
+---- QUERY
+select count(distinct l_orderkey) from tpch_orc_def.lineitem;
+---- RESULTS
+1500000
+---- RUNTIME_PROFILE
+# Expect all cache hits.
+row_regex: .*OrcFooterCacheHits: 4 \(4\).*
+row_regex: .*OrcFooterCacheMisses: 0 \(0\).*
+====

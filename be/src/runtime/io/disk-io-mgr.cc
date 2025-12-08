@@ -27,6 +27,7 @@
 #include "runtime/io/disk-io-mgr-internal.h"
 #include "runtime/io/error-converter.h"
 #include "runtime/io/file-writer.h"
+#include "runtime/io/footer-cache.h"
 #include "runtime/io/handle-cache.inline.h"
 
 #include <boost/algorithm/string.hpp>
@@ -44,6 +45,8 @@
 #include "util/histogram-metric.h"
 #include "util/metrics.h"
 #include "util/os-util.h"
+#include "util/parse-util.h"
+#include "util/pretty-printer.h"
 #include "util/test-info.h"
 #include "util/time.h"
 
@@ -147,6 +150,13 @@ DEFINE_int32(num_adls_io_threads, 16, "Number of ADLS I/O threads");
 
 // The maximum number of GCS I/O threads. TODO: choose the default empirically.
 DEFINE_int32(num_gcs_io_threads, 16, "Number of GCS I/O threads");
+
+// Footer cache configuration
+DEFINE_string(footer_cache_capacity, "512MB",
+    "Specify the capacity of the footer cache. If set to 0, footer cache is disabled.");
+DEFINE_int32(footer_cache_partitions, 16,
+    "Number of partitions in the footer cache for reducing lock contention. "
+    "If set to 0 or negative, footer cache is disabled.");
 
 // The maximum number of GCS I/O threads. TODO: choose the default empirically.
 DEFINE_int32(num_cos_io_threads, 16, "Number of COS I/O threads");
@@ -699,6 +709,24 @@ Status DiskIoMgr::Init() {
         new DataCache(FLAGS_data_cache, FLAGS_data_cache_num_async_write_threads));
     RETURN_IF_ERROR(remote_data_cache_->Init());
   }
+
+  // Initialize footer cache
+  bool is_percent = false;
+  int64_t footer_cache_capacity =
+      ParseUtil::ParseMemSpec(FLAGS_footer_cache_capacity, &is_percent, 0);
+  if (footer_cache_capacity > 0 && FLAGS_footer_cache_partitions > 0) {
+    // If footer_cache_capacity is larger than 0, the number should not be a percentage.
+    DCHECK(!is_percent);
+    footer_cache_.reset(new FooterCache());
+    RETURN_IF_ERROR(footer_cache_->Init(footer_cache_capacity,
+        FLAGS_footer_cache_partitions));
+    LOG(INFO) << "Footer Cache initialized with capacity "
+              << PrettyPrinter::Print(footer_cache_capacity, TUnit::BYTES)
+              << " and " << FLAGS_footer_cache_partitions << " partitions";
+  } else {
+    LOG(INFO) << "Footer Cache is disabled.";
+  }
+
   return Status::OK();
 }
 

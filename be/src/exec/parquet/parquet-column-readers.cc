@@ -1052,7 +1052,7 @@ Status BaseScalarColumnReader::Reset(const HdfsFileDesc& file_desc,
     const parquet::ColumnChunk& col_chunk, int row_group_idx,
     int64_t row_group_first_row) {
   // Ensure metadata is valid before using it to initialize the reader.
-  RETURN_IF_ERROR(ParquetMetadataUtils::ValidateRowGroupColumn(parent_->file_metadata_,
+  RETURN_IF_ERROR(ParquetMetadataUtils::ValidateRowGroupColumn(*parent_->file_metadata_,
       parent_->filename(), row_group_idx, col_idx(), schema_element(),
       parent_->state_));
   num_buffered_values_ = 0;

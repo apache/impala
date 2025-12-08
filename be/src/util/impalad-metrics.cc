@@ -27,6 +27,10 @@
 DECLARE_string(debug_actions);
 DECLARE_bool(use_local_catalog);
 
+// Maximum footer cache entry size for the purposes of histogram sizing in stats
+// collection. A footer entry is expected to be less than 1MB.
+static constexpr int64_t STATS_MAX_FOOTER_CACHE_ENTRY_SIZE = 1L << 20;
+
 namespace impala {
 
 // Naming convention: Components should be separated by '.' and words should
@@ -93,6 +97,21 @@ const char* ImpaladMetricKeys::IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_ENT
     "impala-server.io-mgr.remote-data-cache-async-writes-dropped-entries";
 const char* ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN =
     "impala-server.io-mgr.bytes-written";
+
+// Footer cache metrics
+const char* ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_HITS =
+    "impala-server.io-mgr.footer-cache.hits";
+const char* ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_MISSES =
+    "impala-server.io-mgr.footer-cache.misses";
+const char* ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_ENTRIES_EVICTED =
+    "impala-server.io-mgr.footer-cache.entries-evicted";
+const char* ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE =
+    "impala-server.io-mgr.footer-cache.entries-in-use";
+const char* ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE_BYTES =
+    "impala-server.io-mgr.footer-cache.entries-in-use-bytes";
+const char* ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_ENTRY_SIZES =
+    "impala-server.io-mgr.footer-cache.entry-sizes";
+
 const char* ImpaladMetricKeys::IO_MGR_NUM_CACHED_FILE_HANDLES =
     "impala-server.io.mgr.num-cached-file-handles";
 const char* ImpaladMetricKeys::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING =
@@ -218,6 +237,15 @@ IntCounter* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_BYTES 
 IntCounter* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_ENTRIES =
     nullptr;
 IntCounter* ImpaladMetrics::IO_MGR_BYTES_WRITTEN = nullptr;
+
+// Footer cache metrics
+IntCounter* ImpaladMetrics::IO_MGR_FOOTER_CACHE_HITS = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_FOOTER_CACHE_MISSES = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_FOOTER_CACHE_ENTRIES_EVICTED = nullptr;
+IntGauge* ImpaladMetrics::IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE = nullptr;
+IntGauge* ImpaladMetrics::IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE_BYTES = nullptr;
+HistogramMetric* ImpaladMetrics::IO_MGR_FOOTER_CACHE_ENTRY_SIZES = nullptr;
+
 IntCounter* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_REOPENED = nullptr;
 IntCounter* ImpaladMetrics::HEDGED_READ_OPS = nullptr;
 IntCounter* ImpaladMetrics::HEDGED_READ_OPS_WIN = nullptr;
@@ -449,6 +477,21 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       ImpaladMetricKeys::IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_BYTES, 0);
   IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_ENTRIES = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_REMOTE_DATA_CACHE_ASYNC_WRITES_DROPPED_ENTRIES, 0);
+
+  // Footer cache metrics
+  IO_MGR_FOOTER_CACHE_HITS = IO_MGR_METRICS->AddCounter(
+      ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_HITS, 0);
+  IO_MGR_FOOTER_CACHE_MISSES = IO_MGR_METRICS->AddCounter(
+      ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_MISSES, 0);
+  IO_MGR_FOOTER_CACHE_ENTRIES_EVICTED = IO_MGR_METRICS->AddCounter(
+      ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_ENTRIES_EVICTED, 0);
+  IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE = IO_MGR_METRICS->AddGauge(
+      ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE, 0);
+  IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE_BYTES = IO_MGR_METRICS->AddGauge(
+      ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE_BYTES, 0);
+  IO_MGR_FOOTER_CACHE_ENTRY_SIZES = IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
+      MetricDefs::Get(ImpaladMetricKeys::IO_MGR_FOOTER_CACHE_ENTRY_SIZES),
+      STATS_MAX_FOOTER_CACHE_ENTRY_SIZE, 3));
 
   IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO =
       StatsMetric<uint64_t, StatsType::MEAN>::CreateAndRegister(IO_MGR_METRICS,

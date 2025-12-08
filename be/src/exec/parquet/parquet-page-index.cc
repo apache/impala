@@ -68,7 +68,7 @@ bool ParquetPageIndex::DeterminePageIndexRangesInRowGroup(
 Status ParquetPageIndex::ReadAll(int row_group_idx) {
   DCHECK(page_index_buffer_.buffer() == nullptr);
   bool has_page_index = DeterminePageIndexRangesInRowGroup(
-      scanner_->file_metadata_.row_groups[row_group_idx],
+      scanner_->file_metadata_->row_groups[row_group_idx],
       &column_index_base_offset_, &column_index_size_,
       &offset_index_base_offset_, &offset_index_size_);
 

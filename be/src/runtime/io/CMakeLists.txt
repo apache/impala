@@ -26,6 +26,7 @@ add_library(Io
   disk-io-mgr.cc
   disk-io-mgr-stress.cc
   disk-file.cc
+  footer-cache.cc
   local-file-system.cc
   local-file-system-with-fault-injection.cc
   error-converter.cc
@@ -44,6 +45,7 @@ add_library(IoTests STATIC
   data-cache-trace-test.cc
   disk-io-mgr-test.cc
   disk-file-test.cc
+  footer-cache-test.cc
 )
 add_dependencies(IoTests gen-deps)
 
@@ -62,5 +64,6 @@ target_link_libraries(data-cache-trace-replayer ${IMPALA_TEST_LINK_LIBS})
 ADD_UNIFIED_BE_LSAN_TEST(disk-io-mgr-test DiskIoMgrTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(disk-file-test DiskFileTest.*:DiskFileDeathTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(data-cache-trace-test DataCacheTraceTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(footer-cache-test FooterCacheTest.*)
 # Exception to unified be: Custom main function (platform tests)
 ADD_BE_LSAN_TEST(data-cache-test)

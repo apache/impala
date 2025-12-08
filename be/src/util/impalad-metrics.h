@@ -131,6 +131,24 @@ class ImpaladMetricKeys {
   /// Total number of bytes written to disk by the io mgr (for spilling)
   static const char* IO_MGR_BYTES_WRITTEN;
 
+  /// Footer cache hits
+  static const char* IO_MGR_FOOTER_CACHE_HITS;
+
+  /// Footer cache misses
+  static const char* IO_MGR_FOOTER_CACHE_MISSES;
+
+  /// Footer cache entries evicted
+  static const char* IO_MGR_FOOTER_CACHE_ENTRIES_EVICTED;
+
+  /// Footer cache entries currently in use
+  static const char* IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE;
+
+  /// Footer cache bytes currently in use
+  static const char* IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE_BYTES;
+
+  /// Footer cache entry sizes distribution
+  static const char* IO_MGR_FOOTER_CACHE_ENTRY_SIZES;
+
   /// Number of unbuffered file handles cached by the io mgr
   static const char* IO_MGR_NUM_CACHED_FILE_HANDLES;
 
@@ -336,6 +354,15 @@ class ImpaladMetrics {
   static IntCounter* HEDGED_READ_OPS;
   static IntCounter* HEDGED_READ_OPS_WIN;
   static IntCounter* CATALOG_CACHE_EVICTION_COUNT;
+
+  // Footer cache metrics
+  static IntCounter* IO_MGR_FOOTER_CACHE_HITS;
+  static IntCounter* IO_MGR_FOOTER_CACHE_MISSES;
+  static IntCounter* IO_MGR_FOOTER_CACHE_ENTRIES_EVICTED;
+  static IntGauge* IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE;
+  static IntGauge* IO_MGR_FOOTER_CACHE_ENTRIES_IN_USE_BYTES;
+  static HistogramMetric* IO_MGR_FOOTER_CACHE_ENTRY_SIZES;
+
   static IntCounter* CATALOG_CACHE_HIT_COUNT;
   static IntCounter* CATALOG_CACHE_LOAD_COUNT;
   static IntCounter* CATALOG_CACHE_LOAD_EXCEPTION_COUNT;

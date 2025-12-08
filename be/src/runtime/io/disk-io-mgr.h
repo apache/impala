@@ -41,6 +41,7 @@ namespace io {
 
 class DataCache;
 class DiskQueue;
+class FooterCache;
 
 /// Manager object that schedules IO for all queries on all disks and remote filesystems
 /// (such as S3). Each query maps to one or more RequestContext objects, each of which
@@ -424,6 +425,9 @@ class DiskIoMgr : public CacheLineAligned {
 
   DataCache* remote_data_cache() { return remote_data_cache_.get(); }
 
+  FooterCache* footer_cache() const { return footer_cache_.get(); }
+  bool footer_cache_enabled() const { return footer_cache_ != nullptr; }
+
  private:
   DISALLOW_COPY_AND_ASSIGN(DiskIoMgr);
   friend class DiskIoMgrTest_Buffers_Test;
@@ -504,6 +508,11 @@ class DiskIoMgr : public CacheLineAligned {
   /// non-local reads and data read from remote data nodes will be stored in it. If not
   /// configured, this would be NULL.
   std::unique_ptr<DataCache> remote_data_cache_;
+
+  /// Singleton cache for file footer metadata. If configured, it will cache parsed
+  /// footer metadata to avoid repeated I/O and deserialization. If not configured,
+  /// this would be NULL.
+  std::unique_ptr<FooterCache> footer_cache_;
 };
 }
 }

@@ -43,6 +43,7 @@
 #include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
+#include "runtime/io/footer-cache.h"
 #include "runtime/io/request-context.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
@@ -117,6 +118,8 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     num_row_groups_counter_(nullptr),
     num_minmax_filtered_pages_counter_(nullptr),
     num_dict_filtered_row_groups_counter_(nullptr),
+    num_footer_cache_hits_counter_(nullptr),
+    num_footer_cache_misses_counter_(nullptr),
     parquet_compressed_page_size_counter_(nullptr),
     parquet_uncompressed_page_size_counter_(nullptr),
     coll_items_read_counter_(0),
@@ -159,6 +162,10 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       ADD_COUNTER(scan_node_->runtime_profile(), "NumTopLevelValuesSkipped", TUnit::UNIT);
   num_dict_filtered_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumDictFilteredRowGroups", TUnit::UNIT);
+  num_footer_cache_hits_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "ParquetFooterCacheHits", TUnit::UNIT);
+  num_footer_cache_misses_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "ParquetFooterCacheMisses", TUnit::UNIT);
   parquet_compressed_page_size_counter_ = ADD_SUMMARY_STATS_COUNTER(
       scan_node_->runtime_profile(), "ParquetCompressedPageSize", TUnit::BYTES);
   parquet_uncompressed_page_size_counter_ = ADD_SUMMARY_STATS_COUNTER(
@@ -242,7 +249,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       file_metadata_utils_,
       state_->query_options().parquet_fallback_schema_resolution,
       state_->query_options().parquet_array_resolution));
-  RETURN_IF_ERROR(schema_resolver_->Init(&file_metadata_, filename()));
+  RETURN_IF_ERROR(schema_resolver_->Init(file_metadata_.get(), filename()));
 
   // We've processed the metadata and there are columns that need to be materialized.
   RETURN_IF_ERROR(CreateColumnReaders(
@@ -478,14 +485,14 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
     RETURN_IF_ERROR(
         RowBatch::ResizeAndAllocateTupleBuffer(state_, row_batch->tuple_data_pool(),
             row_batch->row_desc()->GetRowSize(), &capacity, &tuple_buf_size, &tuple_buf));
-    if (file_metadata_.num_rows > 0) {
+    if (file_metadata_->num_rows > 0) {
       COUNTER_ADD(num_file_metadata_read_, 1);
       Tuple* dst_tuple = reinterpret_cast<Tuple*>(tuple_buf);
       TupleRow* dst_row = row_batch->GetRow(row_batch->AddRow());
       InitTuple(template_tuple_, dst_tuple);
       int64_t* dst_slot = dst_tuple->GetBigIntSlot(scan_node_->count_star_slot_offset());
       *dst_slot = 0;
-      for (const auto &row_group : file_metadata_.row_groups) {
+      for (const auto &row_group : file_metadata_->row_groups) {
         *dst_slot += row_group.num_rows;
       }
       dst_row->SetTuple(0, dst_tuple);
@@ -499,14 +506,14 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
     // There are no materialized slots and we are not optimizing count(*), e.g.
     // "select 1 from alltypes". We can serve this query from just the file metadata.
     // We don't need to read the column data.
-    if (row_group_rows_read_ == file_metadata_.num_rows) {
+    if (row_group_rows_read_ == file_metadata_->num_rows) {
       eos_ = true;
       return Status::OK();
     }
     COUNTER_ADD(num_file_metadata_read_, 1);
     assemble_rows_timer_.Start();
-    DCHECK_LE(row_group_rows_read_, file_metadata_.num_rows);
-    int64_t rows_remaining = file_metadata_.num_rows - row_group_rows_read_;
+    DCHECK_LE(row_group_rows_read_, file_metadata_->num_rows);
+    int64_t rows_remaining = file_metadata_->num_rows - row_group_rows_read_;
     int max_tuples = min<int64_t>(row_batch->capacity(), rows_remaining);
     TupleRow* current_row = row_batch->GetRow(row_batch->AddRow());
     int num_to_commit = WriteTemplateTuples(current_row, max_tuples);
@@ -537,8 +544,8 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
       if (!status.ok()) RETURN_IF_ERROR(state_->LogOrReturnError(status.msg()));
     }
     RETURN_IF_ERROR(NextRowGroup());
-    DCHECK_LE(row_group_idx_, file_metadata_.row_groups.size());
-    if (row_group_idx_ == file_metadata_.row_groups.size()) {
+  DCHECK_LE(row_group_idx_, file_metadata_->row_groups.size());
+  if (row_group_idx_ == file_metadata_->row_groups.size()) {
       eos_ = true;
       DCHECK(parse_status_.ok());
       return Status::OK();
@@ -604,7 +611,7 @@ ColumnStatsReader HdfsParquetScanner::CreateStatsReader(
   int col_idx = node->col_idx;
   DCHECK_LT(col_idx, row_group.columns.size());
 
-  const vector<parquet::ColumnOrder>& col_orders = file_metadata_.column_orders;
+  const vector<parquet::ColumnOrder>& col_orders = file_metadata_->column_orders;
   const parquet::ColumnOrder* col_order =
       col_idx < col_orders.size() ? &col_orders[col_idx] : nullptr;
 
@@ -911,7 +918,7 @@ Status HdfsParquetScanner::NextRowGroup() {
     DCHECK_EQ(0, context_->NumStreams());
 
     ++row_group_idx_;
-    if (row_group_idx_ >= file_metadata_.row_groups.size()) {
+  if (row_group_idx_ >= file_metadata_->row_groups.size()) {
       if (start_with_first_row_group && misaligned_row_group_skipped) {
         // We started with the first row group and skipped all the row groups because
         // they were misaligned. The execution flow won't reach this point if there is at
@@ -920,17 +927,16 @@ Status HdfsParquetScanner::NextRowGroup() {
       }
       break;
     }
-    const parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
-    // Also check 'file_metadata_.num_rows' to make sure 'select count(*)' and 'select *'
-    // behave consistently for corrupt files that have 'file_metadata_.num_rows == 0'
-    // but some data in row groups.
-    if (row_group.num_rows == 0 || file_metadata_.num_rows == 0) continue;
-
+  const parquet::RowGroup& row_group = file_metadata_->row_groups[row_group_idx_];
+  // Also check 'file_metadata_->num_rows' to make sure 'select count(*)' and 'select *'
+  // behave consistently for corrupt files that have 'file_metadata_->num_rows == 0'
+  // but non-empty row groups.
+  if (row_group.num_rows == 0 || file_metadata_->num_rows == 0) continue;
     // Let's find the index of the first row in this row group. It's needed to track the
     // file position of each row.
     int64_t row_group_first_row = 0;
     for (int i = 0; i < row_group_idx_; ++i) {
-      const parquet::RowGroup& row_group = file_metadata_.row_groups[i];
+    const parquet::RowGroup& row_group = file_metadata_->row_groups[i];
       row_group_first_row += row_group.num_rows;
     }
 
@@ -1477,7 +1483,7 @@ Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
   }
 
   min_max_tuple_->Init(min_max_tuple_desc->byte_size());
-  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
+  parquet::RowGroup& row_group = file_metadata_->row_groups[row_group_idx_];
 
   int filtered_pages = 0;
 
@@ -1580,7 +1586,7 @@ Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
 }
 
 Status HdfsParquetScanner::EvaluatePageIndex() {
-  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
+  parquet::RowGroup& row_group = file_metadata_->row_groups[row_group_idx_];
   vector<RowRange> skip_ranges;
 
   for (int i = 0; i < stats_conjunct_evals_.size(); ++i) {
@@ -1670,7 +1676,7 @@ Status HdfsParquetScanner::EvaluatePageIndex() {
 Status HdfsParquetScanner::ComputeCandidatePagesForColumns() {
   if (candidate_ranges_.empty()) return Status::OK();
 
-  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
+  parquet::RowGroup& row_group = file_metadata_->row_groups[row_group_idx_];
   for (BaseScalarColumnReader* scalar_reader : scalar_readers_) {
     const auto& page_locations = scalar_reader->offset_index_.page_locations;
     if (!ComputeCandidatePages(page_locations, candidate_ranges_, row_group.num_rows,
@@ -2758,32 +2764,33 @@ inline bool HdfsParquetScanner::ReadCollectionItem(
   return continue_execution;
 }
 
-Status HdfsParquetScanner::ProcessFooter() {
-  const int64_t file_len = stream_->file_desc()->file_length;
-  const int64_t scan_range_len = stream_->scan_range()->len();
+bool HdfsParquetScanner::TryGetFooterFromCache() {
+  FooterCache* footer_cache = ExecEnv::GetInstance()->disk_io_mgr()->footer_cache();
+  if (footer_cache == nullptr) return false;
 
-  // We're processing the scan range issued in IssueInitialRanges(). The scan range should
-  // be the last FOOTER_BYTES of the file. !success means the file is shorter than we
-  // expect. Note we can't detect if the file is larger than we expect without attempting
-  // to read past the end of the scan range, but in this case we'll fail below trying to
-  // parse the footer.
-  DCHECK_LE(scan_range_len, PARQUET_FOOTER_SIZE);
-  uint8_t* buffer;
-  bool success = stream_->ReadBytes(scan_range_len, &buffer, &parse_status_);
-  if (!success) {
-    DCHECK(!parse_status_.ok());
-    if (parse_status_.code() == TErrorCode::SCANNER_INCOMPLETE_READ) {
-      VLOG_QUERY << "Metadata for file '" << filename() << "' appears stale: "
-                 << "metadata states file size to be "
-                 << PrettyPrinter::Print(file_len, TUnit::BYTES)
-                 << ", but could only read "
-                 << PrettyPrinter::Print(stream_->total_bytes_returned(), TUnit::BYTES);
-      return Status(TErrorCode::STALE_METADATA_FILE_TOO_SHORT, filename(),
-          scan_node_->hdfs_table()->fully_qualified_name());
+  const HdfsFileDesc* file_desc = stream_->file_desc();
+  FooterCacheValue cached_value =
+      footer_cache->GetFooter(file_desc->filename, file_desc->mtime);
+  
+  // Check if we got a Parquet footer from cache
+  if (std::holds_alternative<std::shared_ptr<parquet::FileMetaData>>(cached_value)) {
+    auto cached_metadata = std::get<std::shared_ptr<parquet::FileMetaData>>(cached_value);
+    if (cached_metadata != nullptr) {
+      // Cache hit - share the cached FileMetaData, skip disk I/O and deserialization
+      file_metadata_ = cached_metadata;
+      COUNTER_ADD(num_footer_cache_hits_counter_, 1);
+      VLOG(2) << "Footer cache hit for file: " << filename();
+      return true;
     }
-    return parse_status_;
   }
-  DCHECK(stream_->eosr());
+  
+  COUNTER_ADD(num_footer_cache_misses_counter_, 1);
+  return false;
+}
+
+Status HdfsParquetScanner::ValidateFooterBuffer(int64_t scan_range_len, uint8_t* buffer,
+    uint8_t** metadata_ptr, uint32_t* metadata_size, int64_t* metadata_start) {
+  const int64_t file_len = stream_->file_desc()->file_length;
 
   // Number of bytes in buffer after the fixed size footer is accounted for.
   int remaining_bytes_buffered = scan_range_len - sizeof(int32_t) -
@@ -2807,23 +2814,93 @@ Status HdfsParquetScanner::ProcessFooter() {
   // The size of the metadata is encoded as a 4 byte little endian value before
   // the magic number
   uint8_t* metadata_size_ptr = magic_number_ptr - sizeof(int32_t);
-  uint32_t metadata_size = *reinterpret_cast<uint32_t*>(metadata_size_ptr);
+  *metadata_size = *reinterpret_cast<uint32_t*>(metadata_size_ptr);
+  
   // The start of the metadata is:
   // file_len - 4-byte footer length field - 4-byte version number field - metadata size
-  int64_t metadata_start = file_len - sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER) -
-      metadata_size;
-  if (UNLIKELY(metadata_start < 0)) {
+  *metadata_start = file_len - sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER) -
+      *metadata_size;
+  if (UNLIKELY(*metadata_start < 0)) {
     return Status(Substitute("File '$0' is invalid. Invalid metadata size in file "
                              "footer: $1 bytes. File size: $2 bytes.",
-        filename(), metadata_size, file_len));
+        filename(), *metadata_size, file_len));
   }
-  uint8_t* metadata_ptr = metadata_size_ptr - metadata_size;
+  
+  *metadata_ptr = metadata_size_ptr - *metadata_size;
+  
+  return Status::OK();
+}
 
-  // If the metadata was too big, we need to read it into a contiguous buffer before
-  // deserializing it.
+Status HdfsParquetScanner::DeserializeFooterMetadata(uint8_t* metadata_ptr,
+    uint32_t metadata_size, int64_t metadata_start) {
+  const int64_t file_len = stream_->file_desc()->file_length;
+
+  // Deserialize file footer
+  // TODO: this takes ~7ms for a 1000-column table, figure out how to reduce this.
+  file_metadata_ = std::make_shared<parquet::FileMetaData>();
+  Status status =
+      DeserializeThriftMsg(metadata_ptr, &metadata_size, true, file_metadata_.get());
+  if (!status.ok()) {
+    return Status(Substitute("File '$0' of length $1 bytes has invalid file metadata "
+        "at file offset $2, Error = $3.", filename(), file_len, metadata_start,
+        status.GetDetail()));
+  }
+
+  // Write to cache if footer cache is enabled
+  FooterCache* footer_cache = ExecEnv::GetInstance()->disk_io_mgr()->footer_cache();
+  if (footer_cache != nullptr) {
+    const HdfsFileDesc* file_desc = stream_->file_desc();
+    // Share the FileMetaData with cache (zero-copy)
+    Status cache_status = footer_cache->PutParquetFooter(
+        file_desc->filename, file_desc->mtime, file_metadata_);
+    if (!cache_status.ok()) {
+      // Cache insertion failure is not fatal, just log it
+      VLOG(2) << "Failed to cache footer for file '" << filename()
+              << "': " << cache_status.GetDetail();
+    }
+  }
+
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::ReadFooterFromDisk() {
+  // We're processing the scan range issued in IssueInitialRanges(). The scan range should
+  // be the last FOOTER_BYTES of the file. !success means the file is shorter than we
+  // expect. Note we can't detect if the file is larger than we expect without attempting
+  // to read past the end of the scan range, but in this case we'll fail below trying to
+  // parse the footer.
+  const int64_t file_len = stream_->file_desc()->file_length;
+  const int64_t scan_range_len = stream_->scan_range()->len();
+  DCHECK_LE(scan_range_len, PARQUET_FOOTER_SIZE);
+  
+  uint8_t* buffer;
+  bool success = stream_->ReadBytes(scan_range_len, &buffer, &parse_status_);
+  if (!success) {
+    DCHECK(!parse_status_.ok());
+    if (parse_status_.code() == TErrorCode::SCANNER_INCOMPLETE_READ) {
+      VLOG_QUERY << "Metadata for file '" << filename() << "' appears stale: "
+                 << "metadata states file size to be "
+                 << PrettyPrinter::Print(file_len, TUnit::BYTES)
+                 << ", but could only read "
+                 << PrettyPrinter::Print(stream_->total_bytes_returned(), TUnit::BYTES);
+      return Status(TErrorCode::STALE_METADATA_FILE_TOO_SHORT, filename(),
+          scan_node_->hdfs_table()->fully_qualified_name());
+    }
+    return parse_status_;
+  }
+  DCHECK(stream_->eosr());
+
+  uint8_t* metadata_ptr;
+  uint32_t metadata_size;
+  int64_t metadata_start;
+  RETURN_IF_ERROR(ValidateFooterBuffer(scan_range_len, buffer, &metadata_ptr,
+      &metadata_size, &metadata_start));
+  
+  // Check if we need to read additional metadata
+  int remaining_bytes_buffered = scan_range_len - sizeof(int32_t) -
+      sizeof(PARQUET_VERSION_NUMBER);
   ScopedBuffer metadata_buffer(scan_node_->mem_tracker());
-
-  DCHECK(metadata_range_ != nullptr);
+  
   if (UNLIKELY(metadata_size > remaining_bytes_buffered)) {
     // In this case, the metadata is bigger than our guess meaning there are
     // not enough bytes in the footer range from IssueInitialRanges().
@@ -2842,32 +2919,28 @@ Status HdfsParquetScanner::ProcessFooter() {
     // Read the footer into the metadata buffer. Skip HDFS caching in this case.
     RETURN_IF_ERROR(ReadToBuffer(metadata_start, metadata_ptr, metadata_size));
   }
+  
+  RETURN_IF_ERROR(DeserializeFooterMetadata(metadata_ptr, metadata_size, metadata_start));
+  
+  return Status::OK();
+}
 
-  // Deserialize file footer
-  // TODO: this takes ~7ms for a 1000-column table, figure out how to reduce this.
-  Status status =
-      DeserializeThriftMsg(metadata_ptr, &metadata_size, true, &file_metadata_);
-  if (!status.ok()) {
-    return Status(Substitute("File '$0' of length $1 bytes has invalid file metadata "
-        "at file offset $2, Error = $3.", filename(), file_len, metadata_start,
-        status.GetDetail()));
-  }
-
-  RETURN_IF_ERROR(ParquetMetadataUtils::ValidateFileVersion(file_metadata_, filename()));
+Status HdfsParquetScanner::ValidateFileMetadata() {
+  RETURN_IF_ERROR(ParquetMetadataUtils::ValidateFileVersion(*file_metadata_, filename()));
 
   if (VLOG_FILE_IS_ON) {
     VLOG_FILE << "Parquet metadata for " << filename() << " created by "
-              << file_metadata_.created_by << ":\n"
-              << join(file_metadata_.key_value_metadata | transformed(
+              << file_metadata_->created_by << ":\n"
+              << join(file_metadata_->key_value_metadata | transformed(
                   [](parquet::KeyValue kv) { return kv.key + "=" + kv.value; }), "\n");
   }
 
   // IMPALA-3943: Do not throw an error for empty files for backwards compatibility.
-  if (file_metadata_.num_rows == 0) {
+  if (file_metadata_->num_rows == 0) {
     // Warn if the num_rows is inconsistent with the row group metadata.
-    if (!file_metadata_.row_groups.empty()) {
+    if (!file_metadata_->row_groups.empty()) {
       bool has_non_empty_row_group = false;
-      for (const parquet::RowGroup& row_group : file_metadata_.row_groups) {
+      for (const parquet::RowGroup& row_group : file_metadata_->row_groups) {
         if (row_group.num_rows > 0) {
           has_non_empty_row_group = true;
           break;
@@ -2883,17 +2956,35 @@ Status HdfsParquetScanner::ProcessFooter() {
   }
 
   // Parse out the created by application version string
-  if (file_metadata_.__isset.created_by) {
-    file_version_ = ParquetFileVersion(file_metadata_.created_by);
+  if (file_metadata_->__isset.created_by) {
+    file_version_ = ParquetFileVersion(file_metadata_->created_by);
   }
-  if (file_metadata_.row_groups.empty()) {
+  
+  if (file_metadata_->row_groups.empty()) {
     return Status(
         Substitute("Invalid file. This file: $0 has no row groups", filename()));
   }
-  if (file_metadata_.num_rows < 0) {
+  
+  if (file_metadata_->num_rows < 0) {
     return Status(Substitute("Corrupt Parquet file '$0': negative row count $1 in "
-        "file metadata", filename(), file_metadata_.num_rows));
+        "file metadata", filename(), file_metadata_->num_rows));
   }
+  
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::ProcessFooter() {
+  // Try to get footer from cache first if footer cache is enabled
+  bool cache_hit = TryGetFooterFromCache();
+
+  // Cache miss or cache disabled - read footer from disk
+  if (!cache_hit) {
+    RETURN_IF_ERROR(ReadFooterFromDisk());
+  }
+
+  // Validate the deserialized file metadata
+  RETURN_IF_ERROR(ValidateFileMetadata());
+
   return Status::OK();
 }
 
@@ -3070,7 +3161,7 @@ Status HdfsParquetScanner::InitScalarColumns(int64_t row_group_first_row) {
   int64_t partition_id = context_->partition_descriptor()->id();
   const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(partition_id, filename());
   DCHECK(file_desc != nullptr);
-  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
+  parquet::RowGroup& row_group = file_metadata_->row_groups[row_group_idx_];
 
   // Used to validate that the number of values in each reader in column_readers_ at the
   // same SchemaElement is the same.
@@ -3128,7 +3219,7 @@ Status HdfsParquetScanner::ValidateEndOfRowGroup(
       // These column readers materialize table-level values (vs. collection values).
       // Test if the expected number of rows from the file metadata matches the actual
       // number of rows read from the file.
-      int64_t expected_rows_in_group = file_metadata_.row_groups[row_group_idx].num_rows;
+  int64_t expected_rows_in_group = file_metadata_->row_groups[row_group_idx].num_rows;
       if (rows_read != expected_rows_in_group) {
         return Status(TErrorCode::PARQUET_GROUP_ROW_COUNT_ERROR, filename(),
             row_group_idx, expected_rows_in_group, rows_read);
@@ -3207,7 +3298,7 @@ ParquetTimestampDecoder HdfsParquetScanner::CreateTimestampDecoder(
 bool HdfsParquetScanner::GetHiveZoneConversionLegacy() const {
   string writer_zone_conversion_legacy;
   string writer_time_zone;
-  for (const parquet::KeyValue& kv : file_metadata_.key_value_metadata) {
+  for (const parquet::KeyValue& kv : file_metadata_->key_value_metadata) {
     if (kv.key == "writer.zone.conversion.legacy") {
       writer_zone_conversion_legacy = kv.value;
     } else if (kv.key == "writer.time.zone") {

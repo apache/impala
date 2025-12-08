@@ -39,6 +39,7 @@
 #include "runtime/hbase-table-factory.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/io/disk-io-mgr.h"
+#include "runtime/io/footer-cache.h"
 #include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
@@ -106,7 +107,6 @@ DEFINE_int32(admission_control_slots, 0,
     "value for dedicated coordinators).");
 DEFINE_string(codegen_cache_capacity, "1GB",
     "Specify the capacity of the codegen cache. If set to 0, codegen cache is disabled.");
-
 DEFINE_bool(use_local_catalog, true,
     "Use the on-demand metadata feature in coordinators. If this is set, coordinators "
     "pull metadata as needed from catalogd and cache it locally. The cached metadata "

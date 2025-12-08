@@ -25,6 +25,7 @@
 
 #include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
+#include "runtime/io/footer-cache.h"
 #include "runtime/runtime-state.h"
 #include "exec/acid-metadata-utils.h"
 #include "exec/hdfs-columnar-scanner.h"
@@ -37,6 +38,10 @@ namespace impala {
 struct HdfsFileDesc;
 class OrcStructReader;
 class OrcComplexColumnReader;
+
+namespace io {
+  class FooterCache;
+}
 
 /// This scanner leverage the ORC library to parse ORC files located in HDFS. Data is
 /// transformed into Impala in-memory representation (i.e. Tuples, RowBatches) by
@@ -151,13 +156,13 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
       return filename_;
     }
 
+    /// Default read implementation for non async IO.
+    Status readRandom(void* buf, uint64_t length, uint64_t offset);
+
    private:
     HdfsOrcScanner* scanner_;
     const HdfsFileDesc* file_desc_;
     std::string filename_;
-
-    /// Default read implementation for non async IO.
-    Status readRandom(void* buf, uint64_t length, uint64_t offset);
   };
 
   HdfsOrcScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
@@ -307,6 +312,12 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// Number of runtime filters that are pushed down to the ORC reader.
   RuntimeProfile::Counter* num_pushed_down_runtime_filters_counter_ = nullptr;
 
+  /// Number of footer cache hits.
+  RuntimeProfile::Counter* num_footer_cache_hits_counter_ = nullptr;
+
+  /// Number of footer cache misses.
+  RuntimeProfile::Counter* num_footer_cache_misses_counter_ = nullptr;
+
   /// Number of arrived runtime IN-list filters that can be pushed down.
   /// Used in ShouldUpdateSearchArgument(). Init to -1 so the check can pass at first.
   int num_pushable_in_list_filters_ = -1;
@@ -358,6 +369,25 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// Process the file footer and parse file_metadata_.  This should be called with the
   /// last ORC_FOOTER_SIZE bytes in context_.
   Status ProcessFileTail() WARN_UNUSED_RESULT;
+
+  /// Helper methods for ProcessFileTail() to reduce complexity:
+
+  /// Try to get ORC footer from cache. Sets cache_hit to true if cache hit,
+  /// false if cache miss. Returns error status on failure.
+  Status TryGetFooterFromCache(io::FooterCache* footer_cache,
+      std::string* cached_footer, bool* cache_hit) WARN_UNUSED_RESULT;
+  /// Create ORC reader using cached footer.
+  Status CreateOrcReaderWithCachedFooter(const std::string& cached_footer)
+      WARN_UNUSED_RESULT;
+
+  /// Create ORC reader by reading footer from disk.
+  Status CreateOrcReaderFromDisk() WARN_UNUSED_RESULT;
+
+  /// Cache the ORC footer after reading from disk.
+  void CacheOrcFooter(io::FooterCache* footer_cache);
+
+  /// Validate the ORC reader after creation.
+  Status ValidateOrcReader() WARN_UNUSED_RESULT;
 
   /// Resolve SchemaPath in TupleDescriptors and translate them to ORC type ids into
   /// 'selected_nodes'. Track the position slots by pre-order traversal in the
