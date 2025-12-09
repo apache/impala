@@ -3949,6 +3949,26 @@
     "key": "admission-controller.total-dequeue-failed-coordinator-limited"
   },
   {
+    "key": "admission-control-service.num-queries-high-water-mark",
+    "label": "HWM Num Queries in Admission Control Service",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "description": "The high water mark of queries registered in Admission Control Service (queuing or running).",
+    "contexts": [
+      "ADMISSIOND"
+    ]
+  },
+  {
+    "key": "admission-control-service.num-queries",
+    "label": "Num Queries in Admission Control Service",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "description": "The number of queries currently registered in Admission Control Service (queuing or running) and not yet fully released.",
+    "contexts": [
+      "ADMISSIOND"
+    ]
+  },
+  {
     "description": "The full version string of the Admission Control Server.",
     "contexts": [
       "ADMISSIOND"

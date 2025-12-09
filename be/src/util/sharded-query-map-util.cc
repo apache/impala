@@ -20,6 +20,7 @@
 #include "runtime/query-driver.h"
 #include "scheduling/admission-control-service.h"
 #include "util/debug-util.h"
+#include "util/metrics.h"
 
 namespace impala {
 
@@ -36,6 +37,7 @@ Status GenericShardedQueryMap<K, V>::Add(const K& query_id, const V& obj) {
         strings::Substitute("query id $0 already exists", PrintId(query_id))));
   }
   map_ref->insert(make_pair(query_id, obj));
+  if (size_metric_ != nullptr) size_metric_->Increment(1);
   return Status::OK();
 }
 
@@ -65,6 +67,7 @@ Status GenericShardedQueryMap<K, V>::Delete(const K& query_id) {
     return err;
   }
   map_ref->erase(entry);
+  if (size_metric_ != nullptr) size_metric_->Increment(-1);
   return Status::OK();
 }
 

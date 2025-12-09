@@ -2371,7 +2371,7 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     # Max timeout for waiting on query state transitions.
     timeout_s = 10
 
-    ac = self.cluster.admissiond
+    ac = self.cluster.admissiond.service
     all_coords = self.cluster.get_all_coordinators()
     assert len(all_coords) >= 2, "Test requires at least two coordinators"
 
@@ -2382,10 +2382,9 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     handle1 = client1.execute_async(long_query)
     client1.wait_for_impala_state(handle1, RUNNING, timeout_s)
 
-    # Allow some time for the system to stabilize.
-    sleep(5)
+    ac.wait_for_metric_value("admission-control-service.num-queries", 1)
     # Capture memory usage before stressing the system.
-    old_total_bytes = ac.service.get_metric_value("tcmalloc.bytes-in-use")
+    old_total_bytes = ac.get_metric_value("tcmalloc.bytes-in-use")
     assert old_total_bytes != 0
 
     # Submit short queries to coord2 which will be queued and time out.
@@ -2401,7 +2400,7 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
         client2.close_query(handle2)
 
     # Capture memory usage after the test.
-    new_total_bytes = ac.service.get_metric_value("tcmalloc.bytes-in-use")
+    new_total_bytes = ac.get_metric_value("tcmalloc.bytes-in-use")
 
     # Ensure memory usage has not grown more than 10%, indicating no leak.
     assert new_total_bytes < old_total_bytes * 1.1
@@ -2415,6 +2414,13 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     # Cleanup clients.
     client1.close()
     client2.close()
+
+    # Verify num queries return to 0.
+    ac.wait_for_metric_value(
+      "admission-control-service.num-queries", 0)
+    num_queries_hwm = \
+      ac.get_metric_value("admission-control-service.num-queries-high-water-mark")
+    assert num_queries_hwm > 1
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @pytest.mark.execute_serially

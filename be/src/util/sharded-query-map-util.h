@@ -28,6 +28,8 @@
 
 namespace impala {
 
+class AtomicHighWaterMarkGauge;
+
 /// This is a template that can be used for any map that maps from a query ID (TUniqueId
 /// or UniqueIdPB) to some object, and that needs to be sharded. It provides a SpinLock
 /// per shard to synchronize access to each shard of the map. The underlying shard is
@@ -65,6 +67,11 @@ class GenericShardedQueryMap {
     return count;
   }
 
+  void SetSizeMetric(AtomicHighWaterMarkGauge* metric) {
+    DCHECK(size_metric_ == nullptr);
+    size_metric_ = metric;
+  }
+
   // Adds ('key', 'value') to the map, returning an error if 'key' already exists.
   Status Add(const K& key, const V& value);
 
@@ -90,6 +97,9 @@ class GenericShardedQueryMap {
     SpinLock map_lock_;
   };
   struct MapShard shards_[NUM_QUERY_BUCKETS];
+
+  // Metric for tracking the map size.
+  AtomicHighWaterMarkGauge* size_metric_ = nullptr;
 };
 
 template <typename T>
