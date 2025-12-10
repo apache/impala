@@ -413,7 +413,7 @@ class ImpalaTestClusterProperties(object):
     Checks if --hms_event_polling_interval_s is set to non-zero value"""
     try:
       key = "hms_event_polling_interval_s"
-      return key in self.catalogd_runtime_flags and int(
+      return key in self.catalogd_runtime_flags and float(
         self._catalogd_runtime_flags[key]["current"]) > 0
     except Exception:
       if self.is_remote_cluster():
@@ -421,6 +421,22 @@ class ImpalaTestClusterProperties(object):
         LOG.exception(
           "Failed to get flags from web UI, assuming event polling is disabled")
         return False
+      raise
+
+  def is_hierarchical_event_processing_enabled(self):
+    """Whether hierarchical event processing is enabled"""
+    try:
+      key = "enable_hierarchical_event_processing"
+      return self.is_event_polling_enabled() and key in self.catalogd_runtime_flags \
+          and self.runtime_flags[key]["current"] == "true"
+    except Exception:
+      if self.is_remote_cluster():
+        # IMPALA-8553: be more tolerant of failures on remote cluster builds.
+        LOG.exception(
+          "Failed to get flags from web UI, assuming hierarchical event processing is "
+          "disabled")
+        return False
+      raise
 
 def build_flavor_timeout(default_timeout, slow_build_timeout=None,
         asan_build_timeout=None, code_coverage_build_timeout=None):

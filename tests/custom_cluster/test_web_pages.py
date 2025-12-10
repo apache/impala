@@ -27,12 +27,14 @@ import time
 from tests.common.custom_cluster_test_suite import (
   DEFAULT_CLUSTER_SIZE,
   CustomClusterTestSuite)
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.skip import SkipIfFS, SkipIfDockerizedCluster
 from tests.shell.util import run_impala_shell_cmd
 
 SMALL_QUERY_LOG_SIZE_IN_BYTES = 40 * 1024
 CATALOG_URL = "http://localhost:25020/catalog"
+IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 
 
 class TestWebPage(CustomClusterTestSuite):
@@ -495,8 +497,11 @@ class TestWebPage(CustomClusterTestSuite):
     json_res = json.loads(requests.get("http://localhost:25020/events?json").text)
     new_latest_event_id = json_res["progress-info"]["latest_event_id"]
     assert new_latest_event_id > old_latest_event_id
-    # Current event (the failed one) should not be cleared
-    assert "current_event" in json_res["progress-info"]
+    # Current event batch info is not shown when hierarchical event processing is
+    # enabled since events are dispatched and then processed in parallel.
+    if not IMPALA_TEST_CLUSTER_PROPERTIES.is_hierarchical_event_processing_enabled():
+      # Current event (the failed one) should not be cleared
+      assert "current_event" in json_res["progress-info"]
 
     # Verify the error message disappears after a global INVALIDATE METADATA
     self.execute_query("invalidate metadata")
