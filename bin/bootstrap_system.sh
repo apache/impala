@@ -347,7 +347,7 @@ function setup_python2() {
 # IMPALA-14606: Stop building using Python 2 and always run with
 # IMPALA_USE_PYTHON3_TESTS=true.
 # redhat8 setup_python2
-redhat8 pip install --user argparse
+# redhat8 pip install --user argparse
 
 # Point Python to Python 3 for Redhat 9 and Ubuntu 22, or newer
 function setup_python3() {
@@ -378,6 +378,7 @@ function setup_python3() {
   fi
 }
 
+redhat8 setup_python3
 redhat9 setup_python3
 ubuntu22 setup_python3
 ubuntu24 setup_python3
