@@ -1067,6 +1067,7 @@ Status BaseScalarColumnReader::Reset(const HdfsFileDesc& file_desc,
   pos_current_value_ = ParquetLevel::INVALID_POS;
   row_group_first_row_ = row_group_first_row;
   current_row_ = -1;
+  levels_readahead_ = false;
 
   vector<ScanRange::SubRange> sub_ranges;
   CreateSubRanges(&sub_ranges);

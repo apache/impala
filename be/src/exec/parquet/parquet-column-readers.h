@@ -452,6 +452,19 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// processed the first (zeroeth) row.
   int64_t current_row_ = -1;
 
+  /// This flag is needed for the proper tracking of the last processed row.
+  /// The batched and non-batched interfaces behave differently. E.g. when using the
+  /// batched interface you don't need to invoke NextLevels() in advance, while you need
+  /// to do that for the non-batched interface. In fact, the batched interface doesn't
+  /// call NextLevels() at all. It directly reads the levels then the corresponding value
+  /// in a loop. On the other hand, the non-batched interface (ReadValue()) expects that
+  /// the levels for the next value are already read via NextLevels(). And after reading
+  /// the value it calls NextLevels() to read the levels of the next value. Hence, the
+  /// levels are always read ahead in this case.
+  /// Returns true, if we read ahead def and rep levels. In this case 'current_row_'
+  /// points to the row we'll process next, not to the row we already processed.
+  bool levels_readahead_ = false;
+
   /////////////////////////////////////////
   /// BEGIN: Members used for page filtering
   /// They are not set when we don't filter out pages at all.
@@ -474,19 +487,6 @@ class BaseScalarColumnReader : public ParquetColumnReader {
   /// are processing values in this range. When we leave this range, then we need to skip
   /// rows and increment this field.
   int current_row_range_ = 0;
-
-  /// This flag is needed for the proper tracking of the last processed row.
-  /// The batched and non-batched interfaces behave differently. E.g. when using the
-  /// batched interface you don't need to invoke NextLevels() in advance, while you need
-  /// to do that for the non-batched interface. In fact, the batched interface doesn't
-  /// call NextLevels() at all. It directly reads the levels then the corresponding value
-  /// in a loop. On the other hand, the non-batched interface (ReadValue()) expects that
-  /// the levels for the next value are already read via NextLevels(). And after reading
-  /// the value it calls NextLevels() to read the levels of the next value. Hence, the
-  /// levels are always read ahead in this case.
-  /// Returns true, if we read ahead def and rep levels. In this case 'current_row_'
-  /// points to the row we'll process next, not to the row we already processed.
-  bool levels_readahead_ = false;
 
   /// END: Members used for page filtering
   /////////////////////////////////////////

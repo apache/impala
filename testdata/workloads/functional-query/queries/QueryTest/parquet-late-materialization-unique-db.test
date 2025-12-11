@@ -40,3 +40,16 @@ select count(unnest(arr)) from nested_decimals n where d_38 = 1;
 aggregation(SUM, NumPagesSkippedByLateMaterialization): 0
 aggregation(SUM, NumTopLevelValuesSkipped): 17
 ====
+---- QUERY
+# Selects the last row in a row group and then skips the first row in the next
+# row group.
+select count(o_orderkey)
+from customer_nested_multiblock_multipage t
+left join t.c_orders
+where cast(c_custkey as string) like '100';
+---- RESULTS
+20
+---- RUNTIME_PROFILE
+aggregation(SUM, NumPagesSkippedByLateMaterialization): 0
+aggregation(SUM, NumTopLevelValuesSkipped): 299
+====

@@ -37,5 +37,7 @@ class TestParquetLateMaterialization(ImpalaTestSuite):
   def test_parquet_late_materialization_unique_db(self, vector, unique_database):
     create_table_from_parquet(self.client, unique_database, 'decimals_1_10')
     create_table_from_parquet(self.client, unique_database, 'nested_decimals')
+    create_table_from_parquet(
+        self.client, unique_database, 'customer_nested_multiblock_multipage')
     self.run_test_case('QueryTest/parquet-late-materialization-unique-db', vector,
         unique_database)
