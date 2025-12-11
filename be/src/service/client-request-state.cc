@@ -1021,8 +1021,8 @@ void ClientRequestState::ExecLoadIcebergDataRequestImpl(TLoadDataResp response) 
       parent_server_, drop_profile, &profile_pool_);
   // Execute queries
   RETURN_VOID_IF_ERROR(child_query_executor_->ExecAsync(move(child_queries)));
-  vector<ChildQuery*>* completed_queries = new vector<ChildQuery*>();
-  Status query_status = child_query_executor_->WaitForAll(completed_queries);
+  vector<ChildQuery*> completed_queries;
+  Status query_status = child_query_executor_->WaitForAll(&completed_queries);
   if (query_status.ok()) {
     const char* path = response.create_location.c_str();
     string delete_err = "Load was succesful, but failed to remove staging data under '"
@@ -2558,8 +2558,8 @@ void ClientRequestState::ExecMigrateRequestImpl() {
     // Execute child queries
     unique_ptr<ChildQueryExecutor> query_executor(new ChildQueryExecutor());
     RETURN_VOID_IF_ERROR(query_executor->ExecAsync(move(child_queries)));
-    vector<ChildQuery*>* completed_queries = new vector<ChildQuery*>();
-    Status query_status = query_executor->WaitForAll(completed_queries);
+    vector<ChildQuery*> completed_queries;
+    Status query_status = query_executor->WaitForAll(&completed_queries);
     if (!query_status.ok()) AddTableResetHints(params, &query_status);
     {
       lock_guard<mutex> l(lock_);
@@ -2615,8 +2615,8 @@ void ClientRequestState::ExecMigrateRequestImpl() {
     // Execute queries
     unique_ptr<ChildQueryExecutor> query_executor(new ChildQueryExecutor());
     RETURN_VOID_IF_ERROR(query_executor->ExecAsync(move(child_queries)));
-    vector<ChildQuery*>* completed_queries = new vector<ChildQuery*>();
-    Status query_status = query_executor->WaitForAll(completed_queries);
+    vector<ChildQuery*> completed_queries;
+    Status query_status = query_executor->WaitForAll(&completed_queries);
     {
       lock_guard<mutex> l(lock_);
       RETURN_VOID_IF_ERROR(UpdateQueryStatus(query_status));
