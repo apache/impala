@@ -552,6 +552,57 @@ ALTER TABLE ice_t DROP PARTITION (year(timestamp_col) = '2024');
     </conbody>
   </concept>
 
+  <concept id="iceberg_show_files_partition">
+    <title>Showing files in specific partitions of Iceberg tables</title>
+    <conbody>
+      <p>
+        Since <keyword keyref="impala50"/> Impala supports filtering by partition when displaying files in Iceberg tables
+        using the <codeph>SHOW FILES IN table PARTITION</codeph> statement. E.g.:
+        <codeblock>
+SHOW FILES IN ice_t PARTITION (i = 3);
+SHOW FILES IN ice_t PARTITION (identity_int = 1);
+SHOW FILES IN ice_t PARTITION (day(date_col) = '2023-12-01');
+SHOW FILES IN ice_t PARTITION (hour(timestamp_col) = '2023-06-02-0');
+SHOW FILES IN ice_t PARTITION (bucket(5, int_col) = 2);
+SHOW FILES IN ice_t PARTITION (truncate(5, string_col) = 'abcde');
+        </codeblock>
+      </p>
+      <p>
+        Partition transforms must be included in the partition selector to match the table's partition specification.
+        For identity partitions, the column name can be used directly. For other transforms like <codeph>day()</codeph>,
+        <codeph>hour()</codeph>, <codeph>bucket()</codeph>, or <codeph>truncate()</codeph>, the transform function
+        must be specified in the partition filter.
+      </p>
+      <p>
+        Operands for filtering date and timestamp-based columns with transforms must be provided as strings,
+        for example: <codeph>(day(date_col) = '2023-12-01')</codeph>, <codeph>(year(year_date) = '2077')</codeph>,
+        <codeph>(hour(timestamp_col) = '2023-06-02-0')</codeph>.
+      </p>
+      <p>
+        This statement only displays files that belong to partitions matching the specified filter criteria.
+        Complex expressions with multiple predicates are also supported, e.g.:
+        <codeblock>
+SHOW FILES IN ice_t PARTITION (identity_int = 1 AND identity_string = 'test');
+SHOW FILES IN ice_t PARTITION (identity_float &lt; 3.0);
+SHOW FILES IN ice_t PARTITION (identity_double > 0.0);
+        </codeblock>
+      </p>
+      <p>
+        Limitations:
+        <ul>
+          <li>Binary filter predicates must consist of one partition selector and one constant expression;
+          e.g.: <codeph>(day(date_col) = '2023-12-01')</codeph> is allowed, but <codeph>(another_date_col = date_col)</codeph> is not allowed.</li>
+          <li>Filtering expressions must target the latest partition spec of the table.</li>
+          <li>Only partition columns can be used in the filter expressions.</li>
+        </ul>
+      </p>
+      <p>
+        More information about the <codeph>SHOW FILES</codeph> statement can be found at
+        <xref href="impala_show.xml"/>.
+      </p>
+    </conbody>
+  </concept>
+
   <concept id="iceberg_update">
     <title>Updating data in Iceberg tables</title>
     <conbody>
