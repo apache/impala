@@ -25,6 +25,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.common.skip import SkipIfApacheHive
 from tests.common.test_dimensions import create_exec_option_dimension
+from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 from time import sleep
 
 
@@ -187,6 +188,8 @@ class TestPostgresJdbcTables(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   def test_postgres_jdbc_tables(self, vector, unique_database):
+    driver_url = FILESYSTEM_PREFIX +\
+        "/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar"
     sql = """
     DROP TABLE IF EXISTS {0}.country_postgres;
     CREATE EXTERNAL TABLE {0}.country_postgres (
@@ -208,7 +211,7 @@ class TestPostgresJdbcTables(CustomClusterTestSuite):
       "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
       "jdbc.auth"="AuthMech=0",
       "jdbc.driver"="org.postgresql.Driver",
-      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "driver.url"="{1}",
       "dbcp.username"="hiveuser",
       "dbcp.password"="password",
       "table"="country");
@@ -235,7 +238,7 @@ class TestPostgresJdbcTables(CustomClusterTestSuite):
       "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
       "jdbc.auth"="AuthMech=0",
       "jdbc.driver"="org.postgresql.Driver",
-      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "driver.url"="{1}",
       "dbcp.username"="hiveuser",
       "dbcp.password"="password",
       "table"="quoted_col"
@@ -261,7 +264,7 @@ class TestPostgresJdbcTables(CustomClusterTestSuite):
       "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
       "jdbc.auth"="AuthMech=0",
       "jdbc.driver"="org.postgresql.Driver",
-      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "driver.url"="{1}",
       "dbcp.username"="hiveuser",
       "dbcp.password"="password",
       "table"="country");
@@ -286,7 +289,7 @@ class TestPostgresJdbcTables(CustomClusterTestSuite):
       "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
       "jdbc.auth"="AuthMech=0",
       "jdbc.driver"="org.postgresql.Driver",
-      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "driver.url"="{1}",
       "dbcp.username"="hiveuser",
       "dbcp.password"="password",
       "query"="select id,name,bool_col,tinyint_col,smallint_col,
@@ -313,13 +316,13 @@ class TestPostgresJdbcTables(CustomClusterTestSuite):
       "jdbc.url"="jdbc:postgresql://localhost:5432/functional",
       "jdbc.auth"="AuthMech=0",
       "jdbc.driver"="org.postgresql.Driver",
-      "driver.url"="/test-warehouse/data-sources/jdbc-drivers/postgresql-jdbc.jar",
+      "driver.url"="{1}",
       "dbcp.username"="hiveuser",
       "dbcp.password"="password",
       "query"="select id,name,bool_col,tinyint_col,smallint_col,
         int_col,bigint_col,float_col,double_col,date_col,string_col,
         timestamp_col from country");
-    """.format(unique_database)
+    """.format(unique_database, driver_url)
 
     '''
     try:
