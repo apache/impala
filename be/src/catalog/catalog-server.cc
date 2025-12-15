@@ -270,7 +270,7 @@ DEFINE_string(common_hms_event_types, "ADD_PARTITION,ALTER_PARTITION,DROP_PARTIT
 
 DEFINE_bool(enable_hierarchical_event_processing, true,
     "This configuration is used to enable hierarchical event processing. The default "
-    "value is false. When enabled, events are fetched, dispatched and processed in "
+    "value is true. When enabled, events are fetched, dispatched and processed in "
     "different threads.");
 
 DEFINE_int32(num_db_event_executors, 5,

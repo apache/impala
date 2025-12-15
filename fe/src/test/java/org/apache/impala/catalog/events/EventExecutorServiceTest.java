@@ -27,13 +27,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -199,19 +199,25 @@ public class EventExecutorServiceTest {
     do {
       isNeedProcess = false;
       for (DbEventExecutor dbExecutor : eventExecutorService.getDbEventExecutors()) {
-        if (dbExecutor.getOutstandingEventCount() != 0) {
-          isNeedProcess = true;
-          dbExecutor.process();
-        }
-        for (TableEventExecutor tableExecutor : dbExecutor.getTableEventExecutors()) {
-          if (tableExecutor.getOutstandingEventCount() != 0) {
-            isNeedProcess = true;
-            tableExecutor.process();
-          }
-        }
+        isNeedProcess |= process(dbExecutor);
       }
     } while (--maxLoopTimes > 0 && isNeedProcess);
     assertTrue("Events should be processed within the limit", maxLoopTimes > 0);
+  }
+
+  private boolean process(DbEventExecutor dbExecutor) {
+    boolean isNeedProcess = false;
+    if (dbExecutor.getOutstandingEventCount() != 0) {
+      isNeedProcess = true;
+      dbExecutor.process();
+    }
+    for (TableEventExecutor tableExecutor : dbExecutor.getTableEventExecutors()) {
+      if (tableExecutor.getOutstandingEventCount() != 0) {
+        isNeedProcess = true;
+        tableExecutor.process();
+      }
+    }
+    return isNeedProcess;
   }
 
   private EventExecutorService createEventExecutorService(int numDbEventExecutor,
@@ -911,6 +917,63 @@ public class EventExecutorServiceTest {
     // processed
     assertEquals(lastEventId, eventExecutorService.getGreatestSyncedEventId());
     assertEquals(0, eventExecutorService.getPendingEventCount(lastEventId));
+    eventExecutorService.shutdown(true);
   }
 
+  /**
+   * Tests whether events prior to the latest event id are processed at the executors
+   * @throws Exception
+   */
+  @Test
+  public void testEventsProcessedTillLatestEvent() throws Exception {
+    EventExecutorService eventExecutorService = new EventExecutorService(eventsProcessor_,
+        2, 2);
+    eventExecutorService.setStatus(EventExecutorService.EventExecutorStatus.ACTIVE);
+    String t1 = "t1";
+    String t2 = "t2";
+    String t3 = "t3";
+    String t4 = "t4";
+    createDatabase(DB_NAME1);
+    createDatabase(DB_NAME2);
+    createTable(DB_NAME1, t1);
+    createTransactionalTable(DB_NAME1, t2, false);
+    createTable(DB_NAME2, t3);
+    createTransactionalTable(DB_NAME2, t4, true);
+
+    long latestEventId = eventsProcessor_.getCurrentEventId();
+    List<MetastoreEvent> metastoreEvents = eventsProcessor_.getEventsFactory()
+        .getFilteredEvents(eventsProcessor_.getNextMetastoreEvents(),
+            eventsProcessor_.getMetrics());
+    for (MetastoreEvent event : metastoreEvents) {
+      eventExecutorService.dispatch(event);
+    }
+    DbEventExecutor dbExecutor1 = eventExecutorService.getDbEventExecutors().get(0);
+    DbEventExecutor dbExecutor2 = eventExecutorService.getDbEventExecutors().get(1);
+    assertEquals(new HashSet<>(Arrays.asList(DB_NAME1, DB_NAME2)),
+        eventExecutorService.getDbNames());
+    int maxLoopTimes = 2;
+    do {
+      assertFalse(eventExecutorService.isProcessed(DB_NAME1, latestEventId));
+      assertFalse(eventExecutorService.isProcessed(DB_NAME1, t1, latestEventId));
+      assertFalse(eventExecutorService.isProcessed(DB_NAME1, t2, latestEventId));
+    } while (process(dbExecutor1) && --maxLoopTimes > 0);
+    assertTrue(eventExecutorService.isProcessed(DB_NAME1, latestEventId));
+    assertTrue(eventExecutorService.isProcessed(DB_NAME1, t1, latestEventId));
+    assertTrue(eventExecutorService.isProcessed(DB_NAME1, t2, latestEventId));
+    assertEquals(new HashSet<>(Arrays.asList(t1, t2)),
+        new HashSet<>(eventExecutorService.getTableNames(DB_NAME1)));
+
+    maxLoopTimes = 2;
+    do {
+      assertFalse(eventExecutorService.isProcessed(DB_NAME2, latestEventId));
+      assertFalse(eventExecutorService.isProcessed(DB_NAME2, t3, latestEventId));
+      assertFalse(eventExecutorService.isProcessed(DB_NAME2, t4, latestEventId));
+    } while (process(dbExecutor2) && --maxLoopTimes > 0);
+    assertTrue(eventExecutorService.isProcessed(DB_NAME2, latestEventId));
+    assertTrue(eventExecutorService.isProcessed(DB_NAME2, t3, latestEventId));
+    assertTrue(eventExecutorService.isProcessed(DB_NAME2, t4, latestEventId));
+    assertEquals(new HashSet<>(Arrays.asList(t3, t4)),
+        new HashSet<>(eventExecutorService.getTableNames(DB_NAME2)));
+    eventExecutorService.shutdown(true);
+  }
 }

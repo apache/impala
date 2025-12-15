@@ -22,6 +22,7 @@ import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -948,6 +949,13 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    */
   public long getLastSyncedEventId() {
     return lastSyncedEventId_.get();
+  }
+
+  /**
+   * Gets the last dispatched event id.
+   */
+  public long getLastDispatchedEventId() {
+    return getLastSyncedEventId();
   }
 
   /**
@@ -1909,6 +1917,15 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       return res;
     }
     try {
+      if (req.should_expand_views) expandViews(req);
+    } catch (CatalogException | TException e) {
+      LOG.warn("Failed to expand views used by the query.", e);
+    }
+    if (isHierarchicalEventProcessingEnabled()) {
+      syncMetadataWithHierarchicalEventProcessing(req, res, latestEventId);
+      return res;
+    }
+    try {
       waitForEventId = getMinEventIdToWaitFor(req);
     } catch (Throwable e) {
       LOG.warn("Failed to check the min required event id to wait for. Fallback to use " +
@@ -1916,7 +1933,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
           latestEventId, e);
       waitForEventId = latestEventId;
     }
-    long lastSyncedEventId = getGreatestSyncedEventId();
+    long lastSyncedEventId = getLastSyncedEventId();
     long startMs = System.currentTimeMillis();
     long sleepIntervalMs = Math.min(timeoutMs, hmsEventSyncSleepIntervalMs_);
     // Avoid too many log entries if the waiting interval is smaller than 500ms.
@@ -1929,7 +1946,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
             lastSyncedEventId, waitForEventId);
       }
       Uninterruptibles.sleepUninterruptibly(sleepIntervalMs, TimeUnit.MILLISECONDS);
-      lastSyncedEventId = getGreatestSyncedEventId();
+      lastSyncedEventId = getLastSyncedEventId();
       if (!canProcessEventInCurrentStatus()) {
         res.setStatus_code(TErrorCode.GENERAL);
         res.addToError_msgs(
@@ -1950,16 +1967,149 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   }
 
   /**
+   * Method to synchronize all events up to the given latest event id for the requested
+   * databases and tables.
+   * @param req HMS event sync request
+   * @param res Response
+   * @param latestEventId Event id up to which events are expected to be synced
+   */
+  void syncMetadataWithHierarchicalEventProcessing(TWaitForHmsEventRequest req,
+      TStatus res, long latestEventId) {
+    LOG.info("Synchronize events up to latest event ({})", latestEventId);
+    if (getGreatestSyncedEventId() >= latestEventId) {
+      LOG.info("Greatest synced event id ({}) already reached latest event ({})",
+          getGreatestSyncedEventId(), latestEventId);
+      res.setStatus_code(TErrorCode.OK);
+      return;
+    }
+    Set<String> dbNames = new HashSet<>();
+    Map<String, List<String>> db2Tables = new HashMap<>();
+    long timeoutMs = req.timeout_s * 1000L;
+    long sleepIntervalMs = Math.min(timeoutMs, hmsEventSyncSleepIntervalMs_);
+    long startMs = System.currentTimeMillis();
+    int numIters = 0;
+    int logIntervals = Math.max(1, 1000 / hmsEventSyncSleepIntervalMs_);
+    // Wait for all events up to the latest event are dispatched to DbEventExecutors
+    while (getLastDispatchedEventId() < latestEventId
+        && System.currentTimeMillis() - startMs < timeoutMs) {
+      if (numIters++ % logIntervals == 0) {
+        LOG.info("Waiting for last dispatched event ({}) to reach latest event ({})",
+            getLastDispatchedEventId(), latestEventId);
+      }
+      Uninterruptibles.sleepUninterruptibly(sleepIntervalMs, TimeUnit.MILLISECONDS);
+    }
+    if (req.want_db_list) {
+      // Get the list of dbs that have recently received/processed metastore events at
+      // their respective DbProcessors and are not yet purged by idle processor cleanup.
+      // We just make sure all pending events that could change the db list are
+      // processed. So we don't need all the db names from the catalog. Coordinator just
+      // wants the changes on db list to make its cached db list up-to-date.
+      dbNames = eventExecutorService_.getDbNames();
+    } else if (req.isSetObject_descs()) {
+      // Get all db names and table names for each of db
+      getRequestedDbTableNames(req, dbNames, db2Tables);
+    }
+    if (!dbNames.isEmpty() && System.currentTimeMillis() - startMs < timeoutMs) {
+      LOG.info("Databases to ensure synchronized: {}", Joiner.on(", ").join(dbNames));
+    }
+    if (req.want_table_list) {
+      numIters = 0;
+      // Wait for all events up to the latest event are dispatched to TableEventExecutors
+      while (!dbNames.isEmpty() && System.currentTimeMillis() - startMs < timeoutMs) {
+        Iterator<String> it = dbNames.iterator();
+        while (it.hasNext()) {
+          String dbName = it.next();
+          if (eventExecutorService_.isProcessed(dbName, latestEventId)) {
+            LOG.info("Synced database: {}", dbName);
+            it.remove();
+            // Gets the list of tables that have recently received/processed metastore
+            // events for the db and are not yet purged by idle processor cleanup.
+            List<String> tableNames = eventExecutorService_.getTableNames(dbName);
+            if (!tableNames.isEmpty()) db2Tables.put(dbName, tableNames);
+          }
+        }
+        if (!dbNames.isEmpty()) {
+          if (numIters++ % logIntervals == 0) {
+            LOG.info("Waiting to finish sync on database processors");
+          }
+          Uninterruptibles.sleepUninterruptibly(sleepIntervalMs, TimeUnit.MILLISECONDS);
+        }
+      }
+    }
+    // Wait till necessary dbs and tables are synced
+    if (!db2Tables.isEmpty() && System.currentTimeMillis() - startMs < timeoutMs) {
+      LOG.info("Tables to ensure synchronized: {}",
+          Joiner.on(", ").withKeyValueSeparator(" database with tables ")
+              .join(db2Tables));
+    }
+    numIters = 0;
+    boolean isSyncInProgress = !dbNames.isEmpty() || !db2Tables.isEmpty();
+    while (isSyncInProgress && System.currentTimeMillis() - startMs < timeoutMs) {
+      // Remove the synced dbs
+      dbNames.removeIf(dbName -> {
+        boolean isProcessed = eventExecutorService_.isProcessed(dbName, latestEventId);
+        if (isProcessed) LOG.info("Synced database: {}", dbName);
+        return isProcessed;
+      });
+      // Remove the synced tables
+      Iterator<Map.Entry<String, List<String>>> it = db2Tables.entrySet().iterator();
+      while (it.hasNext()) {
+        Map.Entry<String, List<String>> entry = it.next();
+        entry.getValue().removeIf(tableName -> {
+          boolean isProcessed = eventExecutorService_.isProcessed(entry.getKey(),
+              tableName, latestEventId);
+          if (isProcessed) LOG.info("Synced table: {}.{}", entry.getKey(), tableName);
+          return isProcessed;
+        });
+        if (entry.getValue().isEmpty()) {
+          it.remove();
+        }
+      }
+      isSyncInProgress = !dbNames.isEmpty() || !db2Tables.isEmpty();
+      if (isSyncInProgress) {
+        if (numIters++ % logIntervals == 0) {
+          LOG.info("Waiting to finish sync on database/table processors");
+        }
+        Uninterruptibles.sleepUninterruptibly(sleepIntervalMs, TimeUnit.MILLISECONDS);
+      }
+    }
+    // Time out before syncing dbs and tables
+    if (isSyncInProgress || System.currentTimeMillis() - startMs >= timeoutMs) {
+      res.setStatus_code(TErrorCode.GENERAL);
+      StringBuilder error = new StringBuilder();
+      error.append(String.format("Timeout waiting for HMS events to be synced. " +
+          "Event id to wait for: %d. Last synced event id: %d", latestEventId,
+          getGreatestSyncedEventId()));
+      if (!dbNames.isEmpty()) {
+        error.append(". Failed to sync databases: ").append(Joiner.on(", ")
+            .join(dbNames));
+      }
+      if (!db2Tables.isEmpty()) {
+        error.append(". Failed to sync tables: ")
+            .append(Joiner.on(", ").withKeyValueSeparator(" database with tables ")
+                .join(db2Tables));
+      }
+      error.append(".");
+      res.addToError_msgs(error.toString());
+      return;
+    }
+    LOG.info("All required databases and tables are synced up to event ({})",
+        latestEventId);
+    res.setStatus_code(TErrorCode.OK);
+  }
+
+  /**
    * Find the min required event id that should be synced to avoid the query using
    * stale metadata.
    */
   private long getMinEventIdToWaitFor(TWaitForHmsEventRequest req)
-      throws MetastoreNotificationFetchException, TException, CatalogException {
-    if (req.should_expand_views) expandViews(req);
+      throws MetastoreNotificationFetchException {
+    Preconditions.checkState(!isHierarchicalEventProcessingEnabled(),
+        "Hierarchical event processing is enabled");
     // requiredEventId starts from the last synced event id. While checking pending
     // events of a target, we just fetch events after requiredEventId, since events
     // before it are decided to be waited for.
-    long requiredEventId = getGreatestSyncedEventId();
+    long requiredEventId = getLastSyncedEventId();
     if (req.want_db_list) {
       return getMinRequiredEventIdForDbList(requiredEventId);
     }
@@ -1969,19 +2119,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       // checked by one RPC.
       Set<String> dbNames = new HashSet<>();
       Map<String, List<String>> db2Tables = new HashMap<>();
-      for (TCatalogObject catalogObject: req.getObject_descs()) {
-        if (catalogObject.isSetDb()) {
-          dbNames.add(catalogObject.getDb().db_name);
-        } else if (catalogObject.isSetTable()) {
-          TTable table = catalogObject.getTable();
-          if (catalog_.getDb(table.db_name) == null) {
-            // We will check existence of missing dbs.
-            dbNames.add(table.db_name);
-          }
-          db2Tables.computeIfAbsent(table.db_name, k -> new ArrayList<>())
-              .add(table.tbl_name);
-        }
-      }
+      getRequestedDbTableNames(req, dbNames, db2Tables);
       // Step 2: Check DB events
       requiredEventId = getMinRequiredEventIdForDb(requiredEventId, dbNames,
           req.want_table_list);
@@ -1994,6 +2132,30 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       requiredEventId = getMinRequiredTableEventId(requiredEventId, db2Tables);
     }
     return requiredEventId;
+  }
+
+  /**
+   * Populates the database names, table names and groups table names by the db name for
+   * the given HMS event sync request.
+   * @param req HMS event sync request
+   * @param dbNames database names container
+   * @param db2Tables database name to table names mapping container
+   */
+  private void getRequestedDbTableNames(TWaitForHmsEventRequest req,
+      Set<String> dbNames, Map<String, List<String>> db2Tables) {
+    for (TCatalogObject catalogObject: req.getObject_descs()) {
+      if (catalogObject.isSetDb()) {
+        dbNames.add(catalogObject.getDb().db_name);
+      } else if (catalogObject.isSetTable()) {
+        TTable table = catalogObject.getTable();
+        if (catalog_.getDb(table.db_name) == null) {
+          // We will check existence of missing dbs.
+          dbNames.add(table.db_name);
+        }
+        db2Tables.computeIfAbsent(table.db_name, k -> new ArrayList<>())
+            .add(table.tbl_name);
+      }
+    }
   }
 
   private static void doForAllObjectNames(TWaitForHmsEventRequest req,

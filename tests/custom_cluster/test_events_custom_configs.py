@@ -27,6 +27,7 @@ from impala_thrift_gen.hive_metastore.ttypes import FireEventRequest
 from impala_thrift_gen.hive_metastore.ttypes import FireEventRequestData
 from impala_thrift_gen.hive_metastore.ttypes import InsertEventRequestData
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_connection import ERROR, FINISHED
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
@@ -53,7 +54,7 @@ EVENT_SYNC_QUERY_OPTIONS = {
     "sync_hms_events_wait_time_s": 10,
     "sync_hms_events_strict_mode": True
 }
-
+IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 
 def wait_statestore_heartbeat(num_heartbeat=1):
   """Wait for state sync across impalads."""
@@ -2051,6 +2052,9 @@ class TestEventSyncFailures(TestEventProcessingCustomConfigsBase):
         "Timeout waiting for HMS events to be synced. Event id to wait for:")
     assert expected_error in client_log
     assert ". Last synced event id: " in client_log
+    if IMPALA_TEST_CLUSTER_PROPERTIES.is_hierarchical_event_processing_enabled():
+      assert ". Failed to sync tables: {} database with tables [part].".format(
+        unique_database) in client_log
     profile = client.get_runtime_profile(handle)
     assert "Errors: " + expected_error in profile, profile
     self.verify_timeline_item("Query Compilation", label, profile)

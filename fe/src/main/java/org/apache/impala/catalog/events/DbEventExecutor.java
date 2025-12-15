@@ -23,11 +23,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
@@ -132,7 +132,8 @@ public class DbEventExecutor {
     private final Queue<DbBarrierEvent> barrierEvents_ = new ConcurrentLinkedQueue<>();
 
     // TableProcessors for the database
-    private final Set<TableProcessor> tableProcessors_ = ConcurrentHashMap.newKeySet();
+    private final Map<String, TableProcessor> tableProcessors_ =
+        new ConcurrentHashMap<>();
 
     /**
      * Indicates whether DbProcessor is terminating. Events are dispatched and processed
@@ -228,14 +229,15 @@ public class DbEventExecutor {
      * @param event Metastore event
      */
     private void dispatchTableEvent(MetastoreEvent event) {
-      String fqTableName = (event.getDbName() + '.' + event.getTableName()).toLowerCase();
+      String tableName = event.getTableName().toLowerCase();
+      String fqTableName = dbEventExecutor_.getFqTableName(event.getDbName(), tableName);
       synchronized (processorLock_) {
         if (isTerminating()) return;
         TableEventExecutor tableEventExecutor =
             dbEventExecutor_.getOrAssignTableEventExecutor(fqTableName);
         TableProcessor tableProcessor =
             tableEventExecutor.getOrCreateTableProcessor(fqTableName);
-        tableProcessors_.add(tableProcessor);
+        tableProcessors_.put(tableName, tableProcessor);
         // Prepend all the outstanding db barrier events to TableProcessor so that they
         // do not process the table events received before these db barrier events are
         // processed
@@ -254,7 +256,7 @@ public class DbEventExecutor {
       synchronized (processorLock_) {
         if (isTerminating()) return;
         barrierEvent = new DbBarrierEvent(event);
-        tableProcessors_.forEach(tableProcessor -> {
+        tableProcessors_.values().forEach(tableProcessor -> {
           if (!tableProcessor.isEmpty()) tableProcessor.enqueue(barrierEvent);
         });
         barrierEvents_.offer(barrierEvent);
@@ -364,9 +366,10 @@ public class DbEventExecutor {
      *              And false to indicate the removal of idle TableProcessor if any.
      */
     private void cleanIfNecessary(boolean force) {
-      Iterator<TableProcessor> it = tableProcessors_.iterator();
+      Iterator<Map.Entry<String, TableProcessor>> it =
+          tableProcessors_.entrySet().iterator();
       while (it.hasNext()) {
-        TableProcessor tableProcessor = it.next();
+        TableProcessor tableProcessor = it.next().getValue();
         if (force || tableProcessor.canBeRemoved()) {
           TableEventExecutor tableEventExecutor = tableProcessor.getTableEventExecutor();
           tableEventExecutor.deleteTableProcessor(tableProcessor.getTableName());
@@ -467,6 +470,23 @@ public class DbEventExecutor {
       }
       processDbEvents();
       cleanIfNecessary(false);
+    }
+
+    /**
+     * Determines whether all events with event ids less than or equal to the given event
+     * id have been processed for this database.
+     * @param eventId Event id up to which events are expected to be processed
+     * @return True if all events up to the given event id are processed. False otherwise
+     */
+    private boolean isProcessed(long eventId) {
+      synchronized (processorLock_) {
+        // Return false if the DbProcessor is being terminated. May happen when event
+        // processor is being paused or stopped concurrently.
+        if (isTerminating()) return false;
+        if (!inEvents_.isEmpty() &&
+            inEvents_.peek().getEventId() <= eventId) return false;
+        return barrierEvents_.isEmpty() || barrierEvents_.peek().getEventId() > eventId;
+      }
     }
   }
 
@@ -632,7 +652,63 @@ public class DbEventExecutor {
     dbProcessor.enqueue(event);
   }
 
-  @VisibleForTesting
+  /**
+   * Gets the fully qualified table name.
+   * @param dbName Database name
+   * @param tableName Table name
+   * @return Fully qualified table name
+   */
+  String getFqTableName(String dbName, String tableName) {
+    return dbName + '.' + tableName;
+  }
+
+  /**
+   * Determines whether all events with event ids less than or equal to the given event id
+   * have been processed for the given database.
+   * @param dbName Database name
+   * @param eventId Event id up to which events are expected to be processed
+   * @return True if all events up to the given event id are processed. False otherwise
+   */
+  boolean isProcessed(String dbName, long eventId) {
+    DbProcessor dbProcessor = dbProcessors_.get(dbName);
+    if (dbProcessor == null) return true;
+    return dbProcessor.isProcessed(eventId);
+  }
+
+  /**
+   * Determines whether all events with event ids less than or equal to the given event id
+   * have been processed for the given table.
+   * @param dbName Database name
+   * @param tableName Table name
+   * @param eventId Event id up to which events are expected to be processed
+   * @return True if all events up to the given event id are processed. False otherwise
+   */
+  boolean isProcessed(String dbName, String tableName, long eventId) {
+    if (!isProcessed(dbName, eventId)) {
+      return false;
+    }
+    TableEventExecutor eventExecutor =
+        getTableEventExecutor(getFqTableName(dbName,  tableName));
+    if (eventExecutor == null) return true;
+    return eventExecutor.isProcessed(getFqTableName(dbName, tableName), eventId);
+  }
+
+  /**
+   * Gets all table names mapped to executors for the given database.
+   * @param dbName Database name
+   * @return List of table names
+   */
+  List<String> getTableNames(String dbName) {
+    DbProcessor dbProcessor = dbProcessors_.get(dbName);
+    if (dbProcessor == null) return Collections.emptyList();
+    return new ArrayList<>(dbProcessor.tableProcessors_.keySet());
+  }
+
+  /**
+   * Gets the table event executor for the given table.
+   * @param fqTableName Fully qualified table name
+   * @return TableEventExecutor
+   */
   TableEventExecutor getTableEventExecutor(String fqTableName) {
     Preconditions.checkNotNull(fqTableName);
     return tableToEventExecutor_.get(fqTableName);

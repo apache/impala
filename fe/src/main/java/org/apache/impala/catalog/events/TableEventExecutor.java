@@ -213,6 +213,20 @@ public class TableEventExecutor {
     }
 
     /**
+     * Determines whether all events with event ids less than or equal to the given event
+     * id have been processed for this table.
+     * @param eventId Event id up to which events are expected to be processed
+     * @return True if all events up to the given event id are processed. False otherwise
+     */
+    private boolean isProcessed(long eventId) {
+      synchronized (processorLock_) {
+        // Return false if the TableProcessor is being removed.
+        if (isTerminating()) return false;
+        return events_.isEmpty() || events_.peek().getEventId() > eventId;
+      }
+    }
+
+    /**
      * Determines whether TableProcessor is terminating.
      * @return True if terminating. False otherwise
      */
@@ -488,5 +502,18 @@ public class TableEventExecutor {
       LOG.error("Exception occurred for executor: {}", name_);
       eventProcessor_.handleEventProcessException(e.getException(), e.getEvent());
     }
+  }
+
+  /**
+   * Determines whether all events with event ids less than or equal to the given event id
+   * have been processed for the given table.
+   * @param fqTableName Fully qualified table name
+   * @param eventId Event id up to which events are expected to be processed
+   * @return True if all events up to the given event id are processed. False otherwise
+   */
+  boolean isProcessed(String fqTableName, long eventId) {
+    TableProcessor tableProcessor = tableProcessors_.get(fqTableName);
+    if (tableProcessor == null) return true;
+    return tableProcessor.isProcessed(eventId);
   }
 }

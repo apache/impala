@@ -1049,7 +1049,8 @@ public class MetastoreEvents {
 
     @Override
     public String toString() {
-      return String.format(STR_FORMAT_EVENT_ID_TYPE, eventId_, eventType_);
+      return String.format(STR_FORMAT_EVENT_ID_TYPE, eventId_, eventType_,
+          getTargetName());
     }
 
     protected boolean isOlderThanLastSyncEventId(MetastoreEvent event) {

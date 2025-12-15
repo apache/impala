@@ -21,7 +21,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +45,6 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.PseudoAbortTxnEvent;
-import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.compat.MetastoreShim;
 import org.slf4j.Logger;
@@ -577,5 +578,51 @@ public class EventExecutorService {
     Map.Entry<Long, Long> entry = processedLog_.firstEntry();
     if (entry != null) greatestSyncedEventTime = entry.getValue();
     return greatestSyncedEventTime;
+  }
+
+  /**
+   * Gets all the database names mapped to executors.
+   * @return Set of database names
+   */
+  Set<String> getDbNames() {
+    return new HashSet<>(dbNameToEventExecutor_.keySet());
+  }
+
+  /**
+   * Gets all table names mapped to executors for the given database.
+   * @param dbName Database name
+   * @return List of table names
+   */
+  List<String> getTableNames(String dbName) {
+    DbEventExecutor eventExecutor = getDbEventExecutor(dbName);
+    if (eventExecutor == null) return Collections.emptyList();
+    return eventExecutor.getTableNames(dbName);
+  }
+
+  /**
+   * Determines whether all events with event ids less than or equal to the given event id
+   * have been processed for the given database.
+   * @param dbName Database name
+   * @param eventId Event id up to which events are expected to be processed
+   * @return True if all events up to the given event id are processed. False otherwise
+   */
+  boolean isProcessed(String dbName, long eventId) {
+    DbEventExecutor eventExecutor = getDbEventExecutor(dbName);
+    if (eventExecutor == null) return true;
+    return eventExecutor.isProcessed(dbName, eventId);
+  }
+
+  /**
+   * Determines whether all events with event ids less than or equal to the given event id
+   * have been processed for the given table.
+   * @param dbName Database name
+   * @param tableName Table name
+   * @param eventId Event id up to which events are expected to be processed
+   * @return True if all events up to the given event id are processed. False otherwise
+   */
+  boolean isProcessed(String dbName, String tableName, long eventId) {
+    DbEventExecutor eventExecutor = getDbEventExecutor(dbName);
+    if (eventExecutor == null) return true;
+    return eventExecutor.isProcessed(dbName, tableName, eventId);
   }
 }
