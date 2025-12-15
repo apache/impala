@@ -86,6 +86,7 @@ under the License.
     <velocity-engine-core.version>${env.IMPALA_VELOCITY_ENGINE_CORE_VERSION}</velocity-engine-core.version>
     <json-smart.version>${env.IMPALA_JSON_SMART_VERSION}</json-smart.version>
     <commons-dbcp2.version>${env.IMPALA_DBCP2_VERSION}</commons-dbcp2.version>
+    <log4j2.version>${env.IMPALA_LOG4J2_VERSION}</log4j2.version>
     <dropwizard-metrics.version>${env.IMPALA_DROPWIZARD_METRICS_VERSION}</dropwizard-metrics.version>
     <aircompressor.version>${env.IMPALA_AIRCOMPRESSOR_VERSION}</aircompressor.version>
     <datasketches.version>${env.IMPALA_DATASKETCHES_VERSION}</datasketches.version>
@@ -381,6 +382,17 @@ under the License.
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-annotations</artifactId>
         <version>${jackson.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>${log4j2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>${log4j2.version}</version>
       </dependency>
 
       <dependency>
