@@ -130,7 +130,9 @@ DEFINE_bool(fallback_to_hms_on_errors, true, "This configuration is only used if
 DEFINE_bool(invalidate_hms_cache_on_ddls, true, "This configuration is used "
     "only if start_hms_server is true. This is used to invalidate catalogd cache "
     "for non transactional tables if alter/create/delete table hms apis are "
-     "invoked over catalogd's metastore endpoint");
+    "invoked over catalogd's metastore endpoint. Note that when this flag is false, the "
+    "catalogd cache could still be updated by the event processor if "
+    "hms_event_polling_interval_s is greater than 0");
 
 DEFINE_bool(hms_event_incremental_refresh_transactional_table, true, "When set to true "
     "events processor will refresh transactional tables incrementally for partition "

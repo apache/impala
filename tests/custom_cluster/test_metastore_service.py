@@ -456,9 +456,14 @@ class TestMetastoreService(CustomClusterTestSuite):
                       "--hms_port=5899 "
                       "--fallback_to_hms_on_errors=true "
                       "--invalidate_hms_cache_on_ddls=false "
+                      "--hms_event_polling_interval_s=0 "
                       "--enable_sync_to_latest_event_on_ddls=false"
     )
     def test_cache_valid_on_nontransactional_table_ddls(self):
+        """
+        Test makes sure that the cache is not invalidated by table DDLs. Disable event
+        processing to ensure that the cache is not updated by the event processor.
+        """
         db_name = ImpalaTestSuite.get_random_name(
             "test_cache_valid_on_nontransactional_table_ddls_db")
         tbl_name = ImpalaTestSuite.get_random_name(
