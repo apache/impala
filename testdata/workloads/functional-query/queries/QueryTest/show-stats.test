@@ -460,10 +460,177 @@ STRING_COL, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREM
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-# Negative test: SHOW PARTITIONS WHERE not supported on Iceberg tables
-show partitions functional_parquet.iceberg_int_partitioned where i = 1
+# SHOW PARTITIONS on Iceberg table - basic filter
+show partitions functional_parquet.iceberg_partitioned where action = 'click'
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438297","action":"click"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - multiple filters
+show partitions functional_parquet.iceberg_partitioned where hour(event_time) > 438296 and action != 'download'
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438297","action":"click"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - constant true
+show partitions functional_parquet.iceberg_partitioned where true
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438296","action":"view"}',8,8
+'{"event_time_hour":"438297","action":"click"}',6,6
+'{"event_time_hour":"438298","action":"download"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - constant false (no results)
+show partitions functional_parquet.iceberg_partitioned where false
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - constant expression (1=0)
+show partitions functional_parquet.iceberg_partitioned where 1 = 0
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - constant expression (1=1)
+show partitions functional_parquet.iceberg_partitioned where 1 = 1
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438296","action":"view"}',8,8
+'{"event_time_hour":"438297","action":"click"}',6,6
+'{"event_time_hour":"438298","action":"download"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - IN clause
+show partitions functional_parquet.iceberg_partitioned where action in ('view', 'download')
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438296","action":"view"}',8,8
+'{"event_time_hour":"438298","action":"download"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - BETWEEN
+show partitions functional_parquet.iceberg_partitioned where hour(event_time) between 438296 and 438297
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438296","action":"view"}',8,8
+'{"event_time_hour":"438297","action":"click"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - IS NOT NULL
+show partitions functional_parquet.iceberg_partitioned where action is not null
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438296","action":"view"}',8,8
+'{"event_time_hour":"438297","action":"click"}',6,6
+'{"event_time_hour":"438298","action":"download"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - OR conditions
+show partitions functional_parquet.iceberg_partitioned where action = 'view' or hour(event_time) = 438298
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438296","action":"view"}',8,8
+'{"event_time_hour":"438298","action":"download"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - NOT EQUAL
+show partitions functional_parquet.iceberg_partitioned where action != 'click'
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438296","action":"view"}',8,8
+'{"event_time_hour":"438298","action":"download"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - complex AND/OR combination
+show partitions functional_parquet.iceberg_partitioned where (action = 'view' and hour(event_time) = 438296) or (hour(event_time) >= 438298)
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438296","action":"view"}',8,8
+'{"event_time_hour":"438298","action":"download"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE on Iceberg with non-deterministic function
+show partitions functional_parquet.iceberg_partitioned where rand() < 0.5
 ---- CATCH
-WHERE clause in SHOW PARTITIONS is only supported for HDFS tables
+Invalid partition filtering expression: rand() < 0.5.
+Invalid partition predicate: rand()
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE on Iceberg with function (length/uuid)
+show partitions functional_parquet.iceberg_partitioned where length(uuid()) > 30
+---- CATCH
+Invalid partition filtering expression: length(uuid()) > 30.
+Invalid partition predicate: length(uuid())
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE on Iceberg with partition column and function
+show partitions functional_parquet.iceberg_partitioned where hour(event_time) > 438296 and rand() < 1
+---- CATCH
+Invalid partition filtering expression: HOUR(event_time) > 438296 AND rand() < 1.
+Invalid partition predicate: rand()
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE on Iceberg with deterministic function (upper/cast)
+show partitions functional_parquet.iceberg_partitioned where upper(cast(action as string)) = 'VIEW'
+---- CATCH
+Invalid partition filtering expression: upper(CAST(action AS STRING)) = 'VIEW'.
+Invalid partition predicate: upper(CAST(action AS STRING))
+====
+---- QUERY
+# SHOW PARTITIONS on Iceberg table - Filtering using derived partition
+show partitions functional_parquet.iceberg_partitioned where hour(event_time) = 438297
+---- LABELS
+Partition, Number Of Rows, Number Of Files
+---- RESULTS
+'{"event_time_hour":"438297","action":"click"}',6,6
+---- TYPES
+STRING, BIGINT, BIGINT
+====
+---- QUERY
+# Negative test: SHOW PARTITIONS WHERE on Iceberg with partition field name (derived column name)
+show partitions functional_parquet.iceberg_partitioned where event_time_hour = 438296
+---- CATCH
+Could not resolve column/field reference: 'event_time_hour'
 ====
 ---- QUERY
 # Negative test: SHOW PARTITIONS WHERE with non-partition column
@@ -499,7 +666,7 @@ Analytic expressions are not allowed in SHOW PARTITIONS WHERE
 # Negative test: SHOW PARTITIONS WHERE on Kudu table
 show partitions functional_kudu.alltypes where year = 2009
 ---- CATCH
-WHERE clause in SHOW PARTITIONS is only supported for HDFS tables
+WHERE clause in SHOW PARTITIONS is only supported for HDFS and Iceberg tables
 ====
 ---- QUERY
 # Negative test: SHOW PARTITIONS WHERE with subquery

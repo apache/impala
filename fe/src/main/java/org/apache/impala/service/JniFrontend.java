@@ -488,7 +488,9 @@ public class JniFrontend {
       result = frontend_.getTableStats(params.getTable_name().getDb_name(),
           params.getTable_name().getTable_name(), params.op,
               params.isSetFiltered_partition_ids() ?
-              params.getFiltered_partition_ids() : null);
+              params.getFiltered_partition_ids() : null,
+              params.isSetFiltered_iceberg_partition_stats() ?
+              params.getFiltered_iceberg_partition_stats() : null);
     }
     try {
       TSerializer serializer = new TSerializer(protocolFactory_);

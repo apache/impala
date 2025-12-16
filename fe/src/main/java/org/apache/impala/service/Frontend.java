@@ -1739,13 +1739,14 @@ public class Frontend {
    * Generate result set and schema for a SHOW TABLE STATS command.
    */
   public TResultSet getTableStats(String dbName, String tableName, TShowStatsOp op,
-      List<Long> filteredPartitionIds)
+      List<Long> filteredPartitionIds, @Nullable TResultSet filteredIcebergPartitionStats)
       throws ImpalaException {
     RetryTracker retries = new RetryTracker(
         String.format("fetching table stats from %s.%s", dbName, tableName));
     while (true) {
       try {
-        return doGetTableStats(dbName, tableName, op, filteredPartitionIds);
+        return doGetTableStats(dbName, tableName, op, filteredPartitionIds,
+            filteredIcebergPartitionStats);
       } catch(InconsistentMetadataFetchException e) {
         retries.handleRetryOrThrow(e);
       }
@@ -1753,11 +1754,18 @@ public class Frontend {
   }
 
   private TResultSet doGetTableStats(String dbName, String tableName, TShowStatsOp op,
-      List<Long> filteredPartitionIds)
+      List<Long> filteredPartitionIds, @Nullable TResultSet filteredIcebergPartitionStats)
       throws ImpalaException {
     FeTable table = getCatalog().getTable(dbName, tableName);
     if (table instanceof FeFsTable) {
       if (table instanceof FeIcebergTable && op == TShowStatsOp.PARTITIONS) {
+        // For Iceberg tables with WHERE clause, use the pre-computed filtered stats.
+        // Following the IMPALA-12243 pattern, we compute results during analysis
+        // and serialize the results rather than the expression.
+        if (filteredIcebergPartitionStats != null) {
+          return filteredIcebergPartitionStats;
+        }
+        // No filter - return all partitions
         return FeIcebergTable.Utils.getPartitionStats((FeIcebergTable) table);
       }
       if (table instanceof FeIcebergTable && op == TShowStatsOp.TABLE_STATS) {

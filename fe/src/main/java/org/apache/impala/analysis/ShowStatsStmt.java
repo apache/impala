@@ -33,9 +33,11 @@ import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.IcebergPartitionPredicateConverter;
 import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCompoundVerticalBarExprRule;
+import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
 
@@ -51,11 +53,16 @@ public class ShowStatsStmt extends StatementBase implements SingleTableStmt {
   protected final TableName tableName_;
   protected boolean show_column_minmax_stats_ = false;
   // Optional WHERE predicate for SHOW PARTITIONS.
-  // ONLY supported for HDFS tables (FeFsTable, excluding FeIcebergTable).
-  // Iceberg tables use a different partition mechanism and are not supported.
+  // Supported for HDFS and Iceberg tables.
   protected Expr whereClause_;
+
   // Computed during analysis if whereClause_ is set for HDFS tables.
   protected List<Long> filteredPartitionIds_ = null;
+
+  // For Iceberg tables with WHERE clause, store the pre-computed filtered
+  // iceberg partition stats.
+  // This is computed during analysis and serialized through Thrift.
+  protected TResultSet filteredIcebergPartitionStats_ = null;
 
   // Set during analysis.
   protected FeTable table_;
@@ -180,9 +187,9 @@ public class ShowStatsStmt extends StatementBase implements SingleTableStmt {
    * the filtered partition IDs.
    */
   private void analyzeWhereClause(Analyzer analyzer) throws AnalysisException {
-    if (!(table_ instanceof FeFsTable) || table_ instanceof FeIcebergTable) {
+    if (!(table_ instanceof FeFsTable)) {
       throw new AnalysisException(
-        "WHERE clause in SHOW PARTITIONS is only supported for HDFS tables");
+        "WHERE clause in SHOW PARTITIONS is only supported for HDFS and Iceberg tables");
     }
 
     // Disable authorization checks for internal analysis of WHERE clause
@@ -224,33 +231,13 @@ public class ShowStatsStmt extends StatementBase implements SingleTableStmt {
         throw new AnalysisException(
           "Aggregate functions are not allowed in SHOW PARTITIONS WHERE");
       }
-      // Ensure all conjuncts reference only partition columns.
-      List<SlotId> partitionSlots = tableRef.getDesc().getPartitionSlots();
-      if (!whereClause_.isBoundBySlotIds(partitionSlots)) {
-        throw new AnalysisException(
-          "SHOW PARTITIONS WHERE supports only partition columns");
-      }
 
-      // Prune the partitions using the HdfsPartitionPruner.
-      HdfsPartitionPruner pruner = new HdfsPartitionPruner(tableRef.getDesc());
-
-      try {
-        // Clone the conjuncts because the pruner will modify the original list.
-        List<Expr> conjunctsCopy = new ArrayList<>(whereClause_.getConjuncts());
-        // Pass evalAllFuncs=true to ensure non-deterministic functions are evaluated
-        // per-partition instead of being skipped.
-        Pair<List<? extends FeFsPartition>, List<Expr>> res =
-            pruner.prunePartitions(analyzer, conjunctsCopy, true, true, tableRef);
-        Preconditions.checkState(conjunctsCopy.isEmpty(),
-            "All conjuncts should be evaluated");
-
-        // All partitions from the pruner have matched - collect their IDs.
-        Set<Long> ids = new HashSet<>();
-        for (FeFsPartition p : res.first) ids.add(p.getId());
-        filteredPartitionIds_ = new ArrayList<>(ids);
-      } catch (org.apache.impala.common.ImpalaException e) {
-        throw new AnalysisException(
-          "Failed to evaluate WHERE clause for SHOW PARTITIONS: " + e.getMessage(), e);
+      // Handle Iceberg tables separately
+      if (table_ instanceof FeIcebergTable) {
+        analyzeIcebergWhereClause(analyzer, (FeIcebergTable) table_);
+      } else {
+        // Handle HDFS tables
+        analyzeHdfsWhereClause(analyzer, tableRef);
       }
     } finally {
       // Re-enable authorization checks
@@ -258,11 +245,110 @@ public class ShowStatsStmt extends StatementBase implements SingleTableStmt {
     }
   }
 
+  /**
+   * Analyzes the WHERE clause for Iceberg tables and computes filtered partition stats.
+   * Converts the WHERE expression to an Iceberg Expression and evaluates it against
+   * the table's manifest files. Following the IMPALA-12243 pattern, we compute results
+   * during analysis (when Analyzer exists) and serialize the results rather than the
+   * expression, to avoid recreating QueryContext/Analyzer.
+   *
+   * Note: Only simple predicates on partition columns are supported for Iceberg tables.
+   * Functions (deterministic or non-deterministic), aggregates, analytics, and subqueries
+   * are not supported. For complex queries with functions, use Iceberg metadata tables:
+   *   SHOW PARTITIONS functional_parquet.iceberg_partitioned
+   *   WHERE upper(action) = 'CLICK'
+   *     -- Not supported due to upper() function
+   * Instead query the metadata table directly:
+   *   SELECT `partition` FROM functional_parquet.iceberg_partitioned.`partitions`
+   *   WHERE upper(`partition`.action) = 'CLICK'
+   *
+   * TODO: IMPALA-14675: Add support for more complex predicates by evaluating them
+   * per-partition using FeSupport.EvalPredicateBatch(), similar to HDFS tables.
+   */
+  private void analyzeIcebergWhereClause(Analyzer analyzer, FeIcebergTable table)
+      throws AnalysisException {
+    // Rewrite expressions for Iceberg partition transforms and column references
+    // This converts Iceberg partition transform functions to IcebergPartitionExpr
+    // and also handles BETWEEN rewriting internally
+    IcebergPartitionExpressionRewriter rewriter =
+        new IcebergPartitionExpressionRewriter(analyzer,
+            table.getIcebergApiTable().spec());
+
+    try {
+      Expr rewrittenExpr = rewriter.rewrite(whereClause_);
+      rewrittenExpr.analyze(analyzer);
+
+      // Defensive check: all FunctionCallExprs should have been converted by the rewriter
+      // If any remain, it indicates an internal error in the rewriter logic
+      Preconditions.checkState(!rewrittenExpr.contains(FunctionCallExpr.class),
+          "Rewriter should have converted or rejected all function calls, but found: %s",
+          rewrittenExpr.toSql());
+
+      // Constant-fold the expression
+      Expr foldedExpr = analyzer.getConstantFolder().rewrite(rewrittenExpr, analyzer);
+
+      // Convert the Impala expression to an Iceberg expression
+      // BoolLiterals are handled by the converter and optimized in getPartitionStats
+      IcebergPartitionPredicateConverter converter =
+          new IcebergPartitionPredicateConverter(table.getIcebergSchema(), analyzer);
+      org.apache.iceberg.expressions.Expression icebergExpr =
+          converter.convert(foldedExpr);
+
+      // Compute the filtered partition stats using the Iceberg Expression
+      filteredIcebergPartitionStats_ =
+          FeIcebergTable.Utils.getPartitionStats(table, icebergExpr);
+
+    } catch (org.apache.impala.common.ImpalaException e) {
+      // Catch errors from Iceberg expression conversion or partition stats computation
+      throw new AnalysisException(
+          "Invalid partition filtering expression: " + whereClause_.toSql() +
+          ".\n" + e.getMessage());
+    }
+  }
+
+  /**
+   * Analyzes the WHERE clause for HDFS tables and computes filtered partition IDs.
+   */
+  private void analyzeHdfsWhereClause(Analyzer analyzer, TableRef tableRef)
+      throws AnalysisException {
+    Preconditions.checkArgument(tableRef.getTable() instanceof FeFsTable);
+    // Ensure all conjuncts reference only partition columns.
+    List<SlotId> partitionSlots = tableRef.getDesc().getPartitionSlots();
+    if (!whereClause_.isBoundBySlotIds(partitionSlots)) {
+      throw new AnalysisException(
+        "SHOW PARTITIONS WHERE supports only partition columns");
+    }
+
+    // Prune the partitions using the HdfsPartitionPruner.
+    HdfsPartitionPruner pruner = new HdfsPartitionPruner(tableRef.getDesc());
+
+    try {
+      // Clone the conjuncts because the pruner will modify the original list.
+      List<Expr> conjunctsCopy = new ArrayList<>(whereClause_.getConjuncts());
+      // Pass evalAllFuncs=true to ensure non-deterministic functions are evaluated
+      // per-partition instead of being skipped.
+      Pair<List<? extends FeFsPartition>, List<Expr>> res =
+          pruner.prunePartitions(analyzer, conjunctsCopy, true, true, tableRef);
+      Preconditions.checkState(conjunctsCopy.isEmpty(),
+          "All conjuncts should be evaluated");
+
+      // All partitions from the pruner have matched - collect their IDs.
+      Set<Long> ids = new HashSet<>();
+      for (FeFsPartition p : res.first) ids.add(p.getId());
+      filteredPartitionIds_ = new ArrayList<>(ids);
+    } catch (org.apache.impala.common.ImpalaException e) {
+      throw new AnalysisException(
+        "Failed to evaluate WHERE clause for SHOW PARTITIONS: " + e.getMessage(), e);
+    }
+  }
+
   @Override
   public void reset() {
     super.reset();
-    // Clear computed partition IDs so they'll be recomputed after re-analysis
+    // Clear computed partition IDs and filtered stats so they'll be
+    // recomputed after re-analysis
     filteredPartitionIds_ = null;
+    filteredIcebergPartitionStats_ = null;
     // Reset the whereExpr if it exists
     if (whereClause_ != null) whereClause_ = whereClause_.reset();
   }
@@ -289,6 +375,11 @@ public class ShowStatsStmt extends StatementBase implements SingleTableStmt {
     // between "no matches" (empty list) and "all partitions" (null)
     if (filteredPartitionIds_ != null) {
       showStatsParam.setFiltered_partition_ids(filteredPartitionIds_);
+    }
+    // For Iceberg tables with WHERE clause, pass the pre-computed
+    // filtered partition stats.
+    if (filteredIcebergPartitionStats_ != null) {
+      showStatsParam.setFiltered_iceberg_partition_stats(filteredIcebergPartitionStats_);
     }
     return showStatsParam;
   }

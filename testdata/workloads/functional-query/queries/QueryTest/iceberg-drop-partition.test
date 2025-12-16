@@ -415,3 +415,84 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_drop_partition_delete/d
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
+---- QUERY
+# Test BETWEEN predicate in DROP PARTITION
+CREATE TABLE iceberg_drop_partition_between_test
+  (partition_col int, data_col string)
+PARTITIONED BY SPEC (identity(partition_col))
+STORED AS ICEBERG;
+INSERT INTO iceberg_drop_partition_between_test VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four'), (5, 'five');
+====
+---- QUERY
+# Check initial partition count
+SELECT COUNT(*) FROM $DATABASE.iceberg_drop_partition_between_test.`partitions`;
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Drop partitions using BETWEEN predicate
+ALTER TABLE $DATABASE.iceberg_drop_partition_between_test DROP PARTITION (partition_col BETWEEN 2 AND 4);
+---- RESULTS
+'Dropped 3 partition(s)'
+====
+---- QUERY
+# Verify correct partitions were dropped
+SELECT COUNT(*) FROM $DATABASE.iceberg_drop_partition_between_test.`partitions`;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Verify remaining data - note duplicates due to multiple data files
+SELECT DISTINCT partition_col FROM $DATABASE.iceberg_drop_partition_between_test ORDER BY partition_col;
+---- RESULTS
+1
+5
+---- TYPES
+INT
+====
+---- QUERY
+# Test BETWEEN with partition column in mixed partition spec
+CREATE TABLE iceberg_drop_partition_between_mixed_test
+  (identity_col int, unpart_col string, ts_col timestamp)
+PARTITIONED BY SPEC (identity(identity_col), hour(ts_col))
+STORED AS ICEBERG;
+INSERT INTO iceberg_drop_partition_between_mixed_test VALUES (1, 'one', '2023-01-01 10:00:00'), (2, 'two', '2023-01-01 11:00:00'), (3, 'three', '2023-01-01 12:00:00'), (4, 'four', '2023-01-01 13:00:00'), (5, 'five', '2023-01-01 14:00:00');
+====
+---- QUERY
+# Check initial partition count
+SELECT COUNT(*) FROM $DATABASE.iceberg_drop_partition_between_mixed_test.`partitions`;
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Drop partitions using BETWEEN on identity partition column
+ALTER TABLE $DATABASE.iceberg_drop_partition_between_mixed_test DROP PARTITION (identity_col BETWEEN 2 AND 4);
+---- RESULTS
+'Dropped 3 partition(s)'
+====
+---- QUERY
+# Verify remaining partitions
+SELECT COUNT(*) FROM $DATABASE.iceberg_drop_partition_between_mixed_test.`partitions`;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Negative test: BETWEEN with transform function call should fail
+# BETWEEN is rewritten to compound predicate early in analysis, before transform functions are resolved
+CREATE TABLE iceberg_drop_partition_between_bucket_test
+  (bucket_col int, data_col string)
+PARTITIONED BY SPEC (bucket(3, bucket_col))
+STORED AS ICEBERG;
+INSERT INTO iceberg_drop_partition_between_bucket_test VALUES (1, 'one'), (2, 'two'), (3, 'three');
+ALTER TABLE $DATABASE.iceberg_drop_partition_between_bucket_test DROP PARTITION (bucket(3, bucket_col) BETWEEN 0 AND 1);
+---- CATCH
+AnalysisException: $DATABASE.bucket() unknown for database $DATABASE. Currently this db has 0 functions.
+====

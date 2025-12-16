@@ -254,7 +254,11 @@ struct TShowStatsParams {
   2: CatalogObjects.TTableName table_name
   3: optional bool show_column_minmax_stats
   // Optional: filtered partition ids for SHOW PARTITIONS with a WHERE clause.
+  // Only used for HDFS tables.
   4: optional list<i64> filtered_partition_ids
+  // Optional: For Iceberg tables with WHERE clause in SHOW PARTITIONS, this contains
+  // the pre-computed filtered Iceberg partition stats.
+  5: optional Results.TResultSet filtered_iceberg_partition_stats
 }
 
 // Parameters for DESCRIBE HISTORY command

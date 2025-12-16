@@ -63,7 +63,11 @@ public class IcebergPredicateConverter {
   }
 
   public Expression convert(Expr expr) throws ImpalaRuntimeException {
-    if (expr instanceof BinaryPredicate) {
+    if (expr instanceof BoolLiteral) {
+      BoolLiteral boolLiteral = (BoolLiteral) expr;
+      return boolLiteral.getValue() ? Expressions.alwaysTrue() :
+          Expressions.alwaysFalse();
+    } else if (expr instanceof BinaryPredicate) {
       return convert((BinaryPredicate) expr);
     } else if (expr instanceof InPredicate) {
       return convert((InPredicate) expr);

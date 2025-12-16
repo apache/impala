@@ -4575,12 +4575,43 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // WHERE clause with Kudu table should fail (non-HDFS tables don't support WHERE)
     AnalysisError("show partitions functional_kudu.alltypes where year = 2009",
-        "WHERE clause in SHOW PARTITIONS is only supported for HDFS tables");
+        "WHERE clause in SHOW PARTITIONS is only supported for HDFS and Iceberg tables");
 
-    // WHERE clause with Iceberg table should fail
+    // Valid WHERE clauses with Iceberg tables
+    AnalyzesOk("show partitions functional_parquet.iceberg_int_partitioned where i = 1");
+    AnalyzesOk("show partitions functional_parquet.iceberg_int_partitioned " +
+        "where i > 1 and j < 30");
+    AnalyzesOk("show partitions functional_parquet.iceberg_partitioned " +
+        "where action = 'click'");
+
+    // Constant expressions in WHERE clause for Iceberg tables
+    AnalyzesOk("show partitions functional_parquet.iceberg_int_partitioned where 1 = 1");
+    AnalyzesOk("show partitions functional_parquet.iceberg_int_partitioned where 1 = 0");
+    AnalyzesOk("show partitions functional_parquet.iceberg_int_partitioned where true");
+    AnalyzesOk("show partitions functional_parquet.iceberg_int_partitioned where false");
+
+    // Functions (deterministic or non-deterministic) are not supported for Iceberg tables
     AnalysisError("show partitions functional_parquet.iceberg_int_partitioned " +
-        "where i = 1",
-        "WHERE clause in SHOW PARTITIONS is only supported for HDFS tables");
+        "where rand() < 0.5",
+        "Invalid partition filtering expression: rand() < 0.5.\n" +
+        "Invalid partition predicate: rand()");
+    AnalysisError("show partitions functional_parquet.iceberg_int_partitioned " +
+        "where length(uuid()) > 30",
+        "Invalid partition filtering expression: length(uuid()) > 30.\n" +
+        "Invalid partition predicate: length(uuid())");
+    AnalysisError("show partitions functional_parquet.iceberg_int_partitioned " +
+        "where i = 1 and rand() < 1",
+        "Invalid partition filtering expression: i = 1 AND rand() < 1.\n" +
+        "Invalid partition predicate: rand()");
+    AnalysisError("show partitions functional_parquet.iceberg_int_partitioned " +
+        "where upper(cast(i as string)) = '1'",
+        "Invalid partition filtering expression: upper(CAST(i AS STRING)) = '1'.\n" +
+        "Invalid partition predicate: upper(CAST(i AS STRING))");
+
+    // Iceberg WHERE clause with partition field name should fail
+    AnalysisError("show partitions functional_parquet.iceberg_partitioned " +
+        "where event_time_hour = 438296",
+        "Could not resolve column/field reference: 'event_time_hour'");
 
     // WHERE clause must be a boolean expression
     AnalysisError("show partitions functional.alltypes where year",

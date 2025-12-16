@@ -474,6 +474,52 @@ CREATE TABLE ice_p (i INT, b INT) PARTITIONED BY (p1 INT, p2 STRING) STORED AS I
     </conbody>
   </concept>
 
+  <concept id="iceberg_show_partitions">
+    <title>Filtering partition information with SHOW PARTITIONS WHERE</title>
+    <conbody>
+      <p>
+        Since <keyword keyref="impala50"/> Impala supports filtering partition information using the
+        <codeph>SHOW PARTITIONS</codeph> statement with a <codeph>WHERE</codeph> clause for Iceberg tables.
+        This allows you to view only specific partitions that match the given filter criteria.
+      </p>
+      <p>
+        Example:
+        <codeblock>
+SHOW PARTITIONS functional_parquet.iceberg_partitioned WHERE action = 'click';
+SHOW PARTITIONS ice_t WHERE hour(event_time) > 438296 AND status != 'pending';
+SHOW PARTITIONS ice_t WHERE year(date_col) BETWEEN 2020 AND 2023;
+        </codeblock>
+      </p>
+      <p>
+        Limitations:
+        <ul>
+          <li>
+            Only simple predicates on partition columns are supported. Standard SQL functions
+            (e.g., <codeph>rand()</codeph>, <codeph>upper()</codeph>, <codeph>length()</codeph>) are not allowed
+            in the <codeph>WHERE</codeph> clause.
+          </li>
+          <li>
+            Supported predicates include column comparisons, <codeph>BETWEEN</codeph>, <codeph>IN</codeph>,
+            <codeph>IS NULL</codeph>/<codeph>IS NOT NULL</codeph>, and logical operators (<codeph>AND</codeph>,
+            <codeph>OR</codeph>, <codeph>NOT</codeph>).
+          </li>
+          <li>
+            Iceberg partition transforms (<codeph>year()</codeph>, <codeph>month()</codeph>, <codeph>day()</codeph>,
+            <codeph>hour()</codeph>, <codeph>bucket()</codeph>, <codeph>truncate()</codeph>) can be used in predicates.
+          </li>
+          <li>
+            For more complex queries with functions or aggregations, use Iceberg metadata tables instead:
+            <codeblock>SELECT * FROM table_name.partitions WHERE &lt;complex predicate&gt;</codeblock>
+          </li>
+        </ul>
+      </p>
+      <p>
+        More information about the <codeph>SHOW PARTITIONS</codeph> statement can be found at
+        <xref href="impala_show.xml#show_partitions"/>.
+      </p>
+    </conbody>
+  </concept>
+
   <concept id="iceberg_inserts">
     <title>Inserting data into Iceberg tables</title>
     <conbody>

@@ -37,6 +37,8 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
+
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.BlockLocation;
@@ -47,7 +49,11 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.ContentFile;
+import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.FileContent;
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -521,16 +527,36 @@ public interface FeIcebergTable extends FeFsTable {
      * Get partition stats for the given fe iceberg table.
      */
     public static TResultSet getPartitionStats(FeIcebergTable table) {
-      TResultSet result = new TResultSet();
-      TResultSetMetadata resultSchema = new TResultSetMetadata();
-      result.setSchema(resultSchema);
-      result.setRows(new ArrayList<>());
+      return getPartitionStats(table, null);
+    }
 
-      resultSchema.addToColumns(new TColumn("Partition", Type.STRING.toThrift()));
-      resultSchema.addToColumns(new TColumn("Number Of Rows", Type.BIGINT.toThrift()));
-      resultSchema.addToColumns(new TColumn("Number Of Files", Type.BIGINT.toThrift()));
+    /**
+     * Get partition stats for the given Iceberg table, optionally filtered by an
+     * Iceberg Expression. This is used for SHOW PARTITIONS with a WHERE clause.
+     * @param table the Iceberg table
+     * @param filterExpr optional Iceberg Expression to filter partitions,
+     *        null for no filtering
+     */
+    public static TResultSet getPartitionStats(FeIcebergTable table,
+        @Nullable Expression filterExpr) {
+      TResultSet result = createEmptyPartitionStatsResult();
 
-      Map<String, TIcebergPartitionStats> nameToStats = getOrderedPartitionStats(table);
+      // Check if the filter expression is alwaysTrue or alwaysFalse
+      if (filterExpr != null) {
+        if (filterExpr.equals(org.apache.iceberg.expressions.Expressions.alwaysTrue())) {
+          // Treat alwaysTrue same as null filter - return all partitions
+          filterExpr = null;
+        } else if (filterExpr.equals(
+              org.apache.iceberg.expressions.Expressions.alwaysFalse())) {
+          // Return empty result for alwaysFalse
+          return result;
+        }
+      }
+
+      // Get the ordered partition stats
+      Map<String, TIcebergPartitionStats> nameToStats =
+          getOrderedPartitionStats(table, filterExpr);
+
       for (Map.Entry<String, TIcebergPartitionStats> partitionInfo : nameToStats
           .entrySet()) {
         TResultRowBuilder builder = new TResultRowBuilder();
@@ -543,11 +569,73 @@ public interface FeIcebergTable extends FeFsTable {
     }
 
     /**
-     * Get partition stats for the given fe iceberg table ordered by partition name.
+     * Creates an empty TResultSet for partition stats with the correct schema.
+     * Used when no partitions match the filter or for initializing the result.
      */
-    private static Map<String, TIcebergPartitionStats> getOrderedPartitionStats(
-        FeIcebergTable table) {
-      return table.getIcebergPartitionStats()
+    private static TResultSet createEmptyPartitionStatsResult() {
+      TResultSet result = new TResultSet();
+      TResultSetMetadata resultSchema = new TResultSetMetadata();
+      result.setSchema(resultSchema);
+      result.setRows(new ArrayList<>());
+
+      resultSchema.addToColumns(new TColumn("Partition", Type.STRING.toThrift()));
+      resultSchema.addToColumns(new TColumn("Number Of Rows", Type.BIGINT.toThrift()));
+      resultSchema.addToColumns(new TColumn("Number Of Files", Type.BIGINT.toThrift()));
+
+      return result;
+    }
+
+    /**
+     * Get partition stats for the given Iceberg table, optionally filtered by an
+     * Iceberg Expression, ordered by partition name.
+     *
+     * If filterExpr is null, returns stats for all partitions from the cached stats.
+     * If filterExpr is provided, uses Iceberg's TableScan API to efficiently filter
+     * content files at the metadata level (using manifest files) before loading them.
+     *
+     * @param table the Iceberg table
+     * @param filterExpr optional Iceberg Expression to filter partitions,
+     *        null for all partitions
+     * @return Map of partition key to partition stats, ordered by partition key
+     */
+    private static Map<String, TIcebergPartitionStats>
+        getOrderedPartitionStats(FeIcebergTable table, @Nullable Expression filterExpr) {
+      // If no filter, return the cached partition stats
+      if (filterExpr == null) {
+        return table.getIcebergPartitionStats()
+            .entrySet()
+            .stream()
+            .sorted(Map.Entry.comparingByKey())
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
+                (oldValue, newValue) -> oldValue, LinkedHashMap::new));
+      }
+
+      Preconditions.checkNotNull(filterExpr);
+      Map<String, TIcebergPartitionStats> nameToStats = new HashMap<>();
+      // Use IcebergUtil.planFiles to retrieve only matching files.
+      // This uses Iceberg's metadata (manifest files) to skip files that don't match.
+      try (CloseableIterable<FileScanTask> tasks = IcebergUtil.planFiles(table,
+          Collections.singletonList(filterExpr), null, null)) {
+        // Iceberg has already done the filtering at the metadata level.
+        for (FileScanTask task : tasks) {
+          ContentFile<?> contentFile = task.file();
+          String partitionKey = getPartitionKey(table, contentFile);
+          nameToStats.put(partitionKey,
+              mergePartitionStats(nameToStats, contentFile, partitionKey));
+
+          // Also include delete files for completeness
+          for (DeleteFile deleteFile : task.deletes()) {
+            String deletePartitionKey = getPartitionKey(table, deleteFile);
+            nameToStats.put(deletePartitionKey,
+                mergePartitionStats(nameToStats, deleteFile, deletePartitionKey));
+          }
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to retrieve partition stats", e);
+      }
+
+      // Return the filtered stats sorted by partition name
+      return nameToStats
           .entrySet()
           .stream()
           .sorted(Map.Entry.comparingByKey())
@@ -945,7 +1033,8 @@ public interface FeIcebergTable extends FeFsTable {
     /**
      * Get iceberg partition from a dataFile and wrapper to a json string
      */
-    public static String getPartitionKey(IcebergTable table, ContentFile<?> contentFile) {
+    public static String getPartitionKey(FeIcebergTable table,
+        ContentFile<?> contentFile) {
       PartitionSpec spec = table.getIcebergApiTable().specs().get(contentFile.specId());
       Map<String, String> fieldNameToPartitionValue = new LinkedHashMap<>();
       for (int i = 0; i < spec.fields().size(); ++i) {
