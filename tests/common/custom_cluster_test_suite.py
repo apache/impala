@@ -116,6 +116,15 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   # Args for cluster startup/teardown when sharing a single cluster for the entire class.
   SHARED_CLUSTER_ARGS = {}
 
+  # The currently executing test method. setup_method() populates this and tear_method()
+  # clears it. This is used to set the log directory location when a test manually
+  # restarts the cluster during the test. This is left unset for tests that use a single
+  # cluster for multiple tests (i.e. with SHARED_CLUSTER_ARGS), as the logs will be
+  # shared across multiple tests. Since this is used from @classmethod functions, this is
+  # set and accessed via @classmethod functions set/get_current_test_method(). This is
+  # awkward, but it should work because custom cluster tests are single threaded.
+  CURRENT_TEST_METHOD_NAME = None
+
   @classmethod
   def add_test_dimensions(cls):
     super(CustomClusterTestSuite, cls).add_test_dimensions()
@@ -269,6 +278,14 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     del self.TMP_DIRS[name]
 
   @classmethod
+  def set_current_test_method_name(cls, test_method_name):
+    cls.CURRENT_TEST_METHOD_NAME = test_method_name
+
+  @classmethod
+  def get_current_test_method_name(self):
+    return self.CURRENT_TEST_METHOD_NAME
+
+  @classmethod
   def cluster_setup(cls, args):
     cluster_args = list()
     disable_log_buffering = args.get(DISABLE_LOG_BUFFERING, False)
@@ -393,6 +410,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   def setup_method(self, method):
     if not self.SHARED_CLUSTER_ARGS:
+      # Store the test method name so that we can put logs in different directories for
+      # different tests. This only applies if the cluster is being restarted per test
+      # method. If this cluster is used for multiple test methods, leave this unset.
+      self.set_current_test_method_name(method.__name__)
       self.cluster_setup(method.__dict__)
     elif method.__dict__.get(WITH_ARGS_METHOD):
       pytest.fail("Cannot specify with_args on both class and methods")
@@ -426,6 +447,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   def teardown_method(self, method):
     if not self.SHARED_CLUSTER_ARGS:
       self.cluster_teardown(method.__name__, method.__dict__)
+    self.set_current_test_method_name(None)
 
   def wait_for_wm_init_complete(self, timeout_s=180):
     """
@@ -554,7 +576,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   @classmethod
   def _start_impala_cluster(cls,
                             options,
-                            impala_log_dir=os.getenv('LOG_DIR', "/tmp/"),
+                            impala_log_dir=None,
                             cluster_size=DEFAULT_CLUSTER_SIZE,
                             num_coordinators=NUM_COORDINATORS,
                             use_exclusive_coordinators=False,
@@ -570,7 +592,33 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                             wait_for_backends=True,
                             log_symlinks=False,
                             force_restart=True):
-    cls.impala_log_dir = impala_log_dir
+    if impala_log_dir:
+      # If the test gave a specific location, use it, as the test may be parsing the logs
+      # to find certain output.
+      cls.impala_log_dir = impala_log_dir
+    else:
+      # The test didn't customize the log dir, so calculate a reasonable base directory
+      # To find the log directory, we proceed in this order:
+      # 1. LOG_DIR environment variable (used in test scripts for Jenkins jobs, etc)
+      # 2. IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR - set impala-config.sh (used in devenvs)
+      # 3. /tmp/ - This probably shouldn't happen, but at least the logs can go somewhere
+      impala_base_log_dir = os.getenv("LOG_DIR",
+          os.getenv("IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR", "/tmp/"))
+
+      # To make it easier to find logs across multiple custom cluster tests, organize
+      # them into subdirectories based on their test class and their test method name
+      # (where applicable).
+      impala_log_dir_per_test = os.path.join(impala_base_log_dir, cls.__name__)
+      # The CURRENT_TEST_METHOD_NAME will be None when using SHARED_CLUSTER_ARGS as the
+      # cluster is not restarted for each test method
+      if cls.CURRENT_TEST_METHOD_NAME:
+        impala_log_dir_per_test = os.path.join(impala_log_dir_per_test,
+            cls.CURRENT_TEST_METHOD_NAME)
+
+      if not os.path.isdir(impala_log_dir_per_test):
+        os.makedirs(impala_log_dir_per_test)
+      cls.impala_log_dir = impala_log_dir_per_test
+
     # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
     # certain custom startup arguments work and we want to keep them independent of dev
     # environments.
@@ -578,7 +626,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
            '--state_store_args=%s' % DEFAULT_STATESTORE_ARGS,
            '--cluster_size=%d' % cluster_size,
            '--num_coordinators=%d' % num_coordinators,
-           '--log_dir=%s' % impala_log_dir,
+           '--log_dir=%s' % cls.impala_log_dir,
            '--log_level=%s' % log_level]
 
     if ignore_pid_on_log_rotation:

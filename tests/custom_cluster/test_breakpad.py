@@ -264,7 +264,7 @@ class TestBreakpadExhaustive(TestBreakpadBase):
     """Check that setting 'minidump_path' to a relative value results in minidump files
     written to 'log_dir'.
     """
-    minidump_base_dir = os.path.join(os.environ.get('LOG_DIR', '/tmp'), 'minidumps')
+    minidump_base_dir = os.path.join(self.impala_log_dir, 'minidumps')
     shutil.rmtree(minidump_base_dir, ignore_errors=True)
     # Omitting minidump_path as a parameter to the cluster will choose the default
     # configuration, which is a FLAGS_log_dir/minidumps.
