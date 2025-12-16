@@ -455,19 +455,25 @@ class TestWebPage(CustomClusterTestSuite):
     self.run_stmt_in_hive("set hive.exec.dynamic.partition.mode=nonstrict;" + insert_stmt)
     page = requests.get("http://localhost:25020/events").text
     # Wait until the batched events are being processed
-    while "a batch of" not in page:
-      time.sleep(1)
-      page = requests.get("http://localhost:25020/events").text
+    if not IMPALA_TEST_CLUSTER_PROPERTIES.is_hierarchical_event_processing_enabled():
+      while "a batch of" not in page:
+        time.sleep(1)
+        page = requests.get("http://localhost:25020/events").text
+      expected_lines = [
+        "Current Event Batch", "Metastore Event Batch:",
+        "Event ID starts from", "Event time starts from",
+        "Started processing the current batch at",
+        "Started processing the current event at",
+        "Current Metastore event being processed",
+        "(a batch of ", " events on the same table)",
+      ]
+      for expected in expected_lines:
+        assert expected in page, "Missing '%s' in events page:\n%s" % (expected, page)
     expected_lines = [
-      "Lag Info", "Lag time:", "Current Event Batch", "Metastore Event Batch:",
-      "Event ID starts from", "Event time starts from",
-      "Started processing the current batch at",
-      "Started processing the current event at",
-      "Current Metastore event being processed",
-      "(a batch of ", " events on the same table)",
-    ]
+      "Lag Info", "Lag time:"]
     for expected in expected_lines:
       assert expected in page, "Missing '%s' in events page:\n%s" % (expected, page)
+
 
   @SkipIfFS.hive
   @CustomClusterTestSuite.with_args(
