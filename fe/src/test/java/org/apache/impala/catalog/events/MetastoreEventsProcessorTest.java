@@ -101,6 +101,7 @@ import org.apache.impala.catalog.events.MetastoreEventsProcessor.MetaDataFilter;
 import org.apache.impala.catalog.FileMetadataLoadOpts;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.common.TransactionException;
@@ -4363,6 +4364,36 @@ public class MetastoreEventsProcessorTest {
           filteredEvents.get(2).getTargetName());
       eventsProcessor_.start(filteredEvents.get(2).getEventId());
     }
+  }
+
+  @Test
+  public void testLastSyncAndGreatestSyncEventMetrics() throws Exception {
+    String tblName = "test_last_sync_and_greatest_sync_event";
+    createDatabase(TEST_DB_NAME, null);
+    createTable(tblName, true);
+    List<List<String>> partVals =
+        Arrays.asList(
+            Collections.singletonList("1"),
+            Collections.singletonList("2"));
+    addPartitions(TEST_DB_NAME, tblName, partVals);
+    partVals  = Collections.singletonList(Collections.singletonList("1"));
+    alterPartitionsParams(TEST_DB_NAME, tblName, "key", "val", partVals);
+    // HMS notification event time has second-level timestamp granularity. Add a delay to
+    // ensure consecutive alter partition events have distinct eventTime values.
+    Thread.sleep(1000);
+    partVals  = Collections.singletonList(Collections.singletonList("2"));
+    alterPartitionsParams(TEST_DB_NAME, tblName, "key", "val", partVals);
+    // Both alter partition events are batched and processed together with
+    // BatchPartitionEvent. First alter partition event and the second alter partition in
+    // the batch have different notification event time.
+    eventsProcessor_.processEvents();
+    Metrics metrics = eventsProcessor_.getMetrics();
+    assertEquals(
+        metrics.getGauge(MetastoreEventsProcessor.LAST_SYNCED_ID_METRIC).getValue(),
+        metrics.getGauge(MetastoreEventsProcessor.GREATEST_SYNCED_EVENT_ID).getValue());
+    assertEquals(
+        metrics.getGauge(MetastoreEventsProcessor.LAST_SYNCED_EVENT_TIME).getValue(),
+        metrics.getGauge(MetastoreEventsProcessor.GREATEST_SYNCED_EVENT_TIME).getValue());
   }
 
   private void createDatabase(String catName, String dbName,

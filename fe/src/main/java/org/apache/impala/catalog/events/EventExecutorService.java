@@ -482,7 +482,7 @@ public class EventExecutorService {
     if (inProgressLog_.isEmpty() && isDelimiter) {
       // Event is considered implicitly processed and is directly recorded in the
       // processed log
-      addToProcessedLog(event.getEventId(), event.getEvent().getEventTime());
+      addToProcessedLog(event.getEventId(), event.getEventTime());
       return;
     }
     // Initialize the event dispatch time. It is used to calculate the time taken to
@@ -513,7 +513,7 @@ public class EventExecutorService {
     // dispatched for processing
     event.debugLog("Complete process time: {}",
         PrintUtils.printTimeMs(currentTime - event.getDispatchTime()));
-    processedLog_.put(eventId, (long) event.getEvent().getEventTime());
+    processedLog_.put(eventId, event.getEventTime());
     Preconditions.checkState(!event.isDelimiter());
     // Remove all the subsequent delimiter events until a non-delimiter event is
     // encountered
@@ -523,7 +523,7 @@ public class EventExecutorService {
       Map.Entry<Long, MetastoreEvent> entry = it.next();
       event = entry.getValue();
       if (!event.isDelimiter()) break;
-      processedLog_.put(entry.getKey(), (long) event.getEvent().getEventTime());
+      processedLog_.put(entry.getKey(), event.getEventTime());
       it.remove();
     }
     LOG.debug("Current count of dispatched events that are being tracked: {} ",
