@@ -42,6 +42,7 @@ using namespace opentelemetry::sdk::common::internal_log;
 using namespace opentelemetry::sdk::trace;
 using namespace opentelemetry::exporter::otlp;
 
+DECLARE_int32(beeswax_port);
 DECLARE_bool(otel_debug);
 DECLARE_string(otel_trace_additional_headers);
 DECLARE_int32(otel_trace_batch_queue_size);
@@ -75,7 +76,9 @@ TEST(OtelTest, QueriesTracedHS2) {
 TEST(OtelTest, QueriesNotTracedBeeswax) {
   TClientRequest client_request;
   client_request.__set_hs2_metadata_op(false);
-  EXPECT_FALSE(should_otel_trace_query(TSessionType::BEESWAX, client_request));
+  if (FLAGS_beeswax_port > 0) {
+    EXPECT_FALSE(should_otel_trace_query(TSessionType::BEESWAX, client_request));
+  }
 }
 
 TEST(OtelTest, QueriesNotTracedHS2Metadata) {

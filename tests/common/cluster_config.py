@@ -31,14 +31,6 @@ ADMIN = "admin"
 # The path to resources directory which contains the admission control config files.
 RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test", "resources")
 
-enable_authorization = CustomClusterTestSuite.with_args(
-    # Same as IMPALAD_ARGS and CATALOGD_ARGS in tests/authorization/test_ranger.py
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
-                 "--ranger_app_id=impala --authorization_provider=ranger",
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
-                  "--ranger_app_id=impala --authorization_provider=ranger"
-)
-
 
 def impalad_admission_ctrl_flags(max_requests, max_queued, pool_max_mem,
                                  proc_mem_limit=None, queue_wait_timeout_ms=None,

@@ -24,7 +24,7 @@ import os
 
 from builtins import range
 
-from tests.common.environ import ImpalaTestClusterProperties
+from tests.common.environ import ENABLE_BEESWAX, ImpalaTestClusterProperties
 from tests.common.test_vector import (
     assert_exec_option_key,
     BEESWAX,
@@ -177,7 +177,7 @@ def hs2_client_protocol_dimension():
 def create_client_protocol_dimension():
   pytest_config = ImpalaTestClusterProperties.get_instance().pytest_config()
   protocols_to_test = [HS2]
-  if pytest_config.option.default_test_protocol == BEESWAX:
+  if ENABLE_BEESWAX and pytest_config.option.default_test_protocol == BEESWAX:
     protocols_to_test.append(BEESWAX)
   # IMPALA-8864: Older python versions do not support SSLContext object that the thrift
   # http client implementation depends on. Otherwise, include HS2_HTTP.

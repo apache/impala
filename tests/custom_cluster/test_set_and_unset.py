@@ -39,10 +39,10 @@ class TestSetAndUnset(CustomClusterTestSuite, HS2TestSuite):
     Starts Impala cluster with a custom query option, and checks that option
     overlaying works correctly.
 
-    The Beeswax API and the HiveServer2 implementations are slightly different,
-    so the same test is run in both contexts.
+    The Beeswax API and the HiveServer2 implementations are slightly different.
+    This test only validates HiveServer2 implementation since Beeswax is deprecated.
     """
-    # Beeswax API:
+    # HiveServer2 API:
     result = self.execute_query_expect_success(self.client, "set all")
     assert "DEBUG_ACTION\tcustom\tDEVELOPMENT" in result.data, "baseline"
     self.execute_query_expect_success(self.client, "set debug_action=hey")
@@ -73,7 +73,8 @@ class TestSetAndUnset(CustomClusterTestSuite, HS2TestSuite):
 
     # Request Overlay
     self.execute_statement("set batch_size=123")
-    execute_statement_resp = self.execute_statement("select 1", conf_overlay=dict(batch_size="100"))
+    execute_statement_resp = self.execute_statement(
+      "select 1", conf_overlay=dict(batch_size="100"))
     get_profile_req = ImpalaHiveServer2Service.TGetRuntimeProfileReq()
     get_profile_req.operationHandle = execute_statement_resp.operationHandle
     get_profile_req.sessionHandle = self.session_handle
@@ -81,7 +82,8 @@ class TestSetAndUnset(CustomClusterTestSuite, HS2TestSuite):
 
     # Null request overlay
     self.execute_statement("set batch_size=999")
-    execute_statement_resp = self.execute_statement("select 1", conf_overlay=dict(batch_size=""))
+    execute_statement_resp = self.execute_statement(
+      "select 1", conf_overlay=dict(batch_size=""))
     get_profile_req = ImpalaHiveServer2Service.TGetRuntimeProfileReq()
     get_profile_req.operationHandle = execute_statement_resp.operationHandle
     get_profile_req.sessionHandle = self.session_handle
@@ -96,10 +98,10 @@ class TestSetAndUnset(CustomClusterTestSuite, HS2TestSuite):
     Starts Impala cluster with a custom query option, and checks unset option
     works correctly.
 
-    The Beeswax API and the HiveServer2 implementations are slightly different,
-    so the same test is run in both contexts.
+    The Beeswax API and the HiveServer2 implementations are slightly different.
+    This test only validates HiveServer2 implementation since Beeswax is deprecated.
     """
-    # Beeswax API:
+    # HiveServer2 API:
     result = self.execute_query_expect_success(self.client, "set all")
     assert "DEBUG_ACTION\tcustom\tDEVELOPMENT" in result.data, "baseline"
     self.execute_query_expect_success(self.client, "set debug_action=hey")
@@ -125,10 +127,10 @@ class TestSetAndUnset(CustomClusterTestSuite, HS2TestSuite):
     Starts Impala cluster with idle_session_timeout configured, and checks if
     the SET query displays the correct value.
 
-    The Beeswax API and the HiveServer2 implementations are slightly different,
-    so the same test is run in both contexts.
+    The Beeswax API and the HiveServer2 implementations are slightly different.
+    This test only validates HiveServer2 implementation since Beeswax is deprecated.
     """
-    # Beeswax API:
+    # HiveServer2 API:
     # Default value
     result = self.execute_query_expect_success(self.client, "set")
     assert "IDLE_SESSION_TIMEOUT\t321\tREGULAR" in result.data, "baseline"

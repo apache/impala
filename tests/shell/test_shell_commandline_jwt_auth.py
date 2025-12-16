@@ -18,6 +18,7 @@
 # under the License.
 
 from __future__ import absolute_import, division, print_function
+from tests.common.skip import SkipIf
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_client_protocol_http_transport
 from tests.shell.util import run_impala_shell_cmd
@@ -54,6 +55,7 @@ class TestImpalaShellJwtAuth(ImpalaTestSuite):
     assert "JWTs may not be sent over insecure connections. Enable SSL or " \
            "set --auth_creds_ok_in_clear" in result.stderr
 
+  @SkipIf.no_beeswax
   def test_jwt_auth_protocol_beeswax(self, vector):
     """Asserts that JWT auth does not work with the beeswax protocol."""
     result = run_impala_shell_cmd(vector, ['-j', '--protocol=beeswax'],

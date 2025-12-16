@@ -895,14 +895,14 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     assert deadline == "{0}m".format(self.COORD_SHUTDOWN_DEADLINE_S // 60), "4"
     assert registered == "3"
 
-    # Expect that the beeswax shutdown error occurs when calling fn()
-    def expect_beeswax_shutdown_error(fn):
+    # Expect that the shutdown error occurs when calling fn()
+    def expect_shutdown_error(fn):
       try:
         fn()
       except IMPALA_CONNECTION_EXCEPTION as e:
         assert SHUTDOWN_ERROR_PREFIX in str(e)
-    expect_beeswax_shutdown_error(lambda: self.client.execute("select 1"))
-    expect_beeswax_shutdown_error(lambda: self.client.execute_async("select 1"))
+    expect_shutdown_error(lambda: self.client.execute("select 1"))
+    expect_shutdown_error(lambda: self.client.execute_async("select 1"))
 
     # Test that the HS2 shutdown error occurs for various HS2 operations.
     self.execute_statement("select 1", None, TCLIService.TStatusCode.ERROR_STATUS,
@@ -937,7 +937,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     HS2TestSuite.check_response(self.hs2_client.CloseOperation(
         TCLIService.TCloseOperationReq(before_shutdown_hs2_handle)))
 
-    # Make sure that the beeswax query is still executing, then close it to allow the
+    # Make sure that the query is still executing, then close it to allow the
     # coordinator to shut down.
     self.client.wait_for_impala_state(before_shutdown_handle, FINISHED, 20)
     self.client.close_query(before_shutdown_handle)
@@ -1027,7 +1027,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     return handle
 
   def __fetch_and_get_num_backends(self, query, handle, delay_s=0, timeout_s=20):
-    """Fetch the results of 'query' from the beeswax handle 'handle', close the
+    """Fetch the results of 'query' from the query handle 'handle', close the
     query and return the number of backends obtained from the profile."""
     self.client.wait_for_impala_state(handle, FINISHED, timeout_s)
     if delay_s > 0:

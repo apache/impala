@@ -25,6 +25,7 @@ import time
 from subprocess import check_call
 from tests.util.filesystem_utils import get_fs_path
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import ENABLE_BEESWAX
 from tests.common.skip import SkipIf, SkipIfFS
 from tests.common.test_result_verifier import error_msg_startswith
 
@@ -48,13 +49,14 @@ class TestCoordinators(CustomClusterTestSuite):
     worker = self.cluster.impalads[2]
 
     # Verify that Beeswax and HS2 client connections can't be established at a worker node
-    beeswax_client = None
-    try:
-      beeswax_client = worker.service.create_beeswax_client()
-    except Exception as e:
-      LOG.info("Caught exception {0}".format(e))
-    finally:
-      assert beeswax_client is None
+    if ENABLE_BEESWAX:
+      beeswax_client = None
+      try:
+        beeswax_client = worker.service.create_beeswax_client()
+      except Exception as e:
+        LOG.info("Caught exception {0}".format(e))
+      finally:
+        assert beeswax_client is None
 
     hs2_client = None
     try:
@@ -71,10 +73,10 @@ class TestCoordinators(CustomClusterTestSuite):
 
       # select queries
       self.execute_query_expect_success(client1, "select 1")
-      self.execute_query_expect_success(client2, "select * from functional.alltypes");
+      self.execute_query_expect_success(client2, "select * from functional.alltypes")
       # DDL queries w/o SYNC_DDL
       self.execute_query_expect_success(client1, "refresh functional.alltypes")
-      query_options = {"sync_ddl" : 1}
+      query_options = {"sync_ddl": 1}
       self.execute_query_expect_success(client2, "refresh functional.alltypesagg",
           query_options)
       self.execute_query_expect_success(client1,
@@ -170,12 +172,12 @@ class TestCoordinators(CustomClusterTestSuite):
       create_old_fn = (
           "create function `{0}`.`old_fn`(string) returns string LOCATION '{1}' "
           "SYMBOL='org.apache.impala.TestUpdateUdf'".format(db_name, tgt_path))
-      self.execute_query_expect_success(client, create_old_fn);
+      self.execute_query_expect_success(client, create_old_fn)
 
       # run the query for TestUpdateUdf (old) and expect it to work
       old_query = (
           "select count(*) from functional.alltypes where "
-          "`{0}`.old_fn(string_col) = 'Old UDF'".format(db_name));
+          "`{0}`.old_fn(string_col) = 'Old UDF'".format(db_name))
       result = self.execute_query_expect_success(client, old_query)
       assert result.data == ['7300']
 
@@ -186,7 +188,7 @@ class TestCoordinators(CustomClusterTestSuite):
       create_new_fn = (
           "create function `{0}`.`new_fn`(string) returns string LOCATION '{1}' "
           "SYMBOL='org.apache.impala.TestUpdateUdf'".format(db_name, tgt_path))
-      self.execute_query_expect_success(client, create_new_fn);
+      self.execute_query_expect_success(client, create_new_fn)
 
       # run the query for TestUdf (new) and expect the updated version to work.
       # the udf argument prevents constant expression optimizations, which can mask
@@ -196,7 +198,7 @@ class TestCoordinators(CustomClusterTestSuite):
       #       implementation. that is current system behavior, so expected.
       new_query = (
           "select count(*) from functional.alltypes where "
-          "`{0}`.new_fn(string_col) = 'New UDF'".format(db_name));
+          "`{0}`.new_fn(string_col) = 'New UDF'".format(db_name))
       result = self.execute_query_expect_success(client, new_query)
       assert result.data == ['7300']
 
@@ -205,13 +207,13 @@ class TestCoordinators(CustomClusterTestSuite):
       create_add_fn = (
           "create function `{0}`.`add_fn`(string) returns string LOCATION '{1}' "
           "SYMBOL='org.apache.impala.NewReplaceStringUdf'".format(db_name, tgt_path))
-      self.execute_query_expect_success(client, create_add_fn);
+      self.execute_query_expect_success(client, create_add_fn)
 
       # run the query for ReplaceString and expect the query to run.
       # (bug behavior is to not find the class)
       add_query = (
           "select count(*) from functional.alltypes where "
-          "`{0}`.add_fn(string_col) = 'not here'".format(db_name));
+          "`{0}`.add_fn(string_col) = 'not here'".format(db_name))
       result = self.execute_query_expect_success(client, add_query)
       assert result.data == ['0']
 
@@ -223,7 +225,7 @@ class TestCoordinators(CustomClusterTestSuite):
       create_mismatch_fn = (
           "create function `{0}`.`mismatch_fn`(string) returns string LOCATION '{1}' "
           "SYMBOL='org.apache.impala.TestUpdateUdf'".format(db_name, tgt_path_2))
-      self.execute_query_expect_success(client, create_mismatch_fn);
+      self.execute_query_expect_success(client, create_mismatch_fn)
 
       # Run a query that'll run on only one executor.
       small_query = (
@@ -241,7 +243,7 @@ class TestCoordinators(CustomClusterTestSuite):
       # This failure does not happen in local catalog mode.
       mismatch_query = (
           "select count(*) from functional.alltypes where "
-          "`{0}`.mismatch_fn(string_col) = 'Old UDF'".format(db_name));
+          "`{0}`.mismatch_fn(string_col) = 'Old UDF'".format(db_name))
       result = self.execute_query_expect_failure(client, mismatch_query)
       assert "does not match the expected last modified time" in str(result)
 

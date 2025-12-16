@@ -20,6 +20,7 @@ import os
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import ENABLE_BEESWAX
 from tests.common.impala_cluster import (
     DEFAULT_BEESWAX_PORT, DEFAULT_HS2_PORT, DEFAULT_CATALOG1_SERVICE_PORT,
     DEFAULT_STATE_STORE_SUBSCRIBER_PORT, DEFAULT_CATALOGD_STATE_STORE_SUBSCRIBER_PORT,
@@ -42,7 +43,6 @@ from tests.common.test_vector import ImpalaTestDimension
 
 # TLS ports to assert.
 TLS_PORTS = [
-    DEFAULT_BEESWAX_PORT,
     DEFAULT_HS2_PORT,
     DEFAULT_HS2_HTTP_PORT,
     DEFAULT_STATE_STORE_SUBSCRIBER_PORT,
@@ -61,6 +61,8 @@ TLS_PORTS = [
     DEFAULT_STATESTORE_HA_SERVICE_PORT,
     DEFAULT_EXTERNAL_FE_PORT,
 ]
+if ENABLE_BEESWAX:
+  TLS_PORTS.append(DEFAULT_BEESWAX_PORT)
 
 # TLS 1.2 RSA ciphersuites allowed by the cluster configuration.
 TLS_1_2_CIPHERSUITES_RSA = [

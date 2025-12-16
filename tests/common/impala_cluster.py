@@ -208,7 +208,8 @@ class ImpalaCluster(object):
         client.close()
     return n
 
-  def wait_until_ready(self, expected_num_impalads=1, expected_num_ready_impalads=None):
+  def wait_until_ready(self, expected_num_impalads=1, expected_num_ready_impalads=None,
+                       enable_beeswax=False):
     """Waits for this 'cluster' to be ready to submit queries.
 
       A cluster is deemed "ready" if:
@@ -253,7 +254,8 @@ class ImpalaCluster(object):
         continue
       if flags.get('stress_catalog_init_delay_ms', '0') != '0':
         continue
-      impalad.wait_for_coordinator_services(sleep_interval, check_processes_still_running)
+      impalad.wait_for_coordinator_services(
+        sleep_interval, check_processes_still_running, enable_beeswax=enable_beeswax)
       # Decrease sleep_interval after first coordinator ready as the others are also
       # likely to be (nearly) ready.
       sleep_interval = 0.2
@@ -359,6 +361,9 @@ class ImpalaCluster(object):
       executable = os.path.basename(args[0])
       port_map = {}
       for k, v in container_info["NetworkSettings"]["Ports"].items():
+        if not v:
+          # Port is exposed but not mapped (BEESWAX); skip it.
+          continue
         # Key looks like "25000/tcp"..
         port = int(k.split("/")[0])
         # Value looks like { "HostPort": "25002", "HostIp": "" }.
@@ -666,15 +671,21 @@ class ImpaladProcess(BaseImpalaProcess):
       early_abort_fn()
       sleep(sleep_interval)
 
-  def wait_for_coordinator_services(self, sleep_interval, early_abort_fn):
+  def wait_for_coordinator_services(
+    self, sleep_interval, early_abort_fn, enable_beeswax=False):
     """Waits for client ports to be opened. Assumes that the webservice ports are open."""
     start_time = time.time()
-    LOG.info(
-        "Waiting for coordinator client services "
-        + "- hs2 port: %d hs2-http port: %d beeswax port: %d",
-        self.service.hs2_port, self.service.hs2_http_port, self.service.beeswax_port)
+    ports = {"hs2_port": self.service.hs2_port,
+             "hs2_http_port": self.service.hs2_http_port,
+             "beeswax_port": self.service.beeswax_port}
+    log_msg = ("Waiting for coordinator client services "
+               + "- hs2 port: {hs2_port} hs2-http port: {hs2_http_port}"
+               + (" beeswax port: {beeswax_port}" if enable_beeswax else "")).format(
+      **ports)
+    LOG.info(log_msg)
     while time.time() - start_time < CLUSTER_WAIT_TIMEOUT_IN_SECONDS:
-      beeswax_port_is_open = self.service.beeswax_port_is_open()
+      beeswax_port_is_open = (self.service.beeswax_port_is_open()
+                              if enable_beeswax else True)
       hs2_port_is_open = self.service.hs2_port_is_open()
       hs2_http_port_is_open = self.service.hs2_http_port_is_open()
       if beeswax_port_is_open and hs2_port_is_open and hs2_http_port_is_open:

@@ -43,10 +43,6 @@ DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
 DECLARE_string(tls_ciphersuites);
 
-DECLARE_int32(state_store_port);
-
-DECLARE_int32(beeswax_port);
-
 DECLARE_int64(thrift_external_rpc_max_message_size);
 
 static string IMPALA_HOME(getenv("IMPALA_HOME"));

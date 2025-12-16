@@ -47,7 +47,7 @@ from tests.util.workload_management import (
 
 
 class TestQueryLogTableBasic(WorkloadManagementTestSuite):
-  """Tests to assert the query log table is correctly populated when using the Beeswax
+  """Tests to assert the query log table is correctly populated when using the HS2
      client protocol."""
 
   @classmethod

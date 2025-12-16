@@ -25,7 +25,7 @@ import org.junit.Assume;
 import org.junit.Test;
 
 import java.io.File;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -673,11 +673,14 @@ public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase
   protected void testShellKerberosAuthWithUser(
           KerberosKdcEnvironment kerberosKdcEnvironment, String username,
           boolean shouldSucceed, String kerberosHostFqdn) throws Exception {
-
-    List<String> protocolsToTest = Arrays.asList("beeswax", "hs2");
+    List<String> protocolsToTest = new ArrayList<>();
+    protocolsToTest.add("hs2");
+    if ("true".equals(System.getenv("ENABLE_BEESWAX"))) {
+      protocolsToTest.add("beeswax");
+    }
     if (pythonSupportsSSLContext()) {
       // http transport tests will fail with older python versions (IMPALA-8873)
-      protocolsToTest = Arrays.asList("beeswax", "hs2", "hs2-http");
+      protocolsToTest.add("hs2-http");
     }
 
     // create user principal in KDC

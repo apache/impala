@@ -147,7 +147,7 @@ DECLARE_bool(gen_experimental_profile);
 DECLARE_bool(use_local_catalog);
 DECLARE_bool(otel_trace_enabled);
 
-DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served."
+DEFINE_int32(beeswax_port, 0, "port on which Beeswax client requests are served."
     "If 0 or less, the Beeswax server is not started. This interface is deprecated and "
     "will be removed in a future version.");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served."

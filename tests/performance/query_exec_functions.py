@@ -21,7 +21,6 @@ import logging
 import re
 from datetime import datetime
 from impala.dbapi import connect
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
 from tests.common.impala_connection import build_summary_table_from_thrift
 from sys import maxsize
 from tests.performance.query import HiveQueryResult, ImpalaQueryResult
@@ -144,77 +143,6 @@ def execute_using_impala_hs2(query, query_config):
     cursor.close()
     if plugin_runner: plugin_runner.run_plugins_post(scope="Query")
     return exec_result
-
-
-def establish_beeswax_connection(query_config):
-  """Establish a connection to the user specified impalad.
-
-  Args:
-    query_config (QueryExecConfig)
-
-  Returns:
-    ImpalaBeeswaxClient is the connection suceeds, None otherwise.
-
-  DEPRECATED: use hs2 instead of beeswax.
-  """
-  LOG.warning('beeswax protocol is deprecated.')
-  use_kerberos = query_config.use_kerberos
-  user = query_config.user
-  password = query_config.password
-  use_ssl = query_config.use_ssl
-  # If the impalad is for the form host, convert it to host:port that the Impala beeswax
-  # client accepts.
-  if len(query_config.impalad.split(":")) == 1:
-    query_config.impalad = "{0}:{1}".format(query_config.impalad, DEFAULT_BEESWAX_PORT)
-  client = None
-  try:
-    client = ImpalaBeeswaxClient(query_config.impalad, use_kerberos=use_kerberos,
-                                 user=user, password=password, use_ssl=use_ssl)
-    # Try connect
-    client.connect()
-    # Set the exec options.
-    client.set_query_options(query_config.exec_options)
-    LOG.info("Connected to %s" % query_config.impalad)
-  except Exception as e:
-    LOG.error("Error connecting: {0}".format(str(e)))
-  return client
-
-
-def execute_using_impala_beeswax(query, query_config):
-  """Executes a query using beeswax.
-
-  A new client is created per query, then destroyed.
-
-  Args:
-    query (str): string containing the query to be executed.
-    query_config (QueryExecConfig)
-
-  Returns:
-    ImpalaQueryResult
-
-  DEPRECATED: use hs2 instead of beeswax.
-  """
-
-  # Create a client object to talk to impalad
-  exec_result = ImpalaQueryResult(query, query_config=query_config)
-  plugin_runner = query_config.plugin_runner
-  client = establish_beeswax_connection(query_config)
-  if client is None: return exec_result
-  # We need to issue a use database here.
-  if query.db: client.execute("use {0}".format(query.db))
-  # create a map for query options and the query names to send to the plugin
-  context = build_context(query, query_config)
-  if plugin_runner: plugin_runner.run_plugins_pre(context=context, scope="Query")
-  result = None
-  try:
-    result = client.execute(query.query_str)
-  except Exception as e:
-    LOG.error(e)
-    exec_result.query_error = str(e)
-  finally:
-    client.close_connection()
-    if plugin_runner: plugin_runner.run_plugins_post(context=context, scope="Query")
-    return construct_exec_result(result, exec_result)
 
 
 def build_context(query, query_config):

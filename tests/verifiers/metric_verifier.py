@@ -21,6 +21,8 @@ from __future__ import absolute_import, division, print_function
 import logging
 from time import time, sleep
 
+from tests.common.environ import ENABLE_BEESWAX
+
 LOG = logging.getLogger('test_verify_metrics')
 LOG.setLevel(level=logging.DEBUG)
 
@@ -35,10 +37,12 @@ METRIC_LIST = [
                # no clean pages if there are no queries running.
                "buffer-pool.clean-pages",
                "buffer-pool.clean-page-bytes",
-               "impala-server.num-open-beeswax-sessions",
                "impala-server.num-open-hiveserver2-sessions",
                "tmp-file-mgr.scratch-space-bytes-used",
                "tmp-file-mgr.scratch-space-bytes-used.dir-0"]
+if ENABLE_BEESWAX:
+    METRIC_LIST.append("impala-server.num-open-beeswax-sessions")
+
 
 class MetricVerifier(object):
   """Reuseable class that can verify common metrics"""

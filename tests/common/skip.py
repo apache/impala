@@ -25,6 +25,7 @@ import pytest
 from functools import partial
 
 from tests.common.environ import (ImpalaTestClusterProperties,
+                                  ENABLE_BEESWAX,
                                   IS_DOCKERIZED_TEST_CLUSTER, IS_BUGGY_EL6_KERNEL,
                                   HIVE_MAJOR_VERSION,
                                   IS_APACHE_HIVE, IS_TEST_JDK,
@@ -136,6 +137,7 @@ class SkipIf:
       reason="Test cluster runs slowly due to enablement of code coverage or sanitizer")
   not_tuple_cache = pytest.mark.skipif(not IS_TUPLE_CACHE,
       reason="Tuple Cache needed")
+  no_beeswax = pytest.mark.skipif(not ENABLE_BEESWAX, reason="Beeswax disabled")
 
 
 class SkipIfLocal:

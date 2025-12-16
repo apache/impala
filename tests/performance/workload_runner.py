@@ -23,14 +23,12 @@ from tests.common.test_dimensions import (
     get_dataset_from_workload,
     load_table_info_dimension)
 from tests.performance.query_executor import (
-    BeeswaxQueryExecConfig,
     HiveHS2QueryConfig,
     ImpalaHS2QueryConfig,
     JdbcQueryExecConfig,
     QueryExecutor)
 from tests.performance.query_exec_functions import (
     execute_using_hive_hs2,
-    execute_using_impala_beeswax,
     execute_using_impala_hs2,
     execute_using_jdbc)
 from tests.performance.scheduler import Scheduler
@@ -94,29 +92,25 @@ class WorkloadRunner(object):
 
   def _create_executor(self, executor_name):
     query_options = {
-        'impala_beeswax': lambda: (execute_using_impala_beeswax,
-          BeeswaxQueryExecConfig(plugin_runner=self.config.plugin_runner,
-          exec_options=self.config.exec_options,
-          use_kerberos=self.config.use_kerberos,
-          user=self.config.user if self.config.password else None,
-          password=self.config.password,
-          use_ssl=self.config.use_ssl
-          )),
-        'impala_jdbc': lambda: (execute_using_jdbc,
+        'impala_jdbc': lambda: (
+          execute_using_jdbc,
           JdbcQueryExecConfig(plugin_runner=self.config.plugin_runner)
-          ),
-        'impala_hs2': lambda: (execute_using_impala_hs2,
-          ImpalaHS2QueryConfig(plugin_runner=self.config.plugin_runner,
-            use_kerberos=self.config.use_kerberos
-          )),
-        'hive_hs2': lambda: (execute_using_hive_hs2,
+        ),
+        'impala_hs2': lambda: (
+          execute_using_impala_hs2,
+          ImpalaHS2QueryConfig(
+            plugin_runner=self.config.plugin_runner,
+            use_kerberos=self.config.use_kerberos)
+        ),
+        'hive_hs2': lambda: (
+          execute_using_hive_hs2,
           HiveHS2QueryConfig(hiveserver=self.config.hiveserver,
             plugin_runner=self.config.plugin_runner,
             exec_options=self.config.exec_options,
             user=self.config.user,
-            use_kerberos=self.config.use_kerberos
-          ))
-    } [executor_name]()
+            use_kerberos=self.config.use_kerberos)
+        )
+    }[executor_name]()
     return query_options
 
   def _execute_queries(self, queries):

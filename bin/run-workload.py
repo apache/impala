@@ -96,7 +96,7 @@ parser.add_option("--continue_on_query_error", dest="continue_on_query_error",
                   action="store_true", default=False,
                   help="If set, continue execution on each query error.")
 parser.add_option("-c", "--client_type", dest="client_type", default='hs2',
-                  choices=['beeswax', 'jdbc', 'hs2'],
+                  choices=['jdbc', 'hs2'],
                   help="Client type. Valid options are 'beeswax' or 'jdbc' or 'hs2'")
 parser.add_option("--plugin_names", dest="plugin_names", default=None,
                   help=("Set of comma-separated plugin names with scope; Plugins are"

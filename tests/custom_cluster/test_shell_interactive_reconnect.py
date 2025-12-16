@@ -43,7 +43,7 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
       p = ImpalaShell(vector)
       p.send_cmd("USE functional")
       # Connect without arguments works because the custom cluster will have the default
-      # HS2 and Beeswax ports.
+      # HS2 port.
       p.send_cmd("CONNECT")
       p.send_cmd("SHOW TABLES")
 

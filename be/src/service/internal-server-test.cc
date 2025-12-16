@@ -574,7 +574,6 @@ int main(int argc, char** argv) {
   FLAGS_catalog_service_host = FLAGS_hostname;
   FLAGS_enable_webserver = true;
 
-  FLAGS_beeswax_port = 21005;
   FLAGS_hs2_port = 21055;
   FLAGS_hs2_http_port = 28005;
   FLAGS_krpc_port = 27005;
@@ -602,7 +601,7 @@ int main(int argc, char** argv) {
   EXPECT_TRUE(impala_server_->IsExecutor());
   exec_env.frontend()->WaitForCatalog();
 
-  ABORT_IF_ERROR(WaitForServer(FLAGS_hostname, FLAGS_beeswax_port, 10, 100));
+  ABORT_IF_ERROR(WaitForServer(FLAGS_hostname, FLAGS_hs2_port, 10, 100));
 
   int test_ret_val = RUN_ALL_TESTS();
 

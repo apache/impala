@@ -34,6 +34,7 @@ from tests.common.file_utils import count_lines, wait_for_file_line_count
 from tests.common.impala_connection import \
     ERROR, FINISHED, PENDING, RUNNING, MinimalHS2Connection
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
+from tests.common.skip import SkipIf
 from tests.common.test_vector import BEESWAX, ImpalaTestDimension
 from tests.util.cancel_util import FetchingThread
 from tests.util.otel_trace import assert_trace
@@ -91,6 +92,7 @@ class TestOtelTraceSelectsDMLs(TestOtelTraceBase):
     super(TestOtelTraceSelectsDMLs, self).setup_method(method)
     self.client.clear_configuration()
 
+  @SkipIf.no_beeswax
   def test_beeswax_no_trace(self):
     """Since tracing Beeswax queries is not supported, tests that no trace is created
     when executing a query using the Beeswax protocol."""

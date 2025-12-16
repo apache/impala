@@ -26,6 +26,7 @@ from time import sleep
 
 from impala.dbapi import connect
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import ENABLE_BEESWAX
 from tests.common.impala_cluster import DEFAULT_HS2_PORT
 from tests.util.thrift_util import op_handle_to_query_id
 
@@ -41,7 +42,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
     impalad = self.cluster.get_any_impalad()
     self.close_impala_clients()
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
-    num_connections = impalad.service.get_metric_value(
+    num_connections = 0 if not ENABLE_BEESWAX else impalad.service.get_metric_value(
         "impala.thrift-server.beeswax-frontend.connections-in-use")
     with impalad.service.create_hs2_client() as client:
       client.execute('select 1')
@@ -150,7 +151,10 @@ class TestSessionExpiration(CustomClusterTestSuite):
     impalad = self.cluster.get_any_impalad()
     self.close_impala_clients()
 
-    for protocol in ['beeswax', 'hiveserver2']:
+    protocols_to_test = ['hiveserver2']
+    if ENABLE_BEESWAX:
+      protocols_to_test.append('beeswax')
+    for protocol in protocols_to_test:
       num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
       num_connections_metrics_name = \
           "impala.thrift-server.{0}-frontend.connections-in-use".format(protocol)

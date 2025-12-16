@@ -129,6 +129,10 @@ IS_TUPLE_CACHE_CORRECT_CHECK = (
 
 IS_CALCITE_PLANNER = os.environ.get("USE_CALCITE_PLANNER", False) == 'true'
 
+# Whether to enable deprecated beeswax protocol or not.
+ENABLE_BEESWAX = os.getenv("ENABLE_BEESWAX", False) == "true"
+
+
 class ImpalaBuildFlavors:
   """
   Represents the possible CMAKE_BUILD_TYPE values. These build flavors are needed

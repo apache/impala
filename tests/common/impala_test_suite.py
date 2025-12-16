@@ -45,11 +45,12 @@ from threading import Lock
 import tests.common
 from tests.common.base_test_suite import BaseTestSuite
 from tests.common.environ import (
-    HIVE_MAJOR_VERSION,
-    MANAGED_WAREHOUSE_DIR,
+    ENABLE_BEESWAX,
     EXTERNAL_WAREHOUSE_DIR,
+    HIVE_MAJOR_VERSION,
     ICEBERG_DEFAULT_FORMAT_VERSION,
     IS_CALCITE_PLANNER,
+    MANAGED_WAREHOUSE_DIR,
     ImpalaTestClusterProperties)
 from tests.common.errors import Timeout
 from tests.common.impala_connection import create_connection
@@ -237,9 +238,7 @@ class ImpalaTestSuite(BaseTestSuite):
     Most method in ImpalaTestSuite that has optional 'protocol' argument will default
     to the return value of this method.
     Default to return cls.pytest_config().option.default_test_protocol."""
-    # default_test_protocol is usually 'beeswax', unless user specify otherwise.
-    # Individual tests that have been converted to work with the HS2 client can add HS2
-    # in addition to or instead of beeswax.
+    # default_test_protocol is usually 'hs2', unless user specify otherwise.
     return cls.pytest_config().option.default_test_protocol
 
   @staticmethod
@@ -490,7 +489,8 @@ class ImpalaTestSuite(BaseTestSuite):
     if cls.beeswax_client:
       cls.beeswax_client.close()
       cls.beeswax_client = None
-    cls.beeswax_client = cls.create_impala_client_internal(protocol=BEESWAX)
+    if ENABLE_BEESWAX:
+      cls.beeswax_client = cls.create_impala_client_internal(protocol=BEESWAX)
 
     # If the HS2 client already exists, close it to avoid leaks
     if cls.hs2_client:
@@ -499,6 +499,9 @@ class ImpalaTestSuite(BaseTestSuite):
     try:
       cls.hs2_client = cls.create_impala_client_internal(protocol=HS2)
     except Exception as e:
+      if not ENABLE_BEESWAX:
+        # If beeswax is disabled, HS2 connection is required.
+        raise
       # HS2 connection can fail for benign reasons, e.g. running with unsupported auth.
       LOG.info("HS2 connection setup failed, continuing...: {0}".format(e))
 
@@ -1917,7 +1920,11 @@ class ImpalaTestSuite(BaseTestSuite):
     assert res.data == ["2"]
 
   # Checks connections for all protocols.
-  def check_connections(cls, expected_count=3):
+  def check_connections(cls):
+    expected_count = 2  # default: hs2 and hs2_http
+    if ENABLE_BEESWAX:
+      # check beeswax client only when it's expected
+      expected_count += 1
     # default client must exist
     cls.check_connection(cls.client)
     count = 0

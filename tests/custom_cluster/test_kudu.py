@@ -40,9 +40,8 @@ class CustomKuduTest(CustomClusterTestSuite, KuduTestSuite):
 
   @classmethod
   def default_test_protocol(cls):
-    # run_test_case() can produce different result types between beeswax vs hs2 protocol
-    # in some tests. This fix the test to use beeswax protocol until we can migrate
-    # to hs2.
+    # This forces the test to use hs2 protocol so that run_test_case() can produce
+    # consistent result.
     return HS2
 
   @classmethod
