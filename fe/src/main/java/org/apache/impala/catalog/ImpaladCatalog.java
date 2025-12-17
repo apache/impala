@@ -473,10 +473,8 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
       long catalogVersion, long lastLoadedTime) throws TableLoadingException {
     Db db = getDb(thriftTable.db_name);
     if (db == null) {
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Parent database of table does not exist: " +
-            thriftTable.db_name + "." + thriftTable.tbl_name);
-      }
+      LOG.warn("Not adding table since the database does not exist: " +
+          thriftTable.db_name + "." + thriftTable.tbl_name);
       return;
     }
 

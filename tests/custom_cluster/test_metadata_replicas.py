@@ -26,11 +26,14 @@ from tests.util.hive_utils import HiveDbWrapper
 @SkipIfFS.hive
 @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=false",
-    catalogd_args="--catalog_topic_mode=full",
+    catalogd_args="--catalog_topic_mode=full --hms_event_polling_interval_s=0",
     statestored_args="--statestore_update_frequency_ms=1000")
 class TestMetadataReplicas(CustomClusterTestSuite):
   """ Validates metadata content across catalogd and impalad coordinators.
-  This test is only valid in legacy catalog mode. """
+  This test is only valid in legacy catalog mode. Disables HMS event processing to avoid
+  catalogd cache being modified unintentionally by HMS events. The test expects the
+  INVALIDATE command to bring up the latest metadata from HMS. This avoids hitting the bug
+  of IMPALA-12103. """
 
   @classmethod
   def setup_class(cls):
