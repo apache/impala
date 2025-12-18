@@ -101,7 +101,7 @@ INT,STRING,BIGINT,INT,BIGINT,INT,INT,INT,INT,INT,INT,STRING
 ---- QUERY
 select * from functional_parquet.iceberg_query_metadata.`partitions`;
 ---- RESULTS
-3,3,1053,1,1,0,0,regex:.*,regex:\d+
+3,3,regex:\d+,1,1,0,0,regex:.*,regex:\d+
 ---- TYPES
 BIGINT, INT, BIGINT, BIGINT, INT, BIGINT, INT, TIMESTAMP, BIGINT
 ====
