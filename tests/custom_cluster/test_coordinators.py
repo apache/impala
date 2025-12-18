@@ -315,6 +315,14 @@ class TestCoordinators(CustomClusterTestSuite):
         on a.is_current_ancestor = c.bool_col"""
     self.execute_query_expect_success(self.client, q2)
 
+    # A union of metadata tables joined with a regular table.
+    q3 = """select count(DISTINCT a.parent_id, a.is_current_ancestor)
+        from (select * from functional_parquet.iceberg_query_metadata.history
+              union select * from functional_parquet.iceberg_query_metadata.history) a
+        join functional_parquet.alltypestiny c
+        on a.is_current_ancestor = c.bool_col"""
+    self.execute_query_expect_success(self.client, q3)
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="--queue_wait_timeout_ms=2000",
                                     cluster_size=1, num_exclusive_coordinators=1)

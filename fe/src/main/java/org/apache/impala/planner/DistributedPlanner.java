@@ -865,8 +865,11 @@ public class DistributedPlanner {
     // If all child fragments are unpartitioned, return a single unpartitioned fragment
     // with a UnionNode that merges all child fragments.
     if (numUnpartitionedChildFragments == childFragments.size()) {
+      // Propagate coordinator-only property to the new union fragment.
+      boolean coordinatorOnlyChild =
+          childFragments.stream().anyMatch(PlanFragment::coordinatorOnly);
       PlanFragment unionFragment = new PlanFragment(ctx_.getNextFragmentId(),
-          unionNode, DataPartition.UNPARTITIONED);
+          unionNode, DataPartition.UNPARTITIONED, coordinatorOnlyChild);
       // Absorb the plan trees of all childFragments into unionNode
       // and fix up the fragment tree in the process.
       for (int i = 0; i < childFragments.size(); ++i) {
