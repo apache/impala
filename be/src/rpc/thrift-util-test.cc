@@ -129,4 +129,36 @@ TEST(ThriftUtil, SerDeBuffer100MB) {
   }
 }
 
+struct MockCompressedThrift {
+  std::string compressed_data;
+  int64_t uncompressed_size;
+};
+
+TEST(ThriftUtil, CompressDecompressQueryOptions) {
+  TQueryOptions options;
+  options.__set_mem_limit(1024 * 1024 * 1024LL);
+  options.__set_query_timeout_s(300);
+  options.__set_abort_on_error(true);
+
+  // Compress TQueryOptions.
+  MockCompressedThrift compressed_obj;
+  Status status =
+      CompressThrift<TQueryOptions, MockCompressedThrift>(options, &compressed_obj);
+
+  EXPECT_TRUE(status.ok()) << status.GetDetail();
+  EXPECT_GT(compressed_obj.uncompressed_size, 0);
+  EXPECT_GT(compressed_obj.compressed_data.size(), 0);
+
+  // Decompress TQueryOptions.
+  TQueryOptions decompressed_options;
+  status = DecompressThrift<MockCompressedThrift, TQueryOptions>(
+      compressed_obj, &decompressed_options);
+
+  EXPECT_TRUE(status.ok()) << status.GetDetail();
+
+  // Verify the fields.
+  EXPECT_EQ(options.mem_limit, decompressed_options.mem_limit);
+  EXPECT_EQ(options.query_timeout_s, decompressed_options.query_timeout_s);
+  EXPECT_EQ(options.abort_on_error, decompressed_options.abort_on_error);
+}
 }

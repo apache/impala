@@ -1079,6 +1079,14 @@ struct TFinalizeParams {
   9: optional TIcebergDmlFinalizeParams iceberg_params;
 }
 
+struct TQueryExecRequestCompressed {
+  // The size in bytes of the serialized TQueryExecRequest before compression.
+  1: required i64 uncompressed_size
+
+  // Serialized TQueryExecRequest compressed data.
+  2: required binary compressed_data
+}
+
 // Result of call to ImpalaPlanService/JniFrontend.createExecRequest()
 struct TQueryExecRequest {
   // Exec info for all plans; the first one materializes the query result, and subsequent

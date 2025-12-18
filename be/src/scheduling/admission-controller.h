@@ -34,6 +34,7 @@
 #include "scheduling/schedule-state.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
+#include "util/debug-util.h"
 #include "util/internal-queue.h"
 #include "util/runtime-profile.h"
 
@@ -52,6 +53,82 @@ enum class AdmissionOutcome {
   REJECTED,
   TIMED_OUT,
   CANCELLED,
+};
+
+class AdmissionExecRequest {
+ public:
+  virtual ~AdmissionExecRequest() = default;
+
+  /// Retrieves the underlying TQueryExecRequest.
+  /// For compressed requests, this may trigger decompression.
+  /// Returns a pointer to the request via the 'out_req' output parameter.
+  virtual Status GetQueryExecRequest(const TQueryExecRequest** out_req) const = 0;
+
+  /// Fast accessor for uncompressed requests only.
+  /// Avoids Status checks, DCHECKs if called on compressed requests.
+  virtual const TQueryExecRequest* request() const = 0;
+
+  /// For compressed only, clears the cached decompressed object to save memory.
+  virtual void ClearDecompressedCache() const = 0;
+};
+
+class AdmissionExecRequestUncompressed : public AdmissionExecRequest {
+ public:
+  explicit AdmissionExecRequestUncompressed(const TQueryExecRequest* req) : req_(req) {
+    DCHECK(req_ != nullptr);
+  }
+
+  Status GetQueryExecRequest(const TQueryExecRequest** out_req) const override {
+    *out_req = req_;
+    return Status::OK();
+  }
+
+  const TQueryExecRequest* request() const override {
+    DCHECK(req_ != nullptr);
+    return req_;
+  }
+
+  void ClearDecompressedCache() const override {
+    // we don't have a compressed data, so don't need to do anything.
+  }
+
+ private:
+  const TQueryExecRequest* req_;
+};
+
+class AdmissionController;
+class AdmissionExecRequestCompressed : public AdmissionExecRequest {
+ public:
+  explicit AdmissionExecRequestCompressed(
+      const TQueryExecRequestCompressed* req, AdmissionController* admission_controller)
+    : req_(req), admission_controller_(admission_controller) {
+    DCHECK(req_ != nullptr);
+    DCHECK(admission_controller_ != nullptr);
+  }
+
+  Status GetQueryExecRequest(const TQueryExecRequest** out_req) const override;
+
+  const TQueryExecRequest* request() const override {
+    DCHECK(false) << "AdmissionExecRequestCompressed does not support request(). "
+                  << "Use GetQueryExecRequest() instead.";
+    return nullptr;
+  }
+
+  void ClearDecompressedCache() const override {
+    std::lock_guard<std::mutex> l(lock_);
+    if (decompressed_req_) {
+      LOG(INFO) << "Cleared the decompressed request for query "
+                << PrintId(decompressed_req_->query_ctx.query_id);
+      decompressed_req_.reset();
+    }
+  }
+
+ private:
+  const TQueryExecRequestCompressed* req_;
+  const AdmissionController* admission_controller_;
+  mutable std::mutex lock_;
+  mutable std::unique_ptr<TQueryExecRequest> decompressed_req_;
+  mutable bool first_decompress_ = true;
 };
 
 /// The AdmissionController is used to throttle requests (e.g. queries, DML) based
@@ -373,8 +450,7 @@ class AdmissionController {
   struct AdmissionRequest {
     const UniqueIdPB& query_id;
     const UniqueIdPB& coord_id;
-    const TQueryExecRequest& request;
-    const TQueryOptions& query_options;
+    const AdmissionExecRequest& request;
     RuntimeProfile* summary_profile;
     std::unordered_set<NetworkAddressPB>& blacklisted_executor_addresses;
   };
@@ -493,6 +569,9 @@ class AdmissionController {
     admission_map_cleanup_cb_ = std::move(cb);
   }
 
+  void UpdateAdmissionRequestCompressionStats(
+      int64_t compressed_size, int64_t uncompressed_size, float ratio) const;
+
  private:
   class PoolStats;
   friend class PoolStats;
@@ -545,6 +624,12 @@ class AdmissionController {
   /// issue on the coordinator (which therefore cannot be resolved by adding more
   /// executor groups).
   IntCounter* total_dequeue_failed_coordinator_limited_ = nullptr;
+
+  /// Histograms for tracking the compressed/uncompressed sizes and compression ratios
+  /// of the admission requests of TQueryExecRequest.
+  mutable HistogramMetric* compressed_size_metric_;
+  mutable HistogramMetric* uncompressed_size_metric_;
+  mutable HistogramMetric* compression_ratio_metric_;
 
   /// A typedef for a holder of per-user loads.
   /// This matches the thrift-generated type of user_loads in TPoolStats.
@@ -1328,7 +1413,7 @@ class AdmissionController {
   /// resource pool associated with the query.
   std::vector<const ExecutorGroup*> GetExecutorGroupsForQuery(
       const ClusterMembershipMgr::ExecutorGroups& all_groups,
-      const AdmissionRequest& request);
+      const TQueryExecRequest& exec_req);
 
   /// Returns the current size of the cluster.
   int64_t GetClusterSize(const ClusterMembershipMgr::Snapshot& membership_snapshot);

@@ -151,16 +151,21 @@ void AdmissionControlService::AdmitQuery(
   VLOG(1) << "AdmitQuery: query_id=" << req->query_id()
           << " coordinator=" << req->coord_id();
 
-  shared_ptr<AdmissionState> admission_state;
-  admission_state = make_shared<AdmissionState>(req->query_id(), req->coord_id());
-  admission_state->query_exec_request = make_unique<TQueryExecRequest>();
-
+  shared_ptr<AdmissionState> admission_state =
+      make_shared<AdmissionState>(req->query_id(), req->coord_id());
   admission_state->summary_profile =
       RuntimeProfile::Create(&admission_state->profile_pool, "Summary");
+  if (req->has_is_compressed() && req->is_compressed()) {
+    admission_state->query_exec_request_compressed =
+        make_unique<TQueryExecRequestCompressed>();
+    RESPOND_IF_ERROR(GetSidecar(req->query_exec_request_sidecar_idx(), rpc_context,
+        admission_state->query_exec_request_compressed.get()));
 
-  RESPOND_IF_ERROR(GetSidecar(req->query_exec_request_sidecar_idx(), rpc_context,
-      admission_state->query_exec_request.get()));
-
+  } else {
+    admission_state->query_exec_request = make_unique<TQueryExecRequest>();
+    RESPOND_IF_ERROR(GetSidecar(req->query_exec_request_sidecar_idx(), rpc_context,
+        admission_state->query_exec_request.get()));
+  }
   for (const NetworkAddressPB& address : req->blacklisted_executor_addresses()) {
     admission_state->blacklisted_executor_addresses.emplace(address);
   }
@@ -212,7 +217,7 @@ void AdmissionControlService::GetQueryStatus(const GetQueryStatusRequestPB* req,
         if (admission_state->admit_status.ok()) {
           *resp->mutable_query_schedule() = *admission_state->schedule.get();
           // Free TQueryExecRequest since it's not required after admission is done
-          admission_state->query_exec_request.reset();
+          admission_state->ReleaseQueryExecRequest();
         } else {
           status = admission_state->admit_status;
         }
@@ -359,9 +364,19 @@ void AdmissionControlService::AdmitFromThreadPool(const UniqueIdPB& query_id) {
   {
     lock_guard<mutex> l(admission_state->lock);
     bool queued;
+    if (admission_state->query_exec_request) {
+      admission_state->admission_exec_request =
+          std::make_unique<AdmissionExecRequestUncompressed>(
+              admission_state->query_exec_request.get());
+    } else {
+      admission_state->admission_exec_request =
+          std::make_unique<AdmissionExecRequestCompressed>(
+              admission_state->query_exec_request_compressed.get(),
+              AdmissiondEnv::GetInstance()->admission_controller());
+    }
+
     AdmissionController::AdmissionRequest request = {admission_state->query_id,
-        admission_state->coord_id, *admission_state->query_exec_request,
-        admission_state->query_exec_request->query_ctx.client_request.query_options,
+        admission_state->coord_id, *admission_state->admission_exec_request,
         admission_state->summary_profile,
         admission_state->blacklisted_executor_addresses};
     admission_state->admit_status =

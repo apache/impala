@@ -92,11 +92,24 @@ class AdmissionControlService : public AdmissionControlServiceIf,
     AdmissionState(const UniqueIdPB& query_id, const UniqueIdPB& coord_id)
       : query_id(query_id), coord_id(coord_id) {}
 
+    ~AdmissionState() { ReleaseQueryExecRequest(); }
+
+    void ReleaseQueryExecRequest() {
+      // 'admission_exec_request' holds the raw pointer to the request objects,
+      //  so ensure it is destroyed before the requests become invalid.
+      admission_exec_request.reset();
+      query_exec_request.reset();
+      query_exec_request_compressed.reset();
+    }
+
     // The following are copied from the AdmitQueryRequestPB for this query and are valid
     // at any point after this AdmissionState has been added to 'admission_state_map_'.
     UniqueIdPB query_id;
     UniqueIdPB coord_id;
     std::unique_ptr<TQueryExecRequest> query_exec_request;
+    std::unique_ptr<TQueryExecRequestCompressed> query_exec_request_compressed;
+    std::unique_ptr<AdmissionExecRequest> admission_exec_request;
+
     std::unordered_set<NetworkAddressPB> blacklisted_executor_addresses;
 
     // Protects all of the following members.

@@ -19,18 +19,20 @@
 #ifndef IMPALA_RPC_THRIFT_UTIL_H
 #define IMPALA_RPC_THRIFT_UTIL_H
 
-#include <boost/shared_ptr.hpp>
-#include <thrift/protocol/TBinaryProtocol.h>
 #include <sstream>
 #include <vector>
+
+#include <boost/shared_ptr.hpp>
 #include <thrift/TApplicationException.h>
 #include <thrift/TConfiguration.h>
+#include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TSSLSocket.h>
 #include <thrift/transport/TTransportException.h>
 
 #include "common/status.h"
+#include "util/codec.h"
 
 namespace impala {
 
@@ -267,6 +269,108 @@ bool IsPeekTimeoutTException(const apache::thrift::transport::TTransportExceptio
 
 /// Returns true if the exception indicates the other end of the TCP socket was closed.
 bool IsConnResetTException(const apache::thrift::transport::TTransportException& e);
+
+// Helper that compresses a raw buffer using LZ4 and creates a TCompressed object.
+//
+// TCompressed must have:
+//  - int64_t uncompressed_size;
+//  - binary compressed_data;
+//
+// Params:
+//   serialized_buf: Raw uncompressed data to compress.
+//   serialized_len: Length of the uncompressed data in bytes.
+//   dest: Output parameter for the compressed thrift object.
+template <typename TCompressed>
+Status CreateCompressedThrift(
+    const uint8_t* serialized_buf, uint32_t serialized_len, TCompressed* dest) {
+  DCHECK(serialized_buf != nullptr);
+  DCHECK(dest != nullptr);
+
+  // Prepare compressor.
+  boost::scoped_ptr<Codec> compressor;
+  Codec::CodecInfo codec_info(THdfsCompression::LZ4);
+  RETURN_IF_ERROR(Codec::CreateCompressor(nullptr, false, codec_info, &compressor));
+
+  // Calculate buffer size and resize string.
+  int64_t max_out = compressor->MaxOutputLen(serialized_len);
+  std::string compressed_str(max_out, '\0');
+
+  // Perform Compression.
+  uint8_t* out_ptr = reinterpret_cast<uint8_t*>(compressed_str.data());
+  int64_t actual_len = max_out;
+  RETURN_IF_ERROR(compressor->ProcessBlock(
+      true, serialized_len, serialized_buf, &actual_len, &out_ptr));
+  // Validate output length.
+  if (actual_len <= 0 || actual_len > std::numeric_limits<uint32_t>::max()) {
+    return Status(strings::Substitute(
+        "Invalid actual compressed length in compressed request: $0B", actual_len));
+  }
+  compressed_str.resize(actual_len);
+
+  // Write to the TCompressed object.
+  dest->uncompressed_size = static_cast<int64_t>(serialized_len);
+  dest->compressed_data = std::move(compressed_str);
+
+  return Status::OK();
+}
+
+// Serializes a T object 'src', creates a compressed thrift by the serialized bytes,
+// and writes to a compressed T object 'dest'.
+//
+// Params:
+//   src: The thrift object to serialize and compress.
+//   dest: Output parameter for the compressed thrift object.
+template <typename T, typename TCompressed>
+Status CompressThrift(const T& src, TCompressed* dest) {
+  ThriftSerializer serializer(/* compact */ true);
+  uint8_t* serialized_buf = nullptr;
+  uint32_t serialized_len = 0;
+  RETURN_IF_ERROR(serializer.SerializeToBuffer(&src, &serialized_len, &serialized_buf));
+  return CreateCompressedThrift<TCompressed>(serialized_buf, serialized_len, dest);
+}
+
+// Decompresses a compressed Thrift object 'src' and deserializes it back into
+// the standard Thrift object 'dest'.
+//
+// TCompressed must have:
+//  - int64_t uncompressed_size;
+//  - binary compressed_data;
+//
+// Params:
+//   src: The compressed thrift object to decompress and deserialize.
+//   dest: Output parameter for the deserialized thrift object.
+template <typename TCompressed, typename T>
+Status DecompressThrift(const TCompressed& src, T* dest) {
+  DCHECK(dest != nullptr);
+  int64_t uncompressed_len = src.uncompressed_size;
+  if (uncompressed_len <= 0 || uncompressed_len > std::numeric_limits<uint32_t>::max()) {
+    return Status(strings::Substitute(
+        "Invalid uncompressed size in compressed request: $0B", uncompressed_len));
+  }
+
+  // Prepare decompressor and decompress.
+  boost::scoped_ptr<Codec> decompressor;
+  RETURN_IF_ERROR(
+      Codec::CreateDecompressor(nullptr, false, THdfsCompression::LZ4, &decompressor));
+  std::vector<uint8_t> uncompressed_buf(uncompressed_len);
+  uint8_t* out_ptr = uncompressed_buf.data();
+  int64_t actual_out = uncompressed_len;
+  const std::string& input_data = src.compressed_data;
+  const uint8_t* in_ptr = reinterpret_cast<const uint8_t*>(input_data.data());
+  RETURN_IF_ERROR(
+      decompressor->ProcessBlock(true, input_data.size(), in_ptr, &actual_out, &out_ptr));
+  if (actual_out <= 0 || actual_out > std::numeric_limits<uint32_t>::max()) {
+    return Status(strings::Substitute(
+        "Invalid actual output size after decompression: $0B", actual_out));
+  }
+  if (actual_out != uncompressed_len) {
+    return Status("Decompressed size did not match expected size from header");
+  }
+
+  // Deserialize and write to the T object.
+  uint32_t deser_len = static_cast<uint32_t>(actual_out);
+  return DeserializeThriftMsg(uncompressed_buf.data(), &deser_len, true, dest);
+}
 }
 
 #endif

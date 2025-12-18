@@ -38,6 +38,7 @@
 #include "util/bit-util.h"
 #include "util/collection-metrics.h"
 #include "util/debug-util.h"
+#include "util/histogram-metric.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/pretty-printer.h"
@@ -127,6 +128,12 @@ const string EXEC_GROUP_QUERY_LOAD_KEY_FORMAT =
 
 const string TOTAL_DEQUEUE_FAILED_COORDINATOR_LIMITED =
   "admission-controller.total-dequeue-failed-coordinator-limited";
+const string EXEC_REQ_COMPRESSED_SIZE_KEY =
+    "admission-controller.query-exec-request-compressed-bytes";
+const string EXEC_REQ_UNCOMPRESSED_SIZE_KEY =
+    "admission-controller.query-exec-request-uncompressed-bytes";
+const string EXEC_REQ_COMPRESSION_RATIO_KEY =
+    "admission-controller.query-exec-request-compression-ratio";
 
 // Define metric key format strings for metrics in PoolMetrics
 // '$0' is replaced with the pool name by strings::Substitute
@@ -344,6 +351,55 @@ static inline bool ParsePoolTopicKey(
   *pool_name = topic_key.substr(0, pos);
   *backend_id = topic_key.substr(pos + 1);
   return true;
+}
+
+Status AdmissionExecRequestCompressed::GetQueryExecRequest(
+    const TQueryExecRequest** out_req) const {
+  lock_guard<std::mutex> l(lock_);
+  if (decompressed_req_ != nullptr) {
+    *out_req = decompressed_req_.get();
+    return Status::OK();
+  }
+  DCHECK(req_ != nullptr);
+
+  unique_ptr<TQueryExecRequest> new_req = std::make_unique<TQueryExecRequest>();
+  RETURN_IF_ERROR(DecompressThrift(*req_, new_req.get()));
+
+  int64_t comp_size = req_->compressed_data.size();
+  int64_t uncomp_size = req_->uncompressed_size;
+  float ratio = (comp_size > 0) ? (static_cast<float>(uncomp_size) / comp_size) : 0.0f;
+
+  LOG(INFO) << "Decompress TQueryExecRequest for query "
+            << PrintId(new_req->query_ctx.query_id) << ": Compressed size=" << comp_size
+            << " B"
+            << ", Uncompressed size=" << uncomp_size << " B"
+            << ", Ratio=" << ratio << "x";
+
+  // Update the compression stats only once.
+  if (first_decompress_ && admission_controller_ != nullptr) {
+    admission_controller_->UpdateAdmissionRequestCompressionStats(
+        comp_size, uncomp_size, ratio);
+  }
+
+  // Store the object in our cache.
+  decompressed_req_ = std::move(new_req);
+  *out_req = decompressed_req_.get();
+  first_decompress_ = false;
+
+  return Status::OK();
+}
+
+void AdmissionController::UpdateAdmissionRequestCompressionStats(
+    int64_t compressed_size, int64_t uncompressed_size, float ratio) const {
+  if (compressed_size_metric_ != nullptr) {
+    compressed_size_metric_->Update(compressed_size);
+  }
+  if (uncompressed_size_metric_ != nullptr) {
+    uncompressed_size_metric_->Update(uncompressed_size);
+  }
+  if (compression_ratio_metric_ != nullptr) {
+    compression_ratio_metric_->Update(ratio);
+  }
 }
 
 // Append to ss a debug string for memory consumption part of the pool stats.
@@ -700,6 +756,13 @@ AdmissionController::AdmissionController(ClusterMembershipMgr* cluster_membershi
       });
   total_dequeue_failed_coordinator_limited_ =
       metrics_group_->AddCounter(TOTAL_DEQUEUE_FAILED_COORDINATOR_LIMITED, 0);
+  compressed_size_metric_ = metrics_group_->RegisterMetric(new HistogramMetric(
+      MetricDefs::Get(EXEC_REQ_COMPRESSED_SIZE_KEY), numeric_limits<int64_t>::max(), 3));
+  uncompressed_size_metric_ = metrics_group_->RegisterMetric(
+      new HistogramMetric(MetricDefs::Get(EXEC_REQ_UNCOMPRESSED_SIZE_KEY),
+          numeric_limits<int64_t>::max(), 3));
+  compression_ratio_metric_ = metrics_group_->RegisterMetric(
+      new HistogramMetric(MetricDefs::Get(EXEC_REQ_COMPRESSION_RATIO_KEY), 10000, 3));
   if (FLAGS_cluster_membership_topic_id.empty()) {
     request_queue_topic_name_ = Statestore::IMPALA_REQUEST_QUEUE_TOPIC;
   } else {
@@ -1584,7 +1647,11 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     unique_ptr<QuerySchedulePB>* schedule_result, bool& queued,
     std::string* request_pool) {
   queued = false;
-  DebugActionNoFail(request.query_options, "AC_BEFORE_ADMISSION");
+  const TQueryExecRequest* exec_req = nullptr;
+  RETURN_IF_ERROR(request.request.GetQueryExecRequest(&exec_req));
+  DCHECK(exec_req != nullptr);
+  DebugActionNoFail(
+      exec_req->query_ctx.client_request.query_options, "AC_BEFORE_ADMISSION");
   DCHECK(schedule_result->get() == nullptr);
 
   ClusterMembershipMgr::SnapshotPtr membership_snapshot =
@@ -1618,8 +1685,8 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
   // Re-resolve the pool name to propagate any resolution errors now that this request is
   // known to require a valid pool. All executor groups / schedules will use the same pool
   // name.
-  RETURN_IF_ERROR(ResolvePoolAndGetConfig(request.request.query_ctx,
-      &queue_node->pool_name, &queue_node->pool_cfg, &queue_node->root_cfg));
+  RETURN_IF_ERROR(ResolvePoolAndGetConfig(exec_req->query_ctx, &queue_node->pool_name,
+      &queue_node->pool_cfg, &queue_node->root_cfg));
   request.summary_profile->AddInfoString("Request Pool", queue_node->pool_name);
 
   {
@@ -1678,8 +1745,11 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     }
 
     string user;
-    RETURN_IF_ERROR(GetEffectiveShortUser(
-        queue_node->admission_request.request.query_ctx.session, &user));
+    const TQueryExecRequest* exec_req_queue_node = nullptr;
+    RETURN_IF_ERROR(
+        queue_node->admission_request.request.GetQueryExecRequest(&exec_req_queue_node));
+    DCHECK(exec_req_queue_node != nullptr);
+    RETURN_IF_ERROR(GetEffectiveShortUser(exec_req_queue_node->query_ctx.session, &user));
 
     if (queue_node->admitted_schedule.get() != nullptr) {
       DCHECK(queue_node->admitted_schedule->query_schedule_pb().get() != nullptr);
@@ -1719,6 +1789,8 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
       stats->IncrementPerUser(user);
     }
     queue->Enqueue(queue_node);
+    // Clear the decompressed cache to save the memory after enqueue.
+    queue_node->admission_request.request.ClearDecompressedCache();
 
     // Must be done while we still hold 'admission_ctrl_lock_' as the dequeue loop thread
     // can modify 'not_admitted_reason'.
@@ -1786,9 +1858,13 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
     queue_nodes_.erase(query_id);
   });
 
+  const TQueryExecRequest* exec_req_queue_node = nullptr;
+  RETURN_IF_ERROR(
+      queue_node->admission_request.request.GetQueryExecRequest(&exec_req_queue_node));
+  DCHECK(exec_req_queue_node != nullptr);
   // Disallow the FAIL action here. It would leave the queue in an inconsistent state.
-  DebugActionNoFail(
-      queue_node->admission_request.query_options, "AC_AFTER_ADMISSION_OUTCOME");
+  DebugActionNoFail(exec_req_queue_node->query_ctx.client_request.query_options,
+      "AC_AFTER_ADMISSION_OUTCOME");
 
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
@@ -2270,6 +2346,9 @@ Status AdmissionController::ComputeGroupScheduleStates(
     return Status::OK();
   }
   const AdmissionRequest& request = queue_node->admission_request;
+  const TQueryExecRequest* exec_req = nullptr;
+  RETURN_IF_ERROR(request.request.GetQueryExecRequest(&exec_req));
+  DCHECK(exec_req != nullptr);
   VLOG(3) << "Scheduling query " << PrintId(request.query_id)
           << " with membership version " << current_membership_version;
 
@@ -2304,7 +2383,7 @@ Status AdmissionController::ComputeGroupScheduleStates(
     executor_groups = {&membership_snapshot->all_coordinators};
   } else {
     executor_groups =
-        GetExecutorGroupsForQuery(membership_snapshot->executor_groups, request);
+        GetExecutorGroupsForQuery(membership_snapshot->executor_groups, *exec_req);
   }
 
   if (executor_groups.empty()) {
@@ -2314,8 +2393,9 @@ Status AdmissionController::ComputeGroupScheduleStates(
   }
 
   // Collect all coordinators if needed for the request.
-  ExecutorGroup coords = request.request.include_all_coordinators ?
-      membership_snapshot->all_coordinators : ExecutorGroup("all-coordinators");
+  ExecutorGroup coords = exec_req->include_all_coordinators ?
+      membership_snapshot->all_coordinators :
+      ExecutorGroup("all-coordinators");
 
   // We loop over the executor groups in a deterministic order. If
   // --balance_queries_across_executor_groups set to true, executor groups with more
@@ -2342,7 +2422,8 @@ Status AdmissionController::ComputeGroupScheduleStates(
     }
 
     unique_ptr<ScheduleState> group_state = make_unique<ScheduleState>(request.query_id,
-        request.request, request.query_options, request.summary_profile, false);
+        *exec_req, exec_req->query_ctx.client_request.query_options,
+        request.summary_profile, false);
     const string& group_name = executor_group->name();
     VLOG(3) << "Scheduling for executor group: " << group_name << " with "
             << executor_group->NumExecutors() << " executors";
@@ -2628,6 +2709,17 @@ void AdmissionController::TryDequeue() {
       VLOG(3) << "Dequeueing from stats for pool " << pool_name;
       stats->Dequeue(false);
       const UniqueIdPB& query_id = queue_node->admission_request.query_id;
+      const TQueryExecRequest* exec_req = nullptr;
+      Status status =
+          queue_node->admission_request.request.GetQueryExecRequest(&exec_req);
+      if (!status.ok()) {
+        LOG(WARNING) << "Failed to get query execution request for dequeued query "
+                     << PrintId(query_id) << ": " << status.GetDetail();
+        // Fall to rejection handling.
+        queue_node->not_admitted_reason =
+            Substitute("Failed to get query execution request: $0", status.GetDetail());
+        is_rejected = true;
+      }
       if (is_rejected) {
         AdmissionOutcome outcome =
             queue_node->admit_outcome->Set(AdmissionOutcome::REJECTED);
@@ -2667,8 +2759,7 @@ void AdmissionController::TryDequeue() {
       DCHECK(!is_rejected);
       DCHECK(queue_node->admitted_schedule != nullptr);
       string user;
-      Status status = GetEffectiveShortUser(
-          queue_node->admission_request.request.query_ctx.session, &user);
+      status = GetEffectiveShortUser(exec_req->query_ctx.session, &user);
       DCHECK_OK(status); // Should never happen because user name was checked at query
                          // entry.
       AdmitQuery(queue_node, user, true /* was_queued */, is_trivial);
@@ -3097,15 +3188,15 @@ const pair<int64_t, int64_t> AdmissionController::GetAvailableMemAndSlots(
 
 vector<const ExecutorGroup*> AdmissionController::GetExecutorGroupsForQuery(
     const ClusterMembershipMgr::ExecutorGroups& all_groups,
-    const AdmissionRequest& request) {
+    const TQueryExecRequest& exec_req) {
   vector<const ExecutorGroup*> matching_groups;
-  if (scheduler_->IsCoordinatorOnlyQuery(request.request)) {
+  if (scheduler_->IsCoordinatorOnlyQuery(exec_req)) {
     // Coordinator only queries can run regardless of the presence of exec groups. This
     // empty group works as a proxy to schedule coordinator only queries.
     matching_groups.push_back(cluster_membership_mgr_->GetEmptyExecutorGroup());
     return matching_groups;
   }
-  const string& pool_name = request.request.query_ctx.request_pool;
+  const string& pool_name = exec_req.query_ctx.request_pool;
   string prefix(pool_name + POOL_GROUP_DELIMITER);
   // We search for matching groups before the health check so that we don't fall back to
   // the default group in case there are matching but unhealthy groups.

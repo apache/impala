@@ -2097,6 +2097,12 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
   """Runs all of the tests from TestAdmissionController but with the second impalad in the
   minicluster configured to perform all admission control."""
 
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestAdmissionControllerWithACService, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('admission_control_rpc_compress_threshold_bytes', 0, 1))
+
   def get_ac_process(self):
     return self.cluster.admissiond
 

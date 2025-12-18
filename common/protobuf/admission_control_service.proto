@@ -219,6 +219,9 @@ message AdmitQueryRequestPB {
 
   // List of backends this query should not be scheduled on.
   repeated NetworkAddressPB blacklisted_executor_addresses = 4;
+
+  // Indicates whether the TQueryExecRequest sidecar is compressed.
+  optional bool is_compressed = 5 [default = false];
 }
 
 message AdmitQueryResponsePB {

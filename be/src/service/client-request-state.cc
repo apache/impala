@@ -677,10 +677,10 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
     otel_span_manager_->StartChildSpanAdmissionControl();
   }
 
-  const TQueryExecRequest* query_exec_request;
   TQueryExecRequest req;
+  req = exec_req.query_exec_request;
+  req.query_ctx.client_request.query_options = exec_req.query_options;
   if (ExecEnv::GetInstance()->AdmissionServiceEnabled()) {
-    req = exec_req.query_exec_request;
     if (req.__isset.query_plan) {
       // Use the swap() to ensure the string's memory is deallocated.
       // Using clear() sets the size to 0 but may not release the capacity.
@@ -705,14 +705,13 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
       std::string().swap(client_req.redacted_stmt);
       client_req.__isset.redacted_stmt = false;
     }
-    query_exec_request = &req;
-  } else {
-    query_exec_request = &exec_req.query_exec_request;
   }
 
+  DCHECK(!admission_exec_request_);
+  admission_exec_request_ = std::make_unique<AdmissionExecRequestUncompressed>(&req);
   Status admit_status = admission_control_client_->SubmitForAdmission(
-      {query_id_pb, ExecEnv::GetInstance()->backend_id(), *query_exec_request,
-          exec_req.query_options, summary_profile_, blacklisted_executor_addresses_},
+      {query_id_pb, ExecEnv::GetInstance()->backend_id(), *admission_exec_request_,
+          summary_profile_, blacklisted_executor_addresses_},
       query_events_, &schedule_, &wait_start_time_ms_, &wait_end_time_ms_,
       otel_span_manager_.get());
 

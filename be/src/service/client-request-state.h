@@ -39,6 +39,7 @@
 namespace impala {
 
 class AdmissionControlClient;
+class AdmissionExecRequest;
 class Coordinator;
 class Expr;
 class Frontend;
@@ -756,6 +757,9 @@ class ClientRequestState {
   /// The TExecRequest for the query tracked by this ClientRequestState. The TExecRequest
   /// is initialized once it's finalized. It's owned by the parent QueryDriver.
   AtomicPtr<const TExecRequest> exec_request_{&unknown_exec_request_};
+
+  /// Construct only once to be used as a member of AdmissionRequest.
+  std::unique_ptr<AdmissionExecRequest> admission_exec_request_;
 
   /// If true, effective_user() has access to the runtime profile and execution
   /// summary.

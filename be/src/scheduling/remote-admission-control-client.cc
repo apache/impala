@@ -17,6 +17,7 @@
 
 #include "scheduling/remote-admission-control-client.h"
 
+#include "common/names.h"
 #include "gen-cpp/admission_control_service.pb.h"
 #include "gen-cpp/admission_control_service.proxy.h"
 #include "kudu/rpc/rpc_controller.h"
@@ -31,15 +32,16 @@
 #include "util/time.h"
 #include "util/uid-util.h"
 
-#include "common/names.h"
-
-
 DEFINE_int32(admission_status_retry_time_ms, 10,
     "(Advanced) The number of milliseconds coordinators will wait before retrying the "
     "GetQueryStatus rpc.");
 DEFINE_int32(admission_max_retry_time_s, 60,
     "(Advanced) The amount of time in seconds the coordinator will spend attempting to "
     "retry admission if the admissiond is unreachable.");
+DEFINE_int64(admission_control_rpc_compress_threshold_bytes, 0,
+    "The minimum size in bytes of the serialized TQueryExecRequest required to trigger "
+    "compression in Admission Control RPCs. If set to 0, compression is disabled. "
+    "If set to a positive value, requests larger than this size will be compressed.");
 
 using namespace strings;
 using namespace kudu::rpc;
@@ -57,9 +59,12 @@ Status RemoteAdmissionControlClient::TryAdmitQuery(AdmissionControlServiceProxy*
   AdmitQueryResponsePB resp;
   RpcController rpc_controller;
 
-  KrpcSerializer serializer;
+  KrpcSerializer serializer(FLAGS_admission_control_rpc_compress_threshold_bytes);
   int sidecar_idx;
-  RETURN_IF_ERROR(serializer.SerializeToSidecar(&request, &rpc_controller, &sidecar_idx));
+  bool is_compressed;
+  RETURN_IF_ERROR(serializer.SerializeToSidecar<TQueryExecRequestCompressed>(
+      &request, &rpc_controller, &sidecar_idx, &is_compressed));
+  req->set_is_compressed(is_compressed);
   req->set_query_exec_request_sidecar_idx(sidecar_idx);
 
   Status admit_status = Status::OK();
@@ -118,7 +123,7 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
   int64_t admission_start = MonotonicMillis();
   kudu::Status admit_rpc_status = kudu::Status::OK();
   Status admit_status =
-      TryAdmitQuery(proxy.get(), request.request, &req, &admit_rpc_status);
+      TryAdmitQuery(proxy.get(), *request.request.request(), &req, &admit_rpc_status);
   int32_t num_retries = 0;
   // Only retry AdmitQuery if the rpc layer reported a network error, indicating that the
   // admissiond was unreachable.
@@ -142,7 +147,8 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
     // Re-resolve the admissiond address on each retry to handle cases
     // where the admissiond has restarted with a new IP.
     RETURN_IF_ERROR(AdmissionControlService::GetProxy(&proxy));
-    admit_status = TryAdmitQuery(proxy.get(), request.request, &req, &admit_rpc_status);
+    admit_status =
+        TryAdmitQuery(proxy.get(), *request.request.request(), &req, &admit_rpc_status);
   }
 
   KUDU_RETURN_IF_ERROR(admit_rpc_status, "AdmitQuery rpc failed");

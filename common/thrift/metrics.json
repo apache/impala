@@ -3959,6 +3959,36 @@
     "key": "admission-controller.total-dequeue-failed-coordinator-limited"
   },
   {
+    "description": "Compressed TQueryExecRequest sizes processed by the Admission Controller.",
+    "contexts": [
+      "ADMISSIOND"
+    ],
+    "label": "Admission Control Query Execution Request Compressed Size",
+    "units": "BYTES",
+    "kind": "HISTOGRAM",
+    "key": "admission-controller.query-exec-request-compressed-bytes"
+  },
+  {
+    "description": "Uncompressed TQueryExecRequest sizes processed by the Admission Controller.",
+    "contexts": [
+      "ADMISSIOND"
+    ],
+    "label": "Admission Control Query Execution Request Uncompressed Size",
+    "units": "BYTES",
+    "kind": "HISTOGRAM",
+    "key": "admission-controller.query-exec-request-uncompressed-bytes"
+  },
+  {
+    "description": "Compression ratios (Uncompressed / Compressed) of TQueryExecRequest sizes.",
+    "contexts": [
+      "ADMISSIOND"
+    ],
+    "label": "Admission Control Query Execution Request Compression Ratio",
+    "units": "NONE",
+    "kind": "HISTOGRAM",
+    "key": "admission-controller.query-exec-request-compression-ratio"
+  },
+  {
     "key": "admission-control-service.num-queries-high-water-mark",
     "label": "HWM Num Queries in Admission Control Service",
     "units": "NONE",

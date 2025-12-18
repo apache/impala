@@ -31,27 +31,53 @@ namespace impala {
 
 class KrpcSerializer {
  public:
-  KrpcSerializer() : serializer_(/* compact */ true) {}
+  KrpcSerializer(int64_t threshold_bytes = 0)
+    : serializer_(/* compact */ true), compress_threshold_bytes_(threshold_bytes) {}
 
   /// Serialize obj and set it as a sidecar on 'rpc_controller', returning the idx in
-  /// 'sidecar_idx'. The memory for the sidecar is owned by this object and must remain
-  /// valid until the rpc has completed.
-  template <class T>
-  Status SerializeToSidecar(
-      const T* obj, kudu::rpc::RpcController* rpc_controller, int* sidecar_idx) {
-    uint8_t* serialized_buf = nullptr;
-    uint32_t serialized_len = 0;
-    RETURN_IF_ERROR(serializer_.SerializeToBuffer(obj, &serialized_len, &serialized_buf));
+  /// 'sidecar_idx'.
+  ///
+  /// If TCompressed is provided and the serialized size exceeds
+  /// 'compress_threshold_bytes_', the object is compressed and the TCompressed object
+  /// is sent instead. Compression is disabled when the threshold is 0.
+  ///
+  /// The sidecar memory is owned by this serializer and must remain valid until the rpc
+  /// has completed. If provided, 'is_compressed' indicates whether the sidecar thrift
+  /// object is compressed.
+  template <typename TCompressed = void, typename T>
+  Status SerializeToSidecar(const T* obj, kudu::rpc::RpcController* rpc_controller,
+      int* sidecar_idx, bool* is_compressed = nullptr) {
+    uint8_t* buf = nullptr;
+    uint32_t len = 0;
+    RETURN_IF_ERROR(serializer_.SerializeToBuffer(obj, &len, &buf));
+
+    if (is_compressed != nullptr) *is_compressed = false;
+
+    if constexpr (!std::is_same_v<TCompressed, void>) {
+      // Compression path.
+      if (compress_threshold_bytes_ > 0 && len > compress_threshold_bytes_) {
+        // NOTE: 'buf' points to the serializer's internal buffer.
+        // Ensure 'buf' is fully consumed into a compressed thrift in
+        // CreateCompressedThrift() before the next call to SerializeToBuffer()
+        // that could reset or reuse the serializer buffer.
+        TCompressed compressed_obj;
+        RETURN_IF_ERROR(CreateCompressedThrift<TCompressed>(buf, len, &compressed_obj));
+        RETURN_IF_ERROR(serializer_.SerializeToBuffer(&compressed_obj, &len, &buf));
+        if (is_compressed != nullptr) *is_compressed = true;
+      }
+    }
+
     std::unique_ptr<kudu::rpc::RpcSidecar> rpc_sidecar =
-        kudu::rpc::RpcSidecar::FromSlice(kudu::Slice(serialized_buf, serialized_len));
+        kudu::rpc::RpcSidecar::FromSlice(kudu::Slice(buf, len));
     KUDU_RETURN_IF_ERROR(
-        rpc_controller->AddOutboundSidecar(move(rpc_sidecar), sidecar_idx),
+        rpc_controller->AddOutboundSidecar(std::move(rpc_sidecar), sidecar_idx),
         "Failed to add sidecar");
     return Status::OK();
   }
 
  private:
   ThriftSerializer serializer_;
+  int64_t compress_threshold_bytes_;
 };
 
 // Retrieves the sidecar at 'sidecar_idx' from 'rpc_context' and deserializes it into

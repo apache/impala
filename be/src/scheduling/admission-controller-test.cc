@@ -415,10 +415,12 @@ class AdmissionControllerTest : public testing::Test {
     UniqueIdPB* query_id = pool_.Add(new UniqueIdPB());
     RuntimeProfile* summary_profile = pool_.Add(new RuntimeProfile(&pool_, "foo"));
     std::unordered_set<NetworkAddressPB> blacklisted_executor_addresses;
-    const TQueryExecRequest& exec_request = schedule_state->request();
+    const TQueryExecRequest& t_exec_request = schedule_state->request();
+    AdmissionExecRequestUncompressed* exec_request =
+        pool_.Add(new AdmissionExecRequestUncompressed(&t_exec_request));
     TQueryOptions query_options;
-    AdmissionController::AdmissionRequest request = {*query_id, *coord_id, exec_request,
-        query_options, summary_profile, blacklisted_executor_addresses};
+    AdmissionController::AdmissionRequest request = {*query_id, *coord_id, *exec_request,
+        summary_profile, blacklisted_executor_addresses};
 
     // Clear queue_nodes_ so we can call this method again, though this means there can
     // only ever be one queue node.
