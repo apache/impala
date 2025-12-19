@@ -140,7 +140,6 @@ import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TSetEventProcessorStatusResponse;
 import org.apache.impala.thrift.TStatus;
-import org.apache.impala.thrift.TSystemTableName;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableType;
@@ -378,11 +377,6 @@ public class CatalogServiceCatalog extends Catalog {
 
   private AuthorizationManager authzManager_;
 
-  // Databases that will be skipped in loading.
-  private final Set<String> blacklistedDbs_;
-  // Tables that will be skipped in loading.
-  private final Set<TableName> blacklistedTables_;
-
   // Table properties that require file metadata reload
   private final Set<String> whitelistedTblProperties_;
 
@@ -408,8 +402,6 @@ public class CatalogServiceCatalog extends Catalog {
   // True if initial reset() has been triggered internally.
   private boolean triggeredInitialReset_ = false;
 
-  private final List<String> impalaSysTables;
-
   /**
    * Initialize the CatalogServiceCatalog using a given MetastoreClientPool impl.
    *
@@ -422,10 +414,6 @@ public class CatalogServiceCatalog extends Catalog {
       String localLibraryPath, MetaStoreClientPool metaStoreClientPool)
       throws ImpalaException {
     super(metaStoreClientPool);
-    blacklistedDbs_ = CatalogBlacklistUtils.parseBlacklistedDbs(
-        BackendConfig.INSTANCE.getBlacklistedDbs(), LOG);
-    blacklistedTables_ = CatalogBlacklistUtils.parseBlacklistedTables(
-        BackendConfig.INSTANCE.getBlacklistedTables(), LOG);
     maxSkippedUpdatesLockContention_ = BackendConfig.INSTANCE
         .getBackendCfg().catalog_max_lock_skipped_topic_updates;
     Preconditions.checkState(maxSkippedUpdatesLockContention_ > 0,
@@ -434,9 +422,6 @@ public class CatalogServiceCatalog extends Catalog {
         .getBackendCfg().topic_update_tbl_max_wait_time_ms;
     Preconditions.checkState(topicUpdateTblLockMaxWaitTimeMs_ >= 0,
         "topic_update_tbl_max_wait_time_ms must be positive");
-    impalaSysTables = Arrays.asList(
-        BackendConfig.INSTANCE.queryLogTableName(),
-        TSystemTableName.IMPALA_QUERY_LIVE.toString().toLowerCase());
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;
     try {
@@ -577,12 +562,7 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   protected boolean isBlacklistedDbInternal(String loweredDbName) {
-    if (BackendConfig.INSTANCE.enableWorkloadMgmt()
-        && loweredDbName.equalsIgnoreCase(Db.SYS)) {
-      // Override 'sys' for Impala system tables.
-      return false;
-    }
-    return blacklistedDbs_.contains(loweredDbName);
+    return CatalogBlacklistUtils.isDbBlacklisted(loweredDbName);
   }
 
   /**
@@ -590,11 +570,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public boolean isBlacklistedTable(TableName table) {
     Preconditions.checkNotNull(table);
-    if (table.getDb().equalsIgnoreCase(Db.SYS) && blacklistedDbs_.contains(Db.SYS)) {
-      // If we've overridden the database blacklist, only allow Impala system tables.
-      return !impalaSysTables.contains(table.getTbl());
-    }
-    return blacklistedTables_.contains(table);
+    return CatalogBlacklistUtils.isTableBlacklisted(table);
   }
 
   /**

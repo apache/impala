@@ -58,7 +58,8 @@ class TestSysDb(CustomClusterTestSuite):
       assert False, "table '{0}' should have failed to create but was created" \
           .format(table_name)
     except IMPALA_CONNECTION_EXCEPTION as e:
-      expected_error = "IllegalStateException: Can't create blacklisted table: {0}" \
+      expected_error = "AnalysisException: Invalid table/view name: " \
+          "{0}. It has been blacklisted using --blacklisted_tables" \
           .format(table_name)
       assert error_msg_startswith(str(e), expected_error), \
           "table '{0}' failed to create but for the wrong reason:\n{1}\n" \

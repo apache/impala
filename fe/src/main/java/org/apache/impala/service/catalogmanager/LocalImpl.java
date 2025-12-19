@@ -20,9 +20,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.stream.Collectors;
+
 import org.apache.iceberg.exceptions.RESTException;
 import org.apache.impala.catalog.FeCatalog;
+import org.apache.impala.catalog.local.BlacklistingMetaProvider;
 import org.apache.impala.catalog.local.CatalogdMetaProvider;
 import org.apache.impala.catalog.local.IcebergMetaProvider;
 import org.apache.impala.catalog.local.LocalCatalog;
@@ -104,7 +105,8 @@ class LocalImpl extends FeCatalogManager {
     List<MetaProvider> list = new ArrayList<>();
     for (Properties properties : loader.loadConfigs()) {
       try {
-        IcebergMetaProvider icebergMetaProvider = new IcebergMetaProvider(properties);
+        MetaProvider icebergMetaProvider =
+            new BlacklistingMetaProvider(new IcebergMetaProvider(properties));
         list.add(icebergMetaProvider);
       } catch (RESTException e) {
         LOG.error(String.format(

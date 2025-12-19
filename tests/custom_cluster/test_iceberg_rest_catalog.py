@@ -115,6 +115,25 @@ class TestIcebergRestCatalogWithHms(IcebergRestCatalogTests):
     self.run_test_case('QueryTest/iceberg-multiple-rest-catalogs',
                        vector, use_db="ice")
 
+  @RestServerProperties({'port': 9084})
+  @CustomClusterTestSuite.with_args(
+     impalad_args="{} --blacklisted_dbs=ice".format(MULTICATALOG_IMPALAD_ARGS),
+     catalogd_args=MULTICATALOG_CATALOGD_ARGS)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_multicatalog_blacklisted_db(self, vector):
+    self.run_test_case('QueryTest/iceberg-rest-catalog-blacklist-db', vector,
+        use_db="default")
+
+  @RestServerProperties({'port': 9084})
+  @CustomClusterTestSuite.with_args(
+      impalad_args="{} --blacklisted_tables=ice.airports_parquet"
+                   .format(REST_STANDALONE_IMPALAD_ARGS),
+      catalogd_args=MULTICATALOG_CATALOGD_ARGS)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_multicatalog_blacklisted_tables(self, vector):
+    self.run_test_case('QueryTest/iceberg-rest-catalog-blacklist-tables',
+        vector, use_db="ice")
+
 
 class TestIcebergRestCatalogNoHms(IcebergRestCatalogTests):
   """Test suite for Iceberg REST Catalog. HMS is stopped while tests are running"""
@@ -175,3 +194,22 @@ class TestIcebergRestCatalogNoHms(IcebergRestCatalogTests):
   def test_multiple_rest_catalogs_with_ambiguous_tables(self, vector):
     self.run_test_case('QueryTest/iceberg-multiple-rest-catalogs-ambiguous-name',
                        vector, use_db="ice")
+
+  @RestServerProperties({'port': 9084})
+  @CustomClusterTestSuite.with_args(
+     impalad_args="{} --blacklisted_dbs=ice".format(REST_STANDALONE_IMPALAD_ARGS),
+     start_args=NO_CATALOGD_STARTARGS)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_basic_blacklisted_db(self, vector):
+    self.run_test_case('QueryTest/iceberg-rest-catalog-blacklist-db', vector,
+        use_db="default")
+
+  @RestServerProperties({'port': 9084})
+  @CustomClusterTestSuite.with_args(
+      impalad_args="{} --blacklisted_tables=ice.airports_parquet"
+                   .format(REST_STANDALONE_IMPALAD_ARGS),
+      start_args=NO_CATALOGD_STARTARGS)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_basic_blacklisted_tables(self, vector):
+    self.run_test_case('QueryTest/iceberg-rest-catalog-blacklist-tables',
+        vector, use_db="ice")

@@ -1,0 +1,27 @@
+====
+---- QUERY
+# Blacklisted tables are not resolvable.
+select count(*) from ice.airports_parquet;
+---- CATCH
+AnalysisException: Could not resolve table reference: 'ice.airports_parquet'
+====
+---- QUERY
+# Blacklisted tables cannot be shown.
+show tables like 'airports_parquet';
+---- RESULTS: MULTI_LINE
+Query: show tables like 'airports_parquet'
+row_regex:.*Fetched 0 row.*
+====
+---- QUERY
+# Blacklisted tables cannot be inserted into.
+insert into airports_parquet (iata) values ('foo');
+---- CATCH
+row_regex:.*AnalysisException: Table does not exist: ice.airports_parquet
+====
+---- QUERY
+# Cannot create tables via Iceberg REST Catalog, guard against that functionality
+# bypassing the blacklist in the future.
+create table ice.airports_parquet (id string) stored as iceberg LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/airports_parquet';
+---- CATCH
+AnalysisException: Invalid table/view name: ice.airports_parquet. It has been blacklisted using --blacklisted_tables
+====

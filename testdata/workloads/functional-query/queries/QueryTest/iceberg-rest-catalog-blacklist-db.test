@@ -1,0 +1,32 @@
+====
+---- QUERY
+# Blacklisted databases are not shown.
+show databases "ice";
+---- RESULTS: MULTI_LINE
+Query: show databases "ice"
+row_regex:.*Fetched 0 row.*
+====
+---- QUERY
+# Blacklisted databases cannot be used.
+use ice;
+---- CATCH
+AnalysisException: Database does not exist: ice
+====
+---- QUERY
+# Cannot select from any tables in a blacklisted database.
+select count(*) from ice.airports_parquet;
+---- CATCH
+AnalysisException: Could not resolve table reference: 'ice.airports_parquet'
+====
+---- QUERY
+# Cannot create tables via Iceberg REST Catalog, guard against that functionality
+# bypassing the blacklist in the future.
+create table ice.foo (id string) stored as iceberg LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice/foo';
+---- CATCH
+AnalysisException: Database does not exist: ice
+====
+---- QUERY
+create database ice comment 'iceberg catalog blacklist db test' LOCATION '/test-warehouse/iceberg_test/hadoop_catalog/ice'
+---- CATCH
+AnalysisException: Invalid db name: ice. It has been blacklisted using --blacklisted_dbs
+====
