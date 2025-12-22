@@ -403,22 +403,7 @@ public class CastExpr extends Expr {
     noOp_ = childType.equals(type_);
     if (noOp_) return;
 
-    FunctionName fnName = new FunctionName(BuiltinsDb.NAME, getFnName(type_));
-    Type[] args = { childType };
-    Function searchDesc = new Function(fnName, args, Type.INVALID, false);
-    if (isImplicit_) {
-      fn_ = BuiltinsDb.getInstance().getFunction(searchDesc,
-          CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
-      Preconditions.checkState(fn_ != null);
-    } else {
-      fn_ = BuiltinsDb.getInstance().getFunction(searchDesc,
-          CompareMode.IS_IDENTICAL);
-      if (fn_ == null) {
-        // allow for promotion from CHAR to STRING; only if no exact match is found
-        fn_ =  BuiltinsDb.getInstance().getFunction(
-            searchDesc.promoteCharsToStrings(), CompareMode.IS_IDENTICAL);
-      }
-    }
+    fn_ = getFunction(childType, type_, isImplicit_);
     if (fn_ == null) {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
           " from " + childType + " to " + type_);
@@ -426,6 +411,28 @@ public class CastExpr extends Expr {
 
     Preconditions.checkState(type_.matchesType(fn_.getReturnType()),
         type_ + " != " + fn_.getReturnType());
+  }
+
+  public static Function getFunction(Type fromType, Type toType, boolean isImplicit)
+      throws AnalysisException {
+    Function fn = null;
+    FunctionName fnName = new FunctionName(BuiltinsDb.NAME, getFnName(toType));
+    Type[] args = { fromType };
+    Function searchDesc = new Function(fnName, args, Type.INVALID, false);
+    if (isImplicit) {
+      fn = BuiltinsDb.getInstance().getFunction(searchDesc,
+          CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+      Preconditions.checkState(fn != null);
+    } else {
+      fn = BuiltinsDb.getInstance().getFunction(searchDesc,
+          CompareMode.IS_IDENTICAL);
+      if (fn == null) {
+        // allow for promotion from CHAR to STRING; only if no exact match is found
+        fn = BuiltinsDb.getInstance().getFunction(
+            searchDesc.promoteCharsToStrings(), CompareMode.IS_IDENTICAL);
+      }
+    }
+    return fn;
   }
 
   /**

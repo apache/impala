@@ -33,6 +33,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ArithmeticExpr;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.CaseWhenClause;
+import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
@@ -44,6 +45,7 @@ import org.apache.impala.calcite.rules.ImpalaRexExecutor;
 import org.apache.impala.calcite.type.ImpalaTypeConverter;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -191,13 +193,14 @@ public class RexCallConverter {
   private static Expr createCastExpr(RexCall call, List<Expr> params, Analyzer analyzer)
       throws ImpalaException {
     Type impalaRetType = ImpalaTypeConverter.createImpalaType(call.getType());
-    if (params.get(0).getType() == Type.NULL) {
+    Expr paramsOperand = params.get(0);
+    if (paramsOperand.getType() == Type.NULL) {
       return new AnalyzedNullLiteral(impalaRetType);
     }
 
     // no need for redundant cast.
-    if (params.get(0).getType().equals(impalaRetType)) {
-      return params.get(0);
+    if (paramsOperand.getType().equals(impalaRetType)) {
+      return paramsOperand;
     }
 
     // Hack logic: Partition pruning needs the exact number when the column
@@ -212,8 +215,16 @@ public class RexCallConverter {
     // Small hack: Most cast expressions have "isImplicit" set to true. If this
     // is the case, then it blocks "analyze" from working through the cast. We
     // need to analyze the expression before creating the cast around it.
-    params.get(0).analyze(analyzer);
-    return new AnalyzedCastExpr(impalaRetType, params.get(0));
+    paramsOperand.analyze(analyzer);
+
+
+    // call getFunction which will return null if the cast is not valid.
+    Function fn = CastExpr.getFunction(paramsOperand.getType(), impalaRetType, false);
+    if (fn == null) {
+      throw new AnalysisException("Invalid type cast " +
+          "from " + paramsOperand.getType() + " to " + impalaRetType);
+    }
+    return new AnalyzedCastExpr(impalaRetType, paramsOperand);
   }
 
   private static Expr createDecodeExpr(Function fn, List<Expr> params,

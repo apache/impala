@@ -1076,6 +1076,12 @@ where 10.1 not in (tinyint_col, smallint_col, int_col, bigint_col, float_col, do
 8990
 ---- TYPES
 bigint
+=====
+---- QUERY
+# Test that casts are not allowed between DATE and numerical types
+select cast(date '2000-12-21' as int);
+---- CATCH
+AnalysisException: Invalid type cast from DATE to INT
 ====
 ---- QUERY
 # Test for varchar ndv with both 1 and 2 parameters
