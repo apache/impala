@@ -5655,8 +5655,13 @@ public class CatalogOpExecutor {
       }
       // set write id as committed before reload the partitions so that we can get
       // up-to-date filemetadata.
-      hdfsTable.addWriteIds(writeIdsToRefresh,
-          MutableValidWriteIdList.WriteIdStatus.COMMITTED);
+      if (hdfsTable.addWriteIds(writeIdsToRefresh,
+          MutableValidWriteIdList.WriteIdStatus.COMMITTED)) {
+        // Log the deduplicated writeIds. Note that a writeId can be used to update
+        // multiple partitions.
+        LOG.info("Added COMMITTED writeIds to table {}: {} for event {}",
+            table.getFullName(), new HashSet<>(writeIdsToRefresh), eventId);
+      }
       int numOfPartsReloaded;
       try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
         numOfPartsReloaded = hdfsTable.reloadPartitionsFromEvent(eventId,

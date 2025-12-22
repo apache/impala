@@ -858,13 +858,15 @@ public class Hive3MetastoreShimBase {
     private final org.apache.hadoop.hive.metastore.api.Table msTable;
     private final List<org.apache.hadoop.hive.metastore.api.Partition> partitions;
     private final boolean isTruncate;
+    private final Long writeId;
 
     public AlterPartitionsInfo(org.apache.hadoop.hive.metastore.api.Table msTable,
         List<org.apache.hadoop.hive.metastore.api.Partition> partitions,
-        boolean isTruncate) {
+        boolean isTruncate, Long writeId) {
       this.msTable = msTable;
       this.partitions = partitions;
       this.isTruncate = isTruncate;
+      this.writeId = writeId;
     }
 
     /**
@@ -887,6 +889,14 @@ public class Hive3MetastoreShimBase {
      */
     public boolean isTruncate() {
       return isTruncate;
+    }
+
+    /**
+     * Returns the write id of the alter partitions operation, or -1 if for
+     * non-transactional tables.
+     */
+    public long getWriteId() {
+      return writeId == null ? -1 : writeId;
     }
   }
 

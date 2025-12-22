@@ -56,6 +56,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableValidWriteIds;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Client;
+import org.apache.hadoop.hive.metastore.messaging.AlterPartitionMessage;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.EventMessage;
 import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
@@ -205,6 +206,14 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   @VisibleForTesting
   public static String serializeEventMessage(EventMessage message) {
     return message.toString();
+  }
+
+  public static long getWriteId(AlterTableMessage message) {
+    return 0;
+  }
+
+  public static long getWriteId(AlterPartitionMessage message) {
+    return 0;
   }
 
   /**

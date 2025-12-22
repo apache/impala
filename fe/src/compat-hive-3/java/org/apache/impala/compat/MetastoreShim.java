@@ -80,6 +80,7 @@ import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogBatchRequest;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogRequest;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.messaging.AlterPartitionMessage;
 import org.apache.hadoop.hive.metastore.messaging.AlterPartitionsMessage;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.CommitTxnMessage;
@@ -108,6 +109,7 @@ import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.TableNotLoadedException;
+import org.apache.impala.catalog.TableWriteEvent;
 import org.apache.impala.catalog.TableWriteId;
 import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreEventContext;
 import org.apache.impala.catalog.events.MetastoreEvents.DerivedMetastoreTableEvent;
@@ -256,6 +258,14 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   @VisibleForTesting
   public static String serializeEventMessage(EventMessage message) {
     return getMessageSerializer().serialize(message);
+  }
+
+  public static long getWriteId(AlterTableMessage message) {
+    return message.getWriteId();
+  }
+
+  public static long getWriteId(AlterPartitionMessage message) {
+    return message.getWriteId();
   }
 
   /**
@@ -633,8 +643,9 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       org.apache.hadoop.hive.metastore.api.Table msTbl = Preconditions.checkNotNull(
           alterPartitionsMessage.getTableObj());
       boolean isTruncateOp = alterPartitionsMessage.getIsTruncateOp();
+      Long writeId = alterPartitionsMessage.getWriteId();
       alterPartitionsInfo = new AlterPartitionsInfo(msTbl, partitionsAfter,
-          isTruncateOp);
+          isTruncateOp, writeId);
     } catch (Exception e) {
       throw new MetastoreNotificationException(e);
     }
@@ -943,6 +954,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     private final long txnId_;
     private Set<TableWriteId> tableWriteIds_ = Collections.emptySet();
     private final Set<String> tableNames_ = new HashSet<>();
+    private final Map<TableWriteId, List<Partition>> truncateOps_ = new HashMap<>();
 
     public CommitTxnEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
         NotificationEvent event) {
@@ -954,6 +966,11 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
           .getCommitTxnMessage(event.getMessage());
       txnId_ = commitTxnMessage.getTxnId();
       tableWriteIds_ = catalog_.removeWriteIds(txnId_);
+      for (TableWriteId id : tableWriteIds_) {
+        List<Partition> parts = catalog_.removeTruncateOp(id);
+        if (parts == null) continue; // not a truncate writeId
+        truncateOps_.put(id, parts);
+      }
       LOG.info("EventId: {} EventType: COMMIT_TXN transaction id: {}", getEventId(),
           txnId_);
     }
@@ -974,22 +991,10 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     @Override
     protected void process() throws MetastoreNotificationException {
       if (handleIfInCatchUpMode()) return;
-      // Via getAllWriteEventInfo, we can get data insertion info for transactional tables
-      // even though there are no insert events generated for transactional tables. Note
-      // that we cannot get DDL info from this API.
-      List<WriteEventInfo> writeEventInfoList;
-      try (MetaStoreClientPool.MetaStoreClient client = catalog_.getMetaStoreClient()) {
-        writeEventInfoList = client.getHiveClient().getAllWriteEventInfo(
-            new GetAllWriteEventInfoRequest(txnId_));
-      } catch (TException e) {
-        throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
-            + "get write event infos for txn {}. Event processing cannot continue. Issue "
-            + "an invalidate metadata command to reset event processor.", txnId_), e);
-      }
-
+      List<TableWriteEvent> writeEvents = getWriteEventsForTxn(this);
       try {
-        if (writeEventInfoList != null && !writeEventInfoList.isEmpty()) {
-          addCommittedWriteIdsAndRefreshPartitions(writeEventInfoList);
+        if (!writeEvents.isEmpty()) {
+          addCommittedWriteIdsAndRefreshPartitions(writeEvents);
         }
         // committed write ids for DDL need to be added here
         addCommittedWriteIdsToTables(tableWriteIds_);
@@ -1033,14 +1038,13 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     }
 
     private void addCommittedWriteIdsAndRefreshPartitions(
-        List<WriteEventInfo> writeEventInfoList) throws Exception {
-      List<Long> writeIds = writeEventInfoList.stream().map(WriteEventInfo::getWriteId)
+        List<TableWriteEvent> writeEventList) throws Exception {
+      List<Long> writeIds = writeEventList.stream().map(TableWriteEvent::getWriteId)
           .collect(Collectors.toList());
       // To load partitions together for the same table, indexes are grouped by table name
       Map<TableName, AcidTableWriteInfo> tableNameToWriteInfos = new HashMap<>();
       for (int i = 0; i < writeIds.size(); i++) {
-        Table tbl = (Table) MessageBuilder.getTObj(
-            writeEventInfoList.get(i).getTableObj(), Table.class);
+        Table tbl = writeEventList.get(i).getTable();
         if (catalog_.isHmsEventSyncDisabled(tbl)) {
           LOG.debug("Not adding write ids to table {}.{} for event {} " +
               "since table/db level flag {} is set to true", tbl.getDbName(),
@@ -1049,12 +1053,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
           continue;
         }
         TableName tableName = new TableName(tbl.getDbName(), tbl.getTableName());
-        Partition partition = null;
-        if (writeEventInfoList.get(i).getPartitionObj() != null) {
-          partition = (Partition) MessageBuilder.getTObj(
-              writeEventInfoList.get(i).getPartitionObj(), Partition.class);
-          Preconditions.checkNotNull(partition);
-        }
+        Partition partition = writeEventList.get(i).getPartition();
         AcidTableWriteInfo writeInfo = tableNameToWriteInfos.computeIfAbsent(tableName,
             k -> new AcidTableWriteInfo(tbl));
         writeInfo.appendWriteIdAndPartition(writeIds.get(i), partition);
@@ -1194,6 +1193,61 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   }
 
   /**
+   * Retrieves write event information for a CommitTxnEvent and converts them into
+   * TableWriteEvent objects. Inserts come from {@code getAllWriteEventInfo}; truncates
+   * are joined in by intersecting the txn's writeIds with the catalog's truncateOps_
+   * map (populated when the ALTER_TABLE / ALTER_PARTITION / ALTER_PARTITIONS event was
+   * processed). Truncate entries are removed from truncateOps_ as a side effect.
+   */
+  private static List<TableWriteEvent> getWriteEventsForTxn(CommitTxnEvent event)
+      throws MetastoreNotificationNeedsInvalidateException {
+    Set<TableWriteEvent> writeEvents = new HashSet<>();
+    CatalogServiceCatalog cat = event.getCatalogOpExecutor().getCatalog();
+    try (MetaStoreClientPool.MetaStoreClient client = cat.getMetaStoreClient()) {
+      List<WriteEventInfo> writeEventInfoList = client.getHiveClient()
+          .getAllWriteEventInfo(new GetAllWriteEventInfoRequest(event.txnId_));
+      if (writeEventInfoList != null) {
+        for (WriteEventInfo info : writeEventInfoList) {
+          Table tbl = (Table) MessageBuilder.getTObj(info.getTableObj(), Table.class);
+          Partition partition = null;
+          if (info.getPartitionObj() != null) {
+            partition = (Partition) MessageBuilder.getTObj(info.getPartitionObj(),
+                Partition.class);
+          }
+          writeEvents.add(new TableWriteEvent(info.getWriteId(), tbl, partition));
+        }
+      }
+    } catch (Exception e) {
+      throw new MetastoreNotificationNeedsInvalidateException(String.format(
+          "EventId: %d EventType: COMMIT_TXN. Failed to get write event infos for " +
+          "txn %d. Event processing cannot continue. Issue an invalidate metadata " +
+          "command to reset event processor.",
+          event.getEventId(), event.txnId_), e);
+    }
+    // Adds truncate ops tracked in ALTER events. Note that truncate ops never appear in
+    // getAllWriteEventInfo results (HIVE-29677).
+    for (Map.Entry<TableWriteId, List<Partition>> entry : event.truncateOps_.entrySet()) {
+      TableWriteId id = entry.getKey();
+      List<Partition> parts = entry.getValue();
+      // Skip non-truncate writeIds
+      if (parts == null) continue;
+      org.apache.impala.catalog.Table cached = cat.getTableNoThrow(
+          id.getDbName(), id.getTblName());
+      // Skip non-existing or unloaded tables.
+      if (cached == null || cached.getMetaStoreTable() == null) continue;
+      Table tbl = cached.getMetaStoreTable();
+      if (parts.isEmpty()) {
+        writeEvents.add(new TableWriteEvent(id.getWriteId(), tbl, null));
+      } else {
+        for (Partition p : parts) {
+          writeEvents.add(new TableWriteEvent(id.getWriteId(), tbl, p));
+        }
+      }
+    }
+    return new ArrayList<>(writeEvents);
+  }
+
+  /**
    * Gets the list of pseudo commit transaction events. It returns a PseudoCommitTxnEvent
    * for each table involved in the transaction.
    * @param event Commit transaction event
@@ -1203,18 +1257,9 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   public static List<PseudoCommitTxnEvent> getPseudoCommitTxnEvents(CommitTxnEvent event)
       throws MetastoreNotificationException {
     List<PseudoCommitTxnEvent> pseudoEvents = new ArrayList<>();
-    List<WriteEventInfo> writeEventInfoList;
-    try (MetaStoreClientPool.MetaStoreClient client = event.getCatalogOpExecutor()
-        .getCatalog().getMetaStoreClient()) {
-      writeEventInfoList = client.getHiveClient()
-          .getAllWriteEventInfo(new GetAllWriteEventInfoRequest(event.txnId_));
-    } catch (TException e) {
-      throw new MetastoreNotificationNeedsInvalidateException(String.format(
-          "Failed to get write event infos for txn %d. Event processing cannot " +
-              "continue. Issue an invalidate metadata command to reset event processor.",
-          event.txnId_), e);
-    }
-    // Build table name to write ids mapping from the catalog
+    List<TableWriteEvent> writeEvents = getWriteEventsForTxn(event);
+    // Build table name to write ids mapping from the catalog.
+    // Note that tableWriteIds_ are added to CommitTxnEvent from catalog.
     Map<TableName, List<Long>> tableNameToWriteIds = new HashMap<>();
     for (TableWriteId writeId : event.tableWriteIds_) {
       TableName tableName = new TableName(writeId.getDbName(), writeId.getTblName());
@@ -1226,12 +1271,11 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
       Map<TableName, AcidTableWriteInfo> tableNameToWriteInfos = new HashMap<>();
       int derivedEventCount = 0;
       DerivedMetastoreEventContext context = new DerivedMetastoreEventContext(event);
-      if (writeEventInfoList != null && !writeEventInfoList.isEmpty()) {
-        List<Long> writeIds = writeEventInfoList.stream().map(WriteEventInfo::getWriteId)
+      if (!writeEvents.isEmpty()) {
+        List<Long> writeIds = writeEvents.stream().map(TableWriteEvent::getWriteId)
             .collect(Collectors.toList());
         for (int i = 0; i < writeIds.size(); i++) {
-          Table tbl = (Table) MessageBuilder.getTObj(
-              writeEventInfoList.get(i).getTableObj(), Table.class);
+          Table tbl = writeEvents.get(i).getTable();
           if (event.getCatalogOpExecutor().getCatalog().isHmsEventSyncDisabled(tbl)) {
             LOG.debug("Not adding write ids to table {}.{} for event {} " +
                     "since table/db level flag {} or global level flag is set to true",
@@ -1240,12 +1284,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
             continue;
           }
           TableName tableName = new TableName(tbl.getDbName(), tbl.getTableName());
-          Partition partition = null;
-          if (writeEventInfoList.get(i).getPartitionObj() != null) {
-            partition = (Partition) MessageBuilder.getTObj(
-                writeEventInfoList.get(i).getPartitionObj(), Partition.class);
-            Preconditions.checkNotNull(partition);
-          }
+          Partition partition = writeEvents.get(i).getPartition();
           AcidTableWriteInfo writeInfo = tableNameToWriteInfos.computeIfAbsent(tableName,
               k -> new AcidTableWriteInfo(tbl));
           writeInfo.appendWriteIdAndPartition(writeIds.get(i), partition);

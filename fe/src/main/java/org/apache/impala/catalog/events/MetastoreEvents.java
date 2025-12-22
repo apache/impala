@@ -2099,11 +2099,13 @@ public class MetastoreEvents {
       JSONAlterTableMessage alterTableMessage =
           (JSONAlterTableMessage) MetastoreEventsProcessor.getMessageDeserializer()
               .getAlterTableMessage(event.getMessage());
+      long writeId;
       try {
         msTbl_ = Preconditions.checkNotNull(alterTableMessage.getTableObjBefore());
         tableAfter_ = Preconditions.checkNotNull(alterTableMessage.getTableObjAfter());
         tableBefore_ = Preconditions.checkNotNull(alterTableMessage.getTableObjBefore());
         isTruncateOp_ = alterTableMessage.getIsTruncateOp();
+        writeId = MetastoreShim.getWriteId(alterTableMessage);
       } catch (Exception e) {
         throw new MetastoreNotificationException(
             debugString("Unable to parse the alter table message"), e);
@@ -2117,6 +2119,19 @@ public class MetastoreEvents {
       dbFlagVal =
           Boolean.valueOf(catalog_.getDbProperty(dbName_,
               MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey()));
+
+      if (isTruncateOp_) {
+        if (AcidUtils.isTransactionalTable(tableAfter_.getParameters())) {
+          // Track the truncate by writeId. The owning txn is identified later when
+          // processing the COMMIT_TXN event.
+          catalog_.trackTruncateOp(
+              new TableWriteId(dbName_, tblName_, writeId), Collections.emptyList());
+          infoLog("Tracked truncate op with writeId {} on table {}.{}",
+              writeId, dbName_, tblName_);
+        } else {
+          infoLog("TruncateOp on non-transactional table");
+        }
+      }
     }
 
     public boolean isRename() { return isRename_; }
@@ -3024,6 +3039,19 @@ public class MetastoreEvents {
             parameters, MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
         partName_ = HdfsTable.constructPartitionName(getTPartitionSpecFromHmsPartition(
             msTbl_, partitionAfter_));
+        if (isTruncateOp_) {
+          // Track truncate operations on transactional table partitions
+          if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
+            long writeId = MetastoreShim.getWriteId(alterPartitionMessage);
+            catalog_.trackTruncateOp(
+                new TableWriteId(dbName_, tblName_, writeId),
+                Collections.singletonList(partitionAfter_));
+            infoLog("Tracked truncate op with writeId {} on partition {} of {}.{}",
+                writeId, partName_, dbName_, tblName_);
+          } else {
+            infoLog("TruncateOp on non-transactional table");
+          }
+        }
       } catch (Exception e) {
         throw new MetastoreNotificationException(
             debugString("Unable to parse the alter partition message"), e);
@@ -3151,6 +3179,20 @@ public class MetastoreEvents {
         msTbl_ = alterPartitionsInfo.getMsTable();
         partitionsAfter_ = alterPartitionsInfo.getPartitions();
         isTruncateOp_ = alterPartitionsInfo.isTruncate();
+        if (isTruncateOp_) {
+          // Track truncate operations on transactional table partitions. After
+          // HIVE-28668 the entire batch shares one writeId, so a single map entry
+          // carrying every partition is enough.
+          if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
+            long writeId = alterPartitionsInfo.getWriteId();
+            catalog_.trackTruncateOp(
+                new TableWriteId(dbName_, tblName_, writeId), partitionsAfter_);
+            infoLog("Tracked truncate op with writeId {} on {} partitions of {}.{}",
+                writeId, partitionsAfter_.size(), dbName_, tblName_);
+          } else {
+            infoLog("TruncateOp on non-transactional table");
+          }
+        }
       } catch (Exception e) {
         throw new MetastoreNotificationException(
             debugString("Unable to parse the alter partition message"), e);
@@ -3493,6 +3535,8 @@ public class MetastoreEvents {
         TableWriteId tableWriteId =
             new TableWriteId(dbName_, tblName_, txnToWriteId.getWriteId());
         catalog_.addWriteId(txnToWriteId.getTxnId(), tableWriteId);
+        infoLog("Tracked writeId {} in transaction {}", txnToWriteId.getWriteId(),
+            txnToWriteId.getTxnId());
       }
     }
 
@@ -3757,6 +3801,9 @@ public class MetastoreEvents {
               event.getMessage());
       txnId_ = abortTxnMessage.getTxnId();
       tableWriteIds_ = catalog_.removeWriteIds(txnId_);
+      for (TableWriteId id : tableWriteIds_) {
+        catalog_.removeTruncateOp(id);
+      }
       infoLog("Received AbortTxnEvent for transaction " + txnId_);
     }
 

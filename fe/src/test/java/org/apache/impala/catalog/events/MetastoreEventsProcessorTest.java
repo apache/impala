@@ -165,6 +165,7 @@ import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdatedPartition;
+import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.NoOpEventSequence;
@@ -4411,6 +4412,108 @@ public class MetastoreEventsProcessorTest {
     assertEquals(
         metrics.getGauge(MetastoreEventsProcessor.LAST_SYNCED_EVENT_TIME).getValue(),
         metrics.getGauge(MetastoreEventsProcessor.GREATEST_SYNCED_EVENT_TIME).getValue());
+  }
+
+  @Test
+  public void testTruncateTxnTbl() throws Exception {
+    Assume.assumeFalse("Skipping this since it depends on the behavior of CDP Hive 3",
+        TestUtils.isApacheHiveVersion());
+    // Prepare a transactional non-partitioned table and a partitioned table with some
+    // data.
+    String nopartTblName = "test_trunc_txn_nopart";
+    String partTblName = "test_trunc_txn_part";
+    String insertNonPartTbl =
+        "insert into table " + TEST_DB_NAME + '.' + nopartTblName + " values('a', 'b')";
+    String insertPartTbl = String.format(
+        "insert into table %s.%s partition(p1) values" +
+            "('0', '0', 'a'), ('1', '1', 'b'), ('2', '2', 'c'), " +
+            "('3', '3', 'd'), ('4', '4', 'e'), ('5', '5', 'f')",
+        TEST_DB_NAME, partTblName);
+    createDatabase(TEST_DB_NAME, null);
+    createTransactionalTable(TEST_DB_NAME, nopartTblName, false);
+    createTransactionalTable(TEST_DB_NAME, partTblName, true);
+    try (HiveJdbcClientPool jdbcClientPool = HiveJdbcClientPool.create(1);
+         HiveJdbcClientPool.HiveJdbcClient hiveClient = jdbcClientPool.getClient()) {
+      hiveClient.executeSql(insertNonPartTbl);
+      hiveClient.executeSql("set hive.exec.dynamic.partition.mode=nonstrict");
+      hiveClient.executeSql(insertPartTbl);
+    }
+    eventsProcessor_.processEvents();
+
+    // Test truncate operations where the ALTER event is processed before the
+    // transaction is committed/aborted. abortTxn=true runs first so its aborted truncates
+    // leave the partitions intact for the committed truncates (abortTxn=false) to reuse.
+    for (boolean abortTxn : new boolean[]{true, false}) {
+      truncateTxnTblAndProcessEvents(nopartTblName, Arrays.asList(""), abortTxn, true);
+      truncateTxnTblAndProcessEvents(partTblName, Arrays.asList("p1=a"), abortTxn, true);
+      truncateTxnTblAndProcessEvents(
+          partTblName, Arrays.asList("p1=b", "p1=c"), abortTxn, true);
+    }
+
+    try (HiveJdbcClientPool jdbcClientPool = HiveJdbcClientPool.create(1);
+        HiveJdbcClientPool.HiveJdbcClient hiveClient = jdbcClientPool.getClient()) {
+      hiveClient.executeSql(insertNonPartTbl);
+    }
+    eventsProcessor_.processEvents();
+
+    // Test truncate operations where the transaction is committed before the ALTER
+    // event is processed. As above, abortTxn=true runs first so the committed truncates
+    // (abortTxn=false) can reuse the partitions.
+    for (boolean abortTxn : new boolean[]{true, false}) {
+      truncateTxnTblAndProcessEvents(nopartTblName, Arrays.asList(""), abortTxn, false);
+      truncateTxnTblAndProcessEvents(partTblName, Arrays.asList("p1=d"), abortTxn, false);
+      truncateTxnTblAndProcessEvents(
+          partTblName, Arrays.asList("p1=e", "p1=f"), abortTxn, false);
+    }
+  }
+
+  /**
+   * Helper method to truncate a transactional table in Hive and verify it's empty in
+   * Impala. Tests the scenario where the ALTER event from truncation is processed before
+   * or after the transaction is committed.
+   * @param tblName Name of the table to truncate
+   * @param partNames Partition names to verify (empty string for non-partitioned table)
+   * @param abortTxn whether to abort the transaction after the ALTER event is processed
+   * @param processAlterBeforeCommit whether to process the ALTER event before committing
+   * the transaction
+   */
+  private void truncateTxnTblAndProcessEvents(String tblName, List<String> partNames,
+      boolean abortTxn, boolean processAlterBeforeCommit) throws Exception {
+    // Load table in cache to process the events.
+    loadTable(tblName);
+    HdfsTable table = (HdfsTable) catalog_.getTable(TEST_DB_NAME, tblName);
+
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      TblTransaction tblTxn = MetastoreShim.createTblTransaction(
+          client.getHiveClient(), table.getMetaStoreTable(), -1);
+      List<String> hmsPartNames = partNames;
+      // For non-partitioned tables, HMS uses null as the partition names.
+      if (partNames.size() == 1 && "".equals(partNames.get(0))) {
+        hmsPartNames = null;
+      }
+      MetastoreShim.truncateTable(client.getHiveClient(), TEST_DB_NAME, tblName,
+          hmsPartNames, tblTxn.validWriteIds, tblTxn.writeId);
+
+      if (processAlterBeforeCommit) eventsProcessor_.processEvents();
+      if (abortTxn) {
+        MetastoreShim.abortTransaction(client.getHiveClient(), tblTxn.txnId);
+      } else {
+        MetastoreShim.commitTransaction(client.getHiveClient(), tblTxn.txnId);
+      }
+    }
+    eventsProcessor_.processEvents();
+
+    for (HdfsPartition partition : table.getPartitionsForNames(partNames)) {
+      if (abortTxn) {
+        assertTrue(String.format(
+            "Partition %s:%s should not be empty", tblName, partition.getPartitionName()),
+            partition.getNumFileDescriptors() > 0);
+      } else {
+        assertEquals(String.format(
+            "Partition %s:%s should be empty", tblName, partition.getPartitionName()),
+            0, partition.getNumFileDescriptors());
+      }
+    }
   }
 
   private void createDatabase(String catName, String dbName,

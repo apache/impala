@@ -111,6 +111,15 @@ public abstract class Catalog implements AutoCloseable {
   protected final ConcurrentHashMap<Long, Set<TableWriteId>> txnToWriteIds_ =
       new ConcurrentHashMap<>();
 
+  // Tracks transactional truncate operations. When a truncate operation is performed, an
+  // ALTER event is generated before the transaction commits. We track these operations
+  // here and reload the affected tables / partitions when the COMMIT_TXN event is
+  // processed. Entries are cleaned up on receiving commit or abort transaction events.
+  // Uses empty partition lists for non-partitioned tables or whole-table truncates.
+  protected final ConcurrentHashMap<TableWriteId,
+      List<org.apache.hadoop.hive.metastore.api.Partition>> truncateOps_ =
+      new ConcurrentHashMap<>();
+
   // Cache of known HDFS cache pools. Allows for checking the existence
   // of pools without hitting HDFS.
   protected final CatalogObjectCache<HdfsCachePool> hdfsCachePools_ =
@@ -994,9 +1003,36 @@ public abstract class Catalog implements AutoCloseable {
   }
 
   /**
+   * Tracks a truncate operation. {@code partitions} is the list of partitions truncated
+   * under this writeId — empty for a non-partitioned table or a whole-table truncate.
+   * If the same writeId is tracked more than once (e.g. one ALTER_PARTITION event per
+   * partition before HIVE-28668), the partition lists are merged.
+   */
+  public void trackTruncateOp(TableWriteId tableWriteId,
+      List<org.apache.hadoop.hive.metastore.api.Partition> partitions) {
+    Preconditions.checkNotNull(tableWriteId);
+    if (tableWriteId.getWriteId() <= 0) return;
+    Preconditions.checkNotNull(partitions);
+    truncateOps_.computeIfAbsent(tableWriteId, k -> new ArrayList<>())
+        .addAll(partitions);
+  }
+
+  /**
+   * Returns and removes the truncate-op partitions for {@code tableWriteId}, or null
+   * if the writeId was not tracked as a truncate.
+   */
+  @Nullable
+  public List<org.apache.hadoop.hive.metastore.api.Partition> removeTruncateOp(
+      TableWriteId tableWriteId) {
+    Preconditions.checkNotNull(tableWriteId);
+    return truncateOps_.remove(tableWriteId);
+  }
+
+  /**
    * Clears all write id records.
    */
   public void clearWriteIds() {
     txnToWriteIds_.clear();
+    truncateOps_.clear();
   }
 }
