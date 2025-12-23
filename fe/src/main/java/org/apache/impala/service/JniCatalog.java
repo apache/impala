@@ -589,6 +589,7 @@ public class JniCatalog {
           response.setCatalog_num_functions(catalog_.getNumFunctions());
           response.setCatalog_num_hms_clients_idle(catalog_.getNumHmsClientsIdle());
           response.setCatalog_num_hms_clients_in_use(catalog_.getNumHmsClientsInUse());
+          response.setCatalog_num_loaded_tables(catalog_.getNumLoadedTables());
           response.setEvent_metrics(catalog_.getEventProcessorMetrics());
           return response;
         });

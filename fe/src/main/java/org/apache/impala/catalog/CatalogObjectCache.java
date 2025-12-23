@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -69,6 +71,16 @@ public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> 
    * Returns true if this item was added or false if the existing value was preserved.
    */
   public synchronized boolean add(T catalogObject) {
+    return add(catalogObject, null);
+  }
+
+  /**
+   * Extends the base class method to call the update function if provided.
+   * The updateFunc is called with (existingItem, newItem) when an item is added or
+   * replaced, allowing the caller to track state transitions.
+   * Returns true if this item was added or false if the existing value was preserved.
+   */
+  public synchronized boolean add(T catalogObject, BiConsumer<T, T> updateFunc) {
     Preconditions.checkNotNull(catalogObject);
     String key = catalogObject.getName();
     if (caseInsensitiveKeys_) key = key.toLowerCase();
@@ -76,6 +88,9 @@ public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> 
     if (existingItem == null) {
       CatalogObjectVersionSet.INSTANCE.addVersion(
           catalogObject.getCatalogVersion());
+      if (updateFunc != null) {
+        updateFunc.accept(null, catalogObject);
+      }
       return true;
     }
 
@@ -86,6 +101,9 @@ public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> 
       metadataCache_.put(key, catalogObject);
       CatalogObjectVersionSet.INSTANCE.updateVersions(
           existingItem.getCatalogVersion(), catalogObject.getCatalogVersion());
+      if (updateFunc != null) {
+        updateFunc.accept(existingItem, catalogObject);
+      }
       return true;
     }
     return false;
@@ -96,11 +114,24 @@ public class CatalogObjectCache<T extends CatalogObject> implements Iterable<T> 
    * if no item was removed.
    */
   public synchronized T remove(String name) {
+    return remove(name, null);
+  }
+
+  /**
+   * Removes an item from the metadata cache with an optional update function.
+   * The updateFunc is called with the removed item if it was successfully removed,
+   * allowing the caller to track the removal.
+   * Returns the removed item, or null if no item was removed.
+   */
+  public synchronized T remove(String name, Consumer<T> updateFunc) {
     if (caseInsensitiveKeys_) name = name.toLowerCase();
     T removedObject = metadataCache_.remove(name);
     if (removedObject != null) {
       CatalogObjectVersionSet.INSTANCE.removeVersion(
           removedObject.getCatalogVersion());
+      if (updateFunc != null) {
+        updateFunc.accept(removedObject);
+      }
     }
     return removedObject;
   }

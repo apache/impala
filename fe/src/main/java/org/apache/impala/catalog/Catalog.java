@@ -25,6 +25,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
@@ -52,6 +55,8 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.PatternMatcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -76,6 +81,8 @@ import com.google.common.base.Preconditions;
  * Builtins are populated on startup in initBuiltins().
  */
 public abstract class Catalog implements AutoCloseable {
+  private static final Logger LOG = LoggerFactory.getLogger(Catalog.class);
+
   // Initial catalog version and ID.
   public final static long INITIAL_CATALOG_VERSION = 0L;
   public static final TUniqueId INITIAL_CATALOG_SERVICE_ID = new TUniqueId(0L, 0L);
@@ -110,6 +117,47 @@ public abstract class Catalog implements AutoCloseable {
   // Cache of authorization cache invalidation markers.
   protected final CatalogObjectCache<AuthzCacheInvalidation> authzCacheInvalidation_ =
       new CatalogObjectCache<>();
+
+  // Number of loaded tables (i.e. not IncompleteTable) in the catalog cache.
+  // This is updated in real-time when tables are loaded or invalidated.
+  // IMPALA-13863: Track loaded tables to help monitor catalog memory pressure.
+  // This is static because it tracks loaded tables across all catalog instances.
+  protected static final AtomicInteger numLoadedTables_ = new AtomicInteger(0);
+
+  // Update function for tracking table additions/replacements in the loaded tables
+  // counter. This is passed to Db#addTable() to centralize the counter update logic.
+  public static final BiConsumer<Table, Table> TABLE_ADD_UPDATE_FUNC =
+      (existingTbl, newTbl) -> {
+    if (existingTbl != null) {
+      boolean wasLoaded = !(existingTbl instanceof IncompleteTable);
+      boolean isLoaded = !(newTbl instanceof IncompleteTable);
+
+      if (wasLoaded && !isLoaded) {
+        numLoadedTables_.decrementAndGet();
+        LOG.trace("Replaced loaded table {} with IncompleteTable, " +
+            "loaded tables count: {}", newTbl.getFullName(), numLoadedTables_.get());
+      } else if (!wasLoaded && isLoaded) {
+        numLoadedTables_.incrementAndGet();
+        LOG.trace("Replaced IncompleteTable with loaded table {}, " +
+            "loaded tables count: {}", newTbl.getFullName(), numLoadedTables_.get());
+      }
+    } else if (!(newTbl instanceof IncompleteTable)) {
+      // New table being added and it's loaded
+      numLoadedTables_.incrementAndGet();
+      LOG.trace("Added new loaded table {}, loaded tables count: {}",
+          newTbl.getFullName(), numLoadedTables_.get());
+    }
+  };
+
+  // Update function for tracking table removals in the loaded tables counter.
+  // This is passed to Db#removeTable() to centralize the counter update logic.
+  public static final Consumer<Table> TABLE_REMOVE_UPDATE_FUNC = (removedTbl) -> {
+    if (!(removedTbl instanceof IncompleteTable)) {
+      numLoadedTables_.decrementAndGet();
+      LOG.trace("Removed loaded table {}, loaded tables count: {}",
+          removedTbl.getFullName(), numLoadedTables_.get());
+    }
+  };
 
   // This member is responsible for heartbeating HMS locks and transactions.
   private TransactionKeepalive transactionKeepalive_;
@@ -297,6 +345,13 @@ public abstract class Catalog implements AutoCloseable {
    */
   public List<DataSource> getDataSources() {
     return dataSources_.getValues();
+  }
+
+  /**
+   * Returns the number of loaded tables (not IncompleteTable) in the catalog.
+   */
+  public int getNumLoadedTables() {
+    return numLoadedTables_.get();
   }
 
   /**

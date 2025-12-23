@@ -1101,6 +1101,7 @@ class TestWebPage(ImpalaTestSuite):
     assert "catalog.num-functions" in metric_keys
     assert "catalog.hms-client-pool.num-idle" in metric_keys
     assert "catalog.hms-client-pool.num-in-use" in metric_keys
+    assert "catalog.num-loaded-tables" in metric_keys
 
   def test_iceberg_table_metrics(self):
     assert '23448' == self.__get_table_metric(

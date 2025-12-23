@@ -206,6 +206,9 @@ class CatalogServer {
   IntGauge* num_tables_metric_;
   IntGauge* num_functions_metric_;
 
+  /// Metric that tracks the number of loaded tables.
+  IntGauge* num_loaded_tables_metric_;
+
   /// Metrics that track the number of HMS clients
   IntGauge* num_hms_clients_idle_metric_;
   IntGauge* num_hms_clients_in_use_metric_;

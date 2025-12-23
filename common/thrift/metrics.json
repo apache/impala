@@ -572,6 +572,16 @@
     "key": "catalog.num-functions"
   },
   {
+    "description": "The number of loaded tables in the catalog.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Loaded Tables",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.num-loaded-tables"
+  },
+  {
     "description": "The number of Hive Metastore Clients that are idle.",
     "contexts": [
       "CATALOGSERVER"

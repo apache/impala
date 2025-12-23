@@ -366,6 +366,7 @@ const string CATALOG_NUM_TABLES_WAITING_FOR_ASYNC_LOADING =
 const string CATALOG_NUM_DBS = "catalog.num-databases";
 const string CATALOG_NUM_TABLES = "catalog.num-tables";
 const string CATALOG_NUM_FUNCTIONS = "catalog.num-functions";
+const string CATALOG_NUM_LOADED_TABLES = "catalog.num-loaded-tables";
 const string CATALOG_NUM_HMS_CLIENTS_IDLE = "catalog.hms-client-pool.num-idle";
 const string CATALOG_NUM_HMS_CLIENTS_IN_USE = "catalog.hms-client-pool.num-in-use";
 
@@ -645,6 +646,7 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
   num_dbs_metric_ = metrics->AddGauge(CATALOG_NUM_DBS, 0);
   num_tables_metric_ = metrics->AddGauge(CATALOG_NUM_TABLES, 0);
   num_functions_metric_ = metrics->AddGauge(CATALOG_NUM_FUNCTIONS, 0);
+  num_loaded_tables_metric_ = metrics->AddGauge(CATALOG_NUM_LOADED_TABLES, 0);
   num_hms_clients_idle_metric_ = metrics->AddGauge(CATALOG_NUM_HMS_CLIENTS_IDLE, 0);
   num_hms_clients_in_use_metric_ = metrics->AddGauge(CATALOG_NUM_HMS_CLIENTS_IN_USE, 0);
 
@@ -1125,6 +1127,7 @@ void CatalogServer::MarkPendingMetadataReset(const unique_lock<std::mutex>& lock
     num_dbs_metric_->SetValue(response.catalog_num_dbs);
     num_tables_metric_->SetValue(response.catalog_num_tables);
     num_functions_metric_->SetValue(response.catalog_num_functions);
+    num_loaded_tables_metric_->SetValue(response.catalog_num_loaded_tables);
     num_hms_clients_idle_metric_->SetValue(response.catalog_num_hms_clients_idle);
     num_hms_clients_in_use_metric_->SetValue(response.catalog_num_hms_clients_in_use);
     TEventProcessorMetrics eventProcessorMetrics = response.event_metrics;

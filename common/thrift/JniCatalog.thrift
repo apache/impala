@@ -1093,6 +1093,9 @@ struct TGetCatalogServerMetricsResponse {
   // Metrics of HMS clients
   13: optional i32 catalog_num_hms_clients_idle
   14: optional i32 catalog_num_hms_clients_in_use
+
+  // Number of loaded tables (i.e. not IncompleteTable)
+  15: optional i32 catalog_num_loaded_tables
 }
 
 // Request to copy the generated testcase from a given input path.

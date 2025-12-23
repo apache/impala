@@ -211,9 +211,12 @@ public class Db extends CatalogObjectImpl implements FeDb {
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.DATABASE; }
 
   /**
-   * Adds a table to the table cache.
+   * Adds a table to the table cache. The static Catalog.TABLE_ADD_UPDATE_FUNC is used
+   * to track loaded tables count changes.
    */
-  public void addTable(Table table) { tableCache_.add(table); }
+  public void addTable(Table table) {
+    tableCache_.add(table, Catalog.TABLE_ADD_UPDATE_FUNC);
+  }
 
   @Override
   public List<String> getAllTableNames() {
@@ -267,9 +270,11 @@ public class Db extends CatalogObjectImpl implements FeDb {
 
   /**
    * Removes the table name and any cached metadata from the Table cache.
+   * The static Catalog.TABLE_REMOVE_UPDATE_FUNC is used to track loaded tables
+   * count changes.
    */
   public Table removeTable(String tableName) {
-    return tableCache_.remove(tableName.toLowerCase());
+    return tableCache_.remove(tableName.toLowerCase(), Catalog.TABLE_REMOVE_UPDATE_FUNC);
   }
 
   @Override

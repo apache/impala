@@ -2510,6 +2510,10 @@ public class CatalogServiceCatalog extends Catalog {
       catalogTimeline.markEvent(GOT_CATALOG_VERSION_WRITE_LOCK);
       catalogVersion_++;
 
+      // Reset loaded tables counter since all tables will be replaced with
+      // IncompleteTable during global invalidate.
+      numLoadedTables_.set(0);
+
       // Update data source, db and table metadata.
       // First, refresh DataSource objects from HMS and assign new versions.
       refreshDataSources();
@@ -2743,6 +2747,8 @@ public class CatalogServiceCatalog extends Catalog {
     Preconditions.checkState(versionLock_.isWriteLockedByCurrentThread());
     if (!db.isSystemDb()) {
       for (Table tbl: db.getTables()) {
+        // Update loaded tables counter using the centralized update function.
+        Catalog.TABLE_REMOVE_UPDATE_FUNC.accept(tbl);
         tbl.setCatalogVersion(incrementAndGetCatalogVersion());
         deleteLog_.addRemovedObject(tbl.toMinimalTCatalogObject());
       }
