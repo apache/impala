@@ -103,7 +103,8 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
 
   /**
    * This method will be called for the statements of 1) SHOW ROLES,
-   * 2) SHOW CURRENT ROLES, or 3) SHOW ROLE GRANT GROUP <group_name>.
+   * 2) SHOW CURRENT ROLES, 3) SHOW ROLE GRANT GROUP <group_name>,
+   * or, 4) SHOW ROLE GRANT USER <user_name>.
    */
   @Override
   public TShowRolesResult getRoles(TShowRolesParams params) throws ImpalaException {
@@ -112,23 +113,31 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
       Set<String> groups = RangerUtil.getGroups(params.getRequesting_user());
 
       boolean adminOp =
-          !(groups.contains(params.getGrant_group()) || params.is_show_current_roles);
+          !(groups.contains(params.getGrant_group())
+              || params.getRequesting_user().equals(params.getGrant_user())
+              || params.is_show_current_roles);
 
       if (adminOp) {
         RangerUtil.validateRangerAdmin(plugin_.get(), params.getRequesting_user());
       }
 
-      // The branch for SHOW CURRENT ROLES and SHOW ROLE GRANT GROUP.
+      // The branch for SHOW CURRENT ROLES, SHOW ROLE GRANT GROUP/USER.
       Set<String> roleNames;
-      if (params.isIs_show_current_roles() || params.isSetGrant_group()) {
+      if (params.isIs_show_current_roles() || params.isSetGrant_group() ||
+          params.isSetGrant_user()) {
         Set<String> groupNames;
         if (params.isIs_show_current_roles()) {
-          groupNames = groups;
-        } else {
-          Preconditions.checkState(params.isSetGrant_group());
+          roleNames = plugin_.get().getRolesFromUserAndGroups(
+              params.getRequesting_user(), groups);
+        } else if (params.isSetGrant_group()) {
           groupNames = Sets.newHashSet(params.getGrant_group());
+          roleNames = plugin_.get().getRolesFromUserAndGroups(/* user */ null,
+              groupNames);
+        } else {
+          Preconditions.checkState(params.isSetGrant_user());
+          roleNames = plugin_.get().getRolesFromUserAndGroups(params.getGrant_user(),
+              /* group */ null);
         }
-        roleNames = plugin_.get().getRolesFromUserAndGroups(null, groupNames);
       } else {
         // The branch for SHOW ROLES.
         Preconditions.checkState(!params.isIs_show_current_roles());
@@ -154,6 +163,11 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
             ".");
         throw new InternalException("Error executing SHOW ROLE GRANT GROUP "
             + params.getGrant_group() + ". Ranger error message: " + e.getMessage());
+      } else if (params.isSetGrant_user()) {
+        LOG.error("Error executing SHOW ROLE GRANT USER " + params.getGrant_user() +
+            ".");
+        throw new InternalException("Error executing SHOW ROLE GRANT USER "
+            + params.getGrant_user() + ". Ranger error message: " + e.getMessage());
       } else {
         LOG.error("Error executing SHOW ROLES.");
         throw new InternalException("Error executing SHOW ROLES."
@@ -163,15 +177,15 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
   }
 
   @Override
-  public void grantRoleToGroup(User requestingUser, TGrantRevokeRoleParams params,
+  public void grantRoleToGroupOrUser(User requestingUser, TGrantRevokeRoleParams params,
       TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
   @Override
-  public void revokeRoleFromGroup(User requestingUser, TGrantRevokeRoleParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokeRoleFromGroupOrUser(User requestingUser,
+      TGrantRevokeRoleParams params, TDdlExecResponse response) throws ImpalaException {
     throw new UnsupportedOperationException(String.format(
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }

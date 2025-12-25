@@ -307,7 +307,8 @@ struct TShowFilesParams {
   3: optional list<string> selected_files
 }
 
-// Parameters for SHOW [CURRENT] ROLES and SHOW ROLE GRANT GROUP <groupName> commands
+// Parameters for SHOW [CURRENT] ROLES, SHOW ROLE GRANT GROUP <groupName> and
+// SHOW ROLE GRANT USER <userName> commands
 struct TShowRolesParams {
   // The effective user who submitted this request.
   1: optional string requesting_user
@@ -320,9 +321,11 @@ struct TShowRolesParams {
   // True if the statement is "SHOW CURRENT ROLES".
   3: required bool is_show_current_roles
 
-  // Filters roles to the specified grant group. If null or not set, show roles for all
-  // groups.
+  // Filters roles to the specified grant group.
   4: optional string grant_group
+
+  // Filters roles to the specified grant user.
+  5: optional string grant_user
 }
 
 // Result of a SHOW ROLES command

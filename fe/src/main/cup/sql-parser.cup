@@ -1170,11 +1170,16 @@ opt_kw_table ::=
 
 show_roles_stmt ::=
   KW_SHOW KW_ROLES
-  {: RESULT = new ShowRolesStmt(false, null); :}
+  {: RESULT = new ShowRolesStmt(false, null, null); :}
   | KW_SHOW KW_ROLE KW_GRANT KW_GROUP ident_or_unreserved:group
-  {: RESULT = new ShowRolesStmt(false, group); :}
+  {: RESULT = new ShowRolesStmt(false, group, null); :}
+  | KW_SHOW KW_ROLE KW_GRANT IDENT:user_id ident_or_unreserved:user
+  {:
+    parser.checkIdentKeyword("USER", user_id);
+    RESULT = new ShowRolesStmt(false, null, user);
+  :}
   | KW_SHOW KW_CURRENT KW_ROLES
-  {: RESULT = new ShowRolesStmt(true, null); :}
+  {: RESULT = new ShowRolesStmt(true, null, null); :}
   ;
 
 show_grant_principal_stmt ::=
@@ -1236,12 +1241,24 @@ create_drop_role_stmt ::=
 
 grant_role_stmt ::=
   KW_GRANT KW_ROLE ident_or_unreserved:role KW_TO KW_GROUP ident_or_unreserved:group
-  {: RESULT = new GrantRevokeRoleStmt(role, group, true); :}
+  {: RESULT = new GrantRevokeRoleStmt(role, group, null, true); :}
+  | KW_GRANT KW_ROLE ident_or_unreserved:role KW_TO IDENT:user_id
+    ident_or_unreserved:user
+  {:
+    parser.checkIdentKeyword("USER", user_id);
+    RESULT = new GrantRevokeRoleStmt(role, null, user, true);
+  :}
   ;
 
 revoke_role_stmt ::=
   KW_REVOKE KW_ROLE ident_or_unreserved:role KW_FROM KW_GROUP ident_or_unreserved:group
-  {: RESULT = new GrantRevokeRoleStmt(role, group, false); :}
+  {: RESULT = new GrantRevokeRoleStmt(role, group, null, false); :}
+  | KW_REVOKE KW_ROLE ident_or_unreserved:role KW_FROM IDENT:user_id
+    ident_or_unreserved:user
+  {:
+    parser.checkIdentKeyword("USER", user_id);
+    RESULT = new GrantRevokeRoleStmt(role, null, user, false);
+  :}
   ;
 
 // For backwards compatibility, a grant without the principal type will default to

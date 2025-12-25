@@ -18,6 +18,7 @@
 package org.apache.impala.authorization.ranger;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
@@ -138,12 +139,18 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @Override
-  public void grantRoleToGroup(User requestingUser, TGrantRevokeRoleParams params,
+  public void grantRoleToGroupOrUser(User requestingUser, TGrantRevokeRoleParams params,
       TDdlExecResponse response) throws ImpalaException {
+    Preconditions.checkState(
+        (params.getGroup_names().size() == 1 && params.getUser_names().size() == 0) ||
+            (params.getGroup_names().size() == 0 && params.getUser_names().size() == 1));
     GrantRevokeRoleRequest request = createGrantRevokeRoleRequest(
         requestingUser.getShortName(), new HashSet<>(params.getRole_names()),
-        new HashSet<>(params.getGroup_names()));
-
+        params.getGroup_names(), params.getUser_names());
+    boolean isGranteeGroup = params.getUser_names().isEmpty();
+    String granteeType = isGranteeGroup ? "group" : "user";
+    String granteeName = isGranteeGroup ? params.getGroup_names().get(0) :
+        params.getUser_names().get(0);
     try {
       // We found that granting a role to a group that is already assigned the role would
       // actually revoke the role from the group. This should be considered a bug of
@@ -171,25 +178,27 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
         // We note that we will also get this message when a Ranger administrator is
         // trying to grant a non-existing role to a group whether or not this group
         // exists.
-        LOG.error("Error granting role {} to group {} by user {} in Ranger. " +
+        LOG.error("Error granting role {} to {} {} by user {} in Ranger. " +
             "Ranger error message: HTTP 400 Error: User doesn't have permissions to " +
             "grant role " + params.getRole_names().get(0), params.getRole_names().get(0),
-            params.getGroup_names().get(0), requestingUser.getShortName());
+            granteeType, granteeName,
+            requestingUser.getShortName());
         throw new InternalException("Error granting role " +
-            params.getRole_names().get(0) + " to group " +
-            params.getGroup_names().get(0) + " by user " +
-            requestingUser.getShortName() + " in Ranger. " +
+            params.getRole_names().get(0) + " to " +
+            granteeType + " " + granteeName +
+            " by user " + requestingUser.getShortName() + " in Ranger. " +
             "Ranger error message: HTTP 400 Error: User doesn't have permissions to " +
             "grant role " + params.getRole_names().get(0));
       } else {
         // When a Ranger administrator tries to grant an existing role to a non-existing
         // group, we will get this error.
-        LOG.error("Error granting role {} to group {} by user {} in Ranger. " +
+        LOG.error("Error granting role {} to {} {} by user {} in Ranger. " +
             "Ranger error message: " + e.getMessage(), params.getRole_names().get(0),
-            params.getGroup_names().get(0), requestingUser.getShortName());
+            granteeType, granteeName,
+            requestingUser.getShortName());
         throw new InternalException("Error granting role " +
-            params.getRole_names().get(0) + " to group " +
-            params.getGroup_names().get(0) + " by user " +
+            params.getRole_names().get(0) + " to " +
+            granteeType + " " + granteeName + " by user " +
             requestingUser.getShortName() + " in Ranger. " +
             "Ranger error message: " + e.getMessage());
       }
@@ -200,21 +209,27 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   }
 
   @Override
-  public void revokeRoleFromGroup(User requestingUser, TGrantRevokeRoleParams params,
-      TDdlExecResponse response) throws ImpalaException {
+  public void revokeRoleFromGroupOrUser(User requestingUser,
+      TGrantRevokeRoleParams params, TDdlExecResponse response) throws ImpalaException {
+    Preconditions.checkState(
+        (params.getGroup_names().size() == 1 && params.getUser_names().size() == 0) ||
+            (params.getGroup_names().size() == 0 && params.getUser_names().size() == 1));
     GrantRevokeRoleRequest request = createGrantRevokeRoleRequest(
         requestingUser.getShortName(), new HashSet<>(params.getRole_names()),
-        new HashSet<>(params.getGroup_names()));
-
+        params.getGroup_names(), params.getUser_names());
+    boolean isRevokeeGroup = params.getUser_names().isEmpty();
+    String revokeeType = isRevokeeGroup ? "group" : "user";
+    String revokeeName = isRevokeeGroup ? params.getGroup_names().get(0) :
+        params.getUser_names().get(0);
     try {
       plugin_.get().revokeRole(request, /*resultProcessor*/ null);
     } catch (Exception e) {
-      LOG.error("Error revoking role {} from group {} by user {} in Ranger. " +
+      LOG.error("Error revoking role {} from {} {} by user {} in Ranger. " +
           "Ranger error message: " + e.getMessage(), params.getRole_names().get(0),
-          params.getGroup_names().get(0), requestingUser.getShortName());
+          revokeeType, revokeeName, requestingUser.getShortName());
       throw new InternalException("Error revoking role " +
-          params.getRole_names().get(0) + " from group " +
-          params.getGroup_names().get(0) + " by user " +
+          params.getRole_names().get(0) + " from " +
+          revokeeType + " " + revokeeName + " by user " +
           requestingUser.getShortName() + " in Ranger. " +
           "Ranger error message: " + e.getMessage());
     }
@@ -544,11 +559,13 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
    * corresponding to 'targetRoleNames' to/from groups associated with 'groupNames'.
    */
   private static GrantRevokeRoleRequest createGrantRevokeRoleRequest(
-      String grantor, Set<String> targetRoleNames, Set<String> groupNames) {
+      String grantor, Set<String> targetRoleNames, List<String> groupNames,
+      List<String> userNames) {
     GrantRevokeRoleRequest request = new GrantRevokeRoleRequest();
     request.setGrantor(grantor);
     request.setTargetRoles(targetRoleNames);
-    request.setGroups(groupNames);
+    if (groupNames != null) { request.setGroups(new HashSet<>(groupNames)); }
+    if (userNames != null) { request.setUsers(new HashSet<>(userNames)); }
     // We do not set the field of 'grantOption' since WITH GRANT OPTION is not supported
     // when granting/revoking roles. By default, 'grantOption' is set to Boolean.FALSE so
     // that a user in a group assigned a role is not able to grant/revoke the role to/from

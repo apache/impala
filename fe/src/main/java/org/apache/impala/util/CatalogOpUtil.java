@@ -23,6 +23,7 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TCommentOnParams;
 import org.apache.impala.thrift.TDdlExecRequest;
+import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,8 +104,12 @@ public class CatalogOpUtil {
           break;
         case GRANT_ROLE:
         case REVOKE_ROLE:
-          target = req.getGrant_revoke_role_params().getRole_names() + " GROUP " +
-              req.getGrant_revoke_role_params().getGroup_names();
+          boolean principalIsGroup =
+              req.getGrant_revoke_role_params().getUser_names().isEmpty();
+          TGrantRevokeRoleParams params = req.getGrant_revoke_role_params();
+          target = req.getGrant_revoke_role_params().getRole_names() +
+              (principalIsGroup ? " GROUP " : " USER ") +
+              (principalIsGroup ? params.getGroup_names() : params.getUser_names());
           break;
         case GRANT_PRIVILEGE:
           target = "TO " + req.getGrant_revoke_priv_params().getPrincipal_name();

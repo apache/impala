@@ -51,12 +51,13 @@ grant all on server to grant_revoke_test_ALL_SERVER
 ---- USER
 admin
 ---- QUERY
-# Grant the privilege to the group `$GROUP_NAME`, to which the user 'getuser()' belongs
-# so that the user 'getuser()' could perform the some of the following operations on the
-# database 'grant_rev_db'.
-# Group name will be replaced with the group of 'getuser()' in the test.
-# framework.
-grant role grant_revoke_test_ALL_SERVER to group `$GROUP_NAME`
+# Grant the privilege to the group `$GRANTEE_NAME`, to which the user 'getuser()'
+# belongs, or to the user 'getuser()' itself so that the user 'getuser()' could perform
+# some of the following operations on the database 'grant_rev_db'.
+# $GRANTEE_TYPE will be replaced with 'GROUP' or 'USER' depending on the argument
+# 'grantee_type' when we run TestRanger._test_grant_revoke_with_role().
+# $GRANTEE_NAME name will be replaced with 'getuser()' in the test framework.
+grant role grant_revoke_test_ALL_SERVER to $GRANTEE_TYPE `$GRANTEE_NAME`
 ====
 ---- USER
 admin
@@ -109,9 +110,12 @@ User does_not_exist does not have permission for this operation
 ---- USER
 does_not_exist
 ---- QUERY
-# A user that is not a Ranger administrator should not have privilege to execute
-# SHOW ROLE GRANT GROUP for a group the user does not belong to.
-show role grant group non_owner
+# The following should be true for a user that is not a Ranger administrator.
+# When $GRANTEE_TYPE is GROUP, the user should not have the privilege to execute
+# SHOW ROLE GRANT for a group the user does not belong to.
+# When $GRANTEE_TYPE is USER, the user should not have the privilege to execute
+# SHOW ROLE GRANT if the user is executing the query against another user.
+show role grant $GRANTEE_TYPE non_owner
 ---- RESULTS: VERIFY_IS_SUBSET
 ---- TYPES
 STRING
@@ -121,13 +125,15 @@ User does_not_exist does not have permission for this operation
 ---- USER
 non_owner
 ---- QUERY
-# The 'non_owner' user doesn't have any roles granted to them, but since it is part of the
-# 'non_owner' group, they should have privileges to execute this statement.
+# The 'non_owner' user doesn't have any roles granted to it, but since it is part of
+# the 'non_owner' group, it should have privileges to execute this statement
+# when $GRANTEE_TYPE is GROUP. When $GRANTEE_TYPE is USER, the 'non_owner' user should
+# have the privilege to execute this statement to get its associated roles.
 # Note that this test case requires that impalad was started with the argument
 # '--use_customized_user_groups_mapper_for_ranger' so that a customized user-to-groups
 # mapper will be used to retrieve the groups the user 'non_owner' belongs to, which
 # consists of exactly one group, the group 'non_owner'.
-show role grant group non_owner
+show role grant $GRANTEE_TYPE non_owner
 ---- RESULTS: VERIFY_IS_SUBSET
 ---- TYPES
 STRING
@@ -179,11 +185,11 @@ STRING
 ---- USER
 admin
 ---- QUERY
-# To prevent the user 'getuser()' (which belongs to the group '$GROUP_NAME') from
-# performing any operation on the database 'grant_rev_db', we also need to alter
-# the owner of 'grant_rev_db' since 'getuser()' is the owner of this database, which by
-# default is allowed by Ranger to perform any operation on the database.
-revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`;
+# To prevent the user 'getuser()' from performing any operation on the database
+# 'grant_rev_db', we also need to alter the owner of 'grant_rev_db' since 'getuser()' is
+# the owner of this database, which by default is allowed by Ranger to perform any
+# operation on the database.
+revoke role grant_revoke_test_ALL_SERVER from $GRANTEE_TYPE `$GRANTEE_NAME`;
 alter database grant_rev_db set owner user admin;
 refresh authorization;
 ====
@@ -220,7 +226,7 @@ STRING
 ---- USER
 admin
 ---- QUERY
-grant role grant_revoke_test_ALL_TEST_DB to group `$GROUP_NAME`
+grant role grant_revoke_test_ALL_TEST_DB to $GRANTEE_TYPE `$GRANTEE_NAME`
 ====
 ---- USER
 admin
@@ -245,7 +251,7 @@ does not have privileges to access: $NAMENODE/test-warehouse/grant_rev_test_tbl2
 ---- USER
 admin
 ---- QUERY
-grant role grant_revoke_test_ALL_URI to group `$GROUP_NAME`
+grant role grant_revoke_test_ALL_URI to $GRANTEE_TYPE `$GRANTEE_NAME`
 ====
 ---- USER
 admin
@@ -345,9 +351,9 @@ principal_type, principal_name, database, table, column, uri, storage_type, stor
 STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
-# Does not result in an AuthorizationException since '$GROUP_NAME' is still assigned the
-# role 'grant_revoke_test_ALL_TEST_DB', which is granted the 'ALL' privilege on the
-# database 'grant_rev_db'
+# Does not result in an AuthorizationException since '$GRANTEE_NAME' is still assigned
+# the role 'grant_revoke_test_ALL_TEST_DB', which is granted the 'ALL' privilege on the
+# database 'grant_rev_db'.
 # TODO(IMPALA-10401): Investigate whether the privilege on the provided uri should be
 # verified.
 create database grant_rev_db location '$FILESYSTEM_PREFIX/test-warehouse/grant_rev_db.db'
@@ -409,7 +415,7 @@ does not have privileges to execute 'SELECT' on: grant_rev_db.test_tbl1
 ---- USER
 admin
 ---- QUERY
-grant role grant_revoke_test_SELECT_INSERT_TEST_TBL to group `$GROUP_NAME`
+grant role grant_revoke_test_SELECT_INSERT_TEST_TBL to $GRANTEE_TYPE `$GRANTEE_NAME`
 ====
 ---- USER
 admin
@@ -490,14 +496,14 @@ User test_user does not have permission for this operation
 ---- USER
 test_user
 ---- QUERY
-grant role grant_revoke_test_ALL_SERVER to group `$GROUP_NAME`
+grant role grant_revoke_test_ALL_SERVER to $GRANTEE_TYPE `$GRANTEE_NAME`
 ---- CATCH
 User doesn't have permissions to grant role grant_revoke_test_ALL_SERVER
 ====
 ---- USER
 test_user
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`
+revoke role grant_revoke_test_ALL_SERVER from $GRANTEE_TYPE `$GRANTEE_NAME`
 ---- CATCH
 User doesn't have permissions to revoke role grant_revoke_test_ALL_SERVER
 ====
@@ -528,7 +534,7 @@ admin
 # user 'non_owner' belongs according to the user-to-groups mapper provided for impalad
 # and catalogd via the argument of "--use_customized_user_groups_mapper_for_ranger".
 create role grant_revoke_test_NON_OWNER;
-grant role grant_revoke_test_NON_OWNER to group non_owner;
+grant role grant_revoke_test_NON_OWNER to $GRANTEE_TYPE non_owner;
 grant all on database functional to grant_revoke_test_NON_OWNER WITH GRANT OPTION;
 ====
 ---- USER
@@ -612,7 +618,7 @@ User non_owner does not have permission for this operation
 non_owner
 ---- QUERY
 # Also cannot create/drop/grant roles
-grant role grant_revoke_test_NON_OWNER to group non_owner
+grant role grant_revoke_test_NON_OWNER to $GRANTEE_TYPE non_owner
 ---- CATCH
 User doesn't have permissions to grant role grant_revoke_test_NON_OWNER
 ====
@@ -659,17 +665,17 @@ STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, 
 ---- USER
 admin
 ---- QUERY
-# After the following two statements, there is no role assigned to the group
-# '$GROUP_NAME' to which the user 'getuser()' belongs.
-REVOKE ROLE grant_revoke_test_ALL_URI FROM GROUP `$GROUP_NAME`;
-REVOKE ROLE grant_revoke_test_SELECT_INSERT_TEST_TBL FROM GROUP `$GROUP_NAME`;
+# After the following two statements, there is no role assigned to the group (or user)
+# 'GRANTEE_NAME'.
+REVOKE ROLE grant_revoke_test_ALL_URI FROM $GRANTEE_TYPE `$GRANTEE_NAME`;
+REVOKE ROLE grant_revoke_test_SELECT_INSERT_TEST_TBL FROM $GRANTEE_TYPE `$GRANTEE_NAME`;
 ---- RESULTS
 'Role has been revoked.'
 ====
 ---- USER
 admin
 ---- QUERY
-GRANT ROLE grant_revoke_test_ALL_SERVER TO GROUP `$GROUP_NAME`
+GRANT ROLE grant_revoke_test_ALL_SERVER TO $GRANTEE_TYPE `$GRANTEE_NAME`
 ---- RESULTS
 'Role has been granted.'
 ====
@@ -915,7 +921,7 @@ STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, 
 admin
 ---- QUERY
 # Grant SELECT on table to 'non_owner' without 'WITH GRANT' option.
-GRANT ROLE grant_revoke_test_NON_OWNER TO GROUP non_owner;
+GRANT ROLE grant_revoke_test_NON_OWNER TO $GRANTEE_TYPE non_owner;
 GRANT SELECT ON TABLE grant_rev_db.test_tbl3 TO grant_revoke_test_NON_OWNER;
 REVOKE ALL ON DATABASE functional FROM grant_revoke_test_NON_OWNER;
 ---- RESULTS
@@ -1063,9 +1069,9 @@ STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, 
 ---- USER
 admin
 ---- QUERY
-# At this point, the group '$GROUP_NAME' is still assigned the role of
+# At this point, '$GRANTEE_NAME' is still assigned the role of
 # 'grant_revoke_test_ALL_SERVER'.
-revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`
+revoke role grant_revoke_test_ALL_SERVER from $GRANTEE_TYPE `$GRANTEE_NAME`
 ====
 ---- USER
 admin
@@ -1083,8 +1089,9 @@ grant all on server server1 to grant_revoke_test_ALL_SERVER1
 ---- USER
 admin
 ---- QUERY
-# Grant role to the group '$GROUP_NAME' to which the user 'getuser()' belongs.
-grant role grant_revoke_test_ALL_SERVER1 to group `$GROUP_NAME`
+# Grant role to the group '$GRANTEE_NAME' to which the user 'getuser()' belongs or to the
+# user 'getuser()' itself.
+grant role grant_revoke_test_ALL_SERVER1 to $GRANTEE_TYPE `$GRANTEE_NAME`
 ====
 ---- USER
 admin
@@ -1112,11 +1119,12 @@ create database grant_rev_db location '$FILESYSTEM_PREFIX/test-warehouse/grant_r
 ---- USER
 admin
 ---- QUERY
-# To prevent the user 'getuser()' (which belongs to the group '$GROUP_NAME') from
-# performing any operation on the database 'grant_rev_db', we also need to alter
-# the owner of 'grant_rev_db' since 'getuser()' is the owner of this database, which by
-# default is allowed by Ranger to perform any operation on the database.
-revoke role grant_revoke_test_ALL_SERVER1 from group `$GROUP_NAME`;
+# To prevent the user 'getuser()' (which belongs to the group '$GRANTEE_NAME' when
+# $GRANTEE_TYPE is 'GROUP') from performing any operation on the database 'grant_rev_db',
+# we also need to alter the owner of 'grant_rev_db' since 'getuser()' is the owner of
+# this database, which by default is allowed by Ranger to perform any operation on the
+# database.
+revoke role grant_revoke_test_ALL_SERVER1 from $GRANTEE_TYPE `$GRANTEE_NAME`;
 alter database grant_rev_db set owner user admin;
 ====
 ---- QUERY
@@ -1159,7 +1167,7 @@ admin
 ---- QUERY
 # IMPALA-4951: make sure database is visible to a user having only column level access
 # to a table in the database
-grant role grant_revoke_test_ALL_SERVER to group non_owner
+grant role grant_revoke_test_ALL_SERVER to $GRANTEE_TYPE non_owner
 ---- RESULTS
 'Role has been granted.'
 ====
@@ -1171,7 +1179,7 @@ create role grant_revoke_test_COLUMN_PRIV
 ---- USER
 admin
 ---- QUERY
-grant role grant_revoke_test_COLUMN_PRIV to group non_owner
+grant role grant_revoke_test_COLUMN_PRIV to $GRANTEE_TYPE non_owner
 ====
 ---- USER
 non_owner
@@ -1186,7 +1194,7 @@ create table grant_rev_db.test_tbl4 (col1 int, col2 int)
 ---- USER
 admin
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER from group non_owner
+revoke role grant_revoke_test_ALL_SERVER from $GRANTEE_TYPE non_owner
 ====
 ---- USER
 non_owner
@@ -1241,12 +1249,12 @@ STRING,STRING
 admin
 ---- QUERY
 # We will be testing whether the user 'getuser()' is able to drop a database if the group
-# 'getuser()' belongs to is assigned the role 'grant_revoke_test_ALL_SERVER', which is
-# granted the ALL privilege on the server. Before dropping a database, the user also has
-# to revoke every privilege granted on the resources of the database and thus we grant
-# the ALL privilege with the grant option.
+# 'getuser()' belongs to, or the user 'getuser()' itself is assigned the role
+# 'grant_revoke_test_ALL_SERVER', which is granted the ALL privilege on the server.
+# Before dropping a database, the user also has to revoke every privilege granted on the
+# resources of the database and thus we grant the ALL privilege with the grant option.
 grant all on server to role grant_revoke_test_ALL_SERVER with grant option;
-grant role grant_revoke_test_ALL_SERVER to group `$GROUP_NAME`;
+grant role grant_revoke_test_ALL_SERVER to $GRANTEE_TYPE `$GRANTEE_NAME`;
 ---- RESULTS
 'Role has been granted.'
 ====
@@ -1260,18 +1268,19 @@ drop database if exists grant_rev_db cascade;
 ---- USER
 admin
 ---- QUERY
-revoke role grant_revoke_test_ALL_SERVER from group `$GROUP_NAME`
+revoke role grant_revoke_test_ALL_SERVER from $GRANTEE_TYPE `$GRANTEE_NAME`
 ---- RESULTS
 'Role has been revoked.'
 ====
 ---- USER
 admin
 ---- QUERY
-revoke role grant_revoke_test_COLUMN_PRIV from group `$GROUP_NAME`
+revoke role grant_revoke_test_COLUMN_PRIV from $GRANTEE_TYPE `$GRANTEE_NAME`
 ====
 ---- QUERY
-# Verify that the user 'getuser()', which belongs to the group '$GROUP_NAME' is not
-# assigned any role afterwards.
+# Verify that the user 'getuser()', which belongs to the group '$GRANTEE_NAME' when
+# $GRANTEE_TYPE is 'GROUP', or that the user 'getuser()' itself is not assigned any role
+# afterwards.
 show current roles
 ---- RESULTS
 ====

@@ -31,26 +31,36 @@ public class ShowRolesStmt extends AuthorizationStmt {
   // If null, all roles will be shown. Otherwise only roles granted to this
   // group will be shown.
   private final String groupName_;
+  private final String userName_;
   private final boolean isShowCurrentRoles_;
 
   // Set during analysis.
   private User requestingUser_;
 
-  public ShowRolesStmt(boolean isShowCurrentRoles, String groupName) {
-    // An empty group name should never be possible since group name is an identifier
-    // and Impala does not allow empty identifiers.
+  public ShowRolesStmt(boolean isShowCurrentRoles, String groupName, String userName) {
+    // For SHOW CURRENT ROLES, 'groupName' and 'userName' should be null.
     Preconditions.checkState(!isShowCurrentRoles ||
-        (groupName == null || !groupName.isEmpty()));
+        (groupName == null && userName == null));
+    // 'groupName' and 'userName' should not both be set whether 'isShowCurrentRoles' is
+    // true.
+    Preconditions.checkState(groupName == null || userName == null);
+    // An empty 'groupName' or 'userName' should never be possible since 'groupName' and
+    // 'userName' should be an identifier and Impala does not allow empty identifiers.
+    Preconditions.checkState(groupName == null || !groupName.isEmpty());
+    Preconditions.checkState(userName == null || !userName.isEmpty());
     groupName_ = groupName;
+    userName_ = userName;
     isShowCurrentRoles_ = isShowCurrentRoles;
   }
 
   @Override
   public String toSql(ToSqlOptions options) {
-    if (groupName_ == null) {
+    if (groupName_ == null && userName_ == null) {
       return isShowCurrentRoles_ ? "SHOW CURRENT ROLES" : "SHOW ROLES";
     } else {
-      return "SHOW ROLE GRANT GROUP " + groupName_;
+      String granteeType = groupName_ != null ? "GROUP" : "USER";
+      String granteeName = groupName_ != null ? groupName_ : userName_;
+      return "SHOW ROLE GRANT " + granteeType + " " + granteeName;
     }
   }
 
@@ -59,6 +69,7 @@ public class ShowRolesStmt extends AuthorizationStmt {
     params.setRequesting_user(requestingUser_.getShortName());
     params.setIs_show_current_roles(isShowCurrentRoles_);
     if (groupName_ != null) params.setGrant_group(groupName_);
+    if (userName_ != null) params.setGrant_user(userName_);
     // Users should always be able to execute SHOW CURRENT ROLES.
     return params;
   }

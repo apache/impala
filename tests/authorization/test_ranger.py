@@ -796,9 +796,13 @@ class TestRanger(CustomClusterTestSuite):
 
   @staticmethod
   def _check_privileges(result, expected):
+    TestRanger._check_rows(result, expected, True)
+
+  @staticmethod
+  def _check_rows(result, expected, omit_last_column=False):
     def columns(row):
       cols = row.split("\t")
-      return cols[0:len(cols) - 1]
+      return cols[:-1] if omit_last_column else cols
 
     assert list(map(columns, result.data)) == expected
 
@@ -1679,6 +1683,80 @@ class TestRanger(CustomClusterTestSuite):
         for i in range(policy_cnt):
           TestRanger._remove_policy(unique_name + str(i))
 
+  def _test_grant_revoke_with_role(self, grantee_type, vector, admin_client):
+    try:
+      self.run_test_case('QueryTest/grant_revoke', vector, use_db="default",
+          test_file_vars={
+              "$GRANTEE_TYPE": grantee_type,
+              "$GRANTEE_NAME": getuser()
+          })
+    finally:
+      # Below are the statements that need to be executed in order to clean up the
+      # privileges granted to the test roles as well as the test roles themselves.
+      # Note that we need to revoke those previously granted privileges so that each role
+      # is not referenced by any policy before we delete those roles.
+      # Moreover, we need to revoke the privilege on the database 'grant_rev_db' before
+      # dropping 'grant_rev_db'. Otherwise, the revocation would fail due to an
+      # AnalysisException thrown because 'grant_rev_db' does not exist.
+      cleanup_statements = [
+        "revoke all on database grant_rev_db from grant_revoke_test_ALL_TEST_DB",
+        "revoke all on server from grant_revoke_test_ALL_SERVER",
+        "revoke all on table functional.alltypes from grant_revoke_test_NON_OWNER",
+        "revoke grant option for all on database functional "
+        "from grant_revoke_test_NON_OWNER",
+        "REVOKE SELECT (a, b, c, d, e, x, y) ON TABLE grant_rev_db.test_tbl3 "
+        "FROM grant_revoke_test_ALL_SERVER",
+        "REVOKE ALL ON DATABASE functional FROM grant_revoke_test_NON_OWNER",
+        "REVOKE SELECT ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_test_NON_OWNER",
+        "REVOKE GRANT OPTION FOR SELECT (a, c) ON TABLE grant_rev_db.test_tbl3 "
+        "FROM grant_revoke_test_ALL_SERVER",
+        "REVOKE SELECT ON TABLE grant_rev_db.test_tbl1 "
+        "FROM grant_revoke_test_SELECT_INSERT_TEST_TBL",
+        "REVOKE INSERT ON TABLE grant_rev_db.test_tbl1 "
+        "FROM grant_revoke_test_SELECT_INSERT_TEST_TBL",
+        "REVOKE SELECT ON TABLE grant_rev_db.test_tbl3 "
+        "FROM grant_revoke_test_NON_OWNER",
+        "REVOKE SELECT (a) ON TABLE grant_rev_db.test_tbl3 "
+        "FROM grant_revoke_test_NON_OWNER",
+        "REVOKE SELECT (a, c, e) ON TABLE grant_rev_db.test_tbl3 "
+        "FROM grant_revoke_test_ALL_SERVER",
+        "revoke all on server server1 from grant_revoke_test_ALL_SERVER1",
+        "revoke select(col1) on table grant_rev_db.test_tbl4 "
+        "from role grant_revoke_test_COLUMN_PRIV",
+        "{0}{1}{2}".format("revoke all on uri '",
+                           os.getenv("FILESYSTEM_PREFIX"),
+                           "/test-warehouse/grant_rev_test_tbl2'"
+                           "from grant_revoke_test_ALL_URI"),
+        "{0}{1}{2}".format("revoke all on uri '",
+                           os.getenv("FILESYSTEM_PREFIX"),
+                           "/test-warehouse/GRANT_REV_TEST_TBL3'"
+                           "from grant_revoke_test_ALL_URI"),
+        "{0}{1}{2}".format("revoke all on uri '",
+                           os.getenv("FILESYSTEM_PREFIX"),
+                           "/test-warehouse/grant_rev_test_prt'"
+                           "from grant_revoke_test_ALL_URI"),
+        "drop role grant_revoke_test_ALL_TEST_DB",
+        "drop role grant_revoke_test_ALL_SERVER",
+        "drop role grant_revoke_test_SELECT_INSERT_TEST_TBL",
+        "drop role grant_revoke_test_ALL_URI",
+        "drop role grant_revoke_test_NON_OWNER",
+        "drop role grant_revoke_test_ALL_SERVER1",
+        "drop role grant_revoke_test_COLUMN_PRIV",
+        "drop database grant_rev_db cascade"
+      ]
+
+      for statement in cleanup_statements:
+        try:
+          admin_client.execute(statement)
+        except Exception:
+          # There could be an exception thrown due to the non-existence of the role or
+          # resource involved in a statement that aims to revoke the privilege on a
+          # resource from a role, but we do not have to handle such an exception. We only
+          # need to make sure in the case when the role and the corresponding resource
+          # exist, the granted privilege is revoked. The same applies to the case when we
+          # drop a role.
+          pass
+
 
 class TestRangerIndependent(TestRanger):
   """
@@ -1965,76 +2043,61 @@ class TestRangerIndependent(TestRanger):
     catalogd_args="{0} {1}".format(CATALOGD_ARGS,
                                    "--use_customized_user_groups_mapper_for_ranger"))
   def test_grant_revoke_with_role(self, vector):
-    """Test grant/revoke with role."""
-    admin_client = self.create_impala_client(user=ADMIN)
-    try:
-      self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")
-    finally:
-      # Below are the statements that need to be executed in order to clean up the
-      # privileges granted to the test roles as well as the test roles themselves.
-      # Note that we need to revoke those previously granted privileges so that each role
-      # is not referenced by any policy before we delete those roles.
-      # Moreover, we need to revoke the privilege on the database 'grant_rev_db' before
-      # dropping 'grant_rev_db'. Otherwise, the revocation would fail due to an
-      # AnalysisException thrown because 'grant_rev_db' does not exist.
-      cleanup_statements = [
-        "revoke all on database grant_rev_db from grant_revoke_test_ALL_TEST_DB",
-        "revoke all on server from grant_revoke_test_ALL_SERVER",
-        "revoke all on table functional.alltypes from grant_revoke_test_NON_OWNER",
-        "revoke grant option for all on database functional "
-        "from grant_revoke_test_NON_OWNER",
-        "REVOKE SELECT (a, b, c, d, e, x, y) ON TABLE grant_rev_db.test_tbl3 "
-        "FROM grant_revoke_test_ALL_SERVER",
-        "REVOKE ALL ON DATABASE functional FROM grant_revoke_test_NON_OWNER",
-        "REVOKE SELECT ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_test_NON_OWNER",
-        "REVOKE GRANT OPTION FOR SELECT (a, c) ON TABLE grant_rev_db.test_tbl3 "
-        "FROM grant_revoke_test_ALL_SERVER",
-        "REVOKE SELECT ON TABLE grant_rev_db.test_tbl1 "
-        "FROM grant_revoke_test_SELECT_INSERT_TEST_TBL",
-        "REVOKE INSERT ON TABLE grant_rev_db.test_tbl1 "
-        "FROM grant_revoke_test_SELECT_INSERT_TEST_TBL",
-        "REVOKE SELECT ON TABLE grant_rev_db.test_tbl3 "
-        "FROM grant_revoke_test_NON_OWNER",
-        "REVOKE SELECT (a) ON TABLE grant_rev_db.test_tbl3 "
-        "FROM grant_revoke_test_NON_OWNER",
-        "REVOKE SELECT (a, c, e) ON TABLE grant_rev_db.test_tbl3 "
-        "FROM grant_revoke_test_ALL_SERVER",
-        "revoke all on server server1 from grant_revoke_test_ALL_SERVER1",
-        "revoke select(col1) on table grant_rev_db.test_tbl4 "
-        "from role grant_revoke_test_COLUMN_PRIV",
-        "{0}{1}{2}".format("revoke all on uri '",
-                           os.getenv("FILESYSTEM_PREFIX"),
-                           "/test-warehouse/grant_rev_test_tbl2'"
-                           "from grant_revoke_test_ALL_URI"),
-        "{0}{1}{2}".format("revoke all on uri '",
-                           os.getenv("FILESYSTEM_PREFIX"),
-                           "/test-warehouse/GRANT_REV_TEST_TBL3'"
-                           "from grant_revoke_test_ALL_URI"),
-        "{0}{1}{2}".format("revoke all on uri '",
-                           os.getenv("FILESYSTEM_PREFIX"),
-                           "/test-warehouse/grant_rev_test_prt'"
-                           "from grant_revoke_test_ALL_URI"),
-        "drop role grant_revoke_test_ALL_TEST_DB",
-        "drop role grant_revoke_test_ALL_SERVER",
-        "drop role grant_revoke_test_SELECT_INSERT_TEST_TBL",
-        "drop role grant_revoke_test_ALL_URI",
-        "drop role grant_revoke_test_NON_OWNER",
-        "drop role grant_revoke_test_ALL_SERVER1",
-        "drop role grant_revoke_test_COLUMN_PRIV",
-        "drop database grant_rev_db cascade"
-      ]
+    """Test grant/revoke with roles."""
+    with self.create_impala_client(user=ADMIN) as admin_client:
+      TestRanger._test_grant_revoke_with_role(self, 'GROUP', vector, admin_client)
+      TestRanger._test_grant_revoke_with_role(self, 'USER', vector, admin_client)
 
-      for statement in cleanup_statements:
-        try:
-          admin_client.execute(statement)
-        except Exception:
-          # There could be an exception thrown due to the non-existence of the role or
-          # resource involved in a statement that aims to revoke the privilege on a
-          # resource from a role, but we do not have to handle such an exception. We only
-          # need to make sure in the case when the role and the corresponding resource
-          # exist, the granted privilege is revoked. The same applies to the case when we
-          # drop a role.
-          pass
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_show_roles(self):
+    """Test SHOW ROLE GRANT GROUP/USER and SHOW CURRENT ROLES."""
+    user = getuser()
+    group = getuser()
+    with self.create_impala_client(user=ADMIN) as admin_client, \
+        self.create_impala_client(user=user) as user_client:
+      try:
+        admin_client.execute("create role r_1")
+        admin_client.execute("create role r_2")
+        admin_client.execute("grant role r_1 to group {}".format(group))
+        admin_client.execute("grant role r_2 to user {}".format(user))
+
+        # Verify that the group with the name 'getuser()' is associated with the role
+        # 'r_1'.
+        result_1 = admin_client.execute("show role grant group {}".format(group))
+        TestRanger._check_rows(result_1, [['r_1']])
+
+        # Verify that the user 'getuser()' is associated with the role 'r_2'.
+        result_2 = admin_client.execute("show role grant user {}".format(user))
+        TestRanger._check_rows(result_2, [['r_2']])
+
+        # Verify as the user 'getuser()' that its current roles are 'r_1' and 'r_2'.
+        result_3 = user_client.execute("show current roles")
+        TestRanger._check_rows(result_3, [['r_1'], ['r_2']])
+
+        # Try to revoke role 'r_1' from the user 'getuser()'.
+        admin_client.execute("revoke role r_1 from user {}".format(user))
+        # Verify as the user 'getuser()' that its current roles are still 'r_1' and
+        # 'r_2', i.e., the role 'r_1' is still associated with the user 'getuser()'
+        # because the user 'getuser()' belongs to the group 'getuser()', and 'r_1' is
+        # still associated with the group 'getuser()'.
+        result_4 = user_client.execute("show current roles")
+        TestRanger._check_rows(result_4, [['r_1'], ['r_2']])
+
+        # Revoke the role 'r_2' from the group 'getuser()'.
+        admin_client.execute("revoke role r_1 from group {}".format(user))
+        # Verify as the user 'getuser()' its current roles do not include 'r_1'.
+        result_5 = user_client.execute("show current roles")
+        TestRanger._check_rows(result_5, [['r_2']])
+      finally:
+        admin_client.execute("revoke role r_1 from group {}".format(group))
+        admin_client.execute("revoke role r_2 from user {}".format(user))
+        result_6 = admin_client.execute("show role grant user {}".format(user))
+        TestRanger._check_rows(result_6, [])
+        result_7 = admin_client.execute("show role grant group {}".format(group))
+        TestRanger._check_rows(result_7, [])
+        admin_client.execute("drop role r_1")
+        admin_client.execute("drop role r_2")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

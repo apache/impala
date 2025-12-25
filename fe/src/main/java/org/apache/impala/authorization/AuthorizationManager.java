@@ -56,13 +56,13 @@ public interface AuthorizationManager {
   /**
    * Grants a role to a group.
    */
-  void grantRoleToGroup(User requestingUser, TGrantRevokeRoleParams params,
+  void grantRoleToGroupOrUser(User requestingUser, TGrantRevokeRoleParams params,
       TDdlExecResponse response) throws ImpalaException;
 
   /**
    * Revokes a role from a group.
    */
-  void revokeRoleFromGroup(User requestingUser, TGrantRevokeRoleParams params,
+  void revokeRoleFromGroupOrUser(User requestingUser, TGrantRevokeRoleParams params,
       TDdlExecResponse response) throws ImpalaException;
 
   /**

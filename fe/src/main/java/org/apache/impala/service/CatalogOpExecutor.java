@@ -611,17 +611,25 @@ public class CatalogOpExecutor {
           TGrantRevokeRoleParams grant_role_params =
               ddlRequest.getGrant_revoke_role_params();
           tTableName = Optional.of(new TTableName(
-              StringUtils.join(",", grant_role_params.group_names), ""));
+              StringUtils.join(",",
+                  grant_role_params.getUser_names().isEmpty() ?
+                      grant_role_params.getGroup_names() :
+                      grant_role_params.getUser_names()),
+              /* table_name */ ""));
           catalogOpTracker_.increment(ddlRequest, tTableName);
-          grantRoleToGroup(requestingUser, grant_role_params, response);
+          grantRoleToGroupOrUser(requestingUser, grant_role_params, response);
           break;
         case REVOKE_ROLE:
           TGrantRevokeRoleParams revoke_role_params =
               ddlRequest.getGrant_revoke_role_params();
           tTableName = Optional.of(new TTableName(
-              StringUtils.join(",", revoke_role_params.group_names), ""));
+              StringUtils.join(",",
+                  revoke_role_params.getUser_names().isEmpty() ?
+                      revoke_role_params.getGroup_names() :
+                      revoke_role_params.getUser_names()),
+              /* table_name */ ""));
           catalogOpTracker_.increment(ddlRequest, tTableName);
-          revokeRoleFromGroup(
+          revokeRoleFromGroupOrUser(
               requestingUser, revoke_role_params, response);
           break;
         case GRANT_PRIVILEGE:
@@ -7081,28 +7089,28 @@ public class CatalogOpExecutor {
   /**
    * Grants a role to the given group on behalf of the requestingUser.
    */
-  private void grantRoleToGroup(User requestingUser,
+  private void grantRoleToGroupOrUser(User requestingUser,
       TGrantRevokeRoleParams grantRevokeRoleParams, TDdlExecResponse resp)
       throws ImpalaException {
     Preconditions.checkNotNull(requestingUser);
     Preconditions.checkNotNull(grantRevokeRoleParams);
     Preconditions.checkNotNull(resp);
     Preconditions.checkArgument(grantRevokeRoleParams.isIs_grant());
-    authzManager_.grantRoleToGroup(requestingUser, grantRevokeRoleParams, resp);
+    authzManager_.grantRoleToGroupOrUser(requestingUser, grantRevokeRoleParams, resp);
     addSummary(resp, "Role has been granted.");
   }
 
   /**
    * Revokes a role from the given group on behalf of the requestingUser.
    */
-  private void revokeRoleFromGroup(User requestingUser,
+  private void revokeRoleFromGroupOrUser(User requestingUser,
       TGrantRevokeRoleParams grantRevokeRoleParams, TDdlExecResponse resp)
       throws ImpalaException {
     Preconditions.checkNotNull(requestingUser);
     Preconditions.checkNotNull(grantRevokeRoleParams);
     Preconditions.checkNotNull(resp);
     Preconditions.checkArgument(!grantRevokeRoleParams.isIs_grant());
-    authzManager_.revokeRoleFromGroup(requestingUser, grantRevokeRoleParams, resp);
+    authzManager_.revokeRoleFromGroupOrUser(requestingUser, grantRevokeRoleParams, resp);
     addSummary(resp, "Role has been revoked.");
   }
 

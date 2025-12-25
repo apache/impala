@@ -29,27 +29,42 @@ import com.google.common.collect.Lists;
 public class GrantRevokeRoleStmt extends AuthorizationStmt {
   private final String roleName_;
   private final String groupName_;
+  private final String userName_;
   private final boolean isGrantStmt_;
+  private final boolean principalIsGroup_;
 
-  public GrantRevokeRoleStmt(String roleName, String groupName, boolean isGrantStmt) {
+  public GrantRevokeRoleStmt(String roleName, String groupName,
+      String userName, boolean isGrantStmt) {
     Preconditions.checkNotNull(roleName);
-    Preconditions.checkNotNull(groupName);
+    Preconditions.checkArgument((groupName != null && userName == null) ||
+        (groupName == null && userName != null));
     roleName_ = roleName;
     groupName_ = groupName;
+    userName_ = userName;
     isGrantStmt_ = isGrantStmt;
+    // If 'userName_' is null, then the grantee/revokee is a group.
+    principalIsGroup_ = (userName_ == null);
   }
 
   @Override
   public String toSql(ToSqlOptions options) {
-    return String.format("%s ROLE %s %s GROUP %s",
+    return String.format("%s ROLE %s %s %s %s",
         isGrantStmt_ ? "GRANT" : "REVOKE", roleName_,
-        isGrantStmt_ ? "TO" : "FROM", groupName_);
+        isGrantStmt_ ? "TO" : "FROM",
+        principalIsGroup_ ? "GROUP" : "USER",
+        principalIsGroup_ ? groupName_ : userName_);
   }
 
   public TGrantRevokeRoleParams toThrift() {
     TGrantRevokeRoleParams params = new TGrantRevokeRoleParams();
     params.setRole_names(Lists.newArrayList(roleName_));
-    params.setGroup_names(Lists.newArrayList(groupName_));
+    if (principalIsGroup_) {
+      params.setGroup_names(Lists.newArrayList(groupName_));
+      params.setUser_names(Lists.newArrayList());
+    } else {
+      params.setGroup_names(Lists.newArrayList());
+      params.setUser_names(Lists.newArrayList(userName_));
+    }
     params.setIs_grant(isGrantStmt_);
     return params;
   }
@@ -60,8 +75,15 @@ public class GrantRevokeRoleStmt extends AuthorizationStmt {
     if (Strings.isNullOrEmpty(roleName_)) {
       throw new AnalysisException("Role name in GRANT/REVOKE ROLE cannot be empty.");
     }
-    if (Strings.isNullOrEmpty(groupName_)) {
-      throw new AnalysisException("Group name in GRANT/REVOKE ROLE cannot be empty.");
+    if (principalIsGroup_ && Strings.isNullOrEmpty(groupName_)) {
+      throw new AnalysisException(String.format("Group name cannot be empty in " +
+              "%s ROLE %s GROUP.", isGrantStmt_ ? "GRANT" : "REVOKE",
+          isGrantStmt_ ? "TO" : "FROM"));
+    }
+    if (!principalIsGroup_ && Strings.isNullOrEmpty(userName_)) {
+      throw new AnalysisException(String.format("User name cannot be empty in " +
+              "%s ROLE %s USER.", isGrantStmt_ ? "GRANT" : "REVOKE",
+          isGrantStmt_ ? "TO" : "FROM"));
     }
   }
 

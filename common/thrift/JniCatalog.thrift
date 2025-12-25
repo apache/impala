@@ -736,10 +736,17 @@ struct TGrantRevokeRoleParams {
   1: required list<string> role_names
 
   // The group names that are being granted/revoked.
+  // When 'user_names' is empty, the grantee/revokee would be a group, and thus
+  // 'group_names' would consist of exactly one non-empty name of the grantee/revokee.
   2: required list<string> group_names
 
   // True if this is a GRANT statement false if this is a REVOKE statement.
   3: required bool is_grant
+
+  // The user names that are being granted/revoked.
+  // When 'group_names' is empty, the grantee/revokee would be a user, and thus
+  // 'user_names' would consist of exactly one non-empty name of the grantee/revokee.
+  4: optional list<string> user_names
 }
 
 // Parameters for GRANT/REVOKE privilege TO/FROM user/role.
