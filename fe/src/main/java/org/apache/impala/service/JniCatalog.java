@@ -138,7 +138,7 @@ public class JniCatalog {
     return new TUniqueId(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
   }
 
-  private static final HiveConf HIVE_CONF = new HiveConf();
+  public static final HiveConf HIVE_CONF = new HiveConf();
 
   public JniCatalog(byte[] thriftBackendConfig) throws ImpalaException {
     TBackendGflags cfg = new TBackendGflags();

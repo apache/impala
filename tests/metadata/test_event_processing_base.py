@@ -14,8 +14,14 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
+from subprocess import check_output
+
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.event_processor_utils import EventProcessorUtils
+from tests.util.parse_util import bytes_to_str
 
 EVENT_SYNC_QUERY_OPTIONS = {
     "sync_hms_events_wait_time_s": 30,
@@ -301,6 +307,28 @@ class TestEventProcessingBase(ImpalaTestSuite):
         .split('\t')[0])
       assert rows_in_unpart_tbl_target == 0
       assert rows_in_part_tbl_target == 0
+
+      if isinstance(suite, CustomClusterTestSuite):
+        catalogd = suite.cluster.catalogd.service
+      else:
+        catalogd = ImpalaCluster.get_e2e_test_cluster().catalogd.service
+      # If hive.acid.truncate.usebase is true, verify table dir is not empty
+      if catalogd.get_hadoop_config_value("hive.acid.truncate.usebase") == "true":
+        for db in [source_db, target_db]:
+          unpart_tbl_location = suite._get_table_location(db + "." + unpartitioned_tbl)
+          part_tbl_location = suite._get_table_location(db + "." + partitioned_tbl)
+          # When hive.acid.truncate.usebase is true, truncate creates base_* directories
+          # instead of deleting all data, so the table directory should not be empty
+          # Use hdfs CLI to list files instead of filesystem_client to avoid path issues
+          unpart_files_result = bytes_to_str(
+              check_output(["hdfs", "dfs", "-ls", unpart_tbl_location]))
+          part_files_result = bytes_to_str(
+              check_output(["hdfs", "dfs", "-ls", part_tbl_location]))
+          assert unpart_files_result != "", \
+              "Table directory of {0}.{1} should not be empty".format(
+                  db, unpartitioned_tbl)
+          assert part_files_result != "", \
+              "Table directory of {0}.{1} should not be empty".format(db, partitioned_tbl)
     finally:
       src_db = cls.__get_db_nothrow(source_db)
       target_db_obj = cls.__get_db_nothrow(target_db)

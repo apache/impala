@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
@@ -129,6 +130,7 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.hive.common.MutableValidWriteIdList;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
+import org.apache.impala.service.JniCatalog;
 import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
@@ -723,7 +725,14 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
   public static void truncateTable(IMetaStoreClient msClient, String dbName,
       String tableName, List<String> partNames,
       String validWriteIds, long writeId) throws TException {
-    msClient.truncateTable(dbName, tableName, partNames, validWriteIds, writeId);
+    boolean deleteData = true;
+    // For transactional tables, use "hive.acid.truncate.usebase".
+    if (validWriteIds != null && writeId > 0) {
+      deleteData = !JniCatalog.HIVE_CONF.getBoolean(
+          HiveConf.ConfVars.HIVE_ACID_TRUNCATE_USE_BASE.varname, true);
+    }
+    msClient.truncateTable(dbName, tableName, partNames, validWriteIds, writeId,
+        deleteData);
   }
 
   /**

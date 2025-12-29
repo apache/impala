@@ -1439,18 +1439,23 @@ class ImpalaTestSuite(BaseTestSuite):
     if a == b: return True  # Avoid division by 0
     assert abs(a - b) / float(max(abs(a), abs(b))) <= diff_perc
 
-  def _get_table_location(self, table_name, vector):
+  def _get_table_location(self, table_name, vector=None):
     """ Returns the HDFS location of the table. If the table is not fully qualified,
     this uses the database from the vector."""
     is_fully_qualified = table_name.find(".") != -1
     if is_fully_qualified:
       fq_table_name = table_name
-    else:
+    elif vector is not None:
       db_name = self.get_db_name_from_format(vector.get_table_format())
       fq_table_name = "{0}.{1}".format(db_name, table_name)
+    else:
+      fq_table_name = "default." + table_name
 
-    result = self.execute_query_using_client(self.client,
-        "describe formatted %s" % fq_table_name, vector)
+    stmt = "describe formatted %s" % fq_table_name
+    if vector is not None:
+      result = self.execute_query_using_client(self.client, stmt, vector)
+    else:
+      result = self.client.execute(stmt)
     for row in result.data:
       if 'Location:' in row:
         return row.split('\t')[1]
