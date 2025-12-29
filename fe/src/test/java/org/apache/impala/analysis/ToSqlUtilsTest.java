@@ -230,7 +230,7 @@ public class ToSqlUtilsTest extends FrontendTestBase {
   }
 
   @Test
-  public void tesToIdentSql() {
+  public void testToIdentSql() {
     // Normal quoting
     assertEquals("`create`", ToSqlUtils.identSql("create"));
     assertEquals("foo", ToSqlUtils.identSql("foo"));
