@@ -92,7 +92,7 @@ under the License.
         </dlentry>
         <dlentry>
           <dt>AI_GENERATE_TEXT</dt>
-          <dd>Syntax:<codeblock id="codeblock_qdg_zn4_tbc">ai_generate_text(ai_endpoint, prompt, ai_model, ai_api_key_jceks_secret, additional_params)
+          <dd>Syntax:<codeblock id="codeblock_qdg_zn4_tbc">ai_generate_text(ai_endpoint, prompt, ai_model, ai_api_key_jceks_secret, additional_params, impala_options)
           </codeblock></dd>
         </dlentry>
       </dl>
@@ -124,6 +124,21 @@ under the License.
             <codeph>core-site</codeph> configuration for both the executor and coordinator.</li>
         <li><b>additional_params</b>: Additional parameters that the AI API offers that is provided
           to the built-in function as a JSON object.</li>
+        <li><b>impala_options</b>: Optional JSON object that controls Impala-specific behavior for
+          the AI function. This parameter supports the following fields:
+          <ul>
+            <li><b>credential_type</b>: Specifies how the API key credential is provided. Valid
+              values are <codeph>"plain"</codeph> (use the credential as plain text) or
+              <codeph>"jceks"</codeph> (fetch the API key from JCEKS keystore). Default is
+              <codeph>"jceks"</codeph>.</li>
+            <li><b>api_standard</b>: Specifies the API standard to use. Currently only
+              <codeph>"openai"</codeph> is supported.</li>
+            <li><b>payload</b>: Custom payload string to send to the AI API instead of the
+              auto-generated payload. Maximum size is 5MB. When specified, this overrides the
+              default payload construction.</li>
+          </ul>
+          Example: <codeph>{"credential_type":"plain","api_standard":"openai"}</codeph>
+        </li>
       </ul>
     </section>
     <section id="impala-built-in-ai-function">
