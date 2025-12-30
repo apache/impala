@@ -3221,6 +3221,23 @@ public class MetastoreEventsProcessorTest {
     fileMetadataLoadBefore = fileMetadataLoadAfter;
     fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
     assertEquals(fileMetadataLoadBefore + 1, fileMetadataLoadAfter);
+
+    // Test 10: Trivial change in SD parameters
+    LOG.info("Test SD parameters change from unset to empty");
+    hmsTbl = tbl.getMetaStoreTable().deepCopy();
+    hmsTbl.getSd().unsetParameters();
+    fileMetadataLoadBefore = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    // From unset to empty
+    hmsTbl.getSd().setParameters(new HashMap<>());
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals("SD parameters changed from unset to empty should not trigger reload",
+        fileMetadataLoadBefore, fileMetadataLoadAfter);
+    // From empty to unset
+    fileMetadataLoadBefore = fileMetadataLoadAfter;
+    hmsTbl.getSd().unsetParameters();
+    fileMetadataLoadAfter = processAlterTableAndReturnMetric(testTblName, hmsTbl);
+    assertEquals("SD parameters changed from empty to unset should not trigger reload",
+        fileMetadataLoadBefore, fileMetadataLoadAfter);
   }
 
   private long processAlterTableAndReturnMetric(String testTblName,

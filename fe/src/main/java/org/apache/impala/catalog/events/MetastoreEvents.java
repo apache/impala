@@ -2315,15 +2315,55 @@ public class MetastoreEvents {
       Preconditions.checkNotNull(afterSd, "afterSd is null");
       StorageDescriptor previousSD = normalizeStorageDescriptor(beforeSd.deepCopy());
       StorageDescriptor currentSD = normalizeStorageDescriptor(afterSd.deepCopy());
-      if (!Objects.equals(previousSD, currentSD)) {
-        infoLog("Non-trivial change in table storage descriptor (SD) detected for " +
-            "table {}.{}. So file metadata should be reloaded. SD before: {}, SD " +
-            "after: {}", dbName_, tblName_, beforeSd.toString(), afterSd.toString());
-        return false;
+      if (Objects.equals(previousSD, currentSD)) {
+        infoLog("Ignored trivial changes in table storage descriptor (SD) of table " +
+            "{}.{}.", dbName_, tblName_);
+        return true;
       }
-      infoLog("Trivial changes in table storage descriptor (SD) detected for table " +
-          "{}.{}. So file metadata reload can be skipped.", dbName_, tblName_);
-      return true;
+      boolean foundChange = false;
+      if (!Objects.equals(previousSD.getLocation(), currentSD.getLocation())) {
+        foundChange = true;
+        infoLog("Location changed from '{}' to '{}'",
+        previousSD.getLocation(), currentSD.getLocation());
+      }
+      if (!Objects.equals(previousSD.getInputFormat(), currentSD.getInputFormat())) {
+        foundChange = true;
+        infoLog("InputFormat changed from '{}' to '{}'",
+            previousSD.getInputFormat(), currentSD.getInputFormat());
+      }
+      if (!Objects.equals(previousSD.getOutputFormat(), currentSD.getOutputFormat())) {
+        foundChange = true;
+        infoLog("OutputFormat changed from '{}' to '{}'",
+            previousSD.getOutputFormat(), currentSD.getOutputFormat());
+      }
+      if (!Objects.equals(previousSD.getSerdeInfo(), currentSD.getSerdeInfo())) {
+        foundChange = true;
+        infoLog("SerdeInfo changed from '{}' to '{}'",
+            previousSD.getSerdeInfo(), currentSD.getSerdeInfo());
+      }
+      // normalizeStorageDescriptor() makes sure storedAsSubDirectories is set.
+      if (previousSD.isStoredAsSubDirectories() != currentSD.isStoredAsSubDirectories()) {
+        foundChange = true;
+        infoLog("StoredAsSubDirectories changed from '{}' to '{}'",
+            previousSD.isStoredAsSubDirectories(), currentSD.isStoredAsSubDirectories());
+      }
+      if (!Objects.equals(previousSD.getParameters(), currentSD.getParameters())) {
+        foundChange = true;
+        infoLog("Parameters changed from '{}' to '{}'",
+            previousSD.getParameters(), currentSD.getParameters());
+      }
+      if (foundChange) {
+        infoLog("Non-trivial change in table storage descriptor (SD) detected for " +
+            "table {}.{}. So file metadata should be reloaded.", dbName_, tblName_);
+      } else {
+        // New hive versions might add new fields to StorageDescriptor that we don't
+        // normalize or miss in above checks. So we log the full SD objects here.
+        infoLog("Non-trivial change in table storage descriptor (SD) detected for " +
+            "table {}.{}. So file metadata should be reloaded. SD before: " +
+            "{}, SD after: {}",
+            dbName_, tblName_, beforeSd.toString(), afterSd.toString());
+      }
+      return false;
     }
 
     /**
@@ -2342,6 +2382,9 @@ public class MetastoreEvents {
       // this value to false if it is null.
       if (!sd.isSetStoredAsSubDirectories()) {
         sd.setStoredAsSubDirectories(false);
+      }
+      if (sd.isSetParameters() && sd.getParameters().isEmpty()) {
+        sd.unsetParameters();
       }
       return sd;
     }
