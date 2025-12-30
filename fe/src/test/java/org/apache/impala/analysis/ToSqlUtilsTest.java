@@ -197,6 +197,22 @@ public class ToSqlUtilsTest extends FrontendTestBase {
     // version for that.
   }
 
+  // IMPALA-14551: Unicode complex expressions could cause HiveLexer to hang.
+  @Test(timeout = 5000)
+  public void testHiveNeedsQuotesUnicodeComplexExpression() {
+    // Use the lowercased, backticked alias string that toSql() would generate to
+    // make sure HiveLexer doesn't hang.
+    // Korean complex expressions
+    assertTrue(ToSqlUtils.hiveNeedsQuotes(
+        "`매출액` - lag(`매출액`) over (partition by `x` order by `y`)"));
+    // Japanese complex expressions
+    assertTrue(ToSqlUtils.hiveNeedsQuotes(
+        "sum(`売上高`) over (order by `年月日` rows unbounded preceding)"));
+    // Chinese complex expressions
+    assertTrue(ToSqlUtils.hiveNeedsQuotes(
+        "avg(`销售额`) over (order by `日期` rows between 3 preceding and current row)"));
+  }
+
   @Test
   public void testGetIdentSql() {
     // Hive & Impala keyword
