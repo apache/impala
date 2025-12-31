@@ -60,8 +60,12 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.thrift.CatalogObjectsConstants;
+import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TGetPartitionStatsRequest;
+import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrincipalType;
@@ -1062,5 +1066,199 @@ public class CatalogTest {
     for (Principal principal: allRoles) {
       assertTrue(allRoleNames.contains(principal.getName()));
     }
+  }
+
+  /**
+   * Helper method to create a partition descriptor.
+   */
+  private TCatalogObject createPartitionDescriptor(String dbName, String tableName,
+      String partitionName) {
+    TCatalogObject partitionDesc = new TCatalogObject();
+    partitionDesc.setType(TCatalogObjectType.HDFS_PARTITION);
+    THdfsPartition partInfo = new THdfsPartition();
+    partInfo.setDb_name(dbName);
+    partInfo.setTbl_name(tableName);
+    partInfo.setPartition_name(partitionName);
+    partitionDesc.setHdfs_partition(partInfo);
+    return partitionDesc;
+  }
+
+  /**
+   * Helper method to verify that a partition result matches expected values.
+   */
+  private void verifyPartitionResult(TCatalogObject result, String dbName,
+      String tableName, String partitionName) {
+    assertNotNull(result);
+    assertEquals(TCatalogObjectType.HDFS_PARTITION, result.getType());
+    assertTrue(result.isSetHdfs_partition());
+    assertEquals(dbName, result.getHdfs_partition().getDb_name());
+    assertEquals(tableName, result.getHdfs_partition().getTbl_name());
+    assertEquals(partitionName, result.getHdfs_partition().getPartition_name());
+  }
+
+  /**
+   * Helper method to verify that partition retrieval fails with expected error.
+   * Does not load the table - assumes table is already loaded or test wants to
+   * verify behavior without loading.
+   */
+  private void verifyPartitionError(String dbName, String tableName,
+      String partitionName, String expectedErrorMsg) throws CatalogException {
+    TCatalogObject partitionDesc = createPartitionDescriptor(dbName, tableName,
+        partitionName);
+
+    try {
+      catalog_.getTCatalogObject(partitionDesc);
+      fail("Expected CatalogException for " + dbName + "." + tableName +
+          " partition: " + partitionName);
+    } catch (CatalogException e) {
+      assertTrue("Expected error message to contain '" + expectedErrorMsg + "', but got: "
+          + e.getMessage(), e.getMessage().contains(expectedErrorMsg));
+    }
+  }
+
+  /**
+   * Helper method to test partition retrieval that should fail with an error.
+   * This method loads the table first, then verifies the partition error.
+   */
+  private void loadAndVerifyPartitionError(String dbName, String tableName,
+      String partitionName, String expectedErrorMsg) throws CatalogException {
+    catalog_.getOrLoadTable(dbName, tableName, "test", null);
+    verifyPartitionError(dbName, tableName, partitionName, expectedErrorMsg);
+  }
+
+  /**
+   * Test valid partition retrieval with correct partition keys.
+   */
+  @Test
+  public void testGetValidPartitions() throws CatalogException {
+    // Load a partitioned table
+    HdfsTable table = (HdfsTable) catalog_.getOrLoadTable("functional", "alltypes",
+        "test", null);
+    assertNotNull(table);
+    assertTrue(table.getNumClusteringCols() > 0);
+
+    // Test 1: Valid partition with two keys (year=2009, month=1)
+    TCatalogObject partitionDesc = createPartitionDescriptor("functional", "alltypes",
+        "year=2009/month=1");
+    TCatalogObject result = catalog_.getTCatalogObject(partitionDesc);
+    verifyPartitionResult(result, "functional", "alltypes", "year=2009/month=1");
+
+    // Test 2: Another valid partition (year=2010, month=12)
+    partitionDesc = createPartitionDescriptor("functional", "alltypes",
+        "year=2010/month=12");
+    result = catalog_.getTCatalogObject(partitionDesc);
+    verifyPartitionResult(result, "functional", "alltypes", "year=2010/month=12");
+  }
+
+  @Test
+  public void testGetNonExistingPartition() throws CatalogException {
+    loadAndVerifyPartitionError("functional", "alltypes", "year=9999/month=99",
+        "Partition not found");
+  }
+
+  @Test
+  public void testGetNonExistingTablePartition() throws CatalogException {
+    verifyPartitionError("functional", "nonexistenttable", "year=2009/month=1",
+        "Table not found");
+  }
+
+  @Test
+  public void testInvalidPartitionNames() throws CatalogException {
+    // Test cases: [partition_name, expected_error_substring]
+    String[][] testCases = {
+        {"year2009/month=1", "Invalid partition key-value format"},
+        {"year=2009", "expected 2 partition keys, got 1"},
+        {"year=2010/month=12/day=1", "expected 2 partition keys, got 3"},
+        {"year=2009/day=1", "Invalid partition key 'day'"},
+        {"month=1/year=2009", "Invalid partition key 'month'"},
+        {"", "Invalid partition name"},
+        {null, "Invalid partition name"}
+    };
+
+    for (String[] testCase : testCases) {
+      loadAndVerifyPartitionError("functional", "alltypes", testCase[0], testCase[1]);
+    }
+  }
+
+  @Test
+  public void testGetNonPartitionedTablePartition() throws CatalogException {
+    loadAndVerifyPartitionError("functional", "alltypesnopart", "year=2009",
+        "is not a partitioned HDFS table");
+  }
+
+  @Test
+  public void testGetNonHdfsTablePartition() throws CatalogException {
+    loadAndVerifyPartitionError("functional_hbase", "alltypes", "id=1",
+        "is not an HDFS table (table type: HBaseTable)");
+  }
+
+  /**
+   * Test partition catalog object retrieval with special characters.
+   * This test uses a DATE-partitioned table where partition values contain hyphens
+   * (e.g., "date_part=1970-01-01"). This validates that the parsePartitionName
+   * function correctly handles special characters like hyphens in partition values.
+   */
+  @Test
+  public void testGetPartitionWithSpecialCharacters() throws CatalogException {
+    // Test with date_tbl which has DATE partition column
+    HdfsTable table = (HdfsTable) catalog_.getOrLoadTable("functional",
+        "date_tbl", "test", null);
+    assertNotNull(table);
+    assertEquals(1, table.getNumClusteringCols());
+
+    // Get a partition that exists (date_part=1970-01-01)
+    Collection<? extends FeFsPartition> partitions = table.loadAllPartitions();
+    assertFalse(partitions.isEmpty());
+
+    // Pick a real partition (not the prototype partition)
+    FeFsPartition partition = null;
+    for (FeFsPartition p : partitions) {
+      long partitionId = p.getId();
+      if (partitionId != CatalogObjectsConstants.PROTOTYPE_PARTITION_ID) {
+        partition = p;
+        break;
+      }
+    }
+
+    if (partition != null) {
+      String partitionName = partition.getPartitionName();
+      assertNotNull(partitionName);
+      assertTrue(partitionName.startsWith("date_part="));
+
+      TCatalogObject partitionDesc = createPartitionDescriptor("functional", "date_tbl",
+          partitionName);
+      TCatalogObject result = catalog_.getTCatalogObject(partitionDesc);
+      verifyPartitionResult(result, "functional", "date_tbl", partitionName);
+    }
+  }
+
+  @Test
+  public void testGetPartitionFromInvalidatedTable() throws CatalogException {
+    // Invalidate a table to make it incomplete
+    Reference<Boolean> tblWasRemoved = new Reference<>();
+    Reference<Boolean> dbWasAdded = new Reference<>();
+    catalog_.invalidateTable(new TTableName("functional", "alltypes"),
+        tblWasRemoved, dbWasAdded, NoOpEventSequence.INSTANCE);
+
+    // Try to get partition from incomplete table (without loading)
+    verifyPartitionError("functional", "alltypes", "year=2009/month=1",
+        "Table functional.alltypes is not loaded. Please load the table first");
+  }
+
+  /**
+   * Test IncompleteTable (failed to load) returns proper error message.
+   * Tests the scenario where a table exists but failed to load due to errors
+   * (e.g., unsupported SerDe).
+   */
+  @Test
+  public void testGetPartitionFromFailedTable() throws CatalogException {
+    // Load bad_serde table which is an IncompleteTable due to unsupported SerDe
+    Table table = catalog_.getOrLoadTable("functional", "bad_serde", "test", null);
+    assertTrue("Expected IncompleteTable", table instanceof IncompleteTable);
+
+    // Try to get partition from this failed table (without reloading)
+    verifyPartitionError("functional", "bad_serde", "year=2009/month=1",
+        "Table functional.bad_serde failed to load: " +
+        "Failed to load metadata for table: functional.bad_serde");
   }
 }

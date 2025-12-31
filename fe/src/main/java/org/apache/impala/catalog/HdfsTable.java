@@ -1810,6 +1810,18 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
+   * Returns the partition with the given partition name, or null if it doesn't exist.
+   * Uses the nameToPartitionMap_ for O(1) lookup.
+   */
+  public HdfsPartition getPartitionByName(String partitionName) {
+    String partName = DEFAULT_PARTITION_NAME;
+    if (partitionName != null && partitionName.length() > 0) {
+      partName = partitionName;
+    }
+    return nameToPartitionMap_.get(partName);
+  }
+
+  /**
    * Tracks the in-flight INSERT event id in the partition.
    * @return false if the partition doesn't exist. Otherwise returns true.
    */

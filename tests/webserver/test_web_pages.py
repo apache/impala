@@ -456,6 +456,39 @@ class TestWebPage(ImpalaTestSuite):
     self.__test_catalog_tables_loading_time(unique_database, "foo_part")
     self.get_and_check_status(self.EVENT_PROCESSOR_URL, "events-consuming-delay",
         ports_to_test=self.CATALOG_TEST_PORT)
+    # Multi-key partitioned table
+    multi_part_query = "create table {0}.foo_multi_part (id int, val int) " \
+      "partitioned by (year int, month int, day int)".format(unique_database)
+    self.execute_query(multi_part_query)
+    multi_part_insert_query = "insert into {0}.foo_multi_part partition " \
+      "(year=2024, month=12, day=25) values (1, 200)".format(unique_database)
+    self.execute_query(multi_part_insert_query)
+    # Table with string partition that contains special characters
+    slash_part_query = "create table {0}.foo_slash_part (id int, val int) " \
+      "partitioned by (ds string)".format(unique_database)
+    self.execute_query(slash_part_query)
+    slash_part_insert_query = "insert into {0}.foo_slash_part partition " \
+      "(ds='2024/12/25') values (1, 200)".format(unique_database)
+    self.execute_query(slash_part_insert_query)
+
+    # Test partition catalog objects (IMPALA-9935)
+    self.__test_catalog_partition_object(unique_database, "foo_part", "year=2010",
+        cluster_properties)
+    self.__test_json_partition_object(unique_database, "foo_part", "year=2010",
+        cluster_properties)
+    # Test multi-key partition
+    self.__test_catalog_partition_object(unique_database, "foo_multi_part",
+        "year=2024/month=12/day=25", cluster_properties)
+    self.__test_json_partition_object(unique_database, "foo_multi_part",
+        "year=2024/month=12/day=25", cluster_properties)
+    # Test partition value with slash
+    # Note: Pass the pre-encoded partition name that matches Hive's HDFS directory format.
+    # Hive stores "ds=2024/12/25" as directory "ds=2024%2F12%2F25" in HDFS.
+    # The test methods will URL-encode this again for HTTP transmission (double-encoding).
+    self.__test_catalog_partition_object(unique_database, "foo_slash_part",
+        "ds=2024%2F12%2F25", cluster_properties)
+    self.__test_json_partition_object(unique_database, "foo_slash_part",
+        "ds=2024%2F12%2F25", cluster_properties)
 
   def __test_catalog_object(self, db_name, tbl_name, cluster_properties):
     """Tests the /catalog_object endpoint for the given db/table. Runs
@@ -532,6 +565,86 @@ class TestWebPage(ImpalaTestSuite):
     assert "nullColumnValue" in hdfs_tbl_obj
     assert "partitions" in hdfs_tbl_obj
     assert "prototype_partition" in hdfs_tbl_obj
+
+  def __verify_catalog_partition_html_response(self, response_text):
+    """Verify HTML catalog partition response contains expected Thrift structures."""
+    assert "CatalogException" not in response_text, \
+        "Response should not contain error: " + response_text[:200]
+    assert "TCatalogObject" in response_text, "Response should contain TCatalogObject"
+    assert "THdfsPartition" in response_text, "Response should contain THdfsPartition"
+    assert "THdfsStorageDescriptor" in response_text, \
+        "Response should contain THdfsStorageDescriptor"
+
+  def __test_catalog_partition_object(self, db_name, tbl_name, partition_name,
+      cluster_properties):
+    """Tests the /catalog_object endpoint for the given db/table/partition."""
+    import urllib
+    # URL encode the entire object name (db.table:partition).
+    # This is necessary when partition values contain slashes (e.g., "ds=2024/12/25").
+    object_name = "{0}.{1}:{2}".format(db_name, tbl_name, partition_name)
+    encoded_object_name = urllib.parse.quote(object_name, safe='')
+    obj_url = self.CATALOG_OBJECT_URL + \
+        "?object_type=HDFS_PARTITION&object_name={0}".format(encoded_object_name)
+
+    # Make sure the table is loaded
+    self.client.execute("describe %s.%s" % (db_name, tbl_name))
+
+    if cluster_properties.is_catalog_v2_cluster():
+      # In Catalog V2 (local catalog), endpoint only works on catalogd
+      responses = self.get_and_check_status(obj_url, partition_name,
+          ports_to_test=self.CATALOG_TEST_PORT)
+      self.__verify_catalog_partition_html_response(responses[0].text)
+      # Catalog object endpoint is disabled in local catalog mode on impalad
+      impalad_expected_str = "No URI handler for &apos;/catalog_object&apos;"
+      self.check_endpoint_is_disabled(obj_url, impalad_expected_str,
+          ports_to_test=self.IMPALAD_TEST_PORT)
+    else:
+      # In Catalog V1, endpoint works on both catalogd and impalad
+      responses = self.get_and_check_status(obj_url, partition_name,
+          ports_to_test=self.CATALOG_TEST_PORT)
+      self.__verify_catalog_partition_html_response(responses[0].text)
+
+      responses = self.get_and_check_status(obj_url, partition_name,
+          ports_to_test=self.IMPALAD_TEST_PORT)
+      self.__verify_catalog_partition_html_response(responses[0].text)
+
+  def __test_json_partition_object(self, db_name, tbl_name, partition_name,
+      cluster_properties):
+    """Tests the /catalog_object?json endpoint for the given db/table/partition."""
+    import urllib
+    # URL encode the entire object name (db.table:partition).
+    # This is necessary when partition values contain slashes (e.g., "ds=2024/12/25").
+    object_name = "{0}.{1}:{2}".format(db_name, tbl_name, partition_name)
+    encoded_object_name = urllib.parse.quote(object_name, safe='')
+    obj_url = self.CATALOG_OBJECT_URL + \
+        "?json&object_type=HDFS_PARTITION&object_name={0}".format(encoded_object_name)
+
+    # Make sure the table is loaded
+    self.client.execute("describe %s.%s" % (db_name, tbl_name))
+
+    # Test catalogd endpoint (works in both V1 and V2)
+    responses = self.get_and_check_status(obj_url, ports_to_test=self.CATALOG_TEST_PORT)
+    response_json = json.loads(responses[0].text)
+    assert "json_string" in response_json, "Response should contain json_string"
+    obj = json.loads(response_json["json_string"])
+    assert obj["type"] == 11, "type should be HDFS_PARTITION (11)"
+    assert "catalog_version" in obj, "TCatalogObject should have catalog_version"
+    part_obj = obj["hdfs_partition"]
+    assert part_obj["db_name"] == db_name
+    assert part_obj["tbl_name"] == tbl_name
+    assert part_obj["partition_name"] == partition_name
+
+    # In Catalog V1, also test impalad endpoint
+    if not cluster_properties.is_catalog_v2_cluster():
+      responses = self.get_and_check_status(obj_url, ports_to_test=self.IMPALAD_TEST_PORT)
+      response_json = json.loads(responses[0].text)
+      assert "json_string" in response_json, "Response should contain json_string"
+      obj = json.loads(response_json["json_string"])
+      assert obj["type"] == 11, "type should be HDFS_PARTITION (11)"
+      part_obj = obj["hdfs_partition"]
+      assert part_obj["db_name"] == db_name
+      assert part_obj["tbl_name"] == tbl_name
+      assert part_obj["partition_name"] == partition_name
 
   def check_endpoint_is_disabled(self, url, string_to_search="", ports_to_test=None):
     """Helper method that verifies the given url does not exist."""

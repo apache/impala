@@ -145,8 +145,9 @@ TCatalogObjectType::type TCatalogObjectTypeFromName(const string& name) {
     return TCatalogObjectType::PRINCIPAL;
   } else if (upper == "PRIVILEGE") {
     return TCatalogObjectType::PRIVILEGE;
+  } else if (upper == "HDFS_PARTITION") {
+    return TCatalogObjectType::HDFS_PARTITION;
   }
-  // TODO(IMPALA-9935): support HDFS_PARTITION
   return TCatalogObjectType::UNKNOWN;
 }
 
@@ -175,7 +176,37 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       catalog_object->table.__set_tbl_name(object_name.substr(pos + 1));
       break;
     }
-    // TODO(IMPALA-9935): support HDFS_PARTITION
+    case TCatalogObjectType::HDFS_PARTITION: {
+      catalog_object->__set_type(object_type);
+      catalog_object->__set_hdfs_partition(THdfsPartition());
+      // Parse format: dbName.tableName:partitionName
+      // The partitionName format is "key1=value1/key2=value2/..."
+      // If partition values contain special characters (like '/'), they must be
+      // double-encoded in the HTTP request URL because:
+      // 1. Hive stores such partitions on HDFS with '/' pre-encoded as '%2F'
+      //    (e.g., directory name: ds=2024%2F12%2F25)
+      // 2. HTTP URL encoding must encode the '%' character as '%25'
+      //    (e.g., HTTP URL: ds=2024%252F12%252F25)
+      // Example: For partition value "12/25/2025", the URL should contain:
+      //          "ds=12%252F25%252F2025" (double-encoded)
+      // After URL decoding, the backend receives: "ds=12%2F25%2F2025"
+      // After FileUtils.unescapePathName(), the value is: "12/25/2025"
+      int dot_pos = object_name.find('.');
+      int colon_pos = object_name.find(':');
+      if (dot_pos == string::npos || dot_pos >= object_name.size() - 1
+          || colon_pos == string::npos || colon_pos >= object_name.size() - 1
+          || colon_pos <= dot_pos || dot_pos == 0) {
+        stringstream error_msg;
+        error_msg << "Invalid partition name: " << object_name;
+        return Status(error_msg.str());
+      }
+      catalog_object->hdfs_partition.__set_db_name(object_name.substr(0, dot_pos));
+      catalog_object->hdfs_partition.__set_tbl_name(
+          object_name.substr(dot_pos + 1, colon_pos - dot_pos - 1));
+      catalog_object->hdfs_partition.__set_partition_name(
+          object_name.substr(colon_pos + 1));
+      break;
+    }
     case TCatalogObjectType::FUNCTION: {
       // The key looks like: <db>.fn(<args>). We need to parse out the
       // db, fn and signature.

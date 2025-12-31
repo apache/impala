@@ -52,6 +52,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TGetCatalogMetricsResult;
 import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTableType;
@@ -292,6 +293,80 @@ public abstract class FeCatalogUtils {
       partitionValues.add(partitionValue);
     }
     return FileUtils.makePartName(partitionKeys, partitionValues);
+  }
+
+  /**
+   * Parse a partition name string (e.g., "year=2010/month=3") into a list of
+   * TPartitionKeyValue objects.
+   *
+   * Note on URL encoding: If partition values contain special characters like "/",
+   * they must be double-encoded in the HTTP request URL because:
+   * 1. Hive stores such partitions on HDFS with '/' pre-encoded as '%2F'
+   *    (e.g., HDFS directory: ds=2024%2F12%2F25)
+   * 2. HTTP URL encoding must encode the '%' as '%25'
+   *    (e.g., HTTP request: ds=2024%252F12%252F25)
+   * After URL decoding, this method receives "ds=2024%2F12%2F25" (single-encoded),
+   * which is then decoded by FileUtils.unescapePathName() to get "2024/12/25".
+   *
+   * This method validates that:
+   * - The number of partition keys matches the table's clustering columns
+   * - Each partition key name matches the expected column name at that position
+   * - Each partition key-value pair is in the format "key=value"
+   *
+   * @param partitionName The partition name string after one level of URL decoding
+   *                      (e.g., "year=2010/month=3" or "ds=2024%2F12%2F25")
+   * @param table The HdfsTable containing the partition
+   * @return A list of TPartitionKeyValue objects representing the parsed partition
+   * @throws CatalogException if the partition name is invalid or doesn't match the
+   *     table's partition schema
+   */
+  public static List<TPartitionKeyValue> parsePartitionName(
+      String partitionName, HdfsTable table) throws CatalogException {
+    List<TPartitionKeyValue> partitionSpec = new ArrayList<>();
+    if (partitionName == null || partitionName.isEmpty()) {
+      throw new CatalogException("Invalid partition name: " + partitionName);
+    }
+
+    // Split the partition name by "/" to get individual key=value pairs.
+    // Note: If partition values contain "/", they should be URL-encoded as "%2F"
+    // before passing to this method, so the split will not break them apart.
+    String[] parts = partitionName.split("/");
+    int numClusteringCols = table.getNumClusteringCols();
+
+    if (parts.length != numClusteringCols) {
+      throw new CatalogException(
+          String.format("Invalid partition name '%s': expected %d partition keys, got %d",
+              partitionName, numClusteringCols, parts.length));
+    }
+
+    List<Column> clusteringCols = table.getClusteringColumns();
+    for (int i = 0; i < parts.length; i++) {
+      String part = parts[i];
+      int eqPos = part.indexOf('=');
+      if (eqPos <= 0 || eqPos >= part.length() - 1) {
+        throw new CatalogException(
+            "Invalid partition key-value format: " + part);
+      }
+
+      String key = part.substring(0, eqPos);
+      String encodedValue = part.substring(eqPos + 1);
+
+      // URL-decode the value to handle special characters like "/"
+      // that are encoded as "%2F".
+      String value = FileUtils.unescapePathName(encodedValue);
+
+      // Verify that the key matches the expected partition column name
+      String expectedKey = clusteringCols.get(i).getName();
+      if (!key.equals(expectedKey)) {
+        throw new CatalogException(
+            String.format("Invalid partition key '%s': expected '%s'",
+                key, expectedKey));
+      }
+
+      partitionSpec.add(new TPartitionKeyValue(key, value));
+    }
+
+    return partitionSpec;
   }
 
   /**

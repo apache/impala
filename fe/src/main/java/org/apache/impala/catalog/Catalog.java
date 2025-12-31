@@ -38,8 +38,10 @@ import org.apache.hadoop.hive.metastore.api.LockLevel;
 import org.apache.hadoop.hive.metastore.api.LockType;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.common.TransactionKeepalive;
 import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
@@ -640,7 +642,70 @@ public abstract class Catalog implements AutoCloseable {
         }
         break;
       }
-      // TODO(IMPALA-9935): support HDFS_PARTITION
+      case HDFS_PARTITION: {
+        THdfsPartition partDesc = objectDesc.getHdfs_partition();
+        String dbName = partDesc.getDb_name();
+        String tblName = partDesc.getTbl_name();
+        String partitionName = partDesc.getPartition_name();
+
+        Table table = getTable(dbName, tblName);
+        if (table == null) {
+          throw new CatalogException("Table not found: " + dbName + "." + tblName);
+        }
+
+        // Check if table is an IncompleteTable (not yet loaded)
+        if (table instanceof IncompleteTable) {
+          IncompleteTable incompleteTable = (IncompleteTable) table;
+          if (!incompleteTable.isLoaded()) {
+            throw new CatalogException("Table " + dbName + "." + tblName +
+                " is not loaded. Please load the table first (e.g., DESCRIBE " +
+                dbName + "." + tblName + ")");
+          } else {
+            ImpalaException cause = incompleteTable.getCause();
+            throw new CatalogException("Table " + dbName + "." + tblName +
+                " failed to load: " + (cause != null ? cause.getMessage() :
+                "Unknown error"));
+          }
+        }
+
+        if (!(table instanceof HdfsTable)) {
+          throw new CatalogException("Table " + dbName + "." + tblName +
+              " is not an HDFS table (table type: " +
+              table.getClass().getSimpleName() + ")");
+        }
+
+        HdfsTable hdfsTable = (HdfsTable) table;
+        // Check if the table has partition columns
+        if (hdfsTable.getNumClusteringCols() == 0) {
+          throw new CatalogException("Table " + dbName + "." + tblName +
+              " is not a partitioned HDFS table");
+        }
+
+        table.takeReadLock();
+        try {
+          // Parse and validate partition name (e.g., "year=2010/month=3")
+          FeCatalogUtils.parsePartitionName(partitionName, hdfsTable);
+
+          // Use efficient hash map lookup (O(1)) instead of iterating all partitions
+          HdfsPartition partition = hdfsTable.getPartitionByName(partitionName);
+          if (partition == null) {
+            throw new CatalogException("Partition not found: " + partitionName);
+          }
+
+          result.setType(partition.getCatalogObjectType());
+          // Partitions use the table's catalog version
+          result.setCatalog_version(table.getCatalogVersion());
+          result.setLast_modified_time_ms(table.getLastLoadedTimeMs());
+          THdfsPartition tPartition = FeCatalogUtils.fsPartitionToThrift(
+              partition, ThriftObjectType.FULL);
+          tPartition.setDb_name(dbName);
+          tPartition.setTbl_name(tblName);
+          result.setHdfs_partition(tPartition);
+        } finally {
+          table.releaseReadLock();
+        }
+        break;
+      }
       case FUNCTION: {
         TFunction tfn = objectDesc.getFn();
         Function desc = Function.fromThrift(tfn);
