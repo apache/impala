@@ -52,7 +52,6 @@
 #include "util/sharded-query-map-util.h"
 #include "util/simple-logger.h"
 #include "util/thread-pool.h"
-#include "util/ticker.h"
 #include "util/time.h"
 
 namespace kudu {

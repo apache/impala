@@ -58,7 +58,6 @@
 #include "util/sql-util.h"
 #include "util/stopwatch.h"
 #include "util/string-util.h"
-#include "util/ticker.h"
 #include "workload_mgmt/workload-management.h"
 
 using namespace impala;
@@ -428,14 +427,14 @@ const std::array<FieldParser, NumQueryTableColumns> FIELD_PARSERS = {{
 } // namespace workloadmgmt
 
 /// Queue of completed queries and the mutex to synchronize access to it.
-list<CompletedQuery> _completed_queries;
-mutex _completed_queries_mu;
+static list<CompletedQuery> _completed_queries;
+static mutex _completed_queries_mu;
 
 /// Coordinate periodic execution of the completed queries queue processing thread.
-condition_variable _completed_queries_cv;
+static condition_variable _completed_queries_cv;
 
 /// Coordinate shutdown of the completed queries queue processing thread.
-condition_variable _completed_queries_shutdown_cv;
+static condition_variable _completed_queries_shutdown_cv;
 
 /// Determine if the maximum number of queued completed queries has been exceeded.
 ///
@@ -504,7 +503,14 @@ void ImpalaServer::ShutdownWorkloadManagement() {
   if (workload_mgmt_state_ == WorkloadManagementState::RUNNING) {
     workload_mgmt_state_ = WorkloadManagementState::SHUTTING_DOWN;
     LOG(INFO) << "Workload management is shutting down";
+
+    // Wake up the completed queries processing thread so it can drain the in-memory
+    // completed queries queue.
     _completed_queries_cv.notify_all();
+
+    // Wait for the completed queries processing thread to drain the in-memory queue. If
+    // the timeout expires before the queue is drained, the thread will be detached
+    // and shutdown will continue.
     _completed_queries_shutdown_cv.wait_for(l,
         chrono::seconds(FLAGS_query_log_shutdown_timeout_s),
         [this] { return workload_mgmt_state_ == WorkloadManagementState::SHUTDOWN; });
@@ -612,6 +618,8 @@ static string _dmlPrefix(const string& table_name, const Version& target_schema_
   return fields.str();
 } // function _dmlPrefix
 
+// Returns true if workload management is shutting down. If it is, this function updates
+// the workload management state to SHUTDOWN.
 bool ImpalaServer::IsWorkloadManagementShuttingDown() {
   lock_guard<mutex> l(workload_mgmt_state_mu_);
 
@@ -636,10 +644,6 @@ void ImpalaServer::WorkloadManagementWorker(const Version& target_schema_version
     workload_mgmt_state_ = WorkloadManagementState::STARTED;
   }
 
-  /// Ticker that wakes up at set intervals to process the queued completed queries. Uses
-  /// the _completed_queries_mu to synchonize access to the _completed_queries list.
-  unique_ptr<TickerSecondsBool> completed_queries_ticker;
-
   {
     lock_guard<mutex> l(workload_mgmt_state_mu_);
     // This condition will evaluate to false only if a clean shutdown was initiated while
@@ -651,11 +655,6 @@ void ImpalaServer::WorkloadManagementWorker(const Version& target_schema_version
                 << "coordinator shutdown was initiated.";
       return; // Note: early return
     }
-
-    completed_queries_ticker = make_unique<TickerSecondsBool>(
-        FLAGS_query_log_write_interval_s, _completed_queries_cv, _completed_queries_mu);
-    ABORT_IF_ERROR(
-        completed_queries_ticker->Start("impala-server", "completed-queries-ticker"));
   }
 
   // Non-values portion of the sql DML to insert records into the completed queries
@@ -691,22 +690,22 @@ void ImpalaServer::WorkloadManagementWorker(const Version& target_schema_version
       return; // Note: early return
     }
 
-    // Sleep this thread until it is time to process queued completed queries. During the
-    // wait, the _completed_queries_mu is only locked while calling the lambda function
-    // predicate. After waking up, the _completed_queries_mu will be locked.
+    // Sleep this thread until it is time to process queued completed queries or the
+    // _completed_queries_cv condition variable is notified either on shutdown (from the
+    // ShutdownWorkloadManagement() function) or when the max number of queued queries is
+    // exceeded (from the EnqueueCompletedQuery() function).
+    const chrono::seconds write_interval_s(FLAGS_query_log_write_interval_s);
+    chrono::time_point<std::chrono::steady_clock> next_wake_time;
     list<CompletedQuery> queries_to_insert;
     MonotonicStopWatch timer;
     {
+      next_wake_time = chrono::steady_clock::now() + write_interval_s;
       unique_lock<mutex> l(_completed_queries_mu);
-      _completed_queries_cv.wait(l, [this, &completed_queries_ticker] {
-        lock_guard<mutex> l2(workload_mgmt_state_mu_);
-        // To guard against spurious wakeups, this predicate ensures there are
-        // completed queries queued up before waking up the thread.
-        return (completed_queries_ticker->WakeupGuard()() && !_completed_queries.empty())
+      _completed_queries_cv.wait_until(l, next_wake_time, [&next_wake_time, this] {
+        return chrono::steady_clock::now() >= next_wake_time
             || _maxRecordsExceeded(_completed_queries.size())
             || UNLIKELY(workload_mgmt_state_ == WorkloadManagementState::SHUTTING_DOWN);
       });
-      completed_queries_ticker->ResetWakeupGuard();
 
       DebugActionNoFail(FLAGS_debug_actions, "WM_SHUTDOWN_DELAY");
 
