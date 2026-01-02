@@ -201,9 +201,12 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
     catalogd.wait_for_metric_value(metric_name, 1)
     assert self.metadata_cache_string in self._get_catalog_object()
 
-    # Wait for automatic timeout-based invalidation to complete and metric to update
-    # Timeout is 2x the invalidation timeout to account for background processing delays
-    catalogd.wait_for_metric_value(metric_name, 0, timeout=self.timeout * 2)
+    # Wait for automatic timeout-based invalidation to complete and metric to update.
+    # ImpaladTableUsageTracker reports table usage with a delay of up to 15 seconds
+    # (1.5 * REPORT_INTERVAL_MS where REPORT_INTERVAL_MS=10s), then the invalidation
+    # TTL kicks in. Add ~1s extra for metric updates and ~1s buffer for RPC, serde, etc.
+    # Max time = 15s (max report delay) + self.timeout (TTL) + 2s
+    catalogd.wait_for_metric_value(metric_name, 0, timeout=self.timeout + 17)
     # Verify that the table metadata was actually invalidated
     assert self.metadata_cache_string not in self._get_catalog_object(), \
         "Table metadata should be invalidated after timeout"
