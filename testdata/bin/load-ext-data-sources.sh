@@ -196,14 +196,14 @@ sudo -u postgres psql -U hiveuser -d functional -f /tmp/jdbc_country.sql
 # Load data to jdbc table
 cat ${IMPALA_HOME}/testdata/target/AllTypes/* > /tmp/jdbc_alltypes.csv
 loadCmd="\COPY alltypes FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
-sudo -u postgres psql -d functional -c "$loadCmd"
+sudo -u postgres PGOPTIONS='-c DateStyle=ISO,MDY' psql -d functional -c "$loadCmd"
 
 loadCmd="\COPY \"AllTypesWithQuote\" FROM '/tmp/jdbc_alltypes.csv' DELIMITER ',' CSV"
-sudo -u postgres psql -d functional -c "$loadCmd"
+sudo -u postgres PGOPTIONS='-c DateStyle=ISO,MDY' psql -d functional -c "$loadCmd"
 
 cat ${IMPALA_HOME}/testdata/data/decimal_tbl.txt > /tmp/jdbc_decimal_tbl.csv
 loadCmd="\COPY decimal_tbl FROM '/tmp/jdbc_decimal_tbl.csv' DELIMITER ',' CSV"
-sudo -u postgres psql -d functional -c "$loadCmd"
+sudo -u postgres PGOPTIONS='-c DateStyle=ISO,MDY' psql -d functional -c "$loadCmd"
 
 # Create impala tables and load data
 cat > /tmp/impala_jdbc_alltypes.sql <<__EOT__
