@@ -18,7 +18,7 @@
 # under the License.
 
 # This script automates setup of distcc servers on Ubuntu and CentOS. It has been tested
-# on Ubuntu 14.04, 16.04 and 18.04 and CentOS 6 and 7. See bin/distcc/README.md for manual
+# on Ubuntu 20.04 and 22.04 and CentOS 6 and 7. See bin/distcc/README.md for manual
 # setup instructions and background.
 #
 # Usage:
@@ -60,9 +60,8 @@ ALLOWED_NETS=$1
 OS_ID=$(source /etc/os-release && echo "$ID")
 OS_VERSION=$(source /etc/os-release && echo "$VERSION_ID")
 if [[ "$OS_ID" == ubuntu ]]; then
-  if ! [[ $OS_VERSION == 14.04 || $OS_VERSION == 16.04 || $OS_VERSION == 18.04 || \
-      $OS_VERSION == 20.04 ]]; then
-    echo "This script only supports Ubuntu 14.04, 16.04, 18.04, and 20.04" >&2
+  if ! [[ $OS_VERSION == 20.04 || $OS_VERSION == 22.04 ]]; then
+    echo "This script only supports Ubuntu 20.04 and 22.04" >&2
     exit 1
   fi
   LINUX_FLAVOUR=ubuntu

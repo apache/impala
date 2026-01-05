@@ -36,8 +36,8 @@ fi
 OS_ID=$(source /etc/os-release && echo $ID)
 OS_VERSION=$(source /etc/os-release && echo $VERSION_ID)
 if [[ "$OS_ID" == Ubuntu ]]; then
-  if ! [[ $OS_VERSION == 16.04 || $OS_VERSION == 18.04 || $OS_VERSION == 20.04 ]]; then
-    echo "This script only supports Ubuntu 16.04, 18.04, and 20.04" >&2
+  if ! [[ $OS_VERSION == 20.04 || $OS_VERSION == 22.04 ]]; then
+    echo "This script only supports Ubuntu 20.04 and 22.04" >&2
     exit 1
   fi
 fi
