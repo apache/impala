@@ -65,7 +65,7 @@ under the License.
       <ul>
         <li>
           <p>
-            Within a <codeph>MAX()</codeph> or <codeph>MAX()</codeph>
+            Within a <codeph>MIN()</codeph> or <codeph>MAX()</codeph>
             aggregate function or as the argument of any aggregate function with
             the <codeph>DISTINCT</codeph> keyword applied.
           </p>
