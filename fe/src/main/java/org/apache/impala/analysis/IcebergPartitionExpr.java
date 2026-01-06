@@ -58,7 +58,7 @@ public class IcebergPartitionExpr extends Expr {
       throws AnalysisException {
     partitionSpec_ = partitionSpec;
     FunctionParams params = callExpr.getParams();
-    if (params.size() > 2 && params.size() < 1) {
+    if (params.size() < 1 || params.size() > 2) {
       throw new AnalysisException("Invalid partition predicate: " + callExpr.toSql());
     }
     Expr slotRefExpr;

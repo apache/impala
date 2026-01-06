@@ -377,7 +377,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk(partitioned + "(action = 'click' or action = 'download')");
     AnalyzesOk(partitioned + "(action in ('click', 'download'))");
     AnalyzesOk(partitioned + "(hour(event_time) in ('2020-01-01-9', '2020-01-01-1'))");
-    AnalyzesOk(evolution + "(truncate(4,date_string_col,4) = '1231')");
+    AnalyzesOk(evolution + "(truncate(4,date_string_col) = '1231')");
     AnalyzesOk(evolution + "(month = 12)");
     // Paimon ADD/DROP PARTITION Test
     String paimon_partitioned =
@@ -4442,7 +4442,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         + " partition (hour(event_time) in ('2020-01-01-9', '2020-01-01-1'))");
     AnalyzesOk(icebergPartitioned
         + " partition (hour(event_time) = '2020-01-01-9', action = 'click')");
-    AnalyzesOk(icebergEvolution + " partition (truncate(4,date_string_col,4) = '1231')");
+    AnalyzesOk(icebergEvolution + " partition (truncate(4,date_string_col) = '1231')");
     AnalyzesOk(icebergEvolution + " partition (month = 12)");
 
     // Error cases for Iceberg partition filters
