@@ -315,6 +315,7 @@ class ImpalaShell(cmd.Cmd, object):
     self.http_cookie_names = options.http_cookie_names
     self.http_tracing = not options.no_http_tracing
     self.hs2_x_forward = options.hs2_x_forward
+    self.reuse_http_connection = not options.use_new_http_connection
 
     # Due to a readline bug in centos/rhel7, importing it causes control characters to be
     # printed. This breaks any scripting against the shell in non-interactive mode. Since
@@ -681,7 +682,8 @@ class ImpalaShell(cmd.Cmd, object):
                           value_converter=value_converter, rpc_stdout=self.rpc_stdout,
                           rpc_file=self.rpc_file, http_tracing=self.http_tracing,
                           jwt=self.jwt, oauth=self.oauth,
-                          hs2_x_forward=self.hs2_x_forward)
+                          hs2_x_forward=self.hs2_x_forward,
+                          reuse_http_connection=self.reuse_http_connection)
     if protocol == 'hs2':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -703,7 +705,8 @@ class ImpalaShell(cmd.Cmd, object):
                           connect_max_tries=self.connect_max_tries,
                           rpc_stdout=self.rpc_stdout, rpc_file=self.rpc_file,
                           http_tracing=self.http_tracing, jwt=self.jwt, oauth=self.oauth,
-                          hs2_x_forward=self.hs2_x_forward)
+                          hs2_x_forward=self.hs2_x_forward,
+                          reuse_http_connection=self.reuse_http_connection)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,

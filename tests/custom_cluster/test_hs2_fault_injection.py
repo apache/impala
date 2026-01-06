@@ -76,6 +76,9 @@ class FaultInjectingHttpClient(ImpalaHttpClient, object):
 
   def _check_code(self):
     if self.code >= 300:
+      # Read response like in case of an actual >=300 status code to allow
+      # reusing the connection.
+      self.readBody()
       # Report any http response code that is not 1XX (informational response) or
       # 2XX (successful).
       raise HttpError(self.code, self.message, self.body, self.headers)

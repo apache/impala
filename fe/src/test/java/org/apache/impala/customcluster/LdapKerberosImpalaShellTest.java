@@ -24,6 +24,7 @@ import org.apache.directory.server.core.annotations.CreatePartition;
 import org.junit.Assume;
 import org.junit.Test;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,18 @@ import static org.junit.Assert.assertEquals;
         partitions = { @CreatePartition(name = "test", suffix = "dc=myorg,dc=com") })
 @ApplyLdifFiles({"users.ldif"})
 public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase {
+
+  @Override
+  protected String authMethod() {
+    return "negotiate";
+  }
+
+  @Override
+  protected String[] buildCommand(
+      String query, String protocol, String user, String password, String httpPath) {
+    return new String[] {"impala-shell.sh", "--protocol=" + protocol, "--kerberos",
+        "--user=" + user, "--query=" + query, "--http_path=" + httpPath};
+  }
 
   /**
    * Tests Kerberos authentication with custom LDAP user and group filter configs
@@ -433,6 +446,39 @@ public class LdapKerberosImpalaShellTest extends LdapKerberosImpalaShellTestBase
     // Proxy-user without delegation with different transport protocols.
     testShellKerberosAuthWithUser(kerberosKdcEnvironment, TEST_USER_1,
             /* shouldSucceed */ true);
+  }
+
+  /**
+   * Tests cookie rotation during a query does not interrupt the session.
+   */
+  @Test
+  public void testCookieRefresh() throws Exception {
+    File cookieSecretFile = getCookieSecretFile();
+    Map<String, String> flags = mergeFlags(
+        kerberosKdcEnvironment.getKerberosAuthFlags(),
+        ImmutableMap.of("cookie_secret_file", cookieSecretFile.getCanonicalPath())
+    );
+    int ret = startImpalaCluster(flagsToArgs(flags));
+    assertEquals(ret, 0);
+
+    String credentialsCacheFilePath =
+        kerberosKdcEnvironment.createUserPrincipalAndCredentialsCache(TEST_USER_1);
+    testCookieRefreshImpl(cookieSecretFile,
+        kerberosKdcEnvironment.getImpalaShellEnv(credentialsCacheFilePath));
+  }
+
+  /**
+   * Tests that an interrupted connection reconnects.
+   */
+  @Test
+  public void testReconnect() throws Exception {
+    Map<String, String> flags = kerberosKdcEnvironment.getKerberosAuthFlags();
+    int ret = startImpalaCluster(flagsToArgs(flags));
+    assertEquals(ret, 0);
+
+    String credentialsCacheFilePath =
+        kerberosKdcEnvironment.createUserPrincipalAndCredentialsCache(TEST_USER_1);
+    testReconnectImpl(kerberosKdcEnvironment.getImpalaShellEnv(credentialsCacheFilePath));
   }
 
   /**

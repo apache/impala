@@ -73,7 +73,6 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
   def test_oauth_auth_valid(self, vector):
     """Asserts the Impala shell can authenticate to Impala using OAuth authentication.
     Also executes a query to ensure the authentication was successful."""
-    before_rpc_count = self.__get_rpc_count()
 
     # Run a query and wait for it to complete.
     args = ['--protocol', vector.get_value('protocol'), '-a', '--oauth_cmd',
@@ -91,11 +90,11 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
     # will happen via cookie auth, hence this count will be 1.
     self.__assert_success_fail_metric(success_count=1)
 
-    # Total cookie auth success should be 1 less than total rpc_count
-    # since after the 1st rpc count, the cookie is set and no more jwt token
-    # verification happens.
-    query_rpc_count = self.__get_rpc_count() - before_rpc_count
-    assert cookie_auth_count == query_rpc_count - 1, "Incorrect Cookie Auth Count"
+    # Total cookie auth success should be 1 less than total number of RPCs since after
+    # the 1st RPC, the cookie is set and no more jwt token verification happens. However
+    # counting total number of RPCs is not trivial or stable, so ensure we have multiple;
+    # we perform at least 10 RPCs during a query.
+    assert cookie_auth_count > 10, "Incorrect Cookie Auth Count"
 
     # Shut down cluster to ensure logs flush to disk.
     self._stop_impala_cluster()
@@ -124,7 +123,7 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
   def test_oauth_auth_expired(self, vector):
     """Asserts the Impala shell fails to authenticate when it presents an OAuth token
     that has a valid signature but is expired."""
-    before_rpc_count = self.__get_rpc_count()
+    before_connection_count = self.__get_connection_count()
 
     args = ['--protocol', vector.get_value('protocol'), '-a', '--oauth_cmd',
             'cat {0}'.format(TestImpalaShellOAuthAuth.OAUTH_EXPIRED_PATH),
@@ -133,9 +132,9 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
 
     # Ensure the Impala coordinator is correctly reporting the OAuth auth metrics
     # must be done before the cluster shuts down since it calls to the coordinator
-    self.__wait_for_rpc_count(before_rpc_count + 1)
-    query_rpc_count = self.__get_rpc_count() - before_rpc_count
-    self.__assert_success_fail_metric(fail_count=query_rpc_count)
+    self.__wait_for_connection_count(before_connection_count + 1)
+    query_connection_count = self.__get_connection_count() - before_connection_count
+    self.__assert_success_fail_metric(fail_count=query_connection_count)
 
     # Shut down cluster to ensure logs flush to disk.
     self._stop_impala_cluster()
@@ -168,7 +167,7 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
   def test_oauth_auth_invalid_jwk(self, vector):
     """Asserts the Impala shell fails to authenticate when it presents an OAuth token
     that has a valid signature but is expired."""
-    before_rpc_count = self.__get_rpc_count()
+    before_connection_count = self.__get_connection_count()
 
     args = ['--protocol', vector.get_value('protocol'), '-a', '--oauth_cmd',
             'cat {0}'.format(TestImpalaShellOAuthAuth.OAUTH_INVALID_JWK),
@@ -177,9 +176,9 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
 
     # Ensure the Impala coordinator is correctly reporting the OAuth auth metrics
     # must be done before the cluster shuts down since it calls to the coordinator
-    self.__wait_for_rpc_count(before_rpc_count + 1)
-    query_rpc_count = self.__get_rpc_count() - before_rpc_count
-    self.__assert_success_fail_metric(fail_count=query_rpc_count)
+    self.__wait_for_connection_count(before_connection_count + 1)
+    query_connection_count = self.__get_connection_count() - before_connection_count
+    self.__assert_success_fail_metric(fail_count=query_connection_count)
 
     # Shut down cluster to ensure logs flush to disk.
     self._stop_impala_cluster()
@@ -295,9 +294,9 @@ class TestImpalaShellOAuthAuth(CustomClusterTestSuite):
     assert actual[1] == fail_count, "Expected OAuth auth failure count to be '{}' but " \
         "was '{}'".format(fail_count, actual[1])
 
-  def __get_rpc_count(self):
+  def __get_connection_count(self):
     return self.cluster.get_first_impalad().service.get_metric_value(self.HS2_HTTP_CONNS)
 
-  def __wait_for_rpc_count(self, expected_count):
+  def __wait_for_connection_count(self, expected_count):
     self.cluster.get_first_impalad().service.wait_for_metric_value(self.HS2_HTTP_CONNS,
         expected_count, allow_greater=True)

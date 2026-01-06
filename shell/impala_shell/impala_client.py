@@ -160,7 +160,7 @@ class ImpalaClient(object):
                verbose=True, use_http_base_transport=False, http_path=None,
                http_cookie_names=None, http_socket_timeout_s=None, value_converter=None,
                connect_max_tries=4, rpc_stdout=False, rpc_file=None, http_tracing=True,
-               jwt=None, oauth=None, hs2_x_forward=None):
+               jwt=None, oauth=None, hs2_x_forward=None, reuse_http_connection=True):
     self.connected = False
     self.impalad_host = impalad[0]
     self.impalad_port = int(impalad[1])
@@ -198,6 +198,7 @@ class ImpalaClient(object):
     self.rpc_file = rpc_file
     # In h2s-http clients only, the value of the X-Forwarded-For http header.
     self.hs2_x_forward = hs2_x_forward
+    self.reuse_http_connection = reuse_http_connection
 
   def connect(self):
     """Creates a connection to an Impalad instance. Returns a tuple with the impala
@@ -444,12 +445,14 @@ class ImpalaClient(object):
       transport = ImpalaHttpClient(url, ssl_context=ssl_ctx,
                                    http_cookie_names=self.http_cookie_names,
                                    socket_timeout_s=self.http_socket_timeout_s,
-                                   verbose=self.verbose)
+                                   verbose=self.verbose,
+                                   reuse_connection=self.reuse_http_connection)
     else:
       url = "http://{0}/{1}".format(host_and_port, self.http_path)
       transport = ImpalaHttpClient(url, http_cookie_names=self.http_cookie_names,
                                    socket_timeout_s=self.http_socket_timeout_s,
-                                   verbose=self.verbose)
+                                   verbose=self.verbose,
+                                   reuse_connection=self.reuse_http_connection)
 
     if self.use_ldap:
       # Set the BASIC authorization

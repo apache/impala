@@ -21,8 +21,10 @@ import base64
 from collections import namedtuple
 import datetime
 from io import BytesIO
+import errno
 import os
 import os.path
+import socket
 import sys
 
 import six
@@ -54,7 +56,7 @@ class ImpalaHttpClient(TTransportBase):
   MIN_REQUEST_SIZE_FOR_EXPECT = 1024
 
   def __init__(self, uri_or_host, ssl_context=None, http_cookie_names=None,
-               socket_timeout_s=None, verbose=False):
+               socket_timeout_s=None, verbose=False, reuse_connection=True):
     """To properly authenticate against an HTTPS server, provide an ssl_context created
     with ssl.create_default_context() to validate the server certificate.
 
@@ -63,6 +65,11 @@ class ImpalaHttpClient(TTransportBase):
     these names is returned in an http response by the server or an intermediate proxy
     then it will be included in each subsequent request for the same connection. If it
     is set as wildcards, all cookies in an http response will be preserved.
+
+    If reuse_connection is set to True, the underlying HTTP connection will be reused
+    for multiple requests; it will retry establishing a connection on socket error in case
+    the server closed it while idle. If set to False, the connection will be closed and
+    reopened for each request.
     """
     parsed = urllib.parse.urlparse(uri_or_host)
     self.scheme = parsed.scheme
@@ -123,6 +130,7 @@ class ImpalaHttpClient(TTransportBase):
     self.__kerb_service = None
     self.__add_custom_headers_funcs = []
     self.__verbose = verbose
+    self.__reuse_connection = reuse_connection
 
   @staticmethod
   def basic_proxy_auth_header(proxy):
@@ -343,12 +351,13 @@ class ImpalaHttpClient(TTransportBase):
     self.__wbuf.write(buf)
 
   def flush(self):
-    # Send HTTP request and receive response.
-    # Return True if the client should retry this method.
-    def sendRequestRecvResp(data):
-      if self.isOpen():
+    # Send HTTP request headers. This is repeatable, so if there's a connection error
+    # like when the connection has been closed it's safe to retry.
+    def sendRequestHeaders(data_len):
+      if not self.__reuse_connection and self.isOpen():
         self.close()
-      self.open()
+      if not self.isOpen():
+        self.open()
 
       # HTTP request
       if self.using_proxy() and self.scheme == "http":
@@ -360,7 +369,6 @@ class ImpalaHttpClient(TTransportBase):
 
       # Write headers
       self.__http.putheader('Content-Type', 'application/x-thrift')
-      data_len = len(data)
       self.__http.putheader('Content-Length', str(data_len))
       if data_len > ImpalaHttpClient.MIN_REQUEST_SIZE_FOR_EXPECT:
         # Add the 'Expect' header to large requests. Note that we do not explicitly wait
@@ -384,6 +392,9 @@ class ImpalaHttpClient(TTransportBase):
 
       self.__http.endheaders()
 
+    # Complete the request by sending data and getting the response. Return True if the
+    # client should retry this method due to a '401 Unauthorized' response.
+    def sendDataRecvResp(data):
       # Write payload
       self.__http.send(data)
 
@@ -404,12 +415,41 @@ class ImpalaHttpClient(TTransportBase):
 
     # Pull data out of buffer
     data = self.__wbuf.getvalue()
+    data_len = len(data)
     self.__wbuf = BytesIO()
 
-    retry = sendRequestRecvResp(data)
-    if retry:
-      # Received "401 Unauthorized" response. Delete HTTP cookies and then retry.
-      sendRequestRecvResp(data)
+    # Send the request headers, retrying once if the connection was closed. Sending
+    # headers is the earliest point that http_client allows us to detect a closed
+    # connection.
+    retry_because_disconnected = False
+    try:
+      sendRequestHeaders(data_len)
+    except http_client.CannotSendRequest:
+      retry_because_disconnected = True
+    except socket.error as e:
+      if e.errno not in [errno.EPIPE, errno.ECONNRESET]:
+        raise
+      retry_because_disconnected = True
+
+    if retry_because_disconnected and self.__reuse_connection:
+      if self.__verbose:
+        print('Connection closed, reconnecting...', file=sys.stderr)
+      # The underlying socket is broken. Try to reconnect and then retry.
+      self.close()
+      sendRequestHeaders(data_len)
+
+    # Send the data and receive the response. We no longer retry on socket errors as the
+    # request may have already been partially processed by the server and we don't want to
+    # repeat it. We do retry on 401 Unauthorized if we sent cookies as they may have
+    # expired and we don't send the Authorization header with cookies for Kerberos.
+    retry_because_401 = sendDataRecvResp(data)
+    if retry_because_401:
+      if self.__verbose:
+        print('Cookies expired, restarting authentication...', file=sys.stderr)
+      # Received "401 Unauthorized" response and cookies have been cleaned. Retry with
+      # the same connection.
+      sendRequestHeaders(data_len)
+      sendDataRecvResp(data)
 
     if self.code >= 300:
       # Report any http response code that is not 1XX (informational response) or

@@ -381,6 +381,11 @@ def get_option_parser(defaults):
                     "execution, even if query does not expect to fetch any rows. "
                     "This is the default behavior when using beeswax protocol. "
                     "Default to false for other Impala protocol.")
+  parser.add_option("--use_new_http_connection", dest="use_new_http_connection",
+                    action="store_true",
+                    help="If set, a new underlying HTTP connection will be used for each "
+                    "request in hs2-http protocol. By default, the underlying HTTP "
+                    "connection is reused for multiple requests.")
 
   # add default values to the help text
   for option in parser.option_list:

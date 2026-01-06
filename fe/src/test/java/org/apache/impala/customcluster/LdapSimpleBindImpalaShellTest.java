@@ -117,7 +117,16 @@ public class LdapSimpleBindImpalaShellTest extends LdapImpalaShellTest {
   public void testCookieRefresh() throws Exception {
     File cookieSecretFile = getCookieSecretFile();
     setUp(String.format("--cookie_secret_file=%s", cookieSecretFile.getCanonicalPath()));
-    testCookieRefreshImpl(cookieSecretFile);
+    testCookieRefreshImpl(cookieSecretFile, null);
+  }
+
+  /**
+   * Tests that an interrupted connection reconnects.
+   */
+  @Test
+  public void testReconnect() throws Exception {
+    setUp("");
+    testReconnectImpl(null);
   }
 
   /**

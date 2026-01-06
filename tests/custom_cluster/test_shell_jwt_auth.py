@@ -71,7 +71,7 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
   def test_jwt_auth_valid(self, vector):
     """Asserts the Impala shell can authenticate to Impala using JWT authentication.
     Also executes a query to ensure the authentication was successful."""
-    before_rpc_count = self.__get_rpc_count()
+    self.__assert_success_fail_metric()
 
     # Run a query and wait for it to complete.
     args = ['--protocol', vector.get_value('protocol'), '-j', '--jwt_cmd',
@@ -89,11 +89,11 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
     # will happen via cookie auth, hence this count will be 1.
     self.__assert_success_fail_metric(success_count=1)
 
-    # Total cookie auth success should be 1 less than total rpc_count
-    # since after the 1st rpc count, the cookie is set and no more jwt token
-    # verification happens.
-    query_rpc_count = self.__get_rpc_count() - before_rpc_count
-    assert cookie_auth_count == query_rpc_count - 1, "Incorrect Cookie Auth Count"
+    # Total cookie auth success should be 1 less than total number of RPCs since after
+    # the 1st RPC, the cookie is set and no more jwt token verification happens. However
+    # counting total number of RPCs is not trivial or stable, so ensure we have multiple;
+    # we perform at least 10 RPCs during a query.
+    assert cookie_auth_count > 10, "Incorrect Cookie Auth Count"
 
     # Shut down cluster to ensure logs flush to disk.
     self._stop_impala_cluster()
@@ -122,7 +122,8 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
   def test_jwt_auth_expired(self, vector):
     """Asserts the Impala shell fails to authenticate when it presents a JWT that has a
     valid signature but is expired."""
-    before_rpc_count = self.__get_rpc_count()
+    before_connection_count = self.__get_connection_count()
+    self.__assert_success_fail_metric()
 
     args = ['--protocol', vector.get_value('protocol'), '-j', '--jwt_cmd',
             'cat {0}'.format(TestImpalaShellJWTAuth.JWT_EXPIRED_PATH),
@@ -130,10 +131,10 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
     result = run_impala_shell_cmd(vector, args, expect_success=False)
 
     # Ensure the Impala coordinator is correctly reporting the jwt auth metrics
-    # must be done before the cluster shuts down since it calls to the coordinator
-    self.__wait_for_rpc_count(before_rpc_count + 1)
-    query_rpc_count = self.__get_rpc_count() - before_rpc_count
-    self.__assert_success_fail_metric(fail_count=query_rpc_count)
+    # must be done before the cluster shuts down since it calls to the coordinator.
+    self.__wait_for_connection_count(before_connection_count + 1)
+    query_connection_count = self.__get_connection_count() - before_connection_count
+    self.__assert_success_fail_metric(fail_count=query_connection_count)
 
     # Shut down cluster to ensure logs flush to disk.
     self._stop_impala_cluster()
@@ -166,7 +167,7 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
   def test_jwt_auth_invalid_jwk(self, vector):
     """Asserts the Impala shell fails to authenticate when it presents a JWT that has a
     valid signature but is expired."""
-    before_rpc_count = self.__get_rpc_count()
+    before_connection_count = self.__get_connection_count()
 
     args = ['--protocol', vector.get_value('protocol'), '-j', '--jwt_cmd',
             'cat {0}'.format(TestImpalaShellJWTAuth.JWT_INVALID_JWK),
@@ -175,9 +176,9 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
 
     # Ensure the Impala coordinator is correctly reporting the jwt auth metrics
     # must be done before the cluster shuts down since it calls to the coordinator
-    self.__wait_for_rpc_count(before_rpc_count + 1)
-    query_rpc_count = self.__get_rpc_count() - before_rpc_count
-    self.__assert_success_fail_metric(fail_count=query_rpc_count)
+    self.__wait_for_connection_count(before_connection_count + 1)
+    query_connection_count = self.__get_connection_count() - before_connection_count
+    self.__assert_success_fail_metric(fail_count=query_connection_count)
 
     # Shut down cluster to ensure logs flush to disk.
     self._stop_impala_cluster()
@@ -213,9 +214,9 @@ class TestImpalaShellJWTAuth(CustomClusterTestSuite):
     assert actual[1] == fail_count, "Expected JWT auth failure count to be '{}' but " \
         "was '{}'".format(fail_count, actual[1])
 
-  def __get_rpc_count(self):
+  def __get_connection_count(self):
     return self.cluster.get_first_impalad().service.get_metric_value(self.HS2_HTTP_CONNS)
 
-  def __wait_for_rpc_count(self, expected_count):
+  def __wait_for_connection_count(self, expected_count):
     self.cluster.get_first_impalad().service.wait_for_metric_value(self.HS2_HTTP_CONNS,
         expected_count, allow_greater=True)

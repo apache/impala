@@ -123,7 +123,17 @@ public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
     setUp(String.format("--ldap_user_search_basedn=dc=myorg,dc=com "
             + "--ldap_user_filter=(&(objectClass=person)(cn={0})) "
             + "--cookie_secret_file=%s", cookieSecretFile.getCanonicalPath()));
-    testCookieRefreshImpl(cookieSecretFile);
+    testCookieRefreshImpl(cookieSecretFile, null);
+  }
+
+  /**
+   * Tests that an interrupted connection reconnects.
+   */
+  @Test
+  public void testReconnect() throws Exception {
+    setUp(String.format("--ldap_user_search_basedn=dc=myorg,dc=com "
+            + "--ldap_user_filter=(&(objectClass=person)(cn={0}))"));
+    testReconnectImpl(null);
   }
 
   /**
