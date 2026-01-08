@@ -518,6 +518,10 @@ StringVal StringFunctions::AesDecryptImpl(FunctionContext* ctx, const StringVal&
 
   // Remove spaces and set value of gcm_tag in case of GCM mode
   if (encryption_key.IsGcmMode()) {
+    if (len < AES_BLOCK_SIZE) {
+      ctx->SetError("AES GCM input too short to contain a tag");
+      return StringVal::null();
+    }
     len -= AES_BLOCK_SIZE;
     encryption_key.SetGcmTag(expr.ptr + len);
   }
