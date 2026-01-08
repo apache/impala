@@ -44,6 +44,7 @@ class TestCalcitePlanner(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(start_args="--env_vars=USE_CALCITE_PLANNER=true")
-  def test_semicolon(self, cursor):
-    cursor.execute("set use_calcite_planner=true;")
-    cursor.execute("select 4;")
+  def test_semicolon(self):
+    with self.create_impala_client() as client:
+      client.execute("set use_calcite_planner=true;")
+      client.execute("select 4;")

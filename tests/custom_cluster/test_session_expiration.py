@@ -43,20 +43,21 @@ class TestSessionExpiration(CustomClusterTestSuite):
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
     num_connections = impalad.service.get_metric_value(
         "impala.thrift-server.beeswax-frontend.connections-in-use")
-    client = impalad.service.create_hs2_client()
-    client.execute('select 1')
-    # Sleep for half the expiration time to confirm that the session is not expired early
-    # (see IMPALA-838)
-    sleep(3)
-    assert client is not None
-    assert num_expired == impalad.service.get_metric_value(
-        "impala-server.num-sessions-expired")
-    # Wait for session expiration. Impala will poll the session expiry queue every second
-    impalad.service.wait_for_metric_value(
-        "impala-server.num-sessions-expired", num_expired + 1, 20)
-    # Verify that the idle connection is not closed.
-    assert 1 + num_connections == impalad.service.get_metric_value(
-        "impala.thrift-server.hiveserver2-frontend.connections-in-use")
+    with impalad.service.create_hs2_client() as client:
+      client.execute('select 1')
+      # Sleep for half the expiration time to confirm that the session is not expired
+      # early (see IMPALA-838)
+      sleep(3)
+      assert client is not None
+      assert num_expired == impalad.service.get_metric_value(
+          "impala-server.num-sessions-expired")
+      # Wait for session expiration. Impala will poll the session expiry queue every
+      # second
+      impalad.service.wait_for_metric_value(
+          "impala-server.num-sessions-expired", num_expired + 1, 20)
+      # Verify that the idle connection is not closed.
+      assert 1 + num_connections == impalad.service.get_metric_value(
+          "impala.thrift-server.hiveserver2-frontend.connections-in-use")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_session_timeout=3 "
@@ -67,18 +68,18 @@ class TestSessionExpiration(CustomClusterTestSuite):
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
 
     # Test if we can set a shorter timeout than the process-wide option
-    client = impalad.service.create_hs2_client()
-    client.execute("SET IDLE_SESSION_TIMEOUT=1")
-    sleep(2.5)
-    assert num_expired + 1 == impalad.service.get_metric_value(
-      "impala-server.num-sessions-expired")
+    with impalad.service.create_hs2_client() as client:
+      client.execute("SET IDLE_SESSION_TIMEOUT=1")
+      sleep(2.5)
+      assert num_expired + 1 == impalad.service.get_metric_value(
+        "impala-server.num-sessions-expired")
 
     # Test if we can set a longer timeout than the process-wide option
-    client = impalad.service.create_hs2_client()
-    client.execute("SET IDLE_SESSION_TIMEOUT=10")
-    sleep(5)
-    assert num_expired + 1 == impalad.service.get_metric_value(
-      "impala-server.num-sessions-expired")
+    with impalad.service.create_hs2_client() as client:
+      client.execute("SET IDLE_SESSION_TIMEOUT=10")
+      sleep(5)
+      assert num_expired + 1 == impalad.service.get_metric_value(
+        "impala-server.num-sessions-expired")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_session_timeout=5 "
@@ -89,19 +90,19 @@ class TestSessionExpiration(CustomClusterTestSuite):
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
 
     # Test unsetting IDLE_SESSION_TIMEOUT
-    client = impalad.service.create_hs2_client()
-    client.execute("SET IDLE_SESSION_TIMEOUT=1")
+    with impalad.service.create_hs2_client() as client:
+      client.execute("SET IDLE_SESSION_TIMEOUT=1")
 
-    # Unset to 5 sec
-    client.execute('SET IDLE_SESSION_TIMEOUT=""')
-    sleep(2)
-    # client session should be alive at this point
-    assert num_expired == impalad.service.get_metric_value(
-      "impala-server.num-sessions-expired")
-    sleep(5)
-    # now client should have expired
-    assert num_expired + 1 == impalad.service.get_metric_value(
-      "impala-server.num-sessions-expired")
+      # Unset to 5 sec
+      client.execute('SET IDLE_SESSION_TIMEOUT=""')
+      sleep(2)
+      # client session should be alive at this point
+      assert num_expired == impalad.service.get_metric_value(
+        "impala-server.num-sessions-expired")
+      sleep(5)
+      # now client should have expired
+      assert num_expired + 1 == impalad.service.get_metric_value(
+        "impala-server.num-sessions-expired")
 
   def _get_fast_timeout_cursor_from_hs2_client(self, connection, idle_session_timeout=3):
     """Get a fast timing out HiveServer2Cursor from a HiveServer2Connection."""
@@ -157,18 +158,18 @@ class TestSessionExpiration(CustomClusterTestSuite):
 
       # Connect to Impala using either beeswax or HS2 client and verify the number of
       # opened connections.
-      client = impalad.service.create_client(
-          protocol=('hs2' if protocol == 'hiveserver2' else protocol))
-      client.execute("select 1")
-      impalad.service.wait_for_metric_value(num_connections_metrics_name,
-           num_connections + 1, 20)
+      with impalad.service.create_client(
+          protocol=('hs2' if protocol == 'hiveserver2' else protocol)) as client:
+        client.execute("select 1")
+        impalad.service.wait_for_metric_value(num_connections_metrics_name,
+             num_connections + 1, 20)
 
-      # Wait till the session has expired.
-      impalad.service.wait_for_metric_value("impala-server.num-sessions-expired",
-           num_expired + 1, 20)
-      # Wait till the idle connection is closed.
-      impalad.service.wait_for_metric_value(num_connections_metrics_name,
-           num_connections, 5)
+        # Wait till the session has expired.
+        impalad.service.wait_for_metric_value("impala-server.num-sessions-expired",
+             num_expired + 1, 20)
+        # Wait till the idle connection is closed.
+        impalad.service.wait_for_metric_value(num_connections_metrics_name,
+             num_connections, 5)
 
     # Verify that connecting to HS2 port without establishing a session will not cause
     # the connection to be closed.
@@ -194,28 +195,26 @@ class TestSessionExpiration(CustomClusterTestSuite):
     impalad = self.cluster.get_first_impalad()
     self.close_impala_clients()
     # Create 2 clients.
-    client1 = impalad.service.create_hs2_client()
-    client2 = impalad.service.create_hs2_client()
-    # Run query to open session.
-    client1.execute('select "client1 should succeed"')
-    client2.execute('select "client2 should succeed"')
-    try:
-      # Trying to open a third session should fail.
-      client3 = impalad.service.create_hs2_client()
-      client3.execute('select "client3 should fail"')
-      assert False, "should have failed"
-    except Exception as e:
-      assert re.match(r".*Number of sessions for user \S+ exceeds coordinator limit 2",
-                      str(e), re.DOTALL), "Unexpected exception: " + str(e)
+    with impalad.service.create_hs2_client() as client1, \
+      impalad.service.create_hs2_client() as client2:
+      # Run query to open session.
+      client1.execute('select "client1 should succeed"')
+      client2.execute('select "client2 should succeed"')
+      try:
+        # Trying to open a third session should fail.
+        client3 = impalad.service.create_hs2_client()
+        client3.execute('select "client3 should fail"')
+        assert False, "should have failed"
+      except Exception as e:
+        assert re.match(r".*Number of sessions for user \S+ exceeds coordinator limit 2",
+                        str(e), re.DOTALL), "Unexpected exception: " + str(e)
 
-    # Test webui for hs2 sessions.
-    res = impalad.service.get_debug_webpage_json("/sessions")
-    assert res['num_sessions'] == 2
-    assert res['users'][0]['user'] is not None
-    assert res['users'][0]['session_count'] == 2
-    # Let queries finish, session count should go to zero.
-    sleep(6)
-    client1.close()
-    client2.close()
+      # Test webui for hs2 sessions.
+      res = impalad.service.get_debug_webpage_json("/sessions")
+      assert res['num_sessions'] == 2
+      assert res['users'][0]['user'] is not None
+      assert res['users'][0]['session_count'] == 2
+      # Let queries finish, session count should go to zero.
+      sleep(6)
     res = impalad.service.get_debug_webpage_json("/sessions")
     assert res['num_sessions'] == 0

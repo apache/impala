@@ -168,7 +168,7 @@ class TestObservability(ImpalaTestSuite):
     assert "Query Options (set by configuration): MEM_LIMIT=8589934592" in profile,\
         profile
     assert "CLIENT_IDENTIFIER=" + \
-        "query_test/test_observability.py::TestObservability::()::test_query_options" \
+        "query_test/test_observability.py::TestObservability::test_query_options" \
         in profile
     # Get the TIMEZONE value.
     server_timezone = None
@@ -186,7 +186,7 @@ class TestObservability(ImpalaTestSuite):
         "NUM_NODES=1,NUM_SCANNER_THREADS=1,"
         "RUNTIME_FILTER_MODE=OFF,MT_DOP=0,TIMEZONE={timezone},"
         "CLIENT_IDENTIFIER="
-        "query_test/test_observability.py::TestObservability::()::test_query_options,"
+        "query_test/test_observability.py::TestObservability::test_query_options,"
         "SPOOL_QUERY_RESULTS=0"
         "\n")
     expected_str = expected_str.format(timezone=server_timezone)

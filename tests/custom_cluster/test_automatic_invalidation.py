@@ -29,6 +29,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.event_processor_utils import EventProcessorUtils
 
+
 class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
   """ Test that tables are cached in the catalogd after usage for the configured time
       and invalidated afterwards."""
@@ -49,9 +50,8 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
     return self.cluster.catalogd.service.read_debug_webpage(
         "catalog_object?object_type=TABLE&object_name=functional.alltypes")
 
-  def _run_test(self, cursor):
-    cursor.execute(self.query)
-    cursor.fetchall()
+  def _run_test(self):
+    self.client.execute(self.query)
     # The table is cached after usage.
     assert self.metadata_cache_string in self._get_catalog_object()
     # Wait 5 * table TTL for the invalidation to take effect.
@@ -65,15 +65,15 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(catalogd_args=timeout_flag, impalad_args=timeout_flag)
-  def test_v1_catalog(self, cursor):
-    self._run_test(cursor)
+  def test_v1_catalog(self):
+    self._run_test()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       catalogd_args=timeout_flag + " --catalog_topic_mode=minimal",
       impalad_args=timeout_flag + " --use_local_catalog")
-  def test_local_catalog(self, cursor):
-    self._run_test(cursor)
+  def test_local_catalog(self):
+    self._run_test()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(catalogd_args="--invalidate_tables_timeout_s=1",

@@ -132,7 +132,7 @@ class RequestHandler503Extra(RequestHandler503):
     return True
 
 
-class TestHTTPServer503(object):
+class HTTPServer503(object):
   def __init__(self, clazz):
     self.HOST = "localhost"
     self.PORT = get_unused_port()
@@ -150,21 +150,21 @@ def shutdown_server(server):
     server.http_server_thread.join()
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def http_503_server():
   """A fixture that creates an http server that returns a 503 http code."""
-  server = TestHTTPServer503(RequestHandler503)
+  server = HTTPServer503(RequestHandler503)
   yield server
 
   # Cleanup after test.
   shutdown_server(server)
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def http_503_server_extra():
   """A fixture that creates an http server that returns a 503 http code with extra
   body text."""
-  server = TestHTTPServer503(RequestHandler503Extra)
+  server = HTTPServer503(RequestHandler503Extra)
   yield server
 
   # Cleanup after test.
@@ -704,8 +704,9 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       self._expect_with_cmd(child_proc, "select 'hi'", vector, ('hi'))
       child_proc.sendline('exit;')
       child_proc.expect(pexpect.EOF)
-      history_contents = open(new_hist.name).read()
-      assert "select 'hi'" in history_contents
+      with open(new_hist.name) as f:
+        history_contents = f.read()
+        assert "select 'hi'" in history_contents
 
   def test_rerun(self, vector, tmp_history_file):  # noqa: U100
     """Smoke test for the 'rerun' command"""
@@ -753,10 +754,11 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     assert False, "No tip found in output %s" % result.stderr
 
   def test_var_substitution(self, vector):
-    cmds = open(os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql')).read()
-    args = ["--var=foo=123", "--var=BAR=456", "--delimited", "--output_delimiter= "]
-    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
-    assert_var_substitution(result)
+    with open(os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql')) as f:
+      cmds = f.read()
+      args = ["--var=foo=123", "--var=BAR=456", "--delimited", "--output_delimiter= "]
+      result = run_impala_shell_interactive(vector, cmds, shell_args=args)
+      assert_var_substitution(result)
 
   def test_query_option_configuration(self, vector):
     if vector.get_value('strict_hs2_protocol'):

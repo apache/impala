@@ -491,11 +491,11 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       else:
         db_1 = "{}_1".format(db)
         if rename_db:
-          self.execute_query_expect_success(self.create_impala_client(),
+          self.execute_query_expect_success(self.client,
             "drop database if exists {0} cascade".format(db_1))
-          self.execute_query_expect_success(self.create_impala_client(),
+          self.execute_query_expect_success(self.client,
             "create database {0}".format(db_1))
-        self.execute_query_expect_success(self.create_impala_client(),
+        self.execute_query_expect_success(self.client,
           "create table if not exists {0}.rename_test_1 (i int)".format(db))
         if rename_db:
           queries = [
@@ -511,7 +511,7 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       create_metric_name = "tables-added"
       removed_metric_name = "tables-removed"
     elif type == "database":
-      self.execute_query_expect_success(self.create_impala_client(),
+      self.execute_query_expect_success(self.client,
         "drop database if exists {0}".format("test_create_drop_db"))
       queries = [
         "create database {db}".format(db="test_create_drop_db"),
@@ -521,7 +521,7 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
       removed_metric_name = "databases-removed"
     else:
       tbl_name = "test_create_drop_partition"
-      self.execute_query_expect_success(self.create_impala_client(),
+      self.execute_query_expect_success(self.client,
         "create table {db}.{tbl} (c int) partitioned by (p int)".format(
           db=db, tbl=tbl_name))
       queries = [
@@ -540,7 +540,7 @@ class TestEventProcessingCustomConfigs(TestEventProcessingCustomConfigsBase):
     for iter in range(num_iters):
       for q in queries:
         try:
-          self.execute_query_expect_success(self.create_impala_client(), q)
+          self.execute_query_expect_success(self.client, q)
         except Exception as e:
           print("Failed in {} iterations. Error {}".format(iter, str(e)))
           raise

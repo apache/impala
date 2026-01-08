@@ -134,7 +134,7 @@ def populated_table(empty_table, request):
   return fq_table_name
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def tmp_file():
   """
   Test fixture which manages a temporary file

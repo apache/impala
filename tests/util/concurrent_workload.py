@@ -63,8 +63,8 @@ class ConcurrentWorkload(object):
     cluster = ImpalaCluster.get_e2e_test_cluster()
     if len(cluster.impalads) == 0:
       raise Exception("Coordinator not running")
-    client = cluster.get_first_impalad().service.create_hs2_client()
-    return client.execute(query)
+    with cluster.get_first_impalad().service.create_hs2_client() as client:
+      return client.execute(query)
 
   def loop_query(self, query, output_q, stop_ev):
     """Executes 'query' in a loop while 'stop_ev' is not set and inserts the result into
@@ -113,12 +113,12 @@ class ConcurrentWorkload(object):
   def print_query_rate(self):
     """Prints the current query throughput until user presses ctrl-c."""
     try:
-      self._print_query_rate(self.output_q, self.stop_ev)
+      self._print_query_rate(self.stop_ev)
     except KeyboardInterrupt:
       self.stop()
     assert self.stop_ev.is_set(), "Stop event expected to be set but it isn't"
 
-  def _print_query_rate(self, queue_obj, stop_ev):
+  def _print_query_rate(self, stop_ev):
     """Prints the query throughput rate until 'stop_ev' is set by the caller."""
     PERIOD_S = 1
 

@@ -33,6 +33,17 @@ pylint == 2.10.2
 k5test==0.10.3
 kazoo==2.8.0
 
+# Pytest 6.2.5 and its dependents
+pytest == 6.2.5
+  attrs == 19.2.0
+  iniconfig == 1.1.1
+  pluggy == 0.12.0
+  py == 1.8.2
+  pytest-forked == 1.6.0
+  pytest-reportlog == 0.4.0
+  pytest-timeout == 2.2.0
+  pytest-xdist == 2.4.0
+
 # Below are needed only for dev
 flake8==3.9.2
 flake8-unused-arguments==0.0.13

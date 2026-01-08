@@ -199,7 +199,7 @@ class TestIPv6OnlyNoSsl(TestIPv6Base):
 class TestIPv6DualSsl(TestIPv6Base):
   ca_cert = WILDCARD_CA_CERT_PATH
 
-  @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
+  @pytest.mark.skipif(SKIP_SSL_MSG != "", reason=SKIP_SSL_MSG)
   def test_ipv6_dual_ssl(self, vector):
     self.check_connections()
     for port in WEBUI_PORTS:
@@ -232,7 +232,7 @@ class TestIPv6DualSsl(TestIPv6Base):
 class TestIPv6OnlySsl(TestIPv6Base):
   ca_cert = WILDCARD_CA_CERT_PATH
 
-  @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
+  @pytest.mark.skipif(SKIP_SSL_MSG != "", reason=SKIP_SSL_MSG)
   def test_ipv6_only_ssl(self, vector):
     self.check_connections()
     for port in WEBUI_PORTS:

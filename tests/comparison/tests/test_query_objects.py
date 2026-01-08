@@ -66,7 +66,7 @@ def verify_sql_matches(actual, expected, strip=True):
       actual=actual, expected=expected)
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def sql_writer(request):
   """
   Return a SqlWriter object that is torn down at the end of each test.

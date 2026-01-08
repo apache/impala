@@ -41,7 +41,7 @@ class HdfsConfig(object):
     self.conf = {}
     for arg in filename:
       tree = parse(arg)
-      for property in tree.getroot().getiterator('property'):
+      for property in tree.getroot().iter('property'):
         self.conf[property.find('name').text] = property.find('value').text
 
   def get(self, key):

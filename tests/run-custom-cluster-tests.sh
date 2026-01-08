@@ -25,7 +25,6 @@ set -euo pipefail
 setup_report_build_error
 
 # Disable HEAPCHECK for the process failure tests because they can cause false positives.
-# TODO: Combine with run-process-failure-tests.sh
 export HEAPCHECK=
 
 export LOG_DIR="${IMPALA_CUSTOM_CLUSTER_TEST_LOGS_DIR}"
@@ -48,7 +47,7 @@ then
   ARGS+=("${AUX_CUSTOM_DIR}")
 fi
 ARGS+=("--junitxml=${RESULTS_DIR}/TEST-impala-custom-cluster.xml")
-ARGS+=("--resultlog=${RESULTS_DIR}/TEST-impala-custom-cluster.log")
+ARGS+=("--report-log=${RESULTS_DIR}/TEST-impala-custom-cluster.log")
 ARGS+=("$@")
 
 impala-py.test "${ARGS[@]}"

@@ -58,7 +58,7 @@ def unittest_cursor_map(request):
   return request.param
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def postgresql_cursor():
   """
   Yield a PostgresqlCursor object needed for test infra system tests.

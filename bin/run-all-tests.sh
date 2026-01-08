@@ -244,11 +244,13 @@ run_ee_tests() {
   fi
   # Run end-to-end tests.
   # KERBEROS TODO - this will need to deal with ${KERB_ARGS}
-  if ! "${IMPALA_HOME}/tests/run-tests.py" ${COMMON_PYTEST_ARGS} \
+  pushd "${IMPALA_HOME}/tests"
+  if ! ./run-tests.py ${COMMON_PYTEST_ARGS} \
       ${RUN_TESTS_ARGS} ${EXTRA_ARGS} ${EE_TEST_FILES}; then
     #${KERB_ARGS};
     TEST_RET_CODE=1
   fi
+  popd
 }
 
 for i in $(seq 1 $NUM_TEST_ITERATIONS)
@@ -401,10 +403,12 @@ do
     # Run the custom-cluster tests after all other tests, since they will restart the
     # cluster repeatedly and lose state.
     # TODO: Consider moving in to run-tests.py.
-    if ! "${IMPALA_HOME}/tests/run-custom-cluster-tests.sh" ${COMMON_PYTEST_ARGS} \
+    pushd "${IMPALA_HOME}/tests"
+    if ! ./run-custom-cluster-tests.sh ${COMMON_PYTEST_ARGS} \
         ${RUN_CUSTOM_CLUSTER_TESTS_ARGS}; then
       TEST_RET_CODE=1
     fi
+    popd
     export IMPALA_MAX_LOG_FILES="${IMPALA_MAX_LOG_FILES_SAVE}"
   fi
 
@@ -413,16 +417,11 @@ do
     pushd "${IMPALA_HOME}/tests"
     if ! impala-py.test ${TEST_SUITE_VERIFIERS} \
         --junitxml=${TEST_SUITE_VERIFIERS_LOG_DIR}/TEST-impala-verifiers.xml \
-        --resultlog=${TEST_SUITE_VERIFIERS_LOG_DIR}/TEST-impala-verifiers.log; then
+        --report-log=${TEST_SUITE_VERIFIERS_LOG_DIR}/TEST-impala-verifiers.log; then
       TEST_RET_CODE=1
     fi
     popd
   fi
-
-  # Run the process failure tests.
-  # Disabled temporarily until we figure out the proper timeouts required to make the test
-  # succeed.
-  # ${IMPALA_HOME}/tests/run-process-failure-tests.sh
 
   # Store a list of the files at the end of each iteration. This can be compared
   # to the file-list-begin*.log from the beginning of the iteration to see if files

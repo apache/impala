@@ -37,14 +37,14 @@ def cluster(request):
   return __cluster
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def hive_cursor(request):
   with cluster(request).hive.connect() as conn:
     with conn.cursor() as cur:
       yield cur
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def cursor(request):
   with cluster(request).impala.connect() as conn:
     with conn.cursor() as cur:

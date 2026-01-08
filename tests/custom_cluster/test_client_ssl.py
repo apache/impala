@@ -172,7 +172,7 @@ class TestClientSsl(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args=TLS_ECDH_ARGS,
                                     statestored_args=TLS_ECDH_ARGS,
                                     catalogd_args=TLS_ECDH_ARGS)
-  @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
+  @pytest.mark.skipif(SKIP_SSL_MSG != "", reason=SKIP_SSL_MSG)
   def test_tls_ecdh(self, vector):
     self._verify_negative_cases(vector, "%s/server-cert.pem" % CERT_DIR)
     self._validate_positive_cases(vector, "%s/server-cert.pem" % CERT_DIR)
@@ -190,7 +190,7 @@ class TestClientSsl(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args=TLS_V10_ARGS,
                                     statestored_args=TLS_V10_ARGS,
                                     catalogd_args=TLS_V10_ARGS)
-  @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
+  @pytest.mark.skipif(SKIP_SSL_MSG != "", reason=SKIP_SSL_MSG)
   def test_tls_v10(self, vector):
     self._validate_positive_cases(vector, "%s/server-cert.pem" % CERT_DIR)
 
@@ -198,7 +198,7 @@ class TestClientSsl(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args=SSL_WILDCARD_ARGS,
                                     statestored_args=SSL_WILDCARD_ARGS,
                                     catalogd_args=SSL_WILDCARD_ARGS)
-  @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
+  @pytest.mark.skipif(SKIP_SSL_MSG != "", reason=SKIP_SSL_MSG)
   def test_wildcard_ssl(self, vector):
     """ Test for IMPALA-3159: Test with a certificate which has a wildcard for the
     CommonName.
@@ -214,7 +214,7 @@ class TestClientSsl(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args=SSL_WILDCARD_SAN_ARGS,
                                     statestored_args=SSL_WILDCARD_SAN_ARGS,
                                     catalogd_args=SSL_WILDCARD_SAN_ARGS)
-  @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
+  @pytest.mark.skipif(SKIP_SSL_MSG != "", reason=SKIP_SSL_MSG)
   def test_wildcard_san_ssl(self, vector):
     """ Test for IMPALA-3159: Test with a certificate which has a wildcard as a SAN. """
     # This block of code is the same as _validate_positive_cases() but we want to check
@@ -311,7 +311,7 @@ class TestClientSslUnsupported(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args=SSL_ARGS,
                                     statestored_args=SSL_ARGS,
                                     catalogd_args=SSL_ARGS)
-  @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
+  @pytest.mark.skipif(SKIP_SSL_MSG != "", reason=SKIP_SSL_MSG)
   def test_shell_warning(self, vector):
     result = run_impala_shell_cmd_no_expect(vector, ["--ssl", "-q", "select 1 + 2"])
     assert "Warning: TLSv1.2 is not supported for Python < 2.7.9" in result.stderr, \

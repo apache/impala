@@ -1066,8 +1066,8 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     period elapses."""
     impalad = psutil.Process(self.cluster.impalads[0].get_pid())
     LOG.info(
-      "Sending IMPALA_SHUTDOWN_SIGNAL(SIGRTMIN = {0}) signal to impalad PID = {1}",
-      self.IMPALA_SHUTDOWN_SIGNAL, impalad.pid)
+      "Sending IMPALA_SHUTDOWN_SIGNAL(SIGRTMIN = {0}) signal "
+      "to impalad PID = {1}".format(self.IMPALA_SHUTDOWN_SIGNAL, impalad.pid))
     impalad.send_signal(self.IMPALA_SHUTDOWN_SIGNAL)
     # Make sure that the impala daemon exits after the shutdown grace period plus a 10
     # second margin of error.
@@ -1090,8 +1090,9 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     impalad = psutil.Process(self.cluster.impalads[0].get_pid())
     NUM_SIGNALS_TO_SEND = 10
     LOG.info(
-      "Sending {0} IMPALA_SHUTDOWN_SIGNAL(SIGRTMIN = {1}) signals to impalad PID = {2}",
-      NUM_SIGNALS_TO_SEND, self.IMPALA_SHUTDOWN_SIGNAL, impalad.pid)
+      "Sending {0} IMPALA_SHUTDOWN_SIGNAL(SIGRTMIN = {1}) signals "
+      "to impalad PID = {2}".format(
+          NUM_SIGNALS_TO_SEND, self.IMPALA_SHUTDOWN_SIGNAL, impalad.pid))
     for i in range(NUM_SIGNALS_TO_SEND):
       impalad.send_signal(self.IMPALA_SHUTDOWN_SIGNAL)
     # Give shutdown thread some time to wake up and handle all the signals to avoid

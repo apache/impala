@@ -32,9 +32,8 @@ import multiprocessing
 import os
 import pytest
 import sys
-from _pytest.main import EXIT_NOTESTSCOLLECTED
-# change to "from _pytest.config.argparsing import Parser" in pytest >= 6.2.0
-from _pytest.config import Parser
+from _pytest.config import ExitCode
+from _pytest.config.argparsing import Parser
 
 # We whitelist valid test directories. If a new test directory is added, update this.
 VALID_TEST_DIRS = ['failure', 'query_test', 'stress', 'unittests', 'aux_query_tests',
@@ -57,7 +56,7 @@ RESULT_DIR = os.path.join(os.environ['IMPALA_EE_TEST_LOGS_DIR'], 'results')
 # Arguments that control output logging. If additional default arguments are needed they
 # should go in the pytest.ini file.
 LOGGING_ARGS = {'--junitxml': 'TEST-impala-{0}.xml',
-                '--resultlog': 'TEST-impala-{0}.log'}
+                '--report-log': 'TEST-impala-{0}.log'}
 
 # Default the number of concurrent tests defaults to the cpu cores in the system.
 # This can be overridden by setting the NUM_CONCURRENT_TESTS environment variable.
@@ -75,6 +74,7 @@ NUM_STRESS_CLIENTS = min(multiprocessing.cpu_count() * 4, 64)
 if 'NUM_STRESS_CLIENTS' in os.environ:
   NUM_STRESS_CLIENTS = int(os.environ['NUM_STRESS_CLIENTS'])
 
+
 class TestCounterPlugin(object):
   """ Custom pytest plugin to count the number of tests
   collected and executed over multiple pytest runs
@@ -87,21 +87,23 @@ class TestCounterPlugin(object):
     self.tests_executed = set()
 
   # pytest hook to handle test collection when xdist is used (parallel tests)
-  # https://github.com/pytest-dev/pytest-xdist/pull/35/commits (No official documentation available)
-  def pytest_xdist_node_collection_finished(self, node, ids):
+  # https://github.com/pytest-dev/pytest-xdist/pull/35/commits
+  # (No official documentation available)
+  def pytest_xdist_node_collection_finished(self, node, ids):  # noqa: U100
       self.tests_collected.update(set(ids))
 
   # link to pytest_collection_modifyitems
-  # https://docs.pytest.org/en/2.9.2/writing_plugins.html#_pytest.hookspec.pytest_collection_modifyitems
+  # https://docs.pytest.org/en/6.2.x/writing_plugins.html#hook-function-validation-and-execution
   def pytest_collection_modifyitems(self, items):
       for item in items:
           self.tests_collected.add(item.nodeid)
 
   # link to pytest_runtest_logreport
-  # https://docs.pytest.org/en/2.9.2/_modules/_pytest/hookspec.html#pytest_runtest_logreport
+  # https://docs.pytest.org/en/6.2.x/_modules/_pytest/hookspec.html#pytest_runtest_logreport
   def pytest_runtest_logreport(self, report):
     if report.passed:
-       self.tests_executed.add(report.nodeid)
+      self.tests_executed.add(report.nodeid)
+
 
 class TestExecutor(object):
   def __init__(self, exit_on_error=True):
@@ -113,8 +115,9 @@ class TestExecutor(object):
     testcounterplugin = TestCounterPlugin()
 
     try:
-      pytest_exit_code = pytest.main(args, plugins=[testcounterplugin])
-    except:
+      string_args = [str(a) for a in args]
+      pytest_exit_code = pytest.main(string_args, plugins=[testcounterplugin])
+    except Exception:
       sys.stderr.write("Unexpected exception with pytest {0}".format(args))
       raise
 
@@ -124,12 +127,19 @@ class TestExecutor(object):
 
     self.total_executed += len(testcounterplugin.tests_executed)
 
-    if 0 < pytest_exit_code < EXIT_NOTESTSCOLLECTED and self._exit_on_error:
+    if 0 < pytest_exit_code < ExitCode.NO_TESTS_COLLECTED and self._exit_on_error:
       sys.exit(pytest_exit_code)
-    self.tests_failed = 0 < pytest_exit_code < EXIT_NOTESTSCOLLECTED or self.tests_failed
+    self.tests_failed = (0 < pytest_exit_code < ExitCode.NO_TESTS_COLLECTED
+                         or self.tests_failed)
 
 
 def get_explicit_tests(args):
+  """ Returns a list of explicitly specified tests from the given args.
+
+  Note that access to _pytest.config.argparsing.Parser() constructor is deprecated
+  in pytest 7.0.
+  https://docs.pytest.org/en/stable/deprecations.html#directly-constructing-internal-classes
+  """
   pytest_arg_parser = Parser()
   parsed_args = pytest_arg_parser.parse_known_args(args)
   return parsed_args.file_or_dir
@@ -204,7 +214,7 @@ def build_test_args(base_name, valid_dirs=VALID_TEST_DIRS):
     # We also want to strip out any --shard_tests option and its corresponding value.
     while "--shard_tests" in config_options:
       i = config_options.index("--shard_tests")
-      del config_options[i:i+2]
+      del config_options[i:i + 2]
     test_args = ignored_dirs + logging_args + config_options
 
   return test_args
@@ -280,6 +290,10 @@ if __name__ == "__main__":
     test_executor.run_tests(args)
 
   os.chdir(TEST_DIR)
+  # Fix rootdir and pytest.ini path programmatically because individual pytest-xdist
+  # worker often does not pick this up correctly during parallel run.
+  pytest_ini_path = os.path.join(TEST_DIR, 'pytest.ini')
+  conf_args = ["--rootdir", TEST_DIR, '-c', pytest_ini_path]
 
   # Create the test result directory if it doesn't already exist.
   if not os.path.exists(RESULT_DIR):
@@ -290,7 +304,7 @@ if __name__ == "__main__":
   # pytest warnings/messages and displays collected tests
 
   if '--collect-only' in sys.argv:
-    run(sys.argv[1:])
+    run(conf_args + sys.argv[1:])
   else:
     print_metrics('connections')
 
@@ -317,19 +331,20 @@ if __name__ == "__main__":
 
     # First run query tests that need to be executed serially
     if not skip_serial:
-      base_args = ['-m', 'execute_serially']
+      base_args = conf_args + ['-m', 'execute_serially']
       run(base_args + build_test_args("serial{0}".format(shard_identifier)))
       print_metrics('connections')
 
     # Run the stress tests
     if not skip_stress:
-      base_args = ['-m', 'stress', '-n', NUM_STRESS_CLIENTS]
+      base_args = conf_args + ['-m', 'stress', '-n', NUM_STRESS_CLIENTS]
       run(base_args + build_test_args("stress{0}".format(shard_identifier)))
       print_metrics('connections')
 
     # Run the remaining query tests in parallel
     if not skip_parallel:
-      base_args = ['-m', 'not execute_serially and not stress', '-n', NUM_CONCURRENT_TESTS]
+      base_args = conf_args + ['-m', 'not execute_serially and not stress',
+                               '-n', NUM_CONCURRENT_TESTS]
       run(base_args + build_test_args("parallel{0}".format(shard_identifier)))
 
     # The total number of tests executed at this point is expected to be >0
@@ -343,7 +358,7 @@ if __name__ == "__main__":
       args = build_test_args(base_name="verify-metrics{0}".format(shard_identifier),
                              valid_dirs=['verifiers'])
       args.append('verifiers/test_verify_metrics.py')
-      run(args)
+      run(conf_args + args)
 
   if test_executor.tests_failed:
     sys.exit(1)

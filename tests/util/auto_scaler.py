@@ -25,7 +25,6 @@ import os
 import pipes
 from subprocess import check_call
 from tests.common.impala_cluster import ImpalaCluster
-from tests.util.filesystem_utils import IS_EC
 from threading import Event, Thread
 
 IMPALA_HOME = os.environ["IMPALA_HOME"]
@@ -89,9 +88,6 @@ class AutoScaler(object):
 
   def get_service(self):
     return self.get_coordinator().service
-
-  def get_client(self):
-    return self.get_coordinator().service.create_hs2_client()
 
   def group_name(self, idx):
     # By convention, group names must start with their associated resource pool name
@@ -163,7 +159,8 @@ class AutoScaler(object):
     return self.get_service().get_executor_groups()
 
   def execute(self, query):
-    return self.get_client().execute(query)
+    with self.get_coordinator().service.create_hs2_client() as client:
+      return client.execute(query)
 
   def get_num_queued_queries(self):
     """Returns the number of queries currently queued in the default pool on the

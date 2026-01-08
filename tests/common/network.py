@@ -77,4 +77,4 @@ elif _openssl_version_number < REQUIRED_MIN_OPENSSL_VERSION:
   SKIP_SSL_MSG = "Only have OpenSSL version %X, but test requires %X" % (
     ssl.OPENSSL_VERSION_NUMBER, REQUIRED_MIN_OPENSSL_VERSION)
 else:
-  SKIP_SSL_MSG = None
+  SKIP_SSL_MSG = ""

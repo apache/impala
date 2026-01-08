@@ -378,7 +378,7 @@ def get_dev_impala_shell_executable():
 def create_impala_shell_executable_dimension(dev_only=False):
   _, include_pypi = get_dev_impala_shell_executable()
   dimensions = []
-  python3_pytest = (os.getenv("IMPALA_USE_PYTHON3_TESTS", "false") == "true")
+  python3_pytest = (os.getenv("IMPALA_USE_PYTHON3_TESTS", "true") == "true")
   assert os.getenv("IMPALA_SYSTEM_PYTHON3"), "Must set env var IMPALA_SYSTEM_PYTHON3!"
   dimensions.append('dev3')
   if os.getenv("IMPALA_SYSTEM_PYTHON2") and not python3_pytest:
