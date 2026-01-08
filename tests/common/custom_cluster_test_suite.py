@@ -213,7 +213,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       args[LOG_SYMLINKS] = True
     if workload_mgmt:
       args[WORKLOAD_MGMT] = True
-    if force_restart or pytest.config.option.shard_tests:
+    if force_restart or cls.pytest_config().option.shard_tests:
       # When sharding tests, always restart the cluster to avoid issues with tests
       # that depend on a specific test order within a shard.
       args[FORCE_RESTART] = True
@@ -368,7 +368,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       kwargs[IMPALAD_TIMEOUT_S] = args[IMPALAD_TIMEOUT_S]
     if FORCE_RESTART in args:
       kwargs[FORCE_RESTART] = args[FORCE_RESTART]
-      if args[FORCE_RESTART] is True and not pytest.config.option.shard_tests:
+      if args[FORCE_RESTART] is True and not cls.pytest_config().option.shard_tests:
         LOG.warning("Test uses force_restart=True to avoid restarting the cluster. "
                     "Test reorganization/assertion rewrite is needed")
     else:
@@ -643,7 +643,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if add_impalads:
       cmd.append("--add_impalads")
 
-    if pytest.config.option.use_local_catalog:
+    if cls.pytest_config().option.use_local_catalog:
       cmd.append("--impalad_args=--use_local_catalog=1")
       cmd.append("--catalogd_args=--catalog_topic_mode=minimal")
 

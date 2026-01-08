@@ -20,7 +20,6 @@ from __future__ import absolute_import, division, print_function
 import base64
 import datetime
 import os
-import pytest
 import sys
 import uuid
 import xml.etree.ElementTree as ET
@@ -92,7 +91,6 @@ class TestClientSaml(CustomClusterTestSuite):
   SP_CALLBACK_URL = "http://localhost:28000/SAML2/SSO/POST"
   IDP_URL = "https://localhost:8443/simplesaml/saml2/idp/SSOService.php"
   CLIENT_PORT = 12345
-  HOST_PORT = pytest.config.option.impalad_hs2_http_port
   ASSERTATION_ERROR_MESSAGE = \
       "SAML assertion could not be validated. Check server logs for more details."
 
@@ -111,6 +109,10 @@ class TestClientSaml(CustomClusterTestSuite):
   SSO_ARGS_WITH_GROUP_FILTER = (
       "{} --saml2_group_filter=group1,group2 "
       "--saml2_group_attribute_name=eduPersonAffiliation").format(SSO_ARGS)
+
+  @classmethod
+  def hs2_http_port(cls):
+    return cls.pytest_config().option.impalad_hs2_http_port
 
   @CustomClusterTestSuite.with_args(impalad_args=SSO_ARGS, cluster_size=1)
   def test_saml2_browser_profile_no_group_filter(self, vector):
@@ -166,7 +168,7 @@ class TestClientSaml(CustomClusterTestSuite):
         to IDP and contain the authnrequest. """
     opener = build_opener(NoRedirection)
     payload = encode_if_needed(" ")
-    req = Request("http://localhost:%s" % TestClientSaml.HOST_PORT, payload)
+    req = Request("http://localhost:%s" % self.hs2_http_port(), payload)
     req.add_header('X-Hive-Token-Response-Port', TestClientSaml.CLIENT_PORT)
     response = opener.open(req)
     relay_state, client_id, saml_req_xml = \
@@ -200,7 +202,7 @@ class TestClientSaml(CustomClusterTestSuite):
     """ Send POST request to hs2-http port again, this time with bearer tokan.
         The response should contain a security cookie if the validation succeeded """
     payload = encode_if_needed(" ")
-    req = Request("http://localhost:%s" % TestClientSaml.HOST_PORT, payload)
+    req = Request("http://localhost:%s" % self.hs2_http_port(), payload)
     req.add_header('X-Hive-Client-Identifier', client_id)
     req.add_header('Authorization', "Bearer " + bearer_token)
     opener = build_opener(NoRedirection)

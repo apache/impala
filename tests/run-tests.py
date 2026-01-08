@@ -33,7 +33,8 @@ import os
 import pytest
 import sys
 from _pytest.main import EXIT_NOTESTSCOLLECTED
-from _pytest.config import FILE_OR_DIR
+# change to "from _pytest.config.argparsing import Parser" in pytest >= 6.2.0
+from _pytest.config import Parser
 
 # We whitelist valid test directories. If a new test directory is added, update this.
 VALID_TEST_DIRS = ['failure', 'query_test', 'stress', 'unittests', 'aux_query_tests',
@@ -127,6 +128,13 @@ class TestExecutor(object):
       sys.exit(pytest_exit_code)
     self.tests_failed = 0 < pytest_exit_code < EXIT_NOTESTSCOLLECTED or self.tests_failed
 
+
+def get_explicit_tests(args):
+  pytest_arg_parser = Parser()
+  parsed_args = pytest_arg_parser.parse_known_args(args)
+  return parsed_args.file_or_dir
+
+
 def build_test_args(base_name, valid_dirs=VALID_TEST_DIRS):
   """
   Prepare the list of arguments that will be passed to pytest.main().
@@ -146,7 +154,7 @@ def build_test_args(base_name, valid_dirs=VALID_TEST_DIRS):
   - verifiers.test_verify_metrics.TestValidateMetrics.test_metrics_are_zero
   - verifiers.test_verify_metrics.TestValidateMetrics.test_num_unused_buffers
 
-  then we instead need to filter out args that specifiy other tests (otherwise,
+  then we instead need to filter out args that specify other tests (otherwise,
   they will be run again), but still retain the basic config args.
   """
 
@@ -177,20 +185,21 @@ def build_test_args(base_name, valid_dirs=VALID_TEST_DIRS):
     # to filter out any command line args that specify other test modules, classes,
     # and functions. The list of these can be found by calling
     #
-    #    pytest.config.getoption(FILE_OR_DIR)
+    #    _pytest.config.Parser().parse_known_args(commandline_args).file_or_dir
     #
+    # get_explicit_test() does this for us.
     # For example, with the following command line invocation:
     #
     # $ ./run-tests.py query_test/test_limit.py::TestLimit::test_limit \
     #   query_test/test_queries.py::TestHdfsQueries --verbose -n 4 \
     #   --table_formats=parquet/none --exploration_strategy core
     #
-    # then pytest.config.getoption(FILE_OR_DIR) will return a list of two elements:
+    # then get_explicit_test(commandline_args) will return a list of two elements:
     #
     # ['query_test/test_limit.py::TestLimit::test_limit',
     #  'query_test/test_queries.py::TestHdfsQueries']
     #
-    explicit_tests = pytest.config.getoption(FILE_OR_DIR)
+    explicit_tests = get_explicit_tests(commandline_args)
     config_options = [arg for arg in commandline_args if arg not in explicit_tests]
     # We also want to strip out any --shard_tests option and its corresponding value.
     while "--shard_tests" in config_options:

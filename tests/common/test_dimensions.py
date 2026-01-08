@@ -23,8 +23,8 @@ from itertools import product
 import os
 
 from builtins import range
-import pytest
 
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.test_vector import (
     assert_exec_option_key,
     BEESWAX,
@@ -166,7 +166,8 @@ def create_kudu_dimension(workload):
 
 
 def default_client_protocol_dimension():
-  return ImpalaTestDimension(PROTOCOL, pytest.config.option.default_test_protocol)
+  pytest_config = ImpalaTestClusterProperties.get_instance().pytest_config()
+  return ImpalaTestDimension(PROTOCOL, pytest_config.option.default_test_protocol)
 
 
 def hs2_client_protocol_dimension():
@@ -174,8 +175,9 @@ def hs2_client_protocol_dimension():
 
 
 def create_client_protocol_dimension():
+  pytest_config = ImpalaTestClusterProperties.get_instance().pytest_config()
   protocols_to_test = [HS2]
-  if pytest.config.option.default_test_protocol == BEESWAX:
+  if pytest_config.option.default_test_protocol == BEESWAX:
     protocols_to_test.append(BEESWAX)
   # IMPALA-8864: Older python versions do not support SSLContext object that the thrift
   # http client implementation depends on. Otherwise, include HS2_HTTP.
@@ -205,7 +207,8 @@ def create_client_protocol_no_strict_dimension():
 def default_protocol_or_parquet_constraint(v):
   """Constraint function, used to limit non-default test protocol against uncompressed
   parquet format, because file format and the client protocol are orthogonal."""
-  return (v.get_protocol() == pytest.config.option.default_test_protocol
+  pytest_config = ImpalaTestClusterProperties.get_instance().pytest_config()
+  return (v.get_protocol() == pytest_config.option.default_test_protocol
           or (v.get_table_format().file_format == 'parquet'
               and v.get_table_format().compression_codec == 'none'))
 
@@ -213,7 +216,8 @@ def default_protocol_or_parquet_constraint(v):
 def default_protocol_or_text_constraint(v):
   """Constraint function, used to limit non-default test protocol against uncompressed
   text format, because file format and the client protocol are orthogonal."""
-  return (v.get_protocol() == pytest.config.option.default_test_protocol
+  pytest_config = ImpalaTestClusterProperties.get_instance().pytest_config()
+  return (v.get_protocol() == pytest_config.option.default_test_protocol
           or (v.get_table_format().file_format == 'text'
               and v.get_table_format().compression_codec == 'none'))
 

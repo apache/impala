@@ -67,9 +67,16 @@ PYTEST_TIMEOUT_S = \
 
 
 def pytest_configure(config):
-  """ Hook startup of pytest. Sets up log format and per-test timeout. """
+  """ Hook startup of pytest. Sets up log format,per-test timeout,
+  and ImpalaTestClusterProperties singleton."""
   configure_logging()
   config.option.timeout = PYTEST_TIMEOUT_S
+
+  # Initialize the ImpalaTestClusterProperties singleton.
+  # Don't import at top level to avoid circular dependency between conftest and
+  # tests.common.environ, which uses command-line flags set up by conftest.
+  from tests.common.environ import ImpalaTestClusterProperties
+  ImpalaTestClusterProperties.get_instance(config)
 
 
 def configure_logging():
@@ -454,11 +461,11 @@ def unique_name(request, testid_checksum):
 
 
 @pytest.yield_fixture
-def kudu_client():
+def kudu_client(request):
   """Provides a new Kudu client as a pytest fixture. The client only exists for the
      duration of the method it is used in.
   """
-  kudu_master = pytest.config.option.kudu_master_hosts
+  kudu_master = request.config.option.kudu_master_hosts
 
   if "," in kudu_master:
     raise Exception("Multi-master not supported yet")
@@ -498,10 +505,10 @@ def conn(request):
   timeout = __call_cls_method_if_exists(request.cls, "get_conn_timeout") or \
       DEFAULT_CONN_TIMEOUT
   if use_unique_conn:
-    with __unique_conn(db_name=db_name, timeout=timeout) as conn:
+    with __unique_conn(request.config, db_name=db_name, timeout=timeout) as conn:
       yield conn
   else:
-    with __auto_closed_conn(db_name=db_name, timeout=timeout) as conn:
+    with __auto_closed_conn(request.config, db_name=db_name, timeout=timeout) as conn:
       yield conn
 
 
@@ -515,7 +522,7 @@ def __call_cls_method_if_exists(cls, method_name):
 
 
 @contextlib.contextmanager
-def __unique_conn(db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
+def __unique_conn(pytest_config, db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
   """Connects to Impala and creates a new database, then returns a connection to it.
      This is intended to be used in a "with" block. Upon exit, the database will be
      dropped. A database name can be provided by 'db_name', a database by that name
@@ -533,10 +540,10 @@ def __unique_conn(db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
   """
   if not db_name:
     db_name = choice(ascii_lowercase) + "".join(sample(ascii_lowercase + digits, 5))
-  with __auto_closed_conn(timeout=timeout) as conn:
+  with __auto_closed_conn(pytest_config, timeout=timeout) as conn:
     with __auto_closed_cursor(conn) as cur:
       cur.execute("CREATE DATABASE %s" % db_name)
-  with __auto_closed_conn(db_name=db_name, timeout=timeout) as conn:
+  with __auto_closed_conn(pytest_config, db_name=db_name, timeout=timeout) as conn:
     try:
       yield conn
     finally:
@@ -552,7 +559,7 @@ def __unique_conn(db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
 
 
 @contextlib.contextmanager
-def __auto_closed_conn(db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
+def __auto_closed_conn(pytest_config, db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
   """Returns a connection to Impala. This is intended to be used in a "with" block.
      The connection will be closed upon exiting the block.
 
@@ -562,9 +569,9 @@ def __auto_closed_conn(db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
      See the 'unique_database' fixture above to use Impala's custom python
      API instead of DB-API.
   """
-  default_impalad = pytest.config.option.impalad.split(',')[0]
+  default_impalad = pytest_config.option.impalad.split(',')[0]
   impalad_host = default_impalad.split(':')[0]
-  hs2_port = pytest.config.option.impalad_hs2_port
+  hs2_port = pytest_config.option.impalad_hs2_port
 
   conn = impala_connect(host=impalad_host, port=hs2_port, database=db_name,
                         timeout=timeout)
@@ -611,7 +618,7 @@ def cls_cursor(conn):
 
 
 @pytest.yield_fixture
-def unique_cursor():
+def unique_cursor(request):
   """Provides a new DB-API compliant cursor to a newly created Impala database. The
      cursor only exists for the duration of the method it is used in. The database will
      be dropped after the test executes.
@@ -623,7 +630,7 @@ def unique_cursor():
      See the 'unique_database' fixture above to use Impala's custom python
      API instead of DB-API.
   """
-  with __unique_conn() as conn:
+  with __unique_conn(request.config) as conn:
     with __auto_closed_cursor(conn) as cur:
       yield cur
 
@@ -662,13 +669,13 @@ def impala_testinfra_cursor():
 
 
 @pytest.fixture(autouse=True, scope='session')
-def validate_pytest_config():
+def validate_pytest_config(request):
   """
   Validate that pytest command line options make sense.
   """
-  if pytest.config.option.testing_remote_cluster:
+  if request.config.option.testing_remote_cluster:
     local_prefixes = ('localhost', '127.', '0.0.0.0')
-    if any(pytest.config.option.impalad.startswith(loc) for loc in local_prefixes):
+    if any(request.config.option.impalad.startswith(loc) for loc in local_prefixes):
       logging.error("--testing_remote_cluster can not be used with a local impalad")
       pytest.exit("Invalid pytest config option: --testing_remote_cluster")
 

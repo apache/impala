@@ -18,7 +18,6 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 import os
-import pytest
 import requests
 import string
 from contextlib import contextmanager
@@ -39,6 +38,7 @@ from kudu.client import Partitioning
 from random import choice, sample
 from string import ascii_lowercase, digits
 
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import HS2, create_kudu_dimension
 
@@ -46,7 +46,8 @@ DEFAULT_KUDU_MASTER_WEBUI_PORT = os.getenv('KUDU_MASTER_WEBUI_PORT', '8051')
 
 
 def get_kudu_master_webpage(page_name):
-  kudu_master = pytest.config.option.kudu_master_hosts
+  pytest_config = ImpalaTestClusterProperties.get_instance().pytest_config()
+  kudu_master = pytest_config.option.kudu_master_hosts
 
   if "," in kudu_master:
     raise NotImplementedError("Multi-master not supported yet")

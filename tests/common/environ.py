@@ -20,7 +20,6 @@ import distro
 import json
 import logging
 import os
-import pytest
 import re
 import requests
 
@@ -128,6 +127,7 @@ IS_TUPLE_CACHE_CORRECT_CHECK = (
     os.getenv("TUPLE_CACHE_DEBUG_DUMP_DIR", "") != ""
 )
 
+
 class ImpalaBuildFlavors:
   """
   Represents the possible CMAKE_BUILD_TYPE values. These build flavors are needed
@@ -200,7 +200,7 @@ class ImpalaTestClusterFlagsDetector:
         build_type = build_flags[0].strip().lower()
         build_shared_libs = build_flags[1].strip().lower()
     except IOError:
-      LOG.debug("Unable to read .cmake_build_type file, fetching build flags from " +
+      LOG.debug("Unable to read .cmake_build_type file, fetching build flags from "
               "web ui on localhost")
       build_type, build_shared_libs = ImpalaTestClusterFlagsDetector.detect_using_web_ui(
           DEFAULT_LOCAL_WEB_UI_URL)
@@ -261,24 +261,18 @@ class ImpalaTestClusterProperties(object):
   and its likely effects on its responsiveness to automated test timings.
   TODO: Support remote urls for catalogd web UI."""
 
-  def __init__(self, build_flavor, library_link_type, web_ui_url,
+  def __init__(self, build_flavor, library_link_type, web_ui_url, pytest_config,
       catalogd_web_ui_url=DEFAULT_LOCAL_CATALOGD_WEB_UI_URL):
     self._build_flavor = build_flavor
     self._library_link_type = library_link_type
+    self._pytest_config = pytest_config
     self._web_ui_url = web_ui_url
     self._catalogd_web_ui_url = catalogd_web_ui_url
     self._runtime_flags = None  # Lazily populated to avoid unnecessary web UI calls.
     self._catalogd_runtime_flags = None  # Lazily populated
 
   @classmethod
-  def get_instance(cls):
-    """Implements lazy initialization of a singleton instance of this class. We cannot
-    initialize the instances when this module is imported because some dependencies may
-    not be available yet, e.g. the pytest.config object. Thus we instead initialize it
-    the first time that a test needs it."""
-    if cls._instance is not None:
-      return cls._instance
-
+  def create_new_instance(cls, pytest_config=None):
     web_ui_url = IMPALA_REMOTE_URL or DEFAULT_LOCAL_WEB_UI_URL
     if IMPALA_REMOTE_URL:
       # If IMPALA_REMOTE_URL is set, prefer detecting from the web UI.
@@ -287,7 +281,21 @@ class ImpalaTestClusterProperties(object):
     else:
       build_flavor, link_type =\
           ImpalaTestClusterFlagsDetector.detect_using_build_root_or_web_ui(IMPALA_HOME)
-    cls._instance = ImpalaTestClusterProperties(build_flavor, link_type, web_ui_url)
+    return ImpalaTestClusterProperties(
+      build_flavor, link_type, web_ui_url, pytest_config=pytest_config)
+
+  @classmethod
+  def get_instance(cls, pytest_config=None):
+    """Implements lazy initialization of a singleton instance of this class. We cannot
+    initialize the instances when this module is imported because some dependencies may
+    not be available yet, e.g. the pytest config object. Thus we instead initialize it
+    the first time that a test needs it."""
+    if cls._instance is not None:
+      return cls._instance
+
+    assert pytest_config is not None, (
+      "Initial pytest_config must be provided for singleton")
+    cls._instance = cls.create_new_instance(pytest_config)
     return cls._instance
 
   @property
@@ -303,6 +311,10 @@ class ImpalaTestClusterProperties(object):
     Return the library link type (either static or dynamic) for the Impala under test.
     """
     return self._library_link_type
+
+  def pytest_config(self):
+    """Return pytest config object."""
+    return self._pytest_config
 
   def has_code_coverage(self):
     """
@@ -364,10 +376,10 @@ class ImpalaTestClusterProperties(object):
     This should only be called from python tests once pytest has been initialised
     and pytest command line arguments are available.
     """
-    assert hasattr(pytest, 'config'), "Must only be called from Python tests"
+    assert self._pytest_config is not None, "Must only be called from Python tests"
     # A remote cluster build can be indicated in multiple ways.
-    return (IMPALA_REMOTE_URL or os.getenv("REMOTE_LOAD") or
-            pytest.config.option.testing_remote_cluster)
+    return (IMPALA_REMOTE_URL or os.getenv("REMOTE_LOAD")
+            or self._pytest_config.option.testing_remote_cluster)
 
   @property
   def runtime_flags(self):
@@ -439,6 +451,7 @@ class ImpalaTestClusterProperties(object):
         return False
       raise
 
+
 def build_flavor_timeout(default_timeout, slow_build_timeout=None,
         asan_build_timeout=None, code_coverage_build_timeout=None):
   """
@@ -463,7 +476,8 @@ def build_flavor_timeout(default_timeout, slow_build_timeout=None,
   code_coverage_build_timeout - timeout to use if Impala with code coverage is running
   (both debug and release code coverage)
   """
-  cluster_properties = ImpalaTestClusterProperties.get_instance()
+  # Create new instance to avoid issues with pytest config not being available yet.
+  cluster_properties = ImpalaTestClusterProperties.create_new_instance()
   if cluster_properties.is_asan() and asan_build_timeout is not None:
     timeout_val = asan_build_timeout
   elif cluster_properties.has_code_coverage() and\

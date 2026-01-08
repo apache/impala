@@ -37,11 +37,11 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
   @classmethod
   def setup_class(cls):
     super(TestInsertBehaviourCustomCluster, cls).setup_class()
-    if pytest.config.option.namenode_http_address is None:
-      hdfs_conf = HdfsConfig(pytest.config.option.minicluster_xml_conf)
+    if cls.pytest_config().option.namenode_http_address is None:
+      hdfs_conf = HdfsConfig(cls.pytest_config().option.minicluster_xml_conf)
       cls.hdfs_client = get_webhdfs_client_from_conf(hdfs_conf)
     else:
-      host, port = pytest.config.option.namenode_http_address.split(":")
+      host, port = cls.pytest_config().option.namenode_http_address.split(":")
       cls.hdfs_client = get_webhdfs_client(host, port)
 
   def _check_partition_perms(self, part, perms):

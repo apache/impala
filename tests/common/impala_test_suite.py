@@ -47,7 +47,8 @@ from tests.common.environ import (
     HIVE_MAJOR_VERSION,
     MANAGED_WAREHOUSE_DIR,
     EXTERNAL_WAREHOUSE_DIR,
-    ICEBERG_DEFAULT_FORMAT_VERSION)
+    ICEBERG_DEFAULT_FORMAT_VERSION,
+    ImpalaTestClusterProperties)
 from tests.common.errors import Timeout
 from tests.common.impala_connection import create_connection
 from tests.common.impala_service import ImpaladService
@@ -123,7 +124,8 @@ if IS_ADLS:
   except ImportError:
     LOG.error("Need the ADLSClient for testing with ADLS")
 
-IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
+PYTEST_CONFIG = ImpalaTestClusterProperties.get_instance().pytest_config()
+IMPALAD_HOST_PORT_LIST = PYTEST_CONFIG.option.impalad.split(',')
 assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
 IMPALAD = IMPALAD_HOST_PORT_LIST[0]
 IMPALAD_HOSTNAME = IMPALAD.split(':')[0]
@@ -132,7 +134,7 @@ IMPALAD_BEESWAX_PORT_LIST = [int(s.split(':')[1]) for s in IMPALAD_HOST_PORT_LIS
 IMPALAD_BEESWAX_PORT = IMPALAD_BEESWAX_PORT_LIST[0]
 IMPALAD_BEESWAX_HOST_PORT = IMPALAD_HOST_PORT_LIST[0]
 
-IMPALAD_HS2_PORT = int(pytest.config.option.impalad_hs2_port)
+IMPALAD_HS2_PORT = int(PYTEST_CONFIG.option.impalad_hs2_port)
 IMPALAD_HS2_HOST_PORT = IMPALAD_HOSTNAME + ":" + str(IMPALAD_HS2_PORT)
 # Calculate the hs2 ports based on the first hs2 port and the deltas of the beeswax ports
 IMPALAD_HS2_HOST_PORT_LIST = [
@@ -141,7 +143,7 @@ IMPALAD_HS2_HOST_PORT_LIST = [
     for i in range(len(IMPALAD_HOST_PORT_LIST))
 ]
 
-IMPALAD_HS2_HTTP_PORT = int(pytest.config.option.impalad_hs2_http_port)
+IMPALAD_HS2_HTTP_PORT = int(PYTEST_CONFIG.option.impalad_hs2_http_port)
 IMPALAD_HS2_HTTP_HOST_PORT = IMPALAD_HOSTNAME + ":" + str(IMPALAD_HS2_HTTP_PORT)
 # Calculate the hs2-http ports based on the first hs2-http port and the deltas of the
 # beeswax ports
@@ -152,12 +154,12 @@ IMPALAD_HS2_HTTP_HOST_PORT_LIST = [
 ]
 
 STRICT_HS2_HOST_PORT =\
-    IMPALAD_HOSTNAME + ":" + pytest.config.option.strict_hs2_port
+    IMPALAD_HOSTNAME + ":" + PYTEST_CONFIG.option.strict_hs2_port
 STRICT_HS2_HTTP_HOST_PORT =\
-    IMPALAD_HOSTNAME + ":" + pytest.config.option.strict_hs2_http_port
-HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2
+    IMPALAD_HOSTNAME + ":" + PYTEST_CONFIG.option.strict_hs2_http_port
+HIVE_HS2_HOST_PORT = PYTEST_CONFIG.option.hive_server2
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
-HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
+HDFS_CONF = HdfsConfig(PYTEST_CONFIG.option.minicluster_xml_conf)
 TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
 IMPALA_HOME = os.getenv("IMPALA_HOME")
 INTERNAL_LISTEN_HOST = os.getenv("INTERNAL_LISTEN_HOST")
@@ -217,7 +219,7 @@ class ImpalaTestSuite(BaseTestSuite):
   @classmethod
   def default_test_protocol(cls):
     """This method is used to allow test subclasses to override
-    pytest.config.option.default_test_protocol as the default 'protocol' dimension.
+    cls.pytest_config().option.default_test_protocol as the default 'protocol' dimension.
     If subclass override this method, return value must either be 'beeswax', 'hs2',
     or 'hs2-http'.
     The protocol kind of self.client is always match with return value of this method.
@@ -232,27 +234,27 @@ class ImpalaTestSuite(BaseTestSuite):
     - create_impala_client_from_vector()
     Most method in ImpalaTestSuite that has optional 'protocol' argument will default
     to the return value of this method.
-    Default to return pytest.config.option.default_test_protocol."""
+    Default to return cls.pytest_config().option.default_test_protocol."""
     # default_test_protocol is usually 'beeswax', unless user specify otherwise.
     # Individual tests that have been converted to work with the HS2 client can add HS2
     # in addition to or instead of beeswax.
-    return pytest.config.option.default_test_protocol
+    return cls.pytest_config().option.default_test_protocol
 
   @staticmethod
   def create_hive_client(port=None):
     """
     Creates a HMS client to a external running metastore service.
     """
-    metastore_host, metastore_port = pytest.config.option.metastore_server.split(':')
+    metastore_host, metastore_port = PYTEST_CONFIG.option.metastore_server.split(':')
     if port is not None:
       metastore_port = port
     trans_type = 'buffered'
-    if pytest.config.option.use_kerberos:
+    if PYTEST_CONFIG.option.use_kerberos:
       trans_type = 'kerberos'
     hive_transport = create_transport(
       host=metastore_host,
       port=metastore_port,
-      service=pytest.config.option.hive_service_name,
+      service=PYTEST_CONFIG.option.hive_service_name,
       transport_type=trans_type)
     protocol = TBinaryProtocol.TBinaryProtocol(hive_transport)
     hive_client = ThriftHiveMetastore.Client(protocol)
@@ -387,8 +389,9 @@ class ImpalaTestSuite(BaseTestSuite):
       host = cls.impalad_test_service.external_interface
       host_port = to_host_port(host, cls._get_default_port(protocol))
     use_ssl = cls.impalad_test_service.use_ssl_for_clients()
+    use_kerberos = cls.pytest_config().option.use_kerberos
     client = create_connection(
-        host_port=host_port, use_kerberos=pytest.config.option.use_kerberos,
+        host_port=host_port, use_kerberos=use_kerberos,
         protocol=protocol, is_hive=is_hive, user=user, use_ssl=use_ssl)
     client.connect()
     return client
@@ -511,10 +514,10 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @classmethod
   def create_hdfs_client(cls):
-    if pytest.config.option.namenode_http_address is None:
+    if cls.pytest_config().option.namenode_http_address is None:
       webhdfs_client = get_webhdfs_client_from_conf(HDFS_CONF)
     else:
-      host, port = pytest.config.option.namenode_http_address.split(":")
+      host, port = cls.pytest_config().option.namenode_http_address.split(":")
       webhdfs_client = get_webhdfs_client(host, port)
     return DelegatingHdfsClient(webhdfs_client, HadoopFsCommandLineClient())
 
@@ -750,7 +753,8 @@ class ImpalaTestSuite(BaseTestSuite):
               '$DATABASE', use_db)
     result_section, type_section = 'RESULTS', 'TYPES'
     verify_raw_results(test_section, result, vector,
-                       result_section, type_section, pytest.config.option.update_results,
+                       result_section, type_section,
+                       self.pytest_config().option.update_results,
                        replace_filenames_with_placeholder)
 
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
@@ -790,7 +794,7 @@ class ImpalaTestSuite(BaseTestSuite):
     for impalad_client in target_impalad_clients:
       ImpalaTestSuite.__change_client_database(
         impalad_client, table_format=table_format_info, db_name=use_db,
-        scale_factor=pytest.config.option.scale_factor)
+        scale_factor=self.pytest_config().option.scale_factor)
       impalad_client.set_configuration(exec_options)
 
     def __exec_in_impala(query, user=None):
@@ -927,7 +931,7 @@ class ImpalaTestSuite(BaseTestSuite):
         # If --update_results, then replace references to the namenode URI with $NAMENODE.
         # TODO(todd) consider running do_replacements in reverse, though that may cause
         # some false replacements for things like username.
-        if pytest.config.option.update_results and 'RESULTS' in test_section:
+        if self.pytest_config().option.update_results and 'RESULTS' in test_section:
           test_section['RESULTS'] = test_section['RESULTS'] \
               .replace(NAMENODE, '$NAMENODE') \
               .replace(IMPALA_HOME, '$IMPALA_HOME') \
@@ -946,10 +950,10 @@ class ImpalaTestSuite(BaseTestSuite):
             # only do test_file_vars replacement if it exist.
             test_section[rt_profile_info] = self.__do_replacements(
                 test_section[rt_profile_info], extra=test_file_vars)
-          rt_profile = verify_runtime_profile(test_section[rt_profile_info],
-              result.runtime_profile,
-              update_section=pytest.config.option.update_results)
-          if pytest.config.option.update_results:
+          rt_profile = verify_runtime_profile(
+            test_section[rt_profile_info], result.runtime_profile,
+            update_section=self.pytest_config().option.update_results)
+          if self.pytest_config().option.update_results:
             test_section[rt_profile_info] = "".join(rt_profile)
 
         if 'LINEAGE' in test_section:
@@ -960,7 +964,7 @@ class ImpalaTestSuite(BaseTestSuite):
           assert current_query_lineage != "", (
               "No lineage found for query {} in dir {}".format(
                 result.query_id, lineage_log_dir))
-          if pytest.config.option.update_results:
+          if self.pytest_config().option.update_results:
             test_section['LINEAGE'] = json.dumps(current_query_lineage, indent=2,
                 separators=(',', ': '))
           else:
@@ -974,22 +978,22 @@ class ImpalaTestSuite(BaseTestSuite):
           dml_results_query = "select * from %s limit 1000" % \
               test_section['DML_RESULTS_TABLE']
           dml_result = exec_fn(dml_results_query)
-          verify_raw_results(test_section, dml_result, vector,
-                             result_section='DML_RESULTS',
-                             update_section=pytest.config.option.update_results)
+          verify_raw_results(
+            test_section, dml_result, vector, result_section='DML_RESULTS',
+            update_section=self.pytest_config().option.update_results)
       except Exception as e:
         # When the calcite report mode is off, fail fast when hitting an error.
-        if not pytest.config.option.calcite_report_mode:
+        if not self.pytest_config().option.calcite_report_mode:
           raise
         current_error = str(e)
         failed_count += 1
       finally:
-        if pytest.config.option.calcite_report_mode:
+        if self.pytest_config().option.calcite_report_mode:
           result_list.append({"section": test_section, "error": current_error})
         total_count += 1
 
     # Write out the output information
-    if pytest.config.option.calcite_report_mode:
+    if self.pytest_config().option.calcite_report_mode:
       report = {}
       report["test_node_id"] = tests.common.nodeid
       report["test_file"] = os.path.join("testdata", "workloads", self.get_workload(),
@@ -998,7 +1002,7 @@ class ImpalaTestSuite(BaseTestSuite):
       # The node ids are unique, so there should not be hash collisions
       nodeid_hash = hashlib.sha256(tests.common.nodeid.encode()).hexdigest()
       output_file = "output_{0}.json".format(nodeid_hash)
-      output_directory = pytest.config.option.calcite_report_output_dir
+      output_directory = self.pytest_config().option.calcite_report_output_dir
       if output_directory is None:
         output_directory = os.path.join(IMPALA_LOGS_DIR, "calcite_report")
       if not os.path.exists(output_directory):
@@ -1011,7 +1015,7 @@ class ImpalaTestSuite(BaseTestSuite):
       if failed_count != 0:
         raise Exception("{0} out of {1} tests failed".format(failed_count, total_count))
 
-    if pytest.config.option.update_results:
+    if self.pytest_config().option.update_results:
       # Print updated test results to path like
       # $EE_TEST_LOGS_DIR/impala_updated_results/tpcds/queries/tpcds-decimal_v2-q98.test
       output_file = os.path.join(
@@ -1344,8 +1348,8 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def run_impala_stmt_in_beeline(self, stmt, username=None, default_db='default'):
     """ Run a statement in impala by Beeline. """
-    url = 'jdbc:hive2://localhost:' + pytest.config.option.impalad_hs2_port + '/'\
-      + default_db + ";auth=noSasl"
+    url = ('jdbc:hive2://localhost:' + self.pytest_config().option.impalad_hs2_port
+           + '/' + default_db + ";auth=noSasl")
     return self.run_stmt_in_beeline(url, username, stmt)
 
   # TODO(todd) make this use Thrift to connect to HS2 instead of shelling
@@ -1354,7 +1358,7 @@ class ImpalaTestSuite(BaseTestSuite):
   def run_stmt_in_hive(cls, stmt, username=None):
     """Run a statement in Hive by Beeline."""
     LOG.info("-- executing in HiveServer2\n\n" + stmt + "\n")
-    url = 'jdbc:hive2://' + pytest.config.option.hive_server2
+    url = 'jdbc:hive2://' + cls.pytest_config().option.hive_server2
     return cls.run_stmt_in_beeline(url, username, stmt)
 
   @classmethod
@@ -1407,9 +1411,9 @@ class ImpalaTestSuite(BaseTestSuite):
   def create_table_info_dimension(cls, exploration_strategy):
     # If the user has specified a specific set of table formats to run against, then
     # use those. Otherwise, load from the workload test vectors.
-    if pytest.config.option.table_formats:
+    if cls.pytest_config().option.table_formats:
       table_formats = list()
-      for tf in pytest.config.option.table_formats.split(','):
+      for tf in cls.pytest_config().option.table_formats.split(','):
         dataset = get_dataset_from_workload(cls.get_workload())
         table_formats.append(TableFormatInfo.create_from_string(dataset, tf))
       tf_dimensions = ImpalaTestDimension(TABLE_FORMAT, *table_formats)
@@ -1417,7 +1421,7 @@ class ImpalaTestSuite(BaseTestSuite):
       tf_dimensions = load_table_info_dimension(cls.get_workload(), exploration_strategy)
     # If 'skip_hbase' is specified or the filesystem is isilon, s3, GCS(gs), COS(cosn) or
     # local, we don't need the hbase dimension.
-    if pytest.config.option.skip_hbase or TARGET_FILESYSTEM.lower() \
+    if cls.pytest_config().option.skip_hbase or TARGET_FILESYSTEM.lower() \
         in ['s3', 'isilon', 'local', 'abfs', 'adls', 'gs', 'cosn', 'ozone', 'obs']:
       for tf_dimension in tf_dimensions:
         if tf_dimension.value.file_format == "hbase":
@@ -1447,9 +1451,10 @@ class ImpalaTestSuite(BaseTestSuite):
   #       clear how it should be used (IMPALA-13929)
   @classmethod
   def exploration_strategy(cls):
-    default_strategy = pytest.config.option.exploration_strategy
-    if pytest.config.option.workload_exploration_strategy:
-      workload_strategies = pytest.config.option.workload_exploration_strategy.split(',')
+    default_strategy = cls.pytest_config().option.exploration_strategy
+    if cls.pytest_config().option.workload_exploration_strategy:
+      strategy = cls.pytest_config().option.workload_exploration_strategy
+      workload_strategies = strategy.split(',')
       for workload_strategy in workload_strategies:
         workload_strategy = workload_strategy.split(':')
         if len(workload_strategy) != 2:

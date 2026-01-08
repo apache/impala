@@ -19,6 +19,7 @@
 from __future__ import absolute_import, division, print_function
 import logging
 
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.test_vector import HS2, ImpalaTestMatrix
 
 LOG = logging.getLogger('base_test_suite')
@@ -42,3 +43,8 @@ class BaseTestSuite(object):
   def default_test_protocol(cls):
     """See documentation in ImpalaTestSuite.default_test_protocol()."""
     return HS2
+
+  @classmethod
+  def pytest_config(cls):
+    """Return a pytest config object."""
+    return ImpalaTestClusterProperties.get_instance().pytest_config()

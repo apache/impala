@@ -126,8 +126,8 @@ class TestMixedPartitions(ImpalaTestSuite):
   @pytest.mark.parametrize('main_table_format', ['parquetfile', 'textfile'])
   def test_incompatible_avro_partition_in_non_avro_table(
       self, vector, unique_database, main_table_format):
-    if main_table_format == 'parquetfile' and \
-        not pytest.config.option.use_local_catalog:
+    if (main_table_format == 'parquetfile'
+        and not self.pytest_config().option.use_local_catalog):
       pytest.xfail("IMPALA-7309: adding an avro partition to a parquet table "
                    "changes its schema")
     self.run_test_case("QueryTest/incompatible_avro_partition", vector,

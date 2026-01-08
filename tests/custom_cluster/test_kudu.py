@@ -23,15 +23,18 @@ from copy import deepcopy
 from kudu.schema import INT32
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_connection import FINISHED, IMPALA_CONNECTION_EXCEPTION
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.skip import SkipIfKudu, SkipIfBuildType, SkipIf
 from tests.common.test_dimensions import HS2, add_mandatory_exec_option
 from tests.common.test_result_verifier import error_msg_startswith
 
-KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
 LOG = logging.getLogger(__name__)
 
+IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
+KUDU_MASTER_HOSTS = \
+  IMPALA_TEST_CLUSTER_PROPERTIES.pytest_config().option.kudu_master_hosts
 
 class CustomKuduTest(CustomClusterTestSuite, KuduTestSuite):
 

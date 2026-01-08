@@ -59,8 +59,9 @@ from tests.common.test_dimensions import (
   create_single_exec_option_dimension)
 from tests.verifiers.metric_verifier import MetricVerifier
 
-KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
 IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
+KUDU_MASTER_HOSTS = \
+  IMPALA_TEST_CLUSTER_PROPERTIES.pytest_config().option.kudu_master_hosts
 
 LOG = logging.getLogger(__name__)
 

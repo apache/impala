@@ -113,7 +113,8 @@ class SkipIfKudu:
 
 
 class SkipIf:
-  skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,
+  skip_hbase = pytest.mark.skipif(
+      IMPALA_TEST_CLUSTER_PROPERTIES.pytest_config().option.skip_hbase,
       reason="--skip_hbase argument specified")
   not_s3 = pytest.mark.skipif(not IS_S3, reason="S3 Filesystem needed")
   not_hdfs = pytest.mark.skipif(not IS_HDFS, reason="HDFS admin needed")
@@ -164,7 +165,8 @@ class SkipIfNotHdfsMinicluster:
       or IS_EC or IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
       reason="Test is tuned for 3-node HDFS minicluster with no EC")
   scheduling = pytest.mark.skipif(
-      not (IS_HDFS or IS_OZONE) or IS_EC or pytest.config.option.testing_remote_cluster,
+      not (IS_HDFS or IS_OZONE) or IS_EC
+      or IMPALA_TEST_CLUSTER_PROPERTIES.pytest_config().option.testing_remote_cluster,
       reason="Test is tuned for scheduling decisions made on a 3-node HDFS minicluster "
              "with no EC")
 

@@ -274,9 +274,10 @@ class TestEventProcessingPerf(CustomClusterTestSuite):
     test_self = self
 
     class ThreadLocalClient(threading.local):
-      def __init__(self, is_hive):
+      def __init__(self, is_hive, hive_server2_host_port):
         # called for main thread and each thread in the pool
         self.is_hive = is_hive
+        self.hive_server2_host_port = hive_server2_host_port
         self.name = threading.currentThread().name
         LOG.info("Initializing for thread %s", self.name)
 
@@ -308,7 +309,7 @@ class TestEventProcessingPerf(CustomClusterTestSuite):
           is_hive = False
 
         if is_hive:
-          with test_self.create_impala_client(host_port=pytest.config.option.hive_server2,
+          with test_self.create_impala_client(host_port=self.hive_server2_host_port,
                                               protocol=HS2,
                                               is_hive=is_hive) as hive_client:
             for query in query.split(';'):
@@ -324,7 +325,7 @@ class TestEventProcessingPerf(CustomClusterTestSuite):
               LOG.debug(e)
 
     pool = multiprocessing.pool.ThreadPool(processes=8)
-    with ThreadLocalClient(is_hive) as tls:
+    with ThreadLocalClient(is_hive, self.pytest_config().option.hive_server2) as tls:
       dbs = []
       for iter in range(self.db_count):
         dbs.append(self.db_prefix + str(iter))
