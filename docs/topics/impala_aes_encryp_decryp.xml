@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_aes_encryp_decryp" rev="2.2.0">
+  <title>AES encryption and decryption support</title>
+  <titlealts audience="PDF"><navtitle>AES encryption and decryption support</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Governance"/>
+      <data name="Category" value="Navigator"/>
+      <data name="Category" value="Administrators"/>
+      <data name="Category" value="Security"/>
+      <data name="Category" value="Encryption"/>
+      <data name="Category" value="Decryption"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p id="IMPALA-13039">Advanced Encryption Standard (AES) is a widely-used and secure way to
+      protect sensitive data. It works by using a secret key to scramble your data in plaintext into
+      a form that is unreadable as ciphertext. The Impala AES implementation supports two key sizes,
+      128-bit and 256-bit, to meet different security requirements.</p>
+    <section id="section_ajg_z15_whc">
+      <title>Key functions and supported modes</title>
+      <p>Impala provides <codeph>aes_encrypt()</codeph> and <codeph>aes_decrypt()</codeph> functions
+        as entry points for encryption and decryption operations, handling the processes based on
+        user-provided keys, AES modes, and initialization vectors (IVs).</p>
+      <p>These functions use a key, an encryption mode, and a special initialization vector (IV) to
+        keep your data secure. Impala supports the following modes to provide you flexibility:</p>
+      <ul id="ul_d5r_ywb_rgc">
+        <li>Encryption Modes: <ul id="ul_j43_2wb_rgc">
+            <li>AES-GCM</li>
+            <li>AES-CTR</li>
+            <li>AES-CFB</li>
+          </ul>
+        </li>
+        <li>Decryption Modes: <ul id="ul_o4w_cxb_rgc">
+            <li>AES-GCM</li>
+            <li>AES-ECB</li>
+            <li>AES-CTR</li>
+            <li>AES-CFB</li>
+          </ul>
+        </li>
+      </ul>
+      <p>The following table provides information about the available modes:</p>
+      <table frame="all" rowsep="1" colsep="1" id="table_v4w_cxb_rgc">
+        <tgroup cols="2">
+          <colspec colname="col1" colnum="1"/>
+          <colspec colname="col2" colnum="2"/>
+          <thead>
+            <row>
+              <entry>Mode</entry>
+              <entry>Description</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>AES-GCM (Galois/Counter Mode)</entry>
+              <entry>This mode combines the AES block cipher with the Galois/Counter Mode (GCM) for
+                authenticated encryption. It provides both confidentiality and integrity, making it
+                suitable for secure communication and storage. Due to its strong security properties
+                and efficiency, it is the default mode.</entry>
+            </row>
+            <row>
+              <entry>AES-ECB (Electronic Codebook)</entry>
+              <entry>This mode is a basic mode of operation in which each block of plaintext is
+                encrypted independently with the same key. This mode does not use an initialization
+                vector (IV). Because ECB is now considered insecure, it is only supported for
+                decryption and is included for compatibility with legacy systems.</entry>
+            </row>
+            <row>
+              <entry>AES-CTR (Counter Mode)</entry>
+              <entry>This mode turns a block cipher into a stream cipher by encrypting a counter
+                value to produce a key stream. This key stream is then XORed with the plaintext to
+                create the ciphertext, allowing for parallel encryption and decryption.</entry>
+            </row>
+            <row>
+              <entry>AES-CFB (Cipher Feedback Mode)</entry>
+              <entry>This mode uses ciphertext feedback to create a key stream. It operates on a
+                block-by-block basis, in which the previous ciphertext block is encrypted and then
+                XORed with the plaintext to produce the next ciphertext block.</entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+    </section>
+    <section id="section_bjg_z15_whc">
+      <title>Compatibility and error handling</title>
+      <p>For compatibility, AES-CTR and AES-CFB are provided as fallbacks for environments for which
+        AES-GCM might not be supported, for example, OpenSSL versions lower than 1.0.1.</p>
+      <p>If a user-provided mode is a valid member of the AES_CIPHER_MODE modes but is not supported
+        by the internal OpenSSL library, the library default mode is chosen.</p>
+      <p>If a user provides an unsupported or invalid mode, the system returns an error.</p>
+    </section>
+    <section id="section_y25_4jx_k5c">
+      <title>Basic encryption and decryption</title>
+      <p>This is the most common use case. You encrypt a string and then decrypt it to get the
+        original value.</p>
+      <codeblock id="codeblock_vyp_1d5_whc">aes_encrypt(string, key, mode, iv) aes_decrypt(binary, key, mode, iv)</codeblock>
+    </section>
+    <section id="section_qj5_fjx_k5c">
+      <title>Encrypting a string with AES_128_GCM</title>
+      <p>Use this query to encrypt a string. The <codeph>base64encode</codeph> function converts the
+        binary encrypted output into a text string that is easy to store and display.</p>
+      <codeblock id="codeblock_zjs_nkb_hnb"><userinput>SELECT base64encode(aes_encrypt('ABC', '1234567890123456','AES_128_GCM','1234567890123456'));</userinput></codeblock>
+      <p>This example uses the following elements:</p>
+      <ul id="ul_d5v_3cx_k5c">
+        <li><codeph>'ABC'</codeph>: The string to encrypt.</li>
+        <li><codeph>'1234567890123456'</codeph>: The 128-bit encryption key.</li>
+        <li><codeph>'AES_128_GCM'</codeph>: The encryption mode.</li>
+        <li><codeph>'1234567890123456'</codeph>: The initialization vector (IV).</li>
+      </ul>
+    </section>
+    <section id="section_ygl_qjx_k5c">
+      <title>Decrypting the encrypted a string</title>
+      <p>To reverse the process, use the <codeph>base64decode</codeph> function to convert the text
+        back to binary, and then use the <codeph>aes_decrypt</codeph> function with the same key,
+        mode, and IV to restore the original <codeph>ABC</codeph> string.</p>
+      <codeblock id="codeblock_t3n_2mb_hnb"><userinput>SELECT aes_decrypt(base64decode('x+am+BIqtrEK9FpC/zrvpOycjQ=='),'1234567890123456','AES_128_GCM','1234567890123456');</userinput></codeblock>
+    </section>
+    <section id="section_p3j_zjx_k5c">
+      <title>Using different modes</title>
+      <p>The following examples showcase different AES modes, each with their own
+        characteristics:</p>
+      <ul id="ul_wyp_1d5_whc">
+        <li>The <codeph>AES_128_ECB</codeph> mode is the basic mode of operation.<note type="note"
+            id="note_xyp_1d5_whc">This example shows that the AES_128_ECB mode is only supported for
+            decryption, as an error occurs when the mode is used for encryption. Because ECB does
+            not use an IV, the IV parameter is passed as an empty string.</note><ul
+            id="ul_yyp_1d5_whc">
+            <li><ph outputclass="emphasis">Decrypt with ECB
+              mode</ph><codeblock id="codeblock_vhn_mmb_hnb"><userinput>select aes_decrypt(base64decode('y6Ss+zCYObpCbgfWfyNWTw=='),'1234567890123456','AES_128_ECB','');</userinput>
+-- RESULTS
+<systemoutput>'ABC'</systemoutput></codeblock></li>
+          </ul></li>
+        <li>The <codeph>AES_256_GCM</codeph> mode requires a longer 256-bit key.<note type="note"
+            id="note_zyp_1d5_whc">The <codeph>12345678901234567890123456789012</codeph> key string
+            is longer, matching the 256-bit requirement.</note><ul id="ul_azp_1d5_whc">
+            <li><ph outputclass="emphasis">Encrypt with
+              AES_256_GCM</ph><codeblock id="codeblock_l42_hqb_rgc"><userinput>select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM','1234567890123456'));</userinput></codeblock></li>
+            <li><ph outputclass="emphasis">Decrypt with
+              AES_256_GCM</ph><codeblock id="codeblock_d4n_hqb_rgc"><userinput>select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012','AES_256_GCM','1234567890123456');</userinput></codeblock></li>
+          </ul></li>
+      </ul>
+    </section>
+    <section id="section_w3j_kfx_k5c">
+      <title>Common error scenarios</title>
+      <p>The following examples highlight important constraints and errors:</p>
+      <p>
+        <ph outputclass="emphasis">NULL Values</ph> – This example shows that the key is
+          <codeph>NULL</codeph>, which will result in an error:
+        <codeblock id="codeblock_z4n_hqb_rgc">-- This will fail because the key is NULL
+ select base64encode(aes_encrypt('ABC',NULL,'AES_256_GCM','1234567890123456'));</codeblock>
+      </p>
+      <p>
+        <ph outputclass="emphasis">Invalid Mode</ph> – This example shows using an incorrect mode
+        string that will result in an error:
+        <codeblock id="codeblock_j4n_hqb_rgc">-- This will fail due to an invalid mode name
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_CTB','1234567890123456'));</codeblock>
+      </p>
+      <p>
+        <ph outputclass="emphasis">Incorrect Key or IV Length</ph> – This example shows that the key
+        must be either 128 or 256 bits long and the IV must also adhere to specific length
+        requirements, otherwise an error will
+        occur:<codeblock id="codeblock_y4n_hqb_rgc">-- This will fail due to an incorrect key length
+select base64encode(aes_encrypt('ABC', '123456789012345678901234567890121','AES_256_GCM','1234567890123456'));</codeblock>
+      </p>
+      <p>
+        <ph outputclass="emphasis">Case Insensitivity</ph> – This example shows that the mode string
+        is not case-sensitive.
+        <codeblock id="codeblock_r4n_hqb_rgc">-- This works, even with lowercase mode
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012','aes_256_gcm','1234567890123456'));</codeblock>
+      </p>
+    </section>
+  </conbody>
+</concept>

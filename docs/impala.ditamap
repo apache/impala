@@ -84,6 +84,7 @@ under the License.
     <topicref href="topics/impala_security_metastore.xml"/>
     <topicref href="topics/impala_security_webui.xml"/>
     <topicref href="topics/impala_ssl.xml"/>
+    <topicref href="topics/impala_aes_encryp_decryp.xml"/>
     <topicref href="topics/impala_authorization.xml"/>
     <topicref href="topics/impala_authentication.xml">
       <topicref href="topics/impala_kerberos.xml"/>
