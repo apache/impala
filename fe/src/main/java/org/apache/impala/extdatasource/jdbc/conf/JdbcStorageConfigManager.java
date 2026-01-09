@@ -101,22 +101,24 @@ public class JdbcStorageConfigManager {
     try {
       String dbTypeName = props.get(JdbcStorageConfig.DATABASE_TYPE.getPropertyName());
       dbType = DatabaseType.valueOf(dbTypeName.toUpperCase());
-
-      if (dbType != DatabaseType.HIVE) {
-        String table = props.get(JdbcStorageConfig.TABLE.getPropertyName());
-        String query = props.get(JdbcStorageConfig.QUERY.getPropertyName());
-        if (Strings.isNullOrEmpty(table) && Strings.isNullOrEmpty(query)) {
-          throw new IllegalArgumentException(
-              "For JDBC tables, either 'table' or 'query' property must be set.");
-        }
-        if (!Strings.isNullOrEmpty(table) && !Strings.isNullOrEmpty(query)) {
-          throw new IllegalArgumentException("Only one of 'hive.sql.table' or" +
-              " 'hive.sql.query' should be set.");
-        }
-      }
     } catch (Exception e) {
       throw new IllegalArgumentException("Unknown database type.", e);
     }
+
+    // For non-Hive databases, either 'table' or 'query' property must be set.
+    if (dbType != DatabaseType.HIVE) {
+      String table = props.get(JdbcStorageConfig.TABLE.getPropertyName());
+      String query = props.get(JdbcStorageConfig.QUERY.getPropertyName());
+      if (Strings.isNullOrEmpty(table) && Strings.isNullOrEmpty(query)) {
+        throw new IllegalArgumentException(
+                "For JDBC tables, either 'table' or 'query' property must be set.");
+      }
+      if (!Strings.isNullOrEmpty(table) && !Strings.isNullOrEmpty(query)) {
+        throw new IllegalArgumentException(
+                "Only one of 'table' or 'query' should be set.");
+      }
+    }
+
     // Check the required parameters
     for (JdbcStorageConfig config : JdbcStorageConfig.values()) {
       if (config.isRequired() && !props.containsKey(config.getPropertyName())) {
