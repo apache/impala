@@ -21,6 +21,7 @@ import pytest
 import time
 from subprocess import call
 from tests.common.environ import ImpalaTestClusterProperties
+from tests.common.skip import SkipIfFS
 from tests.util.filesystem_utils import IS_HDFS, IS_LOCAL
 
 
@@ -103,6 +104,7 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
     time.sleep(10)
     assert self.metadata_cache_string not in self._get_catalog_object()
 
+  @SkipIfFS.hive
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(catalogd_args=timeout_flag, impalad_args=timeout_flag)
   def test_loaded_tables_metric(self, unique_database):
