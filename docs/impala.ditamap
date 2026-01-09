@@ -324,6 +324,7 @@ under the License.
     <topicref href="topics/impala_data_cache.xml"/>
     <topicref href="topics/impala_perf_testing.xml"/>
     <topicref href="topics/impala_explain_plan.xml"/>
+    <topicref href="topics/impala_intermediate_results_cache.xml"/>
   </topicref>
   <topicref href="topics/impala_scalability.xml">
     <topicref href="topics/impala_scaling_limits.xml"/>

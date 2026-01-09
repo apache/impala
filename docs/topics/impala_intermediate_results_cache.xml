@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="intermediate_results_cache">
+
+  <title>Intermediate Results Cache</title>
+
+  <conbody>
+
+    <p>
+      In Impala, query execution always starts from scratch, computing
+      intermediate results in several stages to produce the final results.
+      These intermediate results are discarded at the end of query execution,
+      so the computation must be repeated for a new run of the query even
+      if none of the underlying data has changed. Caching intermediate results
+      can improve the latency for repetitive work while also freeing up
+      resources for other queries.
+    </p>
+
+    <p>
+      The intermediate results cache is enabled via the following configurations:
+      <ul>
+        <li>
+          <codeph>--allow_tuple_caching</codeph> is a startup flag that gates
+          the intermediate results caching feature. It must be set to true on coordinators
+          and executors to allow the use of the intermediate results cache, but it does
+          not enable the cache by itself.
+        </li>
+        <li>
+          The <codeph>--tuple_cache</codeph> startup flag specifies the storage
+          directory and quota for the intermediate results cache on coordinators and
+          executors. The flag is set to a directory name followed by a <codeph>:</codeph>
+          and a capacity for that directory. For example:
+          <codeblock>--tuple_cache=/data/cache:20GB</codeblock>
+          This setting uses the <codeph>/data/cache</codeph> directory and allows the
+          cache to consume up to 20GB in that directory. The directory must exist in the
+          local filesystem of each Impala Daemon, or Impala will fail to start.
+        </li>
+        <li>
+          The <codeph>enable_tuple_caching</codeph> query option determines whether a
+          query uses the intermediate results cache. To use the feature, this must be
+          set to true via the session or <codeph>default_query_options</codeph>.
+        </li>
+      </ul>
+      All three of these settings must be specified to use the intermediate results cache.
+      The default value for all three configurations is for the feature to be disabled.
+    </p>
+
+    <p>
+      The cache key incorporates information about all the settings that can impact the
+      query results, including information about the base tables and any query options.
+      When any of those settings change, it results in a new cache entry.
+      For example, if new data is ingested into a base table, the key will change. This
+      means that there is no need for an administrator to manually refresh or invalidate
+      the cache entries.
+    </p>
+
+    <p>
+      When the cache reaches the quota, cache entries are evicted to make space for new
+      entries. The cache eviction policy can be specified by the
+      <codeph>--tuple_cache_eviction_policy</codeph> startup flag. Currently, the cache
+      supports the following cache eviction policies:
+      <ul>
+        <li>LRU (Least Recently Used--the default)</li>
+        <li>LIRS (Least Inter-reference Recency Set)</li>
+      </ul>
+      LIRS is a scan-resistant, low performance-overhead policy.
+    </p>
+  </conbody>
+</concept>
