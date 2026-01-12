@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.avro.SchemaParseException;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
@@ -66,9 +67,9 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 /**
-* Represents an ALTER TABLE SET [PARTITION ('k1'='a', 'k2'='b'...)]
-* TBLPROPERTIES|SERDEPROPERTIES ('p1'='v1', ...) statement.
-*/
+ * Represents an ALTER TABLE SET [PARTITION ('k1'='a', 'k2'='b'...)]
+ * TBLPROPERTIES|SERDEPROPERTIES ('p1'='v1', ...) statement.
+ */
 public class AlterTableSetTblProperties extends AlterTableSetStmt {
   private final TTablePropertyType targetProperty_;
   private final Map<String, String> tblProperties_;
@@ -83,27 +84,29 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     CreateTableStmt.unescapeProperties(tblProperties_);
   }
 
-  public Map<String, String> getTblProperties() { return tblProperties_; }
+  public Map<String, String> getTblProperties() {
+    return tblProperties_;
+  }
 
   @Override
   public String getOperation() {
     return (targetProperty_ == TTablePropertyType.TBL_PROPERTY)
-        ? "SET TBLPROPERTIES" : "SET SERDEPROPERTIES";
+        ? "SET TBLPROPERTIES"
+        : "SET SERDEPROPERTIES";
   }
 
   @Override
   public TAlterTableParams toThrift() {
-   TAlterTableParams params = super.toThrift();
-   params.setAlter_type(TAlterTableType.SET_TBL_PROPERTIES);
-   TAlterTableSetTblPropertiesParams tblPropertyParams =
-       new TAlterTableSetTblPropertiesParams();
-   tblPropertyParams.setTarget(targetProperty_);
-   tblPropertyParams.setProperties(tblProperties_);
-   if (partitionSet_ != null) {
-     tblPropertyParams.setPartition_set(partitionSet_.toThrift());
-   }
-   params.setSet_tbl_properties_params(tblPropertyParams);
-   return params;
+    TAlterTableParams params = super.toThrift();
+    params.setAlter_type(TAlterTableType.SET_TBL_PROPERTIES);
+    TAlterTableSetTblPropertiesParams tblPropertyParams = new TAlterTableSetTblPropertiesParams();
+    tblPropertyParams.setTarget(targetProperty_);
+    tblPropertyParams.setProperties(tblProperties_);
+    if (partitionSet_ != null) {
+      tblPropertyParams.setPartition_set(partitionSet_.toThrift());
+    }
+    params.setSet_tbl_properties_params(tblPropertyParams);
+    return params;
   }
 
   @Override
@@ -131,7 +134,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     // If both properties are set then only check avro.schema.literal and ignore
     // avro.schema.url.
     if (tblProperties_.containsKey(
-            AvroSerdeUtils.AvroTableProperties.SCHEMA_LITERAL.getPropName()) ||
+        AvroSerdeUtils.AvroTableProperties.SCHEMA_LITERAL.getPropName()) ||
         tblProperties_.containsKey(
             AvroSerdeUtils.AvroTableProperties.SCHEMA_URL.getPropName())) {
       analyzeAvroSchema(analyzer);
@@ -145,6 +148,9 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
 
     // Analyze 'serialization.encoding' property
     analyzeSerializationEncoding(tblProperties_);
+
+    // Analyze numeric table stats properties (IMPALA-12918)
+    analyzeTableStatsProperties(tblProperties_);
   }
 
   private void analyzeKuduTable(Analyzer analyzer) throws AnalysisException {
@@ -162,8 +168,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     AuthorizationConfig authzConfig = analyzer.getAuthzConfig();
     if (authzConfig.isEnabled()) {
       // Checking for 'EXTERNAL' is case-insensitive, see IMPALA-5637.
-      String keyForExternalProperty =
-          MetaStoreUtil.findTblPropKeyCaseInsensitive(tblProperties_, "EXTERNAL");
+      String keyForExternalProperty = MetaStoreUtil.findTblPropKeyCaseInsensitive(tblProperties_, "EXTERNAL");
       if (keyForExternalProperty != null ||
           tblProperties_.containsKey(KuduTable.KEY_MASTER_HOSTS)) {
         String authzServer = authzConfig.getServerName();
@@ -174,7 +179,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
   }
 
   private void analyzeIcebergTable(Analyzer analyzer) throws AnalysisException {
-    //Cannot set these properties related to metadata
+    // Cannot set these properties related to metadata
     icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG);
     icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG_LOCATION);
     icebergPropertyCheck(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
@@ -252,8 +257,10 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
   }
 
   /**
-   * Check that Avro schema provided in avro.schema.url or avro.schema.literal is valid
-   * Json and contains only supported Impala types. If both properties are set, then
+   * Check that Avro schema provided in avro.schema.url or avro.schema.literal is
+   * valid
+   * Json and contains only supported Impala types. If both properties are set,
+   * then
    * avro.schema.url is ignored.
    */
   private void analyzeAvroSchema(Analyzer analyzer)
@@ -279,12 +286,14 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
   }
 
   /**
-   * Analyzes the 'serialization.encoding' property in 'tblProperties' to check if its
-   * line delimiter is compatible with ASCII, since multi-byte line delimiters are not
+   * Analyzes the 'serialization.encoding' property in 'tblProperties' to check if
+   * its
+   * line delimiter is compatible with ASCII, since multi-byte line delimiters are
+   * not
    * supported.
    */
   public void analyzeSerializationEncoding(Map<String, String> tblProperties)
-        throws AnalysisException {
+      throws AnalysisException {
     if (!tblProperties.containsKey(serdeConstants.SERIALIZATION_ENCODING)
         || !getOperation().equals("SET SERDEPROPERTIES")) {
       return;
@@ -293,26 +302,26 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     if (!(tbl instanceof FeFsTable)) {
       throw new AnalysisException(
           String.format("Property 'serialization.encoding' is only supported "
-                  + "on HDFS tables. Conflicting table: %s", tbl.getFullName()));
+              + "on HDFS tables. Conflicting table: %s", tbl.getFullName()));
     }
 
     if (partitionSet_ != null) {
-      for (FeFsPartition partition: partitionSet_.getPartitions()) {
+      for (FeFsPartition partition : partitionSet_.getPartitions()) {
         if (partition.getFileFormat() != HdfsFileFormat.TEXT) {
           throw new AnalysisException(String.format("Property 'serialization.encoding' "
-                  + "is only supported on TEXT file format.  "
-                  + "Conflicting partition/format: %s %s",
+              + "is only supported on TEXT file format.  "
+              + "Conflicting partition/format: %s %s",
               partition.getPartitionName(), partition.getFileFormat().name()));
         }
       }
     } else {
       StorageDescriptor sd = tbl.getMetaStoreTable().getSd();
       HdfsFileFormat format = HdfsFileFormat.fromHdfsInputFormatClass(
-              sd.getInputFormat(), sd.getSerdeInfo().getSerializationLib());
+          sd.getInputFormat(), sd.getSerdeInfo().getSerializationLib());
       if (format != HdfsFileFormat.TEXT) {
         throw new AnalysisException(String.format("Property 'serialization.encoding' "
-                + "is only supported on TEXT file format. Conflicting "
-                + "table/format: %s %s",
+            + "is only supported on TEXT file format. Conflicting "
+            + "table/format: %s %s",
             tbl.getFullName(), format.name()));
       }
     }
@@ -329,9 +338,9 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
             partition.getInputFormatDescriptor().getLineDelim(), charset)) {
           throw new AnalysisException(String.format(
               "Property 'serialization.encoding' only supports " +
-              "encodings in which line delimiter is compatible with ASCII. " +
-              "Conflicting partition: %s. " +
-              "Please refer to IMPALA-10319 for more info.",
+                  "encodings in which line delimiter is compatible with ASCII. " +
+                  "Conflicting partition: %s. " +
+                  "Please refer to IMPALA-10319 for more info.",
               partition.getPartitionName()));
         }
       }
@@ -347,23 +356,24 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
       if (!isLineDelimiterSameAsAscii(hdfsSD.getLineDelim(), charset)) {
         throw new AnalysisException(String.format(
             "Property 'serialization.encoding' only supports " +
-            "encodings in which line delimiter is compatible with ASCII. " +
-            "Conflicting table: %1$s. " +
-            "Please refer to IMPALA-10319 for more info.",
+                "encodings in which line delimiter is compatible with ASCII. " +
+                "Conflicting table: %1$s. " +
+                "Please refer to IMPALA-10319 for more info.",
             table_.getFullName()));
       }
     }
   }
 
   public static boolean isLineDelimiterSameAsAscii(byte lineDelim, Charset charset) {
-    String lineDelimStr = new String(new byte[]{lineDelim}, charset);
+    String lineDelimStr = new String(new byte[] { lineDelim }, charset);
     byte[] newlineBytesInEncoding = lineDelimStr.getBytes(charset);
     byte[] newlineBytesInAscii = lineDelimStr.getBytes(StandardCharsets.US_ASCII);
     return java.util.Arrays.equals(newlineBytesInEncoding, newlineBytesInAscii);
   }
 
   /**
-   * Analyze the 'skip.header.line.count' property to make sure it is set to a valid
+   * Analyze the 'skip.header.line.count' property to make sure it is set to a
+   * valid
    * value. It is looked up in 'tblProperties', which must not be null.
    */
   public static void analyzeSkipHeaderLineCount(Map<String, String> tblProperties)
@@ -372,9 +382,12 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
   }
 
   /**
-   * Analyze the 'skip.header.line.count' property to make sure it is set to a valid
-   * value. It is looked up in 'tblProperties', which must not be null. If 'table' is not
-   * null, then the method ensures that 'skip.header.line.count' is supported for its
+   * Analyze the 'skip.header.line.count' property to make sure it is set to a
+   * valid
+   * value. It is looked up in 'tblProperties', which must not be null. If 'table'
+   * is not
+   * null, then the method ensures that 'skip.header.line.count' is supported for
+   * its
    * table type. If it is null, then this check is omitted.
    */
   public static void analyzeSkipHeaderLineCount(FeTable table,
@@ -386,23 +399,28 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
       }
       StringBuilder error = new StringBuilder();
       FeFsTable.Utils.parseSkipHeaderLineCount(tblProperties, error);
-      if (error.length() > 0) throw new AnalysisException(error.toString());
+      if (error.length() > 0)
+        throw new AnalysisException(error.toString());
     }
   }
 
   /**
-   * Analyzes the 'sort.columns' property in 'tblProperties' against the columns of
-   * 'table'. The property must store a list of column names separated by commas, and each
-   * column in the property must occur in 'table' as a non-partitioning column. If there
-   * are errors during the analysis, this function will throw an AnalysisException.
-   * Returns a pair of list of positions of the sort columns within the table's list of
+   * Analyzes the 'sort.columns' property in 'tblProperties' against the columns
+   * of
+   * 'table'. The property must store a list of column names separated by commas,
+   * and each
+   * column in the property must occur in 'table' as a non-partitioning column. If
+   * there
+   * are errors during the analysis, this function will throw an
+   * AnalysisException.
+   * Returns a pair of list of positions of the sort columns within the table's
+   * list of
    * columns and the corresponding sorting order.
    */
   public static Pair<List<Integer>, TSortingOrder> analyzeSortColumns(FeTable table,
       Map<String, String> tblProperties) throws AnalysisException {
 
-    boolean containsOrderingProperties =
-        tblProperties.containsKey(AlterTableSortByStmt.TBL_PROP_SORT_ORDER);
+    boolean containsOrderingProperties = tblProperties.containsKey(AlterTableSortByStmt.TBL_PROP_SORT_ORDER);
     boolean containsSortingColumnProperties = tblProperties
         .containsKey(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS);
 
@@ -432,9 +450,44 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
 
     List<String> sortCols = Lists.newArrayList(
         Splitter.on(",").trimResults().omitEmptyStrings().split(
-        tblProperties.get(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS)));
+            tblProperties.get(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS)));
 
     return new Pair<>(TableDef.analyzeSortColumns(sortCols, table, sortingOrder),
         sortingOrder);
+  }
+
+  /**
+   * Validates that table stats properties (numRows, totalSize, rawDataSize)
+   * contain
+   * valid numeric values. These properties must be parseable as long values.
+   * Empty strings and non-numeric values will cause an AnalysisException.
+   * See IMPALA-12918.
+   */
+  public static void analyzeTableStatsProperties(Map<String, String> tblProperties)
+      throws AnalysisException {
+    // Properties that must have numeric values
+    String[] statsProperties = {
+        StatsSetupConst.ROW_COUNT, // "numRows"
+        StatsSetupConst.TOTAL_SIZE, // "totalSize"
+        StatsSetupConst.RAW_DATA_SIZE // "rawDataSize"
+    };
+
+    for (String prop : statsProperties) {
+      if (tblProperties.containsKey(prop)) {
+        String value = tblProperties.get(prop);
+        if (value == null || value.trim().isEmpty()) {
+          throw new AnalysisException(String.format(
+              "Table property '%s' must have a valid numeric value, got empty value.",
+              prop));
+        }
+        try {
+          Long.parseLong(value.trim());
+        } catch (NumberFormatException e) {
+          throw new AnalysisException(String.format(
+              "Table property '%s' must have a valid numeric value, got '%s'.",
+              prop, value));
+        }
+      }
+    }
   }
 }
