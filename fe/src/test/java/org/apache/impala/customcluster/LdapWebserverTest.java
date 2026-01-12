@@ -187,19 +187,19 @@ public class LdapWebserverTest {
     // there will already be some successful auth attempts.
     verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
 
-    // Attempt to access the webserver without a username/password, only the cookie from
-    // the verifyMetrics calls.
+    // Access a different webserver with the cookie from verifyMetrics calls, should
+    // succeed.
+    try (WebClient cookieOnly = new WebClient("", "", 25001, client_.getCookies())) {
+      String result = cookieOnly.readContent("/");
+      assertTrue(result, result.contains("<title>Apache Impala</title>"));
+    }
+
+    // Access the original webserver, then reload the cookie.
     try (WebClient cookieOnly = new WebClient("", "", 25000, client_.getCookies())) {
       String result = cookieOnly.readContent("/");
       assertTrue(result, result.contains("<title>Apache Impala</title>"));
       // Check that there were no unsuccessful auth attempts.
       verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
-    }
-
-    // Access a different webserver with the same cookie, should succeed.
-    try (WebClient cookieOnly = new WebClient("", "", 25001, client_.getCookies())) {
-      String result = cookieOnly.readContent("/");
-      assertTrue(result, result.contains("<title>Apache Impala</title>"));
 
       // Cookie should be reloaded with the new key.
       writeCookieSecret(keyFile);
@@ -211,8 +211,11 @@ public class LdapWebserverTest {
         return res;
       }, 20, 100);
       assertTrue(result, result.contains("Must authenticate with Basic authentication."));
-      // Check that there is an unsuccessful cookie attempt.
-      verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), Range.closed(1L, 1L));
+      // Check that there is an unsuccessful cookie attempt, which also generates an
+      // unsuccessful basic auth attempt since the cookie is invalid. There is a 2nd
+      // cookie failure from client_ reconnecting.
+      verifyMetrics(Range.atLeast(1L), Range.closed(1L, 1L),
+          Range.atLeast(1L), Range.closed(2L, 2L));
     }
   }
 
