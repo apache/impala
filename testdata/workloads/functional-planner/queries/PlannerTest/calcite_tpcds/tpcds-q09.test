@@ -62,8 +62,8 @@ PLAN-ROOT SINK
 |
 45:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N,56N row-size=124B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 44(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N,56N row-size=124B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 44(OPEN)
 |
 |--44:AGGREGATE [FINALIZE]
 |  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_13.ss_net_profit)
@@ -87,8 +87,8 @@ PLAN-ROOT SINK
 |
 42:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N row-size=116B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 41(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N row-size=116B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 41(OPEN)
 |
 |--41:AGGREGATE [FINALIZE]
 |  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_12.ss_ext_discount_amt)
@@ -112,8 +112,8 @@ PLAN-ROOT SINK
 |
 39:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N row-size=108B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 38(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N row-size=108B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 38(OPEN)
 |
 |--38:AGGREGATE [FINALIZE]
 |  |  output: count()
@@ -137,8 +137,8 @@ PLAN-ROOT SINK
 |
 36:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N row-size=100B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 35(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N row-size=100B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 35(OPEN)
 |
 |--35:AGGREGATE [FINALIZE]
 |  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_10.ss_net_profit)
@@ -162,8 +162,8 @@ PLAN-ROOT SINK
 |
 33:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N row-size=92B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 32(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N row-size=92B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 32(OPEN)
 |
 |--32:AGGREGATE [FINALIZE]
 |  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_9.ss_ext_discount_amt)
@@ -187,8 +187,8 @@ PLAN-ROOT SINK
 |
 30:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N,23N,26N,30N,34N,37N row-size=84B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 29(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N,23N,26N,30N,34N,37N row-size=84B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 29(OPEN)
 |
 |--29:AGGREGATE [FINALIZE]
 |  |  output: count()
@@ -212,8 +212,8 @@ PLAN-ROOT SINK
 |
 27:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N,23N,26N,30N,34N row-size=76B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 26(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N,23N,26N,30N,34N row-size=76B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 26(OPEN)
 |
 |--26:AGGREGATE [FINALIZE]
 |  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_7.ss_net_profit)
@@ -237,8 +237,8 @@ PLAN-ROOT SINK
 |
 24:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N,23N,26N,30N row-size=68B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 23(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N,23N,26N,30N row-size=68B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 23(OPEN)
 |
 |--23:AGGREGATE [FINALIZE]
 |  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_6.ss_ext_discount_amt)
@@ -262,8 +262,8 @@ PLAN-ROOT SINK
 |
 21:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N,23N,26N row-size=60B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 20(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N,23N,26N row-size=60B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 20(OPEN)
 |
 |--20:AGGREGATE [FINALIZE]
 |  |  output: count()
@@ -287,8 +287,8 @@ PLAN-ROOT SINK
 |
 18:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N,23N row-size=52B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 17(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N,23N row-size=52B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 17(OPEN)
 |
 |--17:AGGREGATE [FINALIZE]
 |  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_4.ss_net_profit)
@@ -312,8 +312,8 @@ PLAN-ROOT SINK
 |
 15:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N,19N row-size=44B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 14(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N,19N row-size=44B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 14(OPEN)
 |
 |--14:AGGREGATE [FINALIZE]
 |  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_3.ss_ext_discount_amt)
@@ -337,8 +337,8 @@ PLAN-ROOT SINK
 |
 12:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N,15N row-size=36B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 11(OPEN)
+|  tuple-ids=2N,3,8N,12N,15N row-size=36B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 11(OPEN)
 |
 |--11:AGGREGATE [FINALIZE]
 |  |  output: count()
@@ -362,8 +362,8 @@ PLAN-ROOT SINK
 |
 09:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N,12N row-size=28B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 08(OPEN)
+|  tuple-ids=2N,3,8N,12N row-size=28B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 08(OPEN)
 |
 |--08:AGGREGATE [FINALIZE]
 |  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_1.ss_net_profit)
@@ -387,8 +387,8 @@ PLAN-ROOT SINK
 |
 06:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0,8N row-size=20B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 05(OPEN)
+|  tuple-ids=2N,3,8N row-size=20B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 05(OPEN)
 |
 |--05:AGGREGATE [FINALIZE]
 |  |  output: avg(tpcds_partitioned_parquet_snap.store_sales_0.ss_ext_discount_amt)
@@ -412,10 +412,10 @@ PLAN-ROOT SINK
 |
 03:NESTED LOOP JOIN [RIGHT OUTER JOIN]
 |  mem-estimate=4B mem-reservation=0B thread-reservation=0
-|  tuple-ids=4N,0 row-size=12B cardinality=1 cost=0
-|  in pipelines: 02(GETNEXT), 00(OPEN)
+|  tuple-ids=2N,3 row-size=12B cardinality=1 cost=0
+|  in pipelines: 01(GETNEXT), 02(OPEN)
 |
-|--00:SCAN HDFS [tpcds_partitioned_parquet_snap.reason]
+|--02:SCAN HDFS [tpcds_partitioned_parquet_snap.reason]
 |     HDFS partitions=1/1 files=1 size=2.49KB
 |     predicates: tpcds_partitioned_parquet_snap.reason.r_reason_sk = CAST(1 AS INT)
 |     stored statistics:
@@ -425,16 +425,16 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.reason.r_reason_sk = CAST(1 AS INT)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.reason.r_reason_sk = CAST(1 AS INT)
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
-|     tuple-ids=0 row-size=4B cardinality=1 cost=5
-|     in pipelines: 00(GETNEXT)
+|     tuple-ids=3 row-size=4B cardinality=1 cost=5
+|     in pipelines: 02(GETNEXT)
 |
-02:AGGREGATE [FINALIZE]
+01:AGGREGATE [FINALIZE]
 |  output: count()
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=4 row-size=8B cardinality=1 cost=60479546
-|  in pipelines: 02(GETNEXT), 01(OPEN)
+|  tuple-ids=2 row-size=8B cardinality=1 cost=60479546
+|  in pipelines: 01(GETNEXT), 00(OPEN)
 |
-01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
    HDFS partitions=1824/1824 files=1824 size=389.90GB
    predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(1 AS INT)
    stored statistics:
@@ -445,8 +445,8 @@ PLAN-ROOT SINK
    parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(1 AS INT)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(1 AS INT)
    mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-   tuple-ids=2 row-size=4B cardinality=863.99M cost=983224624
-   in pipelines: 01(GETNEXT)
+   tuple-ids=0 row-size=4B cardinality=863.99M cost=983224624
+   in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=1.16GB Threads=207
 Per-Host Resource Estimates: Memory=2.76GB
@@ -459,21 +459,21 @@ PLAN-ROOT SINK
 |
 91:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N,56N row-size=124B cardinality=1 cost=1
-|  in pipelines: 00(GETNEXT)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N,56N row-size=124B cardinality=1 cost=1
+|  in pipelines: 02(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=1 (adjusted from 120)
 Per-Instance Resources: mem-estimate=16.73MB mem-reservation=8.00KB thread-reservation=1
 max-parallelism=1 segment-costs=[21]
 45:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 00
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N,56N row-size=124B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 89(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N,56N row-size=124B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 89(OPEN)
 |
-|--F32:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F32:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -523,12 +523,12 @@ max-parallelism=1 segment-costs=[21]
 42:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 01
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N row-size=116B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 86(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N row-size=116B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 86(OPEN)
 |
-|--F33:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F33:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -578,12 +578,12 @@ max-parallelism=1 segment-costs=[21]
 39:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 02
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N row-size=108B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 83(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N row-size=108B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 83(OPEN)
 |
-|--F34:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F34:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -633,12 +633,12 @@ max-parallelism=1 segment-costs=[21]
 36:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 03
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N row-size=100B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 80(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N row-size=100B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 80(OPEN)
 |
-|--F35:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F35:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -688,12 +688,12 @@ max-parallelism=1 segment-costs=[21]
 33:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 04
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N row-size=92B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 77(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N row-size=92B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 77(OPEN)
 |
-|--F36:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F36:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -743,12 +743,12 @@ max-parallelism=1 segment-costs=[21]
 30:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 05
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N row-size=84B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 74(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N row-size=84B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 74(OPEN)
 |
-|--F37:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F37:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -798,12 +798,12 @@ max-parallelism=1 segment-costs=[21]
 27:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 06
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N row-size=76B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 71(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N row-size=76B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 71(OPEN)
 |
-|--F38:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F38:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -853,12 +853,12 @@ max-parallelism=1 segment-costs=[21]
 24:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 07
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N row-size=68B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 68(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N row-size=68B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 68(OPEN)
 |
-|--F39:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F39:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=07 plan-id=08 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -908,12 +908,12 @@ max-parallelism=1 segment-costs=[21]
 21:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 08
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N row-size=60B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 65(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N row-size=60B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 65(OPEN)
 |
-|--F40:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F40:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=08 plan-id=09 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -963,12 +963,12 @@ max-parallelism=1 segment-costs=[21]
 18:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 09
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N row-size=52B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 62(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N row-size=52B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 62(OPEN)
 |
-|--F41:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F41:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=09 plan-id=10 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1018,12 +1018,12 @@ max-parallelism=1 segment-costs=[21]
 15:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 10
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N row-size=44B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 59(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N row-size=44B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 59(OPEN)
 |
-|--F42:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F42:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=10 plan-id=11 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1073,12 +1073,12 @@ max-parallelism=1 segment-costs=[21]
 12:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 11
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N row-size=36B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 56(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N row-size=36B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 56(OPEN)
 |
-|--F43:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F43:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=11 plan-id=12 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1128,12 +1128,12 @@ max-parallelism=1 segment-costs=[21]
 09:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 12
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N row-size=28B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 53(OPEN)
+|  tuple-ids=3,2N,8N,12N row-size=28B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 53(OPEN)
 |
-|--F44:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F44:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=12 plan-id=13 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1183,12 +1183,12 @@ max-parallelism=1 segment-costs=[21]
 06:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 13
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N row-size=20B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 50(OPEN)
+|  tuple-ids=3,2N,8N row-size=20B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 50(OPEN)
 |
-|--F45:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F45:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=13 plan-id=14 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1238,19 +1238,19 @@ max-parallelism=1 segment-costs=[21]
 03:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 14
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N row-size=12B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 47(OPEN)
+|  tuple-ids=3,2N row-size=12B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 47(OPEN)
 |
-|--F46:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F46:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=14 plan-id=15 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
 |  |
 |  48:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=4 row-size=8B cardinality=1 cost=0
+|  |  tuple-ids=2 row-size=8B cardinality=1 cost=0
 |  |  in pipelines: 47(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -1259,24 +1259,24 @@ max-parallelism=1 segment-costs=[21]
 |  47:AGGREGATE [FINALIZE]
 |  |  output: count:merge()
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=4 row-size=8B cardinality=1 cost=8
-|  |  in pipelines: 47(GETNEXT), 02(OPEN)
+|  |  tuple-ids=2 row-size=8B cardinality=1 cost=8
+|  |  in pipelines: 47(GETNEXT), 01(OPEN)
 |  |
 |  46:EXCHANGE [UNPARTITIONED]
 |  |  mem-estimate=154.78KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=4 row-size=8B cardinality=120 cost=17
-|  |  in pipelines: 02(GETNEXT)
+|  |  tuple-ids=2 row-size=8B cardinality=120 cost=17
+|  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=110 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=110 segment-costs=[1043704170, 123]
-|  02:AGGREGATE
+|  01:AGGREGATE
 |  |  output: count()
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=4 row-size=8B cardinality=120 cost=60479546
-|  |  in pipelines: 02(GETNEXT), 01(OPEN)
+|  |  tuple-ids=2 row-size=8B cardinality=120 cost=60479546
+|  |  in pipelines: 01(GETNEXT), 00(OPEN)
 |  |
-|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+|  00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
@@ -1287,10 +1287,10 @@ max-parallelism=1 segment-costs=[21]
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(1 AS INT)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(1 AS INT)
 |     mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-|     tuple-ids=2 row-size=4B cardinality=863.99M cost=983224624
-|     in pipelines: 01(GETNEXT)
+|     tuple-ids=0 row-size=4B cardinality=863.99M cost=983224624
+|     in pipelines: 00(GETNEXT)
 |
-00:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
+02:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
    HDFS partitions=1/1 files=1 size=2.49KB
    predicates: tpcds_partitioned_parquet_snap.reason.r_reason_sk = CAST(1 AS INT)
    stored statistics:
@@ -1300,8 +1300,8 @@ max-parallelism=1 segment-costs=[21]
    parquet statistics predicates: tpcds_partitioned_parquet_snap.reason.r_reason_sk = CAST(1 AS INT)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.reason.r_reason_sk = CAST(1 AS INT)
    mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
-   tuple-ids=0 row-size=4B cardinality=1 cost=5
-   in pipelines: 00(GETNEXT)
+   tuple-ids=3 row-size=4B cardinality=1 cost=5
+   in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=1.16GB Threads=207
 Per-Host Resource Estimates: Memory=2.76GB
@@ -1314,21 +1314,21 @@ PLAN-ROOT SINK
 |
 91:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N,56N row-size=124B cardinality=1 cost=1
-|  in pipelines: 00(GETNEXT)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N,56N row-size=124B cardinality=1 cost=1
+|  in pipelines: 02(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=1 (adjusted from 120)
 Per-Instance Resources: mem-estimate=16.73MB mem-reservation=8.00KB thread-reservation=1
 max-parallelism=1 segment-costs=[21]
 45:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 00
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N,56N row-size=124B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 89(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N,56N row-size=124B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 89(OPEN)
 |
-|--F32:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F32:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1378,12 +1378,12 @@ max-parallelism=1 segment-costs=[21]
 42:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 01
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N row-size=116B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 86(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N,52N row-size=116B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 86(OPEN)
 |
-|--F33:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F33:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1433,12 +1433,12 @@ max-parallelism=1 segment-costs=[21]
 39:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 02
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N row-size=108B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 83(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N,48N row-size=108B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 83(OPEN)
 |
-|--F34:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F34:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1488,12 +1488,12 @@ max-parallelism=1 segment-costs=[21]
 36:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 03
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N row-size=100B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 80(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N,45N row-size=100B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 80(OPEN)
 |
-|--F35:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F35:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1543,12 +1543,12 @@ max-parallelism=1 segment-costs=[21]
 33:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 04
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N row-size=92B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 77(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N,41N row-size=92B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 77(OPEN)
 |
-|--F36:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F36:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1598,12 +1598,12 @@ max-parallelism=1 segment-costs=[21]
 30:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 05
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N,37N row-size=84B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 74(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N,37N row-size=84B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 74(OPEN)
 |
-|--F37:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F37:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1653,12 +1653,12 @@ max-parallelism=1 segment-costs=[21]
 27:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 06
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N,34N row-size=76B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 71(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N,34N row-size=76B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 71(OPEN)
 |
-|--F38:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F38:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1708,12 +1708,12 @@ max-parallelism=1 segment-costs=[21]
 24:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 07
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N,30N row-size=68B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 68(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N,30N row-size=68B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 68(OPEN)
 |
-|--F39:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F39:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=07 plan-id=08 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1763,12 +1763,12 @@ max-parallelism=1 segment-costs=[21]
 21:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 08
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N,26N row-size=60B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 65(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N,26N row-size=60B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 65(OPEN)
 |
-|--F40:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F40:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=08 plan-id=09 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1818,12 +1818,12 @@ max-parallelism=1 segment-costs=[21]
 18:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 09
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N,23N row-size=52B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 62(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N,23N row-size=52B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 62(OPEN)
 |
-|--F41:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F41:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=09 plan-id=10 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1873,12 +1873,12 @@ max-parallelism=1 segment-costs=[21]
 15:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 10
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N,19N row-size=44B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 59(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N,19N row-size=44B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 59(OPEN)
 |
-|--F42:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F42:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=10 plan-id=11 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1928,12 +1928,12 @@ max-parallelism=1 segment-costs=[21]
 12:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 11
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N,15N row-size=36B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 56(OPEN)
+|  tuple-ids=3,2N,8N,12N,15N row-size=36B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 56(OPEN)
 |
-|--F43:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F43:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=11 plan-id=12 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -1983,12 +1983,12 @@ max-parallelism=1 segment-costs=[21]
 09:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 12
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N,12N row-size=28B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 53(OPEN)
+|  tuple-ids=3,2N,8N,12N row-size=28B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 53(OPEN)
 |
-|--F44:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F44:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=12 plan-id=13 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -2038,12 +2038,12 @@ max-parallelism=1 segment-costs=[21]
 06:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 13
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N,8N row-size=20B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 50(OPEN)
+|  tuple-ids=3,2N,8N row-size=20B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 50(OPEN)
 |
-|--F45:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F45:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=120 [max(10 (self) vs 120 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=13 plan-id=14 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
@@ -2093,19 +2093,19 @@ max-parallelism=1 segment-costs=[21]
 03:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
 |  join table id: 14
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,4N row-size=12B cardinality=1 cost=0
-|  in pipelines: 00(GETNEXT), 47(OPEN)
+|  tuple-ids=3,2N row-size=12B cardinality=1 cost=0
+|  in pipelines: 02(GETNEXT), 47(OPEN)
 |
-|--F46:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|--F46:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=16.01KB mem-reservation=0B thread-reservation=1
-|  |  max-parallelism=1 segment-costs=[0] cpu-comparison-result=110 [max(1 (self) vs 110 (sum children))]
+|  |  max-parallelism=10 segment-costs=[0] cpu-comparison-result=110 [max(10 (self) vs 110 (sum children))]
 |  JOIN BUILD
 |  |  join-table-id=14 plan-id=15 cohort-id=01
 |  |  mem-estimate=8B mem-reservation=0B thread-reservation=0 cost=0
 |  |
 |  48:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=4 row-size=8B cardinality=1 cost=0
+|  |  tuple-ids=2 row-size=8B cardinality=1 cost=0
 |  |  in pipelines: 47(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -2114,24 +2114,24 @@ max-parallelism=1 segment-costs=[21]
 |  47:AGGREGATE [FINALIZE]
 |  |  output: count:merge()
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=4 row-size=8B cardinality=1 cost=8
-|  |  in pipelines: 47(GETNEXT), 02(OPEN)
+|  |  tuple-ids=2 row-size=8B cardinality=1 cost=8
+|  |  in pipelines: 47(GETNEXT), 01(OPEN)
 |  |
 |  46:EXCHANGE [UNPARTITIONED]
 |  |  mem-estimate=154.78KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=4 row-size=8B cardinality=120 cost=17
-|  |  in pipelines: 02(GETNEXT)
+|  |  tuple-ids=2 row-size=8B cardinality=120 cost=17
+|  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=10 instances=110 (adjusted from 120)
 |  Per-Instance Resources: mem-estimate=16.02MB mem-reservation=4.00MB thread-reservation=1
 |  max-parallelism=110 segment-costs=[1043704170, 123]
-|  02:AGGREGATE
+|  01:AGGREGATE
 |  |  output: count()
 |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  |  tuple-ids=4 row-size=8B cardinality=120 cost=60479546
-|  |  in pipelines: 02(GETNEXT), 01(OPEN)
+|  |  tuple-ids=2 row-size=8B cardinality=120 cost=60479546
+|  |  in pipelines: 01(GETNEXT), 00(OPEN)
 |  |
-|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+|  00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
 |     HDFS partitions=1824/1824 files=1824 size=389.90GB
 |     predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(1 AS INT)
 |     stored statistics:
@@ -2142,10 +2142,10 @@ max-parallelism=1 segment-costs=[21]
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(1 AS INT)
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_quantity <= CAST(20 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_quantity >= CAST(1 AS INT)
 |     mem-estimate=16.00MB mem-reservation=4.00MB thread-reservation=0
-|     tuple-ids=2 row-size=4B cardinality=863.99M cost=983224624
-|     in pipelines: 01(GETNEXT)
+|     tuple-ids=0 row-size=4B cardinality=863.99M cost=983224624
+|     in pipelines: 00(GETNEXT)
 |
-00:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
+02:SCAN HDFS [tpcds_partitioned_parquet_snap.reason, RANDOM]
    HDFS partitions=1/1 files=1 size=2.49KB
    predicates: tpcds_partitioned_parquet_snap.reason.r_reason_sk = CAST(1 AS INT)
    stored statistics:
@@ -2155,6 +2155,6 @@ max-parallelism=1 segment-costs=[21]
    parquet statistics predicates: tpcds_partitioned_parquet_snap.reason.r_reason_sk = CAST(1 AS INT)
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.reason.r_reason_sk = CAST(1 AS INT)
    mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
-   tuple-ids=0 row-size=4B cardinality=1 cost=5
-   in pipelines: 00(GETNEXT)
+   tuple-ids=3 row-size=4B cardinality=1 cost=5
+   in pipelines: 02(GETNEXT)
 ====

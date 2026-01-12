@@ -30,6 +30,7 @@ import org.apache.calcite.rel.metadata.RelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.util.BuiltInMethod;
 import org.apache.calcite.util.Pair;
+import org.apache.impala.calcite.rules.ImpalaMQContext;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -78,11 +79,15 @@ public class ImpalaRelMdNonCumulativeCost implements NonCumulativeCost.Handler {
   }
 
   private RelOptCost getJoinCost(Join join, RelMetadataQuery mq) {
+    return getJoinCost(join.getLeft(), join.getRight(), mq);
+  }
+
+  public static RelOptCost getJoinCost(RelNode left, RelNode right, RelMetadataQuery mq) {
     // 1. Sum of input cardinalities
-    final Double leftRCount = mq.getRowCount(join.getLeft());
-    final Double rightRCount = mq.getRowCount(join.getRight());
-    final Double leftRAverageSize = mq.getAverageRowSize(join.getLeft());
-    final Double rightRAverageSize = mq.getAverageRowSize(join.getRight());
+    final Double leftRCount = mq.getRowCount(left);
+    final Double rightRCount = mq.getRowCount(right);
+    final Double leftRAverageSize = mq.getAverageRowSize(left);
+    final Double rightRAverageSize = mq.getAverageRowSize(right);
 
     if (leftRCount == null || rightRCount == null ||
         leftRAverageSize == null || rightRAverageSize == null) {
@@ -104,7 +109,23 @@ public class ImpalaRelMdNonCumulativeCost implements NonCumulativeCost.Handler {
 
   private RelOptCost getScanCost(TableScan scan, RelMetadataQuery mq) {
     double cardinality = mq.getRowCount(scan);
-    double avgTupleSize = mq.getAverageRowSize(scan);
+    double avgTupleSize = 0.0;
+    ImpalaMQContext mqContext =
+        scan.getCluster().getPlanner().getContext().unwrap(ImpalaMQContext.class);
+    if (mqContext.getInputRefs() != null && !mqContext.getInputRefs().isEmpty()) {
+      // The avgColumnSizes list contains an entry in the ArrayList for every column
+      // that exists in the table.
+      List<Double> avgColumnSizes = mq.getAverageColumnSizes(scan);
+      // The mqContext.getInputRefs() contains only the columns needed by the parent.
+      // This allows us to calculate the tuple size of only the columns that are used
+      // by the parent.
+      for (Integer i : mqContext.getInputRefs()) {
+        avgTupleSize += avgColumnSizes.get(i);
+      }
+    } else {
+      avgTupleSize = mq.getAverageRowSize(scan);
+    }
+
     return new ImpalaCost(0, hdfsRead * cardinality * avgTupleSize);
   }
 

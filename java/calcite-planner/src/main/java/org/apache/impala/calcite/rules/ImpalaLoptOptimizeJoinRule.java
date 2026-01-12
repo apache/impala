@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.calcite.rel.rules;
+package org.apache.impala.calcite.rules;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -30,6 +30,11 @@ import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.metadata.RelColumnOrigin;
 import org.apache.calcite.rel.metadata.RelMdUtil;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.rules.LoptJoinTree;
+import org.apache.calcite.rel.rules.LoptMultiJoin;
+import org.apache.calcite.rel.rules.LoptSemiJoinOptimizer;
+import org.apache.calcite.rel.rules.MultiJoin;
+import org.apache.calcite.rel.rules.TransformationRule;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -46,6 +51,7 @@ import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.calcite.util.ImmutableIntList;
 import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.mapping.IntPair;
+import org.apache.impala.calcite.schema.ImpalaRelMdNonCumulativeCost;
 
 import org.checkerframework.checker.nullness.qual.KeyFor;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -79,30 +85,38 @@ import static java.util.Objects.requireNonNull;
  * will allow us to compare the modifications made for Impala directly against the
  * original Calcite code.
  *
- * We need to copy the rule instead of extending the rule class because the
- * modifications needed for Impala are changing parts of the core algorithm. This
- * core is found in some of the private methods within this class. Because the
- * changes are being made in private methods, extending the class with our own
- * modifications is not possible.
+ * On top of the original version, there are some changes added here to work with
+ * the Impala planner:
+ *
+ * - The rule name has been changed to ImpalaLoptOptimizationJoinRule, moved into an
+ *   impala package, and various constructors/configs have been changed to get this
+ *   to compile.
+ *
+ * - CALCITE-6788 was created in version 1.39 to allow a hook for calculating the
+ *   cost of a given join order when doing comparisions. Similar to CALCITE-6788,
+ *   the swapInputs() hook was added. This replaces Calcite's version of swapInputs.
+ *   The new swapInputs method uses the cost model to decide if a swap should be done
+ *   as opposed to just looking at the input rows. This seems to provide better plans
+ *   for tpcds queries within Impala.
  */
 @Value.Enclosing
-public class LoptOptimizeJoinRule
-    extends RelRule<LoptOptimizeJoinRule.Config>
+public class ImpalaLoptOptimizeJoinRule
+    extends RelRule<ImpalaLoptOptimizeJoinRule.Config>
     implements TransformationRule {
 
   /** Creates an LoptOptimizeJoinRule. */
-  protected LoptOptimizeJoinRule(Config config) {
+  protected ImpalaLoptOptimizeJoinRule(Config config) {
     super(config);
   }
 
   @Deprecated // to be removed before 2.0
-  public LoptOptimizeJoinRule(RelBuilderFactory relBuilderFactory) {
+  public ImpalaLoptOptimizeJoinRule(RelBuilderFactory relBuilderFactory) {
     this(Config.DEFAULT.withRelBuilderFactory(relBuilderFactory)
         .as(Config.class));
   }
 
   @Deprecated // to be removed before 2.0
-  public LoptOptimizeJoinRule(RelFactories.JoinFactory joinFactory,
+  public ImpalaLoptOptimizeJoinRule(RelFactories.JoinFactory joinFactory,
       RelFactories.ProjectFactory projectFactory,
       RelFactories.FilterFactory filterFactory) {
     this(RelBuilder.proto(joinFactory, projectFactory, filterFactory));
@@ -458,7 +472,7 @@ public class LoptOptimizeJoinRule
    * @param semiJoinOpt optimal semijoins for each factor
    * @param call RelOptRuleCall associated with this rule
    */
-  private static void findBestOrderings(
+  private void findBestOrderings(
       RelMetadataQuery mq,
       RelBuilder relBuilder,
       LoptMultiJoin multiJoin,
@@ -695,7 +709,7 @@ public class LoptOptimizeJoinRule
    * @return constructed join tree or null if it is not possible for
    * firstFactor to appear as the first factor in the join
    */
-  private static @Nullable LoptJoinTree createOrdering(
+  private @Nullable LoptJoinTree createOrdering(
       RelMetadataQuery mq,
       RelBuilder relBuilder,
       LoptMultiJoin multiJoin,
@@ -894,7 +908,7 @@ public class LoptOptimizeJoinRule
    * @return optimal join tree with the new factor added if it is possible to
    * add the factor; otherwise, null is returned
    */
-  private static @Nullable LoptJoinTree addFactorToTree(
+  private @Nullable LoptJoinTree addFactorToTree(
       RelMetadataQuery mq,
       RelBuilder relBuilder,
       LoptMultiJoin multiJoin,
@@ -1051,7 +1065,7 @@ public class LoptOptimizeJoinRule
    * join tree if it is possible to do the pushdown; otherwise, null is
    * returned
    */
-  private static @Nullable LoptJoinTree pushDownFactor(
+  private @Nullable LoptJoinTree pushDownFactor(
       RelMetadataQuery mq,
       RelBuilder relBuilder,
       LoptMultiJoin multiJoin,
@@ -1207,7 +1221,7 @@ public class LoptOptimizeJoinRule
    *
    * @return new join tree
    */
-  private static @Nullable LoptJoinTree addToTop(
+  private @Nullable LoptJoinTree addToTop(
       RelMetadataQuery mq,
       RelBuilder relBuilder,
       LoptMultiJoin multiJoin,
@@ -1775,7 +1789,7 @@ public class LoptOptimizeJoinRule
    *
    * @return created LogicalJoin
    */
-  private static LoptJoinTree createJoinSubtree(
+  private LoptJoinTree createJoinSubtree(
       RelMetadataQuery mq,
       RelBuilder relBuilder,
       LoptMultiJoin multiJoin,
@@ -1790,7 +1804,10 @@ public class LoptOptimizeJoinRule
         multiJoin.getMultiJoinRel().getCluster().getRexBuilder();
 
     // swap the inputs if beneficial
-    if (swapInputs(mq, multiJoin, left, right, selfJoin)) {
+    // IMPALA CHANGE: using a swapInputs function interface which is defined with the
+    // withSwapInputs() method in the config.
+    if (config.swapInputsFunction().swapInputs(mq, multiJoin, left, right, selfJoin,
+        condition, rexBuilder, fullAdjust)) {
       LoptJoinTree tmp = right;
       right = left;
       left = tmp;
@@ -1892,44 +1909,49 @@ public class LoptOptimizeJoinRule
   }
 
   /**
-   * Swaps the operands to a join, so the smaller input is on the right. Or,
-   * if this is a removable self-join, swap so the factor that should be
-   * preserved when the self-join is removed is put on the left.
+   * *** IMPALA CHANGE ***
+   * Using our own swapInputs method which produces better results.
    *
-   * @param multiJoin join factors being optimized
-   * @param left left side of join tree
-   * @param right right hand side of join tree
-   * @param selfJoin true if the join is a removable self-join
+   * swapInputs Compares left side and right side using the cost model and decides
+   * if it would be better to flip the sides to produce a better plan.
    *
-   * @return true if swapping should be done
+   * @param mq - RelMetaDataQuery object providing metadata information.
+   * @param multiJoin  - The multiJoin RelNode containing the left and right inputs
+   * @param leftTree   - The left tree
+   * @param rightTree  - The right tree
+   * @param condition  - The RexNode condition.  May contain multiple "and" conditions.
+   * @param rexBuilder
+   * @param adjust     - flag specifying whether adjustment needs to be made based on the
+   *                     inputRefs in the condition. If false, the inputrefs can be used
+   *                     directly off the leftTree and rightTree. If true, the inputRefs
+   *                     need to be calculated based on the "factor" of the multiJoin.
+   * @return should the inputs be swapped based on cost analysis.
    */
-  private static boolean swapInputs(
-      RelMetadataQuery mq,
-      LoptMultiJoin multiJoin,
-      LoptJoinTree left,
-      LoptJoinTree right,
-      boolean selfJoin) {
-    boolean swap = false;
+  public static boolean swapInputs(RelMetadataQuery mq, LoptMultiJoin multiJoin,
+      LoptJoinTree leftTree, LoptJoinTree rightTree, RexNode condition,
+      RexBuilder rexBuilder, boolean adjust) {
+    MultiJoin mjRel = multiJoin.getMultiJoinRel();
+    RelNode leftSide = leftTree.getJoinTree();
+    RelNode rightSide = rightTree.getJoinTree();
 
-    if (selfJoin) {
-      return !multiJoin.isLeftFactorInRemovableSelfJoin(
-          ((LoptJoinTree.Leaf) left.getFactorTree()).getId());
-    }
+    RelOptCost rightSideCost = mq.getCumulativeCost(rightSide);
+    RelOptCost leftSideCost = mq.getCumulativeCost(leftSide);
 
-    final Double leftRowCount = mq.getRowCount(left.getJoinTree());
-    final Double rightRowCount = mq.getRowCount(right.getJoinTree());
+    // Calculate the cumulative cost for the inputs underneath the join when there is no
+    // swapping.
+    RelOptCost totalPreJoinCost =
+        leftSideCost.plus(rightSideCost);
 
-    // The left side is smaller than the right if it has fewer rows,
-    // or if it has the same number of rows as the right (excluding
-    // roundoff), but fewer columns.
-    if ((leftRowCount != null)
-        && (rightRowCount != null)
-        && ((leftRowCount < rightRowCount)
-        || ((Math.abs(leftRowCount - rightRowCount) < RelOptUtil.EPSILON)
-            && (rowWidthCost(left.getJoinTree()) < rowWidthCost(right.getJoinTree()))))) {
-      swap = true;
-    }
-    return swap;
+    // Add in the noncumulative cost at the join node to the cumulative input cost.
+    RelOptCost totalJoinNonSwapCost = totalPreJoinCost.plus(
+        ImpalaRelMdNonCumulativeCost.getJoinCost(leftSide, rightSide, mq));
+
+    // Add in the noncumulative cost at the join node to the cumulative input cost.
+    RelOptCost totalJoinSwapCost = totalPreJoinCost.plus(
+        ImpalaRelMdNonCumulativeCost.getJoinCost(rightSide, leftSide, mq));
+
+    // Compare the costs of swapping versus non-swapping.
+    return totalJoinSwapCost.isLt(totalJoinNonSwapCost);
   }
 
   /**
@@ -2105,14 +2127,32 @@ public class LoptOptimizeJoinRule
         joinInfo.leftSet());
   }
 
+  /** Function to compute cost. */
+  @FunctionalInterface
+  public interface SwapInputsFunction {
+    // boolean selfJoin only used in Calcite version
+    // condition, rexBuilder, adjust only used in Impala version
+    @Nullable boolean swapInputs(RelMetadataQuery mq, LoptMultiJoin multiJoin,
+        LoptJoinTree left, LoptJoinTree right, boolean selfJoin, RexNode condition,
+        RexBuilder rexBuilder, boolean adjust);
+  }
+
   /** Rule configuration. */
   @Value.Immutable
   public interface Config extends RelRule.Config {
-    Config DEFAULT = ImmutableLoptOptimizeJoinRule.Config.of()
-        .withOperandSupplier(b -> b.operand(MultiJoin.class).anyInputs());
+    Config DEFAULT = ImmutableImpalaLoptOptimizeJoinRule.Config.builder()
+        .operandSupplier(b -> b.operand(MultiJoin.class).anyInputs()).build();
 
-    @Override default LoptOptimizeJoinRule toRule() {
-      return new LoptOptimizeJoinRule(this);
+    @Value.Default default SwapInputsFunction swapInputsFunction() {
+      return (mq, mj, left, right, sj, cond, rexB, adjust) ->
+          swapInputs(mq, mj, left, right, cond, rexB, adjust);
+    }
+
+    /** Sets {@link #costFunction()}. */
+    Config withSwapInputsFunction(SwapInputsFunction function);
+
+    @Override default ImpalaLoptOptimizeJoinRule toRule() {
+      return new ImpalaLoptOptimizeJoinRule(this);
     }
   }
 }

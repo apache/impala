@@ -206,4 +206,11 @@ public class ImpalaCoreRules {
   public static RelOptRule JOIN_PROJECT_TRANSPOSE_RIGHT_OUTER =
       ImpalaJoinProjectTransposeRule.RIGHT_OUTER;
 
+  public static ImpalaLoptOptimizeJoinRule MULTI_JOIN_OPTIMIZE =
+      ImpalaLoptOptimizeJoinRule.Config.DEFAULT
+          .withSwapInputsFunction((mq, mj, left, right, sj, cond, rexB, adjust)
+              -> ImpalaLoptOptimizeJoinRule.swapInputs(mq, mj, left, right, cond,
+                  rexB, adjust))
+          .toRule();
+
 }

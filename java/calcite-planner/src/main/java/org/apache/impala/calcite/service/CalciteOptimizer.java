@@ -18,7 +18,6 @@
 package org.apache.impala.calcite.service;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.calcite.plan.RelOptCostImpl;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.hep.HepMatchOrder;
@@ -27,14 +26,9 @@ import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.rel.logical.LogicalProject;
-import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.rules.CoreRules;
-import org.apache.calcite.rel.rules.JoinProjectTransposeRule;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
 import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.validate.SqlValidator;
@@ -48,7 +42,9 @@ import org.apache.impala.calcite.rel.node.ImpalaPlanRel;
 import org.apache.impala.calcite.rules.ImpalaCoreRules;
 import org.apache.impala.calcite.rules.ImpalaFilterSimplifyRule;
 import org.apache.impala.calcite.rules.ImpalaProjectSimplifyRule;
+import org.apache.impala.calcite.rules.ImpalaMQContext;
 import org.apache.impala.calcite.rules.ImpalaRexExecutor;
+import org.apache.impala.calcite.schema.ImpalaCost;
 import org.apache.impala.calcite.util.LogUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TQueryCtx;
@@ -77,25 +73,6 @@ public class CalciteOptimizer implements CompilerStep {
   private final Analyzer analyzer_;
 
   private final TQueryCtx queryCtx_;
-
-  JoinProjectTransposeRule.Config JOIN_PROJECT_LEFT =
-      JoinProjectTransposeRule.Config.LEFT_OUTER
-          .withOperandSupplier(b0 ->
-              b0.operand(LogicalJoin.class).inputs(
-                  b1 -> b1.operand(LogicalProject.class).inputs(
-                  b2 -> b2.operand(LogicalJoin.class).anyInputs())))
-          .withDescription("JoinProjectTransposeRule(Project-Other)")
-          .as(JoinProjectTransposeRule.Config.class);
-
-  JoinProjectTransposeRule.Config JOIN_PROJECT_RIGHT =
-      JoinProjectTransposeRule.Config.RIGHT_OUTER
-          .withOperandSupplier(b0 ->
-                b0.operand(LogicalJoin.class).inputs(
-                    b1 -> b1.operand(RelNode.class).anyInputs(),
-                    b2 -> b2.operand(LogicalProject.class).inputs(
-                        b3 -> b3.operand(LogicalJoin.class).anyInputs())))
-            .withDescription("JoinProjectTransposeRule(Other-Project)")
-            .as(JoinProjectTransposeRule.Config.class);
 
   public CalciteOptimizer(CalciteAnalysisResult analysisResult,
       EventSequence timeline) {
@@ -264,7 +241,7 @@ public class CalciteOptimizer implements CompilerStep {
     builder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
     builder.addRuleInstance(ImpalaCoreRules.JOIN_CONDITION_PUSH);
     builder.addRuleInstance(ImpalaCoreRules.JOIN_TO_MULTI_JOIN);
-    builder.addRuleInstance(CoreRules.MULTI_JOIN_OPTIMIZE);
+    builder.addRuleInstance(ImpalaCoreRules.MULTI_JOIN_OPTIMIZE);
 
     return runProgram(plan, builder.build(), simplifier);
   }
@@ -316,9 +293,9 @@ public class CalciteOptimizer implements CompilerStep {
 
   private RelNode runProgram(RelNode currentNode, HepProgram program,
       ImpalaRexSimplify simplifier) {
-    HepPlanner planner = new HepPlanner(program,
-        currentNode.getCluster().getPlanner().getContext(), true, null,
-        RelOptCostImpl.FACTORY);
+    HepPlanner planner = new HepPlanner(program, new ImpalaMQContext(),
+        true, null,
+        ImpalaCost.FACTORY);
     planner.setRoot(currentNode);
     planner.setExecutor(simplifier.getRexExecutor());
 
