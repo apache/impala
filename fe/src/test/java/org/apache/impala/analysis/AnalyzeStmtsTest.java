@@ -3001,6 +3001,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select zip, count(*) from functional.testtbl group by 2",
         "GROUP BY expression must not contain aggregate functions");
 
+    // can't group a complex type
+    AnalysisError("select int_struct_col, count(*) from "
+        + "functional_parquet.allcomplextypes" + " group by int_struct_col",
+        "GROUP BY expression cannot be used on complex types without specifying a field:"
+        + " int_struct_col");
+
     // multiple grouping cols
     AnalyzesOk("select int_col, string_col, bigint_col, count(*) " +
         "from functional.alltypes group by string_col, int_col, bigint_col");

@@ -1149,18 +1149,22 @@ public class SelectStmt extends QueryStmt {
       substituteOrdinalsAndAliases(groupingExprsCopy_, "GROUP BY", analyzer_);
 
       for (int i = 0; i < groupingExprsCopy_.size(); ++i) {
-        groupingExprsCopy_.get(i).analyze(analyzer_);
-        if (groupingExprsCopy_.get(i).contains(Expr.IS_AGGREGATE)) {
-          // reference the original expr in the error msg
+        Expr expr = groupingExprsCopy_.get(i);
+        expr.analyze(analyzer_);
+        if (expr.contains(Expr.IS_AGGREGATE)) {
           throw new AnalysisException(
               "GROUP BY expression must not contain aggregate functions: "
                   + groupingExprs_.get(i).toSql());
         }
-        if (groupingExprsCopy_.get(i).contains(AnalyticExpr.class)) {
-          // reference the original expr in the error msg
+        if (expr.contains(AnalyticExpr.class)) {
           throw new AnalysisException(
               "GROUP BY expression must not contain analytic expressions: "
-                  + groupingExprsCopy_.get(i).toSql());
+                  + expr.toSql());
+        }
+        if (expr.getType().isComplexType()) {
+          throw new AnalysisException(
+              "GROUP BY expression cannot be used on complex types without specifying a "
+              + "field: " + expr.toSql());
         }
       }
 
