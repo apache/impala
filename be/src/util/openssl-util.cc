@@ -306,7 +306,7 @@ Status AuthenticationHashFromFile::Init() {
   }
 
   int wd = inotify_add_watch(
-      fd, path_.c_str(), IN_MODIFY | IN_CLOSE_WRITE | IN_MOVE_SELF | IN_ATTRIB);
+      fd, path_.c_str(), IN_CLOSE_WRITE | IN_MOVE_SELF | IN_ATTRIB);
   if (wd < 0) {
     close(stop_pipe_read_fd_);
     close(fd);

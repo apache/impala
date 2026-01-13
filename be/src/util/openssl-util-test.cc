@@ -548,6 +548,45 @@ TEST_F(OpenSSLUtilTest, AuthenticationHashFromFile) {
   EXPECT_FALSE(auth_hash.Verify(buf.data(), buffer_size, signature));
 }
 
+TEST_F(OpenSSLUtilTest, AuthenticationHashFromFileReload) {
+  // Create a temporary file with a random key.
+  KeyFile key = MakeKeyFile();
+
+  // Create an AuthenticationHashFromFile and check we can Compute/Verify.
+  const int buffer_size = 1024 * 1024;
+  vector<uint8_t> buf(buffer_size);
+  GenerateRandomData(buf.data(), buffer_size);
+
+  AuthenticationHashFromFile auth_hash(key.path);
+  ASSERT_OK(auth_hash.Init());
+
+  uint8_t signature[AuthenticationHash::HashLen()];
+  ASSERT_OK(auth_hash.Compute(buf.data(), buffer_size, signature));
+  EXPECT_TRUE(auth_hash.Verify(buf.data(), buffer_size, signature));
+
+  // Overwrite the file with a new valid key. Perform multiple write system calls.
+  {
+    vector<uint8_t> k(AuthenticationHash::HashLen()-1);
+    std::ofstream key_file(key.path, std::ios::binary);
+    GenerateRandomBytes(k.data(), k.size());
+    key_file.write("b", 1);
+    SleepForMs(100);
+    key_file.write(reinterpret_cast<const char*>(k.data()), k.size());
+  }
+  // Verify it's reloaded in less than a second. Longer means it likely hit an error
+  // prompting retry.
+  const int max_retries = 8;
+  int retries = 0;
+  while (retries++ < max_retries) {
+    SleepForMs(100);
+    if (!auth_hash.Verify(buf.data(), buffer_size, signature)) break;
+  }
+  ASSERT_LT(retries, max_retries) << "Timed out waiting for key reload";
+
+  // Should not verify with the original signature, since the key has changed.
+  EXPECT_FALSE(auth_hash.Verify(buf.data(), buffer_size, signature));
+}
+
 TEST_F(OpenSSLUtilTest, MissingAuthenticationHashFromFile) {
   // Try to create an AuthenticationHashFromFile with a non-existent key file.
   string missing_key_path = Substitute("/tmp/auth_key_missing_$0", getpid());
