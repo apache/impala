@@ -215,7 +215,7 @@ do
     -udf_devel_package)
       UDF_DEVEL=1
       ;;
-    -help|*)
+    -help|--help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
       echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
            "running Hadoop services unless any -format* is True"
