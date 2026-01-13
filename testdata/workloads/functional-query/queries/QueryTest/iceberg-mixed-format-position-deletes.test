@@ -18,7 +18,7 @@ DELETE FROM ice_mixed_formats WHERE i = 3;
 refresh ice_mixed_formats;
 refresh ice_mixed_formats;
 ---- RUNTIME_PROFILE
-row_regex:.*Iceberg table reload skipped as no change detected
+row_regex: Iceberg table reload skipped as no change detected
 ====
 ---- QUERY
 SHOW FILES IN ice_mixed_formats;

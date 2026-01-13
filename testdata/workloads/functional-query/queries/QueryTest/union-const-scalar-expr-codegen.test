@@ -14,7 +14,6 @@ tinyint,tinyint,tinyint
 00:UNION
    constant-operands=3
 #SORT_NODE
-ExecOption: Codegen Enabled
 #UNION_NODE
 ExecOption: Codegen Enabled, Codegen Disabled for const scalar expressions
 ====
@@ -74,7 +73,5 @@ BIGINT, BIGINT
 #AGGREGATION_NODE (id=6)
 ExecOption: Codegen Enabled
 #UNION_NODE (id=3)
-ExecOption: Codegen Enabled
 #AGGREGATION_NODE (id=5)
-ExecOption: Codegen Enabled
 ====

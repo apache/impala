@@ -11,8 +11,8 @@ select count(*) from alltypes t1
 bigint
 ---- RUNTIME_PROFILE
 # Verify that codegen was enabled for join and scan
-row_regex: .*Build Side Codegen Enabled.*
-row_regex: .*TEXT Codegen Enabled.*
+row_regex: Build Side Codegen Enabled
+row_regex: TEXT Codegen Enabled
 ====
 ---- QUERY
 # alltypes has 7300 rows - codegen should be disabled regardless
@@ -26,7 +26,7 @@ select count(*) from alltypes t1
 bigint
 ---- RUNTIME_PROFILE
 # Verify that codegen was disabled
-row_regex: .*Codegen Disabled: disabled due to optimization hints.*
+row_regex: Codegen Disabled: disabled due to optimization hints
 ====
 ---- QUERY
 # IMPALA-6435: codegen for NULL CHAR literals was broken. This query crashed

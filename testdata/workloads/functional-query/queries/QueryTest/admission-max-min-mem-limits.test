@@ -10,8 +10,8 @@ set num_scanner_threads=2;
 select * from (select * from functional_parquet.alltypes limit 10) A,
  (select * from functional_parquet.alltypes limit 10) B;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=68MB.*
-row_regex: .*Cluster Memory Admitted: 68.00 MB.*
+row_regex: Per-Host Resource Estimates: Memory=68MB
+row_regex: Cluster Memory Admitted: 68.00 MB
 ====
 ---- QUERY
 # No mem_limit set
@@ -19,8 +19,8 @@ row_regex: .*Cluster Memory Admitted: 68.00 MB.*
 set request_pool=poolLowMinLimit;
 select * from functional_parquet.alltypes limit 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=16MB.*
-row_regex: .*Cluster Memory Admitted: 32.09 MB.*
+row_regex: Per-Host Resource Estimates: Memory=16MB
+row_regex: Cluster Memory Admitted: 32.09 MB
 ====
 ---- QUERY
 # No mem_limit set
@@ -47,8 +47,8 @@ set num_scanner_threads=2;
 select * from functional_parquet.alltypes A, functional_parquet.alltypes B where
  A.int_col = B.int_col limit 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=68MB.*
-row_regex: .*Cluster Memory Admitted: 67.88 MB.*
+row_regex: Per-Host Resource Estimates: Memory=68MB
+row_regex: Cluster Memory Admitted: 67.88 MB
 ====
 ---- QUERY
 # No mem_limit set
@@ -61,8 +61,8 @@ set DISABLE_HDFS_NUM_ROWS_ESTIMATE=1;
 select * from functional_parquet.alltypes A, functional_parquet.alltypes B where
  A.int_col = B.int_col limit 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=2.06GB.*
-row_regex: .*Cluster Memory Admitted: 1.50 GB.*
+row_regex: Per-Host Resource Estimates: Memory=2.06GB
+row_regex: Cluster Memory Admitted: 1.50 GB
 ====
 ---- QUERY
 # No mem_limit set
@@ -70,8 +70,8 @@ row_regex: .*Cluster Memory Admitted: 1.50 GB.*
 set request_pool=regularPool;
 select 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=10MB.*
-row_regex: .*Cluster Memory Admitted: 50.00 MB.*
+row_regex: Per-Host Resource Estimates: Memory=10MB
+row_regex: Cluster Memory Admitted: 50.00 MB
 ====
 ---- QUERY
 ############################
@@ -81,7 +81,7 @@ set request_pool=regularPool;
 set mem_limit=200mb;
 select 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Cluster Memory Admitted: 200.00 MB.*
+row_regex: Cluster Memory Admitted: 200.00 MB
 ====
 ---- QUERY
 # mem_limit is set
@@ -104,7 +104,7 @@ set request_pool=regularPool;
 set mem_limit=2G;
 select 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Cluster Memory Admitted: 1.50 GB.*
+row_regex: Cluster Memory Admitted: 1.50 GB
 ====
 ---- QUERY
 # mem_limit is set and pool.clamp_mem_limit_query_option is true
@@ -113,7 +113,7 @@ set request_pool=regularPool;
 set mem_limit=40mb;
 select 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Cluster Memory Admitted: 50.00 MB.*
+row_regex: Cluster Memory Admitted: 50.00 MB
 ====
 ---- QUERY
 # mem_limit is set and pool.clamp_mem_limit_query_option is false
@@ -122,7 +122,7 @@ set request_pool=regularPoolWithoutClamping;
 set mem_limit=2G;
 select 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Cluster Memory Admitted: 2.00 GB.*
+row_regex: Cluster Memory Admitted: 2.00 GB
 ====
 ---- QUERY
 # mem_limit is set and pool.clamp_mem_limit_query_option is false
@@ -131,7 +131,7 @@ set request_pool=regularPoolWithoutClamping;
 set mem_limit=50mb;
 select 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Cluster Memory Admitted: 50.00 MB.*
+row_regex: Cluster Memory Admitted: 50.00 MB
 ====
 ---- QUERY
 ############################
@@ -142,8 +142,8 @@ row_regex: .*Cluster Memory Admitted: 50.00 MB.*
 set request_pool=poolNoMemLimits;
 select 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=10MB.*
-row_regex: .*Cluster Memory Admitted: 10.00 MB.*
+row_regex: Per-Host Resource Estimates: Memory=10MB
+row_regex: Cluster Memory Admitted: 10.00 MB
 ====
 ---- QUERY
 ############################

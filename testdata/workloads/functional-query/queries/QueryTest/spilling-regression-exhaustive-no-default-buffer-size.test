@@ -27,5 +27,5 @@ BIGINT,BIGINT,BIGINT,INT,STRING
 6000000,32255,2256,1,'carefully '
 6000000,96127,6128,2,'ooze furiously about the pe'
 ---- RUNTIME_PROFILE
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
+row_regex: SpilledRuns: .* \([1-9][0-9]*\)
 ====

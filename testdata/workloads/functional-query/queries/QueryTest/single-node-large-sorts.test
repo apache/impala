@@ -29,8 +29,8 @@ STRING,STRING,STRING
 'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
 'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','',''
 ---- RUNTIME_PROFILE
-row_regex: .* TotalMergesPerformed: [^0].*
-row_regex: .* SpilledRuns: [^0].*
+row_regex:  TotalMergesPerformed: [^0]
+row_regex:  SpilledRuns: [^0]
 ====
 ---- QUERY
 # Regression test for IMPALA-5554: first string column in sort tuple is null
@@ -62,5 +62,5 @@ STRING,STRING,STRING
 'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
 'Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','NULL','NULL'
 ---- RUNTIME_PROFILE
-row_regex: .* SpilledRuns: [^0].*
+row_regex:  SpilledRuns: [^0]
 ====

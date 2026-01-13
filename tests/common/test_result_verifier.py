@@ -676,12 +676,12 @@ def verify_runtime_profile(expected, actual, update_section=False):
     for i in range(len(expected_lines)):
       if matched[i]: continue
       if expected_regexes[i] is not None:
-        match = expected_regexes[i].match(line)
+        match = expected_regexes[i].search(line)
       elif expected_aggregations[i] is not None:
         # Aggregations are enforced separately
         match = True
       elif unexpected_regexes[i] is not None:
-        if unexpected_regexes[i].match(line):
+        if unexpected_regexes[i].search(line):
           unexpected_matched_lines.append(line)
         match = False
       else:

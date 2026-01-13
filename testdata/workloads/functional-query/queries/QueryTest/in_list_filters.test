@@ -8,8 +8,8 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RESULTS
 620
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 1 items.*
-row_regex: .*Files rejected: 7 \(7\).*
+row_regex: Filter 0 arrival with 1 items
+row_regex: Files rejected: 7 \(7\)
 ====
 ---- QUERY
 # Test two hop IN-list filters on partition columns.
@@ -21,9 +21,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 0 items.*
-row_regex: .*Filter 1 arrival with 0 items.*
-row_regex: .*Files rejected: 8 \(8\).*
+row_regex: Filter 0 arrival with 0 items
+row_regex: Filter 1 arrival with 0 items
+row_regex: Files rejected: 8 \(8\)
 ====
 ---- QUERY
 # Test IN-list filter on string column.
@@ -33,9 +33,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 1 items.*
-row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
-row_regex: .*RowsRead: 0 \(0\).*
+row_regex: Filter 0 arrival with 1 items
+row_regex: NumPushedDownRuntimeFilters: 1 \(1\)
+row_regex: RowsRead: 0 \(0\)
 ====
 ---- QUERY
 # Test IN-list filter on empty strings.
@@ -45,9 +45,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 1 items.*
-row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
-row_regex: .*RowsRead: 0 \(0\).*
+row_regex: Filter 0 arrival with 1 items
+row_regex: NumPushedDownRuntimeFilters: 1 \(1\)
+row_regex: RowsRead: 0 \(0\)
 ====
 ---- QUERY
 # Test IN-list filter on tinyint column.
@@ -57,9 +57,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 1 items.*
-row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
-row_regex: .*RowsRead: 0 \(0\).*
+row_regex: Filter 0 arrival with 1 items
+row_regex: NumPushedDownRuntimeFilters: 1 \(1\)
+row_regex: RowsRead: 0 \(0\)
 ====
 ---- QUERY
 # Test IN-list filter on smallint column.
@@ -69,9 +69,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 1 items.*
-row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
-row_regex: .*RowsRead: 0 \(0\).*
+row_regex: Filter 0 arrival with 1 items
+row_regex: NumPushedDownRuntimeFilters: 1 \(1\)
+row_regex: RowsRead: 0 \(0\)
 ====
 ---- QUERY
 # Test IN-list filter on int column.
@@ -81,9 +81,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 1 items.*
-row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
-row_regex: .*RowsRead: 0 \(0\).*
+row_regex: Filter 0 arrival with 1 items
+row_regex: NumPushedDownRuntimeFilters: 1 \(1\)
+row_regex: RowsRead: 0 \(0\)
 ====
 ---- QUERY
 # Test IN-list filter on bigint column.
@@ -93,9 +93,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 1 items.*
-row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
-row_regex: .*RowsRead: 0 \(0\).*
+row_regex: Filter 0 arrival with 1 items
+row_regex: NumPushedDownRuntimeFilters: 1 \(1\)
+row_regex: RowsRead: 0 \(0\)
 ====
 ---- QUERY
 # Test IN-list filter on bigint column.
@@ -105,9 +105,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 2 items.*
-row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
-row_regex: .*RowsRead: 0 \(0\).*
+row_regex: Filter 0 arrival with 2 items
+row_regex: NumPushedDownRuntimeFilters: 1 \(1\)
+row_regex: RowsRead: 0 \(0\)
 ====
 ---- QUERY
 # Test IN-list filter on DATE partition column.
@@ -118,7 +118,7 @@ select STRAIGHT_JOIN count(*) from date_tbl a
 ---- RESULTS
 11
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 17 items.*
+row_regex: Filter 0 arrival with 17 items
 aggregation(SUM, Files rejected): 2
 ====
 ---- QUERY
@@ -129,8 +129,8 @@ select STRAIGHT_JOIN count(*) from date_tbl a
 ---- RESULTS
 11
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 4 items.*
-row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
+row_regex: Filter 0 arrival with 4 items
+row_regex: NumPushedDownRuntimeFilters: 1 \(1\)
 ====
 ---- QUERY
 # Test IN-list filter with NULL.
@@ -142,9 +142,9 @@ select STRAIGHT_JOIN count(*) from nullrows a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 1 items.*
-row_regex: .*NumPushedDownRuntimeFilters: 1 \(1\).*
-row_regex: .*RowsRead: 0 \(0\).*
+row_regex: Filter 0 arrival with 1 items
+row_regex: NumPushedDownRuntimeFilters: 1 \(1\)
+row_regex: RowsRead: 0 \(0\)
 ====
 ---- QUERY
 # Test IN-list filter on complex target expr, i.e. not a simple slot ref.
@@ -156,7 +156,7 @@ select STRAIGHT_JOIN count(*) from functional_orc_def.alltypes a
 ---- RESULTS
 7
 ---- RUNTIME_PROFILE
-row_regex: .*RowsRead: 2.43K \(2433\).*
+row_regex: RowsRead: 2.43K \(2433\)
 ====
 ---- QUERY
 # Test IN-list filter on wide string that exceeds the total string size.
@@ -167,8 +167,8 @@ select STRAIGHT_JOIN count(*) from alltypes a
     join [BROADCAST] widerow b
     on a.string_col = b.string_col
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 arrival with 0 items.*
-row_regex: .*RowsRead: 2.43K \(2433\).*
+row_regex: Filter 0 arrival with 0 items
+row_regex: RowsRead: 2.43K \(2433\)
 ====
 ---- QUERY
 # IMPALA-11707: Regression test on global IN-list filter
@@ -185,8 +185,8 @@ where t.id = a.id and a.tinyint_col = b.tinyint_col and b.id = 0;
 ---- RESULTS
 4
 ---- RUNTIME_PROFILE
-row_regex: .*0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
-row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: 0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
+row_regex: Filter 0 arrival with 1 items
 ====
 ---- QUERY
 # IMPALA-11707: Regression test on global IN-list filter
@@ -195,8 +195,8 @@ where t.id = a.id and a.smallint_col = b.smallint_col and b.id = 0;
 ---- RESULTS
 4
 ---- RUNTIME_PROFILE
-row_regex: .*0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
-row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: 0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
+row_regex: Filter 0 arrival with 1 items
 ====
 ---- QUERY
 # IMPALA-11707: Regression test on global IN-list filter
@@ -205,8 +205,8 @@ where t.id = a.id and a.int_col = b.int_col and b.id = 0;
 ---- RESULTS
 4
 ---- RUNTIME_PROFILE
-row_regex: .*0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
-row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: 0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
+row_regex: Filter 0 arrival with 1 items
 ====
 ---- QUERY
 # IMPALA-11707: Regression test on global IN-list filter
@@ -215,8 +215,8 @@ where t.id = a.id and a.bigint_col = b.bigint_col and b.id = 0;
 ---- RESULTS
 4
 ---- RUNTIME_PROFILE
-row_regex: .*0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
-row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: 0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
+row_regex: Filter 0 arrival with 1 items
 ====
 ---- QUERY
 # IMPALA-11707: Regression test on global IN-list filter
@@ -225,8 +225,8 @@ where t.id = a.id and a.string_col = b.string_col and b.id = 0;
 ---- RESULTS
 4
 ---- RUNTIME_PROFILE
-row_regex: .*0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
-row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: 0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
+row_regex: Filter 0 arrival with 1 items
 ====
 ---- QUERY
 # IMPALA-11707: Regression test on global IN-list filter on DATE type
@@ -243,8 +243,8 @@ where b.id_col < 5;
 ---- RESULTS
 7
 ---- RUNTIME_PROFILE
-row_regex: .*0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+5
-row_regex: .*Filter 0 arrival with 5 items.*
+row_regex: 0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+5
+row_regex: Filter 0 arrival with 5 items
 ====
 ---- QUERY
 # IMPALA-11707: Regression test on global IN-list filter
@@ -261,6 +261,6 @@ where s_nationkey = n_nationkey
 ---- RESULTS
 1987
 ---- RUNTIME_PROFILE
-row_regex: .*0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
-row_regex: .*Filter 0 arrival with 1 items.*
+row_regex: 0\s+4\s+1\s+REMOTE\s+false.*IN_LIST\s+1
+row_regex: Filter 0 arrival with 1 items
 ====

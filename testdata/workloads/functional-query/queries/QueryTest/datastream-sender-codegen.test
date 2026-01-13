@@ -11,7 +11,7 @@ select count(*) from alltypes t1
 bigint
 ---- RUNTIME_PROFILE
 # Verify that codegen was enabled
-row_regex: .*Hash Partitioned Sender Codegen Enabled.*
+row_regex: Hash Partitioned Sender Codegen Enabled
 ====
 ---- QUERY
 set disable_codegen_rows_threshold=0;
@@ -25,7 +25,7 @@ select count(*) from alltypes t1
 bigint
 ---- RUNTIME_PROFILE
 # Verify that codegen was enabled
-row_regex: .*Unpartitioned Sender Codegen Disabled: not needed.*
+row_regex: Unpartitioned Sender Codegen Disabled: not needed
 ====
 ---- QUERY
 set disable_codegen_rows_threshold=0;
@@ -38,5 +38,5 @@ bigint
 ---- RUNTIME_PROFILE
 # Verify that CHAR codegen was enabled for hash partitioning even though CHAR
 # codegen isn't supported everywhere.
-row_regex: .*Hash Partitioned Sender Codegen Enabled.*
+row_regex: Hash Partitioned Sender Codegen Enabled
 ====

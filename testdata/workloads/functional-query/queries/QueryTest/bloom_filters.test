@@ -18,8 +18,8 @@ select count(*) from tpch.orders join tpch.customer on o_comment = c_mktsegment;
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(8.00 KB\).*
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(8.00 KB\)
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -31,8 +31,8 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(128.00 KB\).*
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(128.00 KB\)
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -44,8 +44,8 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(512.00 KB\).*
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(512.00 KB\)
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -57,8 +57,8 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(1.00 MB\).*
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(1.00 MB\)
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -71,8 +71,8 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(2.00 MB\).*
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(2.00 MB\)
 ====
 
 
@@ -90,8 +90,8 @@ select STRAIGHT_JOIN count(*) from alltypes a join [SHUFFLE] alltypes b on a.id 
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*1|2 of 1|2 Runtime Filter Published.*
-row_regex: .*Filter 0 \(128.00 KB\).*
+row_regex: 1|2 of 1|2 Runtime Filter Published
+row_regex: Filter 0 \(128.00 KB\)
 ====
 ---- QUERY
 # Check that filter sizes are rounded up to power-of-two
@@ -101,8 +101,8 @@ select STRAIGHT_JOIN count(*) from alltypes a join [SHUFFLE] alltypes b on a.id 
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*1|2 of 1|2 Runtime Filter Published.*
-row_regex: .*Filter 0 \(128.00 KB\).*
+row_regex: 1|2 of 1|2 Runtime Filter Published
+row_regex: Filter 0 \(128.00 KB\)
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -113,7 +113,7 @@ with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
 select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
     join (select * from l LIMIT 1000000) b on a.l_orderkey = -b.l_orderkey;
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 \(64.00 KB\).*
+row_regex: Filter 0 \(64.00 KB\)
 ====
 
 
@@ -134,8 +134,8 @@ select STRAIGHT_JOIN count(*) from alltypes a join [SHUFFLE] alltypes b on a.id 
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*1|2 of 1|2 Runtime Filter Published.*
-row_regex: .*Filter 0 \(8.00 KB\).*
+row_regex: 1|2 of 1|2 Runtime Filter Published
+row_regex: Filter 0 \(8.00 KB\)
 ====
 ---- QUERY
 ####################################################
@@ -153,6 +153,6 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(256.00 KB\).*
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(256.00 KB\)
 ====

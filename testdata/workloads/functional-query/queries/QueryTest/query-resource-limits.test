@@ -129,7 +129,7 @@ order by
   value desc
 ) t;
 ---- CATCH
-row_regex:.*terminated due to join rows produced exceeds the limit of 10.00k*
+row_regex:.*terminated due to join rows produced exceeds the limit of 10.00K
 ====
 ---- QUERY
 # The query should succeed when it doesn't exceed the join rows produced limit.

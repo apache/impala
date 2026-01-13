@@ -10,7 +10,7 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RESULTS
 620
 ---- RUNTIME_PROFILE
-row_regex: .*Files rejected: 22 \(22\).*
+row_regex: Files rejected: 22 \(22\)
 ====
 ---- QUERY
 # Test that the single-node plan is executable and produces the correct result for a

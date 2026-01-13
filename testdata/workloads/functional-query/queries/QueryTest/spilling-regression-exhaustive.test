@@ -35,8 +35,8 @@ limit 20;
 CHAR
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+row_regex: SpilledRuns: .* \([1-9][0-9]*\)
+row_regex: TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test sort with small input char column materialized before sort.
@@ -74,8 +74,8 @@ limit 20;
 CHAR
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+row_regex: SpilledRuns: .* \([1-9][0-9]*\)
+row_regex: TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test sort with large input char column materialized before sort.
@@ -113,8 +113,8 @@ limit 20;
 CHAR
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+row_regex: SpilledRuns: .* \([1-9][0-9]*\)
+row_regex: TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test sort with varchar column materialized by exprs.
@@ -154,8 +154,8 @@ STRING
 VARCHAR
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+row_regex: SpilledRuns: .* \([1-9][0-9]*\)
+row_regex: TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test sort with input varchar column materialized before sort.
@@ -195,8 +195,8 @@ STRING
 VARCHAR
 ---- RUNTIME_PROFILE
 # Verify that the sort actually spilled
-row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+row_regex: SpilledRuns: .* \([1-9][0-9]*\)
+row_regex: TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Regression test for IMPALA-2612. The following query will cause CastToChar
@@ -216,7 +216,7 @@ from lineitem
 BIGINT
 ---- RUNTIME_PROFILE
 # Verify that the agg spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Same as above, except disable streaming preaggs to ensure that AggregationNode is also
@@ -234,7 +234,7 @@ from lineitem
 BIGINT
 ---- RUNTIME_PROFILE
 # Verify that the agg spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Same as above, except use a non-grouping aggregate function to ensure that
@@ -268,5 +268,5 @@ BIGINT,DECIMAL,DECIMAL,DECIMAL,DECIMAL
 4571042,0.030000,50.000000,0.090000,104399.500000
 1198304,0.010000,50.000000,0.020000,104299.500000
 ---- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====

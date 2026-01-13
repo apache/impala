@@ -34,5 +34,5 @@ select count(*) from functional_parquet.lineitem_sixblocks where l_orderkey % 2 
 BIGINT
 ---- RUNTIME_PROFILE
 # The following should be in the ExecSummary
-row_regex: 00:SCAN [A-Z0-9]+ +1 +1 +.*
+row_regex: 00:SCAN [A-Z0-9]+ +1 +1 +
 ====

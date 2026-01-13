@@ -23,8 +23,8 @@ from
 ---- TYPES
 TIMESTAMP, BIGINT
 ---- RUNTIME_PROFILE
-row_regex: F03:EXCHANGE SENDER .* 1 .* 2 .*
-row_regex: 05:HASH JOIN .* 1 .* 2 .*
-row_regex: F01:EXCHANGE SENDER .* 1 .* 1 .*
-row_regex: 04:SELECT .* 1 .* 1 .*
+row_regex: F03:EXCHANGE SENDER .* 1 .* 2
+row_regex: 05:HASH JOIN .* 1 .* 2
+row_regex: F01:EXCHANGE SENDER .* 1 .* 1
+row_regex: 04:SELECT .* 1 .* 1
 ====

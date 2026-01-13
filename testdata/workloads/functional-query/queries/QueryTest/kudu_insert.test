@@ -326,7 +326,7 @@ insert into allkeytypes values (1,1,1,1,'1','2009-01-01 00:01:00',cast('1' as va
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
-row_regex: .*EXEC_SINGLE_NODE_ROWS_THRESHOLD=0.*
+row_regex: EXEC_SINGLE_NODE_ROWS_THRESHOLD=0
 ====
 ---- QUERY
 create table timestampkey (t timestamp primary key)

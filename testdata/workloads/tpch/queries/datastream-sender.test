@@ -44,5 +44,5 @@ FROM   cte1 t1
 ---- TYPES
 BIGINT, INT, INT, INT, INT
 ---- RUNTIME_PROFILE
-row_regex:.*:EXCHANGE SENDER.*[0-9\.]+ MB.*
+row_regex: :EXCHANGE SENDER.*[0-9\.]+ MB
 =====

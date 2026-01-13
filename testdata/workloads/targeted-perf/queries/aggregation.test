@@ -2726,10 +2726,10 @@ BIGINT,BIGINT,STRING
 -- IMPALA-2581: LIMIT can be used to speed up aggregations
 select distinct l_orderkey from lineitem limit 10;
 ---- RUNTIME_PROFILE
-row_regex: .*FastLimitCheckExceededRows: [1-9][0-9]*
+row_regex: FastLimitCheckExceededRows: [1-9][0-9]*
 ====
 ---- QUERY: PERF_AGG-Q12
 select l_orderkey from lineitem group by 1 limit 10;
 ---- RUNTIME_PROFILE
-row_regex: .*FastLimitCheckExceededRows: [1-9][0-9]*
+row_regex: FastLimitCheckExceededRows: [1-9][0-9]*
 ====

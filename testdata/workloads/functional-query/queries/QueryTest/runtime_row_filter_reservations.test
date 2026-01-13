@@ -48,7 +48,7 @@ select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
     on a.month = b.id and b.int_col = -3
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 \(128.00 MB\).*
+row_regex: Filter 0 \(128.00 MB\)
 aggregation(SUM, Files processed): 24
 aggregation(SUM, Files rejected): 24
 ====
@@ -84,7 +84,7 @@ select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
     on a.month = b.id and b.int_col = -3
 ---- RESULTS
 ---- RUNTIME_PROFILE
-row_regex: .*Filter 0 \(128.00 MB\).*
+row_regex: Filter 0 \(128.00 MB\)
 aggregation(SUM, Files processed): 24
 aggregation(SUM, Files rejected): 24
 ====

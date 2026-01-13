@@ -14,5 +14,5 @@ select * from tbl_ld
 1
 ---- RUNTIME_PROFILE
 # Verify that ValidWriteIdLists is in the profile
-row_regex: .*Loaded ValidWriteIdLists for transactional tables:.*
+row_regex: Loaded ValidWriteIdLists for transactional tables:
 ====

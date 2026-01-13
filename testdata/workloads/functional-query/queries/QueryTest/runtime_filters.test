@@ -13,7 +13,7 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RESULTS
 620
 ---- RUNTIME_PROFILE
-row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K.*
+row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K
 ====
 ---- QUERY
 # Now turn on local filtering: we expect to see a reduction in scan volume.
@@ -27,7 +27,7 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RUNTIME_PROFILE
 aggregation(SUM, Files rejected): 22
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+608.*
+row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+608
 ====
 
 
@@ -46,7 +46,7 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RESULTS
 620
 ---- RUNTIME_PROFILE
-row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K.*
+row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K
 ====
 ---- QUERY
 # Shuffle join, global mode. Expect filters to be propagated.
@@ -59,7 +59,7 @@ on p.month = b.int_col and b.month = 1 and b.string_col = "1"
 ---- RUNTIME_PROFILE
 aggregation(SUM, Files rejected): 22
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+608.*
+row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+608
 ====
 
 
@@ -85,7 +85,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RUNTIME_PROFILE
 aggregation(SUM, Files rejected): 0
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+7.30K[ ]+7.30K.*
+row_regex: 00:SCAN KUDU.*s[ ]+7.30K[ ]+7.30K
 ====
 ---- QUERY
 # Global mode. Scan of 'b' will receive highly effective filter, and will propagate that
@@ -102,7 +102,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 aggregation(SUM, Files rejected): 48
 ---- RUNTIME_PROFILE: table_format=kudu
 aggregation(SUM, RowsRead): 0
-row_regex: 00:SCAN KUDU.*s[ ]+0[ ]+7.30K.*
+row_regex: 00:SCAN KUDU.*s[ ]+0[ ]+7.30K
 ====
 
 
@@ -125,7 +125,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 aggregation(SUM, RowsRead): 8
 aggregation(SUM, Files rejected): 24
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+7.30K[ ]+7.30K.*
+row_regex: 00:SCAN KUDU.*s[ ]+7.30K[ ]+7.30K
 ====
 
 
@@ -159,7 +159,7 @@ aggregation(SUM, FiltersReceived): 0
 aggregation(SUM, Files rejected): 24
 ---- RUNTIME_PROFILE: table_format=kudu
 aggregation(SUM, FiltersReceived): 0
-row_regex: 00:SCAN KUDU.*s[ ]+0[ ]+7.30K.*
+row_regex: 00:SCAN KUDU.*s[ ]+0[ ]+7.30K
 ====
 
 
@@ -195,10 +195,10 @@ select STRAIGHT_JOIN count(*) from alltypes a
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, FiltersReceived): $NUM_FILTER_UPDATES
-row_regex: .*REMOTE.*.s .*.s .*true
+row_regex: REMOTE.*.s .*.s .*true
 ---- RUNTIME_PROFILE: table_format=kudu
 aggregation(SUM, FiltersReceived): 3
-row_regex: .*REMOTE.*.s .*.s .*true
+row_regex: REMOTE.*.s .*.s .*true
 ====
 
 
@@ -219,7 +219,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RUNTIME_PROFILE
 aggregation(SUM, Files rejected): 23
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+7.30K[ ]+7.30K.*
+row_regex: 00:SCAN KUDU.*s[ ]+7.30K[ ]+7.30K
 ====
 
 
@@ -236,7 +236,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K.*
+row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K
 ====
 
 
@@ -256,7 +256,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RUNTIME_PROFILE
 aggregation(SUM, Files rejected): 24
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+0[ ]+7.30K.*
+row_regex: 00:SCAN KUDU.*s[ ]+0[ ]+7.30K
 ====
 
 ---- QUERY
@@ -272,7 +272,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 7308
 ---- RUNTIME_PROFILE
-row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K.*
+row_regex: 00:SCAN.*s[ ]+7.30K[ ]+[0-9\.]+K
 ====
 
 
@@ -299,7 +299,7 @@ select STRAIGHT_JOIN count(*) from alltypesagg a
 ---- RUNTIME_PROFILE
 aggregation(SUM, Files rejected): 10
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+11.00K[ ]+11.00K.*
+row_regex: 00:SCAN KUDU.*s[ ]+11.00K[ ]+11.00K
 ====
 
 
@@ -321,7 +321,7 @@ with t1 as (select month x, bigint_col y from alltypes limit 7301),
 ---- RUNTIME_PROFILE
 aggregation(SUM, Files rejected): 22
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+1.82K.*
+row_regex: 00:SCAN KUDU.*s[ ]+620[ ]+1.82K
 ====
 
 

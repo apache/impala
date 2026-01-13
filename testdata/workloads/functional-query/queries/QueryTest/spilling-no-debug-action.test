@@ -18,7 +18,7 @@ BIGINT
 ---- RESULTS
 173
 ---- RUNTIME_PROFILE
-row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
+row_regex: NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # spilled partition with 0 probe rows, NULL AWARE LEFT ANTI JOIN
@@ -34,7 +34,7 @@ BIGINT
 ---- RESULTS
 287
 ---- RUNTIME_PROFILE
-row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
+row_regex: NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # spilled partition with 0 probe rows, RIGHT OUTER JOIN
@@ -48,7 +48,7 @@ BIGINT
 ---- RESULTS
 12138
 ---- RUNTIME_PROFILE
-row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
+row_regex: NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # spilled partition with 0 probe rows, RIGHT OUTER JOIN
@@ -64,7 +64,7 @@ BIGINT
 ---- RESULTS
 12138
 ---- RUNTIME_PROFILE
-row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
+row_regex: NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # spilled partition with 0 probe rows, RIGHT ANTI JOIN
@@ -78,7 +78,7 @@ BIGINT
 ---- RESULTS
 5995258
 ---- RUNTIME_PROFILE
-row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
+row_regex: NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Aggregation query that will OOM and fail to spill because of IMPALA-3304 without

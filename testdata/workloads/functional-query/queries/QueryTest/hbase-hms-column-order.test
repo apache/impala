@@ -38,7 +38,7 @@ select * from functional_hbase.stringids
 ---- TYPES
 string, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
 ---- RUNTIME_PROFILE
-row_regex: .*key predicates: id = '5'.*
-row_regex: .*start key: 5.*
-row_regex: .*stop key: 5\\0.*
+row_regex: key predicates: id = '5'
+row_regex: start key: 5
+row_regex: stop key: 5\\0
 ====

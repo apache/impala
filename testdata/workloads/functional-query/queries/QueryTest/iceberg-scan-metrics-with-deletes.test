@@ -7,15 +7,15 @@ select * from
   functional_parquet.iceberg_v2_positional_not_all_data_files_have_delete_files FOR SYSTEM_VERSION AS OF NOT_ALL_DATA_FILES_HAVE_DELETE_FILES_SNAPSHOT_ID
 ---- RUNTIME_PROFILE
 Iceberg Plan Metrics for Node 00:
-row_regex:.*total-planning-duration: .+
+row_regex: total-planning-duration:
   result-data-files: 1
   result-delete-files: 0
   total-data-manifests: 1
   total-delete-manifests: 0
   scanned-data-manifests: 1
   skipped-data-manifests: 0
-row_regex:.*total-file-size-in-bytes: .+ \(\d+\)
-row_regex:.*total-delete-file-size-in-bytes: .+ \(\d+\)
+row_regex: total-file-size-in-bytes: .+ \(\d+\)
+row_regex: total-delete-file-size-in-bytes: .+ \(\d+\)
   skipped-data-files: 0
   skipped-delete-files: 0
   scanned-delete-manifests: 0
@@ -24,38 +24,19 @@ row_regex:.*total-delete-file-size-in-bytes: .+ \(\d+\)
   equality-delete-files: 0
   positional-delete-files: 0
 Iceberg Plan Metrics for Node 03:
-row_regex:.*total-planning-duration: .+
-  result-data-files: 1
   result-delete-files: 1
-  total-data-manifests: 1
   total-delete-manifests: 1
-  scanned-data-manifests: 1
-  skipped-data-manifests: 0
-row_regex:.*total-file-size-in-bytes: .+ \(\d+\)
-row_regex:.*total-delete-file-size-in-bytes: .+ \(\d+\)
-  skipped-data-files: 0
-  skipped-delete-files: 0
   scanned-delete-manifests: 1
-  skipped-delete-manifests: 0
   indexed-delete-files: 1
-  equality-delete-files: 0
   positional-delete-files: 1
 Iceberg Plan Metrics for Node 08:
-row_regex:.*total-planning-duration: .+
   result-data-files: 4
   result-delete-files: 2
   total-data-manifests: 4
   total-delete-manifests: 2
   scanned-data-manifests: 4
-  skipped-data-manifests: 0
-row_regex:.*total-file-size-in-bytes: .+ \(\d+\)
-row_regex:.*total-delete-file-size-in-bytes: .+ \(\d+\)
-  skipped-data-files: 0
-  skipped-delete-files: 0
   scanned-delete-manifests: 2
-  skipped-delete-manifests: 0
   indexed-delete-files: 2
-  equality-delete-files: 0
   positional-delete-files: 2
 ====
 ---- QUERY
@@ -68,15 +49,15 @@ select * from
 Iceberg Plan Metrics for Node 00:
         Planning done without Iceberg: no Iceberg scan metrics available.
 Iceberg Plan Metrics for Node 03:
-row_regex:.*total-planning-duration: .+
+row_regex: total-planning-duration:
   result-data-files: 1
   result-delete-files: 1
   total-data-manifests: 1
   total-delete-manifests: 1
   scanned-data-manifests: 1
   skipped-data-manifests: 0
-row_regex:.*total-file-size-in-bytes: .+ \(\d+\)
-row_regex:.*total-delete-file-size-in-bytes: .+ \(\d+\)
+row_regex: total-file-size-in-bytes: .+ \(\d+\)
+row_regex: total-delete-file-size-in-bytes: .+ \(\d+\)
   skipped-data-files: 0
   skipped-delete-files: 0
   scanned-delete-manifests: 1
@@ -85,20 +66,12 @@ row_regex:.*total-delete-file-size-in-bytes: .+ \(\d+\)
   equality-delete-files: 0
   positional-delete-files: 1
 Iceberg Plan Metrics for Node 08:
-row_regex:.*total-planning-duration: .+
   result-data-files: 4
   result-delete-files: 2
   total-data-manifests: 4
   total-delete-manifests: 2
   scanned-data-manifests: 4
-  skipped-data-manifests: 0
-row_regex:.*total-file-size-in-bytes: .+ \(\d+\)
-row_regex:.*total-delete-file-size-in-bytes: .+ \(\d+\)
-  skipped-data-files: 0
-  skipped-delete-files: 0
   scanned-delete-manifests: 2
-  skipped-delete-manifests: 0
   indexed-delete-files: 2
-  equality-delete-files: 0
   positional-delete-files: 2
 ====

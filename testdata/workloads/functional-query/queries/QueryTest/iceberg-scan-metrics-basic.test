@@ -10,15 +10,15 @@ Iceberg Plan Metrics for Node 00:
 select * from functional_parquet.iceberg_partitioned where action='download'
 ---- RUNTIME_PROFILE
 Iceberg Plan Metrics for Node 00:
-row_regex:.*total-planning-duration: .+
+row_regex: total-planning-duration:
 result-data-files: 6
 result-delete-files: 0
 total-data-manifests: 1
 total-delete-manifests: 0
 scanned-data-manifests: 1
 skipped-data-manifests: 0
-row_regex:.*total-file-size-in-bytes: .+ \(\d+\)
-row_regex:.*total-delete-file-size-in-bytes: .+ \(\d+\)
+row_regex: total-file-size-in-bytes: .+ \(\d+\)
+row_regex: total-delete-file-size-in-bytes: .+ \(\d+\)
 skipped-data-files: 14
 skipped-delete-files: 0
 scanned-delete-manifests: 0

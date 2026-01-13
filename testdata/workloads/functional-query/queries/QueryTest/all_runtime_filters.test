@@ -10,7 +10,7 @@ where a.bool_col = (b.bool_col && !b.bool_col)
 29200
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 3650
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -20,7 +20,7 @@ where a.tinyint_col = b.tinyint_col
 5840
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 1460
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -30,7 +30,7 @@ where a.smallint_col = b.smallint_col
 5840
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 1460
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -40,7 +40,7 @@ where a.int_col = b.int_col
 5840
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 1460
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -50,7 +50,7 @@ where a.bigint_col = b.bigint_col
 5840
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 1460
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -60,7 +60,7 @@ where a.float_col = b.float_col
 5840
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 1460
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -70,7 +70,7 @@ where a.double_col = b.double_col
 5840
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 1460
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -80,7 +80,7 @@ where a.string_col = b.string_col
 5840
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 1460
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 # IMPALA-9691: Support Kudu Timestamp and Date Bloom Filter
@@ -91,7 +91,7 @@ where a.timestamp_col = b.timestamp_col
 8
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 8
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -102,7 +102,7 @@ where a.d5_0 = b.d5_0
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -113,7 +113,7 @@ where a.d5_1 = b.d5_1
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -124,7 +124,7 @@ where a.d5_3 = b.d5_3
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -135,7 +135,7 @@ where a.d5_5 = b.d5_5 and b.d5_5 != 0
 37
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 37
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -146,7 +146,7 @@ where a.d5_5 = b.d5_5 and b.d5_5 = 0
 180
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 180
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -157,7 +157,7 @@ where a.d9_0 = b.d9_0
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -168,7 +168,7 @@ where a.d9_1 = b.d9_1
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -179,7 +179,7 @@ where a.d9_5 = b.d9_5
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -190,7 +190,7 @@ where a.d9_9 = b.d9_9 and b.d9_9 != 0
 37
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 37
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -201,7 +201,7 @@ where a.d9_9 = b.d9_9 and b.d9_9 = 0
 306
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 306
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -212,7 +212,7 @@ where a.d14_0 = b.d14_0
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -223,7 +223,7 @@ where a.d14_1 = b.d14_1
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -234,7 +234,7 @@ where a.d14_7 = b.d14_7
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -245,7 +245,7 @@ where a.d14_14 = b.d14_14 and b.d14_14 != 0
 37
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 37
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -256,7 +256,7 @@ where a.d14_14 = b.d14_14 and b.d14_14 = 0
 441
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 441
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -267,7 +267,7 @@ where a.d28_0 = b.d28_0
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -278,7 +278,7 @@ where a.d28_1 = b.d28_1
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -289,7 +289,7 @@ where a.d28_14 = b.d28_14
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -300,7 +300,7 @@ where a.d28_28 = b.d28_28 and b.d28_28 != 0
 37
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 37
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -311,7 +311,7 @@ where a.d28_28 = b.d28_28 and b.d28_28 = 0
 686
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 686
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -322,7 +322,7 @@ where a.d38_0 = b.d38_0
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -333,7 +333,7 @@ where a.d38_1 = b.d38_1
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -344,7 +344,7 @@ where a.d38_19 = b.d38_19
 38
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 38
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -355,7 +355,7 @@ where a.d38_38 = b.d38_38 and b.d38_38 != 0
 37
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 37
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -366,7 +366,7 @@ where a.d38_38 = b.d38_38 and b.d38_38 = 0
 732
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 732
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -377,7 +377,7 @@ where a.date_col = b.date_col and b.date_col = DATE '2017-11-28'
 9
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 3
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 
 
@@ -402,7 +402,7 @@ where a.id = b.tinyint_col * 2;
 INT,TINYINT,INT,TINYINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 2
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 select STRAIGHT_JOIN count(*) from tpch_kudu.orders a
@@ -412,7 +412,7 @@ where a.o_orderkey = b.o_orderkey and b.o_orderkey = 100000;
 1
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 1
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 select STRAIGHT_JOIN count(*) from tpch_kudu.orders a
@@ -422,7 +422,7 @@ where a.o_orderkey = b.o_orderkey and b.o_orderkey != 100000;
 1499999
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 1499999
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 select STRAIGHT_JOIN count(*) from tpch_kudu.orders a
@@ -432,7 +432,7 @@ where a.o_orderkey = b.o_orderkey and b.o_orderkey = 100009;
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 0
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 
 
@@ -450,8 +450,8 @@ where a.tinyint_col = b.int_col and b.int_col in (0, 1)
 1065800
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 1460
-row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*BloomFilterBytes: 0.*
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: BloomFilterBytes: 0
 ====
 
 
@@ -467,7 +467,7 @@ where a.id in (select b.id from alltypes b where b.int_col < 10);
 7300
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 7300
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 
 
@@ -485,7 +485,7 @@ where a.int_col = b.int_col
 5329000
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 7300
-row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: 1 of 1 Runtime Filter Published
 ====
 ---- QUERY
 # Join on the integer type of columns with Kudu as target
@@ -498,7 +498,7 @@ where a.int_col = b.int_col
 5329000
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 7300
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 # Join on the timestamp type of columns with kudu as target
@@ -512,7 +512,7 @@ where a.timestamp_col = b.timestamp_col
 7300
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 7300
-row_regex: .*2 of 2 Runtime Filters Published.*
+row_regex: 2 of 2 Runtime Filters Published
 ====
 ---- QUERY
 # Join on the timestamp type of columns with HDFS as target
@@ -525,5 +525,5 @@ where a.timestamp_col = b.timestamp_col
 7300
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 7300
-row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: 1 of 1 Runtime Filter Published
 ====

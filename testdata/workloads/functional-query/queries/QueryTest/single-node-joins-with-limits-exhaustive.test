@@ -10,7 +10,7 @@ select id, int_col, bigint_col from functional.alltypesagg a
 where int_col not in (select int_col from functional.alltypestiny t
 where a.id = t.id) limit 10995;
 ---- RUNTIME_PROFILE
-row_regex: .*RowsProduced: 10.99..\W10995\W
+row_regex: RowsProduced: 10.99..\W10995\W
 ====
 ---- QUERY
 # Test to verify that is limit_ is correctly enforced when
@@ -20,7 +20,7 @@ set buffer_pool_limit=180m;
 select * from tpch.lineitem t1 full outer join tpch.lineitem t2 on
 t1.l_orderkey = t2.l_orderkey limit 10;
 ---- RUNTIME_PROFILE
-row_regex: .*RowsProduced: 10 .
+row_regex: RowsProduced: 10 .
 ====
 ---- QUERY
 # IMPALA-4866: Hash join node does not apply limits correctly
@@ -31,7 +31,7 @@ select straight_join t1.id, t2.id from functional.alltypes t1
 right join functional.alltypes t2 on t1.id = t2.int_col + 100000
 limit 5;
 ---- RUNTIME_PROFILE
-row_regex: .*RowsProduced: 5 .
+row_regex: RowsProduced: 5 .
 ====
 ---- QUERY
 # IMPALA-4866: Hash join node does not apply limits correctly
@@ -41,5 +41,5 @@ set batch_size=10;
 select straight_join t1.id, t2.id from functional.alltypes t1
 inner join functional.alltypes t2 on t1.id = t2.id limit 5;
 ---- RUNTIME_PROFILE
-row_regex: .*RowsProduced: 5 .
+row_regex: RowsProduced: 5 .
 ====

@@ -11,5 +11,5 @@ select count(*) from functional_parquet.iceberg_lineitem_sixblocks where l_order
 BIGINT
 ---- RUNTIME_PROFILE
 # The following should be in the ExecSummary
-row_regex: 00:SCAN [A-Z0-9]+ +1 +1 +.*
+row_regex: 00:SCAN [A-Z0-9]+ +1 +1 +
 ====

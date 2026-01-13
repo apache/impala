@@ -4,7 +4,7 @@
 set scratch_limit=-1;
 select o_orderdate, o_custkey, o_comment from tpch.orders limit 100000;
 ---- RUNTIME_PROFILE
-row_regex: .*set by configuration and planner.*
+row_regex: set by configuration and planner
 row_regex: \|  mem-estimate=8.63MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 ====
 ---- QUERY
@@ -12,7 +12,7 @@ row_regex: \|  mem-estimate=8.63MB mem-reservation=4.00MB spill-buffer=2.00MB th
 set scratch_limit=0;
 select o_orderdate, o_custkey, o_comment from tpch.orders limit 100000;
 ---- RUNTIME_PROFILE
-row_regex: .*set by configuration and planner.*SPOOL_QUERY_RESULTS=0
+row_regex: set by configuration and planner.*SPOOL_QUERY_RESULTS=0
 row_regex: \|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 ====
 ---- QUERY
@@ -21,7 +21,7 @@ row_regex: \|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 set scratch_limit=2m;
 select o_orderdate, o_custkey, o_comment from tpch.orders limit 100000;
 ---- RUNTIME_PROFILE
-row_regex: .*set by configuration and planner.*SPOOL_QUERY_RESULTS=0
+row_regex: set by configuration and planner.*SPOOL_QUERY_RESULTS=0
 row_regex: \|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 ====
 ---- QUERY
@@ -30,7 +30,7 @@ row_regex: \|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 set scratch_limit=7m;
 select o_orderdate, o_custkey, o_comment from tpch.orders limit 100000;
 ---- RUNTIME_PROFILE
-row_regex: .*set by configuration and planner.*MAX_RESULT_SPOOLING_MEM=5242880,MAX_SPILLED_RESULT_SPOOLING_MEM=5242880
+row_regex: set by configuration and planner.*MAX_RESULT_SPOOLING_MEM=5242880,MAX_SPILLED_RESULT_SPOOLING_MEM=5242880
 row_regex: \|  mem-estimate=5.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 ====
 ---- QUERY
@@ -39,6 +39,6 @@ row_regex: \|  mem-estimate=5.00MB mem-reservation=4.00MB spill-buffer=2.00MB th
 set scratch_limit=200m;
 select o_orderdate, o_custkey, o_comment from tpch.orders limit 100000;
 ---- RUNTIME_PROFILE
-row_regex: .*set by configuration and planner.*MAX_SPILLED_RESULT_SPOOLING_MEM=207618048
+row_regex: set by configuration and planner.*MAX_SPILLED_RESULT_SPOOLING_MEM=207618048
 row_regex: \|  mem-estimate=8.63MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 ====

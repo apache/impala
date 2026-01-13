@@ -27,7 +27,7 @@ INT,TIMESTAMP,INT,TIMESTAMP
 10,2011-11-06 01:40:00,7,2011-11-06 01:40:00
 10,2011-11-06 01:40:00,10,2011-11-06 01:40:00
 ---- RUNTIME_PROFILE
-row_regex: .*RF00.\[min_max\] <- from_utc_timestamp\(t2.ts, 'America/Los_Angeles'\).*
+row_regex: RF00.\[min_max\] <- from_utc_timestamp\(t2.ts, 'America/Los_Angeles'\)
 ====
 ---- QUERY
 # Test that kudu min_max runtime filter with timestamps can be work correctly in the
@@ -41,7 +41,7 @@ INT,BIGINT,TIMESTAMP,STRING
 5,1320566400,2011-11-06 01:00:00,'2011-11-06 01:00:00'
 8,1320570000,2011-11-06 01:00:00,'2011-11-06 01:00:00'
 ---- RUNTIME_PROFILE
-row_regex: .*RF00.\[min_max\] <- t2.ts.*
+row_regex: RF00.\[min_max\] <- t2.ts
 ====
 ---- QUERY
 # Test that kudu bloom runtime filter with timestamps can be work correctly in the
@@ -69,5 +69,5 @@ INT,TIMESTAMP,TIMESTAMP
 9,2011-11-06 17:20:00,2011-11-06 09:20:00
 10,2011-11-06 17:40:00,2011-11-06 09:40:00
 ---- RUNTIME_PROFILE
-row_regex: .*RF00.\[bloom\] <- utc_to_unix_micros\(to_utc_timestamp\(from_utc_timestamp\(t2.ts, 'Asia/Shanghai'\), 'Asia/Shanghai'\)\).*
+row_regex: RF00.\[bloom\] <- utc_to_unix_micros\(to_utc_timestamp\(from_utc_timestamp\(t2.ts, 'Asia/Shanghai'\), 'Asia/Shanghai'\)\)
 ====

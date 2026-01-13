@@ -6,7 +6,7 @@ select min(string_col) from alltypes
 ---- RESULTS
 '0'
 ---- RUNTIME_PROFILE
-row_regex:.*AdmissionSlots: 4.*
+row_regex:AdmissionSlots: 4
 ====
 ---- QUERY
 # 2 partitions across 3 backends means that we'll get 1 finstance per backend
@@ -15,7 +15,7 @@ select min(string_col) from alltypes where month = 1
 ---- RESULTS
 '0'
 ---- RUNTIME_PROFILE
-row_regex:.*AdmissionSlots: 1.*
+row_regex:AdmissionSlots: 1
 ====
 ---- QUERY
 # 7 partitions across 3 backends results in 3 finstances on one backend and 2
@@ -25,8 +25,8 @@ select min(string_col) from alltypes where month <= 7 and year = 2009
 ---- RESULTS
 '0'
 ---- RUNTIME_PROFILE
-row_regex:.*AdmissionSlots: 2.*
-row_regex:.*AdmissionSlots: 3.*
+row_regex:AdmissionSlots: 2
+row_regex:AdmissionSlots: 3
 ====
 ---- QUERY
 # This query should have three scans in the same fragment. The scan of 'alltypes'
@@ -40,13 +40,13 @@ select min(string_col) from (
 ---- RESULTS
 '0'
 ---- RUNTIME_PROFILE
-row_regex:.*AdmissionSlots: 4 .*
-row_regex:.*F04:ROOT * 1 * 1 .*
-row_regex:.*04:AGGREGATE * 3 * 12 .*
-row_regex:.*00:UNION * 3 * 12 *
-row_regex:.*02:SCAN (HDFS|OZONE) * 3 * 12 .*alltypessmall.*
-row_regex:.*03:SCAN (HDFS|OZONE) * 3 * 12 .*alltypestiny.*
-row_regex:.*01:SCAN (HDFS|OZONE) * 3 * 12 .*alltypes.*
+row_regex: AdmissionSlots: 4
+row_regex: F04:ROOT * 1 * 1
+row_regex: 04:AGGREGATE * 3 * 12
+row_regex: 00:UNION * 3 * 12 *
+row_regex: 02:SCAN (?:HDFS|OZONE) * 3 * 12 .*alltypessmall
+row_regex: 03:SCAN (?:HDFS|OZONE) * 3 * 12 .*alltypestiny
+row_regex: 01:SCAN (?:HDFS|OZONE) * 3 * 12 .*alltypes
 ====
 ---- QUERY
 # Same idea, but with smallest scan first to check that the scheduler is taking the
@@ -60,13 +60,13 @@ select min(string_col) from (
 ---- RESULTS
 '0'
 ---- RUNTIME_PROFILE
-row_regex:.*AdmissionSlots: 4 .*
-row_regex:.*F04:ROOT * 1 * 1 .*
-row_regex:.*04:AGGREGATE * 3 * 12 .*
-row_regex:.*00:UNION * 3 * 12 *
-row_regex:.*02:SCAN (HDFS|OZONE) * 3 * 12 .*alltypessmall.*
-row_regex:.*03:SCAN (HDFS|OZONE) * 3 * 12 .*alltypes.*
-row_regex:.*01:SCAN (HDFS|OZONE) * 3 * 12 .*alltypestiny.*
+row_regex: AdmissionSlots: 4
+row_regex: F04:ROOT * 1 * 1
+row_regex: 04:AGGREGATE * 3 * 12
+row_regex: 00:UNION * 3 * 12 *
+row_regex: 02:SCAN (?:HDFS|OZONE) * 3 * 12 .*alltypessmall
+row_regex: 03:SCAN (?:HDFS|OZONE) * 3 * 12 .*alltypes
+row_regex: 01:SCAN (?:HDFS|OZONE) * 3 * 12 .*alltypestiny
 ====
 ---- QUERY
 # This query should have one scan and one exchange in the interior fragment.
@@ -79,14 +79,14 @@ select min(string_col) from (
 ---- RESULTS
 '0'
 ---- RUNTIME_PROFILE
-row_regex:.*AdmissionSlots: 4.*
-row_regex:.*F04:ROOT * 1 * 1 .*
-row_regex:.*04:AGGREGATE * 3 * 12 .*
-row_regex:.*06:AGGREGATE * 3 * 12 .*
-row_regex:.*03:AGGREGATE * 3 * 12 .*
-row_regex:.*00:UNION * 3 * 12 *
-row_regex:.*02:SCAN (HDFS|OZONE) * 3 * 12 .*alltypes.*
-row_regex:.*01:SCAN (HDFS|OZONE) * 3 * 12 .*alltypestiny.*
+row_regex:AdmissionSlots: 4
+row_regex: F04:ROOT * 1 * 1
+row_regex: 04:AGGREGATE * 3 * 12
+row_regex: 06:AGGREGATE * 3 * 12
+row_regex: 03:AGGREGATE * 3 * 12
+row_regex: 00:UNION * 3 * 12 *
+row_regex: 02:SCAN (?:HDFS|OZONE) * 3 * 12 .*alltypes
+row_regex: 01:SCAN (?:HDFS|OZONE) * 3 * 12 .*alltypestiny
 ====
 ---- QUERY
 # This query should have one scan and one exchange in the interior fragment.
@@ -101,14 +101,14 @@ select min(string_col) from (
 ---- RESULTS
 '0'
 ---- RUNTIME_PROFILE
-row_regex:.*AdmissionSlots: 4.*
-row_regex:.*F04:ROOT * 1 * 1 .*
-row_regex:.*04:AGGREGATE * 3 * 12 .*
-row_regex:.*06:AGGREGATE * 3 * 12 .*
-row_regex:.*03:AGGREGATE * 3 * 4 .*
-row_regex:.*00:UNION * 3 * 12 *
-row_regex:.*02:SCAN (HDFS|OZONE) * 3 * 4 .*alltypestiny.*
-row_regex:.*01:SCAN (HDFS|OZONE) * 3 * 12 .*alltypes.*
+row_regex:AdmissionSlots: 4
+row_regex: F04:ROOT * 1 * 1
+row_regex: 04:AGGREGATE * 3 * 12
+row_regex: 06:AGGREGATE * 3 * 12
+row_regex: 03:AGGREGATE * 3 * 4
+row_regex: 00:UNION * 3 * 12 *
+row_regex: 02:SCAN (?:HDFS|OZONE) * 3 * 4 .*alltypestiny
+row_regex: 01:SCAN (?:HDFS|OZONE) * 3 * 12 .*alltypes
 ====
 ---- QUERY
 # This query should have one scan and two exchanges in the interior fragment.
@@ -123,13 +123,13 @@ select min(string_col) from (
 ---- RESULTS
 '0'
 ---- RUNTIME_PROFILE
-row_regex:.*F06:ROOT * 1 * 1 .*
-row_regex:.*AdmissionSlots: 2.*
-row_regex:.*00:UNION * 3 * 6 .*
-row_regex:.*08:AGGREGATE * 3 * 6 .*
-row_regex:.*03:AGGREGATE * 3 * 6 .*
-row_regex:.*04:SCAN (HDFS|OZONE) * 3 * 6 .*
-row_regex:.*01:SCAN (HDFS|OZONE) * 3 * 6 .*
+row_regex: F06:ROOT * 1 * 1
+row_regex:AdmissionSlots: 2
+row_regex: 00:UNION * 3 * 6
+row_regex: 08:AGGREGATE * 3 * 6
+row_regex: 03:AGGREGATE * 3 * 6
+row_regex: 04:SCAN (?:HDFS|OZONE) * 3 * 6
+row_regex: 01:SCAN (?:HDFS|OZONE) * 3 * 6
 ====
 ---- QUERY: TPCDS-Q11
 with year_total as (
@@ -302,8 +302,8 @@ limit 100;
 ---- TYPES
 STRING, STRING, STRING, STRING
 ---- RUNTIME_PROFILE
-row_regex:.*21:UNION * 2 * 2 .*
-row_regex:.*00:UNION * 3 * 12 .*
-row_regex:.*14:UNION * 2 * 2 .*
-row_regex:.*07:UNION * 3 * 12 .*
+row_regex: 21:UNION * 2 * 2
+row_regex: 00:UNION * 3 * 12
+row_regex: 14:UNION * 2 * 2
+row_regex: 07:UNION * 3 * 12
 ====

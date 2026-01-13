@@ -21,7 +21,7 @@ select * from tpch_parquet.lineitem l
     join tpch_parquet.orders o on l.l_orderkey = o.o_orderkey
     where o_orderdate='1992-06-22' and o_totalprice = 153827.26;
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: 1 of 1 Runtime Filter Published
 aggregation(SUM, NumPagesSkippedByLateMaterialization)> 0
 ====
 ---- QUERY
@@ -34,7 +34,7 @@ select * from tpch_parquet.lineitem l
     join tpch_parquet.orders o on l.l_orderkey = o.o_orderkey
     where o_orderdate='1996-12-01' and o_totalprice >= 250000;
 ---- RUNTIME_PROFILE
-row_regex:.* RF00.\[min_max\] -. .\.l_orderkey.*
+row_regex: RF00.\[min_max\] -. .\.l_orderkey
 aggregation(SUM, NumPagesSkippedByLateMaterialization)> 0
 ====
 ---- QUERY

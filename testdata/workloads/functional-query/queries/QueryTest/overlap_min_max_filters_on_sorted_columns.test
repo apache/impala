@@ -32,9 +32,9 @@ and b.o_custkey = 5
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Number of filters: 2.*
-row_regex: .*0.+0 \(\d+\).+true.+1.00 MB.*
-row_regex: .*1.+0 \(\d+\).+true.+MIN_MAX\s+224167\s+2630562.*
+row_regex: Number of filters: 2
+row_regex: 0.+0 \(\d+\).+true.+1.00 MB
+row_regex: 1.+0 \(\d+\).+true.+MIN_MAX\s+224167\s+2630562
 ====
 ---- QUERY
 # Turn off the min/max filter on leading sort by column. Only the bloom filter will be
@@ -53,7 +53,7 @@ and b.o_custkey = 5
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*0.+0 \(\d+\).+true.+1.00 MB.*
+row_regex: 0.+0 \(\d+\).+true.+1.00 MB
 ====
 ---- QUERY
 ##################################################
@@ -366,5 +366,5 @@ lineitem_orderkey_partkey_only where l_orderkey < 3000);
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRuntimeFilteredRowGroups): 2
 aggregation(SUM, NumRuntimeFilteredPages)> 200
-row_regex:.*NESTED LOOP JOIN.*
+row_regex: NESTED LOOP JOIN
 ====

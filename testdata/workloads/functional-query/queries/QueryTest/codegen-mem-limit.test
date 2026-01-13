@@ -8,5 +8,5 @@ with t as (values(1), (2), (3), (4)) select min(t1.`1` + t2.`1`) from t t1 join 
 ---- CATCH
 Codegen failed to reserve
 ---- RUNTIME_PROFILE
-row_regex: .*EXEC_SINGLE_NODE_ROWS_THRESHOLD=0.*
+row_regex: EXEC_SINGLE_NODE_ROWS_THRESHOLD=0
 ====
