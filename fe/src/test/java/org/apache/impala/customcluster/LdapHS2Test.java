@@ -1051,22 +1051,22 @@ public class LdapHS2Test {
     // Cookie should be reloaded with the new key.
     writeCookieSecret(keyFile);
     String respMessage = retryUntilSuccess(() -> {
-      try (THttpClient transport = new THttpClient("http://localhost:28000")) {
+      try (CloseableHttpClient clientImpl = HttpClients.createDefault();
+          THttpClient transport = new THttpClient("http://localhost:28000", clientImpl)) {
         transport.setCustomHeader("Cookie", cookie[0]);
         transport.open();
         TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
 
         // Open a session which will get username 'Test1Ldap'. Failure is expected since
         // the cookie_secret_file has changed.
-        TOpenSessionReq openReq = new TOpenSessionReq();
         try {
-          client.OpenSession(openReq);
-          throw new Exception("Expected failure due to changed cookie secret.");
+          client.OpenSession(new TOpenSessionReq());
         } catch (Exception e) {
           return e.getMessage();
         }
+        throw new Exception("Expected failure due to changed cookie secret.");
       }
     }, 20, 100);
-    assertEquals(respMessage, "HTTP Response code: 401");
+    assertEquals("HTTP Response code: 401", respMessage);
   }
 }
