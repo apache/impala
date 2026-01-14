@@ -2406,10 +2406,8 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     assert new_total_bytes < old_total_bytes * 1.1
     # Check if the admission state map size stays 1 all the time, which is
     # the long running query.
-    admissiond_log = self.get_ac_log_name()
-    self.assert_log_contains(admissiond_log, 'INFO',
-      "Current admission state map size: {}".format(1),
-      expected_count=number_of_iterations)
+    admission_state_size = ac.get_metric_value("admission-control-service.num-queries")
+    assert admission_state_size == 1
 
     # Cleanup clients.
     client1.close()

@@ -137,8 +137,8 @@ Status AdmissiondEnv::Init() {
   DCHECK(admission_control_svc_);
   DCHECK(admission_controller_);
   admission_controller_->RegisterAdmissionMapCleanupCallback(
-      [&](const UniqueIdPB& query_id) {
-        admission_control_svc_->CleanupAdmissionStateMapAsync(query_id);
+      [&](const UniqueIdPB& query_id, const char* caller_func) {
+        admission_control_svc_->CleanupAdmissionStateMapAsync(query_id, caller_func);
       });
 
   RETURN_IF_ERROR(cluster_membership_mgr_->Init());

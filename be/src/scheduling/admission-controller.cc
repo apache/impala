@@ -2656,7 +2656,7 @@ void AdmissionController::TryDequeue() {
       if (is_cancelled) {
         VLOG_QUERY << "Dequeued cancelled query=" << PrintId(query_id);
         if (admission_map_cleanup_cb_) {
-          admission_map_cleanup_cb_(query_id);
+          admission_map_cleanup_cb_(query_id, __func__);
         }
         return; // next query
       }

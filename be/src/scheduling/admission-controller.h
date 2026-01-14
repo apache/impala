@@ -485,7 +485,8 @@ class AdmissionController {
   };
 
   // Callback type for cleaning up the admission map.
-  using AdmissionMapCleanupCb = std::function<void(const UniqueIdPB&)>;
+  using AdmissionMapCleanupCb =
+      std::function<void(const UniqueIdPB&, const char* caller_func)>;
 
   // Register the callback function for admission map cleanup.
   void RegisterAdmissionMapCleanupCallback(AdmissionMapCleanupCb cb) {

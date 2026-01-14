@@ -81,7 +81,7 @@ class AdmissionControlService : public AdmissionControlServiceIf,
 
   /// Asyncly queues a request to remove the query from admission_state_map_.
   /// This is non-blocking, thread-safe, and avoids deadlocks with the caller.
-  void CleanupAdmissionStateMapAsync(const UniqueIdPB& query_id);
+  void CleanupAdmissionStateMapAsync(const UniqueIdPB& query_id, const char* caller_func);
 
  private:
   friend class ImpalaHttpHandler;
@@ -183,8 +183,8 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   /// Condition variable to wake up the cleanup thread.
   std::condition_variable cleanup_queue_cv_;
 
-  /// Queue of query ids waiting to be removed from the map.
-  std::deque<UniqueIdPB> admission_state_cleanup_queue_;
+  /// Queue of query ids and the caller function name waiting to be removed from the map.
+  std::deque<std::pair<UniqueIdPB, const char*>> admission_state_cleanup_queue_;
 };
 
 } // namespace impala

@@ -241,7 +241,7 @@ void AdmissionControlService::GetQueryStatus(const GetQueryStatusRequestPB* req,
     // a retry may fail with an "Invalid handle" error because the entry is gone.
     // This is okay and doesn't cause any real problem.
     // To make it more robust, we may delay the removal using a time-based approach.
-    discard_result(admission_state_map_.Delete(req->query_id()));
+    CleanupAdmissionStateMapAsync(req->query_id(), __func__);
     VLOG(3) << "Current admission state map size: " << admission_state_map_.Count();
   }
   RespondAndReleaseRpc(status, resp, rpc_context);
@@ -265,7 +265,9 @@ void AdmissionControlService::ReleaseQuery(const ReleaseQueryRequestPB* req,
     }
   }
 
-  RESPOND_IF_ERROR(admission_state_map_.Delete(req->query_id()));
+  // Use async cleanup as the centralized way for admission state deletion, the
+  // client should not need to handle deletion errors of this internal map.
+  CleanupAdmissionStateMapAsync(req->query_id(), __func__);
   RespondAndReleaseRpc(Status::OK(), resp, rpc_context);
 }
 
@@ -326,9 +328,7 @@ void AdmissionControlService::AdmissionHeartbeat(const AdmissionHeartbeatRequest
           req->host_id(), query_ids);
 
   for (const UniqueIdPB& query_id : cleaned_up) {
-    // ShardedQueryMap::Delete will log an error already if anything goes wrong, so just
-    // ignore the return value.
-    discard_result(admission_state_map_.Delete(query_id));
+    CleanupAdmissionStateMapAsync(query_id, __func__);
   }
 
   RespondAndReleaseRpc(Status::OK(), resp, rpc_context);
@@ -343,9 +343,7 @@ void AdmissionControlService::CancelQueriesOnFailedCoordinators(
 
   for (const auto& entry : cleaned_up) {
     for (const UniqueIdPB& query_id : entry.second) {
-      // ShardedQueryMap::Delete will log an error already if anything goes wrong, so just
-      // ignore the return value.
-      discard_result(admission_state_map_.Delete(query_id));
+      CleanupAdmissionStateMapAsync(query_id, __func__);
     }
   }
 }
@@ -404,10 +402,11 @@ bool AdmissionControlService::CheckAndUpdateHeartbeat(
   return false;
 }
 
-void AdmissionControlService::CleanupAdmissionStateMapAsync(const UniqueIdPB& query_id) {
+void AdmissionControlService::CleanupAdmissionStateMapAsync(
+    const UniqueIdPB& query_id, const char* caller_func) {
   {
     std::lock_guard<std::mutex> lock(cleanup_queue_lock_);
-    admission_state_cleanup_queue_.push_back(query_id);
+    admission_state_cleanup_queue_.emplace_back(query_id, caller_func);
   }
   cleanup_queue_cv_.notify_all();
 }
@@ -418,12 +417,13 @@ void AdmissionControlService::AdmissionStateMapCleanupLoop() {
     cleanup_queue_cv_.wait(lock,
         [&] { return !admission_state_cleanup_queue_.empty() || shutdown_.load(); });
     if (admission_state_cleanup_queue_.empty() && shutdown_.load()) return;
-    std::deque<UniqueIdPB> local_queue;
+    std::deque<std::pair<UniqueIdPB, const char*>> local_queue;
     std::swap(local_queue, admission_state_cleanup_queue_);
     lock.unlock();
-    for (const UniqueIdPB& query_id : local_queue) {
-      discard_result(admission_state_map_.Delete(query_id));
-      VLOG_QUERY << "Cleaned up admission state map for query=" << PrintId(query_id);
+    for (const auto& entry : local_queue) {
+      discard_result(admission_state_map_.Delete(entry.first));
+      VLOG_QUERY << "Cleaned up admission state map for query=" << PrintId(entry.first)
+                 << ", triggered by function: " << entry.second;
     }
     lock.lock();
   }
