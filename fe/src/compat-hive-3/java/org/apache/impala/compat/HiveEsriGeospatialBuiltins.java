@@ -94,8 +94,8 @@ public class HiveEsriGeospatialBuiltins {
         new ST_M(), new ST_MaxM(), new ST_MaxZ(),
         new ST_MinM(), new ST_MinZ(), new ST_MLineFromWKB(),
         new ST_MPointFromWKB(), new ST_MPolyFromWKB(), new ST_NumGeometries(),
-        new ST_NumInteriorRing(), new ST_NumPoints(), new ST_Point(),
-        new ST_PointFromWKB(), new ST_PointN(), new ST_PointZ(), new ST_PolyFromWKB(),
+        new ST_NumInteriorRing(), new ST_NumPoints(),
+        new ST_PointFromWKB(), new ST_PointN(), new ST_PolyFromWKB(),
         new ST_Relate(),  new ST_StartPoint(), new ST_SymmetricDiff(),
         new ST_Z());
 
@@ -115,6 +115,8 @@ public class HiveEsriGeospatialBuiltins {
         db.addBuiltin(fn);
       }
     }
+    // st_point is a special case as it has both Java and native overloads
+    addJavaStPoint(db, addNatives);
   }
 
   private static void addGenericUDFs(Db db) {
@@ -178,6 +180,26 @@ public class HiveEsriGeospatialBuiltins {
     for (ScalarFunction function : varargsUDFs) {
       db.addBuiltin(function);
     }
+  }
+
+  private static void addJavaStPoint(Db db, boolean addNatives) {
+    // Create only specific overloads for st_point and st_pointz.
+    // Unlike Hive, overloads with more dimensions are not added to avoid conflict with
+    // PostGis's optional "integer srid=unknown" argument, which is implicitly castable
+    // from double. See HIVE-29395 for details.
+    // There is no ST_PointM and ST_PointZM at the moment so points with M dimension can
+    // be created only with the WKT constructor.
+    if (!addNatives) {
+      Type[] args2d = {Type.DOUBLE, Type.DOUBLE};
+      db.addBuiltin(
+          createScalarFunction(ST_Point.class, "st_point", Type.BINARY, args2d));
+    }
+    Type[] args3d = {Type.DOUBLE, Type.DOUBLE, Type.DOUBLE};
+    db.addBuiltin(
+        createScalarFunction(ST_PointZ.class, "st_pointz", Type.BINARY, args3d));
+    Type[] argsWkt = {Type.STRING};
+    db.addBuiltin(
+        createScalarFunction(ST_Point.class, "st_point", Type.BINARY, argsWkt));
   }
 
   private static List<ScalarFunction> extractFromLegacyHiveBuiltin(
@@ -248,6 +270,7 @@ public class HiveEsriGeospatialBuiltins {
 
   private static void addNatives(Db db) {
     // Legacy UDFs.
+
     // Accessors.
     addNative(db, "st_MinX", false, Type.DOUBLE, Type.BINARY);
     addNative(db, "st_MaxX", false, Type.DOUBLE, Type.BINARY);
@@ -258,6 +281,10 @@ public class HiveEsriGeospatialBuiltins {
     addNative(db, "st_Srid", false, Type.INT, Type.BINARY);
     addNative(db, "st_SetSrid", false, Type.BINARY, Type.BINARY, Type.INT);
     addNative(db, "st_GeometryType", false, Type.STRING, Type.BINARY);
+
+    // Constructors.
+    // Other point constructors are added as Java UDFs, see addJavaStPoint().
+    addNative(db, "st_Point", false, Type.BINARY, Type.DOUBLE, Type.DOUBLE);
 
     // Predicates.
     addNative(db, "st_EnvIntersects", false, Type.BOOLEAN, Type.BINARY, Type.BINARY);

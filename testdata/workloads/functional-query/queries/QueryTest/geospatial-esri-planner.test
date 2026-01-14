@@ -35,9 +35,9 @@ predicates: st_envintersects(binary_col, st_point(CAST(id AS DOUBLE), CAST(id AS
 # Check that AddEnvIntersectsRule does NOT add st_envintersects() if child expressions
 # are expensive (more than 2 Java function calls).
 select * from functional.alltypestiny
-where st_touches(st_point(double_col, double_col), st_point(id, id))
+where st_touches(st_point(string_col), st_point(string_col))
 ---- RUNTIME_PROFILE
-predicates: st_touches(st_point(double_col, double_col), st_point(CAST(id AS DOUBLE), CAST(id AS DOUBLE)))
+predicates: st_touches(st_point(string_col), st_point(string_col))
 ====
 ---- QUERY
 # Check that PointEnvIntersectsRule is applied and st_envintersects() on st_point(x,y)
@@ -77,7 +77,7 @@ INT,DOUBLE,FLOAT
 20,0.0,0.0
 21,10.1,1.100000023841858
 ---- RUNTIME_PROFILE
-row_regex: .*predicates: double_col <= CAST\(20 AS DOUBLE\), double_col >= CAST\(-1 AS DOUBLE\), CAST\(float_col AS DOUBLE\) <= CAST\(20.5 AS DOUBLE\), CAST\(float_col AS DOUBLE\) >= CAST\(0 AS DOUBLE\), st_intersects.*
+row_regex: predicates: double_col <= CAST\(20 AS DOUBLE\), double_col >= CAST\(-1 AS DOUBLE\), CAST\(float_col AS DOUBLE\) <= CAST\(20.5 AS DOUBLE\), CAST\(float_col AS DOUBLE\) >= CAST\(0 AS DOUBLE\), st_intersects
 parquet statistics predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
 parquet dictionary predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
 =====
@@ -92,5 +92,5 @@ BIGINT
 ---- RESULTS
 25
 ---- RUNTIME_PROFILE
-row_regex: .*predicates: st_envintersects\(\'unhex\(\".*\"\)\', st_point\(sqrt\(double_col\), sqrt\(CAST\(float_col AS DOUBLE\)\)\)\)
+row_regex: predicates: st_envintersects\(\'unhex\(\".*\"\)\', st_point\(sqrt\(double_col\), sqrt\(CAST\(float_col AS DOUBLE\)\)\)\)
 =====

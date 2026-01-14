@@ -291,4 +291,17 @@ inline bool bBoxIntersects(const StringVal& lhs_geom, const StringVal rhs_geom,
   return true;
 }
 
+inline StringVal createStPoint(FunctionContext* ctx, double x, double y,
+    uint32_t srid = 0) {
+  StringVal res(ctx, MIN_POINT_SIZE);
+
+  setSrid(res, srid);
+  setOGCType(res, ST_POINT);
+  setEsriType(res, ShapePoint);
+  setMinX(res, x);
+  setMinY(res, y);
+
+  return res;
+}
+
 } // namespace impala

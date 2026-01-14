@@ -95,6 +95,15 @@ StringVal GeospatialFunctions::st_SetSrid(FunctionContext* ctx, const StringVal&
   return res;
 }
 
+// Constructors
+
+StringVal GeospatialFunctions::st_Point(FunctionContext* ctx, const DoubleVal& x,
+    const DoubleVal& y) {
+  if (x.is_null) return StringVal::null();
+  if (y.is_null) return StringVal::null();
+  return createStPoint(ctx, x.val, y.val, 0);
+}
+
 // Predicates
 
 BooleanVal GeospatialFunctions::st_EnvIntersects(

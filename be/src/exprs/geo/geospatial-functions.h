@@ -50,6 +50,9 @@ class GeospatialFunctions {
   static StringVal st_SetSrid(FunctionContext* ctx, const StringVal& geom,
       const IntVal& srid);
 
+  // Constructors
+  static StringVal st_Point(FunctionContext* ctx, const DoubleVal& x, const DoubleVal& y);
+
   // Predicates
   static BooleanVal st_EnvIntersects(
       FunctionContext* ctx, const StringVal& lhs,const StringVal& rhs);
