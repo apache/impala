@@ -1564,7 +1564,11 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     // It's best effort to make the members in 'progressInfo' consistent but we can't
     // guarantee it.
     List<NotificationEvent> eventBatch = currentEventBatch_;
+    long batchStartTimeMs = currentBatchStartTimeMs_;
     List<MetastoreEvent> filteredEvents = currentFilteredEvents_;
+    MetastoreEvent filteredEvent = currentFilteredEvent_;
+    long eventStartTimeMs = currentEventStartTimeMs_;
+    int eventIndex = currentEventIndex_;
     if (eventBatch != null && !eventBatch.isEmpty()) {
       int numHmsEvents = eventBatch.size();
       progressInfo.num_hms_events = numHmsEvents;
@@ -1573,15 +1577,14 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       NotificationEvent lastEvent = eventBatch.get(numHmsEvents - 1);
       progressInfo.max_event_id = lastEvent.getEventId();
       progressInfo.max_event_time_s = lastEvent.getEventTime();
-      progressInfo.current_batch_start_time_ms = currentBatchStartTimeMs_;
-      progressInfo.current_event_start_time_ms = currentEventStartTimeMs_;
-      if (filteredEvents != null) {
+      progressInfo.current_batch_start_time_ms = batchStartTimeMs;
+      if (filteredEvents != null && filteredEvent != null) {
         progressInfo.num_filtered_events = filteredEvents.size();
+        progressInfo.current_event_start_time_ms = eventStartTimeMs;
+        progressInfo.current_event_index = eventIndex;
+        progressInfo.current_event_batch_size = filteredEvent.getNumberOfEvents();
+        progressInfo.current_event = filteredEvent.metastoreNotificationEvent_;
       }
-      progressInfo.current_event_index = currentEventIndex_;
-      progressInfo.current_event_batch_size = currentFilteredEvent_ != null ?
-          currentFilteredEvent_.getNumberOfEvents() : 0;
-      progressInfo.current_event = currentEvent_;
     }
     summaryResponse.setProgress(progressInfo);
     return summaryResponse;
