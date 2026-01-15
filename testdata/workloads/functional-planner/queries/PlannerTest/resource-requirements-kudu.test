@@ -1,0 +1,133 @@
+# Kudu Scan
+select * from functional_kudu.alltypes
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Per-Host Resource Estimates: Memory=10MB
+Codegen disabled by planner
+Analyzed query: SELECT * FROM functional_kudu.alltypes
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=8.88MB mem-reservation=4.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: functional_kudu.alltypes.id, functional_kudu.alltypes.bool_col, functional_kudu.alltypes.tinyint_col, functional_kudu.alltypes.smallint_col, functional_kudu.alltypes.int_col, functional_kudu.alltypes.bigint_col, functional_kudu.alltypes.float_col, functional_kudu.alltypes.double_col, functional_kudu.alltypes.date_string_col, functional_kudu.alltypes.string_col, functional_kudu.alltypes.timestamp_col, functional_kudu.alltypes.year, functional_kudu.alltypes.month
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   mem-estimate=4.88MB mem-reservation=0B thread-reservation=1
+   tuple-ids=0 row-size=97B cardinality=7.30K
+   in pipelines: 00(GETNEXT)
+====
+# Kudu Scan of single column
+select int_col from functional_kudu.alltypes
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Per-Host Resource Estimates: Memory=10MB
+Codegen disabled by planner
+Analyzed query: SELECT int_col FROM functional_kudu.alltypes
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.38MB mem-reservation=4.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: int_col
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   mem-estimate=384.00KB mem-reservation=0B thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=7.30K
+   in pipelines: 00(GETNEXT)
+====
+# Kudu Scan count(*)
+select count(*) from functional_kudu.alltypes
+---- PLAN
+Max Per-Host Resource Reservation: Memory=0B Threads=2
+Per-Host Resource Estimates: Memory=10MB
+Codegen disabled by planner
+Analyzed query: SELECT count(*) FROM functional_kudu.alltypes
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=400.00KB mem-reservation=0B thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum_init_zero(functional_kudu.alltypes.stats: num_rows)
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=1
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN KUDU [functional_kudu.alltypes]
+   mem-estimate=384.00KB mem-reservation=0B thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=7.30K
+   in pipelines: 00(GETNEXT)
+====
+# Kudu Scan
+select * from tpch_kudu.nation
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Per-Host Resource Estimates: Memory=10MB
+Codegen disabled by planner
+Analyzed query: SELECT * FROM tpch_kudu.nation
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=5.50MB mem-reservation=4.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: tpch_kudu.nation.n_nationkey, tpch_kudu.nation.n_name, tpch_kudu.nation.n_regionkey, tpch_kudu.nation.n_comment
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN KUDU [tpch_kudu.nation]
+   mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
+   tuple-ids=0 row-size=117B cardinality=25
+   in pipelines: 00(GETNEXT)
+====
+# kudu insert
+insert into functional_kudu.tinyinttable values(1);
+---- PLAN
+Max Per-Host Resource Reservation: Memory=0B Threads=1
+Per-Host Resource Estimates: Memory=20MB
+Codegen disabled by planner
+Analyzed query: SELECT CAST(1 AS TINYINT)
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=20.00MB mem-reservation=0B thread-reservation=1
+INSERT INTO KUDU [functional_kudu.tinyinttable]
+|  output exprs: CAST(1 AS INT)
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+00:UNION
+   constant-operands=1
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=1B cardinality=1
+   in pipelines: <none>
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=2.00MB Threads=2
+Per-Host Resource Estimates: Memory=22MB
+Codegen disabled by planner
+Analyzed query: SELECT CAST(1 AS TINYINT)
+
+F01:PLAN FRAGMENT [KUDU(KuduPartition(1))] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=22.02MB mem-reservation=2.00MB thread-reservation=1
+INSERT INTO KUDU [functional_kudu.tinyinttable]
+|  output exprs: CAST(1 AS INT)
+|  mem-estimate=20.00MB mem-reservation=0B thread-reservation=0
+|
+02:PARTIAL SORT
+|  order by: KuduPartition(1) ASC NULLS LAST, 1 ASC NULLS LAST
+|  materialized: KuduPartition(1)
+|  mem-estimate=2.00MB mem-reservation=2.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=5B cardinality=1
+|  in pipelines: <none>
+|
+01:EXCHANGE [KUDU(KuduPartition(1))]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=1B cardinality=1
+|  in pipelines: <none>
+|
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Host Resources: mem-estimate=20.00KB mem-reservation=0B thread-reservation=1
+00:UNION
+   constant-operands=1
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=1B cardinality=1
+   in pipelines: <none>
+====

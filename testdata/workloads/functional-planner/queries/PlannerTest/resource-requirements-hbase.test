@@ -1,0 +1,151 @@
+# HBase scan on table without stats.
+select * from functional_hbase.alltypes
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=1
+Per-Host Resource Estimates: Memory=10MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_hbase.alltypes
+Analyzed query: SELECT * FROM functional_hbase.alltypes
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.25MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: functional_hbase.alltypes.id, functional_hbase.alltypes.bigint_col, functional_hbase.alltypes.bool_col, functional_hbase.alltypes.date_string_col, functional_hbase.alltypes.double_col, functional_hbase.alltypes.float_col, functional_hbase.alltypes.int_col, functional_hbase.alltypes.month, functional_hbase.alltypes.smallint_col, functional_hbase.alltypes.string_col, functional_hbase.alltypes.timestamp_col, functional_hbase.alltypes.tinyint_col, functional_hbase.alltypes.year
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HBASE [functional_hbase.alltypes]
+   stored statistics:
+     table: rows=unavailable
+     columns: unavailable
+   mem-estimate=256.00KB mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=14.23K
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Per-Host Resource Estimates: Memory=10MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_hbase.alltypes
+Analyzed query: SELECT * FROM functional_hbase.alltypes
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=5.17MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: functional_hbase.alltypes.id, functional_hbase.alltypes.bigint_col, functional_hbase.alltypes.bool_col, functional_hbase.alltypes.date_string_col, functional_hbase.alltypes.double_col, functional_hbase.alltypes.float_col, functional_hbase.alltypes.int_col, functional_hbase.alltypes.month, functional_hbase.alltypes.smallint_col, functional_hbase.alltypes.string_col, functional_hbase.alltypes.timestamp_col, functional_hbase.alltypes.tinyint_col, functional_hbase.alltypes.year
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=1.17MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=14.23K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=592.00KB mem-reservation=0B thread-reservation=1
+00:SCAN HBASE [functional_hbase.alltypes]
+   stored statistics:
+     table: rows=unavailable
+     columns: unavailable
+   mem-estimate=256.00KB mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=14.30K
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Per-Host Resource Estimates: Memory=10MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_hbase.alltypes
+Analyzed query: SELECT * FROM functional_hbase.alltypes
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=5.17MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: functional_hbase.alltypes.id, functional_hbase.alltypes.bigint_col, functional_hbase.alltypes.bool_col, functional_hbase.alltypes.date_string_col, functional_hbase.alltypes.double_col, functional_hbase.alltypes.float_col, functional_hbase.alltypes.int_col, functional_hbase.alltypes.month, functional_hbase.alltypes.smallint_col, functional_hbase.alltypes.string_col, functional_hbase.alltypes.timestamp_col, functional_hbase.alltypes.tinyint_col, functional_hbase.alltypes.year
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=1.17MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=14.30K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Instance Resources: mem-estimate=592.00KB mem-reservation=0B thread-reservation=1
+00:SCAN HBASE [functional_hbase.alltypes]
+   stored statistics:
+     table: rows=unavailable
+     columns: unavailable
+   mem-estimate=256.00KB mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=14.23K
+   in pipelines: 00(GETNEXT)
+====
+# HBase scan on table with stats.
+select * from functional_hbase.alltypessmall
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=1
+Per-Host Resource Estimates: Memory=10MB
+Codegen disabled by planner
+Analyzed query: SELECT * FROM functional_hbase.alltypessmall
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: functional_hbase.alltypessmall.id, functional_hbase.alltypessmall.bigint_col, functional_hbase.alltypessmall.bool_col, functional_hbase.alltypessmall.date_string_col, functional_hbase.alltypessmall.double_col, functional_hbase.alltypessmall.float_col, functional_hbase.alltypessmall.int_col, functional_hbase.alltypessmall.month, functional_hbase.alltypessmall.smallint_col, functional_hbase.alltypessmall.string_col, functional_hbase.alltypessmall.timestamp_col, functional_hbase.alltypessmall.tinyint_col, functional_hbase.alltypessmall.year
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   stored statistics:
+     table: rows=100
+     columns: all
+   mem-estimate=4.00KB mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=50
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Per-Host Resource Estimates: Memory=10MB
+Codegen disabled by planner
+Analyzed query: SELECT * FROM functional_hbase.alltypessmall
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: functional_hbase.alltypessmall.id, functional_hbase.alltypessmall.bigint_col, functional_hbase.alltypessmall.bool_col, functional_hbase.alltypessmall.date_string_col, functional_hbase.alltypessmall.double_col, functional_hbase.alltypessmall.float_col, functional_hbase.alltypessmall.int_col, functional_hbase.alltypessmall.month, functional_hbase.alltypessmall.smallint_col, functional_hbase.alltypessmall.string_col, functional_hbase.alltypessmall.timestamp_col, functional_hbase.alltypessmall.tinyint_col, functional_hbase.alltypessmall.year
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=30.14KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=100
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=376.00KB mem-reservation=0B thread-reservation=1
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   stored statistics:
+     table: rows=100
+     columns: all
+   mem-estimate=4.00KB mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=100
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
+Per-Host Resource Estimates: Memory=10MB
+Codegen disabled by planner
+Analyzed query: SELECT * FROM functional_hbase.alltypessmall
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: functional_hbase.alltypessmall.id, functional_hbase.alltypessmall.bigint_col, functional_hbase.alltypessmall.bool_col, functional_hbase.alltypessmall.date_string_col, functional_hbase.alltypessmall.double_col, functional_hbase.alltypessmall.float_col, functional_hbase.alltypessmall.int_col, functional_hbase.alltypessmall.month, functional_hbase.alltypessmall.smallint_col, functional_hbase.alltypessmall.string_col, functional_hbase.alltypessmall.timestamp_col, functional_hbase.alltypessmall.tinyint_col, functional_hbase.alltypessmall.year
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=30.14KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=89B cardinality=100
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Instance Resources: mem-estimate=376.00KB mem-reservation=0B thread-reservation=1
+00:SCAN HBASE [functional_hbase.alltypessmall]
+   stored statistics:
+     table: rows=100
+     columns: all
+   mem-estimate=4.00KB mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=89B cardinality=100
+   in pipelines: 00(GETNEXT)
+====

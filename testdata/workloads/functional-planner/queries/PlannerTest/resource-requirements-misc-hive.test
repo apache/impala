@@ -1,0 +1,253 @@
+
+# RC scan.
+select * from tpch_rc.customer
+---- PLAN
+Max Per-Host Resource Reservation: Memory=12.00MB Threads=2
+Per-Host Resource Estimates: Memory=42MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_rc.customer
+Analyzed query: SELECT * FROM tpch_rc.customer
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=42.00MB mem-reservation=12.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: tpch_rc.customer.c_custkey, tpch_rc.customer.c_name, tpch_rc.customer.c_address, tpch_rc.customer.c_nationkey, tpch_rc.customer.c_phone, tpch_rc.customer.c_acctbal, tpch_rc.customer.c_mktsegment, tpch_rc.customer.c_comment
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HDFS [tpch_rc.customer]
+   HDFS partitions=1/1 files=1 size=22.47MB
+   stored statistics:
+     table: rows=unavailable size=22.47MB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=78B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=12.00MB Threads=3
+Per-Host Resource Estimates: Memory=52MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_rc.customer
+Analyzed query: SELECT * FROM tpch_rc.customer
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=20.08MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: tpch_rc.customer.c_custkey, tpch_rc.customer.c_name, tpch_rc.customer.c_address, tpch_rc.customer.c_nationkey, tpch_rc.customer.c_phone, tpch_rc.customer.c_acctbal, tpch_rc.customer.c_mktsegment, tpch_rc.customer.c_comment
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=10.08MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=78B cardinality=unavailable
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=32.32MB mem-reservation=8.00MB thread-reservation=2
+00:SCAN HDFS [tpch_rc.customer, RANDOM]
+   HDFS partitions=1/1 files=1 size=22.47MB
+   stored statistics:
+     table: rows=unavailable size=22.47MB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=78B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=12.00MB Threads=2
+Per-Host Resource Estimates: Memory=52MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpch_rc.customer
+Analyzed query: SELECT * FROM tpch_rc.customer
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.08MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: tpch_rc.customer.c_custkey, tpch_rc.customer.c_name, tpch_rc.customer.c_address, tpch_rc.customer.c_nationkey, tpch_rc.customer.c_phone, tpch_rc.customer.c_acctbal, tpch_rc.customer.c_mktsegment, tpch_rc.customer.c_comment
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=10.08MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=78B cardinality=unavailable
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Instance Resources: mem-estimate=32.32MB mem-reservation=8.00MB thread-reservation=1
+00:SCAN HDFS [tpch_rc.customer, RANDOM]
+   HDFS partitions=1/1 files=1 size=22.47MB
+   stored statistics:
+     table: rows=unavailable size=22.47MB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=78B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+====
+# Seq scan.
+select * from tpcds_seq_snap.web_returns
+---- PLAN
+Max Per-Host Resource Reservation: Memory=12.00MB Threads=2
+Per-Host Resource Estimates: Memory=26MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpcds_seq_snap.web_returns
+Analyzed query: SELECT * FROM tpcds_seq_snap.web_returns
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=26.00MB mem-reservation=12.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: tpcds_seq_snap.web_returns.wr_returned_date_sk, tpcds_seq_snap.web_returns.wr_returned_time_sk, tpcds_seq_snap.web_returns.wr_item_sk, tpcds_seq_snap.web_returns.wr_refunded_customer_sk, tpcds_seq_snap.web_returns.wr_refunded_cdemo_sk, tpcds_seq_snap.web_returns.wr_refunded_hdemo_sk, tpcds_seq_snap.web_returns.wr_refunded_addr_sk, tpcds_seq_snap.web_returns.wr_returning_customer_sk, tpcds_seq_snap.web_returns.wr_returning_cdemo_sk, tpcds_seq_snap.web_returns.wr_returning_hdemo_sk, tpcds_seq_snap.web_returns.wr_returning_addr_sk, tpcds_seq_snap.web_returns.wr_web_page_sk, tpcds_seq_snap.web_returns.wr_reason_sk, tpcds_seq_snap.web_returns.wr_order_number, tpcds_seq_snap.web_returns.wr_return_quantity, tpcds_seq_snap.web_returns.wr_return_amt, tpcds_seq_snap.web_returns.wr_return_tax, tpcds_seq_snap.web_returns.wr_return_amt_inc_tax, tpcds_seq_snap.web_returns.wr_fee, tpcds_seq_snap.web_returns.wr_return_ship_cost, tpcds_seq_snap.web_returns.wr_refunded_cash, tpcds_seq_snap.web_returns.wr_reversed_charge, tpcds_seq_snap.web_returns.wr_account_credit, tpcds_seq_snap.web_returns.wr_net_loss
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HDFS [tpcds_seq_snap.web_returns]
+   HDFS partitions=1/1 files=1 size=6.61MB
+   stored statistics:
+     table: rows=unavailable size=6.61MB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=104B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=12.00MB Threads=3
+Per-Host Resource Estimates: Memory=37MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpcds_seq_snap.web_returns
+Analyzed query: SELECT * FROM tpcds_seq_snap.web_returns
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=20.11MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: tpcds_seq_snap.web_returns.wr_returned_date_sk, tpcds_seq_snap.web_returns.wr_returned_time_sk, tpcds_seq_snap.web_returns.wr_item_sk, tpcds_seq_snap.web_returns.wr_refunded_customer_sk, tpcds_seq_snap.web_returns.wr_refunded_cdemo_sk, tpcds_seq_snap.web_returns.wr_refunded_hdemo_sk, tpcds_seq_snap.web_returns.wr_refunded_addr_sk, tpcds_seq_snap.web_returns.wr_returning_customer_sk, tpcds_seq_snap.web_returns.wr_returning_cdemo_sk, tpcds_seq_snap.web_returns.wr_returning_hdemo_sk, tpcds_seq_snap.web_returns.wr_returning_addr_sk, tpcds_seq_snap.web_returns.wr_web_page_sk, tpcds_seq_snap.web_returns.wr_reason_sk, tpcds_seq_snap.web_returns.wr_order_number, tpcds_seq_snap.web_returns.wr_return_quantity, tpcds_seq_snap.web_returns.wr_return_amt, tpcds_seq_snap.web_returns.wr_return_tax, tpcds_seq_snap.web_returns.wr_return_amt_inc_tax, tpcds_seq_snap.web_returns.wr_fee, tpcds_seq_snap.web_returns.wr_return_ship_cost, tpcds_seq_snap.web_returns.wr_refunded_cash, tpcds_seq_snap.web_returns.wr_reversed_charge, tpcds_seq_snap.web_returns.wr_account_credit, tpcds_seq_snap.web_returns.wr_net_loss
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=10.11MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=104B cardinality=unavailable
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=16.42MB mem-reservation=8.00MB thread-reservation=2
+00:SCAN HDFS [tpcds_seq_snap.web_returns, RANDOM]
+   HDFS partitions=1/1 files=1 size=6.61MB
+   stored statistics:
+     table: rows=unavailable size=6.61MB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=104B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=12.00MB Threads=2
+Per-Host Resource Estimates: Memory=37MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+tpcds_seq_snap.web_returns
+Analyzed query: SELECT * FROM tpcds_seq_snap.web_returns
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.11MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: tpcds_seq_snap.web_returns.wr_returned_date_sk, tpcds_seq_snap.web_returns.wr_returned_time_sk, tpcds_seq_snap.web_returns.wr_item_sk, tpcds_seq_snap.web_returns.wr_refunded_customer_sk, tpcds_seq_snap.web_returns.wr_refunded_cdemo_sk, tpcds_seq_snap.web_returns.wr_refunded_hdemo_sk, tpcds_seq_snap.web_returns.wr_refunded_addr_sk, tpcds_seq_snap.web_returns.wr_returning_customer_sk, tpcds_seq_snap.web_returns.wr_returning_cdemo_sk, tpcds_seq_snap.web_returns.wr_returning_hdemo_sk, tpcds_seq_snap.web_returns.wr_returning_addr_sk, tpcds_seq_snap.web_returns.wr_web_page_sk, tpcds_seq_snap.web_returns.wr_reason_sk, tpcds_seq_snap.web_returns.wr_order_number, tpcds_seq_snap.web_returns.wr_return_quantity, tpcds_seq_snap.web_returns.wr_return_amt, tpcds_seq_snap.web_returns.wr_return_tax, tpcds_seq_snap.web_returns.wr_return_amt_inc_tax, tpcds_seq_snap.web_returns.wr_fee, tpcds_seq_snap.web_returns.wr_return_ship_cost, tpcds_seq_snap.web_returns.wr_refunded_cash, tpcds_seq_snap.web_returns.wr_reversed_charge, tpcds_seq_snap.web_returns.wr_account_credit, tpcds_seq_snap.web_returns.wr_net_loss
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=10.11MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=104B cardinality=unavailable
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Instance Resources: mem-estimate=16.42MB mem-reservation=8.00MB thread-reservation=1
+00:SCAN HDFS [tpcds_seq_snap.web_returns, RANDOM]
+   HDFS partitions=1/1 files=1 size=6.61MB
+   stored statistics:
+     table: rows=unavailable size=6.61MB
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=104B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+====
+# Mixed table format scan
+select * from functional.alltypesmixedformat
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.09MB Threads=2
+Per-Host Resource Estimates: Memory=26MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional.alltypesmixedformat
+Analyzed query: SELECT * FROM functional.alltypesmixedformat
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=26.00MB mem-reservation=4.09MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: functional.alltypesmixedformat.id, functional.alltypesmixedformat.bool_col, functional.alltypesmixedformat.tinyint_col, functional.alltypesmixedformat.smallint_col, functional.alltypesmixedformat.int_col, functional.alltypesmixedformat.bigint_col, functional.alltypesmixedformat.float_col, functional.alltypesmixedformat.double_col, functional.alltypesmixedformat.date_string_col, functional.alltypesmixedformat.string_col, functional.alltypesmixedformat.timestamp_col, functional.alltypesmixedformat.year, functional.alltypesmixedformat.month
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HDFS [functional.alltypesmixedformat]
+   HDFS partitions=4/4 files=4 size=66.33KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/4 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=1
+   tuple-ids=0 row-size=80B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=4.09MB Threads=3
+Per-Host Resource Estimates: Memory=37MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional.alltypesmixedformat
+Analyzed query: SELECT * FROM functional.alltypesmixedformat
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=20.25MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: functional.alltypesmixedformat.id, functional.alltypesmixedformat.bool_col, functional.alltypesmixedformat.tinyint_col, functional.alltypesmixedformat.smallint_col, functional.alltypesmixedformat.int_col, functional.alltypesmixedformat.bigint_col, functional.alltypesmixedformat.float_col, functional.alltypesmixedformat.double_col, functional.alltypesmixedformat.date_string_col, functional.alltypesmixedformat.string_col, functional.alltypesmixedformat.timestamp_col, functional.alltypesmixedformat.year, functional.alltypesmixedformat.month
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=10.25MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=unavailable
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.33MB mem-reservation=88.00KB thread-reservation=2
+00:SCAN HDFS [functional.alltypesmixedformat, RANDOM]
+   HDFS partitions=4/4 files=4 size=66.33KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/4 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=1
+   tuple-ids=0 row-size=80B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=4.17MB Threads=3
+Per-Host Resource Estimates: Memory=53MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional.alltypesmixedformat
+Analyzed query: SELECT * FROM functional.alltypesmixedformat
+
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=20.33MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: functional.alltypesmixedformat.id, functional.alltypesmixedformat.bool_col, functional.alltypesmixedformat.tinyint_col, functional.alltypesmixedformat.smallint_col, functional.alltypesmixedformat.int_col, functional.alltypesmixedformat.bigint_col, functional.alltypesmixedformat.float_col, functional.alltypesmixedformat.double_col, functional.alltypesmixedformat.date_string_col, functional.alltypesmixedformat.string_col, functional.alltypesmixedformat.timestamp_col, functional.alltypesmixedformat.year, functional.alltypesmixedformat.month
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=10.33MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=80B cardinality=unavailable
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=4
+Per-Instance Resources: mem-estimate=16.33MB mem-reservation=88.00KB thread-reservation=1
+00:SCAN HDFS [functional.alltypesmixedformat, RANDOM]
+   HDFS partitions=4/4 files=4 size=66.33KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/4 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+====

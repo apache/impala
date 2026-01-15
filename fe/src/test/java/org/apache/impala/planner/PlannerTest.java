@@ -951,18 +951,57 @@ public class PlannerTest extends PlannerTestBase {
     }
   }
 
-  @Test
-  public void testResourceRequirements() {
+  private void runResourceRequirementsTest(String testFile) {
     // Tests the resource requirement computation from the planner.
     TQueryOptions options = defaultQueryOptions();
     options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
     options.setMinmax_filter_threshold(0.0);
     // Required so that output doesn't vary by whether parquet tables are used or not.
     options.setDisable_hdfs_num_rows_estimate(true);
-    runPlannerTestFile("resource-requirements", options,
+    runPlannerTestFile(testFile, options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
             PlannerTestOption.INCLUDE_EXPLAIN_HEADER,
             PlannerTestOption.VALIDATE_RESOURCES));
+  }
+
+  @Test
+  public void testResourceRequirements() {
+    runResourceRequirementsTest("resource-requirements");
+  }
+
+  @Test
+  public void testResourceRequirementsParquet() {
+    runResourceRequirementsTest("resource-requirements-parquet");
+  }
+
+  @Test
+  public void testResourceRequirementsParquetNested() {
+    runResourceRequirementsTest("resource-requirements-parquet-nested");
+  }
+
+  @Test
+  public void testResourceRequirementsAvro() {
+    runResourceRequirementsTest("resource-requirements-avro");
+  }
+
+  @Test
+  public void testResourceRequirementsOrc() {
+    runResourceRequirementsTest("resource-requirements-orc");
+  }
+
+  @Test
+  public void testResourceRequirementsKudu() {
+    runResourceRequirementsTest("resource-requirements-kudu");
+  }
+
+  @Test
+  public void testResourceRequirementsHbase() {
+    runResourceRequirementsTest("resource-requirements-hbase");
+  }
+
+  @Test
+  public void testResourceRequirementsMiscHive() {
+    runResourceRequirementsTest("resource-requirements-misc-hive");
   }
 
   @Test

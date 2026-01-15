@@ -1,0 +1,129 @@
+# ORC scan
+select * from tpch_orc_def.lineitem
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+2
+---- PLAN
+Max Per-Host Resource Reservation: Memory=12.00MB Threads=2
+Per-Host Resource Estimates: Memory=124MB
+Analyzed query: SELECT * FROM tpch_orc_def.lineitem
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=124.00MB mem-reservation=12.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: tpch_orc_def.lineitem.l_orderkey, tpch_orc_def.lineitem.l_partkey, tpch_orc_def.lineitem.l_suppkey, tpch_orc_def.lineitem.l_linenumber, tpch_orc_def.lineitem.l_quantity, tpch_orc_def.lineitem.l_extendedprice, tpch_orc_def.lineitem.l_discount, tpch_orc_def.lineitem.l_tax, tpch_orc_def.lineitem.l_returnflag, tpch_orc_def.lineitem.l_linestatus, tpch_orc_def.lineitem.l_shipdate, tpch_orc_def.lineitem.l_commitdate, tpch_orc_def.lineitem.l_receiptdate, tpch_orc_def.lineitem.l_shipinstruct, tpch_orc_def.lineitem.l_shipmode, tpch_orc_def.lineitem.l_comment
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HDFS [tpch_orc_def.lineitem]
+   HDFS partitions=1/1 files=6 size=142.84MB
+   stored statistics:
+     table: rows=6.00M size=142.84MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.08M
+   mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=231B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# ORC scan
+select * from tpch_orc_def.lineitem
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+3
+---- PLAN
+Max Per-Host Resource Reservation: Memory=60.00MB Threads=2
+Per-Host Resource Estimates: Memory=188MB
+Analyzed query: SELECT * FROM tpch_orc_def.lineitem
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=188.00MB mem-reservation=60.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: tpch_orc_def.lineitem.l_orderkey, tpch_orc_def.lineitem.l_partkey, tpch_orc_def.lineitem.l_suppkey, tpch_orc_def.lineitem.l_linenumber, tpch_orc_def.lineitem.l_quantity, tpch_orc_def.lineitem.l_extendedprice, tpch_orc_def.lineitem.l_discount, tpch_orc_def.lineitem.l_tax, tpch_orc_def.lineitem.l_returnflag, tpch_orc_def.lineitem.l_linestatus, tpch_orc_def.lineitem.l_shipdate, tpch_orc_def.lineitem.l_commitdate, tpch_orc_def.lineitem.l_receiptdate, tpch_orc_def.lineitem.l_shipinstruct, tpch_orc_def.lineitem.l_shipmode, tpch_orc_def.lineitem.l_comment
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HDFS [tpch_orc_def.lineitem]
+   HDFS partitions=1/1 files=1 size=142.84MB
+   stored statistics:
+     table: rows=6.00M size=142.84MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=6.00M
+   mem-estimate=88.00MB mem-reservation=56.00MB thread-reservation=1
+   tuple-ids=0 row-size=231B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# Single column ORC scan - memory reservation is same as multi-column scan.
+select l_comment from tpch_orc_def.lineitem
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+2
+---- PLAN
+Max Per-Host Resource Reservation: Memory=12.00MB Threads=2
+Per-Host Resource Estimates: Memory=124MB
+Analyzed query: SELECT l_comment FROM tpch_orc_def.lineitem
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=124.00MB mem-reservation=12.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: l_comment
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HDFS [tpch_orc_def.lineitem]
+   HDFS partitions=1/1 files=6 size=142.84MB
+   stored statistics:
+     table: rows=6.00M size=142.84MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.08M
+   mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=38B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+select l_comment from tpch_orc_def.lineitem
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+3
+---- PLAN
+Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
+Per-Host Resource Estimates: Memory=188MB
+Analyzed query: SELECT l_comment FROM tpch_orc_def.lineitem
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=188.00MB mem-reservation=8.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: l_comment
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HDFS [tpch_orc_def.lineitem]
+   HDFS partitions=1/1 files=1 size=142.84MB
+   stored statistics:
+     table: rows=6.00M size=142.84MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=6.00M
+   mem-estimate=88.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=38B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# ORC scan on small files - memory reservation is reduced.
+select * from functional_orc_def.alltypes
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.21MB Threads=2
+Per-Host Resource Estimates: Memory=26MB
+WARNING: The following tables are missing relevant table and/or column statistics.
+functional_orc_def.alltypes
+Analyzed query: SELECT * FROM functional_orc_def.alltypes
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=26.00MB mem-reservation=4.21MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: functional_orc_def.alltypes.id, functional_orc_def.alltypes.bool_col, functional_orc_def.alltypes.tinyint_col, functional_orc_def.alltypes.smallint_col, functional_orc_def.alltypes.int_col, functional_orc_def.alltypes.bigint_col, functional_orc_def.alltypes.float_col, functional_orc_def.alltypes.double_col, functional_orc_def.alltypes.date_string_col, functional_orc_def.alltypes.string_col, functional_orc_def.alltypes.timestamp_col, functional_orc_def.alltypes.year, functional_orc_def.alltypes.month
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|
+00:SCAN HDFS [functional_orc_def.alltypes]
+   HDFS partitions=24/24 files=24 size=42.27KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=216.00KB thread-reservation=1
+   tuple-ids=0 row-size=80B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
+====
