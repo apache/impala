@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TShowDbsParams;
 
@@ -63,7 +64,8 @@ public class ShowDbsStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    // Nothing to do here
+    analyzer.registerPrivReq(builder ->
+        builder.allOf(Privilege.ANY).onDbList().build());
   }
 
   public TShowDbsParams toThrift() {

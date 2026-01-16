@@ -164,6 +164,12 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
             .storageUri(authorizable.getStorageUri())
             .build());
         break;
+      case DB_LIST:
+        // This should happen for SHOW DATABASES only.
+        RangerAccessResourceImpl resource = new RangerAccessResourceImpl();
+        resource.setValue("database", null);
+        resources.add(resource);
+        break;
       default:
         throw new IllegalArgumentException(String.format("Invalid authorizable type: %s",
             authorizable.getType()));
@@ -665,7 +671,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     // If 'resource' is associated with a storage handler URI, then 'accessType' can only
     // be RWSTORAGE since RWSTORAGE is the only valid privilege that could be applied on
     // a storage handler URI.
-    if (resource.getKeys().contains(RangerImpalaResourceBuilder.STORAGE_TYPE)) {
+    if (resource.getKeys() != null &&
+        resource.getKeys().contains(RangerImpalaResourceBuilder.STORAGE_TYPE)) {
       accessType = Privilege.RWSTORAGE.name().toLowerCase();
     } else {
       if (privilege == Privilege.ANY) {

@@ -32,7 +32,8 @@ public abstract class Authorizable {
     COLUMN,
     FUNCTION,
     URI,
-    STORAGEHANDLER_URI
+    STORAGEHANDLER_URI,
+    DB_LIST
   }
 
   // Returns the name of the object.

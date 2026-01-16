@@ -290,6 +290,18 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       assertEquals(0, events.size());
     }, "select * from functional.non_existing_tbl",
         /* expectAnalysisOk */ false, onDatabase("functional", TPrivilegeLevel.SELECT));
+
+    authzOk(events -> {
+      assertEquals(1, events.size());
+      assertEventEquals(null, "_ANY", null, 1, events.get(0));
+      assertEquals("show databases", events.get(0).getRequestData());
+    }, "show databases");
+
+    authzOk(events -> {
+      assertEquals(1, events.size());
+      assertEventEquals(null, "_ANY", null, 1, events.get(0));
+      assertEquals("show databases like 'default*'", events.get(0).getRequestData());
+    }, "show databases like 'default*'");
   }
 
   @Test

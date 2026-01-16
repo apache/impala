@@ -85,4 +85,9 @@ public class DefaultAuthorizableFactory implements AuthorizableFactory {
     Preconditions.checkNotNull(storageUri);
     return new AuthorizableStorageHandlerUri(storageType, storageUri);
   }
+
+  @Override
+  public Authorizable newDbList() {
+    return new AuthorizableDbList();
+  }
 }

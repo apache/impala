@@ -1592,10 +1592,6 @@ public class Frontend {
   private boolean isAccessibleToUser(String dbName, String tblName,
       String owner, User user) throws InternalException {
     Preconditions.checkNotNull(dbName);
-    if (tblName == null && dbName.equalsIgnoreCase(Catalog.DEFAULT_DB)) {
-      // Default DB should always be shown.
-      return true;
-    }
 
     PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder(
         authzFactory_.getAuthorizableFactory())

@@ -74,6 +74,12 @@ public class PrivilegeRequestBuilder {
     return this;
   }
 
+  public PrivilegeRequestBuilder onDbList() {
+    Preconditions.checkState(authorizable_ == null);
+    authorizable_ = authzFactory_.newDbList();
+    return this;
+  }
+
   /**
    * Determines whether the given FeTable corresponds to a view that was created by a
    * non-superuser in HiveMetaStore.

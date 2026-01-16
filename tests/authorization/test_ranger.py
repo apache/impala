@@ -795,6 +795,26 @@ class TestRanger(CustomClusterTestSuite):
     assert 300 > r.status_code >= 200, bytes_to_str(r.content)
 
   @staticmethod
+  def _toggle_ranger_policy(self, policy_name, enable):
+    r = requests.get(
+      "{0}/service/public/v2/api/service/test_impala/policy/"
+      "{1}".format(RANGER_HOST, policy_name),
+      auth=RANGER_AUTH, headers=REST_HEADERS)
+    # We do not return an AssertionError if the policy specified by 'policy_name' is
+    # not found since this type of error should be considered benign.
+    if r.status_code != 404:
+      assert 300 > r.status_code >= 200, bytes_to_str(r.content)
+
+    current_policy = r.json()
+    current_policy['isEnabled'] = enable
+    policy_id = current_policy['id']
+    r = requests.put(
+      "{0}/service/public/v2/api/policy/{1}"
+      .format(RANGER_HOST, policy_id), json=current_policy, auth=RANGER_AUTH,
+      headers=REST_HEADERS)
+    assert 300 > r.status_code >= 200, bytes_to_str(r.content)
+
+  @staticmethod
   def _check_privileges(result, expected):
     TestRanger._check_rows(result, expected, True)
 
@@ -3440,6 +3460,40 @@ class TestRangerLocalCatalog(TestRanger):
 
       for statement in cleanup_statements:
         admin_client.execute(statement)
+
+  @pytest.mark.execute_serially
+  def test_show_databases(self):
+    """Test that SHOW DATABASES and SHOW DATABASES LIKE do not return the database
+    'default' when there is no Ranger policy allowing the requesting user to see the
+    database.
+    """
+    # 'policy_name' is the name of the policy corresponding to all the tables and columns
+    # in the database 'default'.
+    policy_name = "default%20database%20tables%20columns"
+    with self.create_impala_client(user=ADMIN) as admin_client, \
+        self.create_impala_client(user=NON_OWNER) as non_owner_client:
+      try:
+        # By the default, Ranger policy repository allows every user to discover the
+        # existence of the database 'default' for SHOW DATABASES and SHOW DATABASES LIKE.
+        result_1 = non_owner_client.execute("show databases")
+        TestRanger._check_rows(result_1, [['default', 'Default Hive database']])
+
+        result_2 = non_owner_client.execute("show databases like 'default*'")
+        TestRanger._check_rows(result_2, [['default', 'Default Hive database']])
+
+        # Disable the policy that allows every user to determine the existence of the
+        # database 'default'.
+        TestRanger._toggle_ranger_policy(self, policy_name, False)
+        admin_client.execute("refresh authorization")
+
+        result_3 = non_owner_client.execute("show databases")
+        TestRanger._check_rows(result_3, [])
+
+        result_4 = non_owner_client.execute("show databases like 'default*'")
+        TestRanger._check_rows(result_4, [])
+      finally:
+        TestRanger._toggle_ranger_policy(self, policy_name, True)
+        admin_client.execute("refresh authorization")
 
 
 class TestRangerColumnMaskingTpchNested(CustomClusterTestSuite):
