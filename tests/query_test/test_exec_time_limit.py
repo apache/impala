@@ -53,8 +53,10 @@ class TestQueryExecTimeLimit(ImpalaTestSuite):
     result = self.execute_query(query, exec_options)
     assert result.success, "Query failed unexpectedly within exec_time_limit_s."
 
+  @pytest.mark.execute_serially
   def test_exec_time_limit_not_exceeded(self):
-    """Test that queries completing within exec_time_limit_s succeed."""
+    """Test that queries completing within exec_time_limit_s succeed. Run this
+    test serially to avoid impact from other concurrent tests for IMPALA-14650."""
     exec_options = dict()
     exec_options['exec_time_limit_s'] = "60"
     query = "SELECT COUNT(*) FROM tpch.lineitem"
