@@ -23,7 +23,7 @@ FROM letter_marketing_response_events re
       AND re.send_account_sk not in (43)
     GROUP BY ecc.letter_mission_name, re.`date`, c.war_group;
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:,'2024-06-07',
+row_regex:.*,'2024-06-07',.*
 ---- TYPES
 STRING,STRING,STRING
 ====
