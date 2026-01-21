@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.avro.SchemaParseException;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
@@ -145,6 +146,9 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
 
     // Analyze 'serialization.encoding' property
     analyzeSerializationEncoding(tblProperties_);
+
+    // Analyze numeric table stats properties
+    analyzeTableStatsProperties(tblProperties_);
   }
 
   private void analyzeKuduTable(Analyzer analyzer) throws AnalysisException {
@@ -436,5 +440,35 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
 
     return new Pair<>(TableDef.analyzeSortColumns(sortCols, table, sortingOrder),
         sortingOrder);
+  }
+
+  /**
+   * Validates that table stats properties (numRows, totalSize, rawDataSize) contain
+   * valid numeric values. These properties must be parseable as long values.
+   */
+  public static void analyzeTableStatsProperties(Map<String, String> tblProperties)
+      throws AnalysisException {
+    String[] statsProperties = {
+      StatsSetupConst.ROW_COUNT,
+      StatsSetupConst.TOTAL_SIZE,
+      StatsSetupConst.RAW_DATA_SIZE
+    };
+    for (String prop : statsProperties) {
+      if (tblProperties.containsKey(prop)) {
+        String value = tblProperties.get(prop);
+        if (value == null || value.trim().isEmpty()) {
+          throw new AnalysisException(String.format(
+              "Table property '%s' must have a valid numeric value, got empty value.",
+              prop));
+        }
+        try {
+          Long.parseLong(value.trim());
+        } catch (NumberFormatException e) {
+          throw new AnalysisException(String.format(
+              "Table property '%s' must have a valid numeric value, got '%s'.",
+              prop, value));
+        }
+      }
+    }
   }
 }

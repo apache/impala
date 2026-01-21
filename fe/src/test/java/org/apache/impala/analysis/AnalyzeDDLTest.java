@@ -1188,6 +1188,23 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table " + tmpTableName + " (id int) with serdeproperties(" +
         "'serialization.encoding'='NonexistentEncoding')",
         "Unsupported encoding: NonexistentEncoding.");
+
+    // Numeric table stats properties validation
+    AnalysisError("alter table functional.alltypes set tblproperties('numRows'='')",
+        "Table property 'numRows' must have a valid numeric value, got empty value.");
+    AnalysisError("alter table functional.alltypes set tblproperties('totalSize'='')",
+        "Table property 'totalSize' must have a valid numeric value, got empty value.");
+    AnalysisError("alter table functional.alltypes set tblproperties('rawDataSize'='')",
+        "Table property 'rawDataSize' must have a valid numeric value, got empty value.");
+    AnalysisError("alter table functional.alltypes set tblproperties('numRows'='abc')",
+        "Table property 'numRows' must have a valid numeric value, got 'abc'.");
+    AnalysisError("alter table functional.alltypes set tblproperties('totalSize'='xyz')",
+        "Table property 'totalSize' must have a valid numeric value, got 'xyz'.");
+    AnalyzesOk("alter table functional.alltypes set tblproperties('numRows'='100')");
+    AnalyzesOk("alter table functional.alltypes set tblproperties('numRows'='0')");
+    AnalyzesOk("alter table functional.alltypes set tblproperties('numRows'='-1')");
+    AnalyzesOk("alter table functional.alltypes set tblproperties('totalSize'='1000')");
+    AnalyzesOk("alter table functional.alltypes set tblproperties('rawDataSize'='500')");
   }
 
   @Test
