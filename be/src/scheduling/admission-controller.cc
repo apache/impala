@@ -23,6 +23,7 @@
 
 #include "common/logging.h"
 #include "common/names.h"
+#include "kudu/util/logging.h"
 #include "runtime/bufferpool/reservation-util.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
@@ -2715,8 +2716,9 @@ int64_t AdmissionController::GetMaxToDequeue(
 
 void AdmissionController::LogDequeueFailed(
     QueueNode* node, const string& not_admitted_reason) {
-  VLOG_QUERY << "Could not dequeue query id=" << PrintId(node->admission_request.query_id)
-             << " reason: " << not_admitted_reason;
+  KLOG_EVERY_N_SECS(INFO, 5) << "Could not dequeue query id="
+                             << PrintId(node->admission_request.query_id)
+                             << " reason: " << not_admitted_reason;
   node->admission_request.summary_profile->AddInfoString(
       PROFILE_INFO_KEY_LAST_QUEUED_REASON, not_admitted_reason);
 }
