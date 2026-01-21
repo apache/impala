@@ -234,6 +234,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
         ("WRITE_DELIMITED: False", "VERBOSE: True"))
     self._expect_with_cmd(proc, "set", vector,
         ("DELIMITER: \\t", "OUTPUT_FILE: None"))
+    self._expect_with_cmd(proc, "set", vector,
+        ("DELIMITER: \\t", "PROFILE_OUTPUT: None"))
     self._expect_with_cmd(proc, "set write_delimited=true", vector)
     self._expect_with_cmd(proc, "set", vector, ("WRITE_DELIMITED: True", "VERBOSE: True"))
     self._expect_with_cmd(proc, "set DELIMITER=,", vector)
@@ -241,6 +243,11 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     self._expect_with_cmd(proc, "set output_file=/tmp/clmn.txt", vector)
     self._expect_with_cmd(proc, "set", vector,
         ("DELIMITER: ,", "OUTPUT_FILE: /tmp/clmn.txt"))
+    self._expect_with_cmd(proc, "set", vector, ("DELIMITER: ,", "PROFILE_OUTPUT: None"))
+    self._expect_with_cmd(proc, "set profile_output=/tmp/profile.txt", vector)
+    self._expect_with_cmd(proc, "set", vector,
+        ("DELIMITER: ,", "PROFILE_OUTPUT: /tmp/profile.txt"))
+
     proc.sendeof()
     proc.wait()
 
@@ -302,6 +309,36 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     p2.send_cmd("select * from nation")
     result = p2.get_result()
     assert "VIETNAM" in result.stdout
+
+  def test_print_runtime_profile_to_file(self, vector):
+    """Test print profile to file and unset"""
+
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Runtime profile is not supported in strict hs2 mode.")
+
+    # Test writing profile to file
+    p1 = ImpalaShell(vector)
+    local_file = NamedTemporaryFile(delete=True)
+    p1.send_cmd("set profile_output=%s" % local_file.name)
+    p1.send_cmd("select 1")
+    p1.send_cmd("profile")
+    result = p1.get_result()
+    # Profile is not expected in stdout
+    assert "Query Runtime Profile" not in result.stdout
+    # Profile is expected in file
+    with open(local_file.name, "r") as f:
+      result = f.read()
+      assert "Query Runtime Profile" in result
+
+    # Test unset profile
+    p2 = ImpalaShell(vector)
+    p2.send_cmd("set profile_output=%s" % local_file.name)
+    p2.send_cmd("unset profile_output")
+    p2.send_cmd("select 1")
+    p2.send_cmd("profile")
+    result = p2.get_result()
+    # Profile is expected in stdout
+    assert "Query Runtime Profile" in result.stdout
 
   def test_live_progress_no_overlap(self, vector):
     if vector.get_value('strict_hs2_protocol'):

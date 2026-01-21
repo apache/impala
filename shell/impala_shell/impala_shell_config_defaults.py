@@ -38,6 +38,7 @@ impala_shell_defaults = {
             'kerberos_service_name': 'impala',
             'output_delimiter': '\\t',
             'output_file': None,
+            'profile_output': None,
             'print_header': False,
             'vertical': False,
             'live_progress': True,  # The option only applies to interactive shell session

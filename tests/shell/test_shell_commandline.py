@@ -417,6 +417,44 @@ class TestImpalaShell(ImpalaTestSuite):
     assert len(re.findall(regex, result_set.stdout)) == 2, \
         "Could not detect two profiles, stdout: %s" % result_set.stdout
 
+  def test_runtime_profile_output_file(self, vector, tmp_file):
+    """Test that writing profile with --profile_output writes the profile
+    into the file."""
+
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Runtime profile is not supported in strict hs2 mode.")
+
+    # This regex helps us uniquely identify a profile.
+    regex = re.compile(r"Operator\s+#Hosts\s+#Inst\s+Avg\s+Time")
+
+    # Test writing profile with "query; profile;"
+    args = ['-q', 'select 1; profile;', '--profile_output=%s' % tmp_file]
+    result_set = run_impala_shell_cmd(vector, args)
+
+    # We expect no results in stdout
+    assert len(re.findall(regex, result_set.stdout)) == 0, \
+        "Did not expect runtime profile in stdout, stdout: %s" % result_set.stdout
+
+    # We expect the result in the file
+    with open(tmp_file, "r") as f:
+      lines = f.read()
+      assert len(re.findall(regex, lines)) == 1, \
+          "Could not detect profile in the file, file content: %s" % lines
+
+    # Test writing profile with "query;" and -p option
+    args = ['-p', '-q', 'select 1;', '--profile_output=%s' % tmp_file]
+    result_set = run_impala_shell_cmd(vector, args)
+
+    # We expect no results in stdout
+    assert len(re.findall(regex, result_set.stdout)) == 0, \
+        "Did not expect runtime profile in stdout, stdout: %s" % result_set.stdout
+
+    # We expect the result in the file
+    with open(tmp_file, "r") as f:
+      lines = f.read()
+      assert len(re.findall(regex, lines)) == 1, \
+          "Could not detect profile in the file, file content: %s" % lines
+
   def test_runtime_profile_referenced_tables(self, vector, unique_database):
     if vector.get_value('strict_hs2_protocol'):
       pytest.skip("Runtime profile is not supported in strict hs2 mode.")

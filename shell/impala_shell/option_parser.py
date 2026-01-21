@@ -205,6 +205,10 @@ def get_option_parser(defaults):
   parser.add_option("-p", "--show_profiles", dest="show_profiles",
                     action="store_true",
                     help="Always display query profiles after execution")
+  parser.add_option("--profile_output", dest="profile_output",
+                    help="If set, query profiles will be written to the "
+                         "given file. Profiles for multiple semicolon-terminated "
+                         "queries will be appended to the same file")
   parser.add_option("--rpc_stdout", dest="rpc_stdout",
                     action="store_true",
                     help="Output hs2 rpc details to stdout. "
