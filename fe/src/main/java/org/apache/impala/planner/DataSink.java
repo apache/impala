@@ -89,6 +89,12 @@ public abstract class DataSink {
    */
   abstract protected String getLabel();
 
+  /**
+   * Subclasses can override to provide a node specific detail string that
+   * is displayed to the user.
+   * e.g. table sink return the table name.
+   */
+  abstract protected String getLabelDetail();
 
   /**
    * Return runtime filters produced by this sink. Subclasses that use runtime filters
@@ -102,6 +108,7 @@ public abstract class DataSink {
   protected final TDataSink toThrift() {
     TDataSink tsink = new TDataSink(getSinkType());
     tsink.setLabel(fragment_.getId() + ":" + getLabel());
+    tsink.setLabel_detail(getLabelDetail());
     TExecStats estimatedStats = new TExecStats();
     estimatedStats.setMemory_used(resourceProfile_.getMemEstimateBytes());
     tsink.setEstimated_stats(estimatedStats);

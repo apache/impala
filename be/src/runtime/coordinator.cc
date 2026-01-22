@@ -318,7 +318,7 @@ void Coordinator::ExecSummary::Init(const QueryExecParams& exec_params) {
       node_summary.__set_node_id(SINK_NODE_ID);
       node_summary.__set_fragment_idx(fragment.idx);
       node_summary.__set_label(output_sink.label);
-      node_summary.__set_label_detail("");
+      node_summary.__set_label_detail(output_sink.label_detail);
       node_summary.__set_num_children(1);
       DCHECK(output_sink.__isset.estimated_stats);
       node_summary.__set_estimated_stats(output_sink.estimated_stats);

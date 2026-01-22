@@ -27,6 +27,8 @@ import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryOptions;
 
+import com.google.common.base.Preconditions;
+
 /**
  * MultiDataSink can aggregate multiple DataSinks that operate on the same source, e.g.
  * on the same SELECT statement of a modify statement. The backend operator will send
@@ -51,6 +53,8 @@ public class MultiDataSink extends DataSink {
     }
   }
 
+  // The real table sink should be added as the first element, before the virtual tables
+  // This order is maintained to conveniently retrieve the actual table name
   public void addDataSink(DataSink tsink) {
     dataSinks_.add(tsink);
   }
@@ -96,6 +100,15 @@ public class MultiDataSink extends DataSink {
   @Override
   protected String getLabel() {
     return "MULTI DATA SINK";
+  }
+
+  @Override
+  protected String getLabelDetail() {
+    // We expect the the real table's sink to be the first element.
+    // To maintain this order, a comment as been added above the statements
+    // generating this list.
+    Preconditions.checkElementIndex(0, dataSinks_.size());
+    return ((TableSink)dataSinks_.get(0)).getLabelDetail();
   }
 
   @Override

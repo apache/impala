@@ -229,6 +229,8 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
         icePosDelTable_, deletePartitionKeyExprs_, deleteResultExprs_, deleteTableId_);
 
     MultiDataSink ret = new MultiDataSink();
+    // The real table sink should be added as the first element, before the virtual tables
+    // This order is maintained to conveniently retrieve the actual table name
     ret.addDataSink(insertSink);
     ret.addDataSink(deleteSink);
     return ret;

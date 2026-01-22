@@ -171,6 +171,11 @@ public abstract class TableSink extends DataSink {
     }
   }
 
+  @Override
+  protected String getLabelDetail(){
+    return targetTable_.getFullName();
+  }
+
   protected ProcessingCost computeDefaultProcessingCost() {
     // TODO: consider including materialization cost into the returned cost.
     return ProcessingCost.basicCost(getLabel(), fragment_.getPlanRoot().getCardinality(),

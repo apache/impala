@@ -93,6 +93,11 @@ public class PlanRootSink extends DataSink {
   }
 
   @Override
+  protected String getLabelDetail() {
+    return "";
+  }
+
+  @Override
   public void computeProcessingCost(TQueryOptions queryOptions) {
     // TODO: this sanitization should have already happened in PlanRootSink.create().
     // This can be removed once PlanRootSink constructor is made private.

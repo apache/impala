@@ -450,6 +450,33 @@ class TestObservability(ImpalaTestSuite):
     profile = self.client.get_runtime_profile(handle)
     assert "ExecSummary:" in profile, profile
 
+  def test_exec_summary_table_details_in_runtime_profile(self, unique_database):
+    """Test that the exec summary contains the correct table details"""
+    query = "create table if not exists %s.iceberg_test stored as iceberg "\
+        % unique_database + "as select * from functional_parquet.iceberg_v2_no_deletes"
+    result = self.client.execute(query, fetch_exec_summary=True)
+
+    # Assert that SCAN NODE details contain the table being read from
+    scan = result.exec_summary[1]
+    assert 'SCAN ' in scan['operator']
+    assert scan['detail'] == 'functional_parquet.iceberg_v2_no_deletes', \
+        "Table details for 'SCAN NODE' are missing in the ExecSummary"
+
+    # Assert that SINK NODE details contain the table being written to
+    writer = result.exec_summary[0]
+    assert ' WRITER' in writer['operator']
+    assert writer['detail'] == '%s.iceberg_test' % unique_database, \
+        "Table details for 'SINK NODE' are missing in the ExecSummary"
+
+    query = "update %s.iceberg_test set s = concat(s,s) where i = 3" % unique_database
+    result = self.client.execute(query, fetch_exec_summary=True)
+
+    # Assert that (MULTI DATA) SINK NODE details contain the table being written to
+    multi = result.exec_summary[0]
+    assert 'MULTI DATA SINK' in multi['operator']
+    assert multi['detail'] == '%s.iceberg_test' % unique_database, \
+        "Table details for 'MULTI DATA SINK NODE' are missing in the ExecSummary"
+
   @SkipIfLocal.multiple_impalad
   def test_profile_fragment_instances(self):
     """IMPALA-6081: Test that the expected number of fragment instances and their exec

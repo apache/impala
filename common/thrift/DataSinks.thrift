@@ -198,4 +198,8 @@ struct TDataSink {
 
   // Child data sinks if this is a MULTI_DATA_SINK.
   10: optional list<TDataSink> child_data_sinks
+
+  // Additional details that should be printed to the user. This is node specific
+  // e.g. table name, join strategy, etc.
+  11: optional string label_detail
 }

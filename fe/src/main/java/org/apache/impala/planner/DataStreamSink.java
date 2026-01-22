@@ -68,6 +68,11 @@ public class DataStreamSink extends DataSink {
     return "EXCHANGE SENDER";
   }
 
+  @Override
+  protected String getLabelDetail() {
+    return "";
+  }
+
   /**
    * This method estimate total buffer size needed for outbound_batches_ in
    * KrpcDataStreamSender. The total buffer size follow this formula:
