@@ -53,11 +53,6 @@ public class TableLoader {
   private static final Logger LOG = LoggerFactory.getLogger(TableLoader.class);
 
   private final CatalogServiceCatalog catalog_;
-
-  // Lock used to serialize calls to the Hive MetaStore to work around MetaStore
-  // concurrency bugs. Currently used to serialize calls to "getTable()" due to
-  // HIVE-5457.
-  private static final Object metastoreAccessLock_ = new Object();
   private Metrics metrics_ = new Metrics();
 
   public TableLoader(CatalogServiceCatalog catalog) {
@@ -88,12 +83,9 @@ public class TableLoader {
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation);
          MetaStoreClient msClient = catalog_.getMetaStoreClient(catalogTimeline)) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = null;
-      // All calls to getTable() need to be serialized due to HIVE-5457.
       Stopwatch hmsLoadSW = Stopwatch.createStarted();
-      synchronized (metastoreAccessLock_) {
-        msTbl = msClient.getHiveClient().getTable(db.getName(), tblName);
-        catalogTimeline.markEvent(FETCHED_HMS_TABLE);
-      }
+      msTbl = msClient.getHiveClient().getTable(db.getName(), tblName);
+      catalogTimeline.markEvent(FETCHED_HMS_TABLE);
       if (eventId != -1 && catalog_.isEventProcessingEnabled()) {
         // If the eventId is not -1 it means this table was likely created by Impala.
         // However, since the load operation of the table can happen much later, it is
