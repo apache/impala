@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="impala_iceberg_rest_catalog">
+    <title>Using Impala with Iceberg REST Catalog</title>
+    <titlealts audience="PDF"><navtitle>Iceberg REST Catalog</navtitle></titlealts>
+    <prolog>
+      <metadata>
+        <data name="Category" value="Concepts"/>
+        <data name="Category" value="Iceberg"/>
+        <data name="Category" value="REST Catalog"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+      <p>
+        <indexterm audience="hidden">Iceberg REST Catalog</indexterm>
+        Impala supports Apache Iceberg REST Catalog, which enables
+        Impala to connect directly to Iceberg REST Catalog servers. This feature allows you to:
+      </p>
+      <ul>
+        <li>Run Impala without Hive Metastore (HMS) or catalogd dependency</li>
+        <li>Connect to multiple REST catalog endpoints simultaneously</li>
+        <li>Use hybrid deployments with both HMS and REST catalogs</li>
+        <li>Integrate with open-source REST catalog implementations</li>
+      </ul>
+
+      <p>
+        For more information on the Apache Iceberg REST Catalog specification, see
+        <xref href="https://iceberg.apache.org/rest-catalog-spec/" scope="external" format="html">Iceberg REST Catalog</xref>.
+      </p>
+
+      <p outputclass="toc inpage"/>
+    </conbody>
+
+    <concept id="rest_catalog_overview">
+      <title>REST Catalog Overview</title>
+      <prolog>
+        <metadata>
+          <data name="Category" value="Concepts"/>
+        </metadata>
+      </prolog>
+      <conbody>
+        <p>
+          The Iceberg REST Catalog is a standardized HTTP API for managing Iceberg table metadata.
+          Unlike traditional Hive Metastore (HMS) deployments, REST Catalog provides a lightweight,
+          cloud-native approach to catalog management that works seamlessly across different compute engines.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="rest_catalog_configuration">
+      <title>Configuration</title>
+      <prolog>
+        <metadata>
+          <data name="Category" value="Concepts"/>
+        </metadata>
+      </prolog>
+      <conbody>
+        <p>
+          REST Catalog configuration in Impala uses Java properties files that specify connection
+          details and authentication settings. Configuration files must be placed in a directory
+          specified by the <codeph>--catalog_config_dir</codeph> flag.
+        </p>
+
+        <section id="config_file_format">
+          <title>Configuration File Format</title>
+          <p>
+            Configuration files use the standard Java Properties format, with key=value pairs. Each file
+            represents a separate REST Catalog.
+          </p>
+        </section>
+
+        <section id="required_properties">
+          <title>Required Properties</title>
+          <p>
+            The following properties are required in every REST Catalog configuration file:
+          </p>
+          <ul>
+            <li>
+              <codeph>connector.name</codeph>: Must be set to <codeph>iceberg</codeph>
+            </li>
+            <li>
+              <codeph>iceberg.catalog.type</codeph>: Must be set to <codeph>rest</codeph>
+            </li>
+            <li>
+              <codeph>uri</codeph> or <codeph>iceberg.rest-catalog.uri</codeph>: REST Catalog endpoint URL
+            </li>
+          </ul>
+          <p>
+            <b>Example:</b>
+          </p>
+          <codeblock>connector.name=iceberg
+iceberg.catalog.type=rest
+uri=http://rest-catalog-server:9084</codeblock>
+        </section>
+
+        <section id="optional_properties">
+          <title>Optional Properties</title>
+          <p>
+            <b>Warehouse Location:</b>
+          </p>
+          <codeblock>warehouse=hdfs://namenode:8020/warehouse/iceberg
+# Or:
+iceberg.rest-catalog.warehouse=hdfs://namenode:8020/warehouse/iceberg</codeblock>
+          <p>
+            <b>Catalog Prefix:</b>
+          </p>
+          <codeblock>prefix=my_catalog
+# Or:
+iceberg.rest-catalog.prefix=my_catalog</codeblock>
+          <p>
+            <b>OAuth Configuration:</b>
+          </p>
+          <codeblock>iceberg.rest-catalog.security=OAUTH2
+iceberg.rest-catalog.oauth2.credential=client_secret
+iceberg.rest-catalog.oauth2.server-uri=http://localhost:7070/realms/lakekeeper-realm/protocol/openid-connect/token</codeblock>
+        </section>
+
+        <section id="environment_variable_substitution">
+          <title>Environment Variable Substitution</title>
+          <p>
+            Impala supports environment variable substitution in .properties files to securely
+            manage credentials and environment-specific settings. This feature is particularly
+            useful for storing secrets outside of configuration files.
+          </p>
+          <p>
+            <b>Syntax:</b> <codeph>${ENV:VARIABLE_NAME}</codeph>
+          </p>
+          <p>
+            <b>Example:</b>
+          </p>
+          <codeblock>iceberg.rest-catalog.oauth2.credential=${ENV:OAUTH_CLIENT_SECRET}
+connection-password=${ENV:DB_PASSWORD}</codeblock>
+          <p>
+            <b>Requirements:</b>
+          </p>
+          <ul>
+            <li>Variable names must match the pattern: <codeph>[a-zA-Z][a-zA-Z0-9_-]*</codeph></li>
+            <li>Environment variables must be set before starting Impala</li>
+            <li>Undefined variables will cause Impala startup to fail</li>
+          </ul>
+        </section>
+      </conbody>
+    </concept>
+
+    <concept id="rest_catalog_deployment_modes">
+      <title>Deployment Modes</title>
+      <prolog>
+        <metadata>
+          <data name="Category" value="Concepts"/>
+        </metadata>
+      </prolog>
+      <conbody>
+        <p>
+          Impala supports three deployment modes for REST Catalog, each suited to different use cases and architectural requirements.
+        </p>
+
+        <section id="standalone_rest_catalog">
+          <title>Mode 1: Standalone REST Catalog (No HMS/Catalogd)</title>
+          <p>
+            This mode runs Impala without HMS or catalogd, connecting directly to one or more REST Catalog servers.
+            It provides the simplest architecture for pure Iceberg deployments.
+          </p>
+          <p>
+            <b>Example Use Case:</b> New deployments that only need Iceberg tables and want minimal operational complexity.
+          </p>
+          <p>
+            <b>Configuration:</b>
+          </p>
+          <p>
+            <i>Impalad Flags:</i>
+          </p>
+          <codeblock>--use_local_catalog=true
+--catalogd_deployed=false
+--catalog_config_dir=/path/to/config/directory</codeblock>
+          <p>
+            <i>Configuration File</i> (<codeph>/path/to/config/directory/rest.properties</codeph>):
+          </p>
+          <codeblock>connector.name=iceberg
+iceberg.catalog.type=rest
+iceberg.rest-catalog.uri=http://rest-catalog-server:9084</codeblock>
+        </section>
+
+        <section id="multi_catalog_mode">
+          <title>Mode 2: Multi-Catalog (REST Catalog(s) + HMS)</title>
+          <p>
+            This hybrid mode connects to both REST Catalogs and HMS simultaneously, allowing access
+            to both Iceberg tables in the REST Catalog and traditional HMS tables.
+          </p>
+          <p>
+            <b>Example Use Case:</b> Migration scenarios or environments that need both new Iceberg tables and legacy HMS tables.
+          </p>
+          <p>
+            <b>Configuration:</b>
+          </p>
+          <p>
+            <i>Impalad Flags:</i>
+          </p>
+          <codeblock>--use_local_catalog=true
+--catalog_config_dir=/path/to/config/directory</codeblock>
+          <p>
+            <i>Catalogd Flags:</i>
+          </p>
+          <codeblock>--catalog_topic_mode=minimal</codeblock>
+          <p>
+            <i>Configuration File</i> (<codeph>/path/to/config/directory/rest.properties</codeph>):
+          </p>
+          <codeblock>connector.name=iceberg
+iceberg.catalog.type=rest
+iceberg.rest-catalog.uri=http://rest-catalog-server:9084</codeblock>
+          <p>
+            <b>Handling Ambiguous Table Names:</b>
+          </p>
+          <p>
+            If a table with the same name exists in multiple catalogs, queries will fail with an
+            ambiguity error. The error message will indicate which catalogs contain the table.
+          </p>
+        </section>
+      </conbody>
+    </concept>
+
+    <concept id="unsupported_features">
+      <title>Limitations and Unsupported Features</title>
+      <prolog>
+        <metadata>
+          <data name="Category" value="Concepts"/>
+        </metadata>
+      </prolog>
+      <conbody>
+        <section id="limitations">
+          <p>
+            The following Iceberg REST Catalog features are not currently supported:
+          </p>
+          <ul>
+            <li>
+              <b>Vended Credentials:</b> The <codeph>vended-credentials-enabled</codeph> property
+              must be set to <codeph>false</codeph>. Impala does not support delegated credential
+              management from the REST Catalog server.
+            </li>
+            <li>
+              <b>User Sessions:</b> Only <codeph>NONE</codeph> session type is supported. Per-user
+              session isolation is not available.
+            </li>
+            <li>
+              <b>Nested Namespaces:</b> The <codeph>nested-namespace-enabled</codeph> property must
+              be set to <codeph>false</codeph>. Only flat namespace hierarchies are supported.
+            </li>
+            <li>
+              <b>Write Operations:</b> Write operations (INSERT, UPDATE, DELETE, MERGE) are not supported.
+            </li>
+            <li>
+              <b>DDL Operations:</b> DDL operations (CREATE, ALTER, DROP,...) are not supported.
+            </li>
+            <li>
+              <b>Views:</b> Iceberg views are not supported through the REST Catalog.
+            </li>
+          </ul>
+        </section>
+      </conbody>
+    </concept>
+</concept>

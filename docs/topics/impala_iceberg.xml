@@ -1213,4 +1213,31 @@ iceberg.io.manifest.cache.max-content-length=8388608;
       </p>
     </conbody>
   </concept>
+
+  <concept id="iceberg_rest_catalog">
+    <title>Using Impala with Iceberg REST Catalog</title>
+    <titlealts audience="PDF"><navtitle>REST Catalog</navtitle></titlealts>
+    <prolog>
+      <metadata>
+        <data name="Category" value="Concepts"/>
+        <data name="Category" value="Iceberg"/>
+        <data name="Category" value="REST Catalog"/>
+      </metadata>
+    </prolog>
+
+    <conbody>
+      <p>
+        <indexterm audience="hidden">Iceberg REST Catalog</indexterm>
+        Impala supports connecting directly to Iceberg REST Catalog servers.
+        For complete documentation on using Impala with Iceberg REST Catalog, including configuration,
+        deployment modes, see
+        <xref href="impala_iceberg_rest_catalog.xml"/>.
+      </p>
+
+      <p>
+        For more information on the Apache Iceberg REST Catalog specification, see
+        <xref href="https://iceberg.apache.org/rest-catalog-spec/" scope="external" format="html">Iceberg REST Catalog</xref>.
+      </p>
+    </conbody>
+  </concept>
 </concept>
