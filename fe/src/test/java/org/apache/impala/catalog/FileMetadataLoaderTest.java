@@ -85,6 +85,56 @@ public class FileMetadataLoaderTest {
   }
 
   @Test
+  public void testFileMetadataStats() throws IOException, CatalogException {
+    //TODO(IMPALA-9042): Remove "throws CatalogException"
+    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
+    String tablePath = "hdfs://localhost:20500/test-warehouse/alltypes/";
+    FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
+        /* oldFds = */Collections.emptyList(), hostIndex, null, null);
+    fml.load();
+
+    // Test FileMetadataStats
+    FeFsTable.FileMetadataStats stats = fml.getFileMetadataStats();
+    assertNotNull(stats);
+
+    // Basic stats
+    assertEquals(24, stats.numFiles);
+    assertTrue(stats.totalFileBytes > 0);
+    assertTrue(stats.numBlocks >= 0);
+
+    // Min/max/avg file sizes
+    assertTrue(stats.minFileBytes > 0);
+    assertTrue(stats.maxFileBytes >= stats.minFileBytes);
+    assertTrue(stats.getAvgFileBytes() > 0);
+    assertEquals(stats.totalFileBytes / stats.numFiles, stats.getAvgFileBytes());
+
+    // Verify min/max file sizes are consistent with actual files
+    long actualMin = Long.MAX_VALUE;
+    long actualMax = 0;
+    long actualTotal = 0;
+    for (FileDescriptor fd : fml.getLoadedFds()) {
+      long len = fd.getFileLength();
+      if (len < actualMin) actualMin = len;
+      if (len > actualMax) actualMax = len;
+      actualTotal += len;
+    }
+    assertEquals(actualMin, stats.minFileBytes);
+    assertEquals(actualMax, stats.maxFileBytes);
+    assertEquals(actualTotal, stats.totalFileBytes);
+
+    // Modification time stats
+    assertTrue(stats.minModificationTime > 0);
+    assertTrue(stats.maxModificationTime >= stats.minModificationTime);
+
+    // Host and host:disk pair stats (for HDFS tables these should be populated)
+    assertTrue(stats.getNumUniqueHosts() >= 0);
+    assertTrue(stats.getNumUniqueHostDiskPairs() >= 0);
+    // Number of hosts should be <= number of host:disk pairs
+    // (hosts are derived from pairs)
+    assertTrue(stats.getNumUniqueHosts() <= stats.getNumUniqueHostDiskPairs());
+  }
+
+  @Test
   public void testRecursiveLoadingWithoutBlockLocations()
       throws IOException, CatalogException {
     try {

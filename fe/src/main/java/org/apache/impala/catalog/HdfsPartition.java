@@ -1220,6 +1220,10 @@ public class HdfsPartition extends CatalogObjectImpl implements FeFsPartition {
       fileMetadataStats_ = fileMetadataStats;
     }
 
+    public FileMetadataStats getFileMetadataStats() {
+      return fileMetadataStats_;
+    }
+
     public HdfsFileFormat getFileFormat() {
       return fileFormatDescriptor_.getFileFormat();
     }

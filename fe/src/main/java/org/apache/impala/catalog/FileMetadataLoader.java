@@ -207,6 +207,8 @@ public class FileMetadataLoader {
       if (fileStatuses == null) return;
 
       AtomicLong numUnknownDiskIds = new AtomicLong(0);
+      long minAccessTime = Long.MAX_VALUE;
+      long maxAccessTime = 0;
 
       if (writeIds_ != null) {
         fileStatuses = AcidUtils.filterFilesForAcidState(fileStatuses, partPath,
@@ -231,6 +233,13 @@ public class FileMetadataLoader {
             fileStatus, partPath);
         loadedFds_.add(Preconditions.checkNotNull(fd));
         fileMetadataStats_.accumulate(fd);
+
+        // Track access time stats
+        long accessTime = fileStatus.getAccessTime();
+        if (accessTime > 0) {  // Access time can be 0 if not supported/disabled
+          minAccessTime = Math.min(minAccessTime, accessTime);
+          maxAccessTime = Math.max(maxAccessTime, accessTime);
+        }
       }
       if (writeIds_ != null) {
         loadedInsertDeltaFds_ = new ArrayList<>();
@@ -244,6 +253,13 @@ public class FileMetadataLoader {
         }
       }
       loadStats_.unknownDiskIds += numUnknownDiskIds.get();
+
+      // Update access time stats in fileMetadataStats_
+      if (maxAccessTime > 0) {
+        fileMetadataStats_.minAccessTime = minAccessTime;
+        fileMetadataStats_.maxAccessTime = maxAccessTime;
+      }
+
       if (LOG.isTraceEnabled()) {
         LOG.trace(loadStats_.debugString());
       }

@@ -344,6 +344,8 @@ public class HdfsTable extends Table implements FeFsTable {
   //   - Used for reporting through catalog web UI.
   //   - Stats are reset whenever the table is loaded (due to a metadata operation) and
   //   are set when the table is serialized to Thrift.
+  //   - Note: Min/max timestamps and host:disk pairs may become stale after
+  //   dropPartition() calls, but are refreshed on the next full table load.
   private final FileMetadataStats fileMetadataStats_ = new FileMetadataStats();
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsTable.class);
@@ -766,6 +768,15 @@ public class HdfsTable extends Table implements FeFsTable {
           getHostIndex(), debugActions, logPrefix).load();
     }
 
+    // Aggregate file metadata stats from all partitions
+    FileMetadataStats aggregatedStats = new FileMetadataStats();
+    for (HdfsPartition.Builder partBuilder : partBuilders) {
+      FileMetadataStats partStats = partBuilder.getFileMetadataStats();
+      if (partStats != null) {
+        aggregatedStats.merge(partStats);
+      }
+    }
+
     // TODO(todd): would be good to log a summary of the loading process:
     // - how many block locations did we reuse/load individually/load via batch
     // - how many partitions did we read metadata for
@@ -782,8 +793,11 @@ public class HdfsTable extends Table implements FeFsTable {
     catalogTimeline.markEvent(String.format("Loaded file metadata for %d partitions",
         partBuilders.size()));
     long duration = clock.getTick() - startTime;
-    LOG.info("Loaded file and block metadata for {} partitions: {}. Time taken: {}",
-        getFullName(), partNames, PrintUtils.printTimeNs(duration));
+
+    // Log detailed file metadata statistics
+    if (LOG.isInfoEnabled()) {
+      LOG.info(aggregatedStats.toLogString(getFullName(), partNames, duration));
+    }
     return duration;
   }
 

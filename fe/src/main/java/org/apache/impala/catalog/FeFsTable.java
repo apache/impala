@@ -22,6 +22,9 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 import java.io.IOException;
+import java.time.format.DateTimeFormatter;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -44,6 +47,7 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.service.BackendConfig;
@@ -109,6 +113,22 @@ public interface FeFsTable extends FeTable {
     public long numBlocks = 0;
     // Total size (in bytes) of all files in a table/partition.
     public long totalFileBytes = 0;
+    // Min file size in bytes
+    public long minFileBytes = Long.MAX_VALUE;
+    // Max file size in bytes
+    public long maxFileBytes = 0;
+    // Min modification time
+    public long minModificationTime = Long.MAX_VALUE;
+    // Max modification time
+    public long maxModificationTime = 0;
+    // Min access time
+    public long minAccessTime = Long.MAX_VALUE;
+    // Max access time
+    public long maxAccessTime = 0;
+    // Set of unique host:disk pairs (for HDFS/Ozone only)
+    // Stores pairs as Pair<hostIndex, diskId> for efficient tracking
+    // Disk IDs are 0-based per host, so pairs must be tracked together
+    public Set<Pair<Integer, Short>> uniqueHostDiskPairs = new HashSet<>();
 
     public FileMetadataStats() {}
 
@@ -127,24 +147,48 @@ public interface FeFsTable extends FeTable {
       numFiles = 0;
       numBlocks = 0;
       totalFileBytes = 0;
+      minFileBytes = Long.MAX_VALUE;
+      maxFileBytes = 0;
+      minModificationTime = Long.MAX_VALUE;
+      maxModificationTime = 0;
+      minAccessTime = Long.MAX_VALUE;
+      maxAccessTime = 0;
+      uniqueHostDiskPairs.clear();
     }
 
     public void set(FileMetadataStats stats) {
       numFiles = stats.numFiles;
       numBlocks = stats.numBlocks;
       totalFileBytes = stats.totalFileBytes;
+      minFileBytes = stats.minFileBytes;
+      maxFileBytes = stats.maxFileBytes;
+      minModificationTime = stats.minModificationTime;
+      maxModificationTime = stats.maxModificationTime;
+      minAccessTime = stats.minAccessTime;
+      maxAccessTime = stats.maxAccessTime;
+      uniqueHostDiskPairs = new HashSet<>(stats.uniqueHostDiskPairs);
     }
 
     public void merge(FileMetadataStats other) {
       numFiles += other.numFiles;
       numBlocks += other.numBlocks;
       totalFileBytes += other.totalFileBytes;
+      minFileBytes = Math.min(minFileBytes, other.minFileBytes);
+      maxFileBytes = Math.max(maxFileBytes, other.maxFileBytes);
+      minModificationTime = Math.min(minModificationTime, other.minModificationTime);
+      maxModificationTime = Math.max(maxModificationTime, other.maxModificationTime);
+      minAccessTime = Math.min(minAccessTime, other.minAccessTime);
+      maxAccessTime = Math.max(maxAccessTime, other.maxAccessTime);
+      uniqueHostDiskPairs.addAll(other.uniqueHostDiskPairs);
     }
 
     public void remove(FileMetadataStats other) {
       numFiles -= other.numFiles;
       numBlocks -= other.numBlocks;
       totalFileBytes -= other.totalFileBytes;
+      // Note: We cannot accurately update min/max values or host:disk pairs when
+      // removing stats. These fields may be stale after dropPartition() calls.
+      // They are refreshed on the next full table load via HdfsTable.load().
     }
 
     // Accumulate the statistics of the fd into this FileMetadataStats.
@@ -152,6 +196,113 @@ public interface FeFsTable extends FeTable {
       numBlocks += fd.getNumFileBlocks();
       totalFileBytes += fd.getFileLength();
       ++numFiles;
+
+      // Track min/max file sizes
+      long fileLen = fd.getFileLength();
+      minFileBytes = Math.min(minFileBytes, fileLen);
+      maxFileBytes = Math.max(maxFileBytes, fileLen);
+
+      // Track min/max modification times
+      long modTime = fd.getModificationTime();
+      minModificationTime = Math.min(minModificationTime, modTime);
+      maxModificationTime = Math.max(maxModificationTime, modTime);
+
+      // Track unique host:disk pairs from file blocks
+      for (int i = 0; i < fd.getNumFileBlocks(); ++i) {
+        FbFileBlock block = fd.getFbFileBlock(i);
+        int numReplicas = block.replicaHostIdxsLength();
+        int numDiskIds = block.diskIdsLength();
+        // Pair up host indices with disk IDs
+        for (int j = 0; j < numReplicas; ++j) {
+          int hostIdx = FileBlock.getReplicaHostIdx(block, j);
+          short diskId = (j < numDiskIds) ? block.diskIds(j) : -1;
+          if (diskId >= 0) {  // Only track valid disk IDs
+            uniqueHostDiskPairs.add(Pair.create(hostIdx, diskId));
+          }
+        }
+      }
+    }
+
+    public long getAvgFileBytes() {
+      return numFiles > 0 ? totalFileBytes / numFiles : 0;
+    }
+
+    public int getNumUniqueHosts() {
+      Set<Integer> uniqueHosts = new HashSet<>();
+      for (Pair<Integer, Short> pair : uniqueHostDiskPairs) {
+        uniqueHosts.add(pair.first);
+      }
+      return uniqueHosts.size();
+    }
+
+    public int getNumUniqueHostDiskPairs() {
+      return uniqueHostDiskPairs.size();
+    }
+
+    /**
+     * Builds a detailed log string with all file metadata statistics.
+     * @param tableName The full table name for the log message
+     * @param partNames Comma-separated partition names
+     * @param durationNs Time taken to load metadata in nanoseconds
+     * @return Formatted log string with all statistics
+     */
+    public String toLogString(String tableName, String partNames, long durationNs) {
+      DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+          .withZone(ZoneId.systemDefault());
+
+      StringBuilder statsLog = new StringBuilder()
+          .append("Loaded file and block metadata for ").append(tableName);
+      if (!partNames.isEmpty()) {
+        statsLog.append(" partitions: ").append(partNames);
+      }
+      statsLog.append(". ")
+          .append("Time taken: ").append(PrintUtils.printTimeNs(durationNs))
+          .append(". ");
+
+      if (numFiles > 0) {
+        statsLog.append("Files: ").append(numFiles)
+            .append(", Blocks: ").append(numBlocks)
+            .append(", Total size: ")
+            .append(PrintUtils.printBytes(totalFileBytes))
+            .append(", File sizes (min/avg/max): ")
+            .append(PrintUtils.printBytes(minFileBytes))
+            .append("/")
+            .append(PrintUtils.printBytes(getAvgFileBytes()))
+            .append("/")
+            .append(PrintUtils.printBytes(maxFileBytes));
+
+        // Modification time statistics (formatted as dates)
+        if (minModificationTime != Long.MAX_VALUE && maxModificationTime > 0) {
+          statsLog.append(", Modification times (min/max): ")
+              .append(dateFormatter.format(Instant.ofEpochMilli(
+                  minModificationTime)))
+              .append("/")
+              .append(dateFormatter.format(Instant.ofEpochMilli(
+                  maxModificationTime)));
+        }
+
+        // Access time statistics (formatted as dates)
+        // Note: Access time may be 0 or not updated if disabled in HDFS for performance
+        if (minAccessTime != Long.MAX_VALUE && maxAccessTime > 0) {
+          statsLog.append(", Access times (min/max): ")
+              .append(dateFormatter.format(Instant.ofEpochMilli(minAccessTime)))
+              .append("/")
+              .append(dateFormatter.format(Instant.ofEpochMilli(
+                  maxAccessTime)));
+        }
+
+        // HDFS/Ozone specific stats
+        int numUniqueHosts = getNumUniqueHosts();
+        int numUniqueHostDiskPairs = getNumUniqueHostDiskPairs();
+        if (numUniqueHosts > 0) {
+          statsLog.append(", Hosts: ").append(numUniqueHosts);
+        }
+        if (numUniqueHostDiskPairs > 0) {
+          statsLog.append(", Host:Disk pairs: ").append(numUniqueHostDiskPairs);
+        }
+      }
+
+      return statsLog.toString();
     }
   }
 
