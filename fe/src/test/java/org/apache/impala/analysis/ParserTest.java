@@ -2262,6 +2262,9 @@ public class ParserTest extends FrontendTestBase {
       ParsesOk(String.format("CREATE %s Foo LOCATION '/hdfs_location'", kw));
       ParsesOk(String.format(
           "CREATE %s Foo COMMENT 'comment' LOCATION '/hdfs_location'", kw));
+      ParsesOk(String.format("CREATE %s Foo WITH DBPROPERTIES('k'='v')", kw));
+      ParsesOk(String.format(
+          "CREATE %s Foo WITH DBPROPERTIES('k1'='v1', 'k2'='v2')", kw));
 
       // Only string literals are supported
       ParserError(String.format("CREATE %s Foo COMMENT mytable", kw));
@@ -2271,9 +2274,26 @@ public class ParserTest extends FrontendTestBase {
       ParserError(String.format(
           "CREATE %s Foo LOCATION '/hdfs/location' COMMENT 'comment'", kw));
 
+      ParserError(String.format("CREATE %s Foo DBPROPERTIES('a'='b')", kw));
+      ParserError(String.format("CREATE %s Foo WITH DBPROPERTIES()", kw));
+      ParserError(String.format("CREATE %s Foo WITH DBPROPERTIES(a=)", kw));
+      ParserError(String.format("CREATE %s Foo WITH DBPROPERTIES('a'=b)", kw));
+
+      // WITH DBPROPERTIES needs to be *before* LOCATION
+      ParserError(String.format(
+          "CREATE %s Foo LOCATION '/hdfs/location' WITH DBPROPERTIES('a'='b')", kw));
+      ParsesOk(String.format(
+          "CREATE %s Foo WITH DBPROPERTIES('a'='b') LOCATION '/hdfs/location'", kw));
+
       ParserError(String.format("CREATE %s Foo COMMENT LOCATION '/hdfs_location'", kw));
       ParserError(String.format("CREATE %s Foo LOCATION", kw));
       ParserError(String.format("CREATE %s Foo LOCATION 'dfsd' 'dafdsf'", kw));
+
+      ParsesOk(String.format(
+          "CREATE %s Foo COMMENT 'comment' WITH DBPROPERTIES('a'='b')", kw));
+      ParsesOk(String.format(
+          "CREATE %s Foo COMMENT 'comment' WITH DBPROPERTIES('a'='b') " +
+          "LOCATION '/hdfs/location'", kw));
 
       ParserError(String.format("CREATE Foo"));
       ParserError(String.format("CREATE %s 'Foo'", kw));
@@ -4456,6 +4476,22 @@ public class ParserTest extends FrontendTestBase {
     ParserError("ALTER DATABASE db SET OWNER ROLE");
     ParserError("ALTER DATABASE SET OWNER ROLE foo");
     ParserError("ALTER DATABASE SET OWNER");
+  }
+
+  @Test
+  public void TestAlterDatabaseSetDbProperties() {
+    ParsesOk("ALTER DATABASE db SET DBPROPERTIES('a'='b')");
+    ParsesOk("ALTER DATABASE db SET DBPROPERTIES('a'='b', 'b'='c')");
+    ParsesOk("ALTER DATABASE db SET DBPROPERTIES('a'='b', 'b'='c', 'c'='d')");
+
+    ParserError("ALTER DATABASE db SET DBPROPERTIESS('a'='b')");
+    ParserError("ALTER DATABASE db SET DBPROPERTIES()");
+    ParserError("ALTER DATABASE db SET DBPROPERTIES('a')");
+    ParserError("ALTER DATABASE db SET DBPROPERTIES('a'=)");
+    ParserError("ALTER DATABASE db SET DBPROPERTIES('a'=b)");
+    ParserError("ALTER DATABASE db SET DBPROPERTIES(a='b')");
+    ParserError("ALTER DATABASE db SET DBPROPERTIES('a'='b' 'c'='d')");
+    ParserError("ALTER DATABASE db SET DBPROPERTIES('a'='b',)");
   }
 
   @Test

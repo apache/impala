@@ -527,6 +527,7 @@ nonterminal ComputeStatsStmt compute_stats_stmt;
 nonterminal DropDbStmt drop_db_stmt;
 nonterminal DropStatsStmt drop_stats_stmt;
 nonterminal DropTableOrViewStmt drop_tbl_or_view_stmt;
+nonterminal HashMap opt_with_dbproperties;
 nonterminal CreateDbStmt create_db_stmt;
 nonterminal CreateTableAsSelectStmt create_tbl_as_select_stmt;
 nonterminal CreateTableAsSelectStmt.CtasParams create_tbl_as_select_params;
@@ -1414,6 +1415,12 @@ alter_db_stmt ::=
     parser.checkIdentKeyword("OWNER", owner_id);
     RESULT = new AlterDbSetOwnerStmt(db, new Owner(TOwnerType.ROLE, role));
   :}
+  | KW_ALTER KW_DATABASE ident_or_unreserved:db KW_SET IDENT:dbproperties_id
+  LPAREN properties_map:properties RPAREN
+  {:
+    parser.checkIdentKeyword("DBPROPERTIES", dbproperties_id);
+    RESULT = new AlterDbSetDbPropertiesStmt(db, properties);
+  :}
   ;
 
 // In some places, the opt_partition_set is used to avoid conflicts even though
@@ -1581,11 +1588,22 @@ opt_kw_column ::=
   | /* empty */
   ;
 
+opt_with_dbproperties ::=
+  KW_WITH IDENT:dbproperties_id LPAREN properties_map:properties RPAREN
+  {:
+    parser.checkIdentKeyword("DBPROPERTIES", dbproperties_id);
+    RESULT = properties;
+  :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
 create_db_stmt ::=
   KW_CREATE db_or_schema_kw if_not_exists_val:if_not_exists ident_or_unreserved:db_name
-  opt_comment_val:comment location_val:location managed_location_val:managed_location
+  opt_comment_val:comment opt_with_dbproperties:dbproperties
+  location_val:location managed_location_val:managed_location
   {: RESULT = new CreateDbStmt(db_name, comment, location,
-                               managed_location, if_not_exists);
+                               managed_location, if_not_exists, dbproperties);
   :}
   ;
 

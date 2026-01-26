@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Map;
+
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
@@ -35,6 +37,7 @@ public class CreateDbStmt extends StatementBase {
   private final HdfsUri managedLocation_;
   private final String comment_;
   private final boolean ifNotExists_;
+  private final Map<String, String> dbProperties_;
   // Database owner. Set during analysis.
   private String owner_;
 
@@ -45,7 +48,7 @@ public class CreateDbStmt extends StatementBase {
    * Creates a database with the given name.
    */
   public CreateDbStmt(String dbName) {
-    this(dbName, null, null, null, false);
+    this(dbName, null, null, null, false, null);
   }
 
   /**
@@ -55,12 +58,14 @@ public class CreateDbStmt extends StatementBase {
    * unless the ifNotExists is true.
    */
   public CreateDbStmt(String dbName, String comment, HdfsUri location,
-       HdfsUri managedlocation, boolean ifNotExists) {
+       HdfsUri managedlocation, boolean ifNotExists,
+       Map<String, String> properties) {
     this.dbName_ = dbName;
     this.comment_ = comment;
     this.location_ = location;
     this.managedLocation_ = managedlocation;
     this.ifNotExists_ = ifNotExists;
+    this.dbProperties_ = properties;
   }
 
   public String getComment() { return comment_; }
@@ -92,6 +97,7 @@ public class CreateDbStmt extends StatementBase {
     params.setIf_not_exists(getIfNotExists());
     params.setOwner(getOwner());
     params.setServer_name(serverName_);
+    params.setProperties(dbProperties_);
     return params;
   }
 

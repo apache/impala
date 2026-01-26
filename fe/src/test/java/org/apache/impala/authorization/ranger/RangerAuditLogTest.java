@@ -78,6 +78,14 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
 
     authzOk(events -> {
       assertEquals(1, events.size());
+      assertEventEquals("@database", "alter", "functional", 1, events.get(0));
+      assertEquals("alter database functional set dbproperties ('a'='b')",
+          events.get(0).getRequestData());
+    }, "alter database functional set dbproperties ('a'='b')",
+        onDatabase("functional", TPrivilegeLevel.ALTER));
+
+    authzOk(events -> {
+      assertEquals(1, events.size());
       assertEventEquals("@table", "create", "functional/test_tbl", 1, events.get(0));
       assertEquals("create table functional.test_tbl(i int)",
           events.get(0).getRequestData());
@@ -432,6 +440,14 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       assertEventEquals("@database", "create", "test_db", 0, events.get(0));
       assertEquals("create database test_db", events.get(0).getRequestData());
     }, "create database test_db");
+
+    authzError(events -> {
+      assertEquals(1, events.size());
+      assertEventEquals("@database", "alter", "functional", 0, events.get(0));
+      assertEquals("alter database functional set dbproperties ('a'='b')",
+          events.get(0).getRequestData());
+    }, "alter database functional set dbproperties ('a'='b')",
+        onDatabase("functional", TPrivilegeLevel.SELECT));
 
     authzError(events -> {
       assertEquals(1, events.size());

@@ -341,6 +341,11 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"),
         "alter view alltypes_view as select 1", expectedAuthorizables);
+
+    // Alter database set dbproperties.
+    expectedAuthorizables = Sets.newHashSet("functional");
+    verifyPrivilegeReqs("alter database functional set dbproperties ('a'='b')",
+        expectedAuthorizables);
   }
 
   @Test
@@ -2736,6 +2741,35 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       assertEquals("Role 'foo' does not exist.", e.getLocalizedMessage());
     }
     assertTrue(exceptionThrown);
+  }
+
+  @Test
+  public void testAlterDatabaseSetDbProperties() throws ImpalaException {
+    authorize("alter database functional set dbproperties('a'='b')")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.OWNER))
+        .ok(onServer(TPrivilegeLevel.ALTER))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
+        .error(alterError("functional"))
+        .error(alterError("functional"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+            TPrivilegeLevel.ALTER)))
+        .error(alterError("functional"), onDatabase("functional",
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+                TPrivilegeLevel.ALTER)));
+
+    authorize("alter database functional set dbproperties('a'='b')")
+        .ok(onServer(TPrivilegeLevel.values()))
+        .ok(onDatabase("functional", TPrivilegeLevel.values()));
+
+    // Database does not exist.
+    authorize("alter database nodb set dbproperties('a'='b')")
+        .error(alterError("nodb"))
+        .error(alterError("nodb"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+            TPrivilegeLevel.ALTER)));
   }
 
   @Test

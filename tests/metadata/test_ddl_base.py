@@ -74,6 +74,10 @@ class TestDdlBase(ImpalaTestSuite):
     """Extracts the DB properties mapping from the output of DESCRIBE FORMATTED"""
     return self._get_properties("Owner:", db_name, True)
 
+  def _get_db_properties(self, db_name):
+    """Extracts the DB properties mapping from the output of DESCRIBE FORMATTED"""
+    return self._get_properties("Parameter:", db_name, True)
+
   def _get_property(self, property_name, name, is_db=False):
     """Extracts a db/table property value from the output of DESCRIBE FORMATTED."""
     result = self.client.execute("describe {0} formatted {1}".format(

@@ -177,7 +177,9 @@ import org.apache.impala.hive.executor.HiveJavaFunction;
 import org.apache.impala.hive.executor.HiveJavaFunctionFactory;
 import org.apache.impala.thrift.JniCatalogConstants;
 import org.apache.impala.thrift.TAlterDbParams;
+import org.apache.impala.thrift.TAlterDbType;
 import org.apache.impala.thrift.TAlterDbSetOwnerParams;
+import org.apache.impala.thrift.TAlterDbSetDbPropertiesParams;
 import org.apache.impala.thrift.TAlterTableAddColsParams;
 import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
 import org.apache.impala.thrift.TAlterTableAddPartitionParams;
@@ -2341,6 +2343,11 @@ public class CatalogOpExecutor {
     if (params.getComment() != null) {
       db.setDescription(params.getComment());
     }
+    if (params.getProperties() != null) {
+        for (Map.Entry<String, String> property : params.getProperties().entrySet()) {
+          db.putToParameters(property.getKey(), property.getValue());
+        }
+    }
     if (params.getLocation() != null) {
       db.setLocationUri(params.getLocation());
     }
@@ -2724,7 +2731,7 @@ public class CatalogOpExecutor {
         // parameters. If the applyAlterDatabase method below throws an exception,
         // catalog might end up in a inconsistent state. Ideally, we should make a copy
         // of hms Database object and then update the Db once the HMS operation succeeds
-        // similar to what happens in alterDatabaseSetOwner method.
+        // similar to what happens in alterDatabase method.
         if (catalog_.addFunction(fn)) {
           addCatalogServiceIdentifiers(db.getMetaStoreDb(),
               catalog_.getCatalogServiceId(), newCatalogVersion);
@@ -8454,23 +8461,29 @@ public class CatalogOpExecutor {
     if (db == null) {
       throw new CatalogException("Database: " + dbName + " does not exist.");
     }
+    TAlterDbSetOwnerParams setOwnerParams = null;
+    TAlterDbSetDbPropertiesParams setDbPropertiesParams = null;
     switch (params.getAlter_type()) {
-      case SET_OWNER:
-        alterDatabaseSetOwner(db, params.getSet_owner_params(), wantMinimalResult,
-            response, catalogTimeline);
+      case SET_OWNER: {
+        setOwnerParams = params.getSet_owner_params();
+        Preconditions.checkNotNull(setOwnerParams);
+        Preconditions.checkNotNull(setOwnerParams.owner_name);
+        Preconditions.checkNotNull(setOwnerParams.owner_type);
+        tryLock(db, "altering the owner", catalogTimeline);
         break;
+      }
+      case SET_DBPROPERTIES: {
+        setDbPropertiesParams = params.getSet_dbproperties_params();
+        Preconditions.checkNotNull(setDbPropertiesParams);
+        Preconditions.checkNotNull(setDbPropertiesParams.properties);
+        tryLock(db, "altering dbproperties", catalogTimeline);
+        break;
+      }
       default:
         throw new UnsupportedOperationException(
             "Unknown ALTER DATABASE operation type: " + params.getAlter_type());
     }
-  }
 
-  private void alterDatabaseSetOwner(Db db, TAlterDbSetOwnerParams params,
-      boolean wantMinimalResult, TDdlExecResponse response,
-      EventSequence catalogTimeline) throws ImpalaException {
-    Preconditions.checkNotNull(params.owner_name);
-    Preconditions.checkNotNull(params.owner_type);
-    tryLock(db, "altering the owner", catalogTimeline);
     // Get a new catalog version to assign to the database being altered.
     long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
     catalog_.getLock().writeLock().unlock();
@@ -8480,16 +8493,27 @@ public class CatalogOpExecutor {
           newCatalogVersion);
       String originalOwnerName = msDb.getOwnerName();
       PrincipalType originalOwnerType = msDb.getOwnerType();
-      msDb.setOwnerName(params.owner_name);
-      msDb.setOwnerType(PrincipalType.valueOf(params.owner_type.name()));
+      switch (params.getAlter_type()) {
+        case SET_OWNER: {
+          msDb.setOwnerName(setOwnerParams.owner_name);
+          msDb.setOwnerType(PrincipalType.valueOf(setOwnerParams.owner_type.name()));
+          break;
+        }
+        case SET_DBPROPERTIES: {
+          for (Map.Entry<String, String> property :
+              setDbPropertiesParams.properties.entrySet())
+            msDb.putToParameters(property.getKey(), property.getValue());
+          break;
+        }
+      }
       try {
         applyAlterDatabase(msDb, catalogTimeline);
       } catch (ImpalaRuntimeException e) {
         throw e;
       }
-      if (authzConfig_.isEnabled()) {
-        authzManager_.updateDatabaseOwnerPrivilege(params.server_name, db.getName(),
-            originalOwnerName, originalOwnerType, msDb.getOwnerName(),
+      if (params.getAlter_type() == TAlterDbType.SET_OWNER && authzConfig_.isEnabled()) {
+        authzManager_.updateDatabaseOwnerPrivilege(setOwnerParams.server_name,
+            db.getName(), originalOwnerName, originalOwnerType, msDb.getOwnerName(),
             msDb.getOwnerType(), response);
       }
       Db updatedDb = catalog_.updateDb(msDb);

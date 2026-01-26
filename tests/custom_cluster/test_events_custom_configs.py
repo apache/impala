@@ -122,6 +122,8 @@ class TestEventProcessingCustomConfigsBase(CustomClusterTestSuite):
         # ALTER_DATABASE case
         "comment on database {0} is 'self-event test database'".format(db_name),
         "alter database {0} set owner user `test-user`".format(db_name),
+        "alter database {0} set dbproperties ('comment'='self-event test "
+        "database')".format(db_name),
         "create function {0}.f() returns int location '{1}/libTestUdfs.so' "
         "symbol='NoArgs'".format(db_name, WAREHOUSE),
         "drop function {0}.f()".format(db_name),

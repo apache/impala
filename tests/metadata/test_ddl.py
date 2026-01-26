@@ -267,6 +267,12 @@ class TestDdlStatements(TestDdlBase):
       unique_database)).get_data()
     assert "INT\tf()\tNATIVE\ttrue" == func_names
 
+  def test_alter_database_set_db_properties(self, unique_database):
+    self.client.execute("alter database {0} set dbproperties('k'='v')".format(
+      unique_database))
+    properties = self._get_db_properties(unique_database)
+    assert properties['k'] == 'v'
+
   def test_alter_table_set_owner(self, unique_database):
     table_name = "{0}.test_owner_tbl".format(unique_database)
     self.client.execute("create table {0}(i int)".format(table_name))

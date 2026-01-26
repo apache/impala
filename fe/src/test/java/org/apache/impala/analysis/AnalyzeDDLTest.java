@@ -2421,6 +2421,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create database new_db managedlocation " +
         "'blah://bucket/test-warehouse/new_db'",
         "No FileSystem for scheme: blah");
+
+    AnalyzesOk("create database new_db with dbproperties('a'='b')");
   }
 
   @Test
@@ -4841,6 +4843,13 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           ownerType, buildLongOwnerName()), "Owner name exceeds maximum length of 128 " +
           "characters. The given owner name has 133 characters.");
     }
+  }
+
+  @Test
+  public void TestAlterDatabaseSetDbProperties() {
+    AnalyzesOk("alter database functional set dbproperties('a'='b')");
+    AnalysisError("alter database doesntexist set dbproperties('a'='b')",
+          "Database does not exist: doesntexist");
   }
 
   @Test

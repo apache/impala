@@ -231,3 +231,27 @@ drop database $DATABASE_loc
 ---- RESULTS
 'Database has been dropped.'
 ====
+---- QUERY
+# Test CREATE DATABASE WITH DBPROPERTIES
+create database $DATABASE_loc WITH DBPROPERTIES('key0'='value0', 'key1'='value1')
+---- RESULTS
+'Database has been created.'
+====
+---- QUERY
+# Test that DESCRIBE EXTENDED also has all properties.
+describe database extended $DATABASE_loc
+---- RESULTS
+'$DATABASE_loc','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/$DATABASE_loc.db',''
+'Owner: ','',''
+'','$USER','USER'
+'Parameter: ','',''
+'','key0','value0'
+'','key1','value1'
+---- TYPES
+string, string, string
+====
+---- QUERY
+drop database $DATABASE_loc
+---- RESULTS
+'Database has been dropped.'
+====
