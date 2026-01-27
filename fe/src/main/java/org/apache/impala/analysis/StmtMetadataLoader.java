@@ -485,19 +485,7 @@ public class StmtMetadataLoader {
   public Set<TableName> collectTableCandidates(StatementBase stmt) {
     Preconditions.checkNotNull(stmt);
     List<TableRef> tblRefs = new ArrayList<>();
-    // The information about whether table masking is supported is not available to
-    // ResetMetadataStmt so we collect the TableRef for ResetMetadataStmt whenever
-    // applicable. Skip this if allow_catalog_cache_op_from_masked_users=true because
-    // we don't need column info for fetching column-masking policies.
-    if (stmt instanceof ResetMetadataStmt
-        && fe_.getAuthzFactory().getAuthorizationConfig().isEnabled()
-        && fe_.getAuthzFactory().supportsTableMasking()
-        && !BackendConfig.INSTANCE.allowCatalogCacheOpFromMaskedUsers()) {
-      TableName tableName = ((ResetMetadataStmt) stmt).getTableName();
-      if (tableName != null) tblRefs.add(new TableRef(tableName.toPath(), null));
-    } else {
-      stmt.collectTableRefs(tblRefs);
-    }
+    stmt.collectTableRefs(tblRefs);
     Set<TableName> tableNames = new HashSet<>();
     for (TableRef ref: tblRefs) {
       tableNames.addAll(Path.getCandidateTables(ref.getPath(), sessionDb_));

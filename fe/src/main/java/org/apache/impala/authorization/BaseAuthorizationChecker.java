@@ -216,30 +216,6 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     if (dbName != null && checkSystemDbAccess(catalog, dbName, request.getPrivilege())) {
       return;
     }
-    // Populate column names to check column masking policies in blocking updates.
-    // No need to do this for REFRESH if allow_catalog_cache_op_from_masked_users=true.
-    // Note that db.getTable() could be a heavy operation in local catalog mode since it
-    // triggers metadata loading on the table if it's unloaded in catalogd. Skipping this
-    // improves the performance of "INVALIDATE METADATA <table>" statements. For REFRESH
-    // statements, the performance doesn't differ a lot since there are other places that
-    // use db.getTable() (see IMPALA-12591).
-    if (config_.isEnabled() && request.getAuthorizable() != null
-        && request.getAuthorizable().getType() == Type.TABLE
-        && (request.getPrivilege() != Privilege.REFRESH
-          || !BackendConfig.INSTANCE.allowCatalogCacheOpFromMaskedUsers())) {
-      Preconditions.checkNotNull(dbName);
-      AuthorizableTable authorizableTable = (AuthorizableTable) request.getAuthorizable();
-      FeDb db = catalog.getDb(dbName);
-      if (db != null) {
-        // 'db', 'table' could be null for an unresolved table ref. 'table' could be
-        // null for target table of a CTAS statement. Don't need to populate column
-        // names in such cases since no column masking policies will be checked.
-        FeTable table = db.getTable(authorizableTable.getTableName());
-        if (table != null && !(table instanceof FeIncompleteTable)) {
-          authorizableTable.setColumns(table.getColumnNames());
-        }
-      }
-    }
     checkAccess(authzCtx, analysisResult.getAnalyzer().getUser(), request);
   }
 

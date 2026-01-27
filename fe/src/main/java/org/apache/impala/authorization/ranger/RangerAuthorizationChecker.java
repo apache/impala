@@ -491,13 +491,18 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       String tableName, String columnName, RangerBufferAuditHandler auditHandler)
       throws InternalException {
     Preconditions.checkNotNull(user);
-    RangerAccessResourceImpl resource = new RangerImpalaResourceBuilder()
-        .database(dbName)
-        .table(tableName)
-        .column(columnName)
-        .build();
     RangerAccessRequestImpl req = new RangerAccessRequestImpl();
-    req.setResource(resource);
+    RangerImpalaResourceBuilder builder = new RangerImpalaResourceBuilder()
+        .database(dbName)
+        .table(tableName);
+    if (columnName != null) {
+      builder.column(columnName);
+    } else {
+      // If no column is given, find any column masking policy on the table.
+      req.setResourceMatchingScope(
+          RangerAccessRequest.ResourceMatchingScope.SELF_OR_DESCENDANTS);
+    }
+    req.setResource(builder.build());
     req.setAccessType(SELECT_ACCESS_TYPE);
     req.setUser(user.getShortName());
     req.setUserGroups(getUserGroups(user));
@@ -714,7 +719,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       RangerAccessResult rowFilterResult = plugin_.evalRowFilterPolicies(
           request, /*resultProcessor*/null);
       if (rowFilterResult != null && rowFilterResult.isRowFilterEnabled()) {
-        LOG.trace("Deny {} on {} due to row filtering policy {}",
+        LOG.info("Deny {} on {} due to row filtering policy {}",
             privilege, authorizable.getName(), rowFilterResult.getPolicyId());
         accessResult.setIsAllowed(false);
         accessResult.setPolicyId(rowFilterResult.getPolicyId());
@@ -725,30 +730,15 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     }
     // Check if masking is enabled for any column in the table/view.
     if (accessResult.getIsAllowed()) {
-      List<String> columns;
-      if (authorizable.getType() == Type.TABLE) {
-        // Check all columns.
-        columns = ((AuthorizableTable) authorizable).getColumns();
-        LOG.trace("Checking mask policies on {} columns of table {}", columns.size(),
-            authorizable.getFullTableName());
-      } else {
-        columns = Lists.newArrayList(authorizable.getColumnName());
-      }
-      for (String column : columns) {
-        RangerAccessResult columnMaskResult = evalColumnMask(user,
-            authorizable.getDbName(), authorizable.getTableName(), column,
-            /*auditHandler*/null);
-        if (columnMaskResult != null && columnMaskResult.isMaskEnabled()) {
-          LOG.trace("Deny {} on {} due to column masking policy {}",
-              privilege, authorizable.getName(), columnMaskResult.getPolicyId());
-          accessResult.setIsAllowed(false);
-          accessResult.setPolicyId(columnMaskResult.getPolicyId());
-          accessResult.setReason("User does not have access to unmasked column values");
-          break;
-        } else {
-          LOG.trace("No column masking policy found on column {} of {}.", column,
-              authorizable.getFullTableName());
-        }
+      RangerAccessResult columnMaskResult = evalColumnMask(user,
+          authorizable.getDbName(), authorizable.getTableName(), /*columnName*/null,
+          /*auditHandler*/null);
+      if (columnMaskResult != null && columnMaskResult.isMaskEnabled()) {
+        LOG.info("Deny {} on {} due to column masking policy {}",
+            privilege, authorizable.getName(), columnMaskResult.getPolicyId());
+        accessResult.setIsAllowed(false);
+        accessResult.setPolicyId(columnMaskResult.getPolicyId());
+        accessResult.setReason("User does not have access to unmasked column values");
       }
     }
     // Set back the original access type. The request object is still referenced by the

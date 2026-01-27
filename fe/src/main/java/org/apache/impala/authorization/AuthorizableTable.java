@@ -22,9 +22,6 @@ import javax.annotation.Nullable;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * A class to authorize access to a table.
  */
@@ -33,7 +30,6 @@ public class AuthorizableTable extends Authorizable {
   private final String tableName_;
   @Nullable // Is null if the owner is not set.
   private final String ownerUser_;
-  private final List<String> columns_ = new ArrayList<>();
 
   public AuthorizableTable(String dbName, String tableName, @Nullable String ownerUser) {
     Preconditions.checkArgument(!Strings.isNullOrEmpty(dbName));
@@ -60,13 +56,4 @@ public class AuthorizableTable extends Authorizable {
 
   @Override
   public String getOwnerUser() { return ownerUser_; }
-
-  public void setColumns(List<String> columns) {
-    columns_.clear();
-    columns_.addAll(columns);
-  }
-
-  public List<String> getColumns() {
-    return columns_;
-  }
 }
