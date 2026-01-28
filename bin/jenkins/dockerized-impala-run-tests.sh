@@ -81,12 +81,12 @@ start-impala-cluster.py --kill
 # parquet-reader and impala-profile-tool are needed for e2e tests but not built for
 # non-test build.
 IMAGE_TYPE=docker_debug
-case ${IMPALA_DOCKER_JAVA:-8} in
+case ${IMPALA_DOCKER_JAVA:-17} in
+  8)
+    IMAGE_TYPE=${IMAGE_TYPE}_java8
+    ;;
   11)
     IMAGE_TYPE=${IMAGE_TYPE}_java11
-    ;;
-  17)
-    IMAGE_TYPE=${IMAGE_TYPE}_java17
     ;;
   *)
     ;;

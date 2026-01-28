@@ -38,7 +38,7 @@ HIVE_REBUILD=${HIVE_REBUILD-false}
 PATCHED_CACHE_FILE="$HIVE_SRC_DIR/.patched"
 if [ ! -f "$PATCHED_CACHE_FILE" ]; then touch "$PATCHED_CACHE_FILE"; fi
 # Apache Hive patch dir
-HIVE_PARCH_DIR="${IMPALA_HOME}/testdata/cluster/hive"
+HIVE_PATCH_DIR="${IMPALA_HOME}/testdata/cluster/hive"
 
 # Apply the patch and save the patch name to .patched
 function apply_patch {
@@ -53,7 +53,7 @@ function apply_patch {
   done < $PATCHED_CACHE_FILE
   if [ $status = "1" ] ;then
     echo "Apply patch: $p"
-    patch -p1 < ${HIVE_PARCH_DIR}/$p
+    patch -p1 < ${HIVE_PATCH_DIR}/$p
     echo $p >> $PATCHED_CACHE_FILE
     HIVE_REBUILD=true
   fi
@@ -66,11 +66,20 @@ cp $HADOOP_HOME/share/hadoop/hdfs/lib/guava-*.jar $HIVE_HOME/lib/
 
 # 2. Apply patches
 pushd "$HIVE_SRC_DIR"
-for file in `ls ${HIVE_PARCH_DIR}/patch*.diff | sort`
+for file in `ls ${HIVE_PATCH_DIR}/patch*.diff | sort`
 do
   p=$(basename $file)
   apply_patch $p
 done
+
+if (( IMPALA_JAVA_TARGET >= 17 )); then
+  echo "Apply patches for Java 17 compatibility"
+  for file in `ls ${HIVE_PATCH_DIR}/java17/patch*.diff | sort`
+  do
+    p=java17/$(basename $file)
+    apply_patch $p
+  done
+fi
 
 # 3. Repackage the hive submodules affected by the patch
 if [[ "${HIVE_REBUILD}" = "true" ]]; then

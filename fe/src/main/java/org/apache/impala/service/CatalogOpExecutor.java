@@ -144,6 +144,7 @@ import org.apache.impala.catalog.Transaction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.catalog.events.DeleteEventLog;
+import org.apache.impala.catalog.events.MetastoreEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.AddPartitionEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.CreateDatabaseEvent;
@@ -2463,7 +2464,7 @@ public class CatalogOpExecutor {
     List<String> eventTypes = Lists.newArrayList(
         DropDatabaseEvent.EVENT_TYPE, DropTableEvent.EVENT_TYPE);
     NotificationFilter filter = e -> dbName.equalsIgnoreCase(e.getDbName())
-        && MetastoreShim.isDefaultCatalog(e.getCatName())
+        && MetastoreShim.isDefaultCatalog(MetastoreEvents.getCatName(e))
         && eventTypes.contains(e.getEventType());
     List<NotificationEvent> events = MetastoreEventsProcessor
         .getNextMetastoreEventsInBatches(catalog_, eventId, filter,

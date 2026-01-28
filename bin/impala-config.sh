@@ -327,10 +327,7 @@ export USE_CUSTOM_IMPALA_BASE_IMAGE=${USE_CUSTOM_IMPALA_BASE_IMAGE:-false}
 # images (created via e.g. 'make docker_debug_java11_images'). The Java version used in
 # these images is independent of the Java version used to compile Impala.
 # Accepts 8, 11, 17.
-export IMPALA_DOCKER_JAVA=${IMPALA_DOCKER_JAVA:-"8"}
-if [ "${IMPALA_DOCKER_USE_JAVA11:-}" = "true" ]; then
-  export IMPALA_DOCKER_JAVA=11
-fi
+export IMPALA_DOCKER_JAVA=${IMPALA_DOCKER_JAVA:-"17"}
 
 # There are multiple compatible implementations of zlib. Cloudflare Zlib is an
 # implementation with optimizations to use platform-specific CPU features that are not

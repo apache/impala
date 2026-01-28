@@ -26,7 +26,7 @@ set -euo pipefail
 # Default level of extra debugging tools, controlled by the --install-debug-tools flag.
 INSTALL_DEBUG_TOOLS=none
 
-JAVA_VERSION=8
+JAVA_VERSION=17
 DRY_RUN=false
 PKG_LIST=""
 NON_PKG_NAMES=(apt-get yum apk install update add)
@@ -35,7 +35,7 @@ function print_usage {
     echo "install_os_packages.sh - Helper script to install OS dependencies"
     echo "[--install-debug-tools <none|basic|full>] : set the level of debug tools"\
          "to install"
-    echo "[--java <version>] : Use specified Java version rather than the default Java 8."
+    echo "[--java <version>] : Use specified Java version rather than the default Java 17."
     echo "[--dry-run] : Print the list of packages to install."
 }
 

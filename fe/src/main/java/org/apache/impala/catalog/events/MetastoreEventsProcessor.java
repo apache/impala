@@ -334,7 +334,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     Preconditions.checkNotNull(dbName, "dbName is null in fetching db events");
     NotificationFilter filter = notificationEvent ->
         eventType.equals(notificationEvent.getEventType())
-            && catName.equalsIgnoreCase(notificationEvent.getCatName())
+            && catName.equalsIgnoreCase(MetastoreEvents.getCatName(notificationEvent))
             && dbName.equalsIgnoreCase(notificationEvent.getDbName());
     MetaDataFilter metaDataFilter = new MetaDataFilter(filter, catName, dbName);
     return getNextMetastoreEventsWithFilterInBatches(catalog, eventId, metaDataFilter,
@@ -357,7 +357,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     Preconditions.checkNotNull(tblName, "tblName is null in fetching table events");
     NotificationFilter filter = notificationEvent ->
         eventType.equals(notificationEvent.getEventType())
-            && catName.equalsIgnoreCase(notificationEvent.getCatName())
+            && catName.equalsIgnoreCase(MetastoreEvents.getCatName(notificationEvent))
             && dbName.equalsIgnoreCase(notificationEvent.getDbName())
             && tblName.equalsIgnoreCase(notificationEvent.getTableName());
     MetaDataFilter metaDataFilter = new MetaDataFilter(filter, catName, dbName, tblName);
@@ -2132,7 +2132,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       List<String> eventTypes = wantTableList ?
           MetaDataFilter.TABLE_LIST_EVENT_TYPES : MetaDataFilter.DB_EVENT_TYPES;
       NotificationFilter filter = e -> dbName.equalsIgnoreCase(e.getDbName())
-          && MetastoreShim.isDefaultCatalog(e.getCatName())
+          && MetastoreShim.isDefaultCatalog(MetastoreEvents.getCatName(e))
           && eventTypes.contains(e.getEventType());
       // Use 'requiredEventId' as the startEventId since events before it are decided
       // to wait for.
@@ -2242,7 +2242,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    */
   private long getMinRequiredEventIdForDbList(long startEventId)
       throws MetastoreNotificationFetchException {
-    NotificationFilter filter = e -> MetastoreShim.isDefaultCatalog(e.getCatName())
+    NotificationFilter filter = e ->
+        MetastoreShim.isDefaultCatalog(MetastoreEvents.getCatName(e))
         && MetaDataFilter.DB_EVENT_TYPES.contains(e.getEventType());
     List<NotificationEvent> dbEvents = getNextMetastoreEventsInBatches(
         catalog_, startEventId, filter,

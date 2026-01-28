@@ -368,7 +368,7 @@ public class EventExecutorService {
     pseudoDropTableEvent.setEventType(MetastoreEventType.DROP_TABLE.toString());
     pseudoDropTableEvent.setTableName(alterEvent.getBeforeTable().getTableName());
     pseudoDropTableEvent.setDbName(alterEvent.getBeforeTable().getDbName());
-    pseudoDropTableEvent.setCatName(alterEvent.getCatalogName());
+    MetastoreEvents.setCatName(pseudoDropTableEvent, alterEvent.getCatalogName());
     pseudoDropTableEvent.setEventId(alterEvent.getEventId());
     MetastoreTableEvent dropTableEvent = new DropTableEvent(
         alterEvent.getCatalogOpExecutor(), alterEvent.getMetrics(), pseudoDropTableEvent,
@@ -378,7 +378,7 @@ public class EventExecutorService {
     pseudoCreateTableEvent.setEventType(MetastoreEventType.CREATE_TABLE.toString());
     pseudoCreateTableEvent.setTableName(alterEvent.getAfterTable().getTableName());
     pseudoCreateTableEvent.setDbName(alterEvent.getAfterTable().getDbName());
-    pseudoCreateTableEvent.setCatName(alterEvent.getCatalogName());
+    MetastoreEvents.setCatName(pseudoCreateTableEvent, alterEvent.getCatalogName());
     pseudoCreateTableEvent.setEventId(alterEvent.getEventId());
     MetastoreTableEvent createTableEvent = new CreateTableEvent(
         alterEvent.getCatalogOpExecutor(), alterEvent.getMetrics(),

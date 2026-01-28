@@ -18,8 +18,11 @@
 IMPALA_JDK_VERSION=${IMPALA_JDK_VERSION:-}
 
 # Set OS Java package variables for bootstrap_system and Docker builds.
-# Defaults to installing Java 8.
-if [[ "${IMPALA_JDK_VERSION}" == "" || "${IMPALA_JDK_VERSION}" == "8" ]]; then
+# Defaults to installing Java 17.
+if [[ "${IMPALA_JDK_VERSION}" == "" ]]; then
+  UBUNTU_JAVA_VERSION=17
+  REDHAT_JAVA_VERSION=17
+elif [[ "${IMPALA_JDK_VERSION}" == "8" ]]; then
   UBUNTU_JAVA_VERSION=8
   REDHAT_JAVA_VERSION=1.8.0
 else

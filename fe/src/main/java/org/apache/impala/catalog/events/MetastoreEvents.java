@@ -1060,6 +1060,24 @@ public class MetastoreEvents {
     }
   }
 
+  /**
+   * We need this method for Hive 2 compatibility because NotificationEvent
+   * does not have getCatName() method in Hive 2.
+   * See its counterpart in MetastoreEvents.java under compat-apache-hive-2.
+   */
+  public static String getCatName(NotificationEvent event) {
+    return event.getCatName();
+  }
+
+  /**
+   * We need this method for Hive 2 compatibility because NotificationEvent
+   * does not have setCatName() method in Hive 2.
+   * See its counterpart in MetastoreEvents.java under compat-apache-hive-2.
+   */
+  public static void setCatName(NotificationEvent event, String catName) {
+    event.setCatName(catName);
+  }
+
   public static String getStringProperty(
       Map<String, String> params, String key, String defaultVal) {
     if (params == null) return defaultVal;

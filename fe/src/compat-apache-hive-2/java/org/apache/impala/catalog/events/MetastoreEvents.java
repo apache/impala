@@ -61,6 +61,7 @@ import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FileMetadataLoadOpts;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.Hive2MetastoreShimBase;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.MetastoreClientInstantiationException;
 import org.apache.impala.catalog.MetaStoreClientPool;
@@ -601,9 +602,6 @@ public class MetastoreEvents {
     // Logger available for all the sub-classes
     protected final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
-    // catalog name from the event
-    protected final String catalogName_;
-
     // dbName from the event
     protected String dbName_;
 
@@ -648,7 +646,6 @@ public class MetastoreEvents {
       this.eventId_ = event_.getEventId();
       this.eventType_ = MetastoreEventType.from(event.getEventType());
       // certain event types in Hive-3 like COMMIT_TXN may not have dbName set
-      this.catalogName_ = event.getCatName();
       this.dbName_ = event.getDbName();
       this.tblName_ = event.getTableName();
       this.metastoreNotificationEvent_ = event;
@@ -718,7 +715,11 @@ public class MetastoreEvents {
       this.eventType_ = type;
     }
 
-    public String getCatalogName() { return catalogName_; }
+    public String getCatalogName() {
+      // In Hive 2 there is no catalog name support. So we return the Hive 3 default
+      // catalog name
+      return Hive2MetastoreShimBase.getDefaultCatalogName();
+    }
 
     public String getDbName() { return dbName_; }
 
@@ -1051,6 +1052,21 @@ public class MetastoreEvents {
       }
       return false;
     }
+  }
+
+  /**
+   * In Hive 2 there is no catalog name support. So we return the Hive 3 default
+   * catalog name
+   */
+  public static String getCatName(NotificationEvent event) {
+    return Hive2MetastoreShimBase.getDefaultCatalogName();
+  }
+
+  /**
+   * In Hive 2 there is no catalog name support. So this method is a no-op.
+   */
+  public static void setCatName(NotificationEvent event, String unused) {
+    // No-op
   }
 
   public static String getStringProperty(

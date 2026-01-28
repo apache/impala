@@ -59,13 +59,3 @@ do
   p=$(basename $file)
   apply_patch $p
 done
-
-# 2. Repackage the hive submodules affected by the patch
-if [[ "${HIVE_REBUILD}" = "true" ]]; then
-  echo "Repackage the hive-metastore module"
-  ${IMPALA_HOME}/bin/mvn-quiet.sh -pl metastore clean package \
-      -Dmaven.test.skip
-  cp $HIVE_SRC_DIR/metastore/target/hive-metastore-${APACHE_HIVE_2_VERSION}.jar \
-      $HIVE_HOME/lib/
-fi
-popd
