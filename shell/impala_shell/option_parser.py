@@ -209,6 +209,10 @@ def get_option_parser(defaults):
                     help="If set, query profiles will be written to the "
                          "given file. Profiles for multiple semicolon-terminated "
                          "queries will be appended to the same file")
+  parser.add_option("--profile_format", dest="profile_format", default="STRING",
+                    help="Query profile format. Valid inputs are "
+                         "['string', 'base64', 'json']. Format base64 "
+                         "is compatible with impala-profile-tool.")
   parser.add_option("--rpc_stdout", dest="rpc_stdout",
                     action="store_true",
                     help="Output hs2 rpc details to stdout. "

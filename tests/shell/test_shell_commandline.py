@@ -455,6 +455,42 @@ class TestImpalaShell(ImpalaTestSuite):
       assert len(re.findall(regex, lines)) == 1, \
           "Could not detect profile in the file, file content: %s" % lines
 
+  def test_runtime_profile_format(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Runtime profile is not supported in strict hs2 mode.")
+
+    string_regex = re.compile(r"Query \(id=[a-z0-9:]+\):")
+    base64_regex = re.compile(r"\b[a-zA-Z0-9/+=]{64,}\b")
+    json_regex = re.compile(r"{\"contents\":.*}")
+
+    # test default is string
+    args = ['-q', 'select 1; profile;']
+    result_set = run_impala_shell_cmd(vector, args)
+    assert len(re.findall(string_regex, result_set.stdout)) == 1, \
+        "Could not detect string profile by default, stdout: %s" % result_set.stdout
+
+    # test string format explicitly
+    args = ['-q', 'select 1; profile;', '--profile_format=string']
+    result_set = run_impala_shell_cmd(vector, args)
+    assert len(re.findall(string_regex, result_set.stdout)) == 1, \
+        "Could not detect string profile by default, stdout: %s" % result_set.stdout
+
+    # test json format
+    args = ['-q', 'select 1; profile;', '--profile_format=json']
+    result_set = run_impala_shell_cmd(vector, args)
+    assert len(re.findall(string_regex, result_set.stdout)) == 0, \
+        "Did not expect string profile with json format, stdout: %s" % result_set.stdout
+    assert len(re.findall(json_regex, result_set.stdout)) == 1, \
+        "Could not detect json profile, stdout: %s" % result_set.stdout
+
+    # test base64 format
+    args = ['-q', 'select 1; profile;', '--profile_format=base64']
+    result_set = run_impala_shell_cmd(vector, args)
+    assert len(re.findall(string_regex, result_set.stdout)) == 0, \
+        "Did not expect string profile with base64 format, stdout: %s" % result_set.stdout
+    assert len(re.findall(base64_regex, result_set.stdout)) == 1, \
+        "Could not detect base64 profile, stdout: %s" % result_set.stdout
+
   def test_runtime_profile_referenced_tables(self, vector, unique_database):
     if vector.get_value('strict_hs2_protocol'):
       pytest.skip("Runtime profile is not supported in strict hs2 mode.")

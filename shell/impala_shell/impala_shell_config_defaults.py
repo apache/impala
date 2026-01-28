@@ -46,6 +46,7 @@ impala_shell_defaults = {
             'query': None,
             'query_file': None,
             'show_profiles': False,
+            'profile_format': 'string',
             'rpc_stdout': False,
             'rpc_file': None,
             'ssl': False,

@@ -204,6 +204,7 @@ class ImpalaShell(cmd.Cmd, object):
     'OUTPUT_FILE': (lambda x: None if x == '' else x, "output_file"),
     'PROFILE_OUTPUT': (lambda x: None if x == '' else x, "profile_output"),
     'VERTICAL': (lambda x: x in ImpalaShell.TRUE_STRINGS, "vertical"),
+    'PROFILE_FORMAT': (lambda x: "string" if x == '' else x, "profile_format")
   }
 
   # Minimum time in seconds between two calls to get the exec summary.
@@ -265,6 +266,7 @@ class ImpalaShell(cmd.Cmd, object):
 
     self.show_profiles = options.show_profiles
     self.profile_output = options.profile_output
+    self.profile_format = options.profile_format
 
     self.rpc_stdout = options.rpc_stdout
     self.rpc_file = options.rpc_file
@@ -1243,6 +1245,12 @@ class ImpalaShell(cmd.Cmd, object):
         out_file = open(self.profile_output, 'a')
 
       query_profile_prefix = match_string_type("Query Runtime Profile:\n", profile)
+      if self.profile_format.upper() == "BASE64":
+        # Change prefix so that the output can be read by impala-profile-tool
+        timestamp = str(int(time.time()))
+        query_id = self.imp_client.get_query_id_str(self.last_query_handle)
+        query_profile_prefix = timestamp + " " + query_id + " "
+
       if profile_display_mode == QueryAttemptDisplayModes.ALL:
         print(query_profile_prefix + profile, file=out_file)
         if failed_profile:
@@ -1317,7 +1325,7 @@ class ImpalaShell(cmd.Cmd, object):
         return CmdStatus.ERROR
 
     profile, failed_profile = self.imp_client.get_runtime_profile(
-        self.last_query_handle)
+        self.last_query_handle, self.profile_format)
     return self.print_runtime_profile(profile, failed_profile, profile_display_mode)
 
   def do_select(self, args):
@@ -1552,7 +1560,7 @@ class ImpalaShell(cmd.Cmd, object):
         self.imp_client.close_query(self.last_query_handle)
       if self.show_profiles:
         profile, retried_profile = self.imp_client.get_runtime_profile(
-            self.last_query_handle)
+            self.last_query_handle, self.profile_format)
         self.print_runtime_profile(profile, retried_profile)
       return CmdStatus.SUCCESS
     except QueryCancelledByShellException as e:

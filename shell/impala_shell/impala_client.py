@@ -78,6 +78,7 @@ from impala_thrift_gen.TCLIService.TCLIService import (
     TStatusCode,
     TTypeId,
 )
+from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
 
 # Getters to extract HS2's representation of values to the display version.
 # An entry must be added to this map for each supported type. HS2's TColumn has many
@@ -360,7 +361,7 @@ class ImpalaClient(object):
     False otherwise."""
     raise NotImplementedError()
 
-  def get_runtime_profile(self, last_query_handle):
+  def get_runtime_profile(self, last_query_handle, profile_format="string"):  # noqa: U100
     """Get the runtime profile string from the server. Returns None if
     an error was encountered. If the query was retried, returns the profile of the failed
     attempt as well; the tuple (profile, failed_profile) is returned where 'profile' is
@@ -947,15 +948,27 @@ class ImpalaHS2Client(ImpalaClient):
     finally:
       self._clear_current_query_handle()
 
-  def get_runtime_profile(self, last_query_handle):
+  def get_runtime_profile(self, last_query_handle, profile_format="string"):
     try:
       self._set_current_query_handle(last_query_handle)
 
       def GetRuntimeProfile(req):
         return self.imp_service.GetRuntimeProfile(req)
+
+      # convert profile format from string to int (enum id)
+      profile_format_key = profile_format.upper()
+      if profile_format_key in TRuntimeProfileFormat._NAMES_TO_VALUES \
+          and profile_format_key != "THRIFT":
+        profile_format_id = TRuntimeProfileFormat._NAMES_TO_VALUES[profile_format_key]
+      else:
+        err_msg = "Invalid profile format value {0}."
+        print(err_msg.format(profile_format), file=sys.stderr)
+        return None, None
+
       # GetRuntimeProfile rpc is idempotent and so safe to retry.
       profile_req = TGetRuntimeProfileReq(last_query_handle,
                                           self.session_handle,
+                                          format=profile_format_id,
                                           include_query_attempts=True)
       resp = self._do_hs2_rpc(GetRuntimeProfile, profile_req, retry_on_error=True)
       self._check_hs2_rpc_status(resp.status)
@@ -1240,7 +1253,8 @@ class StrictHS2Client(ImpalaHS2Client):
   def get_error_log(self, last_query_handle):
     return ""
 
-  def get_runtime_profile(self, last_query_handle):
+  def get_runtime_profile(self, last_query_handle,  # noqa: U100
+      profile_format="string"):  # noqa: U100
     return None, None
 
   def _populate_query_options(self):
@@ -1389,7 +1403,12 @@ class ImpalaBeeswaxClient(ImpalaClient):
         lambda: self.imp_service.Cancel(last_query_handle), False)
     return rpc_status == RpcStatus.OK
 
-  def get_runtime_profile(self, last_query_handle):
+  def get_runtime_profile(self, last_query_handle, profile_format="string"):
+    if profile_format.upper() != "STRING":
+        err_msg = "Invalid profile format value {0}. Beeswax only supports string."
+        print(err_msg.format(profile_format), file=sys.stderr)
+        return None, None
+
     profile, rpc_status = self._do_beeswax_rpc(
         lambda: self.imp_service.GetRuntimeProfile(last_query_handle))
     if rpc_status == RpcStatus.OK and profile:
