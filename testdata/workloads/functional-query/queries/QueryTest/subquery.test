@@ -1017,7 +1017,7 @@ SELECT id FROM alltypes
 WHERE id = (SELECT bigint_col FROM functional.alltypes_view)
 ---- RESULTS
 ---- CATCH
-Subquery must not return more than one row: SELECT bigint_col FROM functional.alltypes_view
+row_regex:.*Subquery must not return more than one row.*
 ====
 ---- QUERY
 # Runtime scalar subquery with offset.
@@ -1092,8 +1092,21 @@ select id, (select count(id) from alltypessmall where id=t.id)
   from alltypestiny t
 order by id
 ---- RESULTS
+---- CALCITE_PLANNER_RESULTS
+0,1
+1,1
+2,1
+3,1
+4,1
+5,1
+6,1
+7,1
+---- TYPES
+INT, BIGINT
 ---- CATCH
 A correlated scalar subquery is not supported in the expression:
+---- CALCITE_PLANNER_CATCH
+__NO_ERROR__
 ====
 ---- QUERY
 # Uncorrelated Scalar Aggregate in select list combined with aggregation in parent query

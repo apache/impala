@@ -102,7 +102,9 @@ def parse_query_test_file(file_name, valid_section_names=None, encoding=None):
   if section_names is None:
     section_names = ['QUERY', 'HIVE_QUERY', 'RESULTS', 'TYPES', 'LABELS', 'SETUP',
         'CATCH', 'ERRORS', 'USER', 'RUNTIME_PROFILE', 'SHELL', 'DML_RESULTS',
-        'HS2_TYPES', 'HIVE_MAJOR_VERSION', 'LINEAGE', 'IS_HDFS_ONLY']
+        'HS2_TYPES', 'HIVE_MAJOR_VERSION', 'LINEAGE', 'IS_HDFS_ONLY',
+        'CALCITE_PLANNER_RESULTS', 'CALCITE_PLANNER_CATCH',
+        'CALCITE_PLANNER_RUNTIME_PROFILE']
   return parse_test_file(file_name, section_names, encoding=encoding,
       skip_unknown_sections=False)
 
@@ -266,15 +268,15 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
           else:
             raise RuntimeError('Unknown subsection comment: %s' % comment)
 
-      if subsection_name == 'CATCH':
-        parsed_sections['CATCH'] = list()
+      if 'CATCH' in subsection_name:
+        parsed_sections[subsection_name] = list()
         if subsection_comment is None:
-          parsed_sections['CATCH'].append(subsection_str)
+          parsed_sections[subsection_name].append(subsection_str)
         elif subsection_comment == 'ANY_OF':
-          parsed_sections['CATCH'].extend(lines_content)
+          parsed_sections[subsection_name].extend(lines_content)
         else:
           raise RuntimeError('Unknown subsection comment: %s' % subsection_comment)
-        for exception_str in parsed_sections['CATCH']:
+        for exception_str in parsed_sections[subsection_name]:
           assert exception_str.strip(), "Empty exception string."
         continue
 

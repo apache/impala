@@ -333,6 +333,8 @@ export IMPALA_DOCKER_JAVA=${IMPALA_DOCKER_JAVA:-"17"}
 # to true due to the large performance benefits.
 export IMPALA_USE_CLOUDFLARE_ZLIB=${IMPALA_USE_CLOUDFLARE_ZLIB:-"true"}
 
+export USE_CALCITE_PLANNER=${USE_CALCITE_PLANNER:-"false"}
+
 # When IMPALA_(CDP_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDP platform label in bootstrap_toolchain.py
 unset IMPALA_HADOOP_URL

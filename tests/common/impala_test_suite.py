@@ -48,6 +48,7 @@ from tests.common.environ import (
     MANAGED_WAREHOUSE_DIR,
     EXTERNAL_WAREHOUSE_DIR,
     ICEBERG_DEFAULT_FORMAT_VERSION,
+    IS_CALCITE_PLANNER,
     ImpalaTestClusterProperties)
 from tests.common.errors import Timeout
 from tests.common.impala_connection import create_connection
@@ -723,14 +724,15 @@ class ImpalaTestSuite(BaseTestSuite):
     assert False, 'Unexpected exception string. Expected: %s\nNot found in actual: %s' % \
       (expected_str, actual_str)
 
-  def __verify_results_and_errors(self, vector, test_section, result, use_db):
+  def __verify_results_and_errors(self, vector, test_section, result_section_name,
+      result, use_db):
     """Verifies that both results and error sections are as expected. Rewrites both
       by replacing $NAMENODE, $DATABASE and $IMPALA_HOME with their actual values, and
       optionally rewriting filenames with __HDFS_FILENAME__, to ensure that expected and
       actual values are easily compared.
     """
     replace_filenames_with_placeholder = True
-    for section_name in ('RESULTS', 'ERRORS'):
+    for section_name in (result_section_name, 'ERRORS'):
       if section_name in test_section:
         if "$NAMENODE" in test_section[section_name]:
           replace_filenames_with_placeholder = False
@@ -751,7 +753,7 @@ class ImpalaTestSuite(BaseTestSuite):
         if use_db:
           test_section[section_name] = test_section[section_name].replace(
               '$DATABASE', use_db)
-    result_section, type_section = 'RESULTS', 'TYPES'
+    result_section, type_section = result_section_name, 'TYPES'
     verify_raw_results(test_section, result, vector,
                        result_section, type_section,
                        self.pytest_config().option.update_results,
@@ -894,18 +896,22 @@ class ImpalaTestSuite(BaseTestSuite):
           LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])
 
         result = None
+        catch_section_name = 'CALCITE_PLANNER_CATCH' \
+            if IS_CALCITE_PLANNER and 'CALCITE_PLANNER_CATCH' in test_section \
+            else 'CATCH'
         try:
           result = exec_fn(query, user=test_section.get('USER', '').strip() or None)
         except Exception as e:
-          if 'CATCH' in test_section:
-            self.__verify_exceptions(test_section['CATCH'], str(e), use_db)
+          if catch_section_name in test_section:
+            self.__verify_exceptions(test_section[catch_section_name], str(e), use_db)
             assert error_msg_startswith(str(e))
             continue
           raise
 
-        if 'CATCH' in test_section and '__NO_ERROR__' not in test_section['CATCH']:
+        if catch_section_name in test_section \
+            and '__NO_ERROR__' not in test_section[catch_section_name]:
           expected_str = self.__do_replacements(
-              " or ".join(test_section['CATCH']).strip(),
+              " or ".join(test_section[catch_section_name]).strip(),
               use_db=use_db,
               extra=test_file_vars)
           assert False, "Expected exception: {0}\n\nwhen running:\n\n{1}".format(
@@ -918,15 +924,19 @@ class ImpalaTestSuite(BaseTestSuite):
         if encoding and result.data:
             result.data = [row.decode(encoding) for row in result.data]
         # Replace $NAMENODE in the expected results with the actual namenode URI.
-        if 'RESULTS' in test_section:
+        results_section_name = 'CALCITE_PLANNER_RESULTS' \
+            if IS_CALCITE_PLANNER and 'CALCITE_PLANNER_RESULTS' in test_section \
+            else 'RESULTS'
+        if results_section_name in test_section:
           # Combining 'RESULTS' with 'DML_RESULTS" is currently unsupported because
           # __verify_results_and_errors calls verify_raw_results which always checks
           # ERRORS, TYPES, LABELS, etc. which doesn't make sense if there are two
           # different result sets to consider (IMPALA-4471).
           assert 'DML_RESULTS' not in test_section
-          test_section['RESULTS'] = self.__do_replacements(
-              test_section['RESULTS'], use_db=use_db, extra=test_file_vars)
-          self.__verify_results_and_errors(vector, test_section, result, use_db)
+          test_section[results_section_name] = self.__do_replacements(
+              test_section[results_section_name], use_db=use_db, extra=test_file_vars)
+          self.__verify_results_and_errors(vector, test_section, results_section_name,
+              result, use_db)
         else:
           # TODO: Can't validate errors without expected results for now.
           assert 'ERRORS' not in test_section,\
@@ -934,8 +944,9 @@ class ImpalaTestSuite(BaseTestSuite):
         # If --update_results, then replace references to the namenode URI with $NAMENODE.
         # TODO(todd) consider running do_replacements in reverse, though that may cause
         # some false replacements for things like username.
-        if self.pytest_config().option.update_results and 'RESULTS' in test_section:
-          test_section['RESULTS'] = test_section['RESULTS'] \
+        if self.pytest_config().option.update_results \
+            and results_section_name in test_section:
+          test_section[results_section_name] = test_section[results_section_name] \
               .replace(NAMENODE, '$NAMENODE') \
               .replace(IMPALA_HOME, '$IMPALA_HOME') \
               .replace(INTERNAL_LISTEN_HOST, '$INTERNAL_LISTEN_HOST') \
@@ -945,6 +956,8 @@ class ImpalaTestSuite(BaseTestSuite):
           # If this table format has a RUNTIME_PROFILE section specifically for it,
           # evaluate that section and ignore any general RUNTIME_PROFILE sections.
           rt_profile_info = 'RUNTIME_PROFILE_%s' % table_format_info.file_format
+        elif IS_CALCITE_PLANNER and 'CALCITE_PLANNER_RUNTIME_PROFILE' in test_section:
+            rt_profile_info = 'CALCITE_PLANNER_RUNTIME_PROFILE'
         elif 'RUNTIME_PROFILE' in test_section:
           rt_profile_info = 'RUNTIME_PROFILE'
 

@@ -56,6 +56,8 @@ INTERNAL_LISTEN_HOST = os.getenv("INTERNAL_LISTEN_HOST", "localhost")
 TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
 HOST_TZ = os.getenv("TZ", None)
 
+BOOLEAN_STRINGS = ["true", "false"]
+
 # Options
 parser = OptionParser()
 parser.add_option("-s", "--cluster_size", type="int", dest="cluster_size", default=3,
@@ -201,8 +203,8 @@ parser.add_option("--tuple_cache_debug_dump_dir", dest="tuple_cache_debug_dump_d
 parser.add_option("--tuple_cache_eviction_policy", dest="tuple_cache_eviction_policy",
                   default="LRU", help="This specifies the cache eviction policy to use "
                   "for the tuple cache.")
-parser.add_option("--use_calcite_planner", default="False", type="choice",
-                  choices=["true", "True", "false", "False"],
+parser.add_option("--use_calcite_planner", type="choice", choices=BOOLEAN_STRINGS,
+                  default=os.environ.get("USE_CALCITE_PLANNER", "false"),
                   help="If true, use the Calcite planner for query optimization "
                   "instead of the Impala planner")
 parser.add_option("--enable_ranger_authz", dest="enable_ranger_authz",

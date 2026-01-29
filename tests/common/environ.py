@@ -127,6 +127,7 @@ IS_TUPLE_CACHE_CORRECT_CHECK = (
     os.getenv("TUPLE_CACHE_DEBUG_DUMP_DIR", "") != ""
 )
 
+IS_CALCITE_PLANNER = os.environ.get("USE_CALCITE_PLANNER", False) == 'true'
 
 class ImpalaBuildFlavors:
   """
