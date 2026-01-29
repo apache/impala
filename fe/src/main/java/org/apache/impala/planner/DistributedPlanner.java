@@ -160,6 +160,8 @@ public class DistributedPlanner {
     } else if (root instanceof IcebergMergeNode) {
       childFragments.get(0).addPlanRoot(root);
       result = childFragments.get(0);
+    } else if (root instanceof UnpivotNode) {
+      result = createUnpivotNodeFragment((UnpivotNode) root, childFragments);
     } else {
       throw new InternalException("Cannot create plan fragment for this node type: "
           + root.getExplainString(ctx_.getQueryOptions()));
@@ -918,6 +920,17 @@ public class DistributedPlanner {
     // (whereas selectNode.child[0] would point to the original child)
     selectNode.setChild(0, childFragment.getPlanRoot());
     childFragment.setPlanRoot(selectNode);
+    return childFragment;
+  }
+
+  private PlanFragment createUnpivotNodeFragment(UnpivotNode unpivotNode,
+      List<PlanFragment> childFragments) {
+    Preconditions.checkState(unpivotNode.getChildren().size() == childFragments.size());
+    PlanFragment childFragment = childFragments.get(0);
+    // set the child explicitly, an ExchangeNode might have been inserted
+    // (whereas unpivotNode.child[0] would point to the original child)
+    unpivotNode.setChild(0, childFragment.getPlanRoot());
+    childFragment.setPlanRoot(unpivotNode);
     return childFragment;
   }
 

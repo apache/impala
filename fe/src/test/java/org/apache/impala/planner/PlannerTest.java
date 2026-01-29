@@ -1065,6 +1065,13 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testUnpivotClause() {
+    TQueryOptions options = defaultQueryOptions();
+    runPlannerTestFile("unpivot-clause", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
+  @Test
   public void testDefaultJoinDistributionBroadcastMode() {
     TQueryOptions options = defaultQueryOptions();
     Preconditions.checkState(

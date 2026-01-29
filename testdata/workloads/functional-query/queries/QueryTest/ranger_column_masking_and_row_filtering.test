@@ -176,3 +176,15 @@ compute stats functional.alltypestiny
 ---- CATCH
 AuthorizationException: User '$USER' does not have privileges to execute 'ALTER' on: functional.alltypestiny
 ====
+---- QUERY
+select b, c from functional.alltypestiny unpivot (
+    c for b in (id as 'v1')
+) as t
+order by c
+---- TYPES
+STRING,INT
+---- RESULTS
+'v1',100
+'v1',103
+'v1',106
+====

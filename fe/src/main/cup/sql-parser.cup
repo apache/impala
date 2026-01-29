@@ -351,7 +351,7 @@ terminal
   KW_SYSTEM_TIME, KW_SYSTEM_VERSION, KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
   KW_TO, KW_TRAILING, KW_TRUE, KW_UDF, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNIQUE, KW_UNKNOWN,
-  KW_UNNEST, KW_UNSET, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALIDATE,
+  KW_UNNEST, KW_UNPIVOT, KW_UNSET, KW_UPDATE, KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALIDATE,
   KW_VALUES, KW_VARCHAR, KW_VIEW, KW_VIEWS, KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
 
 terminal UNUSED_RESERVED_WORD;
@@ -419,7 +419,9 @@ nonterminal ResetMetadataStmt reset_metadata_stmt;
 nonterminal QueryStmt set_operation_with_order_by_or_limit;
 nonterminal SelectList select_clause;
 nonterminal SelectList select_list;
+nonterminal SelectList unpivot_column_list;
 nonterminal SelectListItem select_list_item;
+nonterminal SelectListItem unpivot_column_item;
 nonterminal SelectListItem star_expr;
 nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr;
 nonterminal List<Expr> expr_list;
@@ -3393,6 +3395,20 @@ select_list ::=
   :}
   ;
 
+unpivot_column_list ::=
+  unpivot_column_item:item
+  {:
+    SelectList list = new SelectList();
+    list.getItems().add(item);
+    RESULT = list;
+  :}
+  | unpivot_column_list:list COMMA unpivot_column_item:item
+  {:
+    list.getItems().add(item);
+    RESULT = list;
+  :}
+  ;
+
 select_list_item ::=
   expr:expr alias_clause:alias
   {: RESULT = new SelectListItem(expr, alias); :}
@@ -3400,6 +3416,13 @@ select_list_item ::=
   {: RESULT = new SelectListItem(expr, null); :}
   | star_expr:expr
   {: RESULT = expr; :}
+  ;
+
+unpivot_column_item ::=
+  ident_or_unreserved:alias KW_AS literal:expr
+  {: RESULT = new SelectListItem(expr, alias); :}
+  | ident_or_unreserved:alias
+  {: RESULT = new SelectListItem(new StringLiteral(alias), alias); :}
   ;
 
 alias_clause ::=
@@ -3529,6 +3552,13 @@ table_ref ::=
   {: RESULT = new TableRef(path, alias, tblsmpl, asof); :}
   | LPAREN query_stmt:query RPAREN alias_clause:alias opt_tablesample:tblsmpl
   {: RESULT = new InlineViewRef(alias, query, tblsmpl); :}
+  | dotted_path:path KW_UNPIVOT LPAREN ident_or_unreserved:data_column KW_FOR
+    ident_or_unreserved:header_column KW_IN
+    LPAREN unpivot_column_list:unpivot_column_list RPAREN RPAREN alias_clause:alias
+  {:
+    RESULT = new UnpivotTableRef(
+        path, alias, data_column, header_column, unpivot_column_list);
+  :}
   ;
 
 unnest_table_ref ::=
@@ -4914,6 +4944,8 @@ word ::=
   | KW_UNKNOWN:r
   {: RESULT = r.toString(); :}
   | KW_UNNEST:r
+  {: RESULT = r.toString(); :}
+  | KW_UNPIVOT:r
   {: RESULT = r.toString(); :}
   | KW_UNSET:r
   {: RESULT = r.toString(); :}

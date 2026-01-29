@@ -56,6 +56,7 @@
 #include "exec/tuple-cache-node.h"
 #include "exec/union-node.h"
 #include "exec/unnest-node.h"
+#include "exec/unpivot-node.h"
 #include "exprs/expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
@@ -242,6 +243,9 @@ Status PlanNode::CreatePlanNode(
       break;
     case TPlanNodeType::PAIMON_SCAN_NODE:
       *node = pool->Add(new PaimonScanPlanNode());
+      break;
+    case TPlanNodeType::UNPIVOT_NODE:
+      *node = pool->Add(new UnpivotPlanNode());
       break;
     default:
       map<int, const char*>::const_iterator i =

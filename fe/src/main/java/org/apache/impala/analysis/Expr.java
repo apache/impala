@@ -1866,15 +1866,23 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public static String getExplainString(
       List<? extends Expr> exprs, TExplainLevel detailLevel) {
+    return getExplainString(exprs, detailLevel, false);
+  }
+
+  public static String getExplainString(
+      List<? extends Expr> exprs, TExplainLevel detailLevel, boolean skipNullElement) {
     if (exprs == null) return "";
     ToSqlOptions toSqlOptions =
         detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal() ?
         ToSqlOptions.SHOW_IMPLICIT_CASTS :
         ToSqlOptions.DEFAULT;
     StringBuilder output = new StringBuilder();
+    int outputIdx = 0;
     for (int i = 0; i < exprs.size(); ++i) {
-      if (i > 0) output.append(", ");
+      if (skipNullElement && exprs.get(i) == null) continue;
+      if (outputIdx > 0) output.append(", ");
       output.append(exprs.get(i).toSql(toSqlOptions));
+      ++outputIdx;
     }
     return output.toString();
   }

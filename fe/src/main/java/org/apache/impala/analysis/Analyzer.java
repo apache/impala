@@ -1073,6 +1073,7 @@ public class Analyzer {
 
     // Delegate creation of the tuple descriptor to the concrete table ref.
     TupleDescriptor result = ref.createTupleDescriptor(this);
+    result.setTableRef(ref);
     result.setAliases(aliases, ref.hasExplicitAlias());
     // Register all legal aliases.
     for (String alias: aliases) {
@@ -1194,88 +1195,16 @@ public class Analyzer {
     }
   }
 
-  /**
-   * Resolves column-masking/row-filtering policies on the given table. Returns a table
-   * masking view if any of these policies exist. The TableRef should be resolved first
-   * so we know the target table/view/collection.
-   *
-   * @param resolvedTableRef A resolved TableRef for table masking
-   */
-  public TableRef resolveTableMask(TableRef resolvedTableRef) throws AnalysisException {
-    Preconditions.checkState(resolvedTableRef.isResolved(), "Table should be resolved");
-    // Only do table masking when authorization is enabled and the authorization
-    // factory supports column-masking/row-filtering. If both of these are false,
-    // return the unmasked table ref.
-    if (!getAuthzFactory().getAuthorizationConfig().isEnabled()
-        || !getAuthzFactory().supportsTableMasking()) {
-      return resolvedTableRef;
-    }
-    // Performing table masking.
-    AuthorizationChecker authChecker = getAuthzFactory().newAuthorizationChecker(
-        getCatalog().getAuthPolicy());
-    String dbName;
-    String tblName;
-    if (resolvedTableRef instanceof InlineViewRef) {
-      FeView view = ((InlineViewRef) resolvedTableRef).getView();
-      dbName = view.getDb().getName();
-      tblName = view.getName();
-    } else if (resolvedTableRef instanceof CollectionTableRef
-        && resolvedTableRef.isRelative()) {
-       // Relative table refs don't need masking. Its base table will be masked.
-       return resolvedTableRef;
-    } else {
-      dbName = resolvedTableRef.getTable().getDb().getName();
-      tblName = resolvedTableRef.getTable().getName();
-    }
-    // The selected columns should be in the same relative order as they are in the
-    // corresponding Hive table so that the order of the SelectListItem's in the
-    // table mask view (if needs masking or filtering) would be correct.
-    List<Column> columns = resolvedTableRef.getSelectedColumnsInHiveOrder();
-    TableMask tableMask = new TableMask(authChecker, dbName, tblName, columns, user_);
-    try {
-      if (resolvedTableRef instanceof CollectionTableRef) {
-        if (tableMask.needsRowFiltering()) {
-          // The table ref is a non-relative CollectionTableRef, e.g. the table ref in
-          // "select item from functional_parquet.complextypestbl.int_array". We can't
-          // replace "complextypestbl" with a table masking view here.
-          // TODO: Support this in IMPALA-10484 by rewriting it to relative ref, e.g.
-          //  select a.item from functional_parquet.complextypestbl t, t.int_array a;
-          throw new AnalysisException(String.format("Using non-relative collection " +
-              "column %s of table %s.%s is not supported since there are row-filtering " +
-              "policies on this table (IMPALA-10484). Rewrite query to use relative " +
-              "reference.",
-              String.join(".", resolvedTableRef.getResolvedPath().getRawPath()),
-              dbName, tblName));
-        }
-      } else if (!(resolvedTableRef instanceof InlineViewRef) &&
-          resolvedTableRef.getTable() instanceof MaterializedViewHdfsTable &&
-          ((MaterializedViewHdfsTable) resolvedTableRef.getTable())
-            .isReferencesMaskedTables(authChecker, getCatalog(), getUser())) {
-        // If a materialized view definition references tables that have table masking
-        // policies defined, we set a flag indicating that this is an authorization
-        // exception instead of throwing an AnalysisException here. Later, during the
-        // AnalysisContext.analyzeAndAuthorize() we throw the AuthorizationException.
-        mvAuthExceptionMsg_ = String.format("Materialized view %s.%s " +
-            "references tables with column masking or " +
-            "row filtering policies.", dbName, tblName);
-      } else if (tableMask.needsMaskingOrFiltering()) {
-        return InlineViewRef.createTableMaskView(resolvedTableRef, tableMask,
-            getAuthzCtx());
-      }
-      return resolvedTableRef;
-    } catch (InternalException e) {
-      String msg = "Error resolving table mask on " + dbName + "." + tblName;
-      LOG.error(msg, e);
-      throw new AnalysisException(msg, e);
-    }
-  }
-
   public boolean encounteredMVAuthException() {
     return mvAuthExceptionMsg_ != null;
   }
 
   public String getMVAuthExceptionMsg() {
     return mvAuthExceptionMsg_;
+  }
+
+  public void setMVAuthExceptionMsg(String message) {
+    mvAuthExceptionMsg_ = message;
   }
 
   public void setTotalRecordsNumV1(long totalRecordsNumV1) {
@@ -1787,6 +1716,7 @@ public class Analyzer {
   public SlotDescriptor registerSlotRef(Path slotPath,
       boolean duplicateIfCollections) throws AnalysisException {
     Preconditions.checkState(slotPath.isRootedAtTuple());
+    SlotDescriptor result = null;
     // If 'tupleStack_' is empty then this is a top level call to this function (not a
     // recursive call) and we push the root TupleDescriptor to 'tupleStack_'.
     try (TupleStackGuard guard = tupleStack_.isEmpty()
@@ -1808,8 +1738,14 @@ public class Analyzer {
       List<String> key = slotPath.getFullyQualifiedRawPath();
       Preconditions.checkState(key.stream().allMatch(s -> s.equals(s.toLowerCase())),
           "Slot paths should be lower case: " + key);
-      return createAndRegisterSlotDesc(slotPath);
+      result = createAndRegisterSlotDesc(slotPath);
     }
+    TableRef tableRef = tableRefMap_.get(result.getParent().getId());
+    if (tableRef instanceof UnpivotTableRef) {
+      Preconditions.checkState(tupleStack_.isEmpty());
+      tableRef.notifySlotRefRegistered(this, result);
+    }
+    return result;
   }
 
   // It is possible that another Analyzer, for example a child Analyzer in an inline view,
@@ -3548,14 +3484,30 @@ public class Analyzer {
       Preconditions.checkState(e.isAnalyzed());
       e.getIds(null, slotIds);
     }
-    return globalState_.descTbl.markSlotsMaterialized(slotIds);
+    Set<TupleDescriptor> result = globalState_.descTbl.markSlotsMaterialized(slotIds);
+    for (TupleDescriptor tupleDesc : result) {
+      TableRef tableRef = tupleDesc.getTableRef();
+      if (tableRef instanceof UnpivotTableRef) {
+        for (Expr expr : exprs) {
+          tableRef.notifySlotsMaterialized(this, expr);
+        }
+      }
+    }
+    return result;
   }
 
   public Set<TupleDescriptor> materializeSlots(Expr e) {
     List<SlotId> slotIds = new ArrayList<>();
     Preconditions.checkState(e.isAnalyzed());
     e.getIds(null, slotIds);
-    return globalState_.descTbl.markSlotsMaterialized(slotIds);
+    Set<TupleDescriptor> result = globalState_.descTbl.markSlotsMaterialized(slotIds);
+    for (TupleDescriptor tupleDesc : result) {
+      TableRef tableRef = tupleDesc.getTableRef();
+      if (tableRef instanceof UnpivotTableRef) {
+        tableRef.notifySlotsMaterialized(this, e);
+      }
+    }
+    return result;
   }
 
   /**

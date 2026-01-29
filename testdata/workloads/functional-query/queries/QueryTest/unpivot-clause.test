@@ -1,0 +1,392 @@
+====
+---- QUERY
+# The child of the UNPIVOT node is a UNION node for a set operation statement.
+with t1(a, v1, v2) as (
+    values (1, 2, 3), (4, 5, 6)
+)
+select a, b, c from t1 unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t;
+---- TYPES
+TINYINT,STRING,TINYINT
+---- RESULTS
+1,'v1',2
+1,'v2',3
+4,'v1',5
+4,'v2',6
+====
+---- QUERY
+# The UNPIVOT clause is in an inline view.
+with t1(a, v1, v2) as (
+    values (1, 2, 3), (4, 5, 6)
+), t2 as (
+    select a, b, c from t1 unpivot (
+        c for b in (v1 as 'v1', v2 as 'v2')
+    ) as t
+)
+select * from t2;
+---- LABELS
+a,b,c
+---- TYPES
+TINYINT,STRING,TINYINT
+---- RESULTS
+1,'v1',2
+1,'v2',3
+4,'v1',5
+4,'v2',6
+====
+---- QUERY
+# The UNPIVOT clause contains duplicate literal expressions.
+with t1 (a, v1, v2) as (
+    values (1, 2, 3)
+) select * from t1 unpivot (
+    c for b in (v1 as 'v1', v2 as 'v1')) as t;
+---- LABELS
+a,c,b
+---- TYPES
+TINYINT,TINYINT,STRING
+---- RESULTS
+1,2,'v1'
+1,3,'v1'
+====
+---- QUERY
+# Neither the data column nor the header column is selected.
+with t1(a, v1, v2) as (
+    values (1, 2, 3), (4, 5, 6)
+)
+select a from t1 unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t;
+---- TYPES
+TINYINT
+---- RESULTS
+1
+1
+4
+4
+====
+---- QUERY
+# The child of the UNPIVOT node is a UNION node for a constant select statement.
+with t1(a, v1, v2) as (
+    select 1, 2, cast(NULL as tinyint)
+)
+select a, b, c from t1 unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t;
+---- TYPES
+TINYINT,STRING,TINYINT
+---- RESULTS
+1,'v2',NULL
+1,'v1',2
+====
+---- QUERY
+# The child of the UNPIVOT node is an inner JOIN node
+with t1(a, i) as (
+    values (1, 2), (3, 4)
+), t2 (a, v1, v2) as (
+    select t11.a, t11.i, t12.i
+    from t1 as t11 inner join t1 as t12
+)
+select a, b, c from t2 unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t1;
+---- TYPES
+TINYINT,STRING,TINYINT
+---- RESULTS
+1,'v1',2
+1,'v2',2
+1,'v1',2
+1,'v2',4
+3,'v1',4
+3,'v2',2
+3,'v1',4
+3,'v2',4
+====
+---- QUERY
+# The child of the UNPIVOT node is an outer JOIN node
+with t1(a, i) as (
+    values (1, 2), (3, 4)
+), t2(a, i) as (
+    values (5, 6), (7, 8)
+), t3 (a, v1, v2) as (
+    select t1.a, t1.i, t2.i
+    from t1 left outer join t2 as t2 on t1.a = t2.a
+)
+select a, b, c from t3 unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t;
+---- TYPES
+TINYINT,STRING,TINYINT
+---- RESULTS
+1,'v1',2
+1,'v2',NULL
+3,'v1',4
+3,'v2',NULL
+==== QUERY
+# The child of the UNPIVOT node is an AGGREGATE node
+with t1(a, i) as (
+    values (1, 2), (3, 4)
+), t2(a, v1, v2) as (
+    select a, min(i), max(i) from t1 group by 1
+)
+select a, b, c from t2 unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t;
+---- TYPES
+TINYINT,STRING,TINYINT
+---- RESULTS
+3,'v1',4
+3,'v2',4
+1,'v1',2
+1,'v2',2
+====
+---- QUERY
+# The child of the UNPIVOT node is a TOP-N node.
+with t1(a, v1, v2) as (
+    values (1, 2, 3), (4, 5, 6)
+), t2(a, v1, v2) as (
+    select sleep(1), v1, v2 from t1 order by 1 limit 2
+)
+select a, b, c from t2 unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t;
+---- TYPES
+BOOLEAN,STRING,TINYINT
+---- RESULTS
+true,'v1',2
+true,'v2',3
+true,'v1',5
+true,'v2',6
+====
+---- QUERY
+# The child of the UNPIVOT node is an ANALYTIC node.
+with t1(a, v1, v2) as (
+    values (1, 2, 3), (4, 5, 6)
+), t2(a, v1, v2) as (
+    select row_number() over (order by a), v1, v2 from t1
+)
+select a, b, c from t2 unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t;
+---- TYPES
+BIGINT,STRING,TINYINT
+---- RESULTS
+1,'v1',2
+1,'v2',3
+2,'v1',5
+2,'v2',6
+====
+---- QUERY
+# The child of the UNPIVOT node is a SCAN node.
+create table test_unpivot_scan as
+    select cast(1 as int) as a, cast(2 as int) as v1, cast(NULL as int) as v2;
+select a, b, c from test_unpivot_scan unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t;
+---- TYPES
+INT,STRING,INT
+---- RESULTS
+1,'v1',2
+1,'v2',NULL
+====
+---- QUERY
+# The child of the UNPIVOT node is a SCAN node with a predicate.
+select b, c from test_unpivot_scan unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t
+where a = 1;
+---- TYPES
+STRING,INT
+---- RESULTS
+'v1',2
+'v2',NULL
+====
+---- QUERY
+# The UNPIVOT node has a predicate.
+select b, c from test_unpivot_scan unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t
+where c = 2;
+---- TYPES
+STRING,INT
+---- RESULTS
+'v1',2
+====
+---- QUERY
+# The parent of the UNPIVOT node is a SORT node.
+select a, b, c
+from test_unpivot_scan unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t
+order by 3, 2, 1;
+---- TYPES
+INT,STRING,INT
+---- RESULTS
+1,'v1',2
+1,'v2',NULL
+====
+---- QUERY
+# The parent of the UNPIVOT node is an AGGREGATE node.
+select a, count(b), count(c)
+from test_unpivot_scan unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t
+group by 1;
+---- TYPES
+INT,BIGINT,BIGINT
+---- RESULTS
+1,2,1
+====
+---- QUERY
+# The output of the UNPIVOT node is consumed by an ANALYTIC node.
+select last_value(c) over (order by b, a), a, b, c
+from test_unpivot_scan unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t;
+---- TYPES
+INT,INT,STRING,INT
+---- RESULTS
+2,1,'v1',2
+NULL,1,'v2',NULL
+====
+---- QUERY
+# The output of the UNPIVOT node is consumed by a JOIN node.
+select t.a, b, c, s.a, v1, v2
+from test_unpivot_scan unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t left outer join test_unpivot_scan as s on c = v1;
+---- TYPES
+INT,STRING,INT,INT,INT,INT
+---- RESULTS
+1,'v1',2,1,2,NULL
+1,'v2',NULL,NULL,NULL,NULL
+====
+---- QUERY
+select t1.c, t2.int_col
+from functional_parquet.alltypestiny unpivot (
+    c for b in (id)
+) as t1
+join functional_parquet.tinyinttable as t2
+on t1.c = t2.int_col
+order by t1.c, t2.int_col
+---- TYPES
+INT,INT
+---- RESULTS
+0,0
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6
+7,7
+====
+---- QUERY
+# Joins two UNPIVOT tables.
+select t1.c, t2.c
+from functional_parquet.alltypestiny unpivot (
+    c for b in (id)
+) as t1
+join functional_parquet.tinyinttable unpivot (
+    c for b in (int_col)
+) as t2
+on t1.c = t2.c
+order by t1.c, t2.c;
+---- TYPES
+INT,INT
+---- RESULTS
+0,0
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6
+7,7
+====
+---- QUERY
+# The child of the UNPIVOT node is a SCAN node on multiple files.
+select id, b, c from functional_parquet.alltypestiny unpivot (
+    c for b in (year as 'y', month as 'm')
+) as t
+order by 3, 2, 1;
+---- TYPES
+INT,STRING,INT
+---- RESULTS
+0,'m',1
+1,'m',1
+2,'m',2
+3,'m',2
+4,'m',3
+5,'m',3
+6,'m',4
+7,'m',4
+0,'y',2009
+1,'y',2009
+2,'y',2009
+3,'y',2009
+4,'y',2009
+5,'y',2009
+6,'y',2009
+7,'y',2009
+====
+---- QUERY
+# Column aliases in the UNPIVOT clause should be optional.
+with t1(a, v1, v2) as (
+    values (1, 2, 3), (4, 5, 6)
+)
+select * from t1 unpivot (
+    c for b in (v1, v2)
+) as t;
+---- LABELS
+a,c,b
+---- TYPES
+TINYINT,TINYINT,STRING
+---- RESULTS
+1,2,'v1'
+1,3,'v2'
+4,5,'v1'
+4,6,'v2'
+====
+---- QUERY
+select c from functional_parquet.complextypestbl unpivot (
+    c for b in (int_array)
+) as t
+order by id;
+---- TYPES
+STRING
+---- RESULTS
+'[1,2,3]'
+'[null,1,2,null,3,null]'
+'[]'
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+'[-1]'
+====
+---- QUERY
+# The UNPIVOT node has a limit.
+select c from functional_parquet.tinyinttable unpivot (
+    c for b in (int_col)
+) as t
+limit 1;
+---- TYPES
+INT
+---- RESULTS
+0
+====
+---- QUERY
+# UNPIVOT on an empty table.
+create table test_unpivot_empty (
+    a int,
+    v1 int,
+    v2 int
+) stored as parquet;
+select a, b, c from test_unpivot_empty unpivot (
+    c for b in (v1 as 'v1', v2 as 'v2')
+) as t;
+---- TYPES
+INT,STRING,INT
+---- RESULTS
+====

@@ -640,4 +640,8 @@ public class InlineViewRef extends TableRef {
   public boolean isNonCorrelatedScalarSubquery() {
     return isNonCorrelatedScalarSubquery_;
   }
+
+  void setIsTableMaskingView() {
+    isTableMaskingView_ = true;
+  }
 }

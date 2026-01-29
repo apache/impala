@@ -1,0 +1,15 @@
+====
+---- QUERY
+# UNPIVOT on a large table.
+select b, count(*) from tpch_parquet.lineitem unpivot (
+    c for b in (l_shipdate, l_commitdate, l_receiptdate)
+) as t
+group by b
+order by b;
+---- TYPES
+STRING,BIGINT
+---- RESULTS
+'l_commitdate',6001215
+'l_receiptdate',6001215
+'l_shipdate',6001215
+====

@@ -118,6 +118,7 @@ add_library(Exec
   tuple-text-file-util.cc
   union-node.cc
   unnest-node.cc
+  unpivot-node.cc
 )
 
 add_dependencies(Exec gen-deps)

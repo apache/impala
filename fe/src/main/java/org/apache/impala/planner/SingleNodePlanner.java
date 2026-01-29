@@ -60,6 +60,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.analysis.UnionStmt;
+import org.apache.impala.analysis.UnpivotTableRef;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeDataSourceTable;
@@ -1880,17 +1881,8 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
     ScanNode scanNode = null;
 
     // Get all predicates bound by the tuple.
-    List<Expr> conjuncts = new ArrayList<>();
+    List<Expr> conjuncts = tblRef.collectConjuncts(analyzer);
     TupleId tid = tblRef.getId();
-    conjuncts.addAll(analyzer.getBoundPredicates(tid));
-
-    // Also add remaining unassigned conjuncts
-    List<Expr> unassigned = analyzer.getUnassignedConjuncts(tid.asList());
-    PlanNode.removeZippingUnnestConjuncts(unassigned, analyzer);
-
-    conjuncts.addAll(unassigned);
-    analyzer.markConjunctsAssigned(unassigned);
-    analyzer.createEquivConjuncts(tid, conjuncts);
 
     // Perform constant propagation and optimization if rewriting is enabled
     if (analyzer.getQueryCtx().client_request.query_options.enable_expr_rewrites) {
@@ -2270,6 +2262,14 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
       result.init(analyzer);
     } else if (tblRef instanceof IcebergMetadataTableRef) {
       result = createScanNode(tblRef, aggInfo, analyzer);
+    } else if (tblRef instanceof UnpivotTableRef) {
+      UnpivotTableRef unpivotTableRef = (UnpivotTableRef)tblRef;
+      List<Expr> remainingConjuncts = unpivotTableRef.pushdownConjuncts(analyzer);
+      PlanNode tableRefNode = createTableRefNode(
+          unpivotTableRef.getSourceTableRef(), aggInfo, analyzer, collectionRefsToZip);
+      result = new UnpivotNode(
+          ctx_.getNextNodeId(), tableRefNode, remainingConjuncts, unpivotTableRef);
+      result.init(analyzer);
     } else {
       throw new NotImplementedException(
           "Planning not implemented for table ref class: " + tblRef.getClass());

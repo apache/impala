@@ -294,6 +294,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("unique", SqlParserSymbols.KW_UNIQUE);
     keywordMap.put("unknown", SqlParserSymbols.KW_UNKNOWN);
     keywordMap.put("unnest", SqlParserSymbols.KW_UNNEST);
+    keywordMap.put("unpivot", SqlParserSymbols.KW_UNPIVOT);
     keywordMap.put("unset", SqlParserSymbols.KW_UNSET);
     keywordMap.put("update", SqlParserSymbols.KW_UPDATE);
     keywordMap.put("update_fn", SqlParserSymbols.KW_UPDATE_FN);

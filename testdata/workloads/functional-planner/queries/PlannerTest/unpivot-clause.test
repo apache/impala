@@ -1,0 +1,71 @@
+# The child node of the UNPIVOT node is a SCAN node.
+# The predicate should be pushed down to the SCAN node.
+select id, b, c from functional_parquet.alltypestiny unpivot (
+    c for b in (year as 'y')
+) as t
+where month = 1;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:UNPIVOT
+|  source-exprs=functional_parquet.alltypestiny.id
+|  unpivot-data-exprs=functional_parquet.alltypestiny.year
+|  row-size=20B cardinality=190
+|
+00:SCAN HDFS [functional_parquet.alltypestiny]
+   partition predicates: functional_parquet.alltypestiny.month = 1
+   HDFS partitions=1/4 files=1 size=2.98KB
+   row-size=12B cardinality=190
+====
+# The child node of the UNPIVOT node is a SCAN node.
+# The predicate should be evaluated in the UNPIVOT node.
+select id, b, c from functional_parquet.alltypestiny unpivot (
+    c for b in (year as 'y', month as 'm')
+) as t
+where c = 1;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:UNPIVOT
+|  source-exprs=functional_parquet.alltypestiny.id
+|  unpivot-data-exprs=functional_parquet.alltypestiny.month, functional_parquet.alltypestiny.year
+|  predicates: c = 1
+|  row-size=20B cardinality=1.52K
+|
+00:SCAN HDFS [functional_parquet.alltypestiny]
+   HDFS partitions=4/4 files=4 size=11.92KB
+   row-size=12B cardinality=758
+====
+# The child node of the UNPIVOT node is a JOIN node.
+select t1.id, b, c, t2.id from functional_parquet.alltypestiny unpivot (
+    c for b in (year as 'y', month as 'm')
+) as t1 join functional_parquet.alltypestiny as t2
+on t1.c = t2.month;
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t1.c = t2.`month`
+|  row-size=28B cardinality=1.52K
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional_parquet.alltypestiny t2]
+|     HDFS partitions=4/4 files=4 size=11.92KB
+|     row-size=8B cardinality=758
+|
+01:UNPIVOT
+|  source-exprs=functional_parquet.alltypestiny.id
+|  unpivot-data-exprs=functional_parquet.alltypestiny.month, functional_parquet.alltypestiny.year
+|  row-size=20B cardinality=1.52K
+|
+00:SCAN HDFS [functional_parquet.alltypestiny]
+   HDFS partitions=4/4 files=4 size=11.92KB
+   row-size=12B cardinality=758
+====

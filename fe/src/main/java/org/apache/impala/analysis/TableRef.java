@@ -28,16 +28,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.impala.authorization.AuthorizationChecker;
+import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.TableMask;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.IcebergFileDescriptor;
+import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
+import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TReplicaPreference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -72,6 +81,8 @@ import com.google.common.collect.Lists;
  * structure of all subclasses.
  */
 public class TableRef extends StmtNode {
+  private final static Logger LOG = LoggerFactory.getLogger(TableRef.class);
+
   // Path to a collection type. Not set for inline views.
   protected List<String> rawPath_;
 
@@ -871,6 +882,31 @@ public class TableRef extends StmtNode {
     return selectedDataFilesWithoutDeletesForOptimize_;
   }
 
+  void notifySlotRefRegistered(Analyzer analyzer, SlotDescriptor slot)
+      throws AnalysisException {
+    // Do nothing
+  }
+
+  void notifySlotsMaterialized(Analyzer analyzer, Expr expr) {
+    // Do nothing
+  }
+
+  public List<Expr> collectConjuncts(Analyzer analyzer) {
+    // Get all predicates bound by the tuple.
+    List<Expr> conjuncts = new ArrayList<>();
+    TupleId tid = getId();
+    conjuncts.addAll(analyzer.getBoundPredicates(tid));
+
+    // Also add remaining unassigned conjuncts
+    List<Expr> unassigned = analyzer.getUnassignedConjuncts(tid.asList());
+    PlanNode.removeZippingUnnestConjuncts(unassigned, analyzer);
+
+    conjuncts.addAll(unassigned);
+    analyzer.markConjunctsAssigned(unassigned);
+    analyzer.createEquivConjuncts(tid, conjuncts);
+    return conjuncts;
+  }
+
   void migratePropertiesTo(TableRef other) {
     other.aliases_ = aliases_;
     other.onClause_ = onClause_;
@@ -887,5 +923,83 @@ public class TableRef extends StmtNode {
     joinOp_ = null;
     joinHints_ = new ArrayList<>();
     tableHints_ = new ArrayList<>();
+  }
+
+  /**
+   * Applies column-masking/row-filtering policies to this table. Returns a table
+   * masking view if any of these policies exist. The TableRef should be resolved first
+   * so we know the target table/view/collection.
+   *
+   * @param analyzer Analyzer
+   */
+  public TableRef applyTableMask(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(isResolved(), "Table should be resolved");
+    // Only do table masking when authorization is enabled and the authorization
+    // factory supports column-masking/row-filtering. If both of these are false,
+    // return the unmasked table ref.
+    if (!analyzer.getAuthzFactory().getAuthorizationConfig().isEnabled()
+        || !analyzer.getAuthzFactory().supportsTableMasking()) {
+      return this;
+    }
+    // Performing table masking.
+    AuthorizationChecker authChecker =
+        analyzer.getAuthzFactory().newAuthorizationChecker(
+            analyzer.getCatalog().getAuthPolicy());
+    String dbName;
+    String tblName;
+    if (this instanceof InlineViewRef) {
+      FeView view = ((InlineViewRef) this).getView();
+      dbName = view.getDb().getName();
+      tblName = view.getName();
+    } else if (this instanceof CollectionTableRef
+        && this.isRelative()) {
+       // Relative table refs don't need masking. Its base table will be masked.
+       return this;
+    } else {
+      dbName = this.getTable().getDb().getName();
+      tblName = this.getTable().getName();
+    }
+    // The selected columns should be in the same relative order as they are in the
+    // corresponding Hive table so that the order of the SelectListItem's in the
+    // table mask view (if needs masking or filtering) would be correct.
+    List<Column> columns = this.getSelectedColumnsInHiveOrder();
+    TableMask tableMask = new TableMask(
+        authChecker, dbName, tblName, columns, analyzer.getUser());
+    try {
+      if (this instanceof CollectionTableRef) {
+        if (tableMask.needsRowFiltering()) {
+          // The table ref is a non-relative CollectionTableRef, e.g. the table ref in
+          // "select item from functional_parquet.complextypestbl.int_array". We can't
+          // replace "complextypestbl" with a table masking view here.
+          // TODO: Support this in IMPALA-10484 by rewriting it to relative ref, e.g.
+          //  select a.item from functional_parquet.complextypestbl t, t.int_array a;
+          throw new AnalysisException(String.format("Using non-relative collection " +
+              "column %s of table %s.%s is not supported since there are row-filtering " +
+              "policies on this table (IMPALA-10484). Rewrite query to use relative " +
+              "reference.",
+              String.join(".", this.getResolvedPath().getRawPath()),
+              dbName, tblName));
+        }
+      } else if (!(this instanceof InlineViewRef) &&
+          this.getTable() instanceof MaterializedViewHdfsTable &&
+          ((MaterializedViewHdfsTable) this.getTable()).isReferencesMaskedTables(
+              authChecker, analyzer.getCatalog(), analyzer.getUser())) {
+        // If a materialized view definition references tables that have table masking
+        // policies defined, we set a flag indicating that this is an authorization
+        // exception instead of throwing an AnalysisException here. Later, during the
+        // AnalysisContext.analyzeAndAuthorize() we throw the AuthorizationException.
+        analyzer.setMVAuthExceptionMsg(String.format("Materialized view %s.%s " +
+            "references tables with column masking or " +
+            "row filtering policies.", dbName, tblName));
+      } else if (tableMask.needsMaskingOrFiltering()) {
+        return InlineViewRef.createTableMaskView(
+            this, tableMask, analyzer.getAuthzCtx());
+      }
+      return this;
+    } catch (InternalException e) {
+      String msg = "Error resolving table mask on " + dbName + "." + tblName;
+      LOG.error(msg, e);
+      throw new AnalysisException(msg, e);
+    }
   }
 }

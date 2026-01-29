@@ -485,11 +485,7 @@ public abstract class QueryStmt extends StatementBase {
    * Mark slots referenced in exprs as materialized.
    */
   protected void materializeSlots(Analyzer analyzer, List<Expr> exprs) {
-    List<SlotId> slotIds = new ArrayList<>();
-    for (Expr e: exprs) {
-      e.getIds(null, slotIds);
-    }
-    analyzer.getDescTbl().markSlotsMaterialized(slotIds);
+    analyzer.materializeSlots(exprs);
   }
 
   /**

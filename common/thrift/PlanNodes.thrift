@@ -58,6 +58,7 @@ enum TPlanNodeType {
   SYSTEM_TABLE_SCAN_NODE = 21
   ICEBERG_MERGE_NODE = 22
   PAIMON_SCAN_NODE=23
+  UNPIVOT_NODE=24
 }
 
 // phases of an execution node
@@ -450,6 +451,19 @@ struct TPaimonScanNode {
   1: required Types.TTupleId tuple_id
   2: required binary paimon_table_obj
   3: required string table_name;
+}
+
+struct TUnpivotNode {
+  // Maps slot index to the Expr on the source table.
+  1: required list<Exprs.TExpr> source_exprs;
+
+  2: required i32 num_unpivot_columns;
+
+  // Set only if the slot is materialized.
+  3: optional Types.TSlotId data_slot_id;
+  4: optional list<Exprs.TExpr> data_exprs;
+  5: optional Types.TSlotId header_slot_id;
+  6: optional list<Exprs.TExpr> header_exprs;
 }
 
 struct TEqJoinCondition {
@@ -874,6 +888,8 @@ struct TPlanNode {
 
   29: optional TSystemTableScanNode system_table_scan_node
   31: optional TPaimonScanNode paimon_table_scan_node
+
+  32: optional TUnpivotNode unpivot_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

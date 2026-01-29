@@ -66,7 +66,7 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
         // Skip local views
         if (!((InlineViewRef) origRef).isCatalogView()) continue;
       }
-      TableRef newRef = analyzer.resolveTableMask(origRef);
+      TableRef newRef = origRef.applyTableMask(analyzer);
       if (newRef == origRef) continue;
       set(i, newRef);
       hasChanges = true;
@@ -193,6 +193,11 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
   public void reset() {
     for (int i = 0; i < size(); ++i) {
       TableRef origTblRef = get(i);
+      if (origTblRef instanceof UnpivotTableRef) {
+        // UnpivotTableRef.clone() creates an unanalyzed clone and can be used for reset.
+        set(i, origTblRef.clone());
+        continue;
+      }
       if (origTblRef.isResolved() && !(origTblRef instanceof InlineViewRef)) {
         // Replace resolved table refs with unresolved ones.
         TableRef newTblRef = new TableRef(origTblRef);

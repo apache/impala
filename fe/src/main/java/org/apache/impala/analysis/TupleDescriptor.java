@@ -126,6 +126,10 @@ public class TupleDescriptor {
   // This affects handling of collections.
   private InlineViewRef sourceView_ = null;
 
+  // TableRef that creates this TupleDescriptor. Null if this TupleDescriptor is not
+  // created with Analyzer.registerTableRef().
+  private TableRef tableRef_ = null;
+
   public TupleDescriptor(TupleId id, String debugName) {
     id_ = id;
     path_ = null;
@@ -268,6 +272,12 @@ public class TupleDescriptor {
     Preconditions.checkState(maskedTable_ == null);
     maskedTable_ = table;
     table.getDesc().maskedByTuple_ = this;
+  }
+
+  TableRef getTableRef() { return tableRef_; }
+  void setTableRef(TableRef tableRef) {
+    Preconditions.checkState(tableRef_ == null);
+    tableRef_ = tableRef;
   }
 
   public void setParentSlotDesc(SlotDescriptor parent) {

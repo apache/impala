@@ -416,6 +416,40 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "TABLESAMPLE is only supported on file-based tables: a.int_array_col");
   }
 
+  @Test
+  public void TestUnpivotClause() {
+    AnalysisError(
+        "with t1 (a, v1, v2) as (values (1, 2, 3.0)) select * from t1 unpivot (" +
+        "    c for b in (v1 as 'v1', v2 as 'v2')) as t;",
+        "Columns in the UNPIVOT clause should have the same type"
+    );
+    AnalysisError(
+        "with t1 (a, v1, v2) as (values (1, 2, 3)) select * from t1 unpivot (" +
+        "    c for b in (v1 as 1, v2 as 'v2')) as t;",
+        "Expressions for the UNPIVOT header column should have the same type"
+    );
+    AnalysisError(
+        "with t1 (a, v1, v2) as (values (1, 2, 3)) select * from t1 unpivot (" +
+        "    c for b in (v1 as 'v1', v2 as 'v2', v3 as 'v3')) as t;",
+        "Could not resolve column/field reference: 'v3'"
+    );
+    AnalysisError(
+        "with t1 (a, v1, v2) as (values (1, 2, 3)) select v1 from t1 unpivot (" +
+        "    c for b in (v1 as 'v1', v2 as 'v2')) as t;",
+        "Could not resolve column/field reference: 'v1'"
+    );
+    AnalysisError(
+        "with t1 (a, v1, v2) as (values (1, 2, 3)) select * from t1 unpivot (" +
+        "    c for b in (v1 as 'v1', v1 as 'v2')) as t;",
+        "Duplicate column name 'v1' in the UNPIVOT clause"
+    );
+    AnalysisError(
+        "with t1 (a, v1, v2) as (values (1, 2, 3)) select * from t1 unpivot (" +
+        "    c for b in (x1 as 'v1', x2 as 'v2')) as t;",
+        "Table 't1' does not contain the columns for UNPIVOT"
+    );
+  }
+
   /**
    * Helper function that returns a list of integers used to improve readability
    * in the path-related tests below.
@@ -4698,7 +4732,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.
-    testNumberOfMembers(TableRef.class, 32);
+    testNumberOfMembers(TableRef.class, 33);
     testNumberOfMembers(BaseTableRef.class, 0);
     testNumberOfMembers(InlineViewRef.class, 10);
   }
