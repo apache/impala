@@ -318,13 +318,13 @@ do
 
     pushd ${IMPALA_HOME}/java/calcite-planner
     # Install Calcite FE jar
-    "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae install -DskipTests
     if [[ "${TARGET_FILESYSTEM}" != "s3" ]]; then
       # Run Calcite FE tests
       if ! "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae test install ; then
         TEST_RET_CODE=1
       fi
     fi
+    "${IMPALA_HOME}/bin/mvn-quiet.sh" -fae install -DskipTests
     popd
 
     # Run the FE custom cluster tests only if not running against S3
