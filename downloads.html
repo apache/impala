@@ -53,12 +53,14 @@ body {
       }
       .navbar .nav {
         margin: 0;
-        display: table;
+        display: flex;
+        flex-wrap: wrap;
         width: 100%;
+        justify-content: center;
       }
       .navbar .nav li {
-        display: table-cell;
-        width: 1%;
+        flex: 1 1 auto;
+        min-width: 100px;
         float: none;
       }
       .navbar .nav li a {
@@ -66,6 +68,8 @@ body {
         text-align: center;
         border-left: 1px solid rgba(255,255,255,.75);
         border-right: 1px solid rgba(0,0,0,.1);
+        padding: 10px 8px;
+        display: block;
       }
       .navbar .nav li:first-child a {
         border-left: 0;
@@ -74,6 +78,33 @@ body {
       .navbar .nav li:last-child a {
         border-right: 0;
         border-radius: 0 3px 3px 0;
+      }
+
+      @media (max-width: 768px) {
+        .navbar .nav li {
+          flex: 0 1 auto;
+          min-width: auto;
+        }
+        .navbar .nav li a {
+          font-size: 14px;
+          padding: 8px 5px;
+          white-space: nowrap;
+        }
+      }
+
+      @media (max-width: 480px){
+        .navbar .nav {
+          flex-direction: column;
+        }
+        .navbar .nav li {
+          width: 100%;
+          border-bottom: 1px solid rgba(0, 0, 0, .1);
+        }
+        .navbar .nav li a {
+          border-left: 0;
+          border-right: 0;
+          border-radius: 0;
+        }
       }
   </style>
   <link href="css/bootstrap-responsive.css" rel="stylesheet" type="text/css">
