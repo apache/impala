@@ -17,7 +17,10 @@
  */
 package org.apache.impala.calcite.schema;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.calcite.rel.RelNode;
@@ -32,8 +35,8 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.calcite.util.Sarg;
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.calcite.rel.util.RexInputRefCollector;
-import org.apache.impala.calcite.schema.JoinRelationInfo.EqualityConjunction;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 
@@ -41,6 +44,7 @@ import org.apache.calcite.plan.hep.HepRelVertex;
 import org.apache.calcite.rel.core.Join;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,10 +60,6 @@ public class FilterSelectivityEstimator {
 
   private final RelMetadataQuery mq_;
 
-  public static final double RANGE_COMPARISON_SELECTIVITY = 1.0 / 3.0;
-
-  public static final double BETWEEN_SELECTIVITY = 1.0 / 9.0;
-
   public FilterSelectivityEstimator(RelNode childRel, RelMetadataQuery mq) {
     this.mq_ = mq;
     this.childRel_ = (childRel instanceof HepRelVertex)
@@ -69,11 +69,16 @@ public class FilterSelectivityEstimator {
   }
 
   public Double estimateSelectivity(RexNode rexNode) {
+    Double selectivity = estimateSelectivityInternal(rexNode, true);
+    return selectivity == null ? Expr.DEFAULT_SELECTIVITY : selectivity;
+  }
+
+  public Double estimateSelectivityInternal(RexNode rexNode, boolean topLevel) {
     if (rexNode instanceof RexInputRef) {
       return estimateInputRefSelectivity((RexInputRef) rexNode);
     }
     if (rexNode instanceof RexCall) {
-      return estimateCallSelectivity((RexCall)rexNode);
+      return estimateCallSelectivity((RexCall)rexNode, topLevel);
     }
     return 1.0;
   }
@@ -110,14 +115,13 @@ public class FilterSelectivityEstimator {
     return 0.5;
   }
 
-  private Double estimateCallSelectivity(RexCall call) {
+  private Double estimateCallSelectivity(RexCall call, boolean topLevel) {
     switch (call.getOperator().getKind()) {
       case EQUALS:
-      case LIKE:
       case IS_NOT_DISTINCT_FROM:
         return computeEqualsSelectivity(call);
       case AND:
-        return computeConjunctionSelectivity(call);
+        return computeConjunctionSelectivity(call, topLevel);
       case OR:
         return computeDisjunctionSelectivity(call);
       case NOT:
@@ -127,21 +131,16 @@ public class FilterSelectivityEstimator {
         return computeIsNullSelectivity(call);
       case IS_NOT_NULL:
         return computeIsNotNullSelectivity(call);
-      // TODO: For inequalities, between, and in, we can give a selectivity
-      // of 0 if condition is out of range. Also, histogram data would be
-      // a nice feature to add :)
-      case LESS_THAN_OR_EQUAL:
-      case GREATER_THAN_OR_EQUAL:
-      case LESS_THAN:
-      case GREATER_THAN:
-        return RANGE_COMPARISON_SELECTIVITY;
-      case BETWEEN:
-        // TODO: Impala has better logic than this
-        return BETWEEN_SELECTIVITY;
       case SEARCH:
         return computeSearchSelectivity(call);
+      // This logic is similar to the Expr framework. If there is any other type function
+      // call, the Expr framework doesn't know what to do with it, so it assigns a null.
+      // If this call is part of a conjunction or disjunction, it will not be considered
+      // (e.g. see the computeConjunctionSelectivity caller which ignores the null which
+      // this method returns). If this is the only "call", the caller will assign a
+      // the default selectivity of Expr.DEFAULT_SELECTIVITY.
       default:
-        return computeEqualsSelectivity(call);
+        return null;
     }
   }
 
@@ -155,6 +154,7 @@ public class FilterSelectivityEstimator {
    */
   private Double computeNotEqualitySelectivity(RexCall call) {
     Double tmpNDV = getMaxNDV(call);
+    if (tmpNDV == null) return null;
     return tmpNDV > 1.0 ? (tmpNDV - 1.0) / tmpNDV : 1.0;
   }
 
@@ -167,6 +167,8 @@ public class FilterSelectivityEstimator {
    * @return returns "equals" selectivity for call.
    */
   private Double computeEqualsSelectivity(RexCall call) {
+    Double tmpNDV = getMaxNDV(call);
+    if (tmpNDV == null) return null;
     return 1.0 / getMaxNDV(call);
   }
 
@@ -181,10 +183,10 @@ public class FilterSelectivityEstimator {
       // of null rows based on what happens with the outer join. We also only change
       // the cardinality if the input ref is on the "outer" side.
       if (join.getJoinType() != JoinRelType.INNER) {
-        return 1.0 - RANGE_COMPARISON_SELECTIVITY;
+        return 1.0 - Expr.DEFAULT_SELECTIVITY;
       }
     }
-    return computeEqualsSelectivity(call);
+    return null;
   }
 
   private Double computeIsNotNullSelectivity(RexCall call) {
@@ -200,12 +202,18 @@ public class FilterSelectivityEstimator {
       // of null rows based on what happens with the outer join. We also only change
       // the cardinality if the input ref is on the "outer" side.
       if (join.getJoinType() != JoinRelType.INNER) {
-        return RANGE_COMPARISON_SELECTIVITY;
+        return Expr.DEFAULT_SELECTIVITY;
       }
     }
-
-    //TODO: IMPALA-14235, let's see if we can do better.
-    return computeNotEqualitySelectivity(call);
+    // IMPALA-14235:  This does not seem right. We are returning an
+    // unknown selectivity here if the child is not a Join or TableScan. If this is the
+    // only condition, the selectivity will be the default of .1 which seems wrong.
+    // Tpcds tests seemed to be good leaving this as null, but this requires further
+    // investigation because we may be able to get better plans if this is changed.
+    // Also, while this is actually similar to the logic in IsNullPredicate does, it is
+    // possible that higher levels (where the child is not just a TableScan or Join) may
+    // still be able to deduce the number of nulls.
+    return null;
   }
 
   private Double computeSearchSelectivity(RexCall call) {
@@ -220,61 +228,80 @@ public class FilterSelectivityEstimator {
             : Math.max(1.0 - selectivity, 0.0);
       } else {
         // TODO: Impala has better logic than this
-        return BETWEEN_SELECTIVITY;
+        return null;
       }
     } catch (Exception e) {
       LOG.warn("Warning: Bug found when trying to calculate selectivity for search " +
           "operator, but instead of throwing an exception, a default selectivity will " +
           "be used.");
-      return computeEqualsSelectivity(call);
+      return null;
     }
   }
 
   /**
-   * Disjunction Selectivity -> (1 D(1-m1/n)(1-m2/n)) where n is the total
-   * number of tuples from child and m1 and m2 is the expected number of tuples
-   * from each part of the disjunction predicate.
-   * <p>
-   * Note we compute m1. m2.. by applying selectivity of the disjunctive element
-   * on the cardinality from child.
-   *
-   * @param call
-   * @return returns "disjunction" selectivity for call.
+   * This logic is similar to the logic found in CompoundPredicate
    */
   private Double computeDisjunctionSelectivity(RexCall call) {
-    Double tmpCardinality;
     Double tmpSelectivity;
-    double selectivity = 1;
+    double selectivity = 0.0;
 
+    // Check to see there are operands, which there should be because this
+    // is called when there is a disjunction.
+    Preconditions.checkState(call.getOperands().size() >= 2);
     for (RexNode dje : call.getOperands()) {
-      tmpCardinality = childCardinality_ * estimateSelectivity(dje);
-      tmpSelectivity = (tmpCardinality > 1.0 && tmpCardinality < childCardinality_)
-        ? 1.0 - tmpCardinality / childCardinality_
-        : 1.0;
-
-      selectivity *= tmpSelectivity;
+      tmpSelectivity = estimateSelectivityInternal(dje, false);
+      // This logic matches the logic in CompoundPredicate.computeSelectivity()
+      // A null is returned when an inner conjunct has an operand where
+      // the selectivity could not be calculated.
+      if (tmpSelectivity == null) {
+        return null;
+      }
+      // This logic matches the disjunction logic found in
+      // CompoundPredicate.computeSelectivity().
+      selectivity = selectivity + tmpSelectivity - selectivity * tmpSelectivity;
     }
-
-    if (selectivity < 0.0) {
-      selectivity = 0.0;
-    }
-
-    return (1.0 - selectivity);
+    return Math.max(0.0, Math.min(1.0, selectivity));
   }
 
   /**
-   * Selectivity of conjunctive predicate -> (selectivity of conjunctive
-   * element1) * (selectivity of conjunctive element2)...
-   *
-   * @param call
-   * @return returns "conjunction" selectivity for call.
+   * This logic is similar to the logic found in PlanNode.computeCombinedSelectivity()
+   * The logic there is a bit more comprehensive on how to deal with missing stats
+   * and overlapping clauses. TODO: Between logic still needs to be handled.
    */
-  private Double computeConjunctionSelectivity(RexCall call) {
-    double selectivity = 1.0;
+  private Double computeConjunctionSelectivity(RexCall call, boolean topLevel) {
+    List<Double> selectivities = new ArrayList<>();
     for (RexNode cje : call.getOperands()) {
-      selectivity *= estimateSelectivity(cje);
+      Double selectivity = estimateSelectivityInternal(cje, false);
+      if (selectivity != null) {
+        selectivities.add(selectivity);
+      }
     }
-    return selectivity;
+    if (selectivities.size() != call.getOperands().size()) {
+      // This logic matches the logic in PlanNode.computeCombinedSelectivity().
+      // At the top level, if there are any underlying conjuncts where the
+      // selectivity could not be calculated, one "default" selectivity is
+      // added in to represent all those conjuncts.
+      // If it is not the top level, the the logic matches what is found in
+      // CompoundPredicate.computeSelectivity() and a null is returned when
+      // an inner conjunct has an operand where the selectivity could not be
+      // calculated.
+      if (topLevel) {
+        selectivities.add(Expr.DEFAULT_SELECTIVITY);
+      } else {
+        return null;
+      }
+    }
+    // Sort the selectivities to get a consistent estimate, regardless of the original
+    // conjunct order. Sort in ascending order such that the most selective conjunct
+    // is fully applied. (comment copied from PlanNode.computeCombinedSelectivity)
+    Collections.sort(selectivities);
+    double selectivity = 1.0;
+    for (int i = 0; i < selectivities.size(); ++i) {
+      // Exponential backoff for each selectivity multiplied into the final result.
+      selectivity *= Math.pow(selectivities.get(i), 1.0 / (double) (i + 1));
+    }
+
+    return Math.max(0.0, Math.min(1.0, selectivity));
   }
 
   /**
@@ -288,25 +315,27 @@ public class FilterSelectivityEstimator {
    * @return estimated number of nulls from statistics
    */
   private long getNumNulls(RexCall call, TableScan t) {
-    Preconditions.checkState(call.getOperator().getKind() == SqlKind.IS_NULL ||
-        call.getOperator().getKind() == SqlKind.IS_NOT_NULL);
     Preconditions.checkState(call.getOperands().size() == 1);
     Preconditions.checkState(call.getOperands().get(0) instanceof RexInputRef);
     RexInputRef inputRef = (RexInputRef) call.getOperands().get(0);
     CalciteTable table = (CalciteTable) t.getTable();
     Column column = table.getColumn(inputRef.getIndex());
-    return column.getStats() != null ? column.getStats().getNumNulls() : 0;
+    return column.getStats() != null
+        ? Math.max(column.getStats().getNumNulls(), 0)
+        : 0;
   }
 
   private Double getMaxNDV(RexCall call) {
-    Set<Integer> inputRefs = new HashSet<>();
-    for (RexNode op : call.getOperands()) {
-      inputRefs.addAll(RexInputRefCollector.getInputRefs(op));
+    Set<Integer> inputRefs = new HashSet<>(RexInputRefCollector.getInputRefs(call));
+
+    if (inputRefs.size() != 1) {
+      return null;
     }
 
     double maxNDV = 1.0;
-    for (Integer index : inputRefs) {
-      maxNDV = Math.max(getDistinctRowCount(index), maxNDV);
+    Double ndv = getDistinctRowCount(inputRefs.toArray(new Integer[0])[0]);
+    if (ndv != null) {
+      maxNDV = Math.max(ndv, maxNDV);
     }
 
     return maxNDV;

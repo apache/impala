@@ -39,6 +39,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.calcite.rel.util.ExprConjunctsConverter;
+import org.apache.impala.calcite.service.CalciteAnalysisResult;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.FeSupport;
@@ -66,6 +67,12 @@ public class ImpalaRexExecutor implements RexExecutor {
 
   // Reducer class used for testing purposes for injection.
   private final Reducer reducer_;
+
+  public ImpalaRexExecutor(CalciteAnalysisResult analysisResult, Reducer reducer) {
+    analyzer_ = analysisResult.getAnalyzer();
+    queryCtx_ = analyzer_.getQueryCtx();
+    reducer_ = reducer;
+  }
 
   public ImpalaRexExecutor(Analyzer analyzer, TQueryCtx queryCtx,
       Reducer reducer) {

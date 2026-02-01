@@ -18,8 +18,8 @@
 package org.apache.impala.calcite.schema;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
@@ -75,26 +75,25 @@ public class ImpalaRelMdDistinctRowCount extends RelMdDistinctRowCount {
       ImmutableBitSet groupKey, RexNode predicate) {
     // Use Calcite distinct row calculation
     // number of distinct rows can never be more than number of total rows
-    return Math.min(mq.getRowCount(rel),
-        super.getDistinctRowCount(rel, mq, groupKey, predicate));
+    Double rows = mq.getRowCount(rel);
+    Double ndv = super.getDistinctRowCount(rel, mq, groupKey, predicate);
+    return ndv == null ? rows : Math.min(rows, ndv);
   }
 
   @Override
   public Double getDistinctRowCount(Filter rel, RelMetadataQuery mq,
       ImmutableBitSet groupKey, RexNode predicate) {
-    // For the distinct row count, we take the number of distinct rows before the
-    // filter and multiply it by the selectivity
-    // TODO: We can do a little better if the "groupKey" is for the column being
-    // selected. Specifically, if we find the selectivity for col1 and the condition
-    // is "col1 is null", we know there is only one distinct row, but it will multiply
-    // by the selectivity of all the distinct rows.
-    Double rowCount = mq.getRowCount(rel);
-    Preconditions.checkState(rowCount >= 0.0);
-    Double childRowCount = mq.getRowCount(rel.getInput(0));
-    Double distinctRowCount =
-        mq.getDistinctRowCount(rel.getInput(0), groupKey, predicate);
-    Preconditions.checkState(rowCount <= childRowCount);
-    return Math.max(1.0, distinctRowCount * rowCount / childRowCount);
+    Double rows = mq.getRowCount(rel);
+    Double ndv = super.getDistinctRowCount(rel, mq, groupKey, predicate);
+    if (ndv != null) {
+      RexNode condition = rel.getCondition();
+      if (condition != null && groupKey != null &&
+         RelOptUtil.InputFinder.bits(condition).equals(groupKey)) {
+        Double childRowCount = mq.getRowCount(rel.getInput(0));
+        ndv = Math.max(1.0, ndv * rows / childRowCount);
+      }
+    }
+    return ndv == null ? rows : Math.min(rows, ndv);
   }
 
   @Override
@@ -102,7 +101,8 @@ public class ImpalaRelMdDistinctRowCount extends RelMdDistinctRowCount {
       ImmutableBitSet groupKey, RexNode predicate) {
     // Use Calcite distinct row calculation
     // number of distinct rows can never be more than number of total rows
-    return Math.min(mq.getRowCount(rel),
-        super.getDistinctRowCount(rel, mq, groupKey, predicate));
+    Double rows = mq.getRowCount(rel);
+    Double ndv = super.getDistinctRowCount(rel, mq, groupKey, predicate);
+    return ndv == null ? rows : Math.min(rows, ndv);
   }
 }

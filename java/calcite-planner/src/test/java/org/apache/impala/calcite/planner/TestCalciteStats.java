@@ -29,6 +29,7 @@ import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCostImpl;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
@@ -40,12 +41,17 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexExecutorImpl;
+import org.apache.calcite.rex.RexSimplify;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
+import org.apache.impala.calcite.operators.ImpalaRexSimplify;
 import org.apache.impala.calcite.rel.util.PrunedPartitionHelper;
+import org.apache.impala.calcite.rules.ImpalaFilterSimplifyRule;
+import org.apache.impala.calcite.rules.ImpalaRexExecutor;
 import org.apache.impala.calcite.schema.ImpalaRelMetadataProvider;
 import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.calcite.schema.FilterSelectivityEstimator;
@@ -103,9 +109,19 @@ public class TestCalciteStats extends PlannerTestBase {
     RuntimeEnv.INSTANCE.reset();
   }
 
-  private RelNode getRelNodeForQuery(String query) throws ImpalaException {
-    CalciteAnalysisResult analysisResult = (CalciteAnalysisResult) parseAndAnalyze(query,
+  private CalciteAnalysisResult getCalciteAnalysisResult(String query)
+      throws ImpalaException {
+    return (CalciteAnalysisResult) parseAndAnalyze(query,
         feFixture_.createAnalysisCtx(), new CalciteCompilerFactory());
+  }
+
+  private RelNode getRelNodeForQuery(String query) throws ImpalaException {
+    CalciteAnalysisResult analysisResult = getCalciteAnalysisResult(query);
+    return getRelNodeForQuery(analysisResult);
+  }
+
+  private RelNode getRelNodeForQuery(CalciteAnalysisResult analysisResult)
+      throws ImpalaException {
     CalciteRelNodeConverter relNodeConverter =
         new CalciteRelNodeConverter(analysisResult);
     return relNodeConverter.convert(analysisResult.getValidatedNode());
@@ -175,11 +191,15 @@ public class TestCalciteStats extends PlannerTestBase {
       RelNode logicalPlan = getRelNodeForQuery("SELECT bigint_col " +
           "FROM functional.alltypes where bigint_col = 10 and smallint_col = 10");
       RelMetadataQuery mq = getMQ();
-      double cardinality = ALL_TYPES_CARD/100.0;
+      double equalsSelectivity = 1.0 / BIGINT_NDV;
+      // selectivity used is .1 * (.1 ^ .5).  The second "and" has an exponential backoff
+      // as calculated in FilterSelectivityEstimator.computeConjunctionSelectivity()
+      double cardinality =
+          ALL_TYPES_CARD * equalsSelectivity * Math.pow(equalsSelectivity, .5);
       assertEquals(cardinality, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
       ImmutableBitSet bitSet = ImmutableBitSet.of(0);
-      assertEquals(1.0, (double) mq.getDistinctRowCount(logicalPlan, bitSet, null),
-          DOUBLE_ERR);
+      assertEquals(BIGINT_NDV,
+          (double) mq.getDistinctRowCount(logicalPlan, bitSet, null), DOUBLE_ERR);
     } catch (ImpalaException e) {
       throw new RuntimeException(e);
     }
@@ -195,7 +215,7 @@ public class TestCalciteStats extends PlannerTestBase {
       assertEquals(cardinality, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
       ImmutableBitSet bitSet = ImmutableBitSet.of(0);
       Double distinctRows = 10.0 * cardinality / ALL_TYPES_CARD;
-      assertEquals(distinctRows, (double) mq.getDistinctRowCount(logicalPlan,
+      assertEquals(10.0, (double) mq.getDistinctRowCount(logicalPlan,
           bitSet, null), DOUBLE_ERR);
     } catch (ImpalaException e) {
       throw new RuntimeException(e);
@@ -258,13 +278,13 @@ public class TestCalciteStats extends PlannerTestBase {
           "FROM functional.alltypes where bigint_col < 5");
       RelMetadataQuery mq = getMQ();
       double cardinality =
-          ALL_TYPES_CARD * FilterSelectivityEstimator.RANGE_COMPARISON_SELECTIVITY;
+          ALL_TYPES_CARD * Expr.DEFAULT_SELECTIVITY;
       assertEquals(cardinality, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
       ImmutableBitSet bitSet = ImmutableBitSet.of(0);
       double distinctRows =
-          BIGINT_NDV * FilterSelectivityEstimator.RANGE_COMPARISON_SELECTIVITY;
-      assertEquals(distinctRows, (double) mq.getDistinctRowCount(logicalPlan,
-          bitSet, null), DOUBLE_ERR);
+          BIGINT_NDV;
+      assertEquals(BIGINT_NDV * Expr.DEFAULT_SELECTIVITY,
+          (double) mq.getDistinctRowCount(logicalPlan, bitSet, null), DOUBLE_ERR);
     } catch (ImpalaException e) {
       throw new RuntimeException(e);
     }
@@ -273,35 +293,51 @@ public class TestCalciteStats extends PlannerTestBase {
   @Test
   public void testFilterBetween() {
     try {
-      RelNode logicalPlan = getRelNodeForQuery("SELECT bigint_col " +
-          "FROM functional.alltypes where bigint_col between 1 and 2");
-      // TODO: Need to apply Impala selectivity logic for between
+      CalciteAnalysisResult analysisResult = getCalciteAnalysisResult(
+          "SELECT bigint_col FROM functional.alltypes where bigint_col between 1 and 2");
+      RelNode logicalPlanWithSearch = runFilterRule(analysisResult);
       RelMetadataQuery mq = getMQ();
       double cardinality =
-          ALL_TYPES_CARD * FilterSelectivityEstimator.BETWEEN_SELECTIVITY;
-      assertEquals(cardinality, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
+          ALL_TYPES_CARD * Expr.DEFAULT_SELECTIVITY;
+      assertEquals(cardinality,
+          (double) mq.getRowCount(logicalPlanWithSearch), DOUBLE_ERR);
       ImmutableBitSet bitSet = ImmutableBitSet.of(0);
-      double distinctRows =
-          BIGINT_NDV * FilterSelectivityEstimator.BETWEEN_SELECTIVITY;
-      assertEquals(distinctRows, (double) mq.getDistinctRowCount(logicalPlan,
-          bitSet, null), DOUBLE_ERR);
+      assertEquals(BIGINT_NDV * Expr.DEFAULT_SELECTIVITY,
+          (double) mq.getDistinctRowCount(logicalPlanWithSearch, bitSet, null),
+          DOUBLE_ERR);
     } catch (ImpalaException e) {
       throw new RuntimeException(e);
     }
   }
 
+  private RelNode runFilterRule(CalciteAnalysisResult analysisResult)
+      throws ImpalaException {
+    RelNode relNode = getRelNodeForQuery(analysisResult);
+    HepProgramBuilder builder = new HepProgramBuilder();
+    RexBuilder rexBuilder = relNode.getCluster().getRexBuilder();
+    ImpalaRexSimplify simplifier =
+        new ImpalaRexSimplify(rexBuilder, new ImpalaRexExecutor(analysisResult, null));
+    builder.addRuleInstance(new ImpalaFilterSimplifyRule(simplifier));
+    HepPlanner planner = new HepPlanner(builder.build(),
+        relNode.getCluster().getPlanner().getContext(), true, null,
+        RelOptCostImpl.FACTORY);
+    planner.setRoot(relNode);
+    return planner.findBestExp();
+  }
+
   @Test
   public void testFilterIn() {
     try {
-      RelNode logicalPlan = getRelNodeForQuery("SELECT bigint_col " +
-          "FROM functional.alltypes where bigint_col in (1,2)");
-      // TODO: It's using "OR" logic, not "IN" logic
+      CalciteAnalysisResult analysisResult = getCalciteAnalysisResult(
+          "SELECT bigint_col FROM functional.alltypes where bigint_col in (1,2)");
+      RelNode logicalPlan = runFilterRule(analysisResult);
       RelMetadataQuery mq = getMQ();
-      Double cardinality = ALL_TYPES_CARD * (1.0 - .9 * .9);
+      // multiply the "Equals" cardinality by 2 since there are 2 elements for "In"
+      Double cardinality = 2 * ALL_TYPES_CARD / BIGINT_NDV;
       assertEquals(cardinality, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
       ImmutableBitSet bitSet = ImmutableBitSet.of(0);
-      Double distinctRows = 10.0 * cardinality / ALL_TYPES_CARD;
-      assertEquals(distinctRows, (double) mq.getDistinctRowCount(logicalPlan,
+      // Should be 2 distinct big int values (which are in the "in" clause)
+      assertEquals(2.0, (double) mq.getDistinctRowCount(logicalPlan,
           bitSet, null), DOUBLE_ERR);
     } catch (ImpalaException e) {
       throw new RuntimeException(e);
@@ -490,7 +526,7 @@ public class TestCalciteStats extends PlannerTestBase {
           "functional.alltypes group by bigint_col HAVING bigint_col >= 5");
       RelMetadataQuery mq = getMQ();
       double selectivity =
-          BIGINT_NDV * FilterSelectivityEstimator.RANGE_COMPARISON_SELECTIVITY;
+          BIGINT_NDV * Expr.DEFAULT_SELECTIVITY;;
       assertEquals(selectivity, (double) mq.getRowCount(logicalPlan), DOUBLE_ERR);
       ImmutableBitSet bitSet = ImmutableBitSet.of(0);
       // Using Calcite's distinct row count, can prolly do better here.

@@ -55,7 +55,7 @@ Max Per-Host Resource Reservation: Memory=65.02MB Threads=1
 Per-Host Resource Estimates: Memory=280MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=279.72MB mem-reservation=65.02MB thread-reservation=1 runtime-filters-memory=6.00MB
-|  max-parallelism=1 segment-costs=[1646384122, 0]
+|  max-parallelism=1 segment-costs=[1783746087, 0]
 PLAN-ROOT SINK
 |  output exprs: avg(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
@@ -63,19 +63,19 @@ PLAN-ROOT SINK
 11:AGGREGATE [FINALIZE]
 |  output: avg(CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS BIGINT)), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=13 row-size=40B cardinality=1 cost=158204
-|  in pipelines: 11(GETNEXT), 00(OPEN)
+|  tuple-ids=13 row-size=40B cardinality=1 cost=8569797
+|  in pipelines: 11(GETNEXT), 02(OPEN)
 |
 10:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk = tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk = tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk
+|  fk/pk conjuncts: none
 |  other join predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S'
 |  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk, RF001[min_max] <- tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk
 |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
-|  tuple-ids=0,2,4,6,8,10 row-size=142B cardinality=565.02K cost=1636062
-|  in pipelines: 00(GETNEXT), 09(OPEN)
+|  tuple-ids=4,6,8,10,2,0 row-size=142B cardinality=30.61M cost=13609899
+|  in pipelines: 02(GETNEXT), 00(OPEN)
 |
-|--09:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics]
+|--00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics]
 |     HDFS partitions=1/1 files=1 size=11.15MB
 |     predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College', 'Unknown'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk IS NOT NULL
 |     stored statistics:
@@ -85,17 +85,39 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College', 'Unknown'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U', 'W')
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College', 'Unknown'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=10 row-size=39B cardinality=213.47K cost=888808
-|     in pipelines: 09(GETNEXT)
+|     tuple-ids=0 row-size=39B cardinality=213.47K cost=888808
+|     in pipelines: 00(GETNEXT)
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk = tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
+|  fk/pk conjuncts: none
+|  other join predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(150.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(200.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN')
+|  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
+|  mem-estimate=154.91MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4,6,8,10,2 row-size=103B cardinality=30.61M cost=16003526
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
+|     HDFS partitions=1/1 files=1 size=307.36MB
+|     predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States'
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=2 row-size=43B cardinality=2.61M cost=5368500
+|     in pipelines: 01(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk = tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk = tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
 |  other join predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT)
-|  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
+|  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk, RF005[min_max] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2,4,6,8 row-size=103B cardinality=5.15M cost=7696494
-|  in pipelines: 00(GETNEXT), 07(OPEN)
+|  tuple-ids=4,6,8,10 row-size=60B cardinality=30.61M cost=45759565
+|  in pipelines: 02(GETNEXT), 07(OPEN)
 |
 |--07:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics]
 |     HDFS partitions=1/1 files=1 size=41.69KB
@@ -107,38 +129,37 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT))
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)), tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=0
-|     tuple-ids=8 row-size=8B cardinality=1.44K cost=1234
+|     tuple-ids=10 row-size=8B cardinality=1.44K cost=1234
 |     in pipelines: 07(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN]
-|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk = tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk = tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  other join predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(150.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(200.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN')
-|  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk, RF005[min_max] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  mem-estimate=154.91MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=0,2,4,6 row-size=95B cardinality=26.36M cost=47596529
-|  in pipelines: 00(GETNEXT), 05(OPEN)
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4,6,8 row-size=52B cardinality=156.77M cost=68619859
+|  in pipelines: 02(GETNEXT), 05(OPEN)
 |
-|--05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address]
-|     HDFS partitions=1/1 files=1 size=307.36MB
-|     predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|--05:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
 |     stored statistics:
-|       table: rows=15.00M size=307.36MB
+|       table: rows=73.05K size=2.17MB
 |       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1.58M
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States'
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
-|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-|     tuple-ids=6 row-size=43B cardinality=2.61M cost=5368500
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=8 row-size=8B cardinality=373 cost=12520
 |     in pipelines: 05(GETNEXT)
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
-|  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF007[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
+|  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF009[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2,4 row-size=52B cardinality=156.77M cost=68620836
-|  in pipelines: 00(GETNEXT), 03(OPEN)
+|  tuple-ids=4,6 row-size=44B cardinality=156.77M(filtered from 766.63M) cost=179127303
+|  in pipelines: 02(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_partitioned_parquet_snap.store]
 |     HDFS partitions=1/1 files=1 size=119.76KB
@@ -149,35 +170,14 @@ PLAN-ROOT SINK
 |     extrapolated-rows=disabled max-scan-range-rows=1.35K
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
-|     tuple-ids=4 row-size=4B cardinality=1.35K cost=115
+|     tuple-ids=6 row-size=4B cardinality=1.35K cost=115
 |     in pipelines: 03(GETNEXT)
 |
-02:HASH JOIN [INNER JOIN]
-|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2 row-size=48B cardinality=156.77M cost=68619859
-|  in pipelines: 00(GETNEXT), 01(OPEN)
-|
-|--01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim]
-|     HDFS partitions=1/1 files=1 size=2.17MB
-|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
-|     stored statistics:
-|       table: rows=73.05K size=2.17MB
-|       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
-|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|     tuple-ids=2 row-size=8B cardinality=373 cost=12520
-|     in pipelines: 01(GETNEXT)
-|
-00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
+02:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales]
    partition predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk IS NOT NULL
    HDFS partitions=1823/1824 files=1823 size=389.69GB
    predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
-   runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF007[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF008[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
+   runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF009[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk, RF008[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
@@ -186,8 +186,8 @@ PLAN-ROOT SINK
    parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(5,2))
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-   tuple-ids=0 row-size=40B cardinality=156.77M(filtered from 766.63M) cost=1445784961
-   in pipelines: 00(GETNEXT)
+   tuple-ids=4 row-size=40B cardinality=156.77M(filtered from 766.63M) cost=1445784961
+   in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=701.45MB Threads=23
 Per-Host Resource Estimates: Memory=986MB
@@ -212,21 +212,21 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
 Per-Host Shared Resources: mem-estimate=6.00MB mem-reservation=6.00MB thread-reservation=0 runtime-filters-memory=6.00MB
 Per-Instance Resources: mem-estimate=16.02MB mem-reservation=512.00KB thread-reservation=1
-max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [max(120 (self) vs 73 (sum children))]
+max-parallelism=180 segment-costs=[1774651180, 370] cpu-comparison-result=120 [max(120 (self) vs 73 (sum children))]
 11:AGGREGATE
 |  output: avg(CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS BIGINT)), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=12 row-size=40B cardinality=120 cost=158204
-|  in pipelines: 11(GETNEXT), 00(OPEN)
+|  tuple-ids=12 row-size=40B cardinality=120 cost=8569797
+|  in pipelines: 11(GETNEXT), 02(OPEN)
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=00
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk = tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk = tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk
+|  fk/pk conjuncts: none
 |  other join predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S'
 |  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
-|  tuple-ids=0,2,4,6,8,10 row-size=142B cardinality=565.02K cost=1422592
-|  in pipelines: 00(GETNEXT), 09(OPEN)
+|  tuple-ids=4,6,8,10,2,0 row-size=142B cardinality=30.61M cost=13396429
+|  in pipelines: 02(GETNEXT), 00(OPEN)
 |
 |--F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=213.27MB mem-reservation=205.00MB thread-reservation=1 runtime-filters-memory=1.00MB
@@ -239,13 +239,13 @@ max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [m
 |  |
 |  16:EXCHANGE [BROADCAST]
 |  |  mem-estimate=8.27MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=10 row-size=39B cardinality=213.47K cost=283700
-|  |  in pipelines: 09(GETNEXT)
+|  |  tuple-ids=0 row-size=39B cardinality=213.47K cost=283700
+|  |  in pipelines: 00(GETNEXT)
 |  |
 |  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=1.00MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[915650]
-|  09:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
+|  00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=11.15MB
 |     predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College', 'Unknown'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk IS NOT NULL
 |     stored statistics:
@@ -255,33 +255,72 @@ max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [m
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College', 'Unknown'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U', 'W')
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College', 'Unknown'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=10 row-size=39B cardinality=213.47K cost=888808
-|     in pipelines: 09(GETNEXT)
+|     tuple-ids=0 row-size=39B cardinality=213.47K cost=888808
+|     in pipelines: 00(GETNEXT)
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=01
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk = tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
+|  fk/pk conjuncts: none
+|  other join predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(150.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(200.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN')
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4,6,8,10,2 row-size=103B cardinality=30.61M cost=13396429
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+|--F08:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=420.46MB mem-reservation=410.00MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  |  max-parallelism=10 segment-costs=[6071927]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
+|  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
+|  |  mem-estimate=408.00MB mem-reservation=408.00MB spill-buffer=2.00MB thread-reservation=0 cost=2607097
+|  |
+|  15:EXCHANGE [BROADCAST]
+|  |  mem-estimate=10.46MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=43B cardinality=2.61M cost=3464830
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=16.18MB mem-reservation=128.00KB thread-reservation=1
+|  max-parallelism=10 segment-costs=[5727497]
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
+|     HDFS partitions=1/1 files=1 size=307.36MB
+|     predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States'
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=2 row-size=43B cardinality=2.61M cost=5368500
+|     in pipelines: 01(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash-table-id=01
+|  hash-table-id=02
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk = tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk = tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
 |  other join predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT)
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2,4,6,8 row-size=103B cardinality=5.15M cost=7695054
-|  in pipelines: 00(GETNEXT), 07(OPEN)
+|  tuple-ids=4,6,8,10 row-size=60B cardinality=30.61M cost=45758125
+|  in pipelines: 02(GETNEXT), 07(OPEN)
 |
-|--F08:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|--F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[3350]
 |  JOIN BUILD
-|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
-|  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
+|  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk, RF005[min_max] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
 |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1440
 |  |
-|  15:EXCHANGE [BROADCAST]
+|  14:EXCHANGE [BROADCAST]
 |  |  mem-estimate=23.25KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=8 row-size=8B cardinality=1.44K cost=1910
+|  |  tuple-ids=10 row-size=8B cardinality=1.44K cost=1910
 |  |  in pipelines: 07(GETNEXT)
 |  |
-|  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=64.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[1296]
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
@@ -294,71 +333,70 @@ max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [m
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT))
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)), tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=0
-|     tuple-ids=8 row-size=8B cardinality=1.44K cost=1234
+|     tuple-ids=10 row-size=8B cardinality=1.44K cost=1234
 |     in pipelines: 07(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash-table-id=02
-|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk = tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk = tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  other join predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(150.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(200.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN')
-|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=0,2,4,6 row-size=95B cardinality=26.36M cost=44989432
-|  in pipelines: 00(GETNEXT), 05(OPEN)
-|
-|--F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=420.46MB mem-reservation=410.00MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  max-parallelism=10 segment-costs=[6071927]
-|  JOIN BUILD
-|  |  join-table-id=02 plan-id=03 cohort-id=01
-|  |  build expressions: tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk, RF005[min_max] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  |  mem-estimate=408.00MB mem-reservation=408.00MB spill-buffer=2.00MB thread-reservation=0 cost=2607097
-|  |
-|  14:EXCHANGE [BROADCAST]
-|  |  mem-estimate=10.46MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=6 row-size=43B cardinality=2.61M cost=3464830
-|  |  in pipelines: 05(GETNEXT)
-|  |
-|  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  Per-Instance Resources: mem-estimate=16.18MB mem-reservation=128.00KB thread-reservation=1
-|  max-parallelism=10 segment-costs=[5727497]
-|  05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-|     HDFS partitions=1/1 files=1 size=307.36MB
-|     predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
-|     stored statistics:
-|       table: rows=15.00M size=307.36MB
-|       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1.58M
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States'
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
-|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-|     tuple-ids=6 row-size=43B cardinality=2.61M cost=5368500
-|     in pipelines: 05(GETNEXT)
-|
-04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=03
-|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2,4 row-size=52B cardinality=156.77M cost=68619486
-|  in pipelines: 00(GETNEXT), 03(OPEN)
+|  tuple-ids=4,6,8 row-size=52B cardinality=156.77M cost=68619486
+|  in pipelines: 02(GETNEXT), 05(OPEN)
 |
 |--F10:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=10 segment-costs=[3140]
+|  |  max-parallelism=10 segment-costs=[863]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
-|  |  build expressions: tpcds_partitioned_parquet_snap.store.s_store_sk
-|  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF007[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
-|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
+|  |  build expressions: tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=373
 |  |
 |  13:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=4 row-size=4B cardinality=1.35K cost=1790
-|  |  in pipelines: 03(GETNEXT)
+|  |  tuple-ids=8 row-size=8B cardinality=373 cost=490
+|  |  in pipelines: 05(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[12536]
+|  05:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=8 row-size=8B cardinality=373 cost=12520
+|     in pipelines: 05(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=04
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4,6 row-size=44B cardinality=156.77M(filtered from 766.63M) cost=179125953
+|  in pipelines: 02(GETNEXT), 03(OPEN)
+|
+|--F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[3140]
+|  JOIN BUILD
+|  |  join-table-id=04 plan-id=05 cohort-id=01
+|  |  build expressions: tpcds_partitioned_parquet_snap.store.s_store_sk
+|  |  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF009[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
+|  |
+|  12:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=6 row-size=4B cardinality=1.35K cost=1790
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[158]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
@@ -370,52 +408,14 @@ max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [m
 |     extrapolated-rows=disabled max-scan-range-rows=1.35K
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
-|     tuple-ids=4 row-size=4B cardinality=1.35K cost=115
+|     tuple-ids=6 row-size=4B cardinality=1.35K cost=115
 |     in pipelines: 03(GETNEXT)
 |
-02:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash-table-id=04
-|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2 row-size=48B cardinality=156.77M cost=68619486
-|  in pipelines: 00(GETNEXT), 01(OPEN)
-|
-|--F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=10 segment-costs=[863]
-|  JOIN BUILD
-|  |  join-table-id=04 plan-id=05 cohort-id=01
-|  |  build expressions: tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  |  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=373
-|  |
-|  12:EXCHANGE [BROADCAST]
-|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2 row-size=8B cardinality=373 cost=490
-|  |  in pipelines: 01(GETNEXT)
-|  |
-|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
-|  max-parallelism=1 segment-costs=[12536]
-|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
-|     HDFS partitions=1/1 files=1 size=2.17MB
-|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
-|     stored statistics:
-|       table: rows=73.05K size=2.17MB
-|       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
-|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|     tuple-ids=2 row-size=8B cardinality=373 cost=12520
-|     in pipelines: 01(GETNEXT)
-|
-00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+02:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    partition predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk IS NOT NULL
    HDFS partitions=1823/1824 files=1823 size=389.69GB
    predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
-   runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF007[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF008[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
+   runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF009[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk, RF008[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
@@ -424,66 +424,65 @@ max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [m
    parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(5,2))
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-   tuple-ids=0 row-size=40B cardinality=156.77M(filtered from 766.63M) cost=1445784961
-   in pipelines: 00(GETNEXT)
+   tuple-ids=4 row-size=40B cardinality=156.77M(filtered from 766.63M) cost=1445784961
+   in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=701.45MB Threads=23
-Per-Host Resource Estimates: Memory=986MB
-F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=635.22KB mem-reservation=0B thread-reservation=1
-|  max-parallelism=1 segment-costs=[68, 0] cpu-comparison-result=120 [max(1 (self) vs 120 (sum children))]
+Max Per-Host Resource Reservation: Memory=123.45MB Threads=24
+Per-Host Resource Estimates: Memory=463MB
+F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=68.03KB mem-reservation=0B thread-reservation=1
+|  max-parallelism=1 segment-costs=[68, 0] cpu-comparison-result=130 [max(1 (self) vs 130 (sum children))]
 PLAN-ROOT SINK
 |  output exprs: avg(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0 cost=0
 |
-18:AGGREGATE [FINALIZE]
+19:AGGREGATE [FINALIZE]
 |  output: avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_quantity), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum:merge(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=13 row-size=40B cardinality=1 cost=33
-|  in pipelines: 18(GETNEXT), 11(OPEN)
+|  in pipelines: 19(GETNEXT), 11(OPEN)
 |
-17:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=619.22KB mem-reservation=0B thread-reservation=0
+18:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=52.03KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=12 row-size=40B cardinality=120 cost=35
 |  in pipelines: 11(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
-Per-Host Shared Resources: mem-estimate=6.00MB mem-reservation=6.00MB thread-reservation=0 runtime-filters-memory=6.00MB
-Per-Instance Resources: mem-estimate=16.02MB mem-reservation=512.00KB thread-reservation=1
-max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [max(120 (self) vs 73 (sum children))]
+F05:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk)] hosts=10 instances=10 (adjusted from 120)
+Per-Instance Resources: mem-estimate=18.92MB mem-reservation=0B thread-reservation=1
+max-parallelism=10 segment-costs=[50589347, 370] cpu-comparison-result=130 [max(130 (self) vs 73 (sum children))]
 11:AGGREGATE
 |  output: avg(CAST(tpcds_partitioned_parquet_snap.store_sales.ss_quantity AS BIGINT)), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_sales_price), avg(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost), sum(tpcds_partitioned_parquet_snap.store_sales.ss_ext_wholesale_cost)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=12 row-size=40B cardinality=120 cost=158204
-|  in pipelines: 11(GETNEXT), 00(OPEN)
+|  tuple-ids=12 row-size=40B cardinality=120 cost=8569797
+|  in pipelines: 11(GETNEXT), 02(OPEN)
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=00
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk = tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk = tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk
+|  fk/pk conjuncts: none
 |  other join predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W' OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S'
 |  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
-|  tuple-ids=0,2,4,6,8,10 row-size=142B cardinality=565.02K cost=1422592
-|  in pipelines: 00(GETNEXT), 09(OPEN)
+|  tuple-ids=4,6,8,10,2,0 row-size=142B cardinality=30.61M cost=13396429
+|  in pipelines: 02(GETNEXT), 00(OPEN)
 |
-|--F07:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=213.27MB mem-reservation=205.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|--F08:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk)] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=26.27MB mem-reservation=18.00MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[497170]
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk
 |  |  runtime filters: RF000[bloom] <- tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk, RF001[min_max] <- tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk
-|  |  mem-estimate=204.00MB mem-reservation=204.00MB spill-buffer=1.00MB thread-reservation=0 cost=213470
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0 cost=213470
 |  |
-|  16:EXCHANGE [BROADCAST]
+|  17:EXCHANGE [BROADCAST]
 |  |  mem-estimate=8.27MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=10 row-size=39B cardinality=213.47K cost=283700
-|  |  in pipelines: 09(GETNEXT)
+|  |  tuple-ids=0 row-size=39B cardinality=213.47K cost=283700
+|  |  in pipelines: 00(GETNEXT)
 |  |
-|  F05:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  F06:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  Per-Instance Resources: mem-estimate=16.17MB mem-reservation=1.00MB thread-reservation=1
 |  max-parallelism=10 segment-costs=[915650]
-|  09:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
+|  00:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_demographics, RANDOM]
 |     HDFS partitions=1/1 files=1 size=11.15MB
 |     predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College', 'Unknown'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'Unknown') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'S', tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('College', 'Unknown') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'W', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status = 'U' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College'), tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'Unknown' OR tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = '2 yr Degree', tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('U', 'W') OR tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status = 'College', tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk IS NOT NULL
 |     stored statistics:
@@ -493,33 +492,81 @@ max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [m
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College', 'Unknown'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U', 'W')
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_demographics.cd_education_status IN ('2 yr Degree', 'College', 'Unknown'), tpcds_partitioned_parquet_snap.customer_demographics.cd_marital_status IN ('S', 'U', 'W'), tpcds_partitioned_parquet_snap.customer_demographics.cd_demo_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=10 row-size=39B cardinality=213.47K cost=888808
-|     in pipelines: 09(GETNEXT)
+|     tuple-ids=0 row-size=39B cardinality=213.47K cost=888808
+|     in pipelines: 00(GETNEXT)
 |
-08:HASH JOIN [INNER JOIN, BROADCAST]
+09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash-table-id=01
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk = tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
+|  fk/pk conjuncts: none
+|  other join predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(150.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(200.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN')
+|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
+|  tuple-ids=4,6,8,10,2 row-size=103B cardinality=30.61M cost=13396429
+|  in pipelines: 02(GETNEXT), 01(OPEN)
+|
+|--F09:PLAN FRAGMENT [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk)] hosts=10 instances=10 (adjusted from 120)
+|  |  Per-Instance Resources: mem-estimate=29.46MB mem-reservation=19.00MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  |  max-parallelism=10 segment-costs=[3412429]
+|  JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
+|  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0 cost=2607097
+|  |
+|  16:EXCHANGE [HASH(tpcds_partitioned_parquet_snap.customer_address.ca_address_sk)]
+|  |  mem-estimate=10.46MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=43B cardinality=2.61M cost=805332
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  Per-Instance Resources: mem-estimate=17.84MB mem-reservation=128.00KB thread-reservation=1
+|  max-parallelism=10 segment-costs=[13931249]
+|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
+|     HDFS partitions=1/1 files=1 size=307.36MB
+|     predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=15.00M size=307.36MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=1.58M
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States'
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=2 row-size=43B cardinality=2.61M cost=5368500
+|     in pipelines: 01(GETNEXT)
+|
+15:EXCHANGE [HASH(tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk)]
+|  mem-estimate=18.91MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4,6,8,10 row-size=60B cardinality=30.61M cost=15226692
+|  in pipelines: 02(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=10 instances=120
+Per-Host Shared Resources: mem-estimate=6.00MB mem-reservation=6.00MB thread-reservation=0 runtime-filters-memory=6.00MB
+Per-Instance Resources: mem-estimate=18.97MB mem-reservation=512.00KB thread-reservation=1
+max-parallelism=200 segment-costs=[1920625430]
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=02
 |  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk = tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
 |  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk = tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
 |  other join predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(3 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count = CAST(1 AS INT)
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2,4,6,8 row-size=103B cardinality=5.15M cost=7695054
-|  in pipelines: 00(GETNEXT), 07(OPEN)
+|  tuple-ids=4,6,8,10 row-size=60B cardinality=30.61M cost=45758125
+|  in pipelines: 02(GETNEXT), 07(OPEN)
 |
-|--F08:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|--F10:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  max-parallelism=10 segment-costs=[3350]
 |  JOIN BUILD
-|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
-|  |  runtime filters: RF002[bloom] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk, RF003[min_max] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
+|  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk, RF005[min_max] <- tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk
 |  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1440
 |  |
-|  15:EXCHANGE [BROADCAST]
+|  14:EXCHANGE [BROADCAST]
 |  |  mem-estimate=23.25KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=8 row-size=8B cardinality=1.44K cost=1910
+|  |  tuple-ids=10 row-size=8B cardinality=1.44K cost=1910
 |  |  in pipelines: 07(GETNEXT)
 |  |
-|  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=64.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[1296]
 |  07:SCAN HDFS [tpcds_partitioned_parquet_snap.household_demographics, RANDOM]
@@ -532,71 +579,70 @@ max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [m
 |     parquet statistics predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT))
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.household_demographics.hd_dep_count IN (CAST(1 AS INT), CAST(3 AS INT)), tpcds_partitioned_parquet_snap.household_demographics.hd_demo_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=64.00KB thread-reservation=0
-|     tuple-ids=8 row-size=8B cardinality=1.44K cost=1234
+|     tuple-ids=10 row-size=8B cardinality=1.44K cost=1234
 |     in pipelines: 07(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash-table-id=02
-|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk = tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk = tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  other join predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'NE', 'OK', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(150.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'KY', 'SC', 'TN', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(200.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(250.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'KY', 'NE', 'OK', 'SC', 'TN'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(100.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)) OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN'), tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('GA', 'TX', 'WV') OR tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'NE', 'OK'), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL OR tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('KY', 'SC', 'TN')
-|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=0,2,4,6 row-size=95B cardinality=26.36M cost=44989432
-|  in pipelines: 00(GETNEXT), 05(OPEN)
-|
-|--F09:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=420.46MB mem-reservation=410.00MB thread-reservation=1 runtime-filters-memory=2.00MB
-|  |  max-parallelism=10 segment-costs=[6071927]
-|  JOIN BUILD
-|  |  join-table-id=02 plan-id=03 cohort-id=01
-|  |  build expressions: tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  |  runtime filters: RF004[bloom] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk, RF005[min_max] <- tpcds_partitioned_parquet_snap.customer_address.ca_address_sk
-|  |  mem-estimate=408.00MB mem-reservation=408.00MB spill-buffer=2.00MB thread-reservation=0 cost=2607097
-|  |
-|  14:EXCHANGE [BROADCAST]
-|  |  mem-estimate=10.46MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=6 row-size=43B cardinality=2.61M cost=3464830
-|  |  in pipelines: 05(GETNEXT)
-|  |
-|  F03:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  Per-Instance Resources: mem-estimate=16.18MB mem-reservation=128.00KB thread-reservation=1
-|  max-parallelism=10 segment-costs=[5727497]
-|  05:SCAN HDFS [tpcds_partitioned_parquet_snap.customer_address, RANDOM]
-|     HDFS partitions=1/1 files=1 size=307.36MB
-|     predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
-|     stored statistics:
-|       table: rows=15.00M size=307.36MB
-|       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=1.58M
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States'
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.customer_address.ca_state IN ('CA', 'GA', 'KY', 'NE', 'OK', 'SC', 'TN', 'TX', 'WV'), tpcds_partitioned_parquet_snap.customer_address.ca_country = 'United States', tpcds_partitioned_parquet_snap.customer_address.ca_address_sk IS NOT NULL
-|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
-|     tuple-ids=6 row-size=43B cardinality=2.61M cost=5368500
-|     in pipelines: 05(GETNEXT)
-|
-04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash-table-id=03
-|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2,4 row-size=52B cardinality=156.77M cost=68619486
-|  in pipelines: 00(GETNEXT), 03(OPEN)
+|  tuple-ids=4,6,8 row-size=52B cardinality=156.77M cost=68619486
+|  in pipelines: 02(GETNEXT), 05(OPEN)
 |
-|--F10:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|--F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
 |  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=10 segment-costs=[3140]
+|  |  max-parallelism=10 segment-costs=[863]
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
-|  |  build expressions: tpcds_partitioned_parquet_snap.store.s_store_sk
-|  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF007[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
-|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
+|  |  build expressions: tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  |  runtime filters: RF006[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=373
 |  |
 |  13:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=4 row-size=4B cardinality=1.35K cost=1790
-|  |  in pipelines: 03(GETNEXT)
+|  |  tuple-ids=8 row-size=8B cardinality=373 cost=490
+|  |  in pipelines: 05(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
+|  max-parallelism=1 segment-costs=[12536]
+|  05:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
+|     HDFS partitions=1/1 files=1 size=2.17MB
+|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     stored statistics:
+|       table: rows=73.05K size=2.17MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT)
+|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
+|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+|     tuple-ids=8 row-size=8B cardinality=373 cost=12520
+|     in pipelines: 05(GETNEXT)
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash-table-id=04
+|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_store_sk = tpcds_partitioned_parquet_snap.store.s_store_sk
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4,6 row-size=44B cardinality=156.77M(filtered from 766.63M) cost=179125953
+|  in pipelines: 02(GETNEXT), 03(OPEN)
+|
+|--F12:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
+|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  max-parallelism=10 segment-costs=[3140]
+|  JOIN BUILD
+|  |  join-table-id=04 plan-id=05 cohort-id=01
+|  |  build expressions: tpcds_partitioned_parquet_snap.store.s_store_sk
+|  |  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.store.s_store_sk, RF009[min_max] <- tpcds_partitioned_parquet_snap.store.s_store_sk
+|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=1350
+|  |
+|  12:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=6 row-size=4B cardinality=1.35K cost=1790
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=16.03MB mem-reservation=16.00KB thread-reservation=1
 |  max-parallelism=1 segment-costs=[158]
 |  03:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
@@ -608,52 +654,14 @@ max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [m
 |     extrapolated-rows=disabled max-scan-range-rows=1.35K
 |     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
 |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
-|     tuple-ids=4 row-size=4B cardinality=1.35K cost=115
+|     tuple-ids=6 row-size=4B cardinality=1.35K cost=115
 |     in pipelines: 03(GETNEXT)
 |
-02:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash-table-id=04
-|  hash predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  fk/pk conjuncts: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk = tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,2 row-size=48B cardinality=156.77M cost=68619486
-|  in pipelines: 00(GETNEXT), 01(OPEN)
-|
-|--F11:PLAN FRAGMENT [RANDOM] hosts=10 instances=10
-|  |  Per-Instance Resources: mem-estimate=24.27MB mem-reservation=24.25MB thread-reservation=1 runtime-filters-memory=1.00MB
-|  |  max-parallelism=10 segment-costs=[863]
-|  JOIN BUILD
-|  |  join-table-id=04 plan-id=05 cohort-id=01
-|  |  build expressions: tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  |  runtime filters: RF008[bloom] <- tpcds_partitioned_parquet_snap.date_dim.d_date_sk
-|  |  mem-estimate=23.25MB mem-reservation=23.25MB spill-buffer=64.00KB thread-reservation=0 cost=373
-|  |
-|  12:EXCHANGE [BROADCAST]
-|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2 row-size=8B cardinality=373 cost=490
-|  |  in pipelines: 01(GETNEXT)
-|  |
-|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.05MB mem-reservation=512.00KB thread-reservation=1
-|  max-parallelism=1 segment-costs=[12536]
-|  01:SCAN HDFS [tpcds_partitioned_parquet_snap.date_dim, RANDOM]
-|     HDFS partitions=1/1 files=1 size=2.17MB
-|     predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
-|     stored statistics:
-|       table: rows=73.05K size=2.17MB
-|       columns: all
-|     extrapolated-rows=disabled max-scan-range-rows=73.05K
-|     parquet statistics predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT)
-|     parquet dictionary predicates: tpcds_partitioned_parquet_snap.date_dim.d_year = CAST(2001 AS INT), tpcds_partitioned_parquet_snap.date_dim.d_date_sk IS NOT NULL
-|     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|     tuple-ids=2 row-size=8B cardinality=373 cost=12520
-|     in pipelines: 01(GETNEXT)
-|
-00:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
+02:SCAN HDFS [tpcds_partitioned_parquet_snap.store_sales, RANDOM]
    partition predicates: tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk IS NOT NULL
    HDFS partitions=1823/1824 files=1823 size=389.69GB
    predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
-   runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF007[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF008[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk
+   runtime filters: RF001[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF003[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF005[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF009[min_max] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk, RF000[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk, RF002[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk, RF004[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk, RF006[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_sold_date_sk, RF008[bloom] -> tpcds_partitioned_parquet_snap.store_sales.ss_store_sk
    stored statistics:
      table: rows=8.64G size=389.90GB
      partitions: 1823/1823 rows=8.25G
@@ -662,6 +670,6 @@ max-parallelism=170 segment-costs=[1637289215, 370] cpu-comparison-result=120 [m
    parquet statistics predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(5,2))
    parquet dictionary predicates: tpcds_partitioned_parquet_snap.store_sales.ss_net_profit <= CAST(300.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_net_profit >= CAST(50.00 AS DECIMAL(7,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price >= CAST(50.00 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store_sales.ss_sales_price IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_cdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_hdemo_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_addr_sk IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_net_profit IS NOT NULL, tpcds_partitioned_parquet_snap.store_sales.ss_store_sk IS NOT NULL
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-   tuple-ids=0 row-size=40B cardinality=156.77M(filtered from 766.63M) cost=1445784961
-   in pipelines: 00(GETNEXT)
+   tuple-ids=4 row-size=40B cardinality=156.77M(filtered from 766.63M) cost=1445784961
+   in pipelines: 02(GETNEXT)
 ====
