@@ -289,17 +289,9 @@ endif()
 # optimized regardless of the default optimization options.
 set_source_files_properties(memory/overwrite.cc PROPERTIES COMPILE_FLAGS "-O3")
 
-# Detect AVX2 support
-execute_process(
-  COMMAND echo
-  COMMAND ${CMAKE_CXX_COMPILER} -mavx2 -dM -E -
-  COMMAND awk "$2 == \"__AVX2__\" { print $3 }"
-  ERROR_QUIET
-  OUTPUT_VARIABLE AVX2_SUPPORT
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
 # block_bloom_filter_avx2.cc uses AVX2 operations.
+# NOTE: This is modified from the Kudu source code. As other Impala code needs AVX2
+# detection, it has been centralized in be/CMakeLists.txt
 if (AVX2_SUPPORT)
   list(APPEND UTIL_SRCS block_bloom_filter_avx2.cc)
   set_source_files_properties(block_bloom_filter_avx2.cc PROPERTIES COMPILE_FLAGS "-mavx2")
@@ -308,9 +300,9 @@ if (AVX2_SUPPORT)
   # instead of relying on __AVX2__ defined by compiler with -mavx2.
   set_source_files_properties(block_bloom_filter_avx2.cc block_bloom_filter.cc
                               PROPERTIES COMPILE_DEFINITIONS "USE_AVX2=1")
-  message("Compiler supports AVX2")
+  message("Compiler supports AVX2 (be/src/kudu/util)")
 else()
-  message("Compiler does not support AVX2")
+  message("Compiler does not support AVX2 (be/src/kudu/util)")
 endif()
 
 set(UTIL_LIBS

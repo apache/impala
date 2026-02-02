@@ -34,6 +34,26 @@ if (NOT "$ENV{IMPALA_LINKER}" STREQUAL "ld" AND
   message(FATAL_ERROR "Invalid IMPALA_LINKER: $ENV{IMPALA_LINKER} (expected: ld, gold, or mold)")
 endif()
 
+# Detect AVX2 support. This centralizes the logic used in be/src/util and be/src/kudu/util.
+# IMPALA-14715: This check is sensitive to CMake versions, so this uses the Impala check that
+# is compatible with CMake 3.22.2.
+set(AVX2_CMD "echo | ${CMAKE_CXX_COMPILER} -mavx2 -dM -E - | awk '$2 == \"__AVX2__\" { print $3 }'")
+execute_process(
+  COMMAND bash -c ${AVX2_CMD}
+  OUTPUT_VARIABLE AVX2_SUPPORT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+if (AVX2_SUPPORT)
+  message("Compiler supports AVX2")
+else()
+  if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+    message(FATAL_ERROR "Compiler is required to support AVX2 on x86_64")
+  else()
+    message("Compiler does not support AVX2 on ${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+endif()
+
 # compiler flags that are common across debug/release builds
 #  -Wall: Enable all warnings.
 #  -Wno-sign-compare: suppress warnings for comparison between signed and unsigned

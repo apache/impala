@@ -122,15 +122,8 @@ set(UTIL_SRCS
   ${MPFIT_SRC_DIR}/mpfit.c
   ${ROARING_SRC_DIR}/roaring.c)
 
-# Detect AVX2 support
-set(AVX2_CMD "echo | ${CMAKE_CXX_COMPILER} -mavx2 -dM -E - | awk '$2 == \"__AVX2__\" { print $3 }'")
-execute_process(
-  COMMAND bash -c ${AVX2_CMD}
-  OUTPUT_VARIABLE AVX2_SUPPORT
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
 # parquet-bloom-filter-avx2.cc uses AVX2 operations.
+# NOTE: AVX2 detection has been centralized in be/CMakeLists.txt.
 if (AVX2_SUPPORT)
   list(APPEND UTIL_SRCS parquet-bloom-filter-avx2.cc)
 
@@ -143,9 +136,9 @@ if (AVX2_SUPPORT)
   # be/src/kudu/util/block_bloom_filter_avx2.cc.
   set_source_files_properties(parquet-bloom-filter-avx2.cc parquet-bloom-filter.cc
                               PROPERTIES COMPILE_DEFINITIONS "USE_AVX2=1")
-  message("Compiler supports AVX2")
+  message("Compiler supports AVX2 (be/src/util)")
 else()
-  message("Compiler does not support AVX2")
+  message("Compiler does not support AVX2 (be/src/util)")
 endif()
 
 # roaring.c uses AVX operations
