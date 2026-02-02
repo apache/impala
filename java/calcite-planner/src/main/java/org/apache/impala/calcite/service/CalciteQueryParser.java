@@ -42,10 +42,6 @@ public class CalciteQueryParser implements CompilerStep {
 
   private final String sqlStmt_;
 
-  public CalciteQueryParser(CalciteJniFrontend.QueryContext queryCtx) {
-    this.sqlStmt_ = queryCtx.getStmt();
-  }
-
   public CalciteQueryParser(String stmt) {
     this.sqlStmt_ = stmt;
   }

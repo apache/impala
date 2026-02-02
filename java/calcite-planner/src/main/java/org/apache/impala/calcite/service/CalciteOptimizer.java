@@ -106,15 +106,6 @@ public class CalciteOptimizer implements CompilerStep {
     this.queryCtx_ = analyzer_.getQueryCtx();
   }
 
-  public CalciteOptimizer(CalciteValidator validator, Analyzer analyzer,
-      EventSequence timeline, TQueryCtx queryCtx) {
-    this.reader_ = validator.getCatalogReader();
-    this.validator_ = validator.getSqlValidator();
-    this.timeline_ = timeline;
-    this.queryCtx_ = queryCtx;
-    this.analyzer_ = analyzer;
-  }
-
   public ImpalaPlanRel optimize(RelNode logPlan) throws ImpalaException {
     RelBuilder relBuilder = ImpalaCoreRules.LOGICAL_BUILDER_NO_SIMPLIFY.create(
         logPlan.getCluster(), reader_);

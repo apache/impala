@@ -345,11 +345,20 @@ public class FrontendTestBase extends AbstractFrontendTest {
     return parseAndAnalyze(stmt, ctx, frontend_);
   }
 
+  protected AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx,
+      CompilerFactory compilerFactory) throws ImpalaException {
+    return parseAndAnalyze(stmt, ctx, frontend_, compilerFactory);
+  }
+
   protected AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx, Frontend fe)
       throws ImpalaException {
+    return parseAndAnalyze(stmt, ctx, fe, new CompilerFactoryImpl());
+  }
+
+  protected AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx, Frontend fe,
+      CompilerFactory compilerFactory) throws ImpalaException {
     try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
       ctx.getQueryCtx().getClient_request().setStmt(stmt);
-      CompilerFactory compilerFactory = new CompilerFactoryImpl();
       ParsedStatement parsedStmt =
           compilerFactory.createParsedStatement(ctx.getQueryCtx());
       User user = new User(TSessionStateUtil.getEffectiveUser(ctx.getQueryCtx().session));

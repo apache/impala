@@ -15,10 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.planner;
+package org.apache.impala.calcite.planner;
 
 import java.nio.file.Paths;
 
+import org.apache.impala.planner.PlannerTestBase;
 import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Test;
 

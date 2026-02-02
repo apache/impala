@@ -48,14 +48,6 @@ public class CalcitePhysPlanCreator implements CompilerStep {
     plannerContext_ = ctx;
   }
 
-  public CalcitePhysPlanCreator(CalciteMetadataHandler mdHandler,
-      CalciteJniFrontend.QueryContext queryCtx) throws ImpalaException {
-    this.analyzer_ = mdHandler.getAnalyzer();
-    this.plannerContext_ =
-        new PlannerContext(analyzer_, queryCtx.getTQueryCtx(), queryCtx.getTimeline());
-
-  }
-
   /**
    * returns the root plan node along with its output expressions.
    */

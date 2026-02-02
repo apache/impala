@@ -15,13 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.planner;
+package org.apache.impala.calcite.planner;
 
-
-import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.thrift.TQueryOptions;
-import org.apache.impala.thrift.TSessionState;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -48,15 +43,18 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.calcite.operators.ImpalaOperatorTable;
 import org.apache.impala.calcite.rules.ImpalaRexExecutor;
-import org.apache.impala.calcite.service.CalciteJniFrontend.QueryContext;
-import org.apache.impala.calcite.service.CalciteMetadataHandler;
-import org.apache.impala.calcite.service.CalciteQueryParser;
+import org.apache.impala.calcite.service.CalciteAnalysisResult;
+import org.apache.impala.calcite.service.CalciteCompilerFactory;
 import org.apache.impala.calcite.service.CalciteRelNodeConverter;
-import org.apache.impala.calcite.service.CalciteValidator;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.catalog.BuiltinsDb;
-import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.planner.PlannerTestBase;
 import org.apache.impala.thrift.TQueryCtx;
+import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TSessionState;
+import org.apache.impala.thrift.TColumnValue;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
@@ -84,7 +82,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
   @Test
   public void testFoldAddTinyInt() {
     try {
-      ReduceShuttleObjects queryObj = new ReduceShuttleObjects("SELECT 1 + 1");
+      ReduceShuttleObjects queryObj = createReduceShuttleObjects("SELECT 1 + 1");
       TColumnValue reducedValue = new TColumnValue();
       reducedValue.setShort_val((short)2);
 
@@ -107,7 +105,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
     try {
       String expr = "CAST(1 AS SMALLINT) + CAST(2 AS SMALLINT)";
       ReduceShuttleObjects queryObj =
-          new ReduceShuttleObjects("SELECT " + expr);
+          createReduceShuttleObjects("SELECT " + expr);
       TColumnValue reducedCast1 = new TColumnValue();
       reducedCast1.setShort_val((short)1);
       TColumnValue reducedCast2 = new TColumnValue();
@@ -139,8 +137,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
   public void testFoldAddInt() {
     try {
       String expr = "CAST(1 AS INT) + CAST(2 AS INT)";
-      ReduceShuttleObjects queryObj =
-          new ReduceShuttleObjects("SELECT " + expr);
+      ReduceShuttleObjects queryObj = createReduceShuttleObjects("SELECT " + expr);
       TColumnValue reducedCast1 = new TColumnValue();
       reducedCast1.setInt_val(1);
       TColumnValue reducedCast2 = new TColumnValue();
@@ -171,8 +168,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
   public void testFoldAddDecimal() {
     try {
       String expr = "1.1 + 2.2";
-      ReduceShuttleObjects queryObj =
-          new ReduceShuttleObjects("SELECT " + expr);
+      ReduceShuttleObjects queryObj = createReduceShuttleObjects("SELECT " + expr);
       TColumnValue reducedCast1 = new TColumnValue();
       reducedCast1.setString_val("3.3");
 
@@ -197,8 +193,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
   public void testFoldConcatString() {
     try {
       String expr = "CONCAT(cast('a' as string), cast('b' as string))";
-      ReduceShuttleObjects queryObj =
-          new ReduceShuttleObjects("SELECT " + expr);
+      ReduceShuttleObjects queryObj = createReduceShuttleObjects("SELECT " + expr);
       TColumnValue reducedCast1 = new TColumnValue();
       reducedCast1.setBinary_val("a".getBytes());
       TColumnValue reducedCast2 = new TColumnValue();
@@ -230,8 +225,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
   public void testBoolean() {
     try {
       String expr = "istrue(false)";
-      ReduceShuttleObjects queryObj =
-          new ReduceShuttleObjects("SELECT " + expr);
+      ReduceShuttleObjects queryObj = createReduceShuttleObjects("SELECT " + expr);
       TColumnValue reducedValue = new TColumnValue();
       reducedValue.setBool_val(false);
 
@@ -252,7 +246,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
   @Test
   public void testPartialExpr() {
     try {
-      ReduceShuttleObjects queryObj = new ReduceShuttleObjects(
+      ReduceShuttleObjects queryObj = createReduceShuttleObjects(
           "SELECT 1 + 1 + tinyint_col from functional.alltypestiny");
       TColumnValue reducedValue = new TColumnValue();
       reducedValue.setShort_val((short)2);
@@ -275,8 +269,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
   public void testNonDeterministic() {
     try {
       String expr = "rand()";
-      ReduceShuttleObjects queryObj =
-          new ReduceShuttleObjects("SELECT " + expr);
+      ReduceShuttleObjects queryObj = createReduceShuttleObjects("SELECT " + expr);
       TestReducerTmp testReducer = new TestReducerTmp();
       List<RexNode> reducedExprs = new ArrayList<>();
       RexExecutor executor = new ImpalaRexExecutor(
@@ -295,8 +288,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
   public void testFoldMultipleFields() {
     try {
       String expr = "1 + 2, 3 + 4";
-      ReduceShuttleObjects queryObj =
-          new ReduceShuttleObjects("SELECT " + expr);
+      ReduceShuttleObjects queryObj = createReduceShuttleObjects("SELECT " + expr);
       TColumnValue reducedAdd1 = new TColumnValue();
       reducedAdd1.setShort_val((short)3);
       TColumnValue reducedAdd2 = new TColumnValue();
@@ -326,8 +318,7 @@ public class TestReduceExprShuttle extends PlannerTestBase {
     try {
       String expr = "add_months(cast('2012-07-01 00:00:00' as timestamp), " +
           "cast(2 as integer))";
-      ReduceShuttleObjects queryObj =
-          new ReduceShuttleObjects("SELECT " + expr);
+      ReduceShuttleObjects queryObj = createReduceShuttleObjects("SELECT " + expr);
       TColumnValue reducedTime1 = new TColumnValue();
       reducedTime1.setString_val("2012-07-01 00:00:00");
       TColumnValue reducedTime2 = new TColumnValue();
@@ -356,36 +347,37 @@ public class TestReduceExprShuttle extends PlannerTestBase {
 
   }
 
+  private ReduceShuttleObjects createReduceShuttleObjects(String query)
+        throws ImpalaException {
+    CalciteAnalysisResult analysisResult =
+        (CalciteAnalysisResult) parseAndAnalyze(query,
+        feFixture_.createAnalysisCtx(), new CalciteCompilerFactory());
+    Analyzer analyzer = analysisResult.getAnalyzer();
+    TQueryCtx queryCtx = analyzer.getQueryCtx();
+    CalciteRelNodeConverter relNodeConverter =
+        new CalciteRelNodeConverter(analysisResult);
+    RelNode rootNode = relNodeConverter.convert(analysisResult.getValidatedNode());
+
+    Preconditions.checkState(rootNode instanceof Project);
+    Project project = (Project) rootNode;
+
+    RelDataTypeFactory typeFactory =
+        new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
+    RexBuilder rexBuilder = new RexBuilder(typeFactory);
+    return new ReduceShuttleObjects(analyzer, queryCtx, project, rexBuilder);
+  }
   private static class ReduceShuttleObjects {
     public final Analyzer analyzer_;
     public final TQueryCtx queryCtx_;
-    public final RexBuilder rexBuilder_;
     public final Project project_;
+    public final RexBuilder rexBuilder_;
 
-    public ReduceShuttleObjects(String query) throws ImpalaException {
-      QueryContext queryCtx = new QueryContext(options, frontend_, query);
-      queryCtx_ = queryCtx.getTQueryCtx();
-
-      TSessionState session = new TSessionState();
-      session.setConnected_user("dummy");
-      queryCtx.getTQueryCtx().setSession(session);
-      CalciteQueryParser queryParser = new CalciteQueryParser(queryCtx);
-      SqlNode parsedSqlNode = queryParser.parse();
-
-      CalciteMetadataHandler mdHandler =
-          new CalciteMetadataHandler(parsedSqlNode, queryCtx);
-      analyzer_ = mdHandler.getAnalyzer();
-
-      CalciteValidator validator = new CalciteValidator(mdHandler, queryCtx);
-      SqlNode validatedNode = validator.validate(parsedSqlNode);
-      CalciteRelNodeConverter relNodeConverter = new CalciteRelNodeConverter(validator);
-      RelNode rootNode = relNodeConverter.convert(validatedNode);
-      Preconditions.checkState(rootNode instanceof Project);
-      project_ = (Project) rootNode;
-
-      RelDataTypeFactory typeFactory =
-          new JavaTypeFactoryImpl(new ImpalaTypeSystemImpl());
-      rexBuilder_ = new RexBuilder(typeFactory);
+    public ReduceShuttleObjects(Analyzer analyzer, TQueryCtx queryCtx, Project project,
+        RexBuilder rexBuilder) {
+      analyzer_ = analyzer;
+      queryCtx_ = queryCtx;
+      project_ = project;
+      rexBuilder_ = rexBuilder;;
     }
   }
 

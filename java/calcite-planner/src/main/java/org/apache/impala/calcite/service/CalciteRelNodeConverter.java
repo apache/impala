@@ -97,20 +97,6 @@ public class CalciteRelNodeConverter implements CompilerStep {
     cluster_.setMetadataProvider(ImpalaRelMetadataProvider.DEFAULT);
   }
 
-  public CalciteRelNodeConverter(CalciteValidator validator) {
-    this.typeFactory_ = validator.getTypeFactory();
-    this.reader_ = validator.getCatalogReader();
-    this.sqlValidator_ = validator.getSqlValidator();
-    this.planner_ = new VolcanoPlanner();
-    planner_.addRelTraitDef(ConventionTraitDef.INSTANCE);
-    planner_.setExecutor(new RemoveUnraggedCharCastRexExecutor());
-    cluster_ =
-        RelOptCluster.create(planner_, new RexBuilder(typeFactory_));
-    viewExpander_ = createViewExpander(validator.getCatalogReader()
-        .getRootSchema().plus());
-    cluster_.setMetadataProvider(ImpalaRelMetadataProvider.DEFAULT);
-  }
-
   private static RelOptTable.ViewExpander createViewExpander(SchemaPlus schemaPlus) {
     SqlParser.Config parserConfig =
         SqlParser.configBuilder().setCaseSensitive(false).build()

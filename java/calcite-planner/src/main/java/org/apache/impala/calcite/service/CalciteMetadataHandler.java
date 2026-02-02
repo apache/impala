@@ -71,46 +71,10 @@ import org.slf4j.LoggerFactory;
  * from catalogd into the coordinator and populating the Calcite schema with
  * these tables.
  */
-public class CalciteMetadataHandler implements CompilerStep {
+public class CalciteMetadataHandler {
 
   protected static final Logger LOG =
       LoggerFactory.getLogger(CalciteMetadataHandler.class.getName());
-
-  // StmtTableCache needed by Impala's Analyzer class at planning time.
-  private final StmtMetadataLoader.StmtTableCache stmtTableCache_;
-
-  // CalciteCatalogReader is a context class that holds global information that
-  // may be needed by the CalciteTable object
-  private final CalciteCatalogReader reader_;
-
-  private final Analyzer analyzer_;
-
-  public CalciteMetadataHandler(SqlNode parsedNode,
-      CalciteJniFrontend.QueryContext queryCtx) throws ImpalaException {
-
-    StmtMetadataLoader stmtMetadataLoader = new StmtMetadataLoader(
-        queryCtx.getFrontend(), queryCtx.getCurrentDb(), queryCtx.getTimeline());
-
-    // retrieve all the tablenames in the query, will be in tableVisitor.tableNames
-    TableVisitor tableVisitor = new TableVisitor(queryCtx.getCurrentDb());
-    parsedNode.accept(tableVisitor);
-
-    // load the relevant tables in the query from catalogd
-    this.stmtTableCache_ = stmtMetadataLoader.loadTables(tableVisitor.tableNames_);
-
-    this.reader_ = createCalciteCatalogReader(stmtTableCache_,
-        queryCtx.getTQueryCtx(), queryCtx.getCurrentDb());
-
-    this.analyzer_ = createAnalyzer(stmtTableCache_, queryCtx);
-
-    // populate calcite schema.  This step needs to be done after the loader because the
-    // schema needs to contain the columns in the table for validation, which cannot
-    // be done when it's an IncompleteTable
-    List<String> errorTables = populateCalciteSchema(reader_,
-        queryCtx.getFrontend().getCatalog(), stmtTableCache_, analyzer_);
-
-    tableVisitor.checkForComplexTable(stmtTableCache_, errorTables, queryCtx);
-  }
 
   /**
    * Creates CalciteCatalogReader object which will contain information about the schema.
@@ -168,26 +132,6 @@ public class CalciteMetadataHandler implements CompilerStep {
       rootSchema.add(dbName, dbSchemas.get(dbName.toLowerCase()).build());
     }
     return notFoundTables;
-  }
-
-  public StmtMetadataLoader.StmtTableCache getStmtTableCache() {
-    return stmtTableCache_;
-  }
-
-  public CalciteCatalogReader getCalciteCatalogReader() {
-    return reader_;
-  }
-
-  public Analyzer getAnalyzer() {
-    return analyzer_;
-  }
-
-  private Analyzer createAnalyzer(StmtMetadataLoader.StmtTableCache stmtTableCache,
-      CalciteJniFrontend.QueryContext queryCtx) throws ImpalaException {
-    // XXX: using NoopAuthorizationFactory, but this part of the code will
-    // eventually either be deprecated or only used in the test environment.
-    return new SimplifiedAnalyzer(stmtTableCache, queryCtx.getTQueryCtx(),
-        new NoopAuthorizationFactory(), null);
   }
 
   /**
@@ -290,55 +234,6 @@ public class CalciteMetadataHandler implements CompilerStep {
       }
       return false;
     }
-
-    /**
-     * Check if the error table is actually a table with a complex column. There is Impala
-     * syntax where a complex column uses the same syntax in the FROM clause as a table.
-     * This method is passed in all the tables that are not found and checks to see if
-     * the table turned out to be a complex column rather than an actual table. If so,
-     * this throws an unsupported feature exception (for the time being). If it's not
-     * a table with a complex column, a table not found error will eventually be thrown
-     * in a different place.
-     */
-    public void checkForComplexTable(StmtMetadataLoader.StmtTableCache stmtTableCache,
-        List<String> errorTables, CalciteJniFrontend.QueryContext queryCtx)
-        throws ImpalaException {
-      List<String> allErrorTables = new ArrayList<>();
-      allErrorTables.addAll(errorTables_);
-      allErrorTables.addAll(errorTables);
-      for (String errorTable : allErrorTables) {
-        List<String> parts = Splitter.on('.').splitToList(errorTable);
-        // if there are 3 parts, then it has to be db.table.column and must be a
-        // complex column.
-        if (parts.size() > 2) {
-          throw new UnsupportedFeatureException("Complex column " +
-              errorTable + " not supported.");
-        }
-        // if there are 2 parts, then it is either a missing db.table or a
-        // table.column.  We look to see if the column can be found in any
-        // of the tables, in which case, it is a complex column being referenced.
-        if (parts.size() == 2) {
-          // first check the already existing cache for the error table.
-          if (anyTableContainsColumn(stmtTableCache, parts.get(1))) {
-            throw new UnsupportedFeatureException("Complex column " +
-                errorTable + " not supported.");
-          }
-          // it's possible that the table wasn't loaded yet because this method is
-          // only called when there is an error finding a table. Try loading the table
-          // from catalogd just in case, and check to see if it's a complex column.
-          TableName potentialComplexTable = new TableName(
-              currentDb_.toLowerCase(), parts.get(0).toLowerCase());
-          StmtMetadataLoader errorLoader = new StmtMetadataLoader(
-              queryCtx.getFrontend(), queryCtx.getCurrentDb(), queryCtx.getTimeline());
-          StmtMetadataLoader.StmtTableCache errorCache =
-              errorLoader.loadTables(Sets.newHashSet(potentialComplexTable));
-          if (anyTableContainsColumn(errorCache, parts.get(1))) {
-            throw new UnsupportedFeatureException("Complex column " +
-                errorTable + " not supported.");
-          }
-        }
-      }
-    }
   }
 
   public static boolean anyTableContainsColumn(
@@ -350,14 +245,5 @@ public class CalciteMetadataHandler implements CompilerStep {
       }
     }
     return false;
-  }
-
-  @Override
-  public void logDebug(Object resultObject) {
-    if (!LOG.isDebugEnabled()) return;
-    String allTables = stmtTableCache_.tables.values().stream()
-        .map(feTable -> feTable.getName().toString())
-        .collect(Collectors.joining( ", " ));
-    LOG.debug("Loaded tables: {}", allTables);
   }
 }

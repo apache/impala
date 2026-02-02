@@ -15,13 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.planner;
+package org.apache.impala.calcite.planner;
 
-
-import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.thrift.TQueryOptions;
-import org.apache.impala.thrift.TSessionState;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -54,14 +49,17 @@ import org.apache.impala.calcite.rel.util.PrunedPartitionHelper;
 import org.apache.impala.calcite.schema.ImpalaRelMetadataProvider;
 import org.apache.impala.calcite.schema.CalciteTable;
 import org.apache.impala.calcite.schema.FilterSelectivityEstimator;
-import org.apache.impala.calcite.service.CalciteJniFrontend.QueryContext;
-import org.apache.impala.calcite.service.CalciteMetadataHandler;
-import org.apache.impala.calcite.service.CalciteQueryParser;
+import org.apache.impala.calcite.service.CalciteAnalysisResult;
+import org.apache.impala.calcite.service.CalciteCompilerFactory;
 import org.apache.impala.calcite.service.CalciteRelNodeConverter;
-import org.apache.impala.calcite.service.CalciteValidator;
 import org.apache.impala.calcite.type.ImpalaTypeSystemImpl;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.planner.PlannerTestBase;
+import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.thrift.TSessionState;
 import com.google.common.base.Preconditions;
 
 import static org.junit.Assert.assertEquals;
@@ -106,20 +104,11 @@ public class TestCalciteStats extends PlannerTestBase {
   }
 
   private RelNode getRelNodeForQuery(String query) throws ImpalaException {
-    QueryContext queryCtx = new QueryContext(options, frontend_, query);
-    TSessionState session = new TSessionState();
-    session.setConnected_user("dummy");
-    queryCtx.getTQueryCtx().setSession(session);
-    CalciteQueryParser queryParser = new CalciteQueryParser(queryCtx);
-    SqlNode parsedSqlNode = queryParser.parse();
-
-    // Make sure the metadata cache has all the info for the query.
-    CalciteMetadataHandler mdHandler =
-        new CalciteMetadataHandler(parsedSqlNode, queryCtx);
-    CalciteValidator validator = new CalciteValidator(mdHandler, queryCtx);
-    SqlNode validatedNode = validator.validate(parsedSqlNode);
-    CalciteRelNodeConverter relNodeConverter = new CalciteRelNodeConverter(validator);
-    return relNodeConverter.convert(validatedNode);
+    CalciteAnalysisResult analysisResult = (CalciteAnalysisResult) parseAndAnalyze(query,
+        feFixture_.createAnalysisCtx(), new CalciteCompilerFactory());
+    CalciteRelNodeConverter relNodeConverter =
+        new CalciteRelNodeConverter(analysisResult);
+    return relNodeConverter.convert(analysisResult.getValidatedNode());
   }
 
   private RelMetadataQuery getMQ() {
