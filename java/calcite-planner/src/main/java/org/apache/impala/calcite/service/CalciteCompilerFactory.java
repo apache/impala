@@ -45,10 +45,6 @@ public class CalciteCompilerFactory implements CompilerFactory {
   protected static final Logger LOG =
       LoggerFactory.getLogger(CalciteCompilerFactory.class.getName());
 
-  static {
-    System.setProperty("calcite.default.charset", "UTF8");
-  }
-
   private static final String PLANNER = "CalcitePlanner";
 
   static {

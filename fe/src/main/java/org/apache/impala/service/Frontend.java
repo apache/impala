@@ -308,6 +308,10 @@ public class Frontend {
   public static final String PLANNER_PROFILE = "PlannerInfo";
   public static final String PLANNER_TYPE = "PlannerType";
 
+  // The Calcite compiler is loaded on demand, not linked in. The factory is a
+  // singleton.
+  private static CompilerFactory calciteCompilerFactory = loadCalciteCompilerFactory();
+
   /**
    * Plan-time context that allows capturing various artifacts created
    * during the process.
@@ -3777,25 +3781,29 @@ public class Frontend {
   }
 
   @Nullable
-  private CompilerFactory getCalciteCompilerFactory(PlanCtx ctx) {
+  private CompilerFactory getCalciteCompilerFactory(PlanCtx ctx)
+      throws ImpalaException {
     TQueryOptions queryOptions = ctx.getQueryContext().client_request.getQuery_options();
-    LOG.info("Searching for planner to use...");
     if (queryOptions.isUse_calcite_planner()) {
-      try {
-        CompilerFactory calciteFactory = (CompilerFactory) Class.forName(
-            "org.apache.impala.calcite.service." +
-            "CalciteCompilerFactory").newInstance();
-        if (calciteFactory != null) {
-          LOG.info("Found Calcite Planner, using it.");
-          return calciteFactory;
-        } else {
-          LOG.info("Could not find Calcite planner, using original planner.");
-        }
-      } catch (Exception e) {
-        LOG.info("Could not find Calcite planner, using original planner: " + e);
+      if (calciteCompilerFactory == null) {
+        throw new InternalException("Could not find Calcite planner");
       }
+      return calciteCompilerFactory;
     }
     return null;
+  }
+
+  private static CompilerFactory loadCalciteCompilerFactory() {
+    LOG.info("Loading Calcite Planner jar file");
+    try {
+      System.setProperty("calcite.default.charset", "UTF8");
+      return (CompilerFactory) Class.forName(
+          "org.apache.impala.calcite.service." +
+          "CalciteCompilerFactory").newInstance();
+    } catch (Exception e) {
+      LOG.info("Could not find Calcite planner: " + e);
+      return null;
+    }
   }
 
   public String getShowCreateTable(
