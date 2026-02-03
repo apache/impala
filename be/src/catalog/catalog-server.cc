@@ -117,6 +117,13 @@ DEFINE_int32_hidden(hms_event_sync_sleep_interval_ms, 100, "Sleep interval (in m
      "used in the thread of catalogd processing the WaitForHmsEvent RPC. The thread "
      "sleeps for such an interval when checking for HMS events to be synced.");
 
+DEFINE_int32(hms_event_catchup_threshold_s, 1800,
+    "Maximum lag time (in seconds) allowed for HMS events before the event processor "
+    "switches to 'catch-up' mode. In this mode, some table-level events trigger a "
+    "lightweight table invalidation to avoid heavier operations, like table reload, "
+    "to speed up the event processing. "
+    "A value of 0 or less disables this feature.");
+
 DECLARE_string(debug_actions);
 DEFINE_bool(start_hms_server, false, "When set to true catalog server starts a HMS "
     "server at a port specified by hms_port flag");

@@ -136,6 +136,7 @@ DECLARE_int32(dbcp_data_source_idle_timeout_s);
 DECLARE_bool(enable_catalogd_ha);
 DECLARE_string(injected_group_members_debug_only);
 DECLARE_int32(hms_event_sync_sleep_interval_ms);
+DECLARE_int32(hms_event_catchup_threshold_s);
 DECLARE_int32(catalog_delete_log_ttl);
 DECLARE_bool(enable_hierarchical_event_processing);
 DECLARE_int32(num_db_event_executors);
@@ -571,6 +572,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
 #endif
   cfg.__set_enable_catalogd_ha(FLAGS_enable_catalogd_ha);
   cfg.__set_hms_event_sync_sleep_interval_ms(FLAGS_hms_event_sync_sleep_interval_ms);
+  cfg.__set_hms_event_catchup_threshold_s(FLAGS_hms_event_catchup_threshold_s);
   cfg.__set_catalog_delete_log_ttl(FLAGS_catalog_delete_log_ttl);
   cfg.__set_enable_hierarchical_event_processing(
       FLAGS_enable_hierarchical_event_processing);

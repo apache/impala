@@ -26,6 +26,7 @@ import com.google.common.collect.Lists;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -1058,6 +1059,60 @@ public class MetastoreEvents {
       }
       return false;
     }
+
+    /**
+     * Checks if the event lag exceeds the configured threshold.
+     * @return the lag value if the event is lagging and should enter catch-up mode.
+     * @return 0 if no lagging.
+     */
+    protected long evaluateCatchUpLag() {
+      int threshold = BackendConfig.INSTANCE.getHmsEventCatchUpThreshold();
+      if (threshold <= 0) return 0;
+      long lag = (System.currentTimeMillis() / 1000) - getEventTime();
+      return lag > threshold ? lag : 0;
+    }
+
+    /**
+     * Checks whether the event is in catch-up mode by comparing the event lag with the
+     * configured threshold. If in catch-up mode, tries to invalidate the table and
+     * returns true to notify the caller to skip the event. Otherwise, returns false.
+     * Note: This should be evaluated before isSelfEvent() and isOlderEvent() to avoid
+     * hitting table locks, which can get stuck waiting for a lock (IMPALA-12461).
+     */
+    protected boolean handleIfInCatchUpMode() {
+      long lag = evaluateCatchUpLag();
+      if (lag > 0) {
+        // It is okay if the table does not exist and can't be invalidated, the event is
+        // skipped anyway.
+        infoLog("Catch-up Mode: Skipping event due to event lag of {}s", lag);
+        Collection<TableName> tables = getTableNames();
+        Preconditions.checkNotNull(tables, "getTableNames() must return non-null");
+        for (TableName tableName : tables) {
+          if (catalog_.invalidateTableIfExists(
+                  tableName.getDb(), tableName.getTbl(), true)
+              != null) {
+            infoLog("Catch-up Mode: Invalidated table {}.{} due to event lag of {}s",
+                tableName.getDb(), tableName.getTbl(), lag);
+          }
+        }
+
+        metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).inc();
+        debugLog("Incremented skipped metric to "
+            + metrics_.getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
+                  .getCount());
+        return true;
+      }
+      return false;
+    }
+
+    /**
+     * Overridden by subclasses to invalidate specific tables during catch-up mode.
+     * Must return non-null.
+     */
+    protected Collection<TableName> getTableNames() {
+      throw new UnsupportedOperationException(
+          "getTableNames() is not supported for event type: " + getEventType());
+    }
   }
 
   /**
@@ -1220,6 +1275,11 @@ public class MetastoreEvents {
     // in case of partition batch events, this method can be overridden to return
     // the partition object from the events which are batched together.
     protected Partition getPartitionForBatching() { return null; }
+
+    @Override
+    protected Collection<TableName> getTableNames() {
+      return Collections.singletonList(new TableName(dbName_, tblName_));
+    }
 
     protected MetastoreTableEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
         NotificationEvent event) {
@@ -1938,6 +1998,9 @@ public class MetastoreEvents {
 
     @Override
     public void processTableEvent() throws MetastoreNotificationException {
+      // Evaluate catch-up mode before isSelfEvent() and isOlderEvent() to avoid
+      // hitting table locks, which can get stuck waiting for a lock.
+      if (handleIfInCatchUpMode()) return;
       if (isSelfEvent()) {
         infoLog("Not processing the insert event as it is a self-event");
         return;
@@ -2128,6 +2191,8 @@ public class MetastoreEvents {
         processRename();
         return;
       }
+
+      if (handleIfInCatchUpMode()) return;
 
       // Determine whether this is an event which we have already seen or if it is a new
       // event
@@ -2869,6 +2934,7 @@ public class MetastoreEvents {
         infoLog("Partition list is empty. Ignoring this event.");
         return;
       }
+      if (handleIfInCatchUpMode()) return;
       try {
         // Reload the whole table if it's a transactional table and incremental
         // refresh is not enabled. Materialized views are treated as a special case
@@ -3013,6 +3079,7 @@ public class MetastoreEvents {
     @Override
     public void processTableEvent() throws MetastoreNotificationException,
         CatalogException {
+      if (handleIfInCatchUpMode()) return;
       if (isSelfEvent()) {
         infoLog("Not processing the event as it is a self-event");
         return;
@@ -3099,6 +3166,7 @@ public class MetastoreEvents {
             "received in the event.", getEventId());
         return;
       }
+      if (handleIfInCatchUpMode()) return;
       if (isSelfEvent()) {
         infoLog("Not processing the event as it is a self-event");
         return;
@@ -3199,6 +3267,7 @@ public class MetastoreEvents {
     @Override
     protected void processTableEvent() throws MetastoreNotificationException,
         CatalogException {
+      if (handleIfInCatchUpMode()) return;
       if (isSelfEvent()) {
         infoLog("Not processing the event as it is a self-event");
         return;
@@ -3358,6 +3427,7 @@ public class MetastoreEvents {
         infoLog("Partition list is empty. Ignoring this event.");
         return;
       }
+      if (handleIfInCatchUpMode()) return;
       try {
         // Reload the whole table if it's a transactional table or materialized view.
         // Materialized views are treated as a special case because it's possible to
@@ -3434,6 +3504,7 @@ public class MetastoreEvents {
             getFullyQualifiedTblName());
         return;
       }
+      if (handleIfInCatchUpMode()) return;
       try {
         List<Long> writeIds = txnToWriteIdList_.stream()
             .map(TxnToWriteId::getWriteId)
@@ -3516,6 +3587,7 @@ public class MetastoreEvents {
 
     @Override
     public void processTableEvent() throws MetastoreNotificationException {
+      if (handleIfInCatchUpMode()) return;
       if (isSelfEvent()) {
         infoLog("Not processing the event as it is a self-event");
         return;
@@ -3693,7 +3765,18 @@ public class MetastoreEvents {
     }
 
     @Override
+    protected Collection<TableName> getTableNames() {
+      if (tableWriteIds_ != null) {
+        return tableWriteIds_.stream()
+            .map(writeId -> new TableName(writeId.getDbName(), writeId.getTblName()))
+            .collect(Collectors.toSet());
+      }
+      return Collections.emptyList();
+    }
+
+    @Override
     protected void process() throws MetastoreNotificationException {
+      if (handleIfInCatchUpMode()) return;
       try {
         infoLog("Adding {} aborted write ids for txn id {}", tableWriteIds_.size(),
             txnId_);
@@ -3774,6 +3857,7 @@ public class MetastoreEvents {
 
     @Override
     protected void processTableEvent() throws MetastoreNotificationException {
+      if (handleIfInCatchUpMode()) return;
       try {
         catalog_.addWriteIdsToTable(getDbName(), getTableName(), getEventId(), writeIds_,
             MutableValidWriteIdList.WriteIdStatus.ABORTED);
@@ -3838,6 +3922,7 @@ public class MetastoreEvents {
 
     @Override
     protected void processTableEvent() throws MetastoreNotificationException {
+      if (handleIfInCatchUpMode()) return;
       try {
         if (partitionName_ == null) {
           boolean notSkipped = reloadTableFromCatalog(true);

@@ -363,4 +363,6 @@ struct TBackendGflags {
   166: required i32 max_stmt_metadata_loader_threads
 
   167: required bool disable_hms_sync_by_default
+
+  168: required i32 hms_event_catchup_threshold_s
 }

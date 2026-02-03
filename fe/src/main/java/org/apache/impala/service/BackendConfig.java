@@ -349,6 +349,10 @@ public class BackendConfig {
     return backendCfg_.hms_event_incremental_refresh_transactional_table;
   }
 
+  public int getHmsEventCatchUpThreshold() {
+    return backendCfg_.hms_event_catchup_threshold_s;
+  }
+
   public boolean isAutoCheckCompaction() {
     return backendCfg_.auto_check_compaction;
   }

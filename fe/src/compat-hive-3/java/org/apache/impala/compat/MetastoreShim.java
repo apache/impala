@@ -34,6 +34,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -952,6 +953,13 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
     }
 
     @Override
+    protected Collection<TableName> getTableNames() {
+      return tableWriteIds_.stream()
+          .map(writeId -> new TableName(writeId.getDbName(), writeId.getTblName()))
+          .collect(Collectors.toSet());
+    }
+
+    @Override
     public String getTargetName() {
       if (tableNames_.isEmpty()) return CLUSTER_WIDE_TARGET;
       return tableNames_.stream().sorted().collect(Collectors.joining(","));
@@ -959,6 +967,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
 
     @Override
     protected void process() throws MetastoreNotificationException {
+      if (handleIfInCatchUpMode()) return;
       // Via getAllWriteEventInfo, we can get data insertion info for transactional tables
       // even though there are no insert events generated for transactional tables. Note
       // that we cannot get DDL info from this API.
@@ -1156,6 +1165,7 @@ public class MetastoreShim extends Hive3MetastoreShimBase {
 
     @Override
     protected void processTableEvent() throws MetastoreNotificationException {
+      if (handleIfInCatchUpMode()) return;
       try {
         addCommittedWriteIdsAndReload(getCatalogOpExecutor(), dbName_, tblName_,
             isPartitioned_, isMaterializedView_, writeIdsInEvent_, partitions_,

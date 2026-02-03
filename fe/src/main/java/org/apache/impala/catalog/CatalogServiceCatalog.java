@@ -3418,16 +3418,20 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Invalidate the table if it exists by overwriting existing entry by a Incomplete
-   * Table.
-   * @return null if the table does not exist else return the invalidated table
+   * Table. If skipIfInvalidated true, the invalidation is skipped if the table is
+   * already an instance of IncompleteTable.
+   * @return null if the table does not exist or skipIfInvalidated is on and table is
+   * invalidated else return the invalidated table
    */
-  public @Nullable Table invalidateTableIfExists(String dbName, String tblName) {
+  public @Nullable Table invalidateTableIfExists(
+      String dbName, String tblName, boolean skipIfInvalidated) {
     Table incompleteTable;
     try (WriteLockAndLookupDb result = new WriteLockAndLookupDb(dbName)) {
       Db db = result.getDb();
       if (db == null) return null;
       Table existingTbl = db.getTable(tblName);
       if (existingTbl == null) return null;
+      if (skipIfInvalidated && existingTbl instanceof IncompleteTable) return null;
       incompleteTable = IncompleteTable.createUninitializedTable(db, tblName,
           existingTbl.getTableType(), existingTbl.getTableComment(),
           existingTbl.getCreateEventId());
@@ -3436,6 +3440,15 @@ public class CatalogServiceCatalog extends Catalog {
     }
     scheduleTableLoading(dbName, tblName);
     return incompleteTable;
+  }
+
+  /**
+   * Invalidate the table if it exists by overwriting existing entry by a Incomplete
+   * Table.
+   * @return null if the table does not exist else return the invalidated table
+   */
+  public @Nullable Table invalidateTableIfExists(String dbName, String tblName) {
+    return invalidateTableIfExists(dbName, tblName, false /* skipIfInvalidated */);
   }
 
   private void scheduleTableLoading(String dbName, String tableName) {

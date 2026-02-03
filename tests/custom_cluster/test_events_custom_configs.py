@@ -2083,3 +2083,232 @@ class TestEventSyncWaiting(TestEventProcessingCustomConfigsBase):
         "alter table {} partition(p=0) compact 'minor' and wait".format(tbl))
     res = self.execute_query_expect_success(client, "show files in " + tbl)
     assert len(res.data) == 1
+
+
+@SkipIfFS.hive
+@CustomClusterTestSuite.with_args(
+    catalogd_args="--hms_event_polling_interval_s=1 "
+                  "--hms_event_catchup_threshold_s=2 "
+                  "--enable_hierarchical_event_processing=false "
+                  "--debug_actions=catalogd_event_processing_delay:SLEEP@3500",
+    disable_log_buffering=True, cluster_size=1)
+class TestEventProcessingCatchupMode(TestEventProcessingCustomConfigsBase):
+  """
+  Tests for the event processor catch-up mode.
+  The cluster is configured with a 2s catch-up threshold, and a 3.5s delay is
+  injected in event processing to trigger catch-up mode for the tests.
+  """
+
+  @pytest.mark.execute_serially
+  def test_catchup_mode_alter_table(self, unique_database):
+    """
+    Tests that the event processor switches to catch-up mode to invalidate the table
+    and skip the alter table events when the event lag exceeds the configured threshold.
+    """
+    tbl = unique_database + ".catchup_test_tbl"
+    self.client.execute("create table {} (i int) partitioned by (p int)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    self.client.execute("show partitions {}".format(tbl))
+    self.run_stmt_in_hive("alter table {} add partition (p=1)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    self.client.execute("show partitions {}".format(tbl))
+    self.run_stmt_in_hive("alter table {} add partition (p=2)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    self.client.execute("show partitions {}".format(tbl))
+    self.run_stmt_in_hive("alter table {} add partition (p=3)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+
+    # Verify the logs.
+    log_regex = r"Invalidated table {} due to event lag of .*s".format(tbl)
+    self.assert_catalogd_log_contains("INFO", log_regex, expected_count=3, timeout_s=20)
+    log_regex =\
+      r"{}.* Catch-up Mode: Skipping event .*s".format(tbl)
+    self.assert_catalogd_log_contains("INFO", log_regex, expected_count=3, timeout_s=20)
+
+    # Verify consistency.
+    res = self.client.execute("show partitions {}".format(tbl))
+    assert len(res.data) == 4
+    assert 'p=1' in res.get_data()
+    assert 'p=2' in res.get_data()
+    assert 'p=3' in res.get_data()
+
+  @pytest.mark.execute_serially
+  def test_catchup_mode_partition_events(self, unique_database):
+    """
+    Tests that various event types (INSERT, ADD_PARTITION, DROP_PARTITION)
+    trigger catch-up mode when the event processor is lagging.
+    """
+    tbl = unique_database + ".catchup_partition_events_tbl"
+    self.client.execute("create table {} (i int) partitioned by (p int)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    self.client.execute("show partitions {}".format(tbl))
+    self.run_stmt_in_hive("alter table {} add partition (p=1)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    # Verify ADD_PARTITION logs.
+    self.assert_catalogd_log_contains("INFO",
+        r"EventType: ADD_PARTITION .* {}.* Catch-up Mode: Skipping".format(tbl),
+        expected_count=1, timeout_s=20)
+    self.assert_catalogd_log_contains("INFO",
+        r"EventType: ADD_PARTITION .* Invalidated table {}".format(tbl),
+        expected_count=1, timeout_s=20)
+    self.client.execute("show partitions {}".format(tbl))
+    self.run_stmt_in_hive("insert into {} partition (p=1) values (100)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    # Verify INSERT logs.
+    self.assert_catalogd_log_contains("INFO",
+        r"EventType: INSERT .* {}.* Catch-up Mode: Skipping".format(tbl),
+        expected_count=1, timeout_s=20)
+    self.assert_catalogd_log_contains("INFO",
+        r"EventType: INSERT .* Invalidated table {}".format(tbl),
+        expected_count=1, timeout_s=20)
+    self.client.execute("show partitions {}".format(tbl))
+    self.run_stmt_in_hive("alter table {} drop partition (p=1)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    # Verify DROP_PARTITION logs.
+    self.assert_catalogd_log_contains("INFO",
+        r"EventType: DROP_PARTITION .* {}.* Catch-up Mode: Skipping".format(tbl),
+        expected_count=1, timeout_s=20)
+    self.assert_catalogd_log_contains("INFO",
+        r"EventType: DROP_PARTITION .* Invalidated table {}".format(tbl),
+        expected_count=1, timeout_s=20)
+    EventProcessorUtils.wait_for_event_processing(self)
+    res = self.client.execute("show partitions {}".format(tbl))
+    assert 'p=1' not in res.get_data()
+
+  def _run_catchup_mode_txn_test(self, unique_database, is_commit, ev_type):
+    tbl1_name = "catchup_txn_tbl1_" + ev_type.lower()
+    tbl2_name = "catchup_txn_tbl2_" + ev_type.lower()
+    tbl1 = unique_database + "." + tbl1_name
+    tbl2 = unique_database + "." + tbl2_name
+
+    # Create multiple transactional tables for testing.
+    self.client.execute(
+        "create table {} (i int) "
+        "tblproperties ('transactional'='true', "
+        "'transactional_properties'='insert_only')".format(tbl1))
+    self.client.execute(
+        "create table {} (i int) "
+        "tblproperties ('transactional'='true', "
+        "'transactional_properties'='insert_only')".format(tbl2))
+    EventProcessorUtils.wait_for_event_processing(self)
+
+    # Use the AcidTxn to manually control the transaction to allow us load the tables
+    # before the commit or abort txn event for invalidating the tables by this event.
+    acid = AcidTxn(self.hive_client)
+    txn_id = acid.open_txns()
+
+    # Triggers ALLOC_WRITE_ID events for later commit or abort txn.
+    acid.allocate_table_write_ids(txn_id, unique_database, tbl1_name)
+    acid.allocate_table_write_ids(txn_id, unique_database, tbl2_name)
+    EventProcessorUtils.wait_for_event_processing(self, timeout=20)
+
+    # Load the tables for commit or abort txn event having something to invalidate.
+    self.client.execute("describe {}".format(tbl1))
+    self.client.execute("describe {}".format(tbl2))
+
+    # Triggers commit or abort txn to invalidate tables in catch-up mode.
+    events_skipped_before = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    if is_commit:
+      acid.commit_txn(txn_id)
+    else:
+      acid.abort_txn(txn_id)
+    EventProcessorUtils.wait_for_event_processing(self, timeout=20)
+    events_skipped_after = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    assert events_skipped_after == events_skipped_before + 1
+
+    # Verify the logs.
+    log_regex1 =\
+      r"{} .* Invalidated table {} due to event lag of .*s".format(ev_type, tbl1)
+    self.assert_catalogd_log_contains("INFO", log_regex1, expected_count=1, timeout_s=20)
+    log_regex2 =\
+      r"{} .* Invalidated table {} due to event lag of .*s".format(ev_type, tbl2)
+    self.assert_catalogd_log_contains("INFO", log_regex2, expected_count=1, timeout_s=20)
+
+  @pytest.mark.execute_serially
+  def test_catchup_mode_commit_txn(self, unique_database):
+    """
+    Tests that CommitTxn events cause the event processor to switch to catch-up mode
+    to invalidate multiple involved tables when the processing delay exceeds the
+    configured threshold.
+    """
+    self._run_catchup_mode_txn_test(
+      unique_database, is_commit=True, ev_type='COMMIT_TXN')
+
+  @pytest.mark.execute_serially
+  def test_catchup_mode_abort_txn(self, unique_database):
+    """
+    Tests that AbortTxn events cause the event processor to switch to catch-up mode
+    to invalidate multiple involved tables when the processing delay exceeds the
+    configured threshold.
+    """
+    self._run_catchup_mode_txn_test(
+      unique_database, is_commit=False, ev_type='ABORT_TXN')
+
+  @pytest.mark.execute_serially
+  def test_catchup_mode_iceberg(self, unique_database):
+    """
+    Tests that iceberg ingestion generates ALTER_TABLE events, when triggering
+    rapid insertions from Hive, it can trigger catch-up mode.
+    """
+    tbl_name = "catchup_mode_iceberg_tbl"
+    tbl = unique_database + "." + tbl_name
+
+    # Create Iceberg table.
+    self.client.execute(
+        "create table {} (i int, s string, p int) "
+        "partitioned by spec(p) stored as iceberg".format(tbl))
+    self.client.execute("insert into {} values (0, 'aaa', 0)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    self.client.execute("describe {}".format(tbl))
+
+    # Trigger hive insertions to have external ALTER_TABLE events rapidly.
+    self.run_stmt_in_hive(
+        "insert into {0} values (1, 'bbb', 1); "
+        "insert into {0} values (2, 'ccc', 2); "
+        "insert into {0} values (3, 'ddd', 3); "
+        "insert into {0} values (4, 'eee', 4); "
+        "insert into {0} values (5, 'fff', 5);".format(tbl)
+    )
+    EventProcessorUtils.wait_for_event_processing(self, timeout=20)
+
+    # Verify logs.
+    log_regex = r"ALTER_TABLE .*{}.* Catch-up Mode: Skipping".format(tbl)
+    self.assert_catalogd_log_contains("INFO", log_regex, expected_count=6, timeout_s=20)
+    log_regex =\
+      r"ALTER_TABLE .* Invalidated table {} due to event lag of .*s".format(tbl)
+    self.assert_catalogd_log_contains("INFO", log_regex, expected_count=2, timeout_s=20)
+
+    # Verify consistency.
+    res = self.client.execute("select count(*) from {}".format(tbl))
+    assert '6' in res.get_data()
+
+
+@SkipIfFS.hive
+class TestEventProcessingCatchupModeCustom(TestEventProcessingCustomConfigsBase):
+
+  @CustomClusterTestSuite.with_args(
+      catalogd_args="--hms_event_polling_interval_s=1 "
+                    "--hms_event_catchup_threshold_s=2 "
+                    "--enable_hierarchical_event_processing=false",
+      disable_log_buffering=True, cluster_size=1)
+  def test_catchup_mode_compute_stats(self, unique_database):
+    """
+    Tests ALTER_TABLE events lagging generated by a slow COMPUTE STATS.
+    """
+    tbl = unique_database + ".catchup_stats_tbl"
+    self.client.execute("create table {} (i int) partitioned by (p int)".format(tbl))
+    self.client.execute("insert into {} partition (p=1) values (1)".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    self.client.execute("describe {}".format(tbl))
+
+    # Trigger COMPUTE STATS to generate ALTER_TABLE events.
+    # The catalogd_update_stats_delay causes at least 3.5s event lag.
+    self.client.execute("set debug_action='catalogd_update_stats_delay:SLEEP@3500'")
+    self.client.execute("compute stats {}".format(tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+
+    # Verify the logs.
+    log_regex = r"ALTER_TABLE.*Invalidated table {} due to event lag".format(tbl)
+    self.assert_catalogd_log_contains("INFO", log_regex, expected_count=1, timeout_s=20)
+    log_regex = r"ALTER_TABLE.*{}.* Catch-up Mode: Skipping".format(tbl)
+    self.assert_catalogd_log_contains("INFO", log_regex, expected_count=1, timeout_s=20)
