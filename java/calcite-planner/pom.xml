@@ -225,6 +225,9 @@ under the License.
           <additionalClasspathElements>
             <additionalClasspathElement>${env.IMPALA_HOME}/fe/src/test/resources</additionalClasspathElement>
           </additionalClasspathElements>
+          <systemPropertyVariables>
+            <calcite.default.charset>UTF8</calcite.default.charset>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
     </plugins>

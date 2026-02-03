@@ -64,12 +64,6 @@ import static org.junit.Assert.*;
 
 public class TestReduceExprShuttle extends PlannerTestBase {
 
-  // This code is duplicated in CalciteCompilerFactory, but it is needed
-  // here because that class is not imported in this test.
-  static {
-    System.setProperty("calcite.default.charset", "UTF8");
-  }
-
   // Query option to run each planner test.
   private static TQueryOptions options =
       tpcdsParquetQueryOptions();
