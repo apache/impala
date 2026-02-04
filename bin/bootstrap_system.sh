@@ -565,8 +565,9 @@ SET_IMPALA_HOME="export IMPALA_HOME=$(pwd)"
 echo -e "\n$SET_IMPALA_HOME" >> ~/.bashrc
 eval "$SET_IMPALA_HOME"
 
-# Try to prepopulate the m2 directory to save time
-if [[ "${PREPOPULATE_M2_REPOSITORY:-true}" == true ]] ; then
+# Optionally try to prepopulate the m2 directory to save time. Since Maven has
+# improved download parallelism, this now defaults to false.
+if [[ "${PREPOPULATE_M2_REPOSITORY:-false}" == true ]] ; then
   echo ">>> Populating m2 directory..."
   if ! bin/jenkins/populate_m2_directory.py ; then
     echo "Failed to prepopulate the m2 directory. Continuing..."

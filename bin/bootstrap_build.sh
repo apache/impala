@@ -85,9 +85,15 @@ if [ ! -d "/usr/local/apache-maven-${MVN_VERSION}" ]; then
   sudo ln -s /usr/local/apache-maven-${MVN_VERSION}/bin/mvn /usr/local/bin
 fi
 
-# Try to prepopulate the m2 directory to save time
-if ! bin/jenkins/populate_m2_directory.py ; then
-  echo "Failed to prepopulate the m2 directory. Continuing..."
+# Optionally try to prepopulate the m2 directory to save time. Since Maven has
+# improved download parallelism, this now defaults to false.
+if [[ "${PREPOPULATE_M2_REPOSITORY:-false}" == true ]] ; then
+  echo ">>> Populating m2 directory..."
+  if ! bin/jenkins/populate_m2_directory.py ; then
+    echo "Failed to prepopulate the m2 directory. Continuing..."
+  fi
+else
+  echo ">>> Skip populating m2 directory"
 fi
 
 ./buildall.sh -notests -so
