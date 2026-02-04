@@ -381,7 +381,7 @@ public class HdfsTableSink extends TableSink {
   }
 
   @Override
-  public void collectExprs(List<Expr> exprs) {
+  public void collectExprsForLineage(List<Expr> exprs) {
     if (!(targetTable_ instanceof FeIcebergTable)) exprs.addAll(partitionKeyExprs_);
     if (isResultSink_) {
       // It is expected outputExprs_ is fully populated with the expected result schema

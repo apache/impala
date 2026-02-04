@@ -99,6 +99,14 @@ public class MergeInsert extends MergeCase {
   @Override
   public TMergeCaseType caseType() { return TMergeCaseType.INSERT; }
 
+  /**
+   * Returns the target column names explicitly listed in the INSERT clause. For an
+   * INSERT with no column list (i.e. positional match against every target column),
+   * this is {@link Collections#EMPTY_LIST} (compared by reference — see
+   * {@link #analyzeColumnPermutation}).
+   */
+  public List<String> getColumnPermutation() { return columnPermutation_; }
+
   @Override
   public void reset() {
     super.reset();

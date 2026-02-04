@@ -79,7 +79,7 @@ public class HBaseTableSink extends TableSink {
   }
 
   @Override
-  public void collectExprs(List<Expr> exprs) {
+  public void collectExprsForLineage(List<Expr> exprs) {
     exprs.addAll(outputExprs_);
   }
 }

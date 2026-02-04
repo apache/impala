@@ -31,20 +31,27 @@ import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.ColumnLineageGraph;
 import org.apache.impala.analysis.ColumnLineageGraph.ColumnLabel;
+import org.apache.impala.analysis.ColumnLineageGraph.OperationType;
 import org.apache.impala.analysis.DeleteStmt;
 import org.apache.impala.analysis.DmlStatementBase;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
+import org.apache.impala.analysis.MergeCase;
+import org.apache.impala.analysis.MergeInsert;
 import org.apache.impala.analysis.MergeStmt;
+import org.apache.impala.analysis.MergeUpdate;
 import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.QueryStmt;
+import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TupleId;
-import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.analysis.UpdateStmt;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
+import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -61,6 +68,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TMergeCaseType;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MathUtil;
@@ -224,67 +232,295 @@ public class Planner {
     ctx_.getTimeline().markEvent("Distributed plan created");
     ctx_.getRootAnalyzer().logCacheStats();
 
-    ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
-      // Lineage is disabled for UPDATE, DELETE, MERGE and OPTIMIZE statements
-      if (ctx_.isUpdate() || ctx_.isDelete() || ctx_.isMerge() || ctx_.isOptimize())
+      // Lineage is disabled for DELETE and OPTIMIZE statements, and for MERGE
+      // statements that only contain DELETE cases (semantically equivalent to a
+      // DELETE and produce no projection edges).
+      if (ctx_.isDelete() || ctx_.isOptimize()) {
         return fragments;
-      // Compute the column lineage graph
-      if (ctx_.isInsertOrCtas()) {
-        InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
-        FeTable targetTable = insertStmt.getTargetTable();
-        Preconditions.checkNotNull(targetTable);
-        if (targetTable instanceof FeKuduTable) {
-          if (ctx_.isInsert()) {
-            // For insert statements on Kudu tables, we only need to consider
-            // the labels of columns mentioned in the column list.
-            List<String> mentionedColumns = insertStmt.getMentionedColumns();
-            Preconditions.checkState(!mentionedColumns.isEmpty());
-            List<ColumnLabel> targetColLabels = new ArrayList<>();
-            for (String column: mentionedColumns) {
-              targetColLabels.add(new ColumnLabel(column, targetTable.getTableName(),
-                  ColumnLineageGraph.getTableType(targetTable)));
-            }
-            graph.addTargetColumnLabels(targetColLabels);
-          } else {
-            Preconditions.checkState(ctx_.isCtas());
-            if (((FeKuduTable)targetTable).hasAutoIncrementingColumn()) {
-              // Omit auto-incrementing column for Kudu table since the column is not in
-              // expression. The auto-incrementing column is only added to target table
-              // for CTAS statement so that the table has same layout as the table
-              // created by Kudu engine. We don't need to compute Lineage graph for the
-              // column.
-              List<ColumnLabel> targetColLabels = new ArrayList<>();
-              for (String column: targetTable.getColumnNames()) {
-                if (column.equals(Schema.getAutoIncrementingColumnName())) continue;
-                targetColLabels.add(new ColumnLabel(column, targetTable.getTableName(),
-                    ColumnLineageGraph.getTableType(targetTable)));
-              }
-              graph.addTargetColumnLabels(targetColLabels);
-            } else {
-              graph.addTargetColumnLabels(targetTable);
-            }
-          }
-        } else if (targetTable instanceof FeHBaseTable) {
-          graph.addTargetColumnLabels(targetTable);
-        } else {
-          graph.addTargetColumnLabels(targetTable);
-        }
-      } else {
-        List<String> colLabels = singleNodePlannerIntf_.getColLabels();
-        graph.addTargetColumnLabels(colLabels.stream()
-            .map(col -> new ColumnLabel(col))
-            .collect(Collectors.toList()));
       }
-      List<Expr> outputExprs = new ArrayList<>();
-      rootFragment.getSink().collectExprs(outputExprs);
-      graph.computeLineageGraph(outputExprs, ctx_.getRootAnalyzer(),
-          ctx_.getAnalysisResult().getParsedStmt().getOperationType());
-      if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
-      ctx_.getTimeline().markEvent("Lineage info computed");
+      if (ctx_.isMerge()
+          && ctx_.getAnalysisResult().getMergeStmt().hasOnlyDeleteCases()) {
+        return fragments;
+      }
+      computeColumnLineage(rootFragment);
     }
 
     return fragments;
+  }
+
+  /**
+   * The full description of a query's column lineage: what target columns it
+   * writes, which source expressions feed each target, and any predicate
+   * expressions (e.g. MERGE ON / WHEN filters) that should be added to the graph
+   * outside the projection edges. For non-MERGE statements every target has
+   * exactly one source expression; MERGE may have several — one per case that
+   * assigns that target — unioned into a single PROJECTION edge downstream.
+   */
+  private static final class LineageProjection {
+    final ColumnLineageGraph.OperationType operationType;
+    final List<ColumnLabel> targets;
+    // Parallel to `targets`. Inner list can hold any number of contributor exprs.
+    final List<List<Expr>> sourcesPerTarget;
+    // MERGE WHEN filter exprs; empty for other statement types.
+    final List<Expr> extraPredicates;
+
+    LineageProjection(ColumnLineageGraph.OperationType operationType,
+        List<ColumnLabel> targets, List<List<Expr>> sourcesPerTarget,
+        List<Expr> extraPredicates) {
+      Preconditions.checkState(targets.size() == sourcesPerTarget.size(),
+          "lineage: targets (%s) and sourcesPerTarget (%s) must be parallel",
+          targets.size(), sourcesPerTarget.size());
+      this.operationType = operationType;
+      this.targets = targets;
+      this.sourcesPerTarget = sourcesPerTarget;
+      this.extraPredicates = extraPredicates;
+    }
+  }
+
+  private void computeColumnLineage(PlanFragment rootFragment) {
+    Analyzer analyzer = ctx_.getRootAnalyzer();
+    ColumnLineageGraph graph = analyzer.getColumnLineageGraph();
+    LineageProjection p = buildLineageProjection(rootFragment);
+    graph.addTargetColumnLabels(p.targets);
+    graph.addDependencyPredicates(p.extraPredicates);
+    graph.computeProjectionEdges(p.sourcesPerTarget, analyzer, p.operationType);
+    if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
+    ctx_.getTimeline().markEvent("Lineage info computed");
+  }
+
+  private LineageProjection buildLineageProjection(PlanFragment rootFragment) {
+    if (ctx_.isInsertOrCtas()) return projectionForInsertOrCtas(rootFragment);
+    if (ctx_.isUpdate())       return projectionForUpdate(rootFragment);
+    if (ctx_.isMerge())        return projectionForMerge();
+    return projectionForSelect(rootFragment);
+  }
+
+  private ColumnLineageGraph.OperationType currentOperationType() {
+    return ctx_.getAnalysisResult().getParsedStmt().getOperationType();
+  }
+
+  /**
+   * Wrap each result-expr in a singleton list. Used by the INSERT/CTAS/UPDATE/SELECT
+   * builders since they all have exactly one contributor per target column.
+   */
+  private static List<List<Expr>> asSingletonLists(List<Expr> resultExprs) {
+    List<List<Expr>> result = new ArrayList<>(resultExprs.size());
+    for (Expr e : resultExprs) result.add(Lists.newArrayList(e));
+    return result;
+  }
+
+  private LineageProjection projectionForInsertOrCtas(PlanFragment rootFragment) {
+    InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
+    FeTable targetTable = insertStmt.getTargetTable();
+    Preconditions.checkNotNull(targetTable);
+    List<ColumnLabel> targetColLabels = new ArrayList<>();
+    if (targetTable instanceof FeKuduTable) {
+      if (ctx_.isInsert()) {
+        // For INSERT on Kudu tables, only the columns mentioned in the column list
+        // are lineage targets.
+        List<String> mentionedColumns = insertStmt.getMentionedColumns();
+        Preconditions.checkState(!mentionedColumns.isEmpty());
+        for (String column : mentionedColumns) {
+          targetColLabels.add(new ColumnLabel(column, targetTable.getTableName(),
+              ColumnLineageGraph.getTableType(targetTable)));
+        }
+      } else {
+        Preconditions.checkState(ctx_.isCtas());
+        if (((FeKuduTable) targetTable).hasAutoIncrementingColumn()) {
+          // The auto-incrementing column is only present in the CTAS target so the
+          // table has the same layout as one created by Kudu; it has no
+          // corresponding source expression and is omitted from lineage.
+          for (String column : targetTable.getColumnNames()) {
+            if (column.equals(Schema.getAutoIncrementingColumnName())) continue;
+            targetColLabels.add(new ColumnLabel(column, targetTable.getTableName(),
+                ColumnLineageGraph.getTableType(targetTable)));
+          }
+        } else {
+          addTargetTableColumnLabels(targetColLabels, targetTable);
+        }
+      }
+    } else {
+      addTargetTableColumnLabels(targetColLabels, targetTable);
+    }
+    List<Expr> outputExprs = new ArrayList<>();
+    rootFragment.getSink().collectExprsForLineage(outputExprs);
+    return new LineageProjection(currentOperationType(), targetColLabels,
+        asSingletonLists(outputExprs), Collections.emptyList());
+  }
+
+  private LineageProjection projectionForUpdate(PlanFragment rootFragment) {
+    UpdateStmt updateStmt = ctx_.getAnalysisResult().getUpdateStmt();
+    FeTable targetTable = updateStmt.getTargetTable();
+    Preconditions.checkNotNull(targetTable);
+    List<Expr> outputExprs = new ArrayList<>();
+    rootFragment.getSink().collectExprsForLineage(outputExprs);
+    List<ColumnLabel> targetColLabels = new ArrayList<>();
+    List<Expr> alignedSourceExprs = new ArrayList<>();
+    if (targetTable instanceof FeKuduTable) {
+      DataSink sink = rootFragment.getSink();
+      Preconditions.checkState(sink instanceof KuduTableSink);
+      List<Integer> kuduUpdateColIdxs = ((KuduTableSink) sink).getTargetColIdxs();
+      Preconditions.checkState(!kuduUpdateColIdxs.isEmpty());
+      List<Column> kuduUpdateColumns = targetTable.getColumnsInHiveOrder();
+      Preconditions.checkState(kuduUpdateColIdxs.size() == outputExprs.size(),
+          "Kudu UPDATE lineage: target col idxs (%s) and output exprs (%s) size "
+              + "mismatch", kuduUpdateColIdxs.size(), outputExprs.size());
+      for (int i = 0; i < kuduUpdateColIdxs.size(); ++i) {
+        Column col = kuduUpdateColumns.get(kuduUpdateColIdxs.get(i));
+        String columnName = col.getName();
+        if (columnName.equals(Schema.getAutoIncrementingColumnName())) continue;
+        // Kudu prepends primary-key columns to the sink projection because the
+        // backend needs the row identifier, but the user did not assign them
+        // (Kudu disallows updating PK columns). Skip so lineage records only
+        // what the SET clause actually writes.
+        if (((KuduColumn) col).isKey()) continue;
+        // Fully qualified name to avoid duplicate vertices for UPDATE.
+        String qualifiedName = targetTable.getTableName() + "." + columnName;
+        targetColLabels.add(new ColumnLabel(qualifiedName,
+            targetTable.getTableName(),
+            ColumnLineageGraph.getTableType(targetTable)));
+        // Non-auto-inc Kudu UPDATE emits outputExprs 1:1 with kuduUpdateColIdxs;
+        // for auto-inc the same is true and we simply skip the auto-inc position.
+        alignedSourceExprs.add(outputExprs.get(i));
+      }
+    } else {
+      // The only non-Kudu updatable table type is Iceberg. Fail fast if that ever
+      // changes so we revisit the position-based expr alignment below.
+      Preconditions.checkState(targetTable instanceof FeIcebergTable,
+          "UPDATE lineage: expected an Iceberg target table, got %s",
+          targetTable.getClass().getSimpleName());
+      // For Iceberg UPDATE, extract targets from the SET assignments and pair each
+      // with its output-expr from the sink.
+      for (Pair<SlotRef, Expr> assignment : updateStmt.getAssignments()) {
+        Column col = assignment.first.getResolvedPath().destColumn();
+        int colIdx = col.getPosition();
+        Preconditions.checkState(colIdx < outputExprs.size(),
+            "UPDATE lineage: column index %s out of range for output exprs (size %s)",
+            colIdx, outputExprs.size());
+        // Fully qualified name to avoid duplicate vertices for UPDATE.
+        String qualifiedName = targetTable.getTableName() + "." + col.getName();
+        targetColLabels.add(new ColumnLabel(qualifiedName,
+            targetTable.getTableName(),
+            ColumnLineageGraph.getTableType(targetTable)));
+        alignedSourceExprs.add(outputExprs.get(colIdx));
+      }
+    }
+    return new LineageProjection(currentOperationType(), targetColLabels,
+        asSingletonLists(alignedSourceExprs), Collections.emptyList());
+  }
+
+  private LineageProjection projectionForMerge() {
+    MergeStmt mergeStmt = ctx_.getAnalysisResult().getMergeStmt();
+    FeTable targetTable = mergeStmt.getTargetTable();
+    Preconditions.checkNotNull(targetTable);
+    // MERGE is currently only implemented for Iceberg targets. Fail fast here so we
+    // notice if that ever changes without revisiting the lineage code below.
+    Preconditions.checkState(targetTable instanceof FeIcebergTable,
+        "MERGE lineage: expected an Iceberg target table, got %s",
+        targetTable.getClass().getSimpleName());
+    // Union the per-case assignment sets: label a column iff at least one UPDATE
+    // or INSERT case actually assigns it.
+    List<Column> allColumns = targetTable.getColumnsInHiveOrder();
+    Set<Integer> assignedColIdxs = new HashSet<>();
+    for (MergeCase mergeCase : mergeStmt.getCases()) {
+      assignedColIdxs.addAll(collectAssignedColIdxs(mergeCase, allColumns));
+    }
+    // Deterministic, ascending order — target labels and per-target contributor
+    // lists must be parallel.
+    List<Integer> sortedIdxs = new ArrayList<>(assignedColIdxs);
+    Collections.sort(sortedIdxs);
+    List<ColumnLabel> targetColLabels = new ArrayList<>(sortedIdxs.size());
+    List<List<Expr>> sourcesPerTarget = new ArrayList<>(sortedIdxs.size());
+    for (Integer colIdx : sortedIdxs) {
+      String columnName = allColumns.get(colIdx).getName();
+      // Fully qualified name matches the UPDATE path and avoids duplicate vertices.
+      String qualifiedName = targetTable.getTableName() + "." + columnName;
+      targetColLabels.add(new ColumnLabel(qualifiedName, targetTable.getTableName(),
+          ColumnLineageGraph.getTableType(targetTable)));
+      sourcesPerTarget.add(new ArrayList<>());
+    }
+    // For each labeled target column, collect only the result-expr contributions
+    // from cases that actually assign that column. This drops MergeUpdate's
+    // pass-through SlotRefs to target-side columns it doesn't touch — those would
+    // otherwise produce spurious "target -> target" projection edges when unioned
+    // with another case's real assignment (e.g. an INSERT branch).
+    List<Expr> caseFilterExprs = new ArrayList<>();
+    for (MergeCase mergeCase : mergeStmt.getCases()) {
+      caseFilterExprs.addAll(mergeCase.getFilterExprs());
+      if (mergeCase.caseType() == TMergeCaseType.DELETE) continue;
+      Set<Integer> caseAssigned = collectAssignedColIdxs(mergeCase, allColumns);
+      List<Expr> caseResultExprs = mergeCase.getResultExprs();
+      for (int i = 0; i < sortedIdxs.size(); ++i) {
+        int colIdx = sortedIdxs.get(i);
+        if (!caseAssigned.contains(colIdx)) continue;
+        Preconditions.checkState(colIdx < caseResultExprs.size(),
+            "MERGE lineage: column index %s out of range for case result exprs (size %s)",
+            colIdx, caseResultExprs.size());
+        sourcesPerTarget.get(i).add(caseResultExprs.get(colIdx));
+      }
+    }
+    return new LineageProjection(ColumnLineageGraph.OperationType.MERGE,
+        targetColLabels, sourcesPerTarget, caseFilterExprs);
+  }
+
+  private LineageProjection projectionForSelect(PlanFragment rootFragment) {
+    List<String> colLabels = singleNodePlannerIntf_.getColLabels();
+    List<ColumnLabel> targetColLabels = colLabels.stream()
+        .map(ColumnLabel::new)
+        .collect(Collectors.toList());
+    List<Expr> outputExprs = new ArrayList<>();
+    rootFragment.getSink().collectExprsForLineage(outputExprs);
+    return new LineageProjection(currentOperationType(), targetColLabels,
+        asSingletonLists(outputExprs), Collections.emptyList());
+  }
+
+  private static void addTargetTableColumnLabels(List<ColumnLabel> out,
+      FeTable targetTable) {
+    for (String column : targetTable.getColumnNames()) {
+      out.add(new ColumnLabel(column, targetTable.getTableName(),
+          ColumnLineageGraph.getTableType(targetTable)));
+    }
+  }
+
+  /**
+   * Returns the target-column indices (positions in {@code allColumns}) that
+   * {@code mergeCase} actually assigns. DELETE cases assign nothing; UPDATE and
+   * INSERT cases assign the columns named in their SET list or column permutation
+   * respectively. INSERT without a column list assigns every column positionally.
+   */
+  private static Set<Integer> collectAssignedColIdxs(MergeCase mergeCase,
+      List<Column> allColumns) {
+    Set<Integer> assigned = new HashSet<>();
+    if (mergeCase instanceof MergeUpdate) {
+      // Covers MergeUpdate and its MergeUpdateStar subclass; the latter populates
+      // assignmentExprs_ with every target column during analysis.
+      for (Pair<SlotRef, Expr> assignment :
+          ((MergeUpdate) mergeCase).getAssignments()) {
+        Column c = assignment.first.getResolvedPath().destColumn();
+        assigned.add(c.getPosition());
+      }
+    } else if (mergeCase instanceof MergeInsert) {
+      // Covers MergeInsert and its MergeInsertStar subclass. When no column list is
+      // written the permutation is empty and every column is assigned positionally;
+      // an explicit empty list is not valid SQL, so isEmpty() unambiguously means
+      // "no column list".
+      List<String> permutation = ((MergeInsert) mergeCase).getColumnPermutation();
+      if (permutation.isEmpty()) {
+        for (int i = 0; i < allColumns.size(); ++i) assigned.add(i);
+      } else {
+        for (String columnName : permutation) {
+          for (int i = 0; i < allColumns.size(); ++i) {
+            if (allColumns.get(i).getName().equals(columnName)) {
+              assigned.add(i);
+              break;
+            }
+          }
+        }
+      }
+    }
+    // DELETE cases: nothing to record.
+    return assigned;
   }
 
   public PlanFragment createIcebergDmlPlanFragment(PlanFragment rootFragment,

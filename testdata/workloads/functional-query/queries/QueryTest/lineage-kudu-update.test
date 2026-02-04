@@ -1,0 +1,1009 @@
+====
+---- QUERY
+drop database if exists lineage_dml_test_db cascade
+====
+---- QUERY
+create database lineage_dml_test_db;
+====
+---- QUERY
+# test update statements with Kudu tables
+create table lineage_dml_test_db.kudu_tbl like functional_kudu.alltypessmall
+====
+---- QUERY
+insert into lineage_dml_test_db.kudu_tbl
+select * from functional_kudu.alltypessmall
+---- LINEAGE
+{
+  "queryText": "insert into lineage_dml_test_db.kudu_tbl select * from functional_kudu.alltypessmall",
+  "operationType": "INSERT",
+  "queryId": "c84e45e48abadf72:387bccbc00000000",
+  "hash": "c97adca4107c6a141a667c3fa4fce730",
+  "user": "dvanko",
+  "timestamp": 1775747169,
+  "endTime": 1775747169,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        9
+      ],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        11
+      ],
+      "targets": [
+        10
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        13
+      ],
+      "targets": [
+        12
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        15
+      ],
+      "targets": [
+        14
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        17
+      ],
+      "targets": [
+        16
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        19
+      ],
+      "targets": [
+        18
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        21
+      ],
+      "targets": [
+        20
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        23
+      ],
+      "targets": [
+        22
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        25
+      ],
+      "targets": [
+        24
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.id",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.bool_col",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.tinyint_col",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.smallint_col",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 8,
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 9,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.int_col",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 10,
+      "vertexType": "COLUMN",
+      "vertexId": "bigint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 11,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.bigint_col",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 12,
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 13,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.float_col",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 14,
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 15,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.double_col",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 16,
+      "vertexType": "COLUMN",
+      "vertexId": "date_string_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 17,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.date_string_col",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 18,
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 19,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.string_col",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 20,
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 21,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.timestamp_col",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 22,
+      "vertexType": "COLUMN",
+      "vertexId": "year",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 23,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.year",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    },
+    {
+      "id": 24,
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 25,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_kudu.alltypessmall.month",
+      "metadata": {
+        "tableName": "functional_kudu.alltypessmall",
+        "tableType": "kudu",
+        "tableCreateTime": 1763994546
+      }
+    }
+  ]
+}
+====
+---- QUERY
+update lineage_dml_test_db.kudu_tbl
+set string_col = "foo"
+where float_col < 0.5
+  and bool_col = true
+---- LINEAGE
+{
+  "queryText": "update lineage_dml_test_db.kudu_tbl set string_col = \"foo\" where float_col < 0.5   and bool_col = true",
+  "operationType": "UPDATE",
+  "queryId": "a047b712f5610210:a81dcd3800000000",
+  "hash": "9c9330c0a70b178ebe15a962c098a700",
+  "user": "dvanko",
+  "timestamp": 1775747174,
+  "endTime": 1775747174,
+  "edges": [
+    {
+      "sources": [],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1,
+        2
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.string_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1778504458
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.bool_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1778504458
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.float_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1778504458
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# Create a reference table for Kudu UPDATE FROM test
+create table lineage_dml_test_db.kudu_ref_table
+primary key (id)
+partition by hash(id) partitions 3
+stored as kudu
+as select id, string_col as new_string, bigint_col as new_bigint
+from functional_kudu.alltypessmall limit 5
+====
+---- QUERY
+update lineage_dml_test_db.kudu_tbl
+set string_col = r.new_string, bigint_col = r.new_bigint
+from lineage_dml_test_db.kudu_tbl, lineage_dml_test_db.kudu_ref_table r
+where lineage_dml_test_db.kudu_tbl.id = r.id
+---- LINEAGE
+{
+  "queryText": "update lineage_dml_test_db.kudu_tbl set string_col = r.new_string, bigint_col = r.new_bigint from lineage_dml_test_db.kudu_tbl, lineage_dml_test_db.kudu_ref_table r where lineage_dml_test_db.kudu_tbl.id = r.id",
+  "operationType": "UPDATE",
+  "queryId": "9c489854b066fa1d:7f2260df00000000",
+  "hash": "5aabb3cd54beefd9a244b9e987bf1595",
+  "user": "dvanko",
+  "timestamp": 1778504472,
+  "endTime": 1778504472,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "targets": [
+        0,
+        2
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.string_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_ref_table.new_string",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_ref_table",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.bigint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_ref_table.new_bigint",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_ref_table",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_ref_table.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_ref_table",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1775747169
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# Multi-column Kudu UPDATE with ascending assignment order.
+update lineage_dml_test_db.kudu_tbl
+set tinyint_col = 1, int_col = 2, bigint_col = 3, string_col = "asc"
+where id = 0
+---- LINEAGE
+{
+  "queryText": "update lineage_dml_test_db.kudu_tbl set tinyint_col = 1, int_col = 2, bigint_col = 3, string_col = \"asc\" where id = 0",
+  "operationType": "UPDATE",
+  "queryId": "db4f69721720b6ed:341486d400000000",
+  "hash": "d978410bde6e326dcd5756bdb5cf6f11",
+  "user": "dvanko",
+  "timestamp": 1782901725,
+  "endTime": 1782901725,
+  "edges": [
+    {
+      "sources": [],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        1
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        3
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.tinyint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.int_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.bigint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.string_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# Same targets as above but assigned in a different, non-schema-order permutation.
+# The lineage output should be identical modulo vertex id assignment order — every
+# assigned column must appear as a projection target regardless of textual order.
+update lineage_dml_test_db.kudu_tbl
+set string_col = "reordered", bigint_col = 30, tinyint_col = 10, int_col = 20
+where id = 0
+---- LINEAGE
+{
+  "queryText": "update lineage_dml_test_db.kudu_tbl set string_col = \"reordered\", bigint_col = 30, tinyint_col = 10, int_col = 20 where id = 0",
+  "operationType": "UPDATE",
+  "queryId": "b24b09cba5b260fb:69c59d7600000000",
+  "hash": "e57371884e520ce93edcecc12e182cc9",
+  "user": "dvanko",
+  "timestamp": 1782901730,
+  "endTime": 1782901730,
+  "edges": [
+    {
+      "sources": [],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        1
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        3
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.string_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.bigint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.tinyint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.int_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# Multi-column UPDATE that mixes literals with expressions referencing multiple
+# source columns (bigint_col = int_col + tinyint_col). Verifies that the sources
+# of a projection edge include every referenced column and that no self-assignment
+# noise edges are produced for columns not in the SET list.
+update lineage_dml_test_db.kudu_tbl
+set string_col = "combo",
+    bigint_col = int_col + tinyint_col,
+    smallint_col = tinyint_col
+where id = 0
+---- LINEAGE
+{
+  "queryText": "update lineage_dml_test_db.kudu_tbl set string_col = \"combo\",     bigint_col = int_col + tinyint_col,     smallint_col = tinyint_col where id = 0",
+  "operationType": "UPDATE",
+  "queryId": "134a94ce5bf51174:fd96a52c00000000",
+  "hash": "9d3679b494e11fca258f1d67bb6d225f",
+  "user": "dvanko",
+  "timestamp": 1782901735,
+  "endTime": 1782901735,
+  "edges": [
+    {
+      "sources": [],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        2,
+        3
+      ],
+      "targets": [
+        1
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "targets": [
+        0,
+        1,
+        4
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.string_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.bigint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.int_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.tinyint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.smallint_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1782901705
+      }
+    }
+  ]
+}
+====
+---- QUERY
+update lineage_dml_test_db.kudu_tbl set int_col = cast(int_col + 1 as int) where id = 1
+---- LINEAGE
+{
+  "queryText": "update lineage_dml_test_db.kudu_tbl set int_col = cast(int_col + 1 as int) where id = 1",
+  "operationType": "UPDATE",
+  "queryId": "e347316769f64969:39420ea700000000",
+  "hash": "6d8fc06c9006e9bc9faae1db28a8c11c",
+  "user": "dvanko",
+  "timestamp": 1783437739,
+  "endTime": 1783437739,
+  "edges": [
+    {
+      "sources": [
+        0
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.int_col",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1783437703
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.kudu_tbl.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.kudu_tbl",
+        "tableType": "kudu",
+        "tableCreateTime": 1783437703
+      }
+    }
+  ]
+}
+====

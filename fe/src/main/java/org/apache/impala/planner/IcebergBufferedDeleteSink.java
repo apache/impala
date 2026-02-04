@@ -145,9 +145,11 @@ public class IcebergBufferedDeleteSink extends TableSink {
   }
 
   @Override
-  public void collectExprs(List<Expr> exprs) {
-    exprs.addAll(partitionKeyExprs_);
-    exprs.addAll(outputExprs_);
+  public void collectExprsForLineage(List<Expr> exprs) {
+    // Do not collect expressions from the delete sink. For Iceberg UPDATE statements,
+    // the root fragment is a MultiDataSink combining this sink and an HdfsTableSink.
+    // Including the delete-file expressions here would misalign the output expression
+    // list with the target column labels used for lineage computation.
   }
 
   @Override

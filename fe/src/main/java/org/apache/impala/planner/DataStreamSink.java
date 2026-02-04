@@ -172,7 +172,7 @@ public class DataStreamSink extends DataSink {
   public DataPartition getOutputPartition() { return outputPartition_; }
 
   @Override
-  public void collectExprs(List<Expr> exprs) {
+  public void collectExprsForLineage(List<Expr> exprs) {
     exprs.addAll(outputPartition_.getPartitionExprs());
   }
 }

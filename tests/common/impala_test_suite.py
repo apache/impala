@@ -1110,15 +1110,31 @@ class ImpalaTestSuite(BaseTestSuite):
           # Lineage flusher thread runs every 5s by default and is not configurable. Wait
           # for that period. (TODO) Get rid of this for faster test execution.
           time.sleep(5)
-          current_query_lineage = self.get_query_lineage(result.query_id, lineage_log_dir)
-          assert current_query_lineage != "", (
-              "No lineage found for query {} in dir {}".format(
-                result.query_id, lineage_log_dir))
-          if self.pytest_config().option.update_results:
-            test_section['LINEAGE'] = json.dumps(current_query_lineage, indent=2,
-                separators=(',', ': '))
+          # An empty LINEAGE section (whitespace only) means "the query is expected
+          # to produce no lineage record" — e.g. delete-only MERGE, which the planner
+          # deliberately skips. Anything else must match the JSON in the section.
+          expect_no_lineage = not test_section['LINEAGE'].strip()
+          current_query_lineage = self.get_query_lineage(
+              result.query_id, lineage_log_dir, require_files=not expect_no_lineage)
+          if expect_no_lineage:
+            if self.pytest_config().option.update_results and current_query_lineage:
+              # Query unexpectedly produced lineage: write it so the developer
+              # notices the change.
+              test_section['LINEAGE'] = json.dumps(current_query_lineage, indent=2,
+                  separators=(',', ': '))
+            else:
+              assert current_query_lineage == "", (
+                  "Expected no lineage for query {} in dir {}, got: {}".format(
+                    result.query_id, lineage_log_dir, current_query_lineage))
           else:
-            verify_lineage(json.loads(test_section['LINEAGE']), current_query_lineage)
+            assert current_query_lineage != "", (
+                "No lineage found for query {} in dir {}".format(
+                  result.query_id, lineage_log_dir))
+            if self.pytest_config().option.update_results:
+              test_section['LINEAGE'] = json.dumps(current_query_lineage, indent=2,
+                  separators=(',', ': '))
+            else:
+              verify_lineage(json.loads(test_section['LINEAGE']), current_query_lineage)
 
         if 'DML_RESULTS' in test_section:
           assert 'ERRORS' not in test_section
@@ -1182,13 +1198,20 @@ class ImpalaTestSuite(BaseTestSuite):
       if multiple_impalad:
         impalad_client.close()
 
-  def get_query_lineage(self, query_id, lineage_dir):
+  def get_query_lineage(self, query_id, lineage_dir, require_files=True):
     """Walks through the lineage files in lineage_dir to look for a given query_id.
-    This is an expensive operation is lineage_dir is large, so use carefully."""
+    This is an expensive operation is lineage_dir is large, so use carefully.
+
+    If require_files is False, an empty lineage_dir (no log files yet) returns ""
+    instead of asserting — useful when the caller is verifying that a query is
+    expected to produce no lineage at all."""
     assert lineage_dir and os.path.isdir(lineage_dir),\
         "Invalid lineage dir %s" % (lineage_dir)
     lineage_files = glob.glob(os.path.join(lineage_dir, 'impala_lineage_log_1.0*'))
-    assert len(lineage_files) > 0, "Directory %s is empty" % (lineage_dir)
+    if not lineage_files:
+      if require_files:
+        assert False, "Directory %s is empty" % (lineage_dir)
+      return ""
     # Sort by mtime. Optimized for most recently written lineages.
     lineage_files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
     for f in lineage_files:

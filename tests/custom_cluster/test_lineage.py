@@ -38,6 +38,8 @@ class TestLineage(CustomClusterTestSuite):
   LINEAGE = "lineage"
   ICEBERG_V3_LINEAGE = "iceberg_v3_lineage"
   ICEBERG_V3_OPTIMIZE_LINEAGE = "iceberg_v3_optimize_lineage"
+  KUDU_DML_LINEAGE = "kudu_dml_lineage"
+  ICEBERG_DML_LINEAGE = "iceberg_dml_lineage"
 
   @classmethod
   def setup_class(cls):
@@ -243,4 +245,43 @@ class TestLineage(CustomClusterTestSuite):
     finally:
       # Clean up the test database
       db_cleanup = "drop database if exists lineage_test_db cascade"
+      self.execute_query_expect_success(self.client, db_cleanup)
+
+  # IMPALA-14328: need to implement lineage for Calcite planner
+  @SkipIfCalcite.lineage_not_supported
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--lineage_event_log_dir={" + KUDU_DML_LINEAGE + "}",
+      tmp_dir_placeholders=[KUDU_DML_LINEAGE])
+  def test_lineage_kudu_update(self, vector):
+    """Test that lineage is correctly generated for Kudu UPDATE statements."""
+    try:
+      self.run_test_case('QueryTest/lineage-kudu-update', vector)
+    finally:
+      # Clean up the test database
+      db_cleanup = "drop database if exists lineage_dml_test_db cascade"
+      self.execute_query_expect_success(self.client, db_cleanup)
+
+  # IMPALA-14328: need to implement lineage for Calcite planner
+  @SkipIfCalcite.lineage_not_supported
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--lineage_event_log_dir={" + ICEBERG_DML_LINEAGE + "}",
+      tmp_dir_placeholders=[ICEBERG_DML_LINEAGE])
+  def test_lineage_iceberg_update_merge(self, vector):
+    """Test lineage for Iceberg UPDATE and MERGE with both v2 and v3 format versions."""
+    try:
+      # Run tests with format version 2
+      self.run_test_case('QueryTest/lineage-iceberg-update-merge', vector,
+                        test_file_vars={'$ICEBERG_FORMAT_VERSION': '2'})
+      # Clean up between runs
+      self.execute_query_expect_success(self.client,
+          "drop database if exists lineage_dml_test_db cascade")
+
+      # Run tests with format version 3
+      self.run_test_case('QueryTest/lineage-iceberg-update-merge', vector,
+                        test_file_vars={'$ICEBERG_FORMAT_VERSION': '3'})
+    finally:
+      # Final cleanup
+      db_cleanup = "drop database if exists lineage_dml_test_db cascade"
       self.execute_query_expect_success(self.client, db_cleanup)

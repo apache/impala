@@ -155,5 +155,5 @@ public abstract class DataSink {
   /**
    * Collect all expressions evaluated by this data sink.
    */
-  public abstract void collectExprs(List<Expr> exprs);
+  public abstract void collectExprsForLineage(List<Expr> exprs);
 }

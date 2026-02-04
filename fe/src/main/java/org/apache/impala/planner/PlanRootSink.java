@@ -275,7 +275,7 @@ public class PlanRootSink extends DataSink {
   }
 
   @Override
-  public void collectExprs(List<Expr> exprs) {
+  public void collectExprsForLineage(List<Expr> exprs) {
     exprs.addAll(outputExprs_);
   }
 

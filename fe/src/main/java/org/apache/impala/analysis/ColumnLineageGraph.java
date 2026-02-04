@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Lists;
 import org.apache.impala.analysis.ColumnLineageGraph.Vertex.Metadata;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeFsTable;
@@ -107,6 +108,8 @@ public class ColumnLineageGraph {
     INSERT("INSERT"),
     SELECT("SELECT"),
     CREATETABLE("CREATETABLE"),
+    UPDATE("UPDATE"),
+    MERGE("MERGE"),
     UNKNOWN("UNKNOWN");
 
     private final String operationType_;
@@ -468,6 +471,21 @@ public class ColumnLineageGraph {
     public int compareTo(ColumnLabel o) {
       return columnLabel_.compareTo(o.columnLabel_);
     }
+
+    @Override
+    public String toString() {
+      StringBuilder buf = new StringBuilder();
+      if (columnLabel_ != null) {
+        buf.append(columnLabel_);
+        buf.append(" (")
+           .append("tableName=").append(String.valueOf(tableName_))
+           .append(" tableType=").append(String.valueOf(tableType_))
+           .append(")");
+      } else {
+        buf.append("no column");
+      }
+      return buf.toString();
+    }
   }
 
   private final static Logger LOG = LoggerFactory.getLogger(ColumnLineageGraph.class);
@@ -596,17 +614,61 @@ public class ColumnLineageGraph {
   }
 
   /**
-   * Computes the column lineage graph of a query from the list of query result exprs.
-   * 'rootAnalyzer' is the Analyzer that was used for the analysis of the query.
+   * Computes the column lineage graph of a query from a per-target-column list of
+   * contributor source exprs. {@code sourcesPerTarget} is parallel to
+   * {@link #targetColumnLabels_}: the i-th inner list holds every expression that
+   * feeds the i-th target column. Most statements have exactly one contributor per
+   * target (INSERT/CTAS/UPDATE/SELECT); MERGE may have several — one per case that
+   * actually assigns that column — unioned into a single PROJECTION edge.
+   * Predicate dependencies (WHERE conjuncts, MERGE ON/WHEN filters previously
+   * pushed via {@link #addDependencyPredicates}) are computed against all target
+   * columns once, at the end.
+   */
+  public void computeProjectionEdges(List<List<Expr>> sourcesPerTarget,
+      Analyzer rootAnalyzer, OperationType operationType) {
+    init(rootAnalyzer, operationType);
+    if (sourcesPerTarget == null || sourcesPerTarget.isEmpty()) return;
+    Preconditions.checkState(sourcesPerTarget.size() == targetColumnLabels_.size(),
+        "lineage: expected %s per-target contributor lists, got %s",
+        targetColumnLabels_.size(), sourcesPerTarget.size());
+    for (int i = 0; i < sourcesPerTarget.size(); ++i) {
+      Map<String, SlotDescriptor> sourceBaseCols = new HashMap<>();
+      List<Expr> dependentExprs = new ArrayList<>();
+      for (Expr contributor : sourcesPerTarget.get(i)) {
+        getSourceBaseCols(contributor, sourceBaseCols, dependentExprs, false);
+      }
+      Set<ColumnLabel> targets = Sets.newHashSet(targetColumnLabels_.get(i));
+      createMultiEdge(targets, sourceBaseCols, MultiEdge.EdgeType.PROJECTION,
+          rootAnalyzer);
+      if (!dependentExprs.isEmpty()) {
+        // Additional exprs that at least one contributor has a predicate dependency
+        // on (e.g. PARTITION BY / ORDER BY exprs of an analytic function). Gather
+        // the transitive predicate dependencies and emit a per-target PREDICATE
+        // edge.
+        Map<String, SlotDescriptor> predicateBaseCols = new HashMap<>();
+        for (Expr dependentExpr : dependentExprs) {
+          getSourceBaseCols(dependentExpr, predicateBaseCols, null, true);
+        }
+        createMultiEdge(targets, predicateBaseCols, MultiEdge.EdgeType.PREDICATE,
+            rootAnalyzer);
+      }
+    }
+    computeResultPredicateDependencies(rootAnalyzer);
+  }
+
+  /**
+   * Thin adapter for callers that have exactly one result expression per target
+   * column (INSERT/CTAS/UPDATE/SELECT). Wraps each expression in a singleton list
+   * and delegates to {@link #computeProjectionEdges}.
    */
   public void computeLineageGraph(List<Expr> resultExprs, Analyzer rootAnalyzer,
       OperationType operationType) {
-    init(rootAnalyzer, operationType);
-    // Compute the dependencies only if result expressions are available.
-    if (resultExprs != null && !resultExprs.isEmpty()) {
-      computeProjectionDependencies(resultExprs, rootAnalyzer);
-      computeResultPredicateDependencies(rootAnalyzer);
+    List<List<Expr>> sourcesPerTarget = null;
+    if (resultExprs != null) {
+      sourcesPerTarget = new ArrayList<>(resultExprs.size());
+      for (Expr e : resultExprs) sourcesPerTarget.add(Lists.newArrayList(e));
     }
+    computeProjectionEdges(sourcesPerTarget, rootAnalyzer, operationType);
   }
 
   /**
@@ -630,33 +692,6 @@ public class ColumnLineageGraph {
   }
 
 
-
-  private void computeProjectionDependencies(List<Expr> resultExprs, Analyzer analyzer) {
-    Preconditions.checkNotNull(resultExprs);
-    Preconditions.checkState(!resultExprs.isEmpty());
-    Preconditions.checkState(resultExprs.size() == targetColumnLabels_.size());
-    for (int i = 0; i < resultExprs.size(); ++i) {
-      Expr expr = resultExprs.get(i);
-      Map<String, SlotDescriptor> sourceBaseCols = new HashMap<>();
-      List<Expr> dependentExprs = new ArrayList<>();
-      getSourceBaseCols(expr, sourceBaseCols, dependentExprs, false);
-      Set<ColumnLabel> targets = Sets.newHashSet(targetColumnLabels_.get(i));
-      createMultiEdge(targets, sourceBaseCols, MultiEdge.EdgeType.PROJECTION, analyzer);
-      if (!dependentExprs.isEmpty()) {
-        // We have additional exprs that 'expr' has a predicate dependency on.
-        // Gather the transitive predicate dependencies of 'expr' based on its direct
-        // predicate dependencies. For each direct predicate dependency p, 'expr' is
-        // transitively predicate dependent on all exprs that p is projection and
-        // predicate dependent on.
-        Map<String, SlotDescriptor> predicateBaseCols = new HashMap<>();
-        for (Expr dependentExpr: dependentExprs) {
-          getSourceBaseCols(dependentExpr, predicateBaseCols, null, true);
-        }
-        createMultiEdge(targets, predicateBaseCols, MultiEdge.EdgeType.PREDICATE,
-            analyzer);
-      }
-    }
-  }
 
   /**
    * Compute predicate dependencies for the query result, i.e. exprs that affect the
@@ -1003,6 +1038,10 @@ public class ColumnLineageGraph {
       return OperationType.SELECT;
     } else if (stmt instanceof CreateTableStmt) {
       return OperationType.CREATETABLE;
+    } else if (stmt instanceof UpdateStmt) {
+      return OperationType.UPDATE;
+    } else if (stmt instanceof MergeStmt) {
+      return OperationType.MERGE;
     } else {
       return OperationType.UNKNOWN;
     }

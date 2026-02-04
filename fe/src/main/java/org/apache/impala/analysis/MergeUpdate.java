@@ -56,6 +56,11 @@ public class MergeUpdate extends MergeCase {
       SlotRef lhs = entry.first;
       Expr rhs = entry.second;
       lhs = disambiguateLhs(lhs);
+      // disambiguateLhs may replace 'lhs' with a freshly-qualified SlotRef when
+      // the original name was ambiguous. Persist the analyzed slot ref back into
+      // assignmentExprs_ so downstream consumers (e.g. lineage) see an analyzed
+      // LHS rather than the original unanalyzed one.
+      entry.first = lhs;
       rhs.analyze(analyzer);
 
       Preconditions.checkNotNull(targetTableRef_);
@@ -136,5 +141,9 @@ public class MergeUpdate extends MergeCase {
     return new MergeUpdate(Expr.cloneList(resultExprs_), Expr.cloneList(getFilterExprs()),
         targetTableName_, targetTableColumns_, targetTableRef_, assignmentExprs_,
         matchType_, sourceTableRef_);
+  }
+
+  public List<Pair<SlotRef, Expr>> getAssignments() {
+    return assignmentExprs_;
   }
 }

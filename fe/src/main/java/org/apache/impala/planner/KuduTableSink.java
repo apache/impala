@@ -18,6 +18,7 @@
 
 package org.apache.impala.planner;
 
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.impala.analysis.DescriptorTable;
@@ -132,7 +133,12 @@ public class KuduTableSink extends TableSink {
   }
 
   @Override
-  public void collectExprs(List<Expr> exprs) {
+  public void collectExprsForLineage(List<Expr> exprs) {
     exprs.addAll(outputExprs_);
+  }
+
+  public List<Integer> getTargetColIdxs() {
+    if (targetColIdxs_ == null) return Collections.emptyList();
+    return Collections.unmodifiableList(targetColIdxs_);
   }
 }

@@ -180,7 +180,7 @@ public class JoinBuildSink extends DataSink implements SpillableOperator {
   }
 
   @Override
-  public void collectExprs(List<Expr> exprs) {
+  public void collectExprsForLineage(List<Expr> exprs) {
     exprs.addAll(buildExprs_);
   }
 

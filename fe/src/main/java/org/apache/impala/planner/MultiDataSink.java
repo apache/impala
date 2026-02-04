@@ -125,10 +125,10 @@ public class MultiDataSink extends DataSink {
   }
 
   @Override
-  public void collectExprs(List<Expr> exprs) {
+  public void collectExprsForLineage(List<Expr> exprs) {
     for (int i = 0; i < dataSinks_.size(); ++i) {
       DataSink dsink = dataSinks_.get(i);
-      dsink.collectExprs(exprs);
+      dsink.collectExprsForLineage(exprs);
     }
   }
 

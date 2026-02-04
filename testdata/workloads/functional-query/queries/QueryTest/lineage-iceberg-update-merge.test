@@ -1,0 +1,2345 @@
+====
+---- QUERY
+drop database if exists lineage_dml_test_db cascade
+====
+---- QUERY
+create database lineage_dml_test_db;
+====
+---- QUERY
+create table lineage_dml_test_db.iceberg_non_partitioned
+like functional_parquet.iceberg_non_partitioned;
+alter table lineage_dml_test_db.iceberg_non_partitioned
+set tblproperties ('format-version' = '$ICEBERG_FORMAT_VERSION')
+====
+---- QUERY
+create table lineage_dml_test_db.iceberg_partitioned
+like functional_parquet.iceberg_partitioned;
+alter table lineage_dml_test_db.iceberg_partitioned
+set tblproperties ('format-version' = '$ICEBERG_FORMAT_VERSION')
+====
+---- QUERY
+insert into lineage_dml_test_db.iceberg_non_partitioned
+select * from functional_parquet.iceberg_non_partitioned
+---- LINEAGE
+{
+  "queryText": "insert into lineage_dml_test_db.iceberg_non_partitioned select * from functional_parquet.iceberg_non_partitioned",
+  "operationType": "INSERT",
+  "queryId": "dc410ad3848d4ae4:27f8847400000000",
+  "hash": "5f84703727ad6b407637ac4e5e4936b6",
+  "user": "dvanko",
+  "timestamp": 1775747129,
+  "endTime": 1775747130,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.id",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.user",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "action",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.action",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "event_time",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.event_time",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# test update statements on Iceberg tables
+update lineage_dml_test_db.iceberg_non_partitioned set user = "Dani" where action = "click"
+---- LINEAGE
+{
+  "queryText": "update lineage_dml_test_db.iceberg_non_partitioned set user = \"Dani\" where action = \"click\"",
+  "operationType": "UPDATE",
+  "queryId": "43455cc803e1ef4e:2be9e6b800000000",
+  "hash": "38f25d8dff833154fb7dc64444d7b22f",
+  "user": "dvanko",
+  "timestamp": 1775747135,
+  "endTime": 1775747135,
+  "edges": [
+    {
+      "sources": [],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.action",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    }
+  ]
+}
+====
+---- QUERY
+insert into lineage_dml_test_db.iceberg_partitioned
+select * from functional_parquet.iceberg_partitioned;
+---- LINEAGE
+{
+  "queryText": "insert into lineage_dml_test_db.iceberg_partitioned select * from functional_parquet.iceberg_partitioned",
+  "operationType": "INSERT",
+  "queryId": "d6460daac71bdb5b:124ec1d500000000",
+  "hash": "d62ae60845f8e4fd68d233f408c0ed04",
+  "user": "dvanko",
+  "timestamp": 1775747140,
+  "endTime": 1775747140,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.id",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.user",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "action",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.action",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "event_time",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.event_time",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    }
+  ]
+}
+====
+---- QUERY
+update lineage_dml_test_db.iceberg_partitioned
+set event_time = HOURS_ADD(event_time, 1)
+where id >= 17
+---- LINEAGE
+{
+  "queryText": "update lineage_dml_test_db.iceberg_partitioned set event_time = HOURS_ADD(event_time, 1) where id >= 17",
+  "operationType": "UPDATE",
+  "queryId": "544d25f87608a86d:c34ac35d00000000",
+  "hash": "1ce0d06756665b72a32a010ac6f79e5d",
+  "user": "dvanko",
+  "timestamp": 1775747145,
+  "endTime": 1775747146,
+  "edges": [
+    {
+      "sources": [
+        0
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.event_time",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# test merge statements on Iceberg tables
+merge into lineage_dml_test_db.iceberg_non_partitioned t
+using functional_parquet.iceberg_non_partitioned s on t.id = s.id
+when matched then update set t.user = s.user
+when not matched then insert values (s.id, s.user, s.action, s.event_time)
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_non_partitioned t using functional_parquet.iceberg_non_partitioned s on t.id = s.id when matched then update set t.user = s.user when not matched then insert values (s.id, s.user, s.action, s.event_time)",
+  "operationType": "MERGE",
+  "queryId": "b347c78c1773522e:a1a135b000000000",
+  "hash": "5b74a1ca8dc69455e9ac4bb9816e0bc0",
+  "user": "dvanko",
+  "timestamp": 1775747151,
+  "endTime": 1775747151,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.id",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.user",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.action",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.action",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.event_time",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.event_time",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    }
+  ]
+}
+====
+---- QUERY
+merge into lineage_dml_test_db.iceberg_partitioned t
+using functional_parquet.iceberg_partitioned s on t.id = s.id
+when matched and s.action = "click" then update set t.event_time = HOURS_ADD(s.event_time, 1)
+when not matched then insert values (s.id, s.user, s.action, s.event_time)
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_partitioned t using functional_parquet.iceberg_partitioned s on t.id = s.id when matched and s.action = \"click\" then update set t.event_time = HOURS_ADD(s.event_time, 1) when not matched then insert values (s.id, s.user, s.action, s.event_time)",
+  "operationType": "MERGE",
+  "queryId": "224eb4525053bdc5:2545a14c00000000",
+  "hash": "507bd25ea84bebdfd143f961f8e37749",
+  "user": "dvanko",
+  "timestamp": 1775747156,
+  "endTime": 1775747157,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1,
+        5
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.id",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.user",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.action",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.action",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.event_time",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.event_time",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# Delete-only MERGE: lineage is intentionally not generated (semantically
+# equivalent to a DELETE), so an empty LINEAGE section asserts that no lineage
+# record is emitted for this query.
+merge into lineage_dml_test_db.iceberg_partitioned t
+using functional_parquet.iceberg_partitioned s on t.id = s.id
+when matched and s.action = "click" then delete
+---- LINEAGE
+====
+---- QUERY
+merge into lineage_dml_test_db.iceberg_partitioned t
+using functional_parquet.iceberg_partitioned s on t.id = s.id
+when matched and s.action = "download" then delete
+when matched then update set t.user = "not-deleted"
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_partitioned t using functional_parquet.iceberg_partitioned s on t.id = s.id when matched and s.action = \"download\" then delete when matched then update set t.user = \"not-deleted\"",
+  "operationType": "MERGE",
+  "queryId": "4846b27240cb7927:e92899cf00000000",
+  "hash": "a79fd4d26e9387d831b3c2bc7c6eeba1",
+  "user": "dvanko",
+  "timestamp": 1780306805,
+  "endTime": 1780306806,
+  "edges": [
+    {
+      "sources": [],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        2,
+        3
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.action",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.id",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1775747129
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# merge UPDATE-only (no INSERT branch), single WHEN MATCHED, different target columns
+merge into lineage_dml_test_db.iceberg_non_partitioned t
+using functional_parquet.iceberg_non_partitioned s on t.id = s.id
+when matched then update set t.user = s.user
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_non_partitioned t using functional_parquet.iceberg_non_partitioned s on t.id = s.id when matched then update set t.user = s.user",
+  "operationType": "MERGE",
+  "queryId": "a6478fe4e68e9e63:624cc39b00000000",
+  "hash": "7e26f674ec3d7855a7be5bc4cadae3a1",
+  "user": "dvanko",
+  "timestamp": 1776869115,
+  "endTime": 1776869115,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        2,
+        3
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1776869076
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.user",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.id",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1776869076
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# merge UPDATE-only (no INSERT branch), two WHEN MATCHED branches with same target column
+merge into lineage_dml_test_db.iceberg_partitioned t
+using functional_parquet.iceberg_partitioned s on t.id = s.id
+when matched and s.action = "click" then update set t.user = s.user
+when matched then update set t.user = "default"
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_partitioned t using functional_parquet.iceberg_partitioned s on t.id = s.id when matched and s.action = \"click\" then update set t.user = s.user when matched then update set t.user = \"default\"",
+  "operationType": "MERGE",
+  "queryId": "284fd67daeb111ad:e8a107d600000000",
+  "hash": "3000553ed88cc5b8fb90e1cd86b569a1",
+  "user": "dvanko",
+  "timestamp": 1776869120,
+  "endTime": 1776869121,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        2,
+        3,
+        4
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1776869076
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.user",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.action",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.id",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1776869076
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# merge INSERT-only (no MATCHED branch), single WHEN NOT MATCHED INSERT
+merge into lineage_dml_test_db.iceberg_non_partitioned t
+using functional_parquet.iceberg_non_partitioned s on t.id = s.id
+when not matched then insert values (s.id, s.user, s.action, s.event_time)
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_non_partitioned t using functional_parquet.iceberg_non_partitioned s on t.id = s.id when not matched then insert values (s.id, s.user, s.action, s.event_time)",
+  "operationType": "MERGE",
+  "queryId": "0042ad7ccff2025e:cd5a55c200000000",
+  "hash": "5e36262097a050007c13bf315e31c82c",
+  "user": "dvanko",
+  "timestamp": 1776869126,
+  "endTime": 1776869126,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1776869076
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.id",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1776869076
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.user",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.action",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1776869076
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.action",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.event_time",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1776869076
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_non_partitioned.event_time",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994561
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# MERGE with an explicit self-assignment on the target column. Only the assigned
+# column (event_time) should appear in the projection targets; the projection edge
+# must still be produced so the self-dependency is visible in the lineage.
+merge into lineage_dml_test_db.iceberg_partitioned t
+using functional_parquet.iceberg_partitioned s on t.id = s.id
+when matched then update set t.event_time = HOURS_ADD(t.event_time, 1)
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_partitioned t using functional_parquet.iceberg_partitioned s on t.id = s.id when matched then update set t.event_time = HOURS_ADD(t.event_time, 1)",
+  "operationType": "MERGE",
+  "queryId": "c340622fa527e1a5:0c09b4df00000000",
+  "hash": "f1986cbe6c0ec2496c0b643ed81b8446",
+  "user": "dvanko",
+  "timestamp": 1783420395,
+  "endTime": 1783420395,
+  "edges": [
+    {
+      "sources": [
+        0
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        2
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.event_time",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420335
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional_parquet.iceberg_partitioned.id",
+      "metadata": {
+        "tableName": "functional_parquet.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1763994560
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_partitioned.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420335
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# Wider target and source tables for MERGE tests below
+create table lineage_dml_test_db.iceberg_wide (
+  id int, a int, b int, c bigint, d string, e string)
+stored by iceberg
+====
+---- QUERY
+create table lineage_dml_test_db.iceberg_wide_src (
+  id int, a int, b int, d string, e string)
+stored by iceberg
+====
+---- QUERY
+insert into lineage_dml_test_db.iceberg_wide_src
+values (1, 10, 20, 'dv1', 'ev1'), (2, 30, 40, 'dv2', 'ev2')
+====
+---- QUERY
+insert into lineage_dml_test_db.iceberg_wide
+values (1, 0, 0, cast(0 as bigint), 'd0', 'e0'),
+       (3, 5, 6, cast(7 as bigint), 'd3', 'e3')
+====
+---- QUERY
+# MERGE with two WHEN MATCHED UPDATE branches, columns assigned in different order,
+# and a multi-source expression (c = a + b). Also touches d in the second branch
+# only. `id` is never assigned; id must be included in the PREDICATE edge only.
+merge into lineage_dml_test_db.iceberg_wide t
+using lineage_dml_test_db.iceberg_wide_src s on t.id = s.id
+when matched and s.a > 15
+  then update set t.c = s.a + s.b, t.a = s.a, t.b = s.b
+when matched
+  then update set t.d = s.d, t.a = s.a, t.c = s.a + s.b
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_wide t using lineage_dml_test_db.iceberg_wide_src s on t.id = s.id when matched and s.a > 15   then update set t.c = s.a + s.b, t.a = s.a, t.b = s.b when matched   then update set t.d = s.d, t.a = s.a, t.c = s.a + s.b",
+  "operationType": "MERGE",
+  "queryId": "a546ff89f154718e:ed4f25af00000000",
+  "hash": "8ce704042fb26b34ec8bbfda1cb02fb0",
+  "user": "dvanko",
+  "timestamp": 1783420401,
+  "endTime": 1783420401,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        3
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6
+      ],
+      "targets": [
+        5
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        7,
+        8
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        5
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.c",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.d",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.d",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 8,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# MERGE with two WHEN NOT MATCHED INSERT branches using different column
+# permutations. The union of assigned columns across the two branches should be
+# {id, a, b, c, d} — column `e` is never assigned by any branch and must not
+# appear as a projection target.
+merge into lineage_dml_test_db.iceberg_wide t
+using lineage_dml_test_db.iceberg_wide_src s on t.id = s.id
+when not matched and s.a > 15
+  then insert (id, a, b, c) values (s.id, s.a, s.b, s.a + s.b)
+when not matched
+  then insert (id, d, a) values (s.id, s.d, s.a)
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_wide t using lineage_dml_test_db.iceberg_wide_src s on t.id = s.id when not matched and s.a > 15   then insert (id, a, b, c) values (s.id, s.a, s.b, s.a + s.b) when not matched   then insert (id, d, a) values (s.id, s.d, s.a)",
+  "operationType": "MERGE",
+  "queryId": "a7426882fca87b94:e5b73b2300000000",
+  "hash": "35974b1849098235d77f93512753c9a5",
+  "user": "dvanko",
+  "timestamp": 1783420406,
+  "endTime": 1783420407,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3,
+        5
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        8
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1,
+        3
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        6,
+        7
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.c",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.d",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 8,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.d",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# MERGE combining multiple UPDATE and INSERT branches. Verifies that the assigned
+# set is the union across all non-DELETE cases: UPDATE touches {a, c}; INSERT
+# touches {id, b, d}. Column `e` is untouched and must not appear as a target.
+merge into lineage_dml_test_db.iceberg_wide t
+using lineage_dml_test_db.iceberg_wide_src s on t.id = s.id
+when matched
+  then update set t.a = s.a, t.c = s.a + s.b
+when not matched
+  then insert (id, b, d) values (s.id, s.b, s.d)
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_wide t using lineage_dml_test_db.iceberg_wide_src s on t.id = s.id when matched   then update set t.a = s.a, t.c = s.a + s.b when not matched   then insert (id, b, d) values (s.id, s.b, s.d)",
+  "operationType": "MERGE",
+  "queryId": "65436547980e12e8:70eafdb900000000",
+  "hash": "f097a67cf18948709d633f42ec0ccf55",
+  "user": "dvanko",
+  "timestamp": 1783420412,
+  "endTime": 1783420412,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3,
+        5
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        8
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        6,
+        7
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.c",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.d",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 8,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.d",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# MERGE whose UPDATE RHS mixes a target column and a source column.
+# Only `c` is assigned, so `c` is the sole projection target — but its sources
+# must include both target.a and source.b.
+merge into lineage_dml_test_db.iceberg_wide t
+using lineage_dml_test_db.iceberg_wide_src s on t.id = s.id
+when matched then update set t.c = t.a + s.b
+---- LINEAGE
+{
+  "queryText": "merge into lineage_dml_test_db.iceberg_wide t using lineage_dml_test_db.iceberg_wide_src s on t.id = s.id when matched then update set t.c = t.a + s.b",
+  "operationType": "MERGE",
+  "queryId": "ba4a34a2f769f75e:235909da00000000",
+  "hash": "7f4c1f2ef0a1b56e0b132fa64dfc7a01",
+  "user": "dvanko",
+  "timestamp": 1783420417,
+  "endTime": 1783420417,
+  "edges": [
+    {
+      "sources": [
+        1,
+        2
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3,
+        4
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.c",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# Create a reference table for UPDATE FROM tests
+create table lineage_dml_test_db.iceberg_ref_table
+(id int, new_user string, new_action string)
+stored by iceberg
+====
+---- QUERY
+insert into lineage_dml_test_db.iceberg_ref_table
+values (1, 'UpdatedUser1', 'UpdatedAction1'),
+       (2, 'UpdatedUser2', 'UpdatedAction2')
+====
+---- QUERY
+update lineage_dml_test_db.iceberg_non_partitioned
+set user = r.new_user, action = r.new_action
+from lineage_dml_test_db.iceberg_non_partitioned, lineage_dml_test_db.iceberg_ref_table r
+where lineage_dml_test_db.iceberg_non_partitioned.id = r.id
+---- LINEAGE
+{
+  "queryText": "update lineage_dml_test_db.iceberg_non_partitioned set user = r.new_user, action = r.new_action from lineage_dml_test_db.iceberg_non_partitioned, lineage_dml_test_db.iceberg_ref_table r where lineage_dml_test_db.iceberg_non_partitioned.id = r.id",
+  "operationType": "UPDATE",
+  "queryId": "e64825dab66ee64e:71a2028f00000000",
+  "hash": "f2e0d22458b9661b411bf3031caf7cc0",
+  "user": "dvanko",
+  "timestamp": 1778504451,
+  "endTime": 1778504452,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "targets": [
+        0,
+        2
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1778504397
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_ref_table.new_user",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_ref_table",
+        "tableType": "iceberg",
+        "tableCreateTime": 1778504451
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.action",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1778504397
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_ref_table.new_action",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_ref_table",
+        "tableType": "iceberg",
+        "tableCreateTime": 1778504451
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_non_partitioned.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_non_partitioned",
+        "tableType": "iceberg",
+        "tableCreateTime": 1778504397
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_ref_table.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_ref_table",
+        "tableType": "iceberg",
+        "tableCreateTime": 1778504451
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# Wide UPDATE FROM with 5 assigned columns in schema order. Uses the iceberg_wide
+# / iceberg_wide_src pair set up earlier in the file. `c` is derived from a
+# multi-source expression (s.a + s.b); the other four columns are direct copies
+# from the source.
+update t
+set t.a = s.a,
+    t.b = s.b,
+    t.c = s.a + s.b,
+    t.d = s.d,
+    t.e = s.e
+from lineage_dml_test_db.iceberg_wide t
+join lineage_dml_test_db.iceberg_wide_src s on t.id = s.id
+---- LINEAGE
+{
+  "queryText": "update t set t.a = s.a,     t.b = s.b,     t.c = s.a + s.b,     t.d = s.d,     t.e = s.e from lineage_dml_test_db.iceberg_wide t join lineage_dml_test_db.iceberg_wide_src s on t.id = s.id",
+  "operationType": "UPDATE",
+  "queryId": "da4159e247221489:e0d28ebc00000000",
+  "hash": "cd552f9b49e3f8c05fdda09b26865bab",
+  "user": "dvanko",
+  "timestamp": 1783420428,
+  "endTime": 1783420429,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        3
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6
+      ],
+      "targets": [
+        5
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        8
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        5,
+        7
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.c",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.d",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.d",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.e",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 8,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.e",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 9,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 10,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    }
+  ]
+}
+====
+---- QUERY
+# Same target columns as the previous UPDATE FROM, but assigned in reverse order.
+# The generated lineage's projection edges must reference the same source columns
+# for each target — assignment order in the SET clause is textual and must not
+# affect the graph.
+update t
+set t.e = s.e,
+    t.d = s.d,
+    t.c = s.a + s.b,
+    t.b = s.b,
+    t.a = s.a
+from lineage_dml_test_db.iceberg_wide t
+join lineage_dml_test_db.iceberg_wide_src s on t.id = s.id
+---- LINEAGE
+{
+  "queryText": "update t set t.e = s.e,     t.d = s.d,     t.c = s.a + s.b,     t.b = s.b,     t.a = s.a from lineage_dml_test_db.iceberg_wide t join lineage_dml_test_db.iceberg_wide_src s on t.id = s.id",
+  "operationType": "UPDATE",
+  "queryId": "6b47f710ba2715ff:1ef0155c00000000",
+  "hash": "dd116fc7ef3d1d6c6222adee65dacd58",
+  "user": "dvanko",
+  "timestamp": 1783420434,
+  "endTime": 1783420434,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5,
+        6
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        7,
+        8
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.e",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.e",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.d",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.d",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.c",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.b",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 8,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.a",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 9,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    },
+    {
+      "id": 10,
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_dml_test_db.iceberg_wide_src.id",
+      "metadata": {
+        "tableName": "lineage_dml_test_db.iceberg_wide_src",
+        "tableType": "iceberg",
+        "tableCreateTime": 1783420400
+      }
+    }
+  ]
+}
+====
