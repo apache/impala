@@ -41,6 +41,7 @@ class LikePredicate: public Predicate {
 
  protected:
   friend class ScalarExprEvaluator;
+  friend class LikePredicateTests;
 
   LikePredicate(const TExprNode& node)
       : Predicate(node) { }
@@ -121,6 +122,11 @@ class LikePredicate: public Predicate {
   static impala_udf::BooleanVal Regex(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
 
+  /// Try to find an optimized function to match constant pattern,
+  /// e.g. if constant contains no wildcards, string equality check will be used.
+  static void OptimizeConstantPatternMatch(const string &pattern,
+      LikePredicateState *state);
+
   /// Prepare function for regexp_like() when a third optional parameter is used
   static void RegexpLikePrepare(impala_udf::FunctionContext* context,
       impala_udf::FunctionContext::FunctionStateScope scope);
@@ -144,6 +150,9 @@ class LikePredicate: public Predicate {
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
 
   static impala_udf::BooleanVal LikeFn(impala_udf::FunctionContext* context,
+      const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
+
+  static impala_udf::BooleanVal LikeFnPartial(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
 
   /// Handling of like predicates that map to strstr
@@ -175,8 +184,9 @@ class LikePredicate: public Predicate {
 
   /// Convert a LIKE pattern (with embedded % and _) into the corresponding
   /// regular expression pattern. Escaped chars are copied verbatim.
-  static void ConvertLikePattern(impala_udf::FunctionContext* context,
-      const impala_udf::StringVal& pattern, std::string* re_pattern);
+  static void ConvertLikePattern(LikePredicateState* state,
+      const impala_udf::StringVal& pattern, std::string* re_pattern,
+      bool anchor_start = false, bool anchor_end = false);
 };
 
 }  // namespace impala

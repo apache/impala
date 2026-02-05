@@ -285,6 +285,61 @@ Benchmark* BenchmarkLike(bool codegen) {
   BENCHMARK("strncmp2", "'abcdefghijklmnopqrstuvwxyz' LIKE 'abc%'");
   BENCHMARK("strncmp3", "'abcdefghijklmnopqrstuvwxyz' LIKE 'abc'");
   BENCHMARK("regex", "'abcdefghijklmnopqrstuvwxyz' LIKE 'abc%z'");
+
+  return suite;
+}
+
+// Like Regexp:               Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+//                                                                          (relative) (relative) (relative)
+// ---------------------------------------------------------------------------------------------------------
+//                                like               10.7     10.8     10.9         1X         1X         1X
+//                               regex               10.7     10.8     10.9         1X     0.997X         1X
+//                        leading like               63.6     64.3     65.2      5.95X      5.95X      5.99X
+//                       leading regex               67.4     67.9     68.8       6.3X      6.28X      6.33X
+//                       trailing like               18.5     18.7       19      1.74X      1.73X      1.75X
+//                      trailing regex               18.7     18.9     19.1      1.75X      1.75X      1.75X
+//               trailing leading like               59.8     60.5     61.1      5.59X      5.59X      5.61X
+//              trailing leading regex               60.5     61.1     61.6      5.66X      5.65X      5.66X
+//
+// Like RegexpCodegen:        Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+//                                                                          (relative) (relative) (relative)
+// ---------------------------------------------------------------------------------------------------------
+//                                like               10.7     10.8     10.9         1X         1X         1X
+//                               regex               10.7     10.8     10.9         1X         1X         1X
+//                        leading like               67.9     68.7     69.3      6.36X      6.36X      6.37X
+//                       leading regex               67.4     68.3     69.1      6.31X      6.32X      6.36X
+//                       trailing like               18.5     18.9       19      1.73X      1.75X      1.75X
+//                      trailing regex               18.7     18.9     19.1      1.75X      1.75X      1.76X
+//               trailing leading like               63.1     63.9     64.6      5.91X      5.92X      5.94X
+//              trailing leading regex               63.5     63.9     64.8      5.95X      5.92X      5.96X
+Benchmark* BenchmarkLikeRegexp(bool codegen) {
+  Benchmark* suite = new Benchmark(BenchmarkName("Like Regexp", codegen));
+
+  #define LONG_STRING "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+  #define MATCH_PATTERN "'b" LONG_STRING "c" LONG_STRING "b'"
+  #define MATCH_PATTERN_LEADING "'" LONG_STRING "xyz'"
+  #define MATCH_PATTERN_TRAILING "'xyz" LONG_STRING "'"
+  #define MATCH_PATTERN_TRAILING_LEADING "'" LONG_STRING "mno" LONG_STRING "'"
+
+  BENCHMARK("like", MATCH_PATTERN "LIKE 'b%b'");
+  BENCHMARK("regex", "regexp_like(" MATCH_PATTERN ", '^b.*b$', 'cn')");
+  BENCHMARK("leading like", MATCH_PATTERN_LEADING " LIKE '%x%z'");
+  BENCHMARK("leading regex", "regexp_like(" MATCH_PATTERN_LEADING ", 'x.*z$', 'cn')");
+  BENCHMARK("trailing like", MATCH_PATTERN_TRAILING " LIKE 'x%z%'");
+  BENCHMARK("trailing regex", "regexp_like(" MATCH_PATTERN_TRAILING ", '^x.*z', 'cn')");
+  BENCHMARK("trailing leading like", MATCH_PATTERN_TRAILING_LEADING " like '%m%o%'");
+  BENCHMARK("trailing leading regex",
+      "regexp_like(" MATCH_PATTERN_TRAILING_LEADING ", 'm.*o', 'cn')");
+
+  #undef MATCH_PATTERN_TRAILING_LEADING
+  #undef MATCH_PATTERN_TRAILING
+  #undef MATCH_PATTERN_LEADING
+  #undef MATCH_PATTERN
+  #undef LONG_STRING
+
+
   return suite;
 }
 
@@ -950,6 +1005,7 @@ int main(int argc, char** argv) {
   benchmarks.push_back(&BenchmarkLiterals);
   benchmarks.push_back(&BenchmarkArithmetic);
   benchmarks.push_back(&BenchmarkLike);
+  benchmarks.push_back(&BenchmarkLikeRegexp);
   benchmarks.push_back(&BenchmarkCast);
   benchmarks.push_back(&BenchmarkDecimalCast);
   benchmarks.push_back(&BenchmarkConditionalFunctions);

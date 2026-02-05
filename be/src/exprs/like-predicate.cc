@@ -71,44 +71,10 @@ void LikePredicate::LikePrepareInternal(FunctionContext* context,
     StringVal pattern_val = *reinterpret_cast<StringVal*>(context->GetConstantArg(1));
     if (pattern_val.is_null) return;
     StringValue pattern = StringValue::FromStringVal(pattern_val);
-    re2::RE2 substring_re("(?:%+)([^%_]*)(?:%+)");
-    re2::RE2 ends_with_re("(?:%+)([^%_]*)");
-    re2::RE2 starts_with_re("([^%_]*)(?:%+)");
-    re2::RE2 equals_re("([^%_]*)");
-    re2::RE2 ends_with_escaped_wildcard(".*\\\\%$");
     string pattern_str(pattern.Ptr(), pattern.Len());
-    string search_string;
-    if (case_sensitive &&
-        RE2::FullMatch(pattern_str, substring_re, &search_string) &&
-        !RE2::FullMatch(pattern_str, ends_with_escaped_wildcard)) {
-      state->SetSearchString(search_string);
-      state->function_ = ConstantSubstringFn;
-    } else if (case_sensitive &&
-        RE2::FullMatch(pattern_str, starts_with_re, &search_string) &&
-        !RE2::FullMatch(pattern_str, ends_with_escaped_wildcard)) {
-      state->SetSearchString(search_string);
-      state->function_ = ConstantStartsWithFn;
-    } else if (case_sensitive &&
-        RE2::FullMatch(pattern_str, ends_with_re, &search_string)) {
-      state->SetSearchString(search_string);
-      state->function_ = ConstantEndsWithFn;
-    } else if (case_sensitive &&
-        RE2::FullMatch(pattern_str, equals_re, &search_string)) {
-      state->SetSearchString(search_string);
-      state->function_ = ConstantEqualsFn;
-    } else {
-      string re_pattern;
-      ConvertLikePattern(context,
-          *reinterpret_cast<StringVal*>(context->GetConstantArg(1)), &re_pattern);
-      RE2::Options opts;
-      opts.set_never_nl(false);
-      opts.set_dot_nl(true);
-      opts.set_case_sensitive(case_sensitive);
-      StringFunctions::SetRE2MemOpt(&opts);
-      state->regex_.reset(new RE2(re_pattern, opts));
-      if (!state->regex_->ok()) {
-        context->SetError(Substitute("Invalid regex: $0", pattern_str).c_str());
-      }
+    OptimizeConstantPatternMatch(pattern_str, state);
+    if (state->regex_ && !state->regex_->ok()) {
+      context->SetError(Substitute("Invalid regex: $0", pattern_str).c_str());
     }
   }
 }
@@ -265,6 +231,12 @@ BooleanVal LikePredicate::LikeFn(FunctionContext* context, const StringVal& val,
   return RegexMatch(context, val, pattern, true);
 }
 
+BooleanVal LikePredicate::LikeFnPartial(FunctionContext* context, const StringVal& val,
+    const StringVal& pattern) {
+  // Handle partial LIKE as if it were a regexp_like, so that it uses PartialMatch
+  return RegexMatch(context, val, pattern, false);
+}
+
 BooleanVal LikePredicate::ConstantSubstringFn(FunctionContext* context,
     const StringVal& val, const StringVal& pattern) {
   if (val.is_null) return BooleanVal::null();
@@ -351,7 +323,7 @@ BooleanVal LikePredicate::RegexMatch(FunctionContext* context,
     opts.set_case_sensitive(state->case_sensitive_);
     StringFunctions::SetRE2MemOpt(&opts);
     if (is_like_pattern) {
-      ConvertLikePattern(context, pattern_value, &re_pattern);
+      ConvertLikePattern(state, pattern_value, &re_pattern);
       opts.set_never_nl(false);
       opts.set_dot_nl(true);
     } else {
@@ -378,11 +350,87 @@ BooleanVal LikePredicate::RegexMatch(FunctionContext* context,
   }
 }
 
-void LikePredicate::ConvertLikePattern(FunctionContext* context, const StringVal& pattern,
-    string* re_pattern) {
+void LikePredicate::OptimizeConstantPatternMatch(const string &pattern,
+    LikePredicateState *state) {
+  re2::RE2 substring_re("(?:%+)([^%_]*)(?:%+)");
+  re2::RE2 ends_with_re("(?:%+)([^%_]*)");
+  re2::RE2 starts_with_re("([^%_]*)(?:%+)");
+  re2::RE2 equals_re("([^%_]*)");
+  re2::RE2 ends_with_escaped_wildcard(".*\\\\%$");
+  string search_string;
+  bool case_sensitive = state->case_sensitive_;
+  if (case_sensitive &&
+      RE2::FullMatch(pattern, substring_re, &search_string) &&
+      !RE2::FullMatch(pattern, ends_with_escaped_wildcard)) {
+    state->SetSearchString(search_string);
+    state->function_ = ConstantSubstringFn;
+  } else if (case_sensitive &&
+      RE2::FullMatch(pattern, starts_with_re, &search_string) &&
+      !RE2::FullMatch(pattern, ends_with_escaped_wildcard)) {
+    state->SetSearchString(search_string);
+    state->function_ = ConstantStartsWithFn;
+  } else if (case_sensitive &&
+      RE2::FullMatch(pattern, ends_with_re, &search_string)) {
+    state->SetSearchString(search_string);
+    state->function_ = ConstantEndsWithFn;
+  } else if (case_sensitive &&
+      RE2::FullMatch(pattern, equals_re, &search_string)) {
+    state->SetSearchString(search_string);
+    state->function_ = ConstantEqualsFn;
+  } else {
+    string re_pattern;
+    bool re_full_match = true;
+    bool re_anchor_start = false;
+    bool re_anchor_end = false;
+    StringVal re_pattern_val = StringVal(pattern.c_str());
+    // IMPALA-12374:
+    // Avoid leading/trailing .* in regex, use (anchored) partial match instead
+    re2::RE2 leading_trailing_re("(?:%+)(.*)(?:%+)");
+    re2::RE2 leading_re("(?:%+)(.*)");
+    re2::RE2 trailing_re("(.*)(?:%+)");
+    string trimmed_pattern;
+    if (RE2::FullMatch(pattern, leading_trailing_re, &trimmed_pattern) &&
+        !RE2::FullMatch(pattern, ends_with_escaped_wildcard)) {
+      // e.g. '%a%b%'
+      re_pattern_val = StringVal(trimmed_pattern.c_str());
+      re_full_match = false;
+    } else if(RE2::FullMatch(pattern, leading_re, &trimmed_pattern)) {
+      // e.g. '%a%b'
+      re_pattern_val = StringVal(trimmed_pattern.c_str());
+      re_full_match = false;
+      re_anchor_end = true;
+    } else if(RE2::FullMatch(pattern, trailing_re, &trimmed_pattern) &&
+        !RE2::FullMatch(pattern, ends_with_escaped_wildcard)) {
+      // e.g. 'a%b%'
+      re_pattern_val = StringVal(trimmed_pattern.c_str());
+      re_full_match = false;
+      re_anchor_start = true;
+    }
+
+    ConvertLikePattern(state, re_pattern_val, &re_pattern, re_anchor_start,
+        re_anchor_end);
+    RE2::Options opts;
+    opts.set_never_nl(false);
+    opts.set_dot_nl(true);
+    opts.set_case_sensitive(case_sensitive);
+    StringFunctions::SetRE2MemOpt(&opts);
+    state->regex_.reset(new RE2(re_pattern, opts));
+    if (re_full_match) {
+      state->function_ = LikeFn;
+    } else {
+      state->function_ = LikeFnPartial;
+    }
+  }
+}
+
+void LikePredicate::ConvertLikePattern(LikePredicateState* state,
+    const StringVal& pattern, string* re_pattern, bool anchor_start,
+    bool anchor_end) {
   re_pattern->clear();
-  LikePredicateState* state = reinterpret_cast<LikePredicateState*>(
-      context->GetFunctionState(FunctionContext::THREAD_LOCAL));
+  if (anchor_start) {
+    re_pattern->append("^");
+  }
+
   bool is_escaped = false;
   for (int i = 0; i < pattern.len; ++i) {
     if (!is_escaped && pattern.ptr[i] == '%') {
@@ -418,6 +466,10 @@ void LikePredicate::ConvertLikePattern(FunctionContext* context, const StringVal
       re_pattern->append(1, pattern.ptr[i]);
       is_escaped = false;
     }
+  }
+
+  if (anchor_end) {
+    re_pattern->append("$");
   }
 }
 

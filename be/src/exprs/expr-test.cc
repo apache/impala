@@ -3933,6 +3933,9 @@ TEST_P(ExprTest, LikePredicate) {
   TestValue("'abcde' LIKE 'abcde%'", TYPE_BOOLEAN, true);
   TestValue("'abcde' LIKE '%abcde'", TYPE_BOOLEAN, true);
   TestValue("'abcde' LIKE '%abcde%'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE '%a%d%'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE '%b%e'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE 'a%b%'", TYPE_BOOLEAN, true);
   // Test multiple wildcard characters
   TestValue("'abcde' LIKE '%%bc%%'", TYPE_BOOLEAN, true);
   TestValue("'abcde' LIKE '%%cb%%'", TYPE_BOOLEAN, false);
@@ -4057,6 +4060,9 @@ TEST_P(ExprTest, LikePredicate) {
   TestValue("'aBcde' ILIKE 'A%%Dc%%'", TYPE_BOOLEAN, false);
   TestValue("'aBcde' ILIKE 'AbCde'", TYPE_BOOLEAN, true);
   TestValue("'aBcde' ILIKE 'AbDCe'", TYPE_BOOLEAN, false);
+  TestValue("'aBcde' ILIKE '%ab%d%'", TYPE_BOOLEAN, true);
+  TestValue("'aBcde' ILIKE '%b%e'", TYPE_BOOLEAN, true);
+  TestValue("'aBcde' ILIKE 'a%b%'", TYPE_BOOLEAN, true);
   TestValue("'Abc\n123' ILIKE 'aBc%123'", TYPE_BOOLEAN, true);
   TestValue("'Abc\n\n123' ILIKE 'aBc%123'", TYPE_BOOLEAN, true);
   TestValue("'\nAbc\n123' ILIKE '%aBc_123'", TYPE_BOOLEAN, true);
