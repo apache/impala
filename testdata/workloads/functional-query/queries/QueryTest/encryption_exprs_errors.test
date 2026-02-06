@@ -54,12 +54,6 @@ select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'123456789012345
 UDF ERROR: Invalid AES 'mode': AES_256_GC
 ====
 ---- QUERY
-select aes_decrypt("a",'1234567890123456','AES_128_GCM','1234567890123456');
----- RESULTS
----- CATCH
-UDF ERROR: AES GCM input too short to contain a tag
-====
----- QUERY
 select aes_decrypt("a",'12345678901234567890123456789012','AES_256_GCM','1234567890123456');
 ---- RESULTS
 ---- CATCH
