@@ -17,6 +17,8 @@
 
 # Python3-only requirements
 
+prettytable == 2.5.0
+  wcwidth == 0.2.14
 pylint == 2.10.2
   astroid == 2.7.3
     lazy-object-proxy == 1.6.0
