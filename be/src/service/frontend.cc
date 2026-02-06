@@ -24,6 +24,7 @@
 #include "common/logging.h"
 #include "rpc/jni-thrift-util.h"
 #include "util/backend-gflag-util.h"
+#include "util/container-util.h"
 #include "util/jni-util.h"
 #include "util/test-info.h"
 #include "util/time.h"

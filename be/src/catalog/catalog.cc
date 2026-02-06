@@ -24,6 +24,7 @@
 #include "common/thread-debug-info.h"
 #include "rpc/jni-thrift-util.h"
 #include "util/backend-gflag-util.h"
+#include "util/container-util.h"
 
 #include "common/names.h"
 

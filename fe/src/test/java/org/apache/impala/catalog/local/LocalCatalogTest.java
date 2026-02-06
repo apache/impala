@@ -52,6 +52,7 @@ import org.apache.impala.thrift.TMetadataOpcode;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialTableInfo;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.util.Hash128;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
@@ -292,7 +293,7 @@ public class LocalCatalogTest {
       // For this test table the manifest files contain data paths without FS-scheme, so
       // they are loaded to the file content store without them.
       path = path.substring(path.indexOf("/test-warehouse"));
-      String pathHash = IcebergUtil.getFilePathHash(path);
+      Hash128 pathHash = IcebergUtil.getFilePathHash(path);
       FileDescriptor catalogFd = catalogFileStore.getDataFileDescriptor(pathHash);
       assertEquals(localFd.getNumFileBlocks(), 1);
       FbFileBlock localBlock = localFd.getFbFileBlock(0);

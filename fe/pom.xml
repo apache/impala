@@ -585,6 +585,12 @@ under the License.
               </exclusion>
           </exclusions>
       </dependency>
+
+    <dependency>
+      <groupId>net.openhft</groupId>
+      <artifactId>zero-allocation-hashing</artifactId>
+      <version>0.16</version>
+    </dependency>
   </dependencies>
 
   <reporting>

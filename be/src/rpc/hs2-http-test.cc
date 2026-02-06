@@ -21,6 +21,7 @@
 
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "rpc/authentication.h"
+#include "util/container-util.h"
 #include "util/kudu-status-util.h"
 #include "util/network-util.h"
 #include "util/os-util.h"

@@ -734,16 +734,17 @@ public class IcebergUtil {
   }
 
   /**
-   * Use ContentFile path to generate 128-bit Murmur3 hash as map key, cached in memory
+   * Use ContentFile path to generate 128-bit XXH128 hash as map key, cached in memory
    */
-  public static String getFilePathHash(ContentFile contentFile) {
+  public static Hash128 getFilePathHash(ContentFile contentFile) {
     return getFilePathHash(contentFile.path().toString());
   }
 
-  public static String getFilePathHash(String path) {
-    Hasher hasher = Hashing.murmur3_128().newHasher();
-    hasher.putUnencodedChars(path);
-    return hasher.hash().toString();
+  public static Hash128 getFilePathHash(String path) {
+    net.openhft.hashing.LongTupleHashFunction hasher =
+        net.openhft.hashing.LongTupleHashFunction.xx128();
+    long[] result = hasher.hashChars(path);
+    return new Hash128(result[0], result[1]);
   }
 
   /**

@@ -259,9 +259,9 @@ public class IcebergUtilTest {
    */
   @Test
   public void testGetDataFilePathHash() {
-    String hash = getFilePathHash(FILE_A);
+    Hash128 hash = getFilePathHash(FILE_A);
     assertNotNull(hash);
-    String hash2 = getFilePathHash(FILE_A);
+    Hash128 hash2 = getFilePathHash(FILE_A);
     assertEquals(hash, hash2);
   }
 

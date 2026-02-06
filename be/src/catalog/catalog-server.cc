@@ -28,6 +28,7 @@
 #include "gen-cpp/CatalogService_types.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/collection-metrics.h"
+#include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/event-metrics.h"
 #include "util/json-util.h"

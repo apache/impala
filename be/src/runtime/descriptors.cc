@@ -35,6 +35,7 @@
 #include "gen-cpp/PlanNodes_types.h"
 #include "rpc/thrift-util.h"
 #include "runtime/runtime-state.h"
+#include "util/container-util.h"
 #include "util/hash-util.h"
 
 #include "common/names.h"

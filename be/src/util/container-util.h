@@ -32,6 +32,7 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/StatestoreService_types.h"
 #include "gen-cpp/common.pb.h"
+#include "util/thash128-util.h"
 
 /// Comparators for types that we commonly use in containers.
 namespace impala {

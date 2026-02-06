@@ -657,12 +657,19 @@ struct TIcebergPartitionStats {
   3: required i64 file_size_in_bytes;
 }
 
-// Contains maps from 128-bit Murmur3 hash of file path to its file descriptor
+// Represents a 128-bit hash value (XXH128 hash of file path)
+// Stored as two 64-bit longs for memory efficiency
+struct THash128 {
+  1: required i64 high
+  2: required i64 low
+}
+
+// Contains maps from 128-bit XXH128 hash of file path to its file descriptor
 struct TIcebergContentFileStore {
-  1: optional map<string, THdfsFileDesc> path_hash_to_data_file_without_deletes
-  2: optional map<string, THdfsFileDesc> path_hash_to_data_file_with_deletes
-  3: optional map<string, THdfsFileDesc> path_hash_to_position_delete_file
-  4: optional map<string, THdfsFileDesc> path_hash_to_equality_delete_file
+  1: optional map<THash128, THdfsFileDesc> path_hash_to_data_file_without_deletes
+  2: optional map<THash128, THdfsFileDesc> path_hash_to_data_file_with_deletes
+  3: optional map<THash128, THdfsFileDesc> path_hash_to_position_delete_file
+  4: optional map<THash128, THdfsFileDesc> path_hash_to_equality_delete_file
   5: optional bool has_avro
   6: optional bool has_orc
   7: optional bool has_parquet

@@ -88,6 +88,7 @@ import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TVirtualColumnType;
+import org.apache.impala.util.Hash128;
 import org.apache.impala.util.IcebergUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -801,7 +802,7 @@ public class IcebergScanPlanner {
   private Pair<IcebergFileDescriptor, Boolean> getFileDescriptor(ContentFile<?> cf,
       IcebergContentFileStore fileStore)
       throws ImpalaRuntimeException {
-    String pathHash = IcebergUtil.getFilePathHash(cf);
+    Hash128 pathHash = IcebergUtil.getFilePathHash(cf);
 
     IcebergFileDescriptor iceFileDesc = cf.content() == FileContent.DATA ?
         fileStore.getDataFileDescriptor(pathHash) :

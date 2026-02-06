@@ -44,10 +44,12 @@ import org.apache.impala.fb.FbFileDesc;
 import org.apache.impala.fb.FbFileMetadata;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
 import org.apache.impala.fb.FbIcebergMetadata;
+import org.apache.impala.thrift.THash128;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.TIcebergContentFileStore;
 import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.util.Hash128;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 
@@ -97,12 +99,12 @@ public class IcebergContentFileStore {
   // Auxiliary class for holding file descriptors in both a map and a list.
   private static class MapListContainer {
     // Key is the ContentFile path hash, value is FileDescriptor transformed from DataFile
-    private final Map<String, EncodedFileDescriptor> fileDescMap_ = new HashMap<>();
+    private final Map<Hash128, EncodedFileDescriptor> fileDescMap_ = new HashMap<>();
     private final List<EncodedFileDescriptor> fileDescList_ = new ArrayList<>();
 
     // Adds a file to the map. If this is a new entry, then add it to the list as well.
     // Return true if 'desc' was a new entry.
-    public boolean add(String pathHash, EncodedFileDescriptor desc) {
+    public boolean add(Hash128 pathHash, EncodedFileDescriptor desc) {
       if (fileDescMap_.put(pathHash, desc) == null) {
         fileDescList_.add(desc);
         return true;
@@ -110,7 +112,7 @@ public class IcebergContentFileStore {
       return false;
     }
 
-    public IcebergFileDescriptor get(String pathHash) {
+    public IcebergFileDescriptor get(Hash128 pathHash) {
       if (!fileDescMap_.containsKey(pathHash)) return null;
       return decode(fileDescMap_.get(pathHash));
     }
@@ -124,27 +126,27 @@ public class IcebergContentFileStore {
     }
 
     // It's enough to only convert the map part to thrift.
-    Map<String, THdfsFileDesc> toThrift() {
-      Map<String, THdfsFileDesc> ret = new HashMap<>();
-      for (Map.Entry<String, EncodedFileDescriptor> entry : fileDescMap_.entrySet()) {
+    Map<THash128, THdfsFileDesc> toThrift() {
+      Map<THash128, THdfsFileDesc> ret = new HashMap<>();
+      for (Map.Entry<Hash128, EncodedFileDescriptor> entry : fileDescMap_.entrySet()) {
         ret.put(
-            entry.getKey(),
+            entry.getKey().toThrift(),
             decode(entry.getValue()).toThrift());
       }
       return ret;
     }
 
-    static MapListContainer fromThrift(Map<String, THdfsFileDesc> thriftMap,
+    static MapListContainer fromThrift(Map<THash128, THdfsFileDesc> thriftMap,
         List<TNetworkAddress> networkAddresses, ListMap<TNetworkAddress> hostIndex) {
       MapListContainer ret = new MapListContainer();
-      for (Map.Entry<String, THdfsFileDesc> entry : thriftMap.entrySet()) {
+      for (Map.Entry<THash128, THdfsFileDesc> entry : thriftMap.entrySet()) {
         IcebergFileDescriptor fd = IcebergFileDescriptor.fromThrift(entry.getValue());
         Preconditions.checkNotNull(fd);
         if (networkAddresses != null) {
           Preconditions.checkNotNull(hostIndex);
           fd = fd.cloneWithNewHostIndex(networkAddresses, hostIndex);
         }
-        ret.add(entry.getKey(), encode(fd));
+        ret.add(Hash128.fromThrift(entry.getKey()), encode(fd));
       }
       return ret;
     }
@@ -161,7 +163,7 @@ public class IcebergContentFileStore {
   private Map<TIcebergPartition, Integer> partitions_;
 
   // Caches file descriptors loaded during time-travel queries.
-  private final ConcurrentMap<String, EncodedFileDescriptor> oldFileDescMap_ =
+  private final ConcurrentMap<Hash128, EncodedFileDescriptor> oldFileDescMap_ =
       new ConcurrentHashMap<>();
   // Caches the partitions of file descriptors loaded during time-travel queries.
   private final ConcurrentMap<TIcebergPartition, Integer> oldPartitionMap_ =
@@ -206,7 +208,7 @@ public class IcebergContentFileStore {
 
   private void storeFile(ContentFile<?> contentFile,
       Map<String, IcebergFileDescriptor> fileDescMap, MapListContainer container) {
-    Pair<String, EncodedFileDescriptor> pathHashAndFd =
+    Pair<Hash128, EncodedFileDescriptor> pathHashAndFd =
         getPathHashAndFd(contentFile, fileDescMap);
     if (pathHashAndFd.second != null) {
       container.add(pathHashAndFd.first, pathHashAndFd.second);
@@ -217,7 +219,7 @@ public class IcebergContentFileStore {
 
   // This is only invoked during time travel, when we are querying a snapshot that has
   // data files which have been removed since.
-  public void addOldFileDescriptor(String pathHash, IcebergFileDescriptor desc) {
+  public void addOldFileDescriptor(Hash128 pathHash, IcebergFileDescriptor desc) {
     oldFileDescMap_.put(pathHash, encode(desc));
   }
 
@@ -227,19 +229,19 @@ public class IcebergContentFileStore {
     oldPartitionMap_.put(partition, id);
   }
 
-  public IcebergFileDescriptor getDataFileDescriptor(String pathHash) {
+  public IcebergFileDescriptor getDataFileDescriptor(Hash128 pathHash) {
     IcebergFileDescriptor desc = dataFilesWithoutDeletes_.get(pathHash);
     if (desc != null) return desc;
     return dataFilesWithDeletes_.get(pathHash);
   }
 
-  public IcebergFileDescriptor getDeleteFileDescriptor(String pathHash) {
+  public IcebergFileDescriptor getDeleteFileDescriptor(Hash128 pathHash) {
     IcebergFileDescriptor ret = positionDeleteFiles_.get(pathHash);
     if (ret != null) return ret;
     return equalityDeleteFiles_.get(pathHash);
   }
 
-  public IcebergFileDescriptor getOldFileDescriptor(String pathHash) {
+  public IcebergFileDescriptor getOldFileDescriptor(Hash128 pathHash) {
     if (!oldFileDescMap_.containsKey(pathHash)) return null;
     return decode(oldFileDescMap_.get(pathHash));
   }
@@ -332,7 +334,7 @@ public class IcebergContentFileStore {
     }
   }
 
-  private Pair<String, EncodedFileDescriptor> getPathHashAndFd(
+  private Pair<Hash128, EncodedFileDescriptor> getPathHashAndFd(
       ContentFile<?> contentFile, Map<String, IcebergFileDescriptor> fileDescMap) {
     return new Pair<>(
         IcebergUtil.getFilePathHash(contentFile),

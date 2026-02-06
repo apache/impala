@@ -84,6 +84,7 @@ import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.util.Hash128;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
@@ -496,7 +497,7 @@ public interface FeIcebergTable extends FeFsTable {
         rowBuilder.add(filePath);
 
         // Try to get actual file size from content file store
-        String pathHash = IcebergUtil.getFilePathHash(filePath);
+        Hash128 pathHash = IcebergUtil.getFilePathHash(filePath);
         FileDescriptor fd = contentFileStore.getDataFileDescriptor(pathHash);
         if (fd == null) {
           fd = contentFileStore.getDeleteFileDescriptor(pathHash);
