@@ -31,7 +31,7 @@ import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
-from tests.common.network import SKIP_SSL_MSG, REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12
+from tests.common.network import SKIP_SSL_MSG
 from tests.common.test_dimensions import create_client_protocol_dimension
 from tests.common.test_vector import BEESWAX
 from tests.shell.util import run_impala_shell_cmd, run_impala_shell_cmd_no_expect, \
@@ -78,12 +78,6 @@ class TestClientSsl(CustomClusterTestSuite):
               "--ssl_private_key={0}/server-key.pem "
               "--hostname=localhost " # Required to match hostname in certificate
               ).format(CERT_DIR)
-
-  @classmethod
-  def setup_class(cls):
-    if sys.version_info < REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12:
-      pytest.skip("Python version does not support tls 1.2")
-    super(TestClientSsl, cls).setup_class()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=SSL_ARGS, statestored_args=SSL_ARGS,
@@ -141,8 +135,7 @@ class TestClientSsl(CustomClusterTestSuite):
   def add_test_dimensions(cls):
     super(TestClientSsl, cls).add_test_dimensions()
     # Limit the test dimensions to avoid long run times. This runs hs2 and hs2-http
-    # with only the dev shells (python2 and python3) for a total of up to 4
-    # dimensions.
+    # with only the python3 dev shell (2 total dimensions).
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
     cls.ImpalaTestMatrix.add_dimension(
         create_impala_shell_executable_dimension(dev_only=True))
@@ -291,28 +284,3 @@ class TestClientSsl(CustomClusterTestSuite):
       response = requests.get(url, verify="%s/server-cert.pem" % CERT_DIR)
       assert response.status_code == requests.codes.ok, url
 
-
-# Run when the python version is too low to support TLS 1.2, to check that impala-shell
-# returns the expected warning.
-class TestClientSslUnsupported(CustomClusterTestSuite):
-  @classmethod
-  def setup_class(cls):
-    if sys.version_info >= REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12:
-      pytest.skip("This test is only run with older versions of python")
-    super(TestClientSslUnsupported, cls).setup_class()
-
-  SSL_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
-              "--ssl_server_certificate=%s/server-cert.pem "
-              "--ssl_private_key=%s/server-key.pem "
-              "--hostname=localhost "  # Required to match hostname in certificate
-              % (CERT_DIR, CERT_DIR, CERT_DIR))
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args=SSL_ARGS,
-                                    statestored_args=SSL_ARGS,
-                                    catalogd_args=SSL_ARGS)
-  @pytest.mark.skipif(SKIP_SSL_MSG != "", reason=SKIP_SSL_MSG)
-  def test_shell_warning(self, vector):
-    result = run_impala_shell_cmd_no_expect(vector, ["--ssl", "-q", "select 1 + 2"])
-    assert "Warning: TLSv1.2 is not supported for Python < 2.7.9" in result.stderr, \
-      result.stderr

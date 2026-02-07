@@ -421,8 +421,6 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
   def test_sigusr1_stacktraces(self, vector):
     if vector.get_value('strict_hs2_protocol'):
       pytest.skip("Strict HS2 mode doesn't support sleep() function")
-    if vector.get_value('impala_shell') in ['dev', 'python2']:
-      pytest.skip("Python 2 doesn't support faulthandler")
     command = "select sleep(5000); quit;"
     p = ImpalaShell(vector)
     p.send_cmd(command)

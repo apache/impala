@@ -22,6 +22,11 @@
 
 allpairspy == 2.5.0
 argparse == 1.4.0
+flake8==3.9.2
+  mccabe == 0.6.1
+  pyflakes==2.3.1
+  pycodestyle==2.7.0
+flake8-unused-arguments==0.0.13
 future == 0.18.3
 hdfs == 2.0.2
   docopt == 0.6.2
@@ -31,12 +36,28 @@ impyla == 0.21a3
   pure-sasl == 0.6.2
   # six == 1.14.0 (specified separately)
   thrift_sasl == 0.4.3
+isort == 5.13.2
+  poetry-core == 1.9.1
+k5test==0.10.3
+kazoo==2.8.0
 kerberos == 1.3.1
 pexpect == 3.3
 pg8000 == 1.10.2
+prettytable == 2.5.0
+  wcwidth == 0.2.14
 prometheus-client == 0.12.0
 psutil == 5.6.3
 pyparsing == 2.4.7
+pytest == 6.2.5
+  attrs == 19.2.0
+  iniconfig == 1.1.1
+  pluggy == 0.13.1
+  py == 1.8.2
+  pytest-forked == 1.6.0
+  pytest-reportlog == 0.4.0
+  pytest-timeout == 2.2.0
+  pytest-xdist == 2.4.0
+  toml == 0.10.2
 python-magic == 0.4.11
 pywebhdfs == 0.3.2
   pbr == 3.1.1
@@ -49,7 +70,6 @@ sasl == 0.2.1
 six == 1.14.0
 sqlparse == 0.3.1
 texttable == 0.8.3
-virtualenv == 16.7.10
 avro==1.10.2
 thrift==0.16.0
 distro==1.6.0

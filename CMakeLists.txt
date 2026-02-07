@@ -536,19 +536,11 @@ add_custom_target(cscope ALL DEPENDS gen-deps
   COMMAND "${CMAKE_SOURCE_DIR}/bin/gen-cscope.sh"
 )
 
-# IMPALA-14606: Stop building impala_python (Python 2) by default.
-# add_custom_target(impala_python ALL
-#   COMMAND "${CMAKE_SOURCE_DIR}/bin/init-impala-python.sh"
-# )
-
 add_custom_target(impala_python3 ALL
-  COMMAND "${CMAKE_SOURCE_DIR}/bin/init-impala-python.sh" "-python3"
+  COMMAND "${CMAKE_SOURCE_DIR}/bin/init-impala-python.sh"
 )
 
 set(IMPALA_PYTHON_INSTALLS "")
-if (NOT $ENV{IMPALA_SYSTEM_PYTHON2} EQUAL "")
-  list(APPEND IMPALA_PYTHON_INSTALLS shell_python2_install)
-endif()
 if (NOT $ENV{IMPALA_SYSTEM_PYTHON3} EQUAL "")
   list(APPEND IMPALA_PYTHON_INSTALLS shell_python3_install)
 endif()

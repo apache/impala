@@ -34,19 +34,10 @@ VENV_DIR=$2
 IS_PY36_OR_HIGHER=$(${PYTHON_EXE} -c "import sys; print(\
   'true' if sys.version_info.major >= 3 and sys.version_info.minor >= 6 else 'false')")
 
-# If using Python >= 3.6, try to use the builtin venv package.
-if $IS_PY36_OR_HIGHER ; then
-  if ${PYTHON_EXE} -m venv ${VENV_DIR} ; then
-    # Success
-    exit 0
-  fi
-  # Failure
-  echo "WARNING: Tried to create virtualenv with Python3's venv module and failed."
-  echo "Falling back to old impala-virtualenv path..."
-  # Remove the directory that Python3 venv created, so impala-virtualenv can start
-  # from a clean slate.
-  rm -rf ${VENV_DIR}
+if ! $IS_PY36_OR_HIGHER ; then
+  echo "ERROR: $0 only supports Python >= 3.6"
+  exit 1
 fi
 
-# Fall back to using the old impala-virtualenv method
-impala-virtualenv --python ${PYTHON_EXE} ${VENV_DIR}
+# Rely on the builtin venv package for Python >= 3.6
+${PYTHON_EXE} -m venv ${VENV_DIR}

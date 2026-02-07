@@ -133,9 +133,6 @@ def tmp_file():
 
 class TestImpalaShell(ImpalaTestSuite):
   """A set of sanity tests for the Impala shell commandline parameters.
-
-  The tests need to maintain Python 2.4 compatibility as a sub-goal of having
-  shell tests is to ensure that it's not broken in systems running Python 2.4.
   The tests need a running impalad instance in order to execute queries.
 
   TODO:

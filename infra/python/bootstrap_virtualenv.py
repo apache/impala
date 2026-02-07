@@ -58,17 +58,11 @@ GCC_VERSION = os.environ["IMPALA_GCC_VERSION"]
 IMPALA_HOME = os.environ["IMPALA_HOME"]
 
 DEPS_DIR = os.path.join(os.path.dirname(__file__), "deps")
-ENV_DIR_PY2 = os.path.join(os.path.dirname(__file__),
-                           "env-gcc{0}".format(GCC_VERSION))
 ENV_DIR_PY3 = os.path.join(os.path.dirname(__file__),
                            "env-gcc{0}-py3".format(GCC_VERSION))
 
 # Setuptools requirements file. Setuptools is required during pip install for
-# some packages. Newer setuptools dropped python 2 support, and some python
-# install tools don't understand that they need to get a version that works
-# with the current python version. This can cause them to try to install the newer
-# setuptools that won't work on python 2. Doing this as a separate step makes it
-# easy to pin the version of setuptools to a Python 2 compatible version.
+# some packages.
 SETUPTOOLS_REQS_PATH = os.path.join(DEPS_DIR, "setuptools-requirements.txt")
 
 # Requirements file with packages we need for our build and tests, which depends
@@ -87,12 +81,6 @@ ADLS_REQS_PATH = os.path.join(DEPS_DIR, "adls-requirements.txt")
 # virtualenv, so they are split off into their own step that only runs when coverage
 # is enabled.
 GCOVR_REQS_PATH = os.path.join(DEPS_DIR, "gcovr-requirements.txt")
-
-# Extra packages specific to python 3
-PY3_REQS_PATH = os.path.join(DEPS_DIR, "py3-requirements.txt")
-
-# Extra packages specific to python 2
-PY2_REQS_PATH = os.path.join(DEPS_DIR, "py2-requirements.txt")
 
 
 def delete_virtualenv_if_exist(venv_dir):
@@ -116,33 +104,12 @@ def detect_virtualenv_version():
   return None
 
 
-def create_virtualenv(venv_dir, is_py3):
-  if is_py3:
-    # Python 3 is much simpler, because there is a builtin venv command
-    LOG.info("Creating python3 virtualenv")
-    python_cmd = download_toolchain_python(is_py3)
-    exec_cmd([python_cmd, "-m" "venv", venv_dir])
-    return
-
-  # Python 2
-  LOG.info("Creating python2 virtualenv")
-  build_dir = tempfile.mkdtemp()
-  # Try to find the virtualenv version by parsing the requirements file
-  # Default to "*" if we can't figure it out.
-  virtualenv_version = detect_virtualenv_version()
-  if virtualenv_version is None:
-    virtualenv_version = "*"
-  # Open the virtualenv tarball
-  virtualenv_tarball = \
-      find_file(DEPS_DIR, "virtualenv-{0}.tar.gz".format(virtualenv_version))
-  file = tarfile.open(virtualenv_tarball, "r:gz")
-  for member in file.getmembers():
-    file.extract(member, build_dir)
-  file.close()
-  python_cmd = download_toolchain_python(is_py3)
-  exec_cmd([python_cmd, find_file(build_dir, "virtualenv*", "virtualenv.py"), "--quiet",
-      "--python", python_cmd, venv_dir])
-  shutil.rmtree(build_dir)
+def create_virtualenv(venv_dir):
+  # Use Python 3's builtin venv command
+  LOG.info("Creating python3 virtualenv")
+  python_cmd = download_toolchain_python()
+  exec_cmd([python_cmd, "-m" "venv", venv_dir])
+  return
 
 
 def exec_cmd(args, **kwargs):
@@ -172,7 +139,7 @@ def select_cc():
   return cc
 
 
-def exec_pip_install(venv_dir, is_py3, args, cc="no-cc-available", env=None):
+def exec_pip_install(venv_dir, args, cc="no-cc-available", env=None):
   '''Executes "pip install" with the provided command line arguments. If 'cc' is set,
   it is used as the C compiler. Otherwise compilation of C/C++ code is disabled by
   setting the CC environment variable to a bogus value.
@@ -201,12 +168,8 @@ def exec_pip_install(venv_dir, is_py3, args, cc="no-cc-available", env=None):
   # Don't call the virtualenv pip directly, it uses a hashbang to to call the python
   # virtualenv using an absolute path. If the path to the virtualenv is very long, the
   # hashbang won't work.
-  if is_py3:
-    impala_pip_base_cmd = [os.path.join(venv_dir, "bin", "python3"),
-                           os.path.join(venv_dir, "bin", "pip3"), "install", "-v"]
-  else:
-    impala_pip_base_cmd = [os.path.join(venv_dir, "bin", "python"),
-                           os.path.join(venv_dir, "bin", "pip"), "install", "-v"]
+  impala_pip_base_cmd = [os.path.join(venv_dir, "bin", "python3"),
+                         os.path.join(venv_dir, "bin", "pip3"), "install", "-v"]
 
   # Passes --no-binary for IMPALA-3767: without this, Cython (and
   # several other packages) fail download.
@@ -216,18 +179,11 @@ def exec_pip_install(venv_dir, is_py3, args, cc="no-cc-available", env=None):
   third_party_pkg_install_cmd = \
       impala_pip_base_cmd[:] + ["--no-binary", ":all:", "--no-cache-dir"]
 
-  # When using a custom mirror, we also must use the index of that mirror.
-  # The python 3 virtualenv has trouble with using --index-url with PYPI_MIRROR,
-  # so it falls back to --no-index, which works fine.
-  if "PYPI_MIRROR" in os.environ and not is_py3:
-    third_party_pkg_install_cmd.extend(["--index-url",
-                                        "%s/simple" % os.environ["PYPI_MIRROR"]])
-  else:
-    # Prevent fetching additional packages from the index. If we forget to add a package
-    # to one of the requirements.txt files, this should trigger an error. However, we will
-    # still access the index for version/dependency resolution, hence we need to change it
-    # when using a private mirror.
-    third_party_pkg_install_cmd.append("--no-index")
+  # Prevent fetching additional packages from the index. If we forget to add a package
+  # to one of the requirements.txt files, this should trigger an error. However, we will
+  # still access the index for version/dependency resolution, hence we need to change it
+  # when using a private mirror.
+  third_party_pkg_install_cmd.append("--no-index")
 
   third_party_pkg_install_cmd.extend(["--find-links",
       "file://%s" % pathname2url(os.path.abspath(DEPS_DIR))])
@@ -255,7 +211,7 @@ def find_file(*paths):
   return files[0]
 
 
-def download_toolchain_python(is_py3):
+def download_toolchain_python():
   '''Grabs the Python implementation from the Impala toolchain, using the machinery from
      bin/bootstrap_toolchain.py.
      Skip the download if SKIP_TOOLCHAIN_BOOTSTRAP=true in the environment. In that case
@@ -267,36 +223,27 @@ def download_toolchain_python(is_py3):
     raise Exception("Impala environment not set up correctly, make sure "
         "$IMPALA_TOOLCHAIN_PACKAGES_HOME is set.")
 
-  if is_py3:
-    package = ToolchainPackage("python",
-                               explicit_version=os.environ["IMPALA_PYTHON3_VERSION"])
-  else:
-    package = ToolchainPackage("python")
+  package = ToolchainPackage("python")
   if package.needs_download() and \
      not (os.environ.get(SKIP_TOOLCHAIN_BOOTSTRAP) == 'true'):
     package.download()
-  if is_py3:
-    python_cmd = os.path.join(package.pkg_directory(), "bin/python3")
-  else:
-    python_cmd = os.path.join(package.pkg_directory(), "bin/python")
+  python_cmd = os.path.join(package.pkg_directory(), "bin/python3")
   if not os.path.exists(python_cmd):
     raise Exception("Unexpected error bootstrapping python from toolchain: {0} does not "
                     "exist".format(python_cmd))
   return python_cmd
 
 
-def install_deps(venv_dir, is_py3):
-  py_str = "3" if is_py3 else "2"
-  LOG.info("Installing setuptools into the python{0} virtualenv".format(py_str))
-  exec_pip_install(venv_dir, is_py3, ["-r", SETUPTOOLS_REQS_PATH])
-  if is_py3:
-    exec_pip_install(venv_dir, is_py3, ["packaging==24.1"])
+def install_deps(venv_dir):
+  LOG.info("Installing setuptools into the python3 virtualenv")
+  exec_pip_install(venv_dir, ["-r", SETUPTOOLS_REQS_PATH])
+  exec_pip_install(venv_dir, ["packaging==24.1"])
   cc = select_cc()
   if cc is None:
     raise Exception("CC not available")
   env = dict(os.environ)
-  LOG.info("Installing packages into the python{0} virtualenv".format(py_str))
-  exec_pip_install(venv_dir, is_py3, ["-r", REQS_PATH], cc=cc, env=env)
+  LOG.info("Installing packages into the python3 virtualenv")
+  exec_pip_install(venv_dir, ["-r", REQS_PATH], cc=cc, env=env)
   mark_reqs_installed(venv_dir, REQS_PATH)
 
 
@@ -312,7 +259,7 @@ def toolchain_pkg_dir(pkg_name):
       pkg_name + "-" + pkg_version)
 
 
-def install_adls_deps(venv_dir, is_py3):
+def install_adls_deps(venv_dir):
   # The ADLS dependencies require that the OS is at least CentOS 6.7 or above,
   # which is why we break this into a seperate step. If the target filesystem is
   # ADLS, the expectation is that the dev environment is running at least CentOS 6.7.
@@ -322,16 +269,12 @@ def install_adls_deps(venv_dir, is_py3):
       return True
     cc = select_cc()
     assert cc is not None
-    py_str = "3" if is_py3 else "2"
-    LOG.info("Installing ADLS packages into the python{0} virtualenv".format(py_str))
-    exec_pip_install(venv_dir, is_py3, ["-r", ADLS_REQS_PATH], cc=cc)
+    LOG.info("Installing ADLS packages into the python3 virtualenv")
+    exec_pip_install(venv_dir, ["-r", ADLS_REQS_PATH], cc=cc)
     mark_reqs_installed(venv_dir, ADLS_REQS_PATH)
 
 
-def install_gcovr_deps(venv_dir, is_py3):
-  # Gcovr is only installed in the python3 virtualenv
-  if not is_py3:
-    return
+def install_gcovr_deps(venv_dir):
   if not reqs_are_installed(venv_dir, GCOVR_REQS_PATH):
     # Gcovr takes several minutes to install, so we only install it if this is a coverage
     # build. We detect a coverage build by reading ${IMPALA_HOME}/.cmake_build_type.
@@ -353,28 +296,11 @@ def install_gcovr_deps(venv_dir, is_py3):
       cc = select_cc()
       assert cc is not None
       LOG.info("Installing gcovr packages into the python3 virtualenv")
-      exec_pip_install(venv_dir, is_py3, ["-r", GCOVR_REQS_PATH], cc=cc)
+      exec_pip_install(venv_dir, ["-r", GCOVR_REQS_PATH], cc=cc)
       mark_reqs_installed(venv_dir, GCOVR_REQS_PATH)
 
 
-def install_py_version_deps(venv_dir, is_py3):
-  cc = select_cc()
-  assert cc is not None
-  if not is_py3:
-    if not reqs_are_installed(venv_dir, PY2_REQS_PATH):
-      # These are extra python2-only packages
-      LOG.info("Installing python2 packages into the virtualenv")
-      exec_pip_install(venv_dir, is_py3, ["-r", PY2_REQS_PATH], cc=cc)
-      mark_reqs_installed(venv_dir, PY2_REQS_PATH)
-  else:
-    if not reqs_are_installed(venv_dir, PY3_REQS_PATH):
-      # These are extra python3-only packages
-      LOG.info("Installing python3 packages into the virtualenv")
-      exec_pip_install(venv_dir, is_py3, ["-r", PY3_REQS_PATH], cc=cc)
-      mark_reqs_installed(venv_dir, PY3_REQS_PATH)
-
-
-def install_kudu_client_if_possible(venv_dir, is_py3):
+def install_kudu_client_if_possible(venv_dir):
   '''Installs the Kudu python module if possible, which depends on the toolchain and
   the compiled requirements in requirements.txt. If the toolchain isn't
   available, nothing will be done.'''
@@ -386,13 +312,11 @@ def install_kudu_client_if_possible(venv_dir, is_py3):
     LOG.debug("Skipping Kudu: %s doesn't exist" % kudu_base_dir)
     return
 
-  py_str = "3" if is_py3 else "2"
-  LOG.info("Installing Kudu into the python{0} virtualenv".format(py_str))
+  LOG.info("Installing Kudu into the python3 virtualenv")
   # The installation requires that KUDU_HOME/build/latest exists. An empty directory
   # structure will be made to satisfy that. The Kudu client headers and lib will be made
   # available through GCC environment variables.
-  fake_kudu_build_dir = os.path.join(tempfile.gettempdir(),
-                                     "virtualenv-kudu{0}".format(py_str))
+  fake_kudu_build_dir = os.path.join(tempfile.gettempdir(), "virtualenv-kudu3")
   try:
     artifact_dir = os.path.join(fake_kudu_build_dir, "build", "latest")
     if not os.path.exists(artifact_dir):
@@ -409,7 +333,7 @@ def install_kudu_client_if_possible(venv_dir, is_py3):
     env["CPLUS_INCLUDE_PATH"] = os.path.join(kudu_client_dir, "include")
     env["LIBRARY_PATH"] = os.path.pathsep.join([os.path.join(kudu_client_dir, 'lib'),
                                                 os.path.join(kudu_client_dir, 'lib64')])
-    exec_pip_install(venv_dir, is_py3, ["-r", KUDU_REQS_PATH], cc=cc, env=env)
+    exec_pip_install(venv_dir, ["-r", KUDU_REQS_PATH], cc=cc, env=env)
     mark_reqs_installed(venv_dir, KUDU_REQS_PATH)
   finally:
     try:
@@ -478,11 +402,11 @@ def reqs_are_installed(venv_dir, reqs_path):
     installed_reqs_file.close()
 
 
-def setup_virtualenv_if_not_exists(venv_dir, is_py3):
+def setup_virtualenv_if_not_exists(venv_dir):
   if not (reqs_are_installed(venv_dir, REQS_PATH)):
     delete_virtualenv_if_exist(venv_dir)
-    create_virtualenv(venv_dir, is_py3)
-    install_deps(venv_dir, is_py3)
+    create_virtualenv(venv_dir)
+    install_deps(venv_dir)
     LOG.debug("Virtualenv setup complete")
 
 
@@ -511,17 +435,13 @@ if __name__ == "__main__":
 
   logging.basicConfig(level=getattr(logging, options.log_level))
 
-  if options.python3:
-    venv_dir = ENV_DIR_PY3
-  else:
-    venv_dir = ENV_DIR_PY2
+  venv_dir = ENV_DIR_PY3
 
   if options.rebuild:
     delete_virtualenv_if_exist(venv_dir)
 
   # Complete as many bootstrap steps as possible (see file comment for the steps).
-  setup_virtualenv_if_not_exists(venv_dir, options.python3)
-  install_kudu_client_if_possible(venv_dir, options.python3)
-  install_adls_deps(venv_dir, options.python3)
-  install_py_version_deps(venv_dir, options.python3)
-  install_gcovr_deps(venv_dir, options.python3)
+  setup_virtualenv_if_not_exists(venv_dir)
+  install_kudu_client_if_possible(venv_dir)
+  install_adls_deps(venv_dir)
+  install_gcovr_deps(venv_dir)

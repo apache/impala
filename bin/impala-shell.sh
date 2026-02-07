@@ -28,7 +28,7 @@ PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/bin
 PYTHONPATH=${PYTHONPATH}:${SHELL_HOME}
 
 export LD_LIBRARY_PATH=":$(PYTHONPATH=${PYTHONPATH} \
-  python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
+  python3 "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
   --print-ld-library-path)"
 
 IMPALA_PY_DIR="$(dirname "$0")/../infra/python"
@@ -36,15 +36,13 @@ IMPALA_PY3_ENV_DIR="${IMPALA_PY_DIR}/env-gcc${IMPALA_GCC_VERSION}-py3"
 # Allow overriding the python executable
 IMPALA_PYTHON_EXECUTABLE="${IMPALA_PYTHON_EXECUTABLE:-${IMPALA_PY3_ENV_DIR}/bin/python3}"
 
-# Note that this uses the external system python executable.
-# IMPALA-14620: At some point, we need to explicitly invoke python3 instead of python
-# here. This is not an issue if python-is-python3 is installed.
-PYTHONPATH=${PYTHONPATH} python "${IMPALA_PY_DIR}/bootstrap_virtualenv.py" --python3
+# Note that this uses the external system python3 executable.
+PYTHONPATH=${PYTHONPATH} python3 "${IMPALA_PY_DIR}/bootstrap_virtualenv.py" --python3
 
 # Enable remote debugging if port was specified via environment variable
 if [[ ${IMPALA_SHELL_DEBUG_PORT:-0} -ne 0 ]]; then
   echo "installing debugpy if needed"
-  ${IMPALA_PY_ENV_DIR}/bin/pip install debugpy
+  ${IMPALA_PY3_ENV_DIR}/bin/pip install debugpy
   echo "impala python shell waiting for remote debugging connection on port" \
        "${IMPALA_SHELL_DEBUG_PORT}"
   EXTRA_ARGS=" -m debugpy --listen ${IMPALA_SHELL_DEBUG_PORT} --wait-for-client"

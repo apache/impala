@@ -56,15 +56,11 @@ for PYTHON_EXE in $*; do
   echo "Deleting all files in ${TARBALL_ROOT}/install_py${PYTHON_VERSION}"
   rm -rf ${TARBALL_ROOT}/install_py${PYTHON_VERSION} 2>&1 > /dev/null
   echo "Installing for python ${PYTHON_VERSION}"
-  # Use pip that matches the major version
-  if [[ $PYTHON_MAJOR_VERSION == 2 ]]; then
-    source ${IMPALA_HOME}/shell/build/python2_venv/bin/activate
+  # Use pip from a matching python version
+  if [[ $IMPALA_SYSTEM_PYTHON3_VERSION == $PYTHON_VERSION ]]; then
+    source ${IMPALA_HOME}/shell/build/python3_venv/bin/activate
   else
-    if [[ $IMPALA_SYSTEM_PYTHON3_VERSION == $PYTHON_VERSION ]]; then
-      source ${IMPALA_HOME}/shell/build/python3_venv/bin/activate
-    else
-      source ${IMPALA_HOME}/shell/build/python${PYTHON_VERSION}_venv/bin/activate
-    fi
+    source ${IMPALA_HOME}/shell/build/python${PYTHON_VERSION}_venv/bin/activate
   fi
 
   mkdir -p ${TARBALL_ROOT}/install_py${PYTHON_VERSION}

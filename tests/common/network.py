@@ -64,12 +64,6 @@ CERT_TO_CA_MAP = {
 }
 
 REQUIRED_MIN_OPENSSL_VERSION = 0x10001000
-# Python supports TLSv1.2 from 2.7.9 officially but on Red Hat/CentOS Python2.7.5
-# with newer python-libs (eg python-libs-2.7.5-77) supports TLSv1.2 already
-if IS_REDHAT_DERIVATIVE:
-  REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12 = (2, 7, 5)
-else:
-  REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12 = (2, 7, 9)
 _openssl_version_number = getattr(ssl, "OPENSSL_VERSION_NUMBER", None)
 if _openssl_version_number is None:
   SKIP_SSL_MSG = "Legacy OpenSSL module detected"
