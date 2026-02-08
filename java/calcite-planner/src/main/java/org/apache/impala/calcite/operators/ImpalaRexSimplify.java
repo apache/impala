@@ -27,7 +27,6 @@ import org.apache.calcite.rex.RexUnknownAs;
 import org.apache.calcite.sql.SqlBinaryOperator;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 
-
 /**
  * ImpalaRexSimplify extends the RexSimplify class in order to 'simplify' expressions.
  * The extension of the "simplify" method catches the double and float types used in
@@ -50,9 +49,16 @@ public class ImpalaRexSimplify extends RexSimplify {
 
   @Override
   public RexNode simplify(RexNode rexNode) {
-    return hasApproximateTypeIssues(rexNode)
-        ? rexNode
-        : super.simplifyUnknownAs(rexNode, RexUnknownAs.FALSE);
+    return simplify(rexNode, false);
+  }
+
+  public RexNode simplify(RexNode rexNode, boolean isFilter) {
+    if (hasApproximateTypeIssues(rexNode)) {
+      return rexNode;
+    }
+    return isFilter
+        ? super.simplifyUnknownAs(rexNode, RexUnknownAs.FALSE)
+        : super.simplify(rexNode);
   }
 
   private boolean hasApproximateTypeIssues(RexNode rexNode) {

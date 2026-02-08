@@ -53,7 +53,7 @@ public class ImpalaFilterSimplifyRule extends RelOptRule {
     RexNode condition = filter.getCondition();
     RexExecutor executor = simplifier_.getRexExecutor();
 
-    RexNode newCondition = simplifier_.simplify(condition);
+    RexNode newCondition = simplifier_.simplify(condition, true);
     List<RexNode> reducedExprs = new ArrayList<>();
     executor.reduce(rexBuilder, ImmutableList.of(newCondition), reducedExprs);
     Preconditions.checkState(reducedExprs.size() == 1);

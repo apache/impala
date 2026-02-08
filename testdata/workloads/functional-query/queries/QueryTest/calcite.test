@@ -1239,3 +1239,11 @@ select count(*) from tpch.lineitem where l_quantity in (1, 2)
 ---- RESULTS
 239861
 ====
+---- QUERY
+# IMPALA-14525: Make sure null is treated as unknown in select clause
+SELECT 1 in (NULL);
+---- RESULTS
+NULL
+---- RUNTIME_PROFILE
+row_regex: .*PlannerType: CalcitePlanner.*
+====
