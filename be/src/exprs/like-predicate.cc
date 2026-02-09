@@ -78,7 +78,9 @@ void LikePredicate::LikePrepareInternal(FunctionContext* context,
     re2::RE2 ends_with_escaped_wildcard(".*\\\\%$");
     string pattern_str(pattern.Ptr(), pattern.Len());
     string search_string;
-    if (case_sensitive && RE2::FullMatch(pattern_str, substring_re, &search_string)) {
+    if (case_sensitive &&
+        RE2::FullMatch(pattern_str, substring_re, &search_string) &&
+        !RE2::FullMatch(pattern_str, ends_with_escaped_wildcard)) {
       state->SetSearchString(search_string);
       state->function_ = ConstantSubstringFn;
     } else if (case_sensitive &&

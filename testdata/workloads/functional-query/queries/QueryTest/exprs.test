@@ -3272,6 +3272,44 @@ true
 ---- TYPES
 BOOLEAN
 ====
+---- QUERY: IMPALA-14731
+# Check that an escaped % is not treated as a wildcard character in a like
+# predicate. Note this test cannot be part of the LikeTbl tests as the
+# like predicate optimizations are only applied when the like predicate is a
+# string literal.
+select 'escape%' like '%escape\%'
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY: IMPALA-14731
+# Check that an escaped % is not treated as a wildcard character in a like
+# predicate. Note this test cannot be part of the LikeTbl tests as the
+# like predicate optimizations are only applied when the like predicate is a
+# string literal.
+select 'esc\\ape' like '%esc\%'
+---- RESULTS
+false
+---- TYPES
+BOOLEAN
+====
+---- QUERY: IMPALA-10849
+# Check that unescaped % is evaluated correctly.
+select 'escape' like '%esc%'
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY: IMPALA-10849
+# Check that unescaped _ is evaluated correctly.
+select 'escape' like '%escap_'
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
 ---- QUERY: IMPALA-955
 # Returns number of bytes in a byte string.
 select bytes(string_col), bytes(date_string_col) from functional.alltypestiny;
