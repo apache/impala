@@ -548,7 +548,11 @@ Status QueryDriver::Unregister(ImpalaServer::QueryDriverMap* query_driver_map) {
   return Status::OK();
 }
 
-void QueryDriver::IncludeInQueryLog(const bool include) noexcept{
+void QueryDriver::Abandon() {
+  finalized_.Store(true);
+}
+
+void QueryDriver::IncludeInQueryLog(const bool include) noexcept {
   include_in_query_log_ = include;
 }
 

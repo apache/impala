@@ -1347,8 +1347,12 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx,
   query_handle->query_driver()->IncludeInQueryLog(include_in_query_log);
 
   // Unregister query if it was registered and not yet finalized.
-  if (!status.ok() && registered_query && !query_handle->query_driver()->finalized()) {
-    UnregisterQueryDiscardResult((*query_handle)->query_id(), &status);
+  if (!status.ok() && !query_handle->query_driver()->finalized()) {
+    if (registered_query) {
+      UnregisterQueryDiscardResult((*query_handle)->query_id(), &status);
+    } else {
+      query_handle->query_driver()->Abandon();
+    }
   }
   return status;
 }

@@ -172,3 +172,44 @@ class TestImpalaShellCommandLine(CustomClusterTestSuite):
       for line in log_file:
         if line.find("HTTP Connection Tracing Headers") != -1:
           pytest.fail("found HTTP connection tracing line line: {0}".format(line))
+
+  @CustomClusterTestSuite.with_args(cluster_size=1)
+  def test_http_socket_timeout(self, vector):
+    """Test setting different http_socket_timeout_s values. Runs as a custom cluster test
+    because session is not closed up after the test."""
+    assert vector.get_value('protocol') == 'hs2-http'
+    # Test short http_socket_timeout_s, expect errors. After the connection is
+    # established - which now uses connect_timeout_ms - RPCs in the minicluster appear to
+    # respond immediately, so non-blocking mode (timeout=0) does not result in an error.
+    # Instead, use a small timeout that allows OpenSession to succeed, then fails on
+    # ExecuteStatement due to a 1s sleep via debug action. 100ms timeout is used to allow
+    # SET ALL to succeed, so we fail predictably. Session and query timeouts are used to
+    # cleanup the query started by Execute, because after the timeout the socket is closed
+    # and impala-shell doesn't close the session.
+    debug_action = 'debug_action=EXECUTE_INTERNAL_REGISTERED:SLEEP@1000'
+    args = ['--quiet', '-B', '-Q', debug_action, '--query', 'select 0']
+    result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=0.1'],
+                                  expect_success=False)
+
+    # Python 2 throws socket.timeout and Python 3 throws TimeoutError.
+    error_template = "[Exception] type=<class '{0}'> in ExecuteStatement.  timed out"
+    err_py2 = error_template.format("socket.timeout")
+    err_py3 = error_template.format("TimeoutError")
+    assert err_py2 in result.stderr or err_py3 in result.stderr, result.stderr
+
+    # Test http_socket_timeout_s=-1, expect errors
+    result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=-1'],
+                                  expect_success=False)
+    expected_err = ("http_socket_timeout_s must be a nonnegative floating point number"
+                    " expressing seconds, or None")
+    assert expected_err in result.stderr
+
+    # Test http_socket_timeout_s>0, expect success
+    result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=2'])
+    assert result.stderr == ""
+    assert result.stdout == "0\n"
+
+    # Test http_socket_timeout_s=None, expect success
+    result = run_impala_shell_cmd(vector, args + ['--http_socket_timeout_s=None'])
+    assert result.stderr == ""
+    assert result.stdout == "0\n"

@@ -189,6 +189,9 @@ class QueryDriver {
   /// Delete this query from the given QueryDriverMap.
   Status Unregister(ImpalaServer::QueryDriverMap* query_driver_map) WARN_UNUSED_RESULT;
 
+  /// Abandon this query. This is used in scenarios where the query was never registered.
+  void Abandon();
+
   /// True if Finalize() was called while the query was inflight.
   bool finalized() const { return finalized_.Load(); }
 
