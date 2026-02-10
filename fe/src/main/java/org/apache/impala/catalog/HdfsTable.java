@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -308,7 +309,10 @@ public class HdfsTable extends Table implements FeFsTable {
 
   // Dropped partitions since last catalog update. These partitions need to be removed
   // in coordinator's cache if there are no updates on them.
-  private final Set<HdfsPartition> droppedPartitions_ = new HashSet<>();
+  // This set is cleared in the catalog update thread after the deletions are collected.
+  // However, catalog update thread just acquires read lock on this table. So we need a
+  // thread-safe set to avoid breaking other readers like toMinimalTCatalogObject().
+  private final Set<HdfsPartition> droppedPartitions_ = ConcurrentHashMap.newKeySet();
 
   // pendingVersionNumber indicates a version number allocated to this HdfsTable for a
   // ongoing DDL operation. This is mainly used by the topic update thread to skip a
