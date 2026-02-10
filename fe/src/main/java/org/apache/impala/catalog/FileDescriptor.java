@@ -215,9 +215,8 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
   }
 
   public String getAbsolutePath() {
-    return StringUtils.isEmpty(fbFileDescriptor_.absolutePath()) ?
-        StringUtils.EMPTY :
-        fbFileDescriptor_.absolutePath();
+    String path = fbFileDescriptor_.absolutePath();
+    return StringUtils.isEmpty(path) ? StringUtils.EMPTY : path;
   }
 
   public String getAbsolutePath(String rootPath) {
@@ -230,12 +229,19 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
   }
 
   public String getPath() {
-    if (StringUtils.isEmpty(fbFileDescriptor_.relativePath())
-        && StringUtils.isNotEmpty(fbFileDescriptor_.absolutePath())) {
-      return fbFileDescriptor_.absolutePath();
+    String relativePath = fbFileDescriptor_.relativePath();
+    if (StringUtils.isEmpty(relativePath)) {
+      String absolutePath = fbFileDescriptor_.absolutePath();
+      return StringUtils.isEmpty(absolutePath) ? StringUtils.EMPTY : absolutePath;
     } else {
-      return fbFileDescriptor_.relativePath();
+      return relativePath;
     }
+  }
+
+  public ByteBuffer getPathAsByteBuffer() {
+    ByteBuffer relativePath = fbFileDescriptor_.relativePathAsByteBuffer();
+    if (relativePath != null) return relativePath;
+    return fbFileDescriptor_.absolutePathAsByteBuffer();
   }
 
   public long getFileLength() {
@@ -303,6 +309,14 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
   @Override
   public int compareTo(FileDescriptor otherFd) {
     return getPath().compareTo(otherFd.getPath());
+  }
+
+  /**
+   * Does lexical comparison without UTF8 decoding. Faster alternative to compareTo where
+   * the exact order is not critical.
+   */
+  public int byteBufferCompareTo(FileDescriptor otherFd) {
+    return getPathAsByteBuffer().compareTo(otherFd.getPathAsByteBuffer());
   }
 
   /**

@@ -113,7 +113,8 @@ public class IcebergScanNode extends HdfsScanNode {
       // Create a clone of the original file descriptor list to avoid getting
       // ConcurrentModificationException when sorting.
       fileDescs_ = new ArrayList<>(fileDescs_);
-      Collections.sort(fileDescs_);
+      Collections.sort(fileDescs_,
+          (IcebergFileDescriptor a, IcebergFileDescriptor b) -> a.byteBufferCompareTo(b));
       filesAreSorted_ = true;
     }
     nonIdentityConjuncts_ = nonIdentityConjuncts;
