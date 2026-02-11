@@ -208,7 +208,7 @@ import com.google.errorprone.annotations.concurrent.GuardedBy;
  */
 public class CatalogdMetaProvider implements MetaProvider {
 
-  private final static Logger LOG = LoggerFactory.getLogger(CatalogdMetaProvider.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogdMetaProvider.class);
 
   /**
    * Sentinel value used as a negative cache entry for column statistics.
@@ -2293,6 +2293,9 @@ public class CatalogdMetaProvider implements MetaProvider {
 
   @VisibleForTesting
   static class SizeOfWeigher implements Weigher<Object, Object> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SizeOfWeigher.class);
+
     // Bypass flyweight objects like small boxed integers, Boolean.TRUE, enums, etc.
     private static final boolean BYPASS_FLYWEIGHT = true;
     // Cache the reflected sizes of classes seen.
@@ -2351,6 +2354,7 @@ public class CatalogdMetaProvider implements MetaProvider {
         entrySize_.update(size);
       }
       if (size > Integer.MAX_VALUE) {
+        LOG.warn("weight exceeded Integer.MAX_VALUE: {}", size);
         return Integer.MAX_VALUE;
       }
       return (int)size;
