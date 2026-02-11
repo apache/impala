@@ -52,7 +52,7 @@ public class HiveJavaFunctionFactoryImpl implements HiveJavaFunctionFactory {
               paramTypes);
         case GENERIC_UDF:
           return new HiveGenericJavaFunction(javaClass.getUDFClass(), hiveFn, retType,
-              paramTypes);
+              paramTypes, null);
         default:
           throw new CatalogException("Function " + fnName + ": The class "
               + jarUri + " does not derive "

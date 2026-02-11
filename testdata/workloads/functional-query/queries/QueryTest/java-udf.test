@@ -377,3 +377,22 @@ STRING
 ---- RESULTS
 'baaa'
 ====
+---- QUERY
+select identity(bool_col), identity(tinyint_col),
+       identity(smallint_col), identity(int_col),
+       identity(bigint_col), identity(float_col),
+       identity(double_col), identity(string_col),
+       identity(cast(string_col as binary))
+from functional.alltypestiny;
+---- TYPES
+boolean, tinyint, smallint, int, bigint, float, double, string, binary
+---- RESULTS
+true,0,0,0,0,0.0,0.0,'0','0'
+false,1,1,1,10,1.100000023841858,10.1,'1','1'
+true,0,0,0,0,0.0,0.0,'0','0'
+false,1,1,1,10,1.100000023841858,10.1,'1','1'
+true,0,0,0,0,0.0,0.0,'0','0'
+false,1,1,1,10,1.100000023841858,10.1,'1','1'
+true,0,0,0,0,0.0,0.0,'0','0'
+false,1,1,1,10,1.100000023841858,10.1,'1','1'
+====

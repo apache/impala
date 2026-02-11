@@ -118,6 +118,11 @@ class HiveUdfCall : public ScalarExpr {
   /// be written to.
   std::vector<int> input_byte_offsets_;
 
+  /// is_constant_arg_[i] is true iff the ith argument is a constant.
+  /// Constant arguments are evaluated and copied into the input buffer once in
+  /// OpenEvaluation, so they are not re-evaluated and copied for each evaluation.
+  std::vector<bool> is_constant_arg_;
+
   /// The size of the buffer for passing in input arguments.
   int input_buffer_size_;
 
@@ -150,6 +155,8 @@ class HiveUdfCall : public ScalarExpr {
        JniContext* jni_ctx, int index, uint8_t value);
    static uint8_t* GetInputValuesBufferAtOffset(JniContext* jni_ctx, int offset);
   };
+
+  void CopyToInputBuffer(JniContext* jni_ctx, int idx, void* val) const;
 
   /// Static helper functions for codegen.
   static jclass* GetExecutorClass();

@@ -56,6 +56,43 @@ HiveUdfCall::HiveUdfCall(const TExprNode& node)
   DCHECK(executor_cl_ != NULL) << "Init() was not called!";
 }
 
+void HiveUdfCall::CopyToInputBuffer(JniContext* jni_ctx, int idx, void* val) const {
+    if (val == nullptr) {
+      jni_ctx->input_nulls_buffer[idx] = 1;
+    } else {
+      uint8_t* input_ptr = jni_ctx->input_values_buffer + input_byte_offsets_[idx];
+      jni_ctx->input_nulls_buffer[idx] = 0;
+      switch (GetChild(idx)->type().type) {
+        case TYPE_BOOLEAN:
+        case TYPE_TINYINT:
+          // Using explicit sizes helps the compiler unroll memcpy
+          memcpy(input_ptr, val, 1);
+          break;
+        case TYPE_SMALLINT:
+          memcpy(input_ptr, val, 2);
+          break;
+        case TYPE_INT:
+        case TYPE_FLOAT:
+        case TYPE_DATE:
+          memcpy(input_ptr, val, 4);
+          break;
+        case TYPE_BIGINT:
+        case TYPE_DOUBLE:
+          memcpy(input_ptr, val, 8);
+          break;
+        case TYPE_TIMESTAMP:
+          memcpy(input_ptr, val, sizeof(TimestampValue));
+          break;
+        case TYPE_STRING:
+        case TYPE_VARCHAR:
+          memcpy(input_ptr, val, sizeof(StringValue));
+          break;
+        default:
+          DCHECK(false) << "NYI";
+      }
+    }
+}
+
 AnyVal* HiveUdfCall::Evaluate(ScalarExprEvaluator* eval, const TupleRow* row) const {
   FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
   JniContext* jni_ctx = reinterpret_cast<JniContext*>(
@@ -67,42 +104,12 @@ AnyVal* HiveUdfCall::Evaluate(ScalarExprEvaluator* eval, const TupleRow* row) co
 
   // Evaluate all the children values and put the results in input_values_buffer
   for (int i = 0; i < GetNumChildren(); ++i) {
-    void* v = eval->GetValue(*GetChild(i), row);
+    // Skip re-evaluation for constant arguments, they are evaluated once and copied
+    // to the input buffer in OpenEvaluator
+    if (is_constant_arg_[i]) continue;
 
-    if (v == nullptr) {
-      jni_ctx->input_nulls_buffer[i] = 1;
-    } else {
-      uint8_t* input_ptr = jni_ctx->input_values_buffer + input_byte_offsets_[i];
-      jni_ctx->input_nulls_buffer[i] = 0;
-      switch (GetChild(i)->type().type) {
-        case TYPE_BOOLEAN:
-        case TYPE_TINYINT:
-          // Using explicit sizes helps the compiler unroll memcpy
-          memcpy(input_ptr, v, 1);
-          break;
-        case TYPE_SMALLINT:
-          memcpy(input_ptr, v, 2);
-          break;
-        case TYPE_INT:
-        case TYPE_FLOAT:
-        case TYPE_DATE:
-          memcpy(input_ptr, v, 4);
-          break;
-        case TYPE_BIGINT:
-        case TYPE_DOUBLE:
-          memcpy(input_ptr, v, 8);
-          break;
-        case TYPE_TIMESTAMP:
-          memcpy(input_ptr, v, sizeof(TimestampValue));
-          break;
-        case TYPE_STRING:
-        case TYPE_VARCHAR:
-          memcpy(input_ptr, v, sizeof(StringValue));
-          break;
-        default:
-          DCHECK(false) << "NYI";
-      }
-    }
+    void* v = eval->GetValue(*GetChild(i), row);
+    CopyToInputBuffer(jni_ctx, i, v);
   }
 
   // Using this version of Call has the lowest overhead. This eliminates the
@@ -164,6 +171,7 @@ Status HiveUdfCall::Init(
     // Align all values up to 8 bytes. We don't care about footprint since we allocate
     // one buffer for all rows and we never copy the entire buffer.
     input_buffer_size_ = BitUtil::RoundUpNumBytes(input_buffer_size_) * 8;
+    is_constant_arg_.push_back(GetChild(i)->is_constant());
   }
   return Status::OK();
 }
@@ -185,6 +193,18 @@ Status HiveUdfCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
   // This object and thus fn_ are alive when rows are evaluated.
   jni_ctx->hdfs_location = fn_.hdfs_location.c_str();
   jni_ctx->scalar_fn_symbol = fn_.scalar_fn.symbol.c_str();
+
+  // Only evaluate constant arguments at the top level of function contexts.
+  // If 'eval' was cloned, the constant values were copied from the parent.
+  if (scope == FunctionContext::FRAGMENT_LOCAL) {
+    vector<AnyVal*> constant_args;
+    for (const ScalarExpr* child : children()) {
+      AnyVal* const_val;
+      RETURN_IF_ERROR(eval->GetConstValue(state, *child, &const_val));
+      constant_args.push_back(const_val);
+    }
+    fn_ctx->impl()->SetConstantArgs(move(constant_args));
+  }
 
   // Add a scoped cleanup jni reference object. This cleans up local refs made below.
   JniLocalFrame jni_frame;
@@ -212,6 +232,18 @@ Status HiveUdfCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
     ctor_params.input_nulls_ptr = (int64_t)jni_ctx->input_nulls_buffer;
     ctor_params.output_buffer_ptr = (int64_t)jni_ctx->output_value_buffer;
     ctor_params.output_null_ptr = (int64_t)&jni_ctx->output_null_value;
+
+    // Copy constant arguments to input buffer here once
+    // They will no longer be evaluted/copied during evaluation
+    for (int i = 0; i < is_constant_arg_.size(); i++) {
+      if (!is_constant_arg_[i]) continue;
+      AnyVal* val = fn_ctx->GetConstantArg(i);
+      DCHECK(val != nullptr);
+      ExprValue exprVal;
+      void* valptr = exprVal.SetToAnyVal(val, children_[i]->type());
+      CopyToInputBuffer(jni_ctx, i, valptr);
+    }
+    ctor_params.__set_is_constant_arg(is_constant_arg_);
 
     jbyteArray ctor_params_bytes;
 
@@ -272,54 +304,58 @@ Status HiveUdfCall::CodegenEvalChildren(LlvmCodeGen* codegen, LlvmBuilder* build
     llvm::Function* function, llvm::Value* (*args)[2], llvm::Value* jni_ctx,
     llvm::BasicBlock* const first_block, llvm::BasicBlock** next_block) {
 
-   llvm::Function* const set_input_null_buff_elem_fn =
-       codegen->GetFunction(IRFunction::JNI_CTX_SET_INPUT_NULL_BUFF_ELEM, false);
-   llvm::Function* const get_input_val_buff_at_offset_fn =
-       codegen->GetFunction(IRFunction::JNI_CTX_INPUT_VAL_BUFF_AT_OFFSET, false);
+  llvm::Function* const set_input_null_buff_elem_fn =
+      codegen->GetFunction(IRFunction::JNI_CTX_SET_INPUT_NULL_BUFF_ELEM, false);
+  llvm::Function* const get_input_val_buff_at_offset_fn =
+      codegen->GetFunction(IRFunction::JNI_CTX_INPUT_VAL_BUFF_AT_OFFSET, false);
 
-   llvm::LLVMContext& context = codegen->context();
-   llvm::BasicBlock* current_eval_child_block = first_block;
-   const int num_children = GetNumChildren();
-   for (int i = 0; i < num_children; ++i) {
-     ScalarExpr* const child_expr = GetChild(i);
-     llvm::Function* child_fn = nullptr;
-     RETURN_IF_ERROR(child_expr->GetCodegendComputeFn(codegen, false, &child_fn));
+  llvm::LLVMContext& context = codegen->context();
+  llvm::BasicBlock* current_eval_child_block = first_block;
+  const int num_children = GetNumChildren();
+  for (int i = 0; i < num_children; ++i) {
+    // Skip re-evaluation for constant arguments, they are evaluated once and copied
+    // to the input buffer in OpenEvaluator
+    if (is_constant_arg_[i]) continue;
 
-     builder->SetInsertPoint(current_eval_child_block);
+    ScalarExpr* const child_expr = GetChild(i);
+    llvm::Function* child_fn = nullptr;
+    RETURN_IF_ERROR(child_expr->GetCodegendComputeFn(codegen, false, &child_fn));
 
-     const ColumnType& child_type = child_expr->type();
-     CodegenAnyVal child_wrapped = CodegenAnyVal::CreateCallWrapped(
-         codegen, builder, child_type, child_fn, *args, "child");
+    builder->SetInsertPoint(current_eval_child_block);
 
-     CodegenAnyValReadWriteInfo rwi = child_wrapped.ToReadWriteInfo();
-     rwi.entry_block().BranchTo(builder);
+    const ColumnType& child_type = child_expr->type();
+    CodegenAnyVal child_wrapped = CodegenAnyVal::CreateCallWrapped(
+        codegen, builder, child_type, child_fn, *args, "child");
 
-     llvm::BasicBlock* next_eval_child_block = llvm::BasicBlock::Create(
-         context, "eval_child", function);
+    CodegenAnyValReadWriteInfo rwi = child_wrapped.ToReadWriteInfo();
+    rwi.entry_block().BranchTo(builder);
 
-     // Child is null
-     builder->SetInsertPoint(rwi.null_block());
-     builder->CreateCall(set_input_null_buff_elem_fn,
-         {jni_ctx, codegen->GetI32Constant(i), codegen->GetI8Constant(1)});
-     builder->CreateBr(next_eval_child_block);
+    llvm::BasicBlock* next_eval_child_block = llvm::BasicBlock::Create(
+        context, "eval_child", function);
 
-     // Child is not null.
-     builder->SetInsertPoint(rwi.non_null_block());
-     builder->CreateCall(set_input_null_buff_elem_fn,
-         {jni_ctx, codegen->GetI32Constant(i), codegen->GetI8Constant(0)});
-     llvm::Value* const input_ptr = builder->CreateCall(get_input_val_buff_at_offset_fn,
-         {jni_ctx, codegen->GetI32Constant(input_byte_offsets_[i])}, "input_ptr");
+    // Child is null
+    builder->SetInsertPoint(rwi.null_block());
+    builder->CreateCall(set_input_null_buff_elem_fn,
+        {jni_ctx, codegen->GetI32Constant(i), codegen->GetI8Constant(1)});
+    builder->CreateBr(next_eval_child_block);
 
-     llvm::Value* const child_val_ptr =
-         SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(rwi);
-     const std::size_t size = CodeGenUtil::GetTypeSize(child_type.type);
-     codegen->CodegenMemcpy(builder, input_ptr, child_val_ptr, size);
-     builder->CreateBr(next_eval_child_block);
-     current_eval_child_block = next_eval_child_block;
-   }
+    // Child is not null.
+    builder->SetInsertPoint(rwi.non_null_block());
+    builder->CreateCall(set_input_null_buff_elem_fn,
+        {jni_ctx, codegen->GetI32Constant(i), codegen->GetI8Constant(0)});
+    llvm::Value* const input_ptr = builder->CreateCall(get_input_val_buff_at_offset_fn,
+        {jni_ctx, codegen->GetI32Constant(input_byte_offsets_[i])}, "input_ptr");
 
-   *next_block = current_eval_child_block;
-   return Status::OK();
+    llvm::Value* const child_val_ptr =
+        SlotDescriptor::CodegenStoreNonNullAnyValToNewAlloca(rwi);
+    const std::size_t size = CodeGenUtil::GetTypeSize(child_type.type);
+    codegen->CodegenMemcpy(builder, input_ptr, child_val_ptr, size);
+    builder->CreateBr(next_eval_child_block);
+    current_eval_child_block = next_eval_child_block;
+  }
+
+  *next_block = current_eval_child_block;
+  return Status::OK();
 }
 
 llvm::Value* CastPtrAndLoad(LlvmCodeGen* codegen, LlvmBuilder* builder,

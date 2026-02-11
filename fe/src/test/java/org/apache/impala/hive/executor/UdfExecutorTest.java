@@ -241,12 +241,14 @@ public class UdfExecutorTest {
       Object[] originalArgs, Object[] args) throws ImpalaException, TException {
     int inputBufferSize = 0;
     ArrayList<Integer> inputByteOffsets = Lists.newArrayList();
+    ArrayList<Boolean> isConstantArg = Lists.newArrayList();
     ArrayList<Type> argTypes = Lists.newArrayList();
     for (Object originalArg: originalArgs) {
       Preconditions.checkNotNull(originalArg);
       Type argType = getType(originalArg);
       inputByteOffsets.add(Integer.valueOf(inputBufferSize));
       inputBufferSize += argType.getSlotSize();
+      isConstantArg.add(false);
       argTypes.add(argType);
     }
 
@@ -266,6 +268,7 @@ public class UdfExecutorTest {
 
     THiveUdfExecutorCtorParams params = new THiveUdfExecutorCtorParams(fn, jarFile,
         inputByteOffsets, inputNullsPtr, inputBufferPtr, outputNullPtr, outputBufferPtr);
+    params.setIs_constant_arg(isConstantArg);
     TSerializer serializer = new TSerializer(PROTOCOL_FACTORY);
     return new UdfExecutor(serializer.serialize(params));
   }

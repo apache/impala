@@ -147,4 +147,8 @@ symbol='org.apache.impala.GenericBufferAlteringUdf';
 create function increment(string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.GenericBufferAlteringUdf';
+
+create function alltypeargs_constcheck(boolean, tinyint, smallint, int, bigint, float, double, string, binary) returns string
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.GenericAlltypeArgConstCheckUdf';
 ====

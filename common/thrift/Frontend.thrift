@@ -63,6 +63,13 @@ struct THiveUdfExecutorCtorParams {
   // NULL.
   6: required i64 output_null_ptr
   7: required i64 output_buffer_ptr
+
+  // is_constant_arg[i] is true iff the i-th argument is a constant.
+  // Constant arguments are only copied to the input buffer once, to save
+  // re-evaluation and extra copying for every evaluation.
+  // The information about an argument being a constant is also forwarded
+  // to Hive UDF executor, for further optimization when possible.
+  8: optional list<bool> is_constant_arg
 }
 
 // Arguments to getTableNames, which returns a list of tables that are of specified table

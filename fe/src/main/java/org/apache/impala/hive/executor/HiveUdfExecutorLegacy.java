@@ -47,9 +47,9 @@ public class HiveUdfExecutorLegacy extends HiveUdfExecutor {
    * Used by the backend.
    */
   public HiveUdfExecutorLegacy(THiveUdfExecutorCtorParams request,
-      HiveLegacyJavaFunction hiveJavaFn) throws ImpalaRuntimeException {
-    super(request, JavaUdfDataType.getType(hiveJavaFn.getRetType()),
-        JavaUdfDataType.getTypes(hiveJavaFn.getParameterTypes()));
+      HiveLegacyJavaFunction hiveJavaFn, HiveUdfInputHandler inputHandler)
+      throws ImpalaRuntimeException {
+    super(request, JavaUdfDataType.getType(hiveJavaFn.getRetType()), inputHandler);
     udf_ = hiveJavaFn.getUDFInstance();
     method_ = hiveJavaFn.getMethod();
     inputArgs_ = new Object[getNumParams()];
@@ -69,61 +69,10 @@ public class HiveUdfExecutorLegacy extends HiveUdfExecutor {
    * Returns Object returned by UDF.
    */
   @Override
-  protected Object evaluateDerived(JavaUdfDataType[] argTypes,
-      long inputNullsPtr, Object... inputObjects)
+  protected Object evaluateDerived(Object[] inputObjects)
       throws ImpalaRuntimeException {
     try {
-      for (int i = 0; i < argTypes.length; ++i) {
-        if (UnsafeUtil.UNSAFE.getByte(inputNullsPtr + i) == 0) {
-          switch (argTypes[i]) {
-            case BOOLEAN_WRITABLE:
-            case BYTE_WRITABLE:
-            case SHORT_WRITABLE:
-            case INT_WRITABLE:
-            case LONG_WRITABLE:
-            case FLOAT_WRITABLE:
-            case DOUBLE_WRITABLE: inputArgs_[i] = inputObjects[i]; break;
-            case BYTE_ARRAY:
-            case BYTES_WRITABLE:
-              ((ImpalaBytesWritable) inputObjects[i]).reload();
-              inputArgs_[i] = inputObjects[i];
-              break;
-            case TEXT:
-              ((ImpalaTextWritable) inputObjects[i]).reload();
-              inputArgs_[i] = inputObjects[i];
-              break;
-            case BOOLEAN:
-              inputArgs_[i] = ((ImpalaBooleanWritable)inputObjects[i]).get();
-              break;
-            case TINYINT:
-              inputArgs_[i] = ((ImpalaTinyIntWritable)inputObjects[i]).get();
-              break;
-            case SMALLINT:
-              inputArgs_[i] = ((ImpalaSmallIntWritable)inputObjects[i]).get();
-              break;
-            case INT:
-              inputArgs_[i] = ((ImpalaIntWritable)inputObjects[i]).get();
-              break;
-            case BIGINT:
-              inputArgs_[i] = ((ImpalaBigIntWritable)inputObjects[i]).get();
-              break;
-            case FLOAT:
-              inputArgs_[i] = ((ImpalaFloatWritable)inputObjects[i]).get();
-              break;
-            case DOUBLE:
-              inputArgs_[i] = ((ImpalaDoubleWritable)inputObjects[i]).get();
-              break;
-            case STRING:
-              Preconditions.checkState(inputObjects[i] instanceof ImpalaBytesWritable);
-              ImpalaBytesWritable inputObject = (ImpalaBytesWritable) inputObjects[i];
-              inputObject.reload();
-              inputArgs_[i] = new String(inputObject.getBytes());
-              break;
-          }
-        } else {
-          inputArgs_[i] = null;
-        }
-      }
+      inputHandler_.fillArgArray(inputArgs_, inputObjects, false);
       return method_.invoke(udf_, inputArgs_);
     } catch (Exception e) {
       e.printStackTrace(System.err);

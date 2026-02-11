@@ -208,6 +208,46 @@ struct ExprValue {
     }
   }
 
+  void* SetToAnyVal(impala_udf::AnyVal* v, const ColumnType& type) {
+    if (v->is_null) return nullptr;
+    switch (type.type) {
+      case TYPE_BOOLEAN:
+        bool_val = ((impala_udf::BooleanVal*)v)->val;
+        return &bool_val;
+      case TYPE_TINYINT:
+        tinyint_val = ((impala_udf::TinyIntVal*)v)->val;
+        return &tinyint_val;
+      case TYPE_SMALLINT:
+        smallint_val = ((impala_udf::SmallIntVal*)v)->val;
+        return &smallint_val;
+      case TYPE_INT:
+        int_val = ((impala_udf::IntVal*)v)->val;
+        return &int_val;
+      case TYPE_BIGINT:
+        bigint_val = ((impala_udf::BigIntVal*)v)->val;
+        return &bigint_val;
+      case TYPE_FLOAT:
+        float_val = ((impala_udf::FloatVal*)v)->val;
+        return &float_val;
+      case TYPE_DOUBLE:
+        double_val = ((impala_udf::DoubleVal*)v)->val;
+        return &double_val;
+      case TYPE_TIMESTAMP:
+        timestamp_val = TimestampValue::FromTimestampVal(*((impala_udf::TimestampVal*)v));
+        return &timestamp_val;
+      case TYPE_DATE:
+        date_val = DateValue(((impala_udf::DateVal*)v)->val);
+        return &date_val;
+      case TYPE_STRING:
+      case TYPE_VARCHAR:
+        string_val = StringValue::FromStringVal(*((impala_udf::StringVal*)v));
+        return &string_val;
+      default:
+        DCHECK(false) << "NYI";
+        return nullptr;
+    }
+  }
+
   /// Returns whether the two ExprValue's are equal if they both have the given type.
   bool EqualsWithType(const ExprValue& other, const ColumnType& type) const {
     switch (type.type) {

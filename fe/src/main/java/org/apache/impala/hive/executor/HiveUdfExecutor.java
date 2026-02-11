@@ -45,19 +45,9 @@ public abstract class HiveUdfExecutor {
 
   private static final Logger LOG = Logger.getLogger(HiveUdfExecutor.class);
 
-  // Return and argument types of the function inferred from the udf method signature.
+  // Return type of the function inferred from the udf method signature.
   // The JavaUdfDataType enum maps it to corresponding primitive type.
-  private final JavaUdfDataType[] argTypes_;
   private final JavaUdfDataType retType_;
-
-  // Input buffer from the backend. This is valid for the duration of an evaluate() call.
-  // These buffers are allocated in the BE.
-  private final long inputBufferPtr_;
-  private final long inputNullsPtr_;
-
-  // This is the byte offset in inputBufferPtr to the start of the input argument.
-  // e.g. *inputBufferPtr_[inputBufferOffsets[i]] is the ith input argument.
-  private final int[] inputBufferOffsets_;
 
   // Output buffer to return non-string values. These buffers are allocated in the BE.
   private final long outputBufferPtr_;
@@ -72,27 +62,17 @@ public abstract class HiveUdfExecutor {
   // Size of outBufferStringPtr_.
   private int outBufferStringCapacity_;
 
-  // Preconstructed input objects for the UDF. This minimizes object creation overhead
-  // as these objects are reused across calls to evaluate().
-  private final Writable[] inputObjects_;
+  protected final HiveUdfInputHandler inputHandler_;
 
   protected HiveUdfExecutor(
-      THiveUdfExecutorCtorParams request,
-      JavaUdfDataType retType, JavaUdfDataType[] argTypes) throws ImpalaRuntimeException {
+      THiveUdfExecutorCtorParams request, JavaUdfDataType retType,
+      HiveUdfInputHandler inputHandler) throws ImpalaRuntimeException {
     retType_ = retType;
-    argTypes_ = argTypes;
-    inputBufferPtr_ = request.input_buffer_ptr;
-    inputNullsPtr_ = request.input_nulls_ptr;
     outputBufferPtr_ = request.output_buffer_ptr;
     outputNullPtr_ = request.output_null_ptr;
     outBufferStringPtr_ = 0;
     outBufferStringCapacity_ = 0;
-    inputBufferOffsets_ = new int[request.input_byte_offsets.size()];
-    for (int i = 0; i < request.input_byte_offsets.size(); ++i) {
-      inputBufferOffsets_[i] = request.input_byte_offsets.get(i).intValue();
-    }
-    inputObjects_ = new Writable[argTypes_.length];
-    allocateInputObjects();
+    inputHandler_ = inputHandler;
   }
 
   /**
@@ -108,10 +88,10 @@ public abstract class HiveUdfExecutor {
 
   /**
    * Evaluate function called by the backend. The inputs to the UDF have
-   * been serialized to 'inputObjects_'
+   * been serialized to 'inputHandler_.getInputObjects()'
    */
   public long evaluate() throws ImpalaRuntimeException {
-    return storeUdfResult(evaluateDerived(argTypes_, inputNullsPtr_, inputObjects_));
+    return storeUdfResult(evaluateDerived(inputHandler_.getInputObjects()));
   }
 
   /**
@@ -119,7 +99,7 @@ public abstract class HiveUdfExecutor {
    * for testing and not the version of evaluate() the backend uses.
    */
   public long evaluateForTesting(Object... args) throws ImpalaRuntimeException {
-    return storeUdfResult(evaluateDerived(argTypes_, inputNullsPtr_, args));
+    return storeUdfResult(evaluateDerived(args));
   }
 
   // Sets the result object 'obj' into the outputBufferPtr_
@@ -218,11 +198,11 @@ public abstract class HiveUdfExecutor {
   }
 
   protected int getNumParams() {
-    return inputObjects_.length;
+    return inputHandler_.getNumParams();
   }
 
   protected Object getInputObject(int i) {
-    return inputObjects_[i];
+    return inputHandler_.getInputObject(i);
   }
 
   private void copyBytesToOutputBuffer(byte[] bytes) {
@@ -235,56 +215,6 @@ public abstract class HiveUdfExecutor {
     UnsafeUtil.Copy(outBufferStringPtr_, bytes, 0, bytes.length);
     UnsafeUtil.UNSAFE.putInt(
         outputBufferPtr_ + JavaUdfDataType.STRING_VALUE_LEN_OFFSET, bytes.length);
-  }
-
-  // Preallocate the input objects that will be passed to the underlying UDF.
-  // These objects are allocated once and reused across calls to evaluate()
-  private void allocateInputObjects() throws ImpalaRuntimeException {
-    for (int i = 0; i < argTypes_.length; ++i) {
-      int offset = inputBufferOffsets_[i];
-      switch (argTypes_[i]) {
-        case BOOLEAN:
-        case BOOLEAN_WRITABLE:
-          inputObjects_[i] = new ImpalaBooleanWritable(inputBufferPtr_ + offset);
-          break;
-        case TINYINT:
-        case BYTE_WRITABLE:
-          inputObjects_[i] = new ImpalaTinyIntWritable(inputBufferPtr_ + offset);
-          break;
-        case SMALLINT:
-        case SHORT_WRITABLE:
-          inputObjects_[i] = new ImpalaSmallIntWritable(inputBufferPtr_ + offset);
-          break;
-        case INT:
-        case INT_WRITABLE:
-          inputObjects_[i] = new ImpalaIntWritable(inputBufferPtr_ + offset);
-          break;
-        case BIGINT:
-        case LONG_WRITABLE:
-          inputObjects_[i] = new ImpalaBigIntWritable(inputBufferPtr_ + offset);
-          break;
-        case FLOAT:
-        case FLOAT_WRITABLE:
-          inputObjects_[i] = new ImpalaFloatWritable(inputBufferPtr_ + offset);
-          break;
-        case DOUBLE:
-        case DOUBLE_WRITABLE:
-          inputObjects_[i] = new ImpalaDoubleWritable(inputBufferPtr_ + offset);
-          break;
-        case TEXT:
-          inputObjects_[i] = new ImpalaTextWritable(inputBufferPtr_ + offset);
-          break;
-        case BYTES_WRITABLE:
-          inputObjects_[i] = new ImpalaBytesWritable(inputBufferPtr_ + offset);
-          break;
-        case STRING:
-          // String can be mapped to any String-like Writable class.
-          inputObjects_[i] = new ImpalaBytesWritable(inputBufferPtr_ + offset);
-          break;
-        default:
-          throw new ImpalaRuntimeException("Unsupported argument type: " + argTypes_[i]);
-      }
-    }
   }
 
   public static Type getRetType(THiveUdfExecutorCtorParams request) {
@@ -307,8 +237,8 @@ public abstract class HiveUdfExecutor {
   /**
    * Abstract method allowing derived class to evaluate the function.
    */
-  abstract protected Object evaluateDerived(JavaUdfDataType[] argTypes,
-      long inputNullsPtr, Object[] inputObjectArgs) throws ImpalaRuntimeException;
+  abstract protected Object evaluateDerived(Object[] inputObjectArgs)
+      throws ImpalaRuntimeException;
 
   /**
    * Abstract method returning the Java reflection Method type of the 'evaluate' method.

@@ -20,9 +20,12 @@ package org.apache.impala.hive.executor;
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
+import org.apache.hadoop.hive.serde2.objectinspector.ConstantObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
@@ -53,14 +56,15 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
   private final GenericUDF genericUDF_;
 
   public HiveGenericJavaFunction(Class<?> udfClass,
-      Function hiveFn, Type retType, Type[] parameterTypes)
+      Function hiveFn, Type retType, Type[] parameterTypes,
+      HiveUdfInputHandler inputHandler)
       throws CatalogException {
     try {
       hiveFn_ = hiveFn;
       retType_ = retType;
       parameterTypes_ = parameterTypes;
       genericUDF_ = createGenericUDFInstance(udfClass);
-      returnOi_ = initializeWrapper();
+      returnOi_ = initializeWrapper(inputHandler);
       checkValidFunction();
     } catch (CatalogException e) {
       String errorMsg = "Error retrieving class " + udfClass + ": " + e.getMessage();
@@ -69,8 +73,9 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
   }
 
   public HiveGenericJavaFunction(Class<?> udfClass,
-      Type retType, Type[] parameterTypes) throws CatalogException {
-    this(udfClass, null, retType, parameterTypes);
+      Type retType, Type[] parameterTypes, HiveUdfInputHandler inputHandler)
+      throws CatalogException {
+    this(udfClass, null, retType, parameterTypes, inputHandler);
   }
 
   @Override
@@ -124,16 +129,20 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
   }
 
   private void checkValidFunction() throws CatalogException {
-    if (returnOi_ != getInspector(retType_, true)
-        && returnOi_ != getInspector(retType_, false)
+    boolean isRetTypeConst = returnOi_ instanceof ConstantObjectInspector;
+    if (returnOi_.getClass()
+        != getInspector(retType_, true, isRetTypeConst, null).getClass()
+        && returnOi_.getClass()
+        != getInspector(retType_, false, isRetTypeConst, null).getClass()
         && !returnOi_.getTypeName().equals("void")) {
       throw new CatalogException("Function expected return type " +
           returnOi_.getTypeName() + " but was created with " + retType_);
     }
   }
 
-  private ObjectInspector initializeWrapper() throws CatalogException {
-    ObjectInspector[] parameterOIs = getInspectors(parameterTypes_, true);
+  private ObjectInspector initializeWrapper(HiveUdfInputHandler inputHandler)
+      throws CatalogException {
+    ObjectInspector[] parameterOIs = getInspectors(parameterTypes_, true, inputHandler);
     try {
       return genericUDF_.initialize(parameterOIs);
     } catch (UDFArgumentException e) {
@@ -143,21 +152,34 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
     }
   }
 
-  private ObjectInspector[] getInspectors(Type[] typeArray, boolean useWritable)
+  private ObjectInspector[] getInspectors(Type[] typeArray, boolean useWritable,
+      HiveUdfInputHandler inputHandler)
       throws CatalogException {
     ObjectInspector[] OIArray = new ObjectInspector[typeArray.length];
     for (int i = 0; i < typeArray.length; ++i) {
-      OIArray[i] = getInspector(typeArray[i], useWritable);
+      boolean isConst = inputHandler == null ? false : inputHandler.isArgConst(i);
+      Object constObj = isConst ? inputHandler.getConstObj(i) : null;
+      OIArray[i] = getInspector(typeArray[i], useWritable, isConst, constObj);
     }
     return OIArray;
   }
 
-  private ObjectInspector getInspector(Type t, boolean useWritable)
+  private ObjectInspector getInspector(Type t, boolean useWritable, boolean isConst,
+      Object constObj)
       throws CatalogException {
+    if (isConst) {
+      return getConstInspector(t, constObj);
+    }
     PrimitiveCategory cat = getPrimitiveCategory(t);
     return useWritable
         ? PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(cat)
         : PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(cat);
+  }
+
+  private ConstantObjectInspector getConstInspector(Type t, Object constObj) {
+    PrimitiveTypeInfo pt = TypeInfoFactory.getPrimitiveTypeInfo(t.toSql().toLowerCase());
+    return PrimitiveObjectInspectorFactory.getPrimitiveWritableConstantObjectInspector(
+        pt, constObj);
   }
 
   private PrimitiveCategory getPrimitiveCategory(Type t) throws CatalogException {
