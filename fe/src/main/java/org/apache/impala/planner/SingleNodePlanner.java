@@ -1324,6 +1324,15 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
       List<TupleId> tids = new ArrayList<>();
       e.getIds(tids, null);
       if (tids.isEmpty()) {
+        // Do not migrate anti-join conjuncts (e.g., ON FALSE) into the inline view.
+        // For anti-joins, a constant FALSE in the ON clause means no rows from the
+        // right table will match, so the correct behavior depends on the join
+        // type (LEFT ANTI returns all left rows, RIGHT ANTI returns all right rows).
+        // Migrating such conjuncts would incorrectly mark the inline view as having an
+        // empty result set.
+        if (analyzer.isAntiJoinedConjunct(e)) {
+          continue;
+        }
         evalInInlineViewPreds.add(e);
       } else if (e.isOnClauseConjunct()) {
         if (!analyzer.canEvalOnClauseConjunct(tupleIds, e)) continue;
@@ -2082,8 +2091,8 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
       // Unassigned conjuncts bound by the invisible tuple id of a semi join must have
       // come from the join's On-clause, and therefore, must be added to the other join
       // conjuncts to produce correct results.
-      // TODO This doesn't handle predicates specified in the On clause which are not
-      // bound by any tuple id (e.g. ON (true))
+      // Note: Constant predicates in the On clause (e.g. ON TRUE, ON FALSE) are now
+      // handled correctly through canEvalPredicate() and canEvalAntiJoinedConjunct().
       List<TupleId> tblRefIds = Lists.newArrayList(outer.getTblRefIds());
       tblRefIds.addAll(inner.getTblRefIds());
       otherJoinConjuncts = analyzer.getUnassignedConjuncts(tblRefIds, false);
@@ -2397,6 +2406,15 @@ public class SingleNodePlanner implements SingleNodePlannerIntf {
       throws ImpalaException {
     List<Expr> conjuncts =
         analyzer.getUnassignedConjuncts(unionStmt.getTupleId().asList(), false);
+    // Do not push anti-join On-clause conjuncts (e.g. a constant ON FALSE/ON NULL of an
+    // enclosing anti-join whose preserved input is this union) into the operands. Such
+    // conjuncts are only "bound" by the union tuple because they are constant, but they
+    // must be evaluated at the anti-join node. Pushing them into the operands would lose
+    // the anti-join association (the copied conjunct is re-registered as a plain
+    // constant predicate) and incorrectly mark the operands, and hence the preserved
+    // input, as producing an empty result set. Leaving them unassigned here lets the
+    // anti-join node pick them up as other-join conjuncts (see createJoinNode()).
+    conjuncts.removeIf(e -> analyzer.isAntiJoinedConjunct(e));
     if (!unionStmt.hasAnalyticExprs()) {
       // Turn unassigned predicates for unionStmt's tupleId_ into predicates for
       // the individual operands.

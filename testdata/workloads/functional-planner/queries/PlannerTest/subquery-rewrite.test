@@ -927,6 +927,7 @@ where not exists (select * from functional.alltypessmall s where s.id < 5)
 PLAN-ROOT SINK
 |
 02:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  join predicates: TRUE
 |  row-size=89B cardinality=8
 |
 |--01:SCAN HDFS [functional.alltypessmall s]
@@ -950,6 +951,7 @@ where not exists (select 1 from w2)
 PLAN-ROOT SINK
 |
 02:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  join predicates: TRUE
 |  row-size=89B cardinality=8
 |
 |--01:SCAN HDFS [functional.alltypessmall s]
@@ -973,6 +975,7 @@ where not exists
 PLAN-ROOT SINK
 |
 03:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  join predicates: TRUE
 |  row-size=0B cardinality=8
 |
 |--00:SCAN HDFS [functional.alltypestiny t]
@@ -2539,6 +2542,7 @@ select * from functional.alltypessmall where
 PLAN-ROOT SINK
 |
 02:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  join predicates: TRUE
 |  row-size=89B cardinality=100
 |
 |--01:SCAN HDFS [functional.alltypestiny]
@@ -2602,6 +2606,7 @@ select * from functional.alltypessmall where
 PLAN-ROOT SINK
 |
 03:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  join predicates: TRUE
 |  row-size=89B cardinality=100
 |
 |--02:AGGREGATE [FINALIZE]
@@ -2693,6 +2698,7 @@ select * from functional.alltypessmall where
 PLAN-ROOT SINK
 |
 03:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  join predicates: TRUE
 |  row-size=89B cardinality=100
 |
 |--02:SELECT
@@ -4778,6 +4784,7 @@ WHERE -1 NOT IN (SELECT COUNT(id) FROM functional.alltypestiny HAVING false)
 PLAN-ROOT SINK
 |
 02:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  join predicates: TRUE
 |  row-size=4B cardinality=8
 |
 |--01:EMPTYSET
@@ -4797,6 +4804,7 @@ WHERE -1 NOT IN (SELECT COUNT(id) FROM functional.alltypestiny HAVING count(id) 
 PLAN-ROOT SINK
 |
 03:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  join predicates: TRUE
 |  row-size=4B cardinality=8
 |
 |--02:AGGREGATE [FINALIZE]

@@ -346,3 +346,239 @@ RIGHT ANTI JOIN SemiJoinTblB b on v.b = b.b
 ---- TYPES
 INT, INT, INT
 ====
+---- QUERY
+# Testing LEFT ANTI JOIN with ON FALSE should return all rows from left table
+# because no rows from right table can match.
+SELECT a.* FROM SemiJoinTblA a LEFT ANTI JOIN SemiJoinTblB b ON false
+---- RESULTS
+1,1,1
+1,1,10
+1,2,10
+1,3,10
+NULL,NULL,30
+2,4,30
+2,NULL,20
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing RIGHT ANTI JOIN with ON FALSE should return all rows from right table
+# because no rows from left table can match.
+SELECT b.* FROM SemiJoinTblA a RIGHT ANTI JOIN SemiJoinTblB b ON false
+---- RESULTS
+1,1,1
+1,1,10
+1,2,5
+1,NULL,10
+2,10,NULL
+3,NULL,NULL
+3,NULL,50
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing LEFT ANTI JOIN with ON TRUE should return empty result set
+# because all rows from right table match.
+SELECT a.* FROM SemiJoinTblA a LEFT ANTI JOIN SemiJoinTblB b ON true
+---- RESULTS
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing RIGHT ANTI JOIN with ON TRUE should return empty result set
+# because all rows from left table match.
+SELECT b.* FROM SemiJoinTblA a RIGHT ANTI JOIN SemiJoinTblB b ON true
+---- RESULTS
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing LEFT ANTI JOIN with constant expression 1=0 (equivalent to FALSE)
+SELECT a.* FROM SemiJoinTblA a LEFT ANTI JOIN SemiJoinTblB b ON 1=0
+---- RESULTS
+1,1,1
+1,1,10
+1,2,10
+1,3,10
+NULL,NULL,30
+2,4,30
+2,NULL,20
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing LEFT ANTI JOIN with constant expression 1=1 (equivalent to TRUE)
+SELECT a.* FROM SemiJoinTblA a LEFT ANTI JOIN SemiJoinTblB b ON 1=1
+---- RESULTS
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing LEFT ANTI JOIN with ON FALSE and WHERE clause
+# Should return rows from left table that satisfy WHERE condition
+SELECT a.* FROM SemiJoinTblA a LEFT ANTI JOIN SemiJoinTblB b ON false
+WHERE a.a = 1
+---- RESULTS
+1,1,1
+1,1,10
+1,2,10
+1,3,10
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing LEFT ANTI JOIN with ON TRUE and WHERE clause
+# Should return empty result (anti-join filters all, then WHERE is applied)
+SELECT a.* FROM SemiJoinTblA a LEFT ANTI JOIN SemiJoinTblB b ON true
+WHERE a.a = 1
+---- RESULTS
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing LEFT SEMI JOIN with ON FALSE should return empty result
+# because no rows from right table can match.
+SELECT a.* FROM SemiJoinTblA a LEFT SEMI JOIN SemiJoinTblB b ON false
+---- RESULTS
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing LEFT SEMI JOIN with ON TRUE should return all rows from left table
+SELECT a.* FROM SemiJoinTblA a LEFT SEMI JOIN SemiJoinTblB b ON true
+---- RESULTS
+1,1,1
+1,1,10
+1,2,10
+1,3,10
+NULL,NULL,30
+2,4,30
+2,NULL,20
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing nested query with LEFT ANTI JOIN ON FALSE
+SELECT * FROM (
+  SELECT a.* FROM SemiJoinTblA a LEFT ANTI JOIN SemiJoinTblB b ON false
+) v WHERE v.a = 2
+---- RESULTS
+2,4,30
+2,NULL,20
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing multiple anti-joins with constant predicates
+SELECT a.* FROM SemiJoinTblA a
+LEFT ANTI JOIN SemiJoinTblB b ON false
+LEFT ANTI JOIN SemiJoinTblB c ON true
+---- RESULTS
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing anti-join with mixed constant and regular predicates (ON FALSE OR a.a = b.a)
+# The OR with FALSE should be optimized away, leaving just a.a = b.a
+# Only rows with NULL in column a are returned because NULL doesn't match anything
+SELECT a.* FROM SemiJoinTblA a LEFT ANTI JOIN SemiJoinTblB b ON (false OR a.a = b.a)
+---- RESULTS
+NULL,NULL,30
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing anti-join with mixed constant and regular predicates (ON TRUE AND a.a = b.a)
+# The AND with TRUE should be optimized away, leaving just a.a = b.a
+# Only rows with NULL in column a are returned because NULL doesn't match anything
+SELECT a.* FROM SemiJoinTblA a LEFT ANTI JOIN SemiJoinTblB b ON (true AND a.a = b.a)
+---- RESULTS
+NULL,NULL,30
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing anti-join with inline view on the left side and ON FALSE
+# The inline view should not be marked as having an empty result set
+SELECT v.* FROM (SELECT * FROM SemiJoinTblA WHERE a = 1) v
+LEFT ANTI JOIN SemiJoinTblB b ON false
+---- RESULTS
+1,1,1
+1,1,10
+1,2,10
+1,3,10
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing nested inline views with anti-join and ON FALSE
+# Verifies that constant predicates don't propagate incorrectly through nested views
+SELECT * FROM (
+  SELECT v.* FROM (SELECT * FROM SemiJoinTblA WHERE a = 2) v
+  LEFT ANTI JOIN SemiJoinTblB b ON false
+) v2 WHERE v2.a = 2
+---- RESULTS
+2,4,30
+2,NULL,20
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing anti-join with inline view and mixed predicates
+# Constant FALSE should not be migrated into the inline view
+SELECT v.* FROM (SELECT * FROM SemiJoinTblA WHERE a = 1) v
+LEFT ANTI JOIN SemiJoinTblB b ON (false OR v.a = b.a)
+---- RESULTS
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# IMPALA-14714: constant inline view (UNION ALL) on the preserved side of a LEFT
+# ANTI JOIN with ON FALSE. The constant predicate must be evaluated at the anti-join
+# node, not pushed into the union operands (which would incorrectly empty the input).
+# All left rows must be returned.
+SELECT a.id FROM (SELECT 1 AS id UNION ALL SELECT 2 AS id) a
+LEFT ANTI JOIN (SELECT 1 AS id UNION ALL SELECT 2 AS id) b ON false
+---- RESULTS
+1
+2
+---- TYPES
+TINYINT
+====
+---- QUERY
+# IMPALA-14714: same shape as above but with ON NULL, which is also never TRUE.
+# All left rows must be returned.
+SELECT a.id FROM (SELECT 1 AS id UNION ALL SELECT 2 AS id) a
+LEFT ANTI JOIN (SELECT 1 AS id UNION ALL SELECT 2 AS id) b ON null
+---- RESULTS
+1
+2
+---- TYPES
+TINYINT
+====
+---- QUERY
+# IMPALA-14714: RIGHT ANTI JOIN where the preserved (right) input is a constant
+# UNION ALL. ON FALSE must return all right rows.
+SELECT b.id FROM (SELECT 1 AS id UNION ALL SELECT 2 AS id) a
+RIGHT ANTI JOIN (SELECT 1 AS id UNION ALL SELECT 2 AS id) b ON false
+---- RESULTS
+1
+2
+---- TYPES
+TINYINT
+====
+---- QUERY
+# IMPALA-14714: mixed predicate (false OR a.id = b.id) with a constant UNION ALL
+# preserved side. The constant FALSE must not empty the input; only rows with no
+# matching value on the right survive the anti-join. Here a={1,2,3}, b={1,2} so
+# only id=3 is returned.
+SELECT a.id FROM
+  (SELECT 1 AS id UNION ALL SELECT 2 AS id UNION ALL SELECT 3 AS id) a
+LEFT ANTI JOIN (SELECT 1 AS id UNION ALL SELECT 2 AS id) b
+ON (false OR a.id = b.id)
+---- RESULTS
+3
+---- TYPES
+TINYINT
+====
+

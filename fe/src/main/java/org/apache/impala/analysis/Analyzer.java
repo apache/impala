@@ -2203,13 +2203,20 @@ public class Analyzer {
    * evaluates the conjunct. If the conjunct evaluates to false, marks this query
    * block as having an empty result set or as having an empty select-project-join
    * portion, if fromHavingClause is true or false, respectively.
-   * No-op if the conjunct is not constant or is outer joined.
+   * No-op if the conjunct is not constant, is outer joined, or is anti-joined.
+   * For anti-joins, a constant FALSE in the ON clause means no rows from the right
+   * table will match, so all rows from the left table should be returned (for LEFT
+   * ANTI JOIN) or no rows should be returned (for RIGHT ANTI JOIN). We should not
+   * mark the entire query as having an empty result set.
    * Return true, if conjunct is constant FALSE.
    * Throws an AnalysisException if there is an error evaluating `conjunct`
    */
   private boolean markConstantConjunct(Expr conjunct, boolean fromHavingClause)
       throws AnalysisException {
-    if (!conjunct.isConstant() || isOjConjunct(conjunct)) return false;
+    if (!conjunct.isConstant() || isOjConjunct(conjunct)
+        || isAntiJoinedConjunct(conjunct)) {
+      return false;
+    }
     markConjunctAssigned(conjunct);
     if ((!fromHavingClause && !hasEmptySpjResultSet_)
         || (fromHavingClause && !hasEmptyResultSet_)) {
@@ -2570,13 +2577,15 @@ public class Analyzer {
    */
   public boolean canEvalPredicate(List<TupleId> tupleIds, Expr e) {
     if (!e.isBoundByTupleIds(tupleIds)) return false;
-    List<TupleId> tids = new ArrayList<>();
-    e.getIds(tids, null);
-    if (tids.isEmpty()) return true;
-
+    // Check On-clause conjuncts before the tids.isEmpty() shortcut so that constant
+    // On-clause predicates (e.g. ON false) are routed to canEvalOnClauseConjunct()
+    // instead of being incorrectly assigned to a scan node.
     if (e.isOnClauseConjunct()) {
       return canEvalOnClauseConjunct(tupleIds, e);
     }
+    List<TupleId> tids = new ArrayList<>();
+    e.getIds(tids, null);
+    if (tids.isEmpty()) return true;
     return isLastOjMaterializedByTupleIds(tupleIds, e);
   }
 
@@ -2662,6 +2671,11 @@ public class Analyzer {
     if (antiJoinRef == null) return true;
     List<TupleId> tids = new ArrayList<>();
     e.getIds(tids, null);
+    if (tids.isEmpty()) {
+      // Constant anti-join On-clause conjuncts (e.g. ON false) must be evaluated
+      // at the anti-join node, not at a scan node below it.
+      return nodeTupleIds.containsAll(antiJoinRef.getAllTableRefIds());
+    }
     if (tids.size() > 1) {
       return nodeTupleIds.containsAll(antiJoinRef.getAllTableRefIds())
           && antiJoinRef.getAllTableRefIds().containsAll(nodeTupleIds);
