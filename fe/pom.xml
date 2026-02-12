@@ -842,6 +842,8 @@ under the License.
                     <exclude>org.apache.sentry:*</exclude>
                     <!-- IMPALA-11673: Ensure spring-jcl is not present. -->
                     <exclude>org.springframework:spring-jcl</exclude>
+                    <!-- We don't support junit 5 yet. -->
+                    <exclude>org.junit.jupiter:*</exclude>
                     <!-- Assert that we only use artifacts from only the specified
                          version of these components. -->
                     <exclude>org.apache.hadoop:*</exclude>
