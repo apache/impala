@@ -82,6 +82,12 @@ class LocalImpl extends FeCatalogManager {
     if (provider_ instanceof CatalogdMetaProvider) {
       ((CatalogdMetaProvider) provider_).setAuthzChecker(authzChecker_);
     }
+    if (provider_ instanceof  MultiMetaProvider) {
+      MetaProvider primaryProvider = ((MultiMetaProvider) provider_).getPrimaryProvider();
+      if (primaryProvider instanceof CatalogdMetaProvider) {
+        ((CatalogdMetaProvider) primaryProvider).setAuthzChecker(authzChecker_);
+      }
+    }
     return new LocalCatalog(provider_);
   }
 
