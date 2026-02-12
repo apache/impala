@@ -63,6 +63,11 @@ public class IcebergUpdateImpl extends IcebergModifyImpl {
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+    if (originalTargetTable_.getFormatVersion() > 2) {
+      throw new AnalysisException(String.format(
+          "Impala does not support UPDATE statements on Iceberg tables with format " +
+          "version %d", originalTargetTable_.getFormatVersion()));
+    }
     deleteTableId_ = analyzer.getDescTbl().addTargetTable(icePosDelTable_);
     IcebergUtil.validateIcebergTableForInsert(originalTargetTable_);
   }

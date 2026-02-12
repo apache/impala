@@ -37,7 +37,7 @@ def rewrite_metadata(prefix, unique_database, metadata_dir):
       continue
 
     version = metadata['format-version']
-    if version < 1 or version > 2:
+    if version < 1 or version > 3:
       print("WARN: skipping {}, unknown version {}".format(f, version))
       continue
 
@@ -163,6 +163,11 @@ def add_prefix_to_snapshot_entry(table_params, entry):
   if 'data_file' in entry:
     entry['data_file']['file_path'] = generate_new_path(
         table_params, entry['data_file']['file_path'])
+    if ('referenced_data_file' in entry['data_file']
+        and entry['data_file']['referenced_data_file'] is not None):
+      entry['data_file']['referenced_data_file'] = \
+          generate_new_path(
+              table_params, entry['data_file']['referenced_data_file'])
   return entry
 
 

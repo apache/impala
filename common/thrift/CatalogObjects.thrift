@@ -664,6 +664,12 @@ struct THash128 {
   2: required i64 low
 }
 
+struct TIcebergDeletionVector {
+  1: required string path;
+  2: required i64 content_offset;
+  3: required i64 content_size_in_bytes;
+}
+
 // Contains maps from 128-bit XXH128 hash of file path to its file descriptor
 struct TIcebergContentFileStore {
   1: optional map<THash128, THdfsFileDesc> path_hash_to_data_file_without_deletes
@@ -675,6 +681,7 @@ struct TIcebergContentFileStore {
   7: optional bool has_parquet
   8: optional list<string> missing_files
   9: optional list<TIcebergPartition> partitions
+  10: optional map<THash128, TIcebergDeletionVector> data_path_hash_to_dv
 }
 
 // Represents a drop partition request for Iceberg tables

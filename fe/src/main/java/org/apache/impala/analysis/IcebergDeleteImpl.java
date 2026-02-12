@@ -40,6 +40,12 @@ public class IcebergDeleteImpl extends IcebergModifyImpl {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+    if (originalTargetTable_.getFormatVersion() > 2) {
+      throw new AnalysisException(String.format(
+          "Impala does not support DELETE statements on Iceberg tables with format " +
+              "version %d", originalTargetTable_.getFormatVersion()));
+    }
+
     // Make the virtual position delete table the new target table.
     modifyStmt_.setTargetTable(icePosDelTable_);
 

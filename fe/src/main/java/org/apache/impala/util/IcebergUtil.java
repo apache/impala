@@ -20,8 +20,6 @@ package org.apache.impala.util;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import com.google.common.hash.Hasher;
-import com.google.common.hash.Hashing;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.google.flatbuffers.FlatBufferBuilder;
@@ -42,13 +40,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.ContentFile;
+import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.FileContent;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionField;
@@ -67,9 +66,7 @@ import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.expressions.Term;
 import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.CloseableIterable;
-import org.apache.iceberg.metrics.LoggingMetricsReporter;
 import org.apache.iceberg.metrics.MetricsReporter;
-import org.apache.iceberg.metrics.MetricsReporters;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 import org.apache.iceberg.transforms.Transforms;
@@ -118,6 +115,7 @@ import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
+import org.apache.impala.thrift.TIcebergDeletionVector;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TIcebergPartitionField;
@@ -1463,6 +1461,15 @@ public class IcebergUtil {
       case TRUNCATE: return "iceberg_truncate_transform";
     }
     return "";
+  }
+
+  public static TIcebergDeletionVector createTIcebergDeletionVector(
+      DeleteFile delFile) {
+    Preconditions.checkState(delFile.content() == FileContent.POSITION_DELETES);
+    Preconditions.checkState(delFile.format() == FileFormat.PUFFIN);
+    return new TIcebergDeletionVector(
+        delFile.location(),
+        delFile.contentOffset(), delFile.contentSizeInBytes());
   }
 
   /**

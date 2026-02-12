@@ -26,16 +26,12 @@ import java.util.Set;
 
 import com.google.common.collect.Lists;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.hive.HiveSchemaUtil;
 import org.apache.iceberg.types.Types;
-import org.apache.impala.analysis.IcebergPartitionField;
-import org.apache.impala.analysis.IcebergPartitionSpec;
-import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.IcebergColumn;
@@ -48,7 +44,6 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnType;
-import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
 /**
  * Utility class for converting between Iceberg and Impala schemas and types.

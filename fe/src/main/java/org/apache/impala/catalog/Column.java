@@ -83,14 +83,18 @@ public class Column {
     stats_.update(type_, statsData);
   }
 
-  @Override
-  public String toString() {
+  protected MoreObjects.ToStringHelper toStringHelper() {
     return MoreObjects.toStringHelper(this.getClass())
                   .add("name_", name_)
                   .add("type_", type_)
                   .add("comment_", comment_)
                   .add("stats", stats_)
-                  .add("position_", position_).toString();
+                  .add("position_", position_);
+  }
+
+  @Override
+  public String toString() {
+    return toStringHelper().toString();
   }
 
   public static Column fromThrift(TColumn columnDesc) throws ImpalaRuntimeException {

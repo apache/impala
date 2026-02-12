@@ -20,6 +20,8 @@ package org.apache.impala.catalog;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnDescriptor;
 
+import com.google.common.base.MoreObjects;
+
 /**
  * Represents an Iceberg column.
  *
@@ -79,5 +81,14 @@ public class IcebergColumn extends Column {
     desc.setIcebergFieldMapKeyId(fieldMapKeyId_);
     desc.setIcebergFieldMapValueId(fieldMapValueId_);
     return desc;
+  }
+
+  @Override
+  protected MoreObjects.ToStringHelper toStringHelper() {
+    return super.toStringHelper()
+        .add("fieldId_", fieldId_)
+        .add("fieldMapKeyId_", fieldMapKeyId_)
+        .add("fieldMapValueId_", fieldMapValueId_)
+        .add("isNullable_", isNullable_);
   }
 }

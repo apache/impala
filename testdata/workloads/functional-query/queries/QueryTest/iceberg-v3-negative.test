@@ -1,0 +1,106 @@
+====
+---- QUERY
+CREATE TABLE ice_v3 (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+
+INSERT INTO ice_v3 VALUES (1, 'impala');
+INSERT INTO ice_v3 VALUES (2, 'iceberg');
+INSERT INTO ice_v3 VALUES (3, 'spark');
+====
+---- QUERY
+DELETE FROM ice_v3 WHERE i = 1;
+---- CATCH
+Impala does not support DELETE statements on Iceberg tables with format version 3
+====
+---- QUERY
+UPDATE ice_v3 SET s = 'updated' WHERE i = 1;
+---- CATCH
+Impala does not support UPDATE statements on Iceberg tables with format version 3
+====
+---- QUERY
+MERGE INTO ice_v3 AS target
+USING (SELECT 1 AS i, 'updated' AS s) AS source ON target.i = source.i
+WHEN MATCHED THEN UPDATE SET target.s = source.s;
+---- CATCH
+Impala does not support MERGE statements on Iceberg tables with format version 3
+====
+---- QUERY
+OPTIMIZE TABLE ice_v3;
+---- CATCH
+Impala does not support OPTIMIZE statements on Iceberg tables with format version 3
+====
+---- QUERY
+SELECT * FROM iceberg_v3_deletion_vectors;
+---- CATCH
+Iceberg tables with Deletion Vectors are not supported yet
+====
+---- QUERY
+# The first snapshot has no deletion vectors.
+SELECT *
+FROM iceberg_v3_deletion_vectors FOR SYSTEM_VERSION AS OF 2700858159721908397;
+---- RESULTS
+1
+2
+3
+4
+5
+---- TYPES
+INT
+====
+---- QUERY
+SELECT * FROM iceberg_v3_default_value;
+---- CATCH
+Iceberg columns with default values not supported yet.
+====
+---- QUERY
+# Column 'i' does not have a default value.
+SELECT i FROM iceberg_v3_default_value;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# The first snapshot only has column 'i' which does not have a default value.
+SELECT * FROM iceberg_v3_default_value FOR SYSTEM_VERSION AS OF 7752776210164022855;
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# 'j' is not materialized.
+select i from (select * from iceberg_v3_default_value) v;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+# 'j' is not materialized.
+select i from (select i, j from iceberg_v3_default_value) v;
+---- RESULTS
+1
+2
+---- TYPES
+INT
+====
+---- QUERY
+select i, file__position, input__file__name from iceberg_v3_default_value;
+---- RESULTS
+1,0,regex:'.*00000-0-4bcf51b3-40de-43df-a74a-3eb29c0a9634-0-00001.parquet'
+2,0,regex:'.*00000-1-18a720eb-5773-431a-b440-5e9caa4ac641-0-00001.parquet'
+---- TYPES
+INT,BIGINT,STRING
+====
+---- QUERY
+# 'j' is not materialized.
+select count(*) from (select j from iceberg_v3_default_value) v;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====

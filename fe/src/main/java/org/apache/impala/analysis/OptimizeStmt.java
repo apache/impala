@@ -169,6 +169,12 @@ public class OptimizeStmt extends DmlStatementBase {
     FeIcebergTable iceTable = (FeIcebergTable) table_;
     IcebergUtil.validateIcebergTableForInsert(iceTable);
 
+    if (iceTable.getFormatVersion() > 2) {
+      throw new AnalysisException(String.format(
+          "Impala does not support OPTIMIZE statements on Iceberg tables with format " +
+              "version %d", iceTable.getFormatVersion()));
+    }
+
     selectFiles(iceTable);
 
     prepareExpressions(analyzer);

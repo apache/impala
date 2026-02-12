@@ -119,6 +119,11 @@ public class IcebergMergeImpl implements MergeImpl {
     Preconditions.checkState(table instanceof FeIcebergTable);
     icebergTable_ = (FeIcebergTable) table;
     IcebergUtil.validateIcebergTableForInsert(icebergTable_);
+    if (icebergTable_.getFormatVersion() > 2) {
+      throw new AnalysisException(String.format(
+          "Impala does not support MERGE statements on Iceberg tables with format " +
+              "version %d", icebergTable_.getFormatVersion()));
+    }
     String modifyWriteMode = icebergTable_.getIcebergApiTable().properties()
         .get(TableProperties.MERGE_MODE);
     if (modifyWriteMode != null && !Objects.equals(modifyWriteMode, "merge-on-read")

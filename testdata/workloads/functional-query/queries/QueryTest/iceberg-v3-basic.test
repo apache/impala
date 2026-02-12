@@ -1,0 +1,31 @@
+====
+---- QUERY
+CREATE TABLE ice_v3 (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+
+INSERT INTO ice_v3 VALUES (1, 'impala');
+INSERT INTO ice_v3 VALUES (2, 'iceberg');
+INSERT INTO ice_v3 VALUES (3, 'spark');
+====
+---- QUERY
+SELECT * FROM ice_v3;
+---- RESULTS
+1,'impala'
+2,'iceberg'
+3,'spark'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+ALTER TABLE ice_v3 ADD COLUMN new_col STRING;
+INSERT INTO ice_v3 VALUES (4, 'hive', 'new_value');
+SELECT * FROM ice_v3;
+---- RESULTS
+1,'impala','NULL'
+2,'iceberg','NULL'
+3,'spark','NULL'
+4,'hive','new_value'
+---- TYPES
+INT,STRING,STRING
+====

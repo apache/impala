@@ -2311,6 +2311,30 @@ class TestIcebergV2Table(IcebergTestSuite):
       assert len(result.data) == 3
 
 
+class TestIcebergV3Table(IcebergTestSuite):
+  """Tests related to Iceberg V3 tables."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIcebergV3Table, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_v3_basic(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-v3-basic', vector, unique_database)
+
+  def test_v3_negative(self, vector, unique_database):
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_v3_deletion_vectors", "parquet",
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_v3",
+        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_v3_default_value", "parquet",
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_v3",
+        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
+    self.run_test_case('QueryTest/iceberg-v3-negative', vector, unique_database)
+
+
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
 # of the test coverage is in TestIcebergV2Table.test_read_position_deletes but since it
 # runs also with the V2 optimizations setting turned off, some tests were moved here.

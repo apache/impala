@@ -24,12 +24,8 @@ import java.util.List;
 
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
-import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
-
-import com.google.common.base.Preconditions;
 
 /**
  * Representation of an Update statement.

@@ -35,8 +35,10 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.iceberg.ContentFile;
+import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileContent;
+import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.ExpressionUtil;
@@ -47,6 +49,7 @@ import org.apache.iceberg.metrics.MetricsReport;
 import org.apache.iceberg.metrics.MetricsReporter;
 import org.apache.iceberg.metrics.ScanMetricsResult;
 import org.apache.iceberg.metrics.ScanReport;
+import org.apache.iceberg.types.Types.NestedField;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BinaryPredicate.Operator;
@@ -85,6 +88,7 @@ import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.thrift.TColumnStats;
+import org.apache.impala.thrift.TIcebergDeletionVector;
 import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TQueryOptions;
@@ -146,6 +150,7 @@ public class IcebergScanPlanner {
   private List<IcebergFileDescriptor> dataFilesWithoutDeletes_ = new ArrayList<>();
   private List<IcebergFileDescriptor> dataFilesWithDeletes_ = new ArrayList<>();
   private Set<IcebergFileDescriptor> positionDeleteFiles_ = new HashSet<>();
+  public Map<Hash128, TIcebergDeletionVector> dataFileToDV_ = new HashMap<>();
 
   // Holds all the equalityFieldIds from the equality delete file descriptors involved in
   // this query.
@@ -238,16 +243,38 @@ public class IcebergScanPlanner {
     }
     dataFilesWithDeletes_ = fileStore.getDataFilesWithDeletes();
     positionDeleteFiles_ = new HashSet<>(fileStore.getPositionDeleteFiles());
+    dataFileToDV_ = fileStore.getDataFileToDV();
     initEqualityIds(fileStore.getEqualityDeleteFiles());
 
     updateDeleteStatistics();
   }
 
   private boolean noDeleteFiles() {
-    return positionDeleteFiles_.isEmpty() && equalityIdsToDeleteFiles_.isEmpty();
+    return positionDeleteFiles_.isEmpty() &&
+        equalityIdsToDeleteFiles_.isEmpty() &&
+        dataFileToDV_.isEmpty();
+  }
+
+  private void validateSlotRefs() throws ImpalaException {
+    if (getIceTable().getFormatVersion() < 3) return;
+    for (SlotDescriptor slotDesc : tblRef_.getDesc().getSlots()) {
+      if (!slotDesc.isMaterialized()) continue;
+      Column column = slotDesc.getColumn();
+      if (column == null) continue;
+      int fieldId = ((IcebergColumn) column).getFieldId();
+      NestedField field = getIceTable().getIcebergApiTable().schema().findField(fieldId);
+      if (field.initialDefaultLiteral() != null) {
+        throw new ImpalaRuntimeException(String.format(
+            "Iceberg columns with default values not supported yet. " +
+            "Table: %s Column: %s Default value: %s",
+            getIceTable().getFullName(), column.getName(),
+            field.initialDefaultLiteral().toString()));
+      }
+    }
   }
 
   private PlanNode createIcebergScanPlanImpl() throws ImpalaException {
+    validateSlotRefs();
     boolean isPartitionKeyScan = IsPartitionKeyScan();
     if (noDeleteFiles()) {
       Preconditions.checkState(!tblRef_.optimizeCountStarForIcebergV2());
@@ -260,6 +287,11 @@ public class IcebergScanPlanner {
           getSkippedConjuncts(), snapshotId_, isPartitionKeyScan);
       ret.init(analyzer_);
       return ret;
+    }
+    if (!dataFileToDV_.isEmpty()) {
+      throw new ImpalaRuntimeException(
+          "Iceberg tables with Deletion Vectors are not supported yet: " +
+          getIceTable().getFullName());
     }
 
     PlanNode joinNode = null;
@@ -690,12 +722,13 @@ public class IcebergScanPlanner {
             metricsReporter_)) {
       long dataFilesCacheMisses = 0;
       for (FileScanTask fileScanTask : fileScanTasks) {
+        DataFile dataFile = fileScanTask.file();
         Expression residualExpr = fileScanTask.residual();
         if (residualExpr != null && !(residualExpr instanceof True)) {
           residualExpressions_.add(residualExpr);
         }
         Pair<IcebergFileDescriptor, Boolean> fileDesc =
-            getFileDescriptor(fileScanTask.file(), fileStore);
+            getFileDescriptor(dataFile, fileStore);
         if (!fileDesc.second) ++dataFilesCacheMisses;
         if (fileScanTask.deletes().isEmpty()) {
           dataFilesWithoutDeletes_.add(fileDesc.first);
@@ -708,8 +741,14 @@ public class IcebergScanPlanner {
             if (delFile.content() == FileContent.EQUALITY_DELETES) {
               addEqualityDeletesAndIds(delFileDesc.first);
             } else {
-              Preconditions.checkState(delFile.content() == FileContent.POSITION_DELETES);
-              positionDeleteFiles_.add(delFileDesc.first);
+              if (delFile.format() == FileFormat.PUFFIN) {
+                Preconditions.checkState(fileScanTask.deletes().size() == 1);
+                dataFileToDV_.put(
+                    IcebergUtil.getFilePathHash(dataFile.location()),
+                    IcebergUtil.createTIcebergDeletionVector(delFile));
+              } else {
+                positionDeleteFiles_.add(delFileDesc.first);
+              }
             }
           }
         }

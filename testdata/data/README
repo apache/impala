@@ -1199,6 +1199,26 @@ iceberg_v2_null_delete_record:
   * manually edited the metadata JSON, and the manifest and manifest list files to
     register the delete files in the table
 
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_deletion_vectors
+Iceberg V3 table created by Spark 4.0.2.
+Built Spark with the following:
+> ./build/mvn -Phive -Phive-thriftserver -DskipTests clean package
+Copy Impala's core-site.xml, hdfs-site.xml, hive-site.xml into Spark's conf/ directory.
+Run spark-shell with the following command:
+> bin/spark-shell --jars iceberg-spark-runtime-4.0_2.13-1.10.1.jar \
+                  --conf spark.sql.catalogImplementation=hive \
+                  --conf spark.sql.catalog.spark_catalog.type=hive \
+                  --conf spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog
+Then Spark SQL commands were used to create the tables:
+sql("create table iceberg_v3_deletion_vectors (i int) using iceberg options('format-version'='3', 'write.delete.mode'='merge-on-read', 'write.update.mode'='merge-on-read')").collect()
+...
+
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_default_value
+Iceberg V3 table created by Spark 4.0.2, see above (iceberg_v3_deletion_vectors).
+Since Spark still doesn't support default values, the metadata.json file was edited
+manually to set the default value for column 'j':
+{"id":2,"name":"j","required":false,"type":"int","initial-default":-1,"write-default":-1}
+
 arrays_big.parq:
 Generated with RandomNestedDataGenerator.java from the following schema:
 {

@@ -47,6 +47,7 @@ import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.thrift.THash128;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.TIcebergContentFileStore;
+import org.apache.impala.thrift.TIcebergDeletionVector;
 import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.Hash128;
@@ -157,6 +158,7 @@ public class IcebergContentFileStore {
   private MapListContainer dataFilesWithDeletes_ = new MapListContainer();
   private MapListContainer positionDeleteFiles_ = new MapListContainer();
   private MapListContainer equalityDeleteFiles_ = new MapListContainer();
+  private Map<Hash128, TIcebergDeletionVector> dataFileToDV_ = new HashMap<>();
   private Set<String> missingFiles_ = new HashSet<>();
   // Partitions with their corresponding ids that are used to refer to the partition info
   // from the IcebergFileDescriptors.
@@ -204,6 +206,7 @@ public class IcebergContentFileStore {
     for (DeleteFile deleteFile : icebergFiles.equalityDeleteFiles) {
       storeFile(deleteFile, fileDescMap, equalityDeleteFiles_);
     }
+    dataFileToDV_ = icebergFiles.dataFileToDV;
   }
 
   private void storeFile(ContentFile<?> contentFile,
@@ -276,6 +279,10 @@ public class IcebergContentFileStore {
 
   public Set<String> getMissingFiles() {
     return missingFiles_;
+  }
+
+  public Map<Hash128, TIcebergDeletionVector> getDataFileToDV() {
+    return dataFileToDV_;
   }
 
   public long getNumFiles() {
@@ -372,6 +379,11 @@ public class IcebergContentFileStore {
     ret.setHas_parquet(hasParquet_);
     ret.setMissing_files(new ArrayList<>(missingFiles_));
     ret.setPartitions(convertPartitionMapToList(partitions_));
+    Map<THash128, TIcebergDeletionVector> tdeletion_vectors = new HashMap<>();
+    for (Map.Entry<Hash128, TIcebergDeletionVector> entry : dataFileToDV_.entrySet()) {
+      tdeletion_vectors.put(entry.getKey().toThrift(), entry.getValue());
+    }
+    ret.setData_path_hash_to_dv(tdeletion_vectors);
     return ret;
   }
 
@@ -398,6 +410,12 @@ public class IcebergContentFileStore {
       ret.equalityDeleteFiles_ = MapListContainer.fromThrift(
           tFileStore.getPath_hash_to_equality_delete_file(),
           networkAddresses, hostIndex);
+    }
+    if (tFileStore.isSetData_path_hash_to_dv()) {
+      for (Map.Entry<THash128, TIcebergDeletionVector> entry :
+          tFileStore.getData_path_hash_to_dv().entrySet()) {
+        ret.dataFileToDV_.put(Hash128.fromThrift(entry.getKey()), entry.getValue());
+      }
     }
     ret.hasAvro_ = tFileStore.isSetHas_avro() ? tFileStore.isHas_avro() : false;
     ret.hasOrc_ = tFileStore.isSetHas_orc() ? tFileStore.isHas_orc() : false;
