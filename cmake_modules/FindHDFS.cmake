@@ -25,8 +25,9 @@
 #  HDFS_FOUND, If false, do not try to use ant
 #  hdfsstatic
 
-exec_program(hadoop ARGS version OUTPUT_VARIABLE Hadoop_VERSION
-             RETURN_VALUE Hadoop_RETURN)
+execute_process(COMMAND hadoop version
+  OUTPUT_VARIABLE Hadoop_VERSION
+  RESULT_VARIABLE Hadoop_RETURN)
 
 # Only look in HADOOP_INCLUDE_DIR
 find_path(HDFS_INCLUDE_DIR hdfs.h PATHS

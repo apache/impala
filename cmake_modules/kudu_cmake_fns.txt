@@ -20,7 +20,7 @@
 # also defines a shim method (ADD_KUDU_TEST) to simplify importing Kudu's utility
 # libraries.
 
-cmake_minimum_required(VERSION 3.2.3)
+cmake_minimum_required(VERSION 3.11.2)
 include(CMakeParseArguments)
 
 # add_library() wrapper provided for compatibility with Kudu. In the original version,

@@ -17,6 +17,13 @@
 
 cmake_minimum_required(VERSION 3.22)
 
+# CMP0144 controls how CMake find_package() interacts with X_ROOT
+# variables. The NEW policy respects both Package_ROOT (case-sensitive)
+# and PACKAGE_ROOT (all-caps). Since we tend to use all-caps names
+# (e.g. BOOST_ROOT), this is a better setting for us (OLD is only the
+# case-sensitive). Explicitly setting this avoids several verbose warnings.
+cmake_policy(SET CMP0144 NEW)
+
 # This is a Kudu-specific flag that disables Kudu targets that are test-only.
 set(NO_TESTS 1)
 
@@ -153,36 +160,6 @@ set_dep_root(CALLONCEHACK)
 set_dep_root(CLOUDFLAREZLIB)
 set_dep_root(OPENTELEMETRY_CPP)
 
-# The boost-cmake project hasn't been maintained for years. Let's make sure we
-# don't accidentally use it if it can be found.
-set(Boost_NO_BOOST_CMAKE ON)
-
-# Make Boost follow the preference of shared libraries vs static libraries.
-if(BUILD_SHARED_LIBS)
-  set(Boost_USE_STATIC_LIBS OFF)
-else()
-  set(Boost_USE_STATIC_LIBS ON)
-endif()
-# Always use the static Boost runtime
-set(Boost_USE_STATIC_RUNTIME ON)
-
-# Newer versions of boost (including the version in toolchain) don't build separate
-# multithreaded versions (they always are). Make sure to pick those up.
-# TODO: understand the consequence of leaving this ON (the default value).
-set(Boost_USE_MULTITHREADED OFF)
-
-# The casing and underscoring expected for these properties varies between
-# versions of CMake. Multiple inconsistent versions may be present here
-# intentionally to provide what a wide range of versions expects.
-set(Boost_NO_SYSTEM_PATHS true)
-set(BOOST_LIBRARYDIR ${BOOST_ROOT}/lib)
-set(BOOST_INCLUDEDIR ${BOOST_ROOT}/include)
-set(Boost_INCLUDE_DIR ${BOOST_INCLUDEDIR})
-
-if (CMAKE_DEBUG)
-  set(Boost_DEBUG TRUE)
-endif()
-
 # Adds a third-party library with name ${NAME}. If BUILD_SHARED_LIBS is true, the new
 # library refers to ${SHARED_LIB}; otherwise it refers to ${STATIC_LIB}. If only one
 # library (static or shared) is provided, it is used regardless of BUILD_SHARED_LIBS. The
@@ -214,8 +191,20 @@ function(IMPALA_ADD_THIRDPARTY_LIB NAME HEADER STATIC_LIB SHARED_LIB)
   endif()
 endfunction()
 
+# Make Boost follow the preference of shared libraries vs static libraries.
+if(BUILD_SHARED_LIBS)
+  set(Boost_USE_STATIC_LIBS OFF)
+else()
+  set(Boost_USE_STATIC_LIBS ON)
+endif()
 
-find_package(Boost REQUIRED COMPONENTS thread regex filesystem system date_time random locale serialization)
+if (CMAKE_DEBUG)
+  set(Boost_DEBUG TRUE)
+endif()
+
+find_package(Boost CONFIG REQUIRED
+  COMPONENTS thread regex filesystem system date_time random locale serialization
+  NO_SYSTEM_ENVIRONMENT_PATH NO_CMAKE_SYSTEM_PATH)
 # Mark Boost as a system header to avoid compile warnings.
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})
@@ -223,7 +212,7 @@ message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
 
 # Use OpenSSL from the system, because that is the closest match to the version that this
 # build will use when it is deployed.
-find_package(OpenSSL 1.0.2 REQUIRED)
+find_package(OpenSSL 1.1.1 REQUIRED)
 
 # OpenSSL, being a security dependency, is always dynamically linked.
 IMPALA_ADD_THIRDPARTY_LIB(openssl_ssl ${OPENSSL_INCLUDE_DIR} "" ${OPENSSL_SSL_LIBRARY})

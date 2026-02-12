@@ -81,13 +81,13 @@ export USE_AVRO_CPP=${USE_AVRO_CPP:=false}
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=159-1fade8203e
-export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=612-1fade8203e
+export IMPALA_TOOLCHAIN_BUILD_ID_AARCH64=169-65bcf0ca99
+export IMPALA_TOOLCHAIN_BUILD_ID_X86_64=630-65bcf0ca99
 export IMPALA_TOOLCHAIN_REPO=\
 ${IMPALA_TOOLCHAIN_REPO:-https://github.com/cloudera/native-toolchain.git}
 export IMPALA_TOOLCHAIN_BRANCH=${IMPALA_TOOLCHAIN_BRANCH:-master}
 export IMPALA_TOOLCHAIN_COMMIT_HASH=\
-${IMPALA_TOOLCHAIN_COMMIT_HASH-1fade8203e3df234dc5bab35cd32ff1f40d1db17}
+${IMPALA_TOOLCHAIN_COMMIT_HASH-65bcf0ca99082360dffe1484425ec9a77e1212ca}
 # Compare the build ref in build IDs by removing everything up-to-and-including the
 # first hyphen.
 if [ "${IMPALA_TOOLCHAIN_BUILD_ID_AARCH64#*-}" \
@@ -115,7 +115,7 @@ else
   export IMPALA_AVRO_VERSION=1.7.4-p5
 fi
 unset IMPALA_AVRO_URL
-export IMPALA_BINUTILS_VERSION=2.42
+export IMPALA_BINUTILS_VERSION=2.42-p24
 unset IMPALA_BINUTILS_URL
 export IMPALA_BOOST_VERSION=1.74.0-p1
 unset IMPALA_BOOST_URL
@@ -125,11 +125,11 @@ export IMPALA_BZIP2_VERSION=1.0.8-p2
 unset IMPALA_BZIP2_URL
 export IMPALA_CCTZ_VERSION=2.2
 unset IMPALA_CCTZ_URL
-export IMPALA_CMAKE_VERSION=3.22.2
+export IMPALA_CMAKE_VERSION=3.31.11
 unset IMPALA_CMAKE_URL
 export IMPALA_CRCUTIL_VERSION=2903870057d2f1f109b245650be29e856dc8b646
 unset IMPALA_CRCUTIL_URL
-export IMPALA_CURL_VERSION=8.14.1
+export IMPALA_CURL_VERSION=8.17.0
 unset IMPALA_CURL_URL
 export IMPALA_CYRUS_SASL_VERSION=2.1.23
 unset IMPALA_CYRUS_SASL_URL
@@ -177,7 +177,7 @@ export IMPALA_LZ4_VERSION=1.9.3
 unset IMPALA_LZ4_URL
 export IMPALA_ZSTD_VERSION=1.5.2
 unset IMPALA_ZSTD_URL
-export IMPALA_OPENLDAP_VERSION=2.4.47
+export IMPALA_OPENLDAP_VERSION=2.5.20
 unset IMPALA_OPENLDAP_URL
 export IMPALA_ORC_VERSION=1.7.9-p11
 unset IMPALA_ORC_URL

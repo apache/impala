@@ -452,7 +452,7 @@ public class JwtHttpTest {
     String expectedErrString = String.format("Impalad services did not start correctly, "
         + "exiting.  Error: Error downloading JWKS from '%s': Network error: curl "
         + "error: SSL peer certificate or SSH remote key was not OK: SSL certificate "
-        + "problem: unable to get local issuer certificate", jwksHttpUrl);
+        + "OpenSSL verify result: unable to get local issuer certificate", jwksHttpUrl);
 
     // cluster start will fail because the TLS cert returned by the
     // JWKS server is not trusted
