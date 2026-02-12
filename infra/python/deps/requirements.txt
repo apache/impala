@@ -20,60 +20,62 @@
 # Dependents are indented. Dependents that have multiple parents are not listed
 # multiple times (though maybe they could be).
 
-allpairspy == 2.5.0
-argparse == 1.4.0
-flake8==3.9.2
-  mccabe == 0.6.1
-  pyflakes==2.3.1
-  pycodestyle==2.7.0
-flake8-unused-arguments==0.0.13
+allpairspy == 2.5.1
+flake8==7.3.0
+  mccabe == 0.7.0
+  pyflakes==3.4.0
+  pycodestyle==2.14.0
+flake8-unused-arguments==0.0.14
 future == 0.18.3
-hdfs == 2.0.2
+hdfs == 2.7.3
   docopt == 0.6.2
-  execnet == 1.9.0
 impyla == 0.21a3
   bitarray == 2.3.0
   pure-sasl == 0.6.2
-  # six == 1.14.0 (specified separately)
+  # six == 1.17.0 (specified separately)
   thrift_sasl == 0.4.3
 isort == 5.13.2
   poetry-core == 1.9.1
 k5test==0.10.3
-kazoo==2.8.0
+kazoo==2.10.0
 kerberos == 1.3.1
 pexpect == 3.3
-pg8000 == 1.10.2
 prettytable == 2.5.0
   wcwidth == 0.2.14
-prometheus-client == 0.12.0
-psutil == 5.6.3
-pyparsing == 2.4.7
+prometheus-client == 0.24.1
+psutil == 7.2.2
+pyparsing == 3.3.2
 pytest == 6.2.5
   attrs == 19.2.0
   iniconfig == 1.1.1
-  pluggy == 0.13.1
-  py == 1.8.2
+  pluggy == 1.6.0
+  py == 1.11.0
   pytest-forked == 1.6.0
   pytest-reportlog == 0.4.0
   pytest-timeout == 2.2.0
   pytest-xdist == 2.4.0
+    execnet == 2.1.2
+      hatchling == 1.28.0
+      pathspec == 1.0.4
+      trove-classifiers == 2026.1.14.14
+        calver == 2025.10.20
+      hatch-vcs == 0.5.0
   toml == 0.10.2
-python-magic == 0.4.11
+python-magic == 0.4.27
 pywebhdfs == 0.3.2
-  pbr == 3.1.1
-requests == 2.21.0
-  chardet == 3.0.4
-  idna == 2.8
-  urllib3 == 1.24.2
-  certifi == 2020.12.5
-sasl == 0.2.1
-six == 1.14.0
+  pbr == 7.0.3
+requests == 2.32.5
+  charset_normalizer == 3.4.4
+  idna == 3.11
+  urllib3 == 2.6.3
+  certifi == 2026.1.4
+sasl == 0.4a1
+six == 1.17.0
 sqlparse == 0.3.1
-texttable == 0.8.3
-avro==1.10.2
+avro==1.12.1
 thrift==0.16.0
-distro==1.6.0
+distro==1.9.0
 
 # Required for Kudu:
-  Cython == 0.29.14
-  pytz == 2020.1
+  Cython == 0.29.37
+  pytz == 2025.2

@@ -576,13 +576,15 @@ def parse_result_rows(exec_result, escape_strings=True):
     result.append(','.join(new_cols))
   return result
 
+
 # Special syntax for basic aggregation over fields in the runtime profile.
 # The syntax is:
 # aggregation(function, field_name): expected_value
 # Currently, the only implemented function is SUM and only integers are supported.
-AGGREGATION_PREFIX_PATTERN = 'aggregation\('
+AGGREGATION_PREFIX_PATTERN = r'aggregation\('
 AGGREGATION_PREFIX = re.compile(AGGREGATION_PREFIX_PATTERN)
-AGGREGATION_SYNTAX_MATCH_PATTERN = 'aggregation\((\w+)[ ]*,[ ]*([^)]+)\)([:><])[ ]*(\d+)'
+AGGREGATION_SYNTAX_MATCH_PATTERN = r'aggregation\((\w+)[ ]*,[ ]*([^)]+)\)([:><])[ ]*(\d+)'
+
 
 def try_compile_aggregation(row_string):
   """
@@ -615,7 +617,7 @@ def compute_aggregation(function, field, runtime_profile):
   # These lines are printed by 'be/src/util/pretty-printer.h' with verbose=true.
   # 'field_regex' also captures the accurate value of the field which is the number
   # in parenthesis. It means we can retrieve this value with 're.findall()'.
-  field_regex = "{0}: \d+(?:\.\d+[KMB])? \((\d+)\)".format(field)
+  field_regex = r"{0}: \d+(?:\.\d+[KMB])? \((\d+)\)".format(field)
   field_regex_re = re.compile(field_regex)
   inside_avg_fragment = False
   avg_fragment_indent = None

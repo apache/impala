@@ -22,7 +22,7 @@ import argparse
 import time
 import logging
 import os
-import pipes
+import shlex
 from subprocess import check_call
 from tests.common.impala_cluster import ImpalaCluster
 from threading import Event, Thread
@@ -258,7 +258,7 @@ class AutoScaler(object):
     options += ["--impalad_args=%s" % a for a in impalad_args]
 
     logging.debug("Starting cluster with command: %s" %
-                 " ".join(pipes.quote(arg) for arg in cmd + options))
+                 " ".join(shlex.quote(arg) for arg in cmd + options))
     log_debug = logging.getLogger().getEffectiveLevel() == logging.DEBUG
     log_file = None
     if not log_debug:

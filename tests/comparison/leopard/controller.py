@@ -154,7 +154,7 @@ class Controller(object):
     '''
     while True:
       self.schedule_items = dict([(run_id, thread) for run_id, thread
-        in self.schedule_items.items() if self.schedule_items[run_id].isAlive()])
+        in self.schedule_items.items() if self.schedule_items[run_id].is_alive()])
       LOG.info('Number of Active Threads: {0}'.format(len(self.schedule_items)))
       self.generate_schedule_item()
       self.start_new_jobs()

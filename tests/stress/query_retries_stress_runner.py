@@ -27,9 +27,9 @@
 from __future__ import absolute_import, division, print_function
 from builtins import map, range
 import logging
-import pipes
 import os
 import random
+import shlex
 import subprocess
 import sys
 import threading
@@ -94,7 +94,7 @@ completed_queries_latch = None
 def configured_call(cmd):
   """Call a command in a shell with config-impala.sh."""
   if type(cmd) is list:
-    cmd = " ".join([pipes.quote(arg) for arg in cmd])
+    cmd = " ".join([shlex.quote(arg) for arg in cmd])
   cmd = "source {0}/bin/impala-config.sh && {1}".format(IMPALA_HOME, cmd)
   return subprocess.check_call(["bash", "-c", cmd])
 

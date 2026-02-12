@@ -2651,7 +2651,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     for thread in self.all_threads:
       thread.join(5)
       LOG.info("Join thread for query num %s %s", thread.query_num,
-          "TIMED OUT" if thread.isAlive() else "")
+          "TIMED OUT" if thread.is_alive() else "")
     super(TestAdmissionControllerStress, self).teardown_method(method)
 
   def should_run(self):

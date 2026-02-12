@@ -22,11 +22,11 @@ from builtins import map, range
 import json
 import logging
 import os
-import pipes
 import psutil
+import requests
+import shlex
 import socket
 import time
-import requests
 from getpass import getuser
 from random import choice
 from signal import SIGKILL, SIGRTMIN
@@ -487,6 +487,15 @@ class Process(object):
     # In non-containerised case, search for process based on matching command lines.
     procs = []
     for process in psutil.process_iter(['pid', 'ppid', 'cmdline']):
+      # psutil changed behavior for process_iter() so that it no longer checks
+      # for reused pids. Use is_running() to do that.
+      if not process.is_running():
+        continue
+
+      # psutil returns None for fields from a zombie process
+      if not process.info['cmdline']:
+        continue
+
       # Use info because it won't throw NoSuchProcess exceptions.
       if set(self.cmd) == set(process.info['cmdline']):
         procs.append(process.info)
@@ -804,9 +813,9 @@ def run_daemon(daemon_binary, args, build_type="latest", env_vars={}, output_fil
   # cannot cleanly kill it until py.test exits. In theory, Popen(shell=True) should
   # achieve the same thing but it doesn't work on some platforms for some reasons.
   sys_cmd = ("{set_cmds} {cmd} {redirect} &".format(
-      set_cmds=''.join(["export {0}={1};".format(k, pipes.quote(v))
+      set_cmds=''.join(["export {0}={1};".format(k, shlex.quote(v))
                          for k, v in env_vars.items()]),
-      cmd=' '.join([pipes.quote(tok) for tok in cmd]),
+      cmd=' '.join([shlex.quote(tok) for tok in cmd]),
       redirect=redirect))
   os.system(sys_cmd)
 

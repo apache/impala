@@ -53,12 +53,25 @@ responsible for and how they were created:
           -extensions SAN -out wildcard-san-cert.pem -days 10000 -sha256
 
 -------------
-  4) server-cert.pem & server-cert.key:
+  4) server-key.pem & server-key-password.pem & server-cert.key:
 
     This is a self-signed certificate and its corresponding key which has the commonName
-    as "localhost".
+    as "localhost" and subject alternative name "DNS:localhost,IP:192.168.1.1". It also
+    specifies CA:FALSE to be clear that this is a leaf certificate.
 
-      This was created the same as 1) with a different commonName.
+    This was created using the following commands:
+
+      openssl genrsa -out server-key.pem 2048
+
+      openssl req -x509 -new -nodes -key server-key.pem -sha256 -days 10000 -out server-cert.pem \
+          -addext 'basicConstraints=CA:FALSE' \
+          -addext 'subjectAltName=DNS:localhost,IP:192.168.1.1'
+
+      (Fill in all the details according to prompts with common name set to 'localhost')
+
+      openssl rsa -aes256 -in server-key.pem -out server-key-password.pem
+
+      (Specify "password" for the pass phrase)
 
 -------------
   5) incorrect-commonname-cert.pem & incorrect-commonname-cert.key:

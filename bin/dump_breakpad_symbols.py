@@ -178,7 +178,7 @@ def is_regular_file(path):
 
 def is_elf_file(path):
   """Check whether 'path' is an ELF file."""
-  return is_regular_file(path) and b'ELF' in magic.from_file(path)
+  return is_regular_file(path) and 'ELF' in magic.from_file(path)
 
 
 def find_elf_files(path):

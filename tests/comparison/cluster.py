@@ -90,7 +90,7 @@ class Cluster(with_metaclass(ABCMeta, object)):
         if not file_name.lower().endswith(".xml"):
           continue
         xml_doc = parse_xml(os.path.join(self.local_hadoop_conf_dir, file_name))
-        for property in xml_doc.getiterator("property"):
+        for property in xml_doc.iter("property"):
           name = property.find("name")
           if name is None or name.text is None:
             continue

@@ -23,8 +23,8 @@ import inspect
 import logging
 import os
 import os.path
-import pipes
 import pytest
+import shlex
 import subprocess
 
 from glob import glob
@@ -657,7 +657,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     options.append("--impalad_args=--default_query_options={0}".format(
         ','.join(["{0}={1}".format(k, v) for k, v in default_query_option_kvs])))
 
-    cmd_str = " ".join(pipes.quote(arg) for arg in cmd + options)
+    cmd_str = " ".join(shlex.quote(arg) for arg in cmd + options)
 
     # If the cluster is already started, we don't need to start it again, unless
     # force_restart is set to True. NOTE: reordering tests into classes with class-level
