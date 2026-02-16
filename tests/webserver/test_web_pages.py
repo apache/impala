@@ -37,6 +37,7 @@ import os
 import pytest
 import re
 import requests
+import time
 
 LOG = logging.getLogger(__name__)
 
@@ -1197,6 +1198,240 @@ class TestWebPage(ImpalaTestSuite):
       LOG.info("Catalog operations: " + catalog_operations_page)
       LOG.info("Queries: " + queries_page)
     assert matched
+
+  def test_catalog_operation_detail_endpoint(self, unique_database):
+    """Test the /operation_detail endpoint shows detailed information about catalog
+       operations including thrift request, timeline, and byte sizes."""
+    # Execute a DDL to generate a catalog operation
+    # Use CTAS to generate multiple catalog operations
+    result = self.execute_query(
+        "create table {0}.test_detail as select * from functional.alltypes limit 10"
+        .format(unique_database))
+    expected_query_id = result.query_id
+
+    # Get the operation from /operations endpoint
+    catalog_operations_page = requests.get("http://localhost:25020/operations?json").text
+    catalog_operations = json.loads(catalog_operations_page)
+    assert "finished_catalog_operations" in catalog_operations
+    assert len(catalog_operations["finished_catalog_operations"]) > 0
+
+    # Find finished CTAS operations - there should be two:
+    # CREATE_TABLE_AS_SELECT and FINALIZE_CREATE_TABLE_AS_SELECT
+    ctas_operations = []
+    for op in catalog_operations["finished_catalog_operations"]:
+      if expected_query_id in op["query_id"] and \
+          ("CREATE_TABLE_AS_SELECT" in op["catalog_op_name"]
+          or "FINALIZE_CREATE_TABLE_AS_SELECT" in op["catalog_op_name"]):
+        ctas_operations.append(op)
+
+    assert len(ctas_operations) == 2, \
+        "Expected 2 CTAS operations (CREATE_TABLE_AS_SELECT and " \
+        "FINALIZE_CREATE_TABLE_AS_SELECT), found {0}. " \
+        "Operations: {1}".format(len(ctas_operations),
+        ", ".join([op["catalog_op_name"] for op in ctas_operations]))
+
+    # Verify both operations have the correct query_id
+    for test_op in ctas_operations:
+      query_id = test_op["query_id"]
+      thread_id = test_op["thread_id"]
+      start_time_ms = test_op["start_time_ms"]
+
+      # Verify query_id matches what we got from execute_query
+      assert expected_query_id in query_id, \
+          "Query ID mismatch: expected {0}, got {1}".format(expected_query_id, query_id)
+
+      LOG.info("Testing operation detail for query_id: {0}, thread_id: {1}, op: {2}"
+          .format(query_id, thread_id, test_op["catalog_op_name"]))
+
+      # Test HTML endpoint returns 200 OK (requires start_time_ms for finished operations)
+      html_response = requests.get(
+          "http://localhost:25020/operation_detail?query_id={0}&thread_id={1}"
+          "&start_time_ms={2}".format(query_id, thread_id, start_time_ms))
+      assert html_response.status_code == requests.codes.ok
+      assert "Operation Information" in html_response.text
+      assert "Execution Timeline" in html_response.text
+
+      # Test JSON endpoint returns proper data
+      json_response = requests.get(
+          "http://localhost:25020/operation_detail?query_id={0}&thread_id={1}"
+          "&start_time_ms={2}&json".format(query_id, thread_id, start_time_ms))
+      assert json_response.status_code == requests.codes.ok
+      detail_data = json.loads(json_response.text)
+
+      # Verify basic operation fields are present
+      assert "query_id" in detail_data
+      assert detail_data["query_id"] == query_id
+      assert "catalog_op_name" in detail_data
+      assert test_op["catalog_op_name"] in detail_data["catalog_op_name"]
+      assert "target_name" in detail_data
+      assert "user" in detail_data
+      assert "status" in detail_data
+      assert "start_time" in detail_data
+      assert "finish_time" in detail_data
+      assert "duration" in detail_data
+      assert "timeline" in detail_data, "timeline field missing"
+      assert "request_size_bytes" in detail_data, "request_size_bytes field missing"
+      assert "response_size_bytes" in detail_data, "response_size_bytes field missing"
+
+      # Verify the fields contain actual data
+      assert len(detail_data["timeline"]) > 0, "timeline should not be empty"
+      assert detail_data["request_size_bytes"] > 0, \
+          "request_size_bytes should be positive"
+      assert detail_data["response_size_bytes"] > 0, \
+          "response_size_bytes should be positive"
+
+      # Verify timeline is formatted text (pre-formatted on server side)
+      timeline_str = detail_data["timeline"]
+      assert isinstance(timeline_str, str), "timeline should be a formatted string"
+
+      # Check for expected timeline format from RuntimeProfile
+      assert "Catalog Server Operation:" in timeline_str, \
+          "timeline should have the operation name"
+      # Check that it contains typical timeline events
+      assert ("Got" in timeline_str or "DDL" in timeline_str
+          or "finished" in timeline_str), "timeline should contain at least one event"
+
+  def test_catalog_operation_detail_invalid_query_id(self):
+    """Test that /operation_detail handles invalid query_id gracefully."""
+    # Test with a non-existent query_id and thread_id
+    response = requests.get(
+        "http://localhost:25020/operation_detail"
+        "?query_id=nonexistent:123456789abcd"
+        "&thread_id=999&json"
+    )
+    assert response.status_code == requests.codes.ok
+    detail_data = json.loads(response.text)
+    assert "error" in detail_data
+
+    # Test without thread_id (should return error about missing parameter)
+    response = requests.get(
+        "http://localhost:25020/operation_detail?query_id=nonexistent:123456789abcd&json")
+    assert response.status_code == requests.codes.ok
+    detail_data = json.loads(response.text)
+    assert "error" in detail_data
+    assert "thread_id" in detail_data["error"].lower(), \
+        "Should return error for non-existent query_id"
+
+    # Test with missing query_id parameter
+    response = requests.get("http://localhost:25020/operation_detail?json")
+    assert response.status_code == requests.codes.ok
+    detail_data = json.loads(response.text)
+    assert "error" in detail_data, \
+        "Should return error when query_id parameter is missing"
+
+    # Test with missing start_time_ms for a finished operation
+    # First, execute a simple DDL to get a finished operation
+    self.execute_query("create database if not exists test_invalid_param_db")
+    catalog_operations_page = requests.get("http://localhost:25020/operations?json").text
+    catalog_operations = json.loads(catalog_operations_page)
+    if len(catalog_operations.get("finished_catalog_operations", [])) > 0:
+      finished_op = catalog_operations["finished_catalog_operations"][0]
+      query_id = finished_op["query_id"]
+      thread_id = finished_op["thread_id"]
+      # Try to access finished operation without start_time_ms (should fail)
+      response = requests.get(
+          "http://localhost:25020/operation_detail?query_id={0}&thread_id={1}&json"
+          .format(query_id, thread_id))
+      assert response.status_code == requests.codes.ok
+      detail_data = json.loads(response.text)
+      assert "error" in detail_data, \
+          "Should return error when start_time_ms is missing for finished operation"
+      assert "start_time_ms" in detail_data["error"].lower(), \
+          "Error message should mention start_time_ms"
+
+  @pytest.mark.execute_serially
+  def test_catalog_operation_detail_in_flight(self, unique_database):
+    """Test that /operation_detail shows real-time timeline for in-flight operations.
+       Uses a debug action to inject a delay in DDL execution."""
+    # Create a table first, then refresh it with a delay
+    # Use catalogd_refresh_hdfs_listing_delay which triggers during REFRESH
+    self.client.execute("create table {0}.test_in_flight (id int)"
+        .format(unique_database))
+
+    delay_action = "catalogd_refresh_hdfs_listing_delay:SLEEP@100"
+
+    # Start the REFRESH asynchronously
+    refresh_stmt = "refresh {0}.test_in_flight".format(unique_database)
+    # Set the debug action before executing
+    self.client.set_configuration({"debug_action": delay_action})
+    handle = self.client.execute_async(refresh_stmt)
+
+    # Get the query_id from the handle
+    expected_query_id = self.client.get_query_id(handle)
+
+    try:
+      # Poll for the in-flight operation (with timeout)
+      inflight_op = None
+      query_id = None
+      max_attempts = 20
+      attempt = 0
+
+      while attempt < max_attempts and inflight_op is None:
+        attempt += 1
+
+        # Get in-flight operations
+        catalog_operations_page = requests.get(
+            "http://localhost:25020/operations?json").text
+        catalog_operations = json.loads(catalog_operations_page)
+
+        # Find the in-flight REFRESH operation
+        if "inflight_catalog_operations" in catalog_operations:
+          for op in catalog_operations["inflight_catalog_operations"]:
+            if op["catalog_op_name"] == "REFRESH" and \
+                op["target_name"] == "{0}.test_in_flight".format(unique_database):
+              inflight_op = op
+              query_id = op["query_id"]
+              break
+
+        # If not found yet, sleep before next attempt
+        if inflight_op is None and attempt < max_attempts:
+          time.sleep(0.1)
+
+      # Assert that we found the in-flight operation
+      assert inflight_op is not None, \
+          "In-flight REFRESH operation not found after {0} attempts".format(max_attempts)
+      thread_id = inflight_op["thread_id"]
+
+      # Verify query_id matches what we got from the handle
+      assert expected_query_id in query_id, \
+          "Query ID mismatch: expected {0}, got {1}".format(expected_query_id, query_id)
+
+      LOG.info("Found in-flight operation with query_id: {0}, thread_id: {1}".format(
+          query_id, thread_id))
+
+      # Test the operation_detail page for the in-flight operation
+      json_response = requests.get(
+          "http://localhost:25020/operation_detail?query_id={0}&thread_id={1}&json"
+          .format(query_id, thread_id))
+      assert json_response.status_code == requests.codes.ok
+      detail_data = json.loads(json_response.text)
+
+      # Verify the operation is in STARTED status
+      assert detail_data["status"] == "STARTED", \
+          "In-flight operation should have STARTED status"
+
+      # Verify timeline is present for in-flight operation
+      assert "timeline" in detail_data, \
+          "Timeline should be present for in-flight operation"
+      assert len(detail_data["timeline"]) > 0, \
+          "Timeline should not be empty for in-flight operation"
+
+      # Verify timeline is formatted text (not JSON)
+      timeline_str = detail_data["timeline"]
+      assert isinstance(timeline_str, str), "Timeline should be a formatted string"
+
+      # Check for expected timeline format from RuntimeProfile
+      assert "Catalog Server Operation:" in timeline_str, \
+          "Timeline should have the operation name"
+      assert ("Got Metastore client" in timeline_str or "Got catalog version"
+          in timeline_str), "Timeline should contain at least one event"
+
+      LOG.info("In-flight operation detail test passed")
+
+    finally:
+      # Wait for the query to complete and close it
+      self.client.wait_for_finished_timeout(handle, 30)
+      self.client.close_query(handle)
 
   def test_catalog_metrics(self):
     """Test /metrics of catalogd"""

@@ -17,6 +17,8 @@
 
 package org.apache.impala.service;
 
+import static org.apache.impala.service.CatalogOpExecutor.CATALOG_TIMELINE_NAME;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -25,6 +27,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
@@ -37,6 +40,7 @@ import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.monitor.CatalogOperationTracker;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FileMetadataLoader;
@@ -61,8 +65,10 @@ import org.apache.impala.hive.executor.HiveJavaFunctionFactoryImpl;
 import org.apache.impala.service.JniCatalogOp.JniCatalogOpCallable;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogOpRecord;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
+import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryRequest;
 import org.apache.impala.thrift.TGetCatalogDeltaRequest;
@@ -84,16 +90,20 @@ import org.apache.impala.thrift.TGetTablesResult;
 import org.apache.impala.thrift.TLogLevel;
 import org.apache.impala.thrift.TPrioritizeLoadRequest;
 import org.apache.impala.thrift.TResetMetadataRequest;
+import org.apache.impala.thrift.TResetMetadataResponse;
 import org.apache.impala.thrift.TSetEventProcessorStatusRequest;
 import org.apache.impala.thrift.TStatus;
+import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableUsage;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
+import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.thrift.TGetAllHadoopConfigsResponse;
 import org.apache.impala.thrift.TWaitForHmsEventRequest;
 import org.apache.impala.util.AuthorizationUtil;
 import org.apache.impala.util.CatalogOpUtil;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.PatternMatcher;
@@ -314,8 +324,26 @@ public class JniCatalog {
     JniUtil.deserializeThrift(protocolFactory_, params, thriftDdlExecReq);
     String shortDesc = CatalogOpUtil.getShortDescForExecDdl(params);
 
-    return execAndSerialize(
-        "execDdl", shortDesc, () -> catalogOpExecutor_.execDdlRequest(params));
+    TUniqueId queryId = params.isSetHeader() ? params.getHeader().getQuery_id() : null;
+    EventSequence catalogTimeline = new EventSequence(CATALOG_TIMELINE_NAME);
+    final int requestSize = thriftDdlExecReq.length;
+
+    // Add the record first with timeline and request size
+    // Operation details will be set later in increment()
+    TCatalogOpRecord record = CatalogOperationTracker.INSTANCE.addRecord(queryId,
+        catalogTimeline, requestSize);
+
+    // Execute and serialize the response
+    byte[] result = execAndSerialize("execDdl", shortDesc, () -> {
+      return catalogOpExecutor_.execDdlRequest(params, catalogTimeline);
+    });
+
+    // Update response size on the record
+    if (record != null && result != null) {
+      record.setResponse_size_bytes(result.length);
+    }
+
+    return result;
   }
 
   /**
@@ -327,8 +355,26 @@ public class JniCatalog {
     JniUtil.deserializeThrift(protocolFactory_, req, thriftResetMetadataReq);
     String shortDesc = CatalogOpUtil.getShortDescForReset(req);
 
-    return execAndSerialize("resetMetadata", shortDesc,
-        () -> catalogOpExecutor_.execResetMetadata(req));
+    TUniqueId queryId = req.isSetHeader() ? req.getHeader().getQuery_id() : null;
+    EventSequence catalogTimeline = new EventSequence(CATALOG_TIMELINE_NAME);
+    final int requestSize = thriftResetMetadataReq.length;
+
+    // Add the record first with timeline and request size
+    // Operation details will be set later in increment()
+    TCatalogOpRecord record = CatalogOperationTracker.INSTANCE.addRecord(queryId,
+        catalogTimeline, requestSize);
+
+    // Execute and serialize the response
+    byte[] result = execAndSerialize("resetMetadata", shortDesc, () -> {
+      return catalogOpExecutor_.execResetMetadata(req, catalogTimeline);
+    });
+
+    // Update response size on the record
+    if (record != null && result != null) {
+      record.setResponse_size_bytes(result.length);
+    }
+
+    return result;
   }
 
   /**
@@ -502,8 +548,26 @@ public class JniCatalog {
     String shortDesc = "Update catalog for "
         + fullyQualifiedTableName(request.getDb_name(), request.getTarget_table());
 
-    return execAndSerialize("updateCatalog", shortDesc,
-        () -> catalogOpExecutor_.updateCatalog(request));
+    TUniqueId queryId = request.isSetHeader() ? request.getHeader().getQuery_id() : null;
+    EventSequence catalogTimeline = new EventSequence(CATALOG_TIMELINE_NAME);
+    final int requestSize = thriftUpdateCatalog.length;
+
+    // Add the record first with timeline and request size
+    // Operation details will be set later in increment()
+    TCatalogOpRecord record = CatalogOperationTracker.INSTANCE.addRecord(queryId,
+        catalogTimeline, requestSize);
+
+    // Execute and serialize the response
+    byte[] result = execAndSerialize("updateCatalog", shortDesc, () -> {
+      return catalogOpExecutor_.updateCatalog(request, catalogTimeline);
+    });
+
+    // Update response size on the record
+    if (record != null && result != null) {
+      record.setResponse_size_bytes(result.length);
+    }
+
+    return result;
   }
 
   /**

@@ -411,6 +411,11 @@ class CatalogServer {
   void GetCatalogOpRecords(
       const TGetOperationUsageResponse& response, rapidjson::Document* document);
 
+  /// Debug webpage handler for detailed catalog operation information.
+  /// Shows details for a single operation identified by query_id and thread_id.
+  void OperationDetailUrlCallback(
+      const Webserver::WebRequest& req, rapidjson::Document* document);
+
   /// Debug webpage handler that is used to dump all the registered metrics of a
   /// table. The caller specifies the "name" parameter which is the fully
   /// qualified table name and this function retrieves all the metrics of that

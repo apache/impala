@@ -233,6 +233,18 @@ class RuntimeProfileBase {
   // Return true if successful, false if it's not a valid verbosity value.
   static bool ParseVerbosity(const std::string& str, Verbosity* out);
 
+  /// Pretty-print a timeline with events in a human-readable format.
+  /// This is a utility method used by both RuntimeProfile::EventSequence
+  /// and TEventSequence.
+  static void PrettyPrintTimeline(std::ostream* s, const std::string& prefix,
+      const std::string& name, int64_t duration,
+      const std::vector<std::pair<std::string, int64_t>>& events);
+
+  /// Pretty-print a timeline from a TEventSequence into a human-readable format.
+  /// Converts TEventSequence to the format expected by PrettyPrintTimeline.
+  static void PrettyPrintTimelineFromThrift(std::ostream* s, const std::string& prefix,
+      const TEventSequence& event_sequence);
+
  protected:
   FRIEND_TEST(CountersTest, AggregateEventSequences);
   friend class AggregatedEventSequenceToJsonTest;

@@ -25,6 +25,7 @@ import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlQueryOptions;
 import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TCatalogOpRecord;
+import org.apache.impala.thrift.TEventSequence;
 import org.apache.impala.thrift.TGetOperationUsageResponse;
 import org.apache.impala.thrift.TOperationUsageCounter;
 import org.apache.impala.thrift.TQueryOptions;
@@ -32,6 +33,7 @@ import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
+import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.TUniqueIdUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,7 +98,25 @@ public final class CatalogOperationTracker {
     }
   }
 
-  private final Map<RpcKey, TCatalogOpRecord> inFlightOperations_ =
+  /**
+   * Tracks in-flight operations. Each entry contains both the catalog operation record
+   * and its associated EventSequence for real-time timeline tracking.
+   *
+   * Note: While TCatalogOpRecord also has a timeline field (TEventSequence type), we
+   * need to track the original EventSequence instance separately to allow updates
+   * during operation execution.
+   */
+  private static class InFlightOperation {
+    final TCatalogOpRecord record;
+    EventSequence timeline;
+
+    InFlightOperation(TCatalogOpRecord record, EventSequence timeline) {
+      this.record = record;
+      this.timeline = timeline;
+    }
+  }
+
+  private final Map<RpcKey, InFlightOperation> inFlightOperations_ =
       new ConcurrentHashMap<>();
   private final Queue<TCatalogOpRecord> finishedOperations_ =
       new ConcurrentLinkedQueue<>();
@@ -110,38 +130,82 @@ public final class CatalogOperationTracker {
     Preconditions.checkState(catalogOperationLogSize_ >= 0);
   }
 
-  private void addRecord(TCatalogServiceRequestHeader header,
+  /**
+   * Adds a new catalog operation record. Should be called from JniCatalog when
+   * an RPC arrives, before calling increment(). It creates a minimal operation record
+   * with default values for user, client IP, and coordinator initially set to "unknown".
+   * These fields will be updated later in updateRecord().
+   *
+   * @return the created record (which can be used to set response_size_bytes directly)
+   */
+  public TCatalogOpRecord addRecord(TUniqueId queryId, EventSequence timeline,
+      int requestSizeBytes) {
+    if (queryId == null) return null;
+
+    long startTimeMs = System.currentTimeMillis();
+    TCatalogOpRecord record = new TCatalogOpRecord(Thread.currentThread().getId(),
+        queryId, /*clientIp*/"unknown", /*coordinator*/"unknown",
+        /*catalogOpName*/"unknown", /*targetName*/"unknown", /*user*/"unknown",
+        startTimeMs, -1, "STARTED", "");
+
+    record.setRequest_size_bytes(requestSizeBytes);
+
+    RpcKey key = new RpcKey(queryId);
+    InFlightOperation operation = new InFlightOperation(record, timeline);
+
+    inFlightOperations_.put(key, operation);
+    return record;
+  }
+
+  /**
+   * Updates an in-flight catalog operation record with operation details.
+   * Called by increment() to populate fields like catalog_op_name, user, etc.
+   *
+   * @param queryId The query ID of the operation to update
+   * @param header The request header containing user, client_ip, coordinator info
+   * @param catalogOpName The name of the catalog operation (e.g., CREATE_TABLE)
+   * @param tTableName The table name (if applicable) for counter tracking
+   * @param details Additional operation details
+   */
+  private void updateRecordFields(TUniqueId queryId, TCatalogServiceRequestHeader header,
       String catalogOpName, Optional<TTableName> tTableName, String details) {
-    String user = "unknown";
-    String clientIp = "unknown";
-    String coordinator = "unknown";
-    TUniqueId queryId = header.getQuery_id();
-    if (header.isSetRequesting_user()) {
-      user = header.getRequesting_user();
+    if (queryId == null) return;
+
+    final String user = header.isSetRequesting_user() ?
+        header.getRequesting_user() : "unknown";
+    final String clientIp = header.isSetClient_ip() ? header.getClient_ip() : "unknown";
+    final String coordinator = header.isSetCoordinator_hostname() ?
+        header.getCoordinator_hostname() : "unknown";
+    final String targetName = catalogDdlCounter_.getTableName(tTableName);
+
+    RpcKey key = new RpcKey(queryId);
+    InFlightOperation operation = inFlightOperations_.get(key);
+    if (operation == null) {
+      LOG.warn("updateRecordFields: In-flight operation not found for query_id={}",
+          TUniqueIdUtil.PrintId(queryId));
+      return;
     }
-    if (header.isSetClient_ip()) {
-      clientIp = header.getClient_ip();
-    }
-    if (header.isSetCoordinator_hostname()) {
-      coordinator = header.getCoordinator_hostname();
-    }
-    if (queryId != null) {
-      TCatalogOpRecord record = new TCatalogOpRecord(Thread.currentThread().getId(),
-          queryId, clientIp, coordinator, catalogOpName,
-          catalogDdlCounter_.getTableName(tTableName), user,
-          System.currentTimeMillis(), -1, "STARTED", details);
-      inFlightOperations_.put(new RpcKey(queryId), record);
-    }
+
+    // Update record fields
+    TCatalogOpRecord record = operation.record;
+    record.setCatalog_op_name(catalogOpName);
+    record.setTarget_name(targetName);
+    record.setUser(user);
+    record.setClient_ip(clientIp);
+    record.setCoordinator_hostname(coordinator);
+    record.setDetails(details);
   }
 
   private void archiveRecord(TUniqueId queryId, String errorMsg) {
     if (queryId == null) return;
     RpcKey key = new RpcKey(queryId);
-    TCatalogOpRecord record = inFlightOperations_.remove(key);
-    if (record == null) {
-      LOG.error("Null record for query {}", TUniqueIdUtil.PrintId(queryId));
+    InFlightOperation operation = inFlightOperations_.remove(key);
+    if (operation == null) {
+      LOG.error("Failed to archive the in-flight operation of query {} since " +
+          "it's missing", TUniqueIdUtil.PrintId(queryId));
       return;
     }
+    TCatalogOpRecord record = operation.record;
     if (catalogOperationLogSize_ == 0) return;
     record.setFinish_time_ms(System.currentTimeMillis());
     if (errorMsg != null) {
@@ -149,6 +213,10 @@ public final class CatalogOperationTracker {
       record.setDetails(record.getDetails() + ", error=" + errorMsg);
     } else {
       record.setStatus("FINISHED");
+    }
+    // Convert EventSequence to TEventSequence and store if available
+    if (operation.timeline != null) {
+      record.setTimeline(operation.timeline.toThrift());
     }
     synchronized (finishedOperations_) {
       if (finishedOperations_.size() >= catalogOperationLogSize_) {
@@ -167,6 +235,10 @@ public final class CatalogOperationTracker {
 
   public void increment(TDdlExecRequest ddlRequest, Optional<TTableName> tTableName) {
     if (ddlRequest.isSetHeader()) {
+      TUniqueId queryId = ddlRequest.getHeader().getQuery_id();
+      if (queryId == null) return;
+      TCatalogServiceRequestHeader header = ddlRequest.getHeader();
+
       // Only show non-default options in the 'details' field.
       TDdlQueryOptions options = ddlRequest.query_options;
       List<String> nonDefaultOptions = new ArrayList<>();
@@ -182,14 +254,18 @@ public final class CatalogOperationTracker {
         nonDefaultOptions.add(
             "kudu_table_reserve_seconds=" + options.kudu_table_reserve_seconds);
       }
-      addRecord(ddlRequest.getHeader(), getDdlType(ddlRequest), tTableName,
-          StringUtils.join(nonDefaultOptions, ", "));
+
+      final String catalogOpName = getDdlType(ddlRequest);
+      final String details = StringUtils.join(nonDefaultOptions, ", ");
+
+      updateRecordFields(queryId, header, catalogOpName, tTableName, details);
+      catalogDdlCounter_.incrementOperation(ddlRequest.ddl_type, tTableName);
     }
-    catalogDdlCounter_.incrementOperation(ddlRequest.ddl_type, tTableName);
   }
 
   public void decrement(TDdlType tDdlType, TUniqueId queryId,
       Optional<TTableName> tTableName, String errorMsg) {
+    if (queryId == null) return;
     archiveRecord(queryId, errorMsg);
     catalogDdlCounter_.decrementOperation(tDdlType, tTableName);
   }
@@ -198,6 +274,10 @@ public final class CatalogOperationTracker {
     Optional<TTableName> tTableName =
         req.table_name != null ? Optional.of(req.table_name) : Optional.empty();
     if (req.isSetHeader()) {
+      TUniqueId queryId = req.getHeader().getQuery_id();
+      if (queryId == null) return;
+      TCatalogServiceRequestHeader header = req.getHeader();
+
       List<String> details = new ArrayList<>();
       if (req.sync_ddl) details.add("sync_ddl=true");
       if (req.header.want_minimal_response) {
@@ -209,17 +289,22 @@ public final class CatalogOperationTracker {
       if (StringUtils.isNotEmpty(req.debug_action)) {
         details.add("debug_action=" + req.debug_action);
       }
-      addRecord(req.getHeader(),
-          CatalogResetMetadataCounter.getResetMetadataType(req, tTableName).name(),
-          tTableName, StringUtils.join(details, ", "));
+
+      final String catalogOpName = CatalogResetMetadataCounter.getResetMetadataType(
+          req, tTableName).name();
+      final String detailsStr = StringUtils.join(details, ", ");
+
+      updateRecordFields(queryId, header, catalogOpName, tTableName, detailsStr);
+
+      if (queryId != null) {
+        catalogResetMetadataCounter_.incrementOperation(req);
+      }
     }
-    catalogResetMetadataCounter_.incrementOperation(req);
   }
 
   public void decrement(TResetMetadataRequest req, String errorMsg) {
-    if (req.isSetHeader()) {
-      archiveRecord(req.getHeader().getQuery_id(), errorMsg);
-    }
+    if (!(req.isSetHeader() && req.getHeader().isSetQuery_id())) return;
+    archiveRecord(req.getHeader().getQuery_id(), errorMsg);
     catalogResetMetadataCounter_.decrementOperation(req);
   }
 
@@ -227,6 +312,10 @@ public final class CatalogOperationTracker {
     Optional<TTableName> tTableName =
         Optional.of(new TTableName(req.db_name, req.target_table));
     if (req.isSetHeader()) {
+      TUniqueId queryId = req.getHeader().getQuery_id();
+      if (queryId == null) return;
+      TCatalogServiceRequestHeader header = req.getHeader();
+
       List<String> details = new ArrayList<>();
       details.add("#partitions=" + req.getUpdated_partitionsSize());
       if (req.sync_ddl) details.add("sync_ddl=true");
@@ -241,17 +330,22 @@ public final class CatalogOperationTracker {
       if (StringUtils.isNotEmpty(req.debug_action)) {
         details.add("debug_action=" + req.debug_action);
       }
-      addRecord(req.getHeader(),
-          CatalogFinalizeDmlCounter.getDmlType(req.getHeader().redacted_sql_stmt).name(),
-          tTableName, StringUtils.join(details, ", "));
+
+      final String catalogOpName = CatalogFinalizeDmlCounter.getDmlType(
+          req.getHeader().redacted_sql_stmt).name();
+      final String detailsStr = StringUtils.join(details, ", ");
+
+      updateRecordFields(queryId, header, catalogOpName, tTableName, detailsStr);
+
+      if (queryId != null) {
+        catalogFinalizeDmlCounter_.incrementOperation(req);
+      }
     }
-    catalogFinalizeDmlCounter_.incrementOperation(req);
   }
 
   public void decrement(TUpdateCatalogRequest req, String errorMsg) {
-    if (req.isSetHeader()) {
-      archiveRecord(req.getHeader().getQuery_id(), errorMsg);
-    }
+    if (!(req.isSetHeader() && req.getHeader().isSetQuery_id())) return;
+    archiveRecord(req.getHeader().getQuery_id(), errorMsg);
     catalogFinalizeDmlCounter_.decrementOperation(req);
   }
 
@@ -265,8 +359,16 @@ public final class CatalogOperationTracker {
     merged.addAll(catalogResetMetadataCounter_.getOperationUsage());
     merged.addAll(catalogFinalizeDmlCounter_.getOperationUsage());
     TGetOperationUsageResponse res = new TGetOperationUsageResponse(merged);
-    for (TCatalogOpRecord record : inFlightOperations_.values()) {
-      res.addToIn_flight_catalog_operations(record);
+    // For in-flight operations, dynamically set timeline from current EventSequence
+    for (InFlightOperation operation : inFlightOperations_.values()) {
+      // Create a copy of the record so we don't modify the original
+      TCatalogOpRecord recordCopy = operation.record.deepCopy();
+      // Set current timeline if available
+      if (operation.timeline != null && !recordCopy.isSetTimeline()) {
+        TEventSequence timelineThrift = operation.timeline.toThrift();
+        recordCopy.setTimeline(timelineThrift);
+      }
+      res.addToIn_flight_catalog_operations(recordCopy);
     }
     List<TCatalogOpRecord> records = new ArrayList<>(finishedOperations_);
     // Reverse the list to show recent operations first.

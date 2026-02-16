@@ -1553,8 +1553,26 @@ static void PrettyPrintTimeSeries(const string& label, const int64_t* samples, i
   stream << endl;
 }
 
+void RuntimeProfileBase::PrettyPrintTimeline(ostream* s, const string& prefix,
+    const string& name, int64_t duration,
+    const vector<pair<string, int64_t>>& events) {
+  // Print timeline header with total duration
+  *s << prefix << name << ": " << PrettyPrinter::Print(duration, TUnit::TIME_NS)
+     << endl;
+
+  // Print each event with absolute time and delta from previous event
+  int64_t prev = 0L;
+  for (const auto& event : events) {
+    int64_t delta_time = event.second - prev;
+    *s << prefix << "   - " << event.first << ": "
+       << PrettyPrinter::Print(event.second, TUnit::TIME_NS) << " ("
+       << PrettyPrinter::Print(delta_time, TUnit::TIME_NS) << ")"
+       << endl;
+    prev = event.second;
+  }
+}
+
 void RuntimeProfile::PrettyPrintTimeline(ostream* s, const string& prefix) const {
-  ostream& stream = *s;
   // Print all the event timers as the following:
   // <EventKey> Timeline: 2s719ms
   //     - Event 1: 6.522us (6.522us)
@@ -1571,20 +1589,39 @@ void RuntimeProfile::PrettyPrintTimeline(ostream* s, const string& prefix) const
     int64_t last = event_sequence.second->ElapsedTime();
     event_sequence.second->GetEvents(&events);
     if (last == 0 && events.size() > 0) last = events.back().second;
-    stream << prefix << event_sequence.first << ": "
-           << PrettyPrinter::Print(last, TUnit::TIME_NS)
-           << endl;
 
-    int64_t prev = 0L;
-    event_sequence.second->GetEvents(&events);
-    for (const EventSequence::Event& event: events) {
-      stream << prefix << "   - " << event.first << ": "
-             << PrettyPrinter::Print(event.second, TUnit::TIME_NS) << " ("
-             << PrettyPrinter::Print(event.second - prev, TUnit::TIME_NS) << ")"
-             << endl;
-      prev = event.second;
-    }
+    // Use the utility method to print the timeline
+    RuntimeProfileBase::PrettyPrintTimeline(s, prefix, event_sequence.first,
+        last, events);
   }
+}
+
+void RuntimeProfileBase::PrettyPrintTimelineFromThrift(ostream* s, const string& prefix,
+    const TEventSequence& event_sequence) {
+  // Check if we have valid data (all TEventSequence fields are required, so just check
+  // if vectors are empty)
+  if (event_sequence.timestamps.empty() || event_sequence.labels.empty()) {
+    return;
+  }
+
+  const string& name = event_sequence.name;
+
+  // Convert TEventSequence to relative timestamps (like EventSequence format)
+  int64_t start_time = event_sequence.timestamps[0];
+  int64_t last_time = event_sequence.timestamps.back();
+  int64_t total_duration = last_time - start_time;
+
+  // Build a vector of (label, relative_timestamp) pairs
+  vector<pair<string, int64_t>> events;
+  size_t num_events = min(event_sequence.timestamps.size(), event_sequence.labels.size());
+  events.reserve(num_events);
+  for (size_t i = 0; i < num_events; ++i) {
+    int64_t relative_time = event_sequence.timestamps[i] - start_time;
+    events.emplace_back(event_sequence.labels[i], relative_time);
+  }
+
+  // Use the utility method to print the timeline
+  PrettyPrintTimeline(s, prefix, name, total_duration, events);
 }
 
 void RuntimeProfile::PrettyPrintSubclassCounters(

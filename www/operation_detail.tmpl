@@ -1,0 +1,167 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+{{> www/common-header.tmpl }}
+
+<h2>Catalog Operation Detail</h2>
+
+{{?error}}
+<div class="alert alert-danger">
+  <strong>Error:</strong> {{error}}
+</div>
+{{/error}}
+
+{{^error}}
+<div class="panel panel-info">
+<div class="card">
+  <div class="card-header">
+    <h5 class="card-title">Operation Information</h5>
+  </div>
+  <div class="card-body">
+    <table class='table table-bordered'>
+      <tr>
+        <th style="width: 200px;">Query ID</th>
+        <td style="word-break:break-all;">{{query_id}}</td>
+      </tr>
+      <tr>
+        <th>Operation Type</th>
+        <td>{{catalog_op_name}}</td>
+      </tr>
+      <tr>
+        <th>Target</th>
+        <td>{{target_name}}</td>
+      </tr>
+      <tr>
+        <th>User</th>
+        <td>{{user}}</td>
+      </tr>
+      <tr>
+        <th>Client IP</th>
+        <td>{{client_ip}}</td>
+      </tr>
+      <tr>
+        <th>Coordinator</th>
+        <td>{{coordinator}}</td>
+      </tr>
+      <tr>
+        <th>Start Time</th>
+        <td>{{start_time}}</td>
+      </tr>
+      {{?finish_time}}
+      <tr>
+        <th>Finish Time</th>
+        <td>{{finish_time}}</td>
+      </tr>
+      {{/finish_time}}
+      <tr>
+        <th>Duration</th>
+        <td>{{duration}}</td>
+      </tr>
+      <tr>
+        <th>Status</th>
+        <td>{{status}}</td>
+      </tr>
+      {{?request_size}}
+      <tr>
+        <th>Request Size</th>
+        <td>{{request_size}} ({{request_size_bytes}} bytes)</td>
+      </tr>
+      {{/request_size}}
+      {{?response_size}}
+      <tr>
+        <th>Response Size</th>
+        <td>{{response_size}} ({{response_size_bytes}} bytes)</td>
+      </tr>
+      {{/response_size}}
+      <tr>
+        <th>Details</th>
+        <td>
+          <div id="details-raw" style="display:none;">{{details}}</div>
+          <div id="details-container"></div>
+
+          <script>
+            $(document).ready(function () {
+              var rawDiv = document.getElementById('details-raw');
+              var outDiv = document.getElementById('details-container');
+
+              var detailsText = rawDiv ? rawDiv.textContent : '';
+
+              if (!detailsText || !detailsText.trim()) {
+                outDiv.innerHTML = '<em>No details available</em>';
+                return;
+              }
+
+              // Normalize newlines (Impala errors often vary)
+              detailsText = detailsText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+              if (detailsText.includes('\n')) {
+                var pre = document.createElement('pre');
+                pre.style.cssText =
+                  'margin:0;padding:8px;background:#f5f5f5;border-radius:3px;' +
+                  'white-space:pre-wrap;word-break:break-word;font-family:monospace;';
+                pre.textContent = detailsText;
+                outDiv.appendChild(pre);
+              } else if (detailsText.includes(', ')) {
+                var ul = document.createElement('ul');
+                ul.style.cssText = 'margin:0;padding-left:20px;';
+
+                detailsText.split(', ').forEach(function (item) {
+                  if (item.trim()) {
+                    var li = document.createElement('li');
+                    li.style.wordBreak = 'break-word';
+                    li.textContent = item.trim();
+                    ul.appendChild(li);
+                  }
+                });
+
+                outDiv.appendChild(ul);
+              } else {
+                var div = document.createElement('div');
+                div.style.wordBreak = 'break-word';
+                div.textContent = detailsText;
+                outDiv.appendChild(div);
+              }
+            });
+          </script>
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>
+</div>
+
+{{?timeline}}
+<div class="panel panel-info">
+<div class="card">
+  <div class="card-header">
+    <h5 class="card-title">Execution Timeline</h5>
+  </div>
+  <div class="card-body">
+    <pre style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; max-height: 500px; overflow-y: auto; font-family: monospace; white-space: pre;">{{timeline}}</pre>
+  </div>
+</div>
+</div>
+{{/timeline}}
+
+<div style="margin-top: 20px;">
+  <a href="/operations" class="btn btn-primary">Back to Operations List</a>
+</div>
+{{/error}}
+
+{{> www/common-footer.tmpl }}

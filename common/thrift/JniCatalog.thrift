@@ -23,6 +23,7 @@ include "CatalogObjects.thrift"
 include "Types.thrift"
 include "Status.thrift"
 include "TCLIService.thrift"
+include "RuntimeProfile.thrift"
 include "hive_metastore.thrift"
 
 // This is a short value due to the HDFS API limits
@@ -924,6 +925,12 @@ struct TCatalogOpRecord {
   9: required i64 finish_time_ms
   10: required string status
   11: required string details
+  // Optional field for the timeline of execution in catalogd
+  12: optional RuntimeProfile.TEventSequence timeline
+  // Optional field for request size in bytes
+  13: optional i64 request_size_bytes
+  // Optional field for response size in bytes
+  14: optional i64 response_size_bytes
 }
 
 // Response to getOperationUsage request.

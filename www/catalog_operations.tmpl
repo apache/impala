@@ -113,7 +113,9 @@ under the License.
         <td>{{start_time}}</td>
         <td>{{duration}}</td>
         <td>{{status}}</td>
-        <td style="min-width:240px;word-break:break-all;">{{details}}</td>
+        <td style="min-width:240px;word-break:break-all;">
+          <a href="/operation_detail?query_id={{query_id}}&thread_id={{thread_id}}&start_time_ms={{start_time_ms}}" target="_blank">View Details</a>
+        </td>
       </tr>
       {{/inflight_catalog_operations}}
     </table>
@@ -159,7 +161,9 @@ under the License.
         <td>{{finish_time}}</td>
         <td>{{duration}}</td>
         <td>{{status}}</td>
-        <td style="word-break:break-all;">{{details}}</td>
+        <td style="word-break:break-all;">
+          <a href="/operation_detail?query_id={{query_id}}&thread_id={{thread_id}}&start_time_ms={{start_time_ms}}" target="_blank">View Details</a>
+        </td>
       </tr>
       {{/finished_catalog_operations}}
     </table>

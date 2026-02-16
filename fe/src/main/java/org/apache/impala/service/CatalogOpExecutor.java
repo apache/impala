@@ -396,7 +396,7 @@ public class CatalogOpExecutor {
   public static final String CAPABILITIES_KEY = "OBJCAPABILITIES";
 
   // Labels used in catalog timelines
-  private static final String CATALOG_TIMELINE_NAME = "Catalog Server Operation";
+  public static final String CATALOG_TIMELINE_NAME = "Catalog Server Operation";
   private static final String CHECKED_HMS_TABLE_EXISTENCE =
       "Checked table existence in Metastore";
   private static final String CREATED_HMS_TABLE = "Created table in Metastore";
@@ -451,9 +451,14 @@ public class CatalogOpExecutor {
 
   public AuthorizationManager getAuthzManager() { return authzManager_; }
 
+  @VisibleForTesting
   public TDdlExecResponse execDdlRequest(TDdlExecRequest ddlRequest)
       throws ImpalaException {
-    EventSequence catalogTimeline = new EventSequence(CATALOG_TIMELINE_NAME);
+    return execDdlRequest(ddlRequest, new EventSequence(CATALOG_TIMELINE_NAME));
+  }
+
+  public TDdlExecResponse execDdlRequest(TDdlExecRequest ddlRequest,
+      EventSequence catalogTimeline) throws ImpalaException {
     TDdlExecResponse response = new TDdlExecResponse();
     response.setResult(new TCatalogUpdateResult());
     response.getResult().setCatalog_service_id(JniCatalog.getServiceId());
@@ -7389,11 +7394,17 @@ public class CatalogOpExecutor {
     return fsList;
   }
 
+  @VisibleForTesting
   public TResetMetadataResponse execResetMetadata(TResetMetadataRequest req)
       throws CatalogException {
+    return execResetMetadata(req, new EventSequence(CATALOG_TIMELINE_NAME));
+  }
+
+  public TResetMetadataResponse execResetMetadata(TResetMetadataRequest req,
+      EventSequence catalogTimeline) throws CatalogException {
     catalogOpTracker_.increment(req);
     try {
-      TResetMetadataResponse response = execResetMetadataImpl(req);
+      TResetMetadataResponse response = execResetMetadataImpl(req, catalogTimeline);
       catalogOpTracker_.decrement(req, /*errorMsg*/null);
       return response;
     } catch (Exception e) {
@@ -7416,9 +7427,8 @@ public class CatalogOpExecutor {
    * For details on the specific commands see comments on their respective
    * methods in CatalogServiceCatalog.java.
    */
-  public TResetMetadataResponse execResetMetadataImpl(TResetMetadataRequest req)
-      throws CatalogException {
-    EventSequence catalogTimeline = new EventSequence(CATALOG_TIMELINE_NAME);
+  public TResetMetadataResponse execResetMetadataImpl(TResetMetadataRequest req,
+      EventSequence catalogTimeline) throws CatalogException {
     String cmdString = CatalogOpUtil.getShortDescForReset(req);
     TResetMetadataResponse resp = new TResetMetadataResponse();
     resp.setResult(new TCatalogUpdateResult());
@@ -7697,11 +7707,17 @@ public class CatalogOpExecutor {
     }
   }
 
+  @VisibleForTesting
   public TUpdateCatalogResponse updateCatalog(TUpdateCatalogRequest update)
       throws ImpalaException {
+    return updateCatalog(update, new EventSequence(CATALOG_TIMELINE_NAME));
+  }
+
+  public TUpdateCatalogResponse updateCatalog(TUpdateCatalogRequest update,
+      EventSequence catalogTimeline) throws ImpalaException {
     catalogOpTracker_.increment(update);
     try {
-      TUpdateCatalogResponse response = updateCatalogImpl(update);
+      TUpdateCatalogResponse response = updateCatalogImpl(update, catalogTimeline);
       catalogOpTracker_.decrement(update, /*errorMsg*/null);
       return response;
     } catch (Exception e) {
@@ -7720,9 +7736,8 @@ public class CatalogOpExecutor {
    * watch the associated cache directives will be submitted. This will result in an
    * async table refresh once the cache request completes.
    */
-  public TUpdateCatalogResponse updateCatalogImpl(TUpdateCatalogRequest update)
-      throws ImpalaException {
-    EventSequence catalogTimeline = new EventSequence(CATALOG_TIMELINE_NAME);
+  public TUpdateCatalogResponse updateCatalogImpl(TUpdateCatalogRequest update,
+      EventSequence catalogTimeline) throws ImpalaException {
     TUpdateCatalogResponse response = new TUpdateCatalogResponse();
     TUniqueId queryId = update.isSetHeader() && update.header.isSetQuery_id() ?
         update.header.query_id : null;
