@@ -736,7 +736,7 @@ async def main() -> None:
             if result.stdout:
                 print(result.stdout, end=("" if result.stderr else "\n"))
             if result.stderr:
-                print(result.stderr)
+                print(result.stderr, file=sys.stderr)
     except asyncio.CancelledError:
         if not args.hide_progress:
             print("\nCtrl-C detected, goodbye.")
