@@ -92,11 +92,11 @@ class TestIPv6Base(CustomClusterTestSuite):
       port = self._get_default_port(proto)
       host_port = "%s:%d" % (host, port)
       use_ssl = self.ca_cert is not None
-      conn = create_connection(host_port, protocol=proto, use_ssl=use_ssl)
-      conn.connect()
-      assert not expected_errors
-      res = conn.execute("select 1")
-      assert res.data == ["1"]
+      with create_connection(host_port, protocol=proto, use_ssl=use_ssl) as conn:
+        conn.connect()
+        assert not expected_errors
+        res = conn.execute("select 1")
+        assert res.data == ["1"]
     except Exception as ex:
       for err in expected_errors:
         if err in str(ex): return

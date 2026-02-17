@@ -637,7 +637,8 @@ class ImpylaHS2Connection(ImpalaConnection):
     # Remove all async cursors.
     self.__async_cursors = list()
     try:
-      self.__impyla_conn.close()
+      if self.__impyla_conn:
+        self.__impyla_conn.close()
     except AttributeError as e:
       # When the HTTP endpoint restarts, Thrift HTTP will close the endpoint and calling
       # close() will result in an exception.

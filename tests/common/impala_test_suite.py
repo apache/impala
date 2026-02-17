@@ -811,6 +811,7 @@ class ImpalaTestSuite(BaseTestSuite):
       if user:
         # Create a new client so the session will use the new username.
         target_impalad_client = self.create_impala_client(protocol=protocol)
+      client_needs_cleanup = user is not None
       query_options_changed = []
       try:
         for query in query.split(';'):
@@ -826,6 +827,8 @@ class ImpalaTestSuite(BaseTestSuite):
       finally:
         if len(query_options_changed) > 0:
           self.__restore_query_options(query_options_changed, target_impalad_client)
+        if client_needs_cleanup:
+          target_impalad_client.close()
       return result
 
     def __exec_in_hive(query, user=None):
@@ -1029,6 +1032,8 @@ class ImpalaTestSuite(BaseTestSuite):
     # Revert target_impalad_clients back to default database.
     for impalad_client in target_impalad_clients:
       ImpalaTestSuite.__change_client_database(impalad_client, db_name='default')
+      if multiple_impalad:
+        impalad_client.close()
 
   def get_query_lineage(self, query_id, lineage_dir):
     """Walks through the lineage files in lineage_dir to look for a given query_id.

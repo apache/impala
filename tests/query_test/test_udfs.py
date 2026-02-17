@@ -49,9 +49,9 @@ class TestUdfBase(ImpalaTestSuite):
   def _run_query_all_impalads(self, exec_options, query, expected):
     impala_cluster = ImpalaCluster.get_e2e_test_cluster()
     for impalad in impala_cluster.impalads:
-      client = impalad.service.create_hs2_client()
-      result = self.execute_query_expect_success(client, query, exec_options)
-      assert result.data == expected, impalad
+      with impalad.service.create_hs2_client() as client:
+        result = self.execute_query_expect_success(client, query, exec_options)
+        assert result.data == expected, impalad
 
   def _load_functions(self, template, vector, database, location):
     queries = template.format(database=database, location=location)
