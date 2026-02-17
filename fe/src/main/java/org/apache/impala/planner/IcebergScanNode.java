@@ -89,19 +89,20 @@ public class IcebergScanNode extends HdfsScanNode {
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<IcebergFileDescriptor> fileDescs,
       int numPartitions,
-      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, long snapshotId) {
+      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, long snapshotId,
+      boolean isPartitionKeyScan) {
     this(id, tblRef, conjuncts, aggInfo, fileDescs, numPartitions, nonIdentityConjuncts,
-        skippedConjuncts, null, snapshotId);
+        skippedConjuncts, null, snapshotId, isPartitionKeyScan);
   }
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<IcebergFileDescriptor> fileDescs,
       int numPartitions,
       List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, PlanNodeId deleteId,
-      long snapshotId) {
+      long snapshotId, boolean isPartitionKeyScan) {
     super(id, tblRef.getDesc(), conjuncts,
         getIcebergPartition(((FeIcebergTable)tblRef.getTable()).getFeFsTable()), tblRef,
-        aggInfo, null, false);
+        aggInfo, null, isPartitionKeyScan);
     // Hdfs table transformed from iceberg table only has one partition
     Preconditions.checkState(partitions_.size() == 1);
 
@@ -143,6 +144,8 @@ public class IcebergScanNode extends HdfsScanNode {
               cardinality_, iceFd.getFbFileMetadata().icebergMetadata().recordCount());
         }
       }
+    } else if (isPartitionKeyScan_) {
+      cardinality_ = fileDescs_.size();
     } else {
       for (IcebergFileDescriptor fd : fileDescs_) {
         cardinality_ = MathUtil.addCardinalities(

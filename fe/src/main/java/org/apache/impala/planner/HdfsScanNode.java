@@ -268,7 +268,7 @@ public class HdfsScanNode extends ScanNode {
 
   // True if this is a scan that only returns partition keys and is only required to
   // return at least one of each of the distinct values of the partition keys.
-  private final boolean isPartitionKeyScan_;
+  protected final boolean isPartitionKeyScan_;
 
   // Conjuncts that can be evaluated while materializing the items (tuples) of
   // collection-typed slots. Maps from tuple descriptor to the conjuncts bound by that

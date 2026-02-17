@@ -52,6 +52,7 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.IcebergExpressionCollector;
+import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.SlotDescriptor;
@@ -247,6 +248,7 @@ public class IcebergScanPlanner {
   }
 
   private PlanNode createIcebergScanPlanImpl() throws ImpalaException {
+    boolean isPartitionKeyScan = IsPartitionKeyScan();
     if (noDeleteFiles()) {
       Preconditions.checkState(!tblRef_.optimizeCountStarForIcebergV2());
       // If there are no delete files we can just create a single SCAN node.
@@ -255,7 +257,7 @@ public class IcebergScanPlanner {
           aggInfo_, dataFilesWithoutDeletes_,
           getIceTable().getContentFileStore().getNumPartitions(),
           nonIdentityConjuncts_,
-          getSkippedConjuncts(), snapshotId_);
+          getSkippedConjuncts(), snapshotId_, isPartitionKeyScan);
       ret.init(analyzer_);
       return ret;
     }
@@ -280,7 +282,7 @@ public class IcebergScanPlanner {
     IcebergScanNode dataScanNode = new IcebergScanNode(
         ctx_.getNextNodeId(), tblRef_, conjuncts_, aggInfo_, dataFilesWithoutDeletes_,
         getIceTable().getContentFileStore().getNumPartitions(),
-        nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_);
+        nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_, isPartitionKeyScan);
     dataScanNode.init(analyzer_);
     List<Expr> outputExprs = tblRef_.getDesc().getSlots().stream().map(
         SlotRef::new).collect(Collectors.toList());
@@ -297,6 +299,48 @@ public class IcebergScanPlanner {
     Preconditions.checkState(unionNode.getChildCount() == 2);
     Preconditions.checkState(unionNode.getFirstNonPassthroughChildIndex() == 2);
     return unionNode;
+  }
+
+  private boolean IsPartitionKeyScan() {
+    if (tblRef_.optimizeCountStarForIcebergV2()) return false;
+    boolean allAggsDistinct = aggInfo_ != null && aggInfo_.hasAllDistinctAgg();
+    if (!allAggsDistinct) return false;
+    TupleDescriptor tDesc = tblRef_.getDesc();
+    if (!tDesc.hasMaterializedSlots()) return true;
+
+    FeIcebergTable iceTable = getIceTable();
+    for (SlotDescriptor slotDesc: tDesc.getSlots()) {
+      if (!slotDesc.isMaterialized()) continue;
+      IcebergColumn column = (IcebergColumn) slotDesc.getColumn();
+      if (column == null) continue;
+      // We check all partition specs here. We are a bit stricter than necessary,
+      // because old partition specs might no longer have any data.
+      // TODO: later we could group data files (without deletes) into categories:
+      // - files eligible for partition key scan
+      // - files non-eligible for partition key scans
+      // Then we could do the following plan:
+      //              UNION  ALL
+      //           /       |      \
+      //         /         |        \
+      //       /           |          \
+      //  PARTITION     SCAN         ICEBERG
+      //  KEY          WITHOUT       DELETE
+      //  SCAN         DELETES        NODE
+      //                              /  \
+      //                             /    \
+      //                           SCAN   SCAN
+      //                           data   delete
+      //                           files  files
+      // Later PARTITION KEY SCAN could be a UNION NODE that produces the partition keys,
+      // see SingleNodePlanner.createOptimizedPartitionUnionNode().
+      for (IcebergPartitionSpec spec : iceTable.getPartitionSpecs()) {
+        if (IcebergUtil.getPartitionTransformType(column, spec) !=
+            TIcebergPartitionTransformType.IDENTITY) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private PlanNode createPositionJoinNode() throws ImpalaException {
@@ -320,7 +364,8 @@ public class IcebergScanPlanner {
     IcebergScanNode dataScanNode = new IcebergScanNode(
         dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
         getIceTable().getContentFileStore().getNumPartitions(),
-        nonIdentityConjuncts_, getSkippedConjuncts(), deleteScanNodeId, snapshotId_);
+        nonIdentityConjuncts_, getSkippedConjuncts(), deleteScanNodeId, snapshotId_,
+        false /*isPartitionKeyScan*/);
     dataScanNode.init(analyzer_);
     IcebergScanNode deleteScanNode = new IcebergScanNode(
         deleteScanNodeId,
@@ -331,7 +376,8 @@ public class IcebergScanPlanner {
         getIceTable().getContentFileStore().getNumPartitions(),
         Collections.emptyList(), /*nonIdentityConjuncts*/
         Collections.emptyList(), /*skippedConjuncts*/
-        snapshotId_);
+        snapshotId_,
+        false /*isPartitionKeyScan*/);
     deleteScanNode.init(analyzer_);
 
     // Now let's create the JOIN node
@@ -533,7 +579,8 @@ public class IcebergScanPlanner {
       IcebergScanNode dataScanNode = new IcebergScanNode(
           dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
           getIceTable().getContentFileStore().getNumPartitions(),
-          nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_);
+          nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_,
+          false /*isPartitionKeyScan*/);
       addAllSlotsForEqualityDeletes(tblRef_);
       dataScanNode.init(analyzer_);
 
@@ -573,8 +620,9 @@ public class IcebergScanPlanner {
           Lists.newArrayList(equalityDeleteFiles),
           getIceTable().getContentFileStore().getNumPartitions(),
           Collections.emptyList(), /*nonIdentityConjuncts*/
-          Collections.emptyList(),
-          snapshotId_); /*skippedConjuncts*/
+          Collections.emptyList(), /*skippedConjuncts*/
+          snapshotId_,
+          false /*isPartitionKeyScan*/);
       deleteScanNode.init(analyzer_);
 
       Pair<List<BinaryPredicate>, List<Expr>> equalityJoinConjuncts =

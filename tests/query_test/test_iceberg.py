@@ -2264,6 +2264,9 @@ class TestIcebergV2Table(IcebergTestSuite):
             tbl_name, second_snapshot.get_snapshot_id()))
     assert "partitions=2/unknown" in selective_time_travel_data.runtime_profile
 
+  def test_partition_key_scans(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-partition-key-scans', vector, unique_database)
+
   def test_table_repair(self, unique_database):
     tbl_name = 'tbl_with_removed_files'
     db_tbl = unique_database + "." + tbl_name

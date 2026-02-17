@@ -1,0 +1,140 @@
+====
+---- QUERY
+CREATE TABLE ice_store_sales PARTITIONED BY SPEC (ss_store_sk)
+STORED BY ICEBERG
+AS SELECT * FROM tpcds_parquet.store_sales;
+====
+---- QUERY
+select distinct ss_store_sk
+from ice_store_sales;
+---- RESULTS
+1
+2
+8
+4
+10
+7
+NULL
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+   partition key scan
+   tuple-ids=0 row-size=4B cardinality=7
+aggregation(SUM, NumPages): 7
+====
+---- QUERY
+select count(distinct ss_store_sk)
+from ice_store_sales;
+---- RESULTS
+6
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+   partition key scan
+   tuple-ids=0 row-size=4B cardinality=7
+aggregation(SUM, NumPages): 7
+====
+---- QUERY
+select min(ss_store_sk), max(ss_store_sk)
+from ice_store_sales;
+---- RESULTS
+1,10
+---- TYPES
+INT,INT
+---- RUNTIME_PROFILE
+   partition key scan
+   tuple-ids=0 row-size=4B cardinality=7
+aggregation(SUM, NumPages): 7
+====
+---- QUERY
+# Partition key scan optimization cannot be applied with non-partition column in select list.
+select min(ss_store_sk), max(ss_store_sk), max(ss_sold_date_sk)
+from ice_store_sales;
+---- RESULTS
+1,10,2452642
+---- TYPES
+INT,INT,INT
+---- RUNTIME_PROFILE
+   tuple-ids=0 row-size=8B cardinality=2.88M
+====
+---- QUERY
+select distinct typeof(ss_store_sk)
+from ice_store_sales;
+---- RESULTS
+'INT'
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+   partition key scan
+   tuple-ids=0 row-size=4B cardinality=7
+aggregation(SUM, NumPages): 7
+====
+---- QUERY
+select distinct ss_store_sk
+from ice_store_sales
+where ss_store_sk % 2 = 0;
+---- RESULTS
+2
+8
+4
+10
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+   partition key scan
+   tuple-ids=0 row-size=4B cardinality=1
+====
+---- QUERY
+select count(*) from (select distinct ss_store_sk from ice_store_sales limit 3) v;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+    partition key scan
+    tuple-ids=0 row-size=4B cardinality=7
+aggregation(SUM, NumPages): 7
+====
+---- QUERY
+DELETE FROM ice_store_sales WHERE ss_store_sk = 1
+AND ss_sold_date_sk % 199 = 0;
+====
+---- QUERY
+select distinct ss_store_sk
+from ice_store_sales;
+---- RESULTS
+1
+2
+8
+4
+10
+7
+NULL
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+   partition key scan
+   tuple-ids=0 row-size=24B cardinality=6
+   |     tuple-ids=0 row-size=24B cardinality=456.90K
+====
+---- QUERY
+ALTER TABLE ice_store_sales SET PARTITION SPEC (ss_sold_date_sk);
+====
+---- QUERY
+# Now partition key scan optimization cannot be applied on 'ss_store_sk'.
+select distinct ss_store_sk
+from ice_store_sales;
+---- RESULTS
+1
+2
+8
+4
+10
+7
+NULL
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+   tuple-ids=0 row-size=24B cardinality=2.42M
+   |     tuple-ids=0 row-size=24B cardinality=456.90K
+====
