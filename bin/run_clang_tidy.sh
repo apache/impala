@@ -57,9 +57,8 @@ else
   CORES=7
 fi
 
-export PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/share/clang\
-:${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/bin/\
-:$PATH"
+# Put clang-tidy on the PATH
+export PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/bin/:$PATH"
 TMP_STDERR=$(mktemp)
 echo; echo "Running clang tidy, for error logs see ${TMP_STDERR}"
 STRCAT_MESSAGE="Impala-specific note: This can also be fixed using the StrCat() function \
@@ -69,8 +68,8 @@ FALLTHROUGH_MESSAGE="Impala-specific note: Impala is a C++ 17 codebase, so the p
 way to indicate intended fallthrough is C++ 17's [[fallthrough]]"
 CLANG_FALLTHROUGH="clang-diagnostic-implicit-fallthrough"
 trap "rm $TMP_STDERR" EXIT
-if ! run-clang-tidy.py -quiet -header-filter "${PIPE_DIRS%?}" \
-                       -j"${CORES}" ${DIRS} 2> ${TMP_STDERR} | \
+if ! ${IMPALA_HOME}/bin/llvm/run-clang-tidy.py -quiet -header-filter "${PIPE_DIRS%?}" \
+                       -j"${CORES}" -hide-progress ${DIRS} 2> ${TMP_STDERR} | \
    sed "/${CLANG_STRING_CONCAT}/ s#\$# \n${STRCAT_MESSAGE}#" | \
    sed "/${CLANG_FALLTHROUGH}/ s#\$# \n${FALLTHROUGH_MESSAGE}#" | \
    sed 's#FALLTHROUGH_INTENDED#[[fallthrough]]#';
