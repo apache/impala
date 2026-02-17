@@ -91,6 +91,7 @@ CONFIG = {
   'fs.azure.account.oauth2.client.secret': '${azure_client_secret}',
   'fs.azure.account.oauth2.client.endpoint':
     'https://login.microsoftonline.com/${azure_tenant_id}/oauth2/token',
+  'fs.azure.account.hns.enabled': '${azure_hns_enabled}',
 
   # This property can be used in tests to ascertain that this core-site.xml from
   # the classpath has been loaded. (Ex: TestRequestPoolService)
