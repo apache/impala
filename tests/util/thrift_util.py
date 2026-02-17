@@ -19,9 +19,11 @@
 from __future__ import absolute_import, division, print_function
 import getpass
 import sasl
+import ssl
 import struct
 
 from thrift.transport.TSocket import TSocket
+from thrift.transport.TSSLSocket import TSSLSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift_sasl import TSaslClientTransport
 
@@ -40,14 +42,10 @@ def create_transport(host, port, service, transport_type="buffered", user=None,
   """
   port = int(port)
   if use_ssl:
-    from thrift.transport import TSSLSocket
     if ssl_cert is None:
-      sock = TSSLSocket.TSSLSocket(host, port, validate=False)
+      sock = TSSLSocket(host, port, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_TLS)
     else:
-      sock = TSSLSocket.TSSLSocket(host, port, validate=True, ca_certs=ssl_cert)
-    # Set allowed SSL / TLS protocols to a permissive set to connect to any Impala server.
-    import ssl
-    sock.SSL_VERSION = ssl.PROTOCOL_SSLv23
+      sock = TSSLSocket(host, port, cert_reqs=ssl.CERT_REQUIRED, ca_certs=ssl_cert)
   else:
     sock = TSocket(host, port)
   if transport_type.lower() == "buffered":

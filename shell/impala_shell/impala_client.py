@@ -33,6 +33,7 @@ import sasl
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException, TException
 from thrift.transport.TSocket import TSocket
+from thrift.transport.TSSLSocket import TSSLSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift_sasl import TSaslClientTransport
 
@@ -49,7 +50,6 @@ from impala_shell.shell_exceptions import (
     RPCException,
 )
 from impala_shell.thrift_printer import ThriftPrettyPrinter
-from impala_shell.TSSLSocketWithFixes import TSSLSocketWithFixes
 from impala_shell.value_converter import HS2ValueConverter
 from impala_thrift_gen.beeswax import BeeswaxService
 from impala_thrift_gen.beeswax.BeeswaxService import QueryState
@@ -508,10 +508,12 @@ class ImpalaClient(object):
     sock_port = self.impalad_port
     if self.use_ssl:
       if self.ca_cert is None:
-        # No CA cert means don't try to verify the certificate
-        sock = TSSLSocketWithFixes(sock_host, sock_port, cert_reqs=ssl.CERT_NONE)
+        # No CA cert means don't try to verify the certificate. TSSLSocket defaults to
+        # ssl.PROTOCOL_TLS_CLIENT - which verifies certs - so override to PROTOCOL_TLS.
+        sock = TSSLSocket(
+            sock_host, sock_port, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_TLS)
       else:
-        sock = TSSLSocketWithFixes(
+        sock = TSSLSocket(
             sock_host, sock_port, cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.ca_cert)
     else:
       sock = TSocket(sock_host, sock_port)
