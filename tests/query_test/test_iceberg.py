@@ -2250,6 +2250,9 @@ class TestIcebergV2Table(IcebergTestSuite):
     self.run_test_case('QueryTest/iceberg-predicate-push-down-hint', vector,
                        use_db=unique_database)
 
+  def test_like_pushdown(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-like-pushdown', vector, use_db=unique_database)
+
   def test_partitions(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-partitions', vector, unique_database)
     tbl_name = unique_database + ".ice_num_partitions"

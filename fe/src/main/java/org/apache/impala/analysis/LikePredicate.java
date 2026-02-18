@@ -32,7 +32,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class LikePredicate extends Predicate {
-  enum Operator {
+  public enum Operator {
     LIKE("LIKE"),
     ILIKE("ILIKE"),
     RLIKE("RLIKE"),

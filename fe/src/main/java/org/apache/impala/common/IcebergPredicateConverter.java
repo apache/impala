@@ -38,6 +38,7 @@ import org.apache.impala.analysis.DateLiteral;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
+import org.apache.impala.analysis.LikePredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotDescriptor;
@@ -75,6 +76,8 @@ public class IcebergPredicateConverter {
       return convert((IsNullPredicate) expr);
     } else if (expr instanceof CompoundPredicate) {
       return convert((CompoundPredicate) expr);
+    } else if (expr instanceof LikePredicate) {
+      return convert((LikePredicate) expr);
     } else {
       throw new ImpalaRuntimeException(String.format(
           "Unsupported expression: %s", expr.toSql()));
@@ -148,6 +151,171 @@ public class IcebergPredicateConverter {
 
     return op.equals(Operation.AND) ? Expressions.and(left, right) :
         Expressions.or(left, right);
+  }
+
+  /**
+   * Checks if a wildcard character at the given position is escaped by counting
+   * preceding backslashes. An odd number of backslashes means the wildcard is escaped.
+   */
+  static boolean isWildcardEscaped(String pattern, int wildcardPos) {
+    int backslashCount = 0;
+    int j = wildcardPos - 1;
+    while (j >= 0 && pattern.charAt(j) == '\\') {
+      backslashCount++;
+      j--;
+    }
+    return backslashCount % 2 == 1;
+  }
+
+  /**
+   * Checks if there's any literal (non-wildcard) content after the given position.
+   * This determines if a pattern like 'd%d' has content after the first wildcard.
+   * Only unescaped % and _ are considered non-literal.
+   *
+   * @param pattern The pattern string from StringLiteral.getUnescapedValue()
+   * @param afterPos Position to check after (exclusive)
+   * @return True if there's any literal content after afterPos
+   */
+  static boolean hasLiteralContentAfterWildcard(String pattern, int afterPos) {
+    for (int i = afterPos + 1; i < pattern.length(); i++) {
+      char c = pattern.charAt(i);
+
+      // Check if this is a wildcard
+      if (c == '%' || c == '_') {
+        // If escaped, it's literal content
+        if (isWildcardEscaped(pattern, i)) {
+          return true;
+        }
+        // Unescaped wildcard, continue checking
+        continue;
+      }
+
+      // Any non-wildcard character is literal content
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Finds the position of the first unescaped wildcard (% or _) in the pattern.
+   * Wildcards can be escaped with '\', e.g., 'asd\%' has no unescaped wildcard.
+   *
+   * @return Position of first unescaped wildcard, or -1 if none found
+   */
+  static int findFirstUnescapedWildcard(String pattern) {
+    for (int i = 0; i < pattern.length(); i++) {
+      char c = pattern.charAt(i);
+
+      // Check if this character is a wildcard
+      if (c == '%' || c == '_') {
+        // Return position if not escaped
+        if (!isWildcardEscaped(pattern, i)) {
+          return i;
+        }
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Removes backslash escapes from LIKE wildcards in the pattern.
+   *
+   * Background: When Impala parses SQL LIKE 'test\%value',
+   * StringLiteral.getUnescapedValue() preserves LIKE-specific escape sequences
+   * and returns the Java string "test\\%value" (backslash followed by %). This
+   * method converts it to "test%value" (literal %) for Iceberg, which doesn't
+   * use backslash escaping.
+   *
+   * Example:
+   *   Input: "test\\%value" (from SQL: LIKE 'test\%value')
+   *   Output: "test%value" (literal % for Iceberg equal())
+   *
+   * @param pattern The pattern string from StringLiteral.getUnescapedValue()
+   * @param endPos Position to stop processing, or -1 to process entire string
+   * @return Pattern with LIKE escape sequences removed
+   */
+  static String unescapeLikePattern(String pattern, int endPos) {
+    int len = (endPos == -1) ? pattern.length() : endPos;
+    StringBuilder sb = new StringBuilder(len);
+
+    for (int i = 0; i < len; i++) {
+      char c = pattern.charAt(i);
+
+      if (c == '\\' && i + 1 < pattern.length()) {
+        char next = pattern.charAt(i + 1);
+        // Unescape LIKE wildcards: \% -> %, \_ -> _
+        // Also handle escaped backslash: \\ -> \
+        if (next == '%' || next == '_' || next == '\\') {
+          sb.append(next);
+          i++; // Skip the next character as we've already processed it
+          continue;
+        }
+      }
+
+      sb.append(c);
+    }
+
+    return sb.toString();
+  }
+
+  protected Expression convert(LikePredicate predicate)
+      throws ImpalaRuntimeException {
+    // Only LIKE operator is supported, not RLIKE, REGEXP, etc.
+    if (predicate.getOp() != LikePredicate.Operator.LIKE) {
+      throw new ImpalaRuntimeException(String.format(
+          "Only LIKE operator is supported for Iceberg pushdown, got: %s",
+          predicate.getOp()));
+    }
+
+    Term term = getTerm(predicate.getChild(0));
+    IcebergColumn column = term.referencedColumn_;
+
+    // Check if the column is a string type
+    if (!column.getType().isStringType()) {
+      throw new ImpalaRuntimeException(String.format(
+          "LIKE predicate pushdown only supports string columns, got: %s",
+          column.getType()));
+    }
+
+    LiteralExpr literal = getSecondChildAsLiteralExpr(predicate);
+    checkNullLiteral(literal);
+
+    if (!(literal instanceof StringLiteral)) {
+      throw new ImpalaRuntimeException(String.format(
+          "LIKE pattern must be a string literal, got: %s", literal.toSql()));
+    }
+
+    String pattern = ((StringLiteral) literal).getUnescapedValue();
+    if (pattern == null || pattern.isEmpty()) {
+      throw new ImpalaRuntimeException("LIKE pattern cannot be null or empty");
+    }
+
+    // Find first unescaped wildcard position
+    int firstWildcard = findFirstUnescapedWildcard(pattern);
+
+    // Case 1: Pattern starts with wildcard - cannot push down
+    if (firstWildcard == 0) {
+      throw new ImpalaRuntimeException(String.format(
+          "LIKE pattern '%s' cannot be pushed down to Iceberg. Patterns must start "
+          + "with at least one literal character.", pattern));
+    }
+
+    // Case 2: No wildcards - exact match
+    if (firstWildcard == -1) {
+      String unescapedPattern = unescapeLikePattern(pattern, -1);
+      return Expressions.equal(column.getName(), unescapedPattern);
+    }
+
+    // Case 3: Wildcard in middle with literal content after - cannot push down
+    if (hasLiteralContentAfterWildcard(pattern, firstWildcard)) {
+      throw new ImpalaRuntimeException(String.format(
+          "LIKE pattern '%s' cannot be pushed down to Iceberg. Only prefix patterns "
+          + "(e.g., 'prefix%%') are supported.", pattern));
+    }
+
+    // Case 4: Pure prefix pattern (wildcard only at end) - use startsWith
+    String unescapedPattern = unescapeLikePattern(pattern, firstWildcard);
+    return Expressions.startsWith(column.getName(), unescapedPattern);
   }
 
   protected void checkNullLiteral(LiteralExpr literal) throws ImpalaRuntimeException {

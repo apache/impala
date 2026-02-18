@@ -1131,7 +1131,7 @@ where s like "árvíz%";
 STRING
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 select * from unicode_truncate

@@ -1,0 +1,356 @@
+====
+---- QUERY
+# IMPALA-14737: Test LIKE predicate pushdown to Iceberg
+# This test demonstrates that LIKE predicates with prefix patterns enable partition
+# pruning, while patterns starting with wildcards do not.
+#
+# KEY COMPARISON:
+# - LIKE 'prefix%' -> extracts prefix, enables pruning -> partitions=1/3
+# - LIKE '%suffix' -> no prefix, cannot prune -> partitions=3/3
+#
+# The 'action' column is a partition column in iceberg_partitioned table.
+# Positive Cases: LIKE with prefix enables partition pruning
+
+# Test 1: LIKE with prefix 'c%' - ENABLES partition pruning
+EXPLAIN SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'c%';
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*partitions=1/3.*
+row_regex:.*Iceberg snapshot id.*
+====
+---- QUERY
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'c%';
+---- TYPES
+BIGINT
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Test 2: LIKE with longer prefix 'cli%' - still enables pruning
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'cli%';
+---- TYPES
+BIGINT
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Test 3: LIKE with underscore wildcard 'c____' - extracts 'c' prefix
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'c____';
+---- TYPES
+BIGINT
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Test 4: LIKE with OR - prunes to 2 out of 3 partitions
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'c%' OR action LIKE 'd%';
+---- TYPES
+BIGINT
+---- RESULTS
+12
+---- RUNTIME_PROFILE
+row_regex: partitions=2/.* files=.*
+====
+---- QUERY
+# Test 5: LIKE on different partition value 'v%'
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'v%';
+---- TYPES
+BIGINT
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Negative Cases: Patterns that CANNOT be pushed down
+#
+# The following LIKE patterns cannot be optimized with Iceberg pushdown:
+# 1. Patterns starting with wildcards: '%suffix', '_prefix'
+# 2. Patterns with literal content after wildcards: 'prefix%suffix', 'd%d'
+#    (Note: startsWith('prefix') would incorrectly match 'prefix123' for 'prefix%suffix')
+
+# Test 1: LIKE starting with '%' wildcard - NO partition pruning
+EXPLAIN SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE '%lick';
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*partitions=3/3.*
+====
+---- QUERY
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE '%lick';
+---- TYPES
+BIGINT
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+row_regex: partitions=3/.* files=.*
+====
+---- QUERY
+# Test 2: LIKE starting with '_' wildcard - NO partition pruning
+EXPLAIN SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE '_lick';
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*partitions=3/3.*
+====
+---- QUERY
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE '_lick';
+---- TYPES
+BIGINT
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+row_regex: partitions=3/.* files=.*
+====
+---- QUERY
+# Test 3: Pattern with only '%' - scans all partitions
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE '%';
+---- TYPES
+BIGINT
+---- RESULTS
+20
+---- RUNTIME_PROFILE
+row_regex: partitions=3/.* files=.*
+====
+---- QUERY
+# Comparison Tests: Demonstrating the benefit
+# Comparison: LIKE 'c%' vs LIKE '%lick' on same data
+# Both return same result (6 rows), but LIKE 'c%' scans fewer partitions
+
+# With prefix (efficient)
+EXPLAIN SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'c%';
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*partitions=1/3.*
+====
+---- QUERY
+# Without prefix (inefficient)
+EXPLAIN SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE '%ick';
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*partitions=3/3.*
+====
+---- QUERY
+# Tests on non-partition columns
+SELECT id, user FROM functional_parquet.iceberg_partitioned WHERE user LIKE 'L%' ORDER BY id;
+---- TYPES
+INT, STRING
+---- RESULTS
+2,'Lisa'
+5,'Lisa'
+7,'Lisa'
+8,'Lisa'
+14,'Lisa'
+16,'Lisa'
+====
+---- QUERY
+# LIKE with underscore on non-partition column - extracts 'Al' prefix
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE user LIKE 'Al_%';
+---- TYPES
+BIGINT
+---- RESULTS
+14
+====
+---- QUERY
+# Compound predicate: partition column LIKE + non-partition column LIKE
+# Partition column enables pruning
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'c%' AND user LIKE 'Al%';
+---- TYPES
+BIGINT
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Edge Cases
+
+# Case sensitivity test
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE user LIKE 'lisa%';
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# Empty result with valid prefix
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'z%';
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# Tests on non-partitioned table
+# LIKE works correctly on non-partitioned table
+SELECT count(*) FROM functional_parquet.iceberg_non_partitioned WHERE user LIKE 'L%';
+---- TYPES
+BIGINT
+---- RESULTS
+6
+====
+---- QUERY
+# LIKE with underscore on non-partitioned table
+SELECT count(*) FROM functional_parquet.iceberg_non_partitioned WHERE user LIKE 'Al_%';
+---- TYPES
+BIGINT
+---- RESULTS
+14
+====
+---- QUERY
+# UTF-8 Character Tests
+
+# Test table with UTF-8 strings
+CREATE TABLE ice_utf8_test (s STRING)
+PARTITIONED BY SPEC (truncate(5, s))
+STORED AS ICEBERG;
+====
+---- QUERY
+INSERT INTO ice_utf8_test VALUES ('impala'), ('árvíztűrőtükörfúrógép'), ('árvíztűrő'), ('űűű'), ('你好hello'), ('你好world'), ('test%value'), ('test_value'), ('wild%card_mix');
+====
+---- QUERY
+# Test: LIKE with UTF-8 prefix pattern - should use startsWith pushdown
+SELECT s FROM ice_utf8_test WHERE s LIKE 'árvíz%' ORDER BY s;
+---- TYPES
+STRING
+---- RESULTS: RAW_STRING
+'árvíztűrő'
+'árvíztűrőtükörfúrógép'
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Test: LIKE with exact UTF-8 match - should use equality pushdown
+SELECT s FROM ice_utf8_test WHERE s LIKE 'űűű';
+---- TYPES
+STRING
+---- RESULTS: RAW_STRING
+'űűű'
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Test: LIKE with Chinese characters prefix
+SELECT s FROM ice_utf8_test WHERE s LIKE '你好%' ORDER BY s;
+---- TYPES
+STRING
+---- RESULTS: RAW_STRING
+'你好hello'
+'你好world'
+---- RUNTIME_PROFILE
+row_regex: partitions=2/.* files=.*
+====
+---- QUERY
+# Escaped Wildcard Tests
+# When wildcards are escaped with '\', they are treated as literal characters
+
+# Test 1: Escaped % at end - exact match using Expressions.equal()
+SELECT s FROM ice_utf8_test WHERE s LIKE 'test\%value';
+---- TYPES
+STRING
+---- RESULTS: RAW_STRING
+'test%value'
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Test 2: Escaped _ in middle - exact match
+SELECT s FROM ice_utf8_test WHERE s LIKE 'test\_value';
+---- TYPES
+STRING
+---- RESULTS: RAW_STRING
+'test_value'
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Test 3: Escaped wildcard followed by unescaped wildcard - extracts prefix including literal wildcard
+# Pattern 'wild\%card%' means: starts with 'wild%card', then any suffix
+# Should match 'wild%card_mix'
+SELECT s FROM ice_utf8_test WHERE s LIKE 'wild\%card%';
+---- TYPES
+STRING
+---- RESULTS: RAW_STRING
+'wild%card_mix'
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Test 4: Multiple escaped wildcards - exact match
+SELECT s FROM ice_utf8_test WHERE s LIKE 'wild\%card\_mix';
+---- TYPES
+STRING
+---- RESULTS: RAW_STRING
+'wild%card_mix'
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Test 5: Unescaped wildcard at the beginning of partitioned table - no pruning
+SELECT count(*) FROM ice_utf8_test WHERE s LIKE '%value';
+---- TYPES
+BIGINT
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+row_regex: partitions=8/8.* files=.*
+====
+---- QUERY
+# Exact Match Cases: LIKE without wildcards
+# Test: LIKE with exact match 'click' (no wildcards) - uses equality pushdown
+EXPLAIN SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'click';
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.*partitions=1/3.*
+row_regex:.*Iceberg snapshot id.*
+====
+---- QUERY
+SELECT count(*) FROM functional_parquet.iceberg_partitioned WHERE action LIKE 'click';
+---- TYPES
+BIGINT
+---- RESULTS
+6
+---- RUNTIME_PROFILE
+row_regex: partitions=1/.* files=.*
+====
+---- QUERY
+# Test: LIKE with exact match on non-partition column
+SELECT id, user FROM functional_parquet.iceberg_partitioned WHERE user LIKE 'Alex' ORDER BY id;
+---- TYPES
+INT, STRING
+---- RESULTS
+1,'Alex'
+4,'Alex'
+6,'Alex'
+11,'Alex'
+15,'Alex'
+17,'Alex'
+19,'Alex'
+20,'Alex'
+====
+---- QUERY
+# Verify árvíz%p returns correct results (should only match 'árvíztűrőtükörfúrógép' and not 'árvíztűrő')
+# Checks pattern not being pushed down, else startsWith('árvíz') would incorrectly match 'árvíztűrő'
+SELECT s FROM ice_utf8_test WHERE s LIKE 'árvíz%p';
+---- TYPES
+STRING
+---- RESULTS: RAW_STRING
+'árvíztűrőtükörfúrógép'
+====
+---- QUERY
+# Negative Test: LIKE with suffix after wildcard - cannot be pushed down
+# Using escaped wildcard test table to verify patterns with literal content after wildcard
+SELECT s FROM ice_utf8_test WHERE s LIKE 'test%value' ORDER BY s;
+---- TYPES
+STRING
+---- RESULTS
+'test%value'
+'test_value'
+====
+---- QUERY
+# Negative Test: Complex pattern with wildcards and literal content
+# Pattern 'i%a' requires 'i' at start and 'a' at end - cannot use startsWith('i')
+SELECT s FROM ice_utf8_test WHERE s LIKE 'i%a' ORDER BY s;
+---- TYPES
+STRING
+---- RESULTS
+'impala'
+====
