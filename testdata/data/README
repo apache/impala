@@ -1219,6 +1219,16 @@ Since Spark still doesn't support default values, the metadata.json file was edi
 manually to set the default value for column 'j':
 {"id":2,"name":"j","required":false,"type":"int","initial-default":-1,"write-default":-1}
 
+testdata/data/iceberg_test/iceberg_v3/iceberg_v3_row_lineage(_orc):
+Iceberg V3 table created by Spark 4.0.2, see above (iceberg_v3_deletion_vectors).
+sql("create table iceberg_v3_row_lineage (i int) using iceberg options('format-version'='3')").collect()
+sql("create table iceberg_v3_row_lineage_orc (i int) using iceberg options('format-version'='3', 'write.format.default'='orc')").collect()
+The followings are the same for both tables:
+sql("insert into iceberg_v3_row_lineage values(1)").collect()
+sql("insert into iceberg_v3_row_lineage values(2)").collect()
+sql("insert into iceberg_v3_row_lineage values(3)").collect()
+sql("CALL spark_catalog.system.rewrite_data_files('iceberg_v3_row_lineage', options => map('min-input-files', '2'))").show()
+
 arrays_big.parq:
 Generated with RandomNestedDataGenerator.java from the following schema:
 {

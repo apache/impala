@@ -36,8 +36,10 @@ HdfsTableWriter::HdfsTableWriter(TableSinkBase* parent,
     output_expr_evals_(parent->output_expr_evals()) {
   int num_non_partition_cols =
       table_desc_->num_cols() - table_desc_->num_clustering_cols();
-  DCHECK_GE(output_expr_evals_.size(), num_non_partition_cols)
-      << parent_->DebugString();
+  if (!table_desc_->IsIcebergTable() || table_desc_->IcebergFormatVersion() < 3) {
+    DCHECK_GE(output_expr_evals_.size(), num_non_partition_cols)
+        << parent_->DebugString();
+  }
 }
 
 Status HdfsTableWriter::Write(const uint8_t* data, int32_t len) {

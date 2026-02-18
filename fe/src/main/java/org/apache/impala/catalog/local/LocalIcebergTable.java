@@ -23,9 +23,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.iceberg.BaseTable;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.Column;
@@ -33,8 +35,10 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCompressionCodec;
@@ -97,6 +101,10 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
       List<Column> iceColumns = IcebergSchemaConverter.convertToImpalaSchema(
           icebergApiTable.schema());
       validateColumns(iceColumns, msTable.getSd().getCols());
+      int formatVersion =
+          ((BaseTable) icebergApiTable).operations().current().formatVersion();
+      iceColumns.addAll(
+          FeIcebergTable.getHiddenColumns(formatVersion, iceColumns.size()));
       ColumnMap colMap = new ColumnMap(iceColumns,
           /*numClusteringCols=*/ 0,
           db.getName() + "." + msTable.getTableName(),
@@ -169,6 +177,17 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     for (int i = 0; i < impalaCols.size(); ++i) {
       Preconditions.checkState(
           impalaCols.get(i).getName().equalsIgnoreCase(hmsCols.get(i).getName()));
+    }
+  }
+
+  @Override
+  public List<Column> getColumnsInHiveOrder() {
+    if (getFormatVersion() < 3) {
+      return super.getColumnsInHiveOrder();
+    } else {
+      return super.getColumnsInHiveOrder().stream()
+          .filter(col -> !col.isHidden())
+          .collect(Collectors.toList());
     }
   }
 

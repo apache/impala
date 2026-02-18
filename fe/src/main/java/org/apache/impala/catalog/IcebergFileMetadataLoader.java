@@ -52,6 +52,7 @@ import org.apache.impala.catalog.iceberg.GroupedContentFiles;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Pair;
+import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.thrift.TIcebergPartition;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.IcebergUtil;
@@ -192,11 +193,19 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
         TIcebergPartition partition = oldIcebergPartitions_.get(oldPartId);
         Integer newPartId = loadedIcebergPartitions_.computeIfAbsent(
             partition, k -> nextPartitionId_.getAndIncrement());
+        FbIcebergMetadata icebergMetadata = fd.getFbFileMetadata().icebergMetadata();
         // Look up the partition info in this old file descriptor from the partition list.
         // Put the partition info in the new partitions map and write the new partition id
         // to the file metadata of the fd.
-        if (!fd.getFbFileMetadata().icebergMetadata().mutatePartId(newPartId)) {
-          throw new TableLoadingException("Error modifying the Iceberg file descriptor.");
+        if (!icebergMetadata.mutatePartId(newPartId)) {
+          throw new TableLoadingException(
+              "Error modifying the partition id of the Iceberg file descriptor.");
+        }
+        if (icebergMetadata.firstRowId() == -1 && contentFile.firstRowId() != null) {
+          if (!icebergMetadata.mutateFirstRowId(contentFile.firstRowId())) {
+            throw new TableLoadingException(
+                "Error modifying the first-row-id Iceberg file descriptor.");
+          }
         }
         ++loadStats_.skippedFiles;
         loadedFds_.add(fd);

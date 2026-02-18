@@ -82,6 +82,21 @@ void FileMetadataUtils::AddFileLevelVirtualColumns(MemPool* mem_pool,
       } else {
         template_tuple->SetNull(slot_desc->null_indicator_offset());
       }
+    } else if (slot_desc->virtual_column_type() ==
+        TVirtualColumnType::ICEBERG_FIRST_ROW_ID) {
+      using namespace org::apache::impala::fb;
+      const FbIcebergMetadata* ice_metadata =
+          file_desc_->file_metadata->iceberg_metadata();
+      DCHECK(ice_metadata != nullptr);
+
+      int64_t first_row_id = ice_metadata->first_row_id();
+      if (first_row_id > -1) {
+        int64_t* slot = template_tuple->GetBigIntSlot(slot_desc->tuple_offset());
+        *slot = first_row_id;
+        template_tuple->SetNotNull(slot_desc->null_indicator_offset());
+      } else {
+        template_tuple->SetNull(slot_desc->null_indicator_offset());
+      }
     }
   }
 }

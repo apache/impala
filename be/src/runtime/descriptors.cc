@@ -272,6 +272,7 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
   valid_write_id_list_ = tdesc.hdfsTable.valid_write_ids;
   if (tdesc.__isset.icebergTable) {
     is_iceberg_ = true;
+    iceberg_format_version_ = tdesc.icebergTable.format_version;
     iceberg_table_location_ = tdesc.icebergTable.table_location;
     iceberg_spec_id_ = tdesc.icebergTable.default_partition_spec_id;
     iceberg_partition_specs_ = tdesc.icebergTable.partition_spec;

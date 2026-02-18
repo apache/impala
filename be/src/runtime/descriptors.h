@@ -517,6 +517,10 @@ class HdfsTableDescriptor : public TableDescriptor {
     return iceberg_spec_id_;
   }
 
+  int32_t IcebergFormatVersion() const {
+    return iceberg_format_version_;
+  }
+
   virtual std::string DebugString() const;
 
  protected:
@@ -539,6 +543,7 @@ class HdfsTableDescriptor : public TableDescriptor {
   int64_t iceberg_parquet_plain_page_size_;
   int64_t iceberg_parquet_dict_page_size_;
   int32_t iceberg_spec_id_;
+  int32_t iceberg_format_version_;
 };
 
 class HBaseTableDescriptor : public TableDescriptor {

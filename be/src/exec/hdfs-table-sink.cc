@@ -124,9 +124,9 @@ Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
         << DebugString();
     DCHECK_EQ(partition_key_expr_evals_.size(), table_desc_->num_clustering_cols())
         << DebugString();
-  }
-  DCHECK_GE(output_expr_evals_.size(),
+    DCHECK_GE(output_expr_evals_.size(),
       table_desc_->num_cols() - table_desc_->num_clustering_cols()) << DebugString();
+  }
 
   return Status::OK();
 }

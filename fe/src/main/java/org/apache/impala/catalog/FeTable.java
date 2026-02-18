@@ -154,7 +154,7 @@ public interface FeTable {
     if (!isFullAcid) return columns;
     // Filter out row__id as it doesn't exist in HMS.
     return columns.stream()
-        .filter(c -> !c.getName().equals("row__id"))
+        .filter(c -> !c.isHidden() && !c.getName().equals("row__id"))
         .collect(Collectors.toList());
   }
 

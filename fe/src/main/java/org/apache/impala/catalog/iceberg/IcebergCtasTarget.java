@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.iceberg;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import com.google.common.base.Preconditions;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.types.TypeUtil;
@@ -274,6 +276,27 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   @Override
   public org.apache.iceberg.Table getIcebergApiTable() {
     return null;
+  }
+
+  @Override
+  public int getFormatVersion() {
+    String version = msTable_.getParameters().get(IcebergTable.FORMAT_VERSION);
+    try {
+      if (version != null) {
+        return Integer.parseInt(version);
+      } else {
+        // Try to return the library-default. Since DEFAULT_TABLE_FORMAT_VERSION is
+        // private in class TableMetadata, we need to use reflection.
+        Field field = TableMetadata.class.getDeclaredField(
+            "DEFAULT_TABLE_FORMAT_VERSION");
+        field.setAccessible(true);
+        return (int) field.get(null);
+      }
+    } catch (NumberFormatException e) {
+      throw new IllegalStateException("Invalid format version: " + version);
+    } catch (Exception e) {
+      throw new IllegalStateException("Unable to determine default format version", e);
+    }
   }
 
   public void addColumn(IcebergColumn col) {

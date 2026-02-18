@@ -511,6 +511,7 @@ public class IcebergMetaProvider implements MetaProvider {
       ret.add(VirtualColumn.PARTITION_SPEC_ID);
       ret.add(VirtualColumn.ICEBERG_PARTITION_SERIALIZED);
       ret.add(VirtualColumn.ICEBERG_DATA_SEQUENCE_NUMBER);
+      ret.add(VirtualColumn.ICEBERG_FIRST_ROW_ID);
       return ret;
     }
 

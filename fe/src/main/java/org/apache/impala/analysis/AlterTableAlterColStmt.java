@@ -119,6 +119,10 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
       throw new AnalysisException(String.format(
           "Column '%s' does not exist in table: %s", colName_, tableName));
     }
+    if (column.isHidden()) {
+      throw new AnalysisException(String.format(
+          "Hidden column '%s' of table '%s' cannot be altered.", colName_, tableName));
+    }
     // Verify the column being modified isn't a partition column.
     if (t.isClusteringColumn(column)) {
       throw new AnalysisException("Cannot modify partition column: " + colName_);

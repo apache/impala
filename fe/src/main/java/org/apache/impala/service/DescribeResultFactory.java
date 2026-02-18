@@ -215,6 +215,7 @@ public class DescribeResultFactory {
     List<Column> nonClustered = new ArrayList<Column>();
     List<Column> clustered = new ArrayList<Column>();
     for (Column col: filteredColumns) {
+      if (col.isHidden()) continue;
       if (table.isClusteringColumn(col)) {
         clustered.add(col);
       } else {
@@ -341,6 +342,7 @@ public class DescribeResultFactory {
     TDescribeResult descResult = new TDescribeResult();
     descResult.results = Lists.newArrayList();
     for (Column c: columns) {
+      if (c.isHidden()) continue;
       Preconditions.checkState(c instanceof IcebergColumn);
       IcebergColumn icebergColumn = (IcebergColumn) c;
       // General describe info.

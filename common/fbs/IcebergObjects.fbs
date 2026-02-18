@@ -49,6 +49,7 @@ table FbIcebergMetadata {
   partition_keys : [FbIcebergPartitionTransformValue];
   equality_field_ids : [int];
   part_id : int = -1;
+  first_row_id : long;
 }
 
 table FbIcebergColumnStats {

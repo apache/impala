@@ -2320,19 +2320,53 @@ class TestIcebergV3Table(IcebergTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
 
+  def load_table(self, database, table_name, format="parquet"):
+    create_iceberg_table_from_directory(self.client, database,
+        table_name, format,
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_v3",
+        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
+
   def test_v3_basic(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-v3-basic', vector, unique_database)
 
   def test_v3_negative(self, vector, unique_database):
-    create_iceberg_table_from_directory(self.client, unique_database,
-        "iceberg_v3_deletion_vectors", "parquet",
-        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_v3",
-        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
-    create_iceberg_table_from_directory(self.client, unique_database,
-        "iceberg_v3_default_value", "parquet",
-        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_v3",
-        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
+    self.load_table(unique_database, "iceberg_v3_deletion_vectors")
+    self.load_table(unique_database, "iceberg_v3_default_value")
     self.run_test_case('QueryTest/iceberg-v3-negative', vector, unique_database)
+
+  def test_v3_row_lineage(self, vector, unique_database):
+    self.load_table(unique_database, "iceberg_v3_row_lineage")
+    self.load_table(unique_database, "iceberg_v3_row_lineage_orc", format="orc")
+    self.run_test_case('QueryTest/iceberg-v3-row-lineage', vector, unique_database)
+
+  @SkipIf.not_dfs
+  def test_v3_row_lineage_file_schema(self, unique_database):
+    """Test that plain INSERTs only write user columns, not hidden metadata columns."""
+    table_name = "ice_impala_lineage"
+    qualified_table_name = "%s.%s" % (unique_database, table_name)
+    query = """create table %s (a string) stored as iceberg
+               tblproperties ('format-version'='3')""" % qualified_table_name
+    self.client.execute(query)
+
+    query = "insert into %s values ('impala')" % qualified_table_name
+    self.client.execute(query)
+
+    # Copy the created file to the local filesystem and parse metadata
+    local_file = '/tmp/ice_impala_lineage_%s.parq' % random.randint(0, 10000)
+    LOG.info("test_v3_row_lineage_file_schema local file name: " + local_file)
+    hdfs_file = get_fs_path('/test-warehouse/%s.db/%s/data/*.parq'
+        % (unique_database, table_name))
+    check_call(['hadoop', 'fs', '-copyToLocal', hdfs_file, local_file])
+    try:
+      metadata = get_parquet_metadata(local_file)
+      # Verify that hidden columns are not written.
+      assert len(metadata.schema) == 2
+      root_schema_element = metadata.schema[0]
+      assert root_schema_element.name == 'schema'
+      a_schema_element = metadata.schema[1]
+      assert a_schema_element.name == 'a'
+    finally:
+      os.remove(local_file)
 
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most

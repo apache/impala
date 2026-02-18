@@ -1186,11 +1186,12 @@ public class IcebergUtil {
       // for manifest entries with status DELETED (older Iceberg versions)."
       FbIcebergMetadata.addDataSequenceNumber(fbb, -1l);
     }
-
     if (eqFieldIdsOffset != -1) {
       FbIcebergMetadata.addEqualityFieldIds(fbb, eqFieldIdsOffset);
     }
     FbIcebergMetadata.addPartId(fbb, partId);
+    FbIcebergMetadata.addFirstRowId(fbb,
+        cf.firstRowId() != null ? cf.firstRowId() : -1L);
     return FbIcebergMetadata.endFbIcebergMetadata(fbb);
   }
 

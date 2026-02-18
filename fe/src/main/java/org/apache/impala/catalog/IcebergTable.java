@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -410,6 +411,17 @@ public class IcebergTable extends Table implements FeIcebergTable {
   }
 
   @Override
+  public List<Column> getColumnsInHiveOrder() {
+    if (getFormatVersion() < 3) {
+      return super.getColumnsInHiveOrder();
+    } else {
+      return super.getColumnsInHiveOrder().stream()
+          .filter(col -> !col.isHidden())
+          .collect(Collectors.toList());
+    }
+  }
+
+  @Override
   public TTable toThrift() {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.ICEBERG_TABLE);
@@ -675,6 +687,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
       throws TableLoadingException, ImpalaRuntimeException {
     loadSchema();
     addVirtualColumns();
+    addHiddenColumns();
     partitionSpecs_ = Utils.loadPartitionSpecByIceberg(this);
     defaultPartitionSpecId_ = icebergApiTable_.spec().specId();
   }
@@ -731,6 +744,14 @@ public class IcebergTable extends Table implements FeIcebergTable {
     addVirtualColumn(VirtualColumn.PARTITION_SPEC_ID);
     addVirtualColumn(VirtualColumn.ICEBERG_PARTITION_SERIALIZED);
     addVirtualColumn(VirtualColumn.ICEBERG_DATA_SEQUENCE_NUMBER);
+    addVirtualColumn(VirtualColumn.ICEBERG_FIRST_ROW_ID);
+  }
+
+  private void addHiddenColumns() {
+    for (Column col : FeIcebergTable.getHiddenColumns(
+        getFormatVersion(), getColumns().size())) {
+      addColumn(col);
+    }
   }
 
   @Override

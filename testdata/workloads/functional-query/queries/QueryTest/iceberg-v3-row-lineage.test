@@ -1,0 +1,502 @@
+====
+---- QUERY
+select i from iceberg_v3_row_lineage;
+---- RESULTS
+1
+2
+3
+---- TYPES
+INT
+====
+---- QUERY
+# Hidden columns are not expanded by 'select *'
+select * from iceberg_v3_row_lineage;
+---- RESULTS
+1
+2
+3
+---- TYPES
+INT
+====
+---- QUERY
+select i, _file_row_id from iceberg_v3_row_lineage;
+---- RESULTS
+1,0
+2,1
+3,2
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+select _file_row_id from iceberg_v3_row_lineage;
+---- RESULTS
+0
+1
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+select _file_last_updated_sequence_number from iceberg_v3_row_lineage;
+---- RESULTS
+1
+2
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+select i, _file_row_id, _file_last_updated_sequence_number from iceberg_v3_row_lineage;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+select i, _file_row_id, _file_last_updated_sequence_number
+from iceberg_v3_row_lineage for system_version as of 2872597867664652808;
+---- RESULTS
+1,NULL,NULL
+2,NULL,NULL
+3,NULL,NULL
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+# Calculate 'row_id' and 'last_updated_sequence_number'
+select i, coalesce(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION),
+          coalesce(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER)
+from iceberg_v3_row_lineage for system_version as of 2872597867664652808;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+# Calculate 'row_id' and 'last_updated_sequence_number'
+select i, coalesce(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION),
+          coalesce(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER)
+from iceberg_v3_row_lineage;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+INSERT INTO iceberg_v3_row_lineage (i) VALUES (4);
+====
+---- QUERY
+select *, _file_row_id, _file_last_updated_sequence_number from iceberg_v3_row_lineage;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+4,NULL,NULL
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+# Calculate 'row_id' and 'last_updated_sequence_number' after insert.
+# The new row should have 'row_id' = 6 because we had 3 original rows and during
+# compaction we wrote a file with 3 rows that blindly increased next-row-id of the
+# table.
+# The new row should have 'last_updated_sequence_number' = 5 because we had 3 snapshots
+# for the original INSERTs, 1 snapshot for the compaction, and 1 snapshot for the new
+# INSERT.
+select i, coalesce(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION),
+          coalesce(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER)
+from iceberg_v3_row_lineage;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+4,6,5
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+INSERT OVERWRITE iceberg_v3_row_lineage (i) VALUES (5);
+====
+---- QUERY
+select *, _file_row_id, _file_last_updated_sequence_number from iceberg_v3_row_lineage;
+---- RESULTS
+5,NULL,NULL
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+# Calculate 'row_id' and 'last_updated_sequence_number' after overwrite.
+select i, coalesce(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION),
+          coalesce(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER)
+from iceberg_v3_row_lineage;
+---- RESULTS
+5,7,6
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+ALTER TABLE iceberg_v3_row_lineage EXECUTE ROLLBACK(5398841822738664432);
+====
+---- QUERY
+select *, _file_row_id, _file_last_updated_sequence_number from iceberg_v3_row_lineage;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+compute stats iceberg_v3_row_lineage;
+show table stats iceberg_v3_row_lineage;
+---- RESULTS
+3,1,regex:.*,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*,'$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+show column stats iceberg_v3_row_lineage;
+---- RESULTS
+'i','INT',3,0,4,4.0,-1,-1
+---- TYPES
+STRING,STRING,BIGINT,BIGINT,BIGINT,DOUBLE,BIGINT,BIGINT
+====
+---- QUERY
+describe iceberg_v3_row_lineage;
+---- RESULTS
+'i','int','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+describe formatted iceberg_v3_row_lineage;
+---- RESULTS: VERIFY_IS_SUBSET
+'i','int','NULL'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+describe formatted iceberg_v3_row_lineage;
+---- RESULTS: VERIFY_IS_NOT_IN
+'_file_row_id',regex:.*,regex:.*
+'_file_last_updated_sequence_number',regex:.*,regex:.*
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# Data files in V2 tables don't have 'first-row-id'.
+CREATE TABLE v2_to_v3 (i int) STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='2');
+
+INSERT INTO v2_to_v3 VALUES (1);
+SELECT ICEBERG__FIRST__ROW__ID, i FROM v2_to_v3;
+---- RESULTS
+NULL,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# After upgrading to V3, the existing data files still don't have 'first-row-id'.
+ALTER TABLE v2_to_v3 SET TBLPROPERTIES ('format-version'='3');
+SELECT ICEBERG__FIRST__ROW__ID, i FROM v2_to_v3;
+---- RESULTS
+NULL,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# After adding new files, even existing files get an associated 'first-row-id'.
+# (Interestingly, their 'first-row-id' is higher then the 'first-row-id' of the
+# newly added files. This matches Spark's behavior)
+INSERT INTO v2_to_v3 VALUES (2);
+SELECT ICEBERG__FIRST__ROW__ID, i FROM v2_to_v3;
+---- RESULTS
+1,1
+0,2
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# Data files in V2 tables don't have 'first-row-id'.
+CREATE TABLE v2_to_v3_part (s string)
+PARTITIONED BY SPEC (TRUNCATE(5, s))
+STORED AS ICEBERG
+TBLPROPERTIES ('format-version'='2');
+
+INSERT INTO v2_to_v3_part VALUES ('árvíztűrőtükörfúrógép'), ('árvíztűrő'), ('űűű'),
+    ('你好hello'), ('你好world'), ('test%value'), ('test_value'), ('wild%card_mix');
+SELECT ICEBERG__FIRST__ROW__ID, s FROM v2_to_v3_part;
+---- RESULTS: RAW_STRING
+NULL,'árvíztűrőtükörfúrógép'
+NULL,'árvíztűrő'
+NULL,'űűű'
+NULL,'你好hello'
+NULL,'你好world'
+NULL,'test%value'
+NULL,'test_value'
+NULL,'wild%card_mix'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# After upgrading to V3, the existing data files still don't have 'first-row-id'.
+ALTER TABLE v2_to_v3_part SET TBLPROPERTIES ('format-version'='3');
+SELECT ICEBERG__FIRST__ROW__ID, s FROM v2_to_v3_part;
+---- RESULTS: RAW_STRING
+NULL,'árvíztűrőtükörfúrógép'
+NULL,'árvíztűrő'
+NULL,'űűű'
+NULL,'你好hello'
+NULL,'你好world'
+NULL,'test%value'
+NULL,'test_value'
+NULL,'wild%card_mix'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# After adding new files, even existing files get an associated 'first-row-id'.
+# (Interestingly, their 'first-row-id' is higher then the 'first-row-id' of the
+# newly added files. This matches Spark's behavior)
+INSERT INTO v2_to_v3_part VALUES ('IMPALA');
+SELECT ICEBERG__FIRST__ROW__ID, s FROM v2_to_v3_part;
+---- RESULTS: RAW_STRING
+0,'IMPALA'
+1,'árvíztűrőtükörfúrógép'
+1,'árvíztűrő'
+3,'űűű'
+4,'你好hello'
+5,'你好world'
+6,'test%value'
+7,'test_value'
+8,'wild%card_mix'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+SELECT ICEBERG__FIRST__ROW__ID, ICEBERG__DATA__SEQUENCE__NUMBER, s FROM v2_to_v3_part;
+---- RESULTS: RAW_STRING
+0,2,'IMPALA'
+1,1,'árvíztűrőtükörfúrógép'
+1,1,'árvíztűrő'
+3,1,'űűű'
+4,1,'你好hello'
+5,1,'你好world'
+6,1,'test%value'
+7,1,'test_value'
+8,1,'wild%card_mix'
+---- TYPES
+BIGINT,BIGINT,STRING
+====
+---- QUERY
+compute stats iceberg_v3_row_lineage (_file_row_id);
+---- CATCH
+COMPUTE STATS not supported for hidden column _file_row_id
+====
+---- QUERY
+compute stats iceberg_v3_row_lineage (_file_last_updated_sequence_number);
+---- CATCH
+COMPUTE STATS not supported for hidden column _file_last_updated_sequence_number
+====
+---- QUERY
+alter table iceberg_v3_row_lineage change column _file_row_id _file_row_id INT;
+---- CATCH
+cannot be altered.
+====
+---- QUERY
+alter table iceberg_v3_row_lineage change column _file_last_updated_sequence_number _file_last_updated_sequence_number INT;
+---- CATCH
+cannot be altered.
+====
+---- QUERY
+alter table iceberg_v3_row_lineage drop column _file_row_id;
+---- CATCH
+cannot be dropped.
+====
+---- QUERY
+alter table iceberg_v3_row_lineage drop column _file_last_updated_sequence_number;
+---- CATCH
+cannot be dropped.
+====
+---- QUERY
+alter table iceberg_v3_row_lineage add column _file_row_id INT;
+---- CATCH
+Column already exists: _file_row_id
+====
+---- QUERY
+alter table iceberg_v3_row_lineage add column _file_last_updated_sequence_number INT;
+---- CATCH
+Column already exists: _file_last_updated_sequence_number
+====
+---- QUERY
+insert into iceberg_v3_row_lineage (i, _file_row_id) values (100, 100);
+---- CATCH
+Column '_file_row_id' in column permutation is hidden and cannot be targeted for insert
+====
+---- QUERY
+insert into iceberg_v3_row_lineage (i, _file_last_updated_sequence_number) values (100, 100);
+---- CATCH
+Column '_file_last_updated_sequence_number' in column permutation is hidden and cannot be targeted for insert
+====
+---- QUERY
+select i from iceberg_v3_row_lineage_orc;
+---- RESULTS
+1
+2
+3
+---- TYPES
+INT
+====
+---- QUERY
+# Hidden columns are not expanded by 'select *'
+select * from iceberg_v3_row_lineage_orc;
+---- RESULTS
+1
+2
+3
+---- TYPES
+INT
+====
+---- QUERY
+select i, _file_row_id from iceberg_v3_row_lineage_orc;
+---- RESULTS
+1,0
+2,1
+3,2
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+select _file_row_id from iceberg_v3_row_lineage_orc;
+---- RESULTS
+0
+1
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+select _file_last_updated_sequence_number from iceberg_v3_row_lineage_orc;
+---- RESULTS
+1
+2
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+select i, _file_row_id, _file_last_updated_sequence_number from iceberg_v3_row_lineage_orc;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+select i, _file_row_id, _file_last_updated_sequence_number
+from iceberg_v3_row_lineage_orc for system_version as of 7033898671372067760;
+---- RESULTS
+1,NULL,NULL
+2,NULL,NULL
+3,NULL,NULL
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+# Calculate 'row_id' and 'last_updated_sequence_number'
+select i, coalesce(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION),
+          coalesce(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER)
+from iceberg_v3_row_lineage_orc for system_version as of 7033898671372067760;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+# Calculate 'row_id' and 'last_updated_sequence_number'
+select i, coalesce(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION),
+          coalesce(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER)
+from iceberg_v3_row_lineage_orc;
+---- RESULTS
+1,0,1
+2,1,2
+3,2,3
+---- TYPES
+INT,BIGINT,BIGINT
+====
+---- QUERY
+compute stats iceberg_v3_row_lineage_orc;
+show table stats iceberg_v3_row_lineage_orc;
+---- RESULTS
+3,1,regex:.*,'NOT CACHED','NOT CACHED','ORC','false',regex:.*,'$ERASURECODE_POLICY'
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====
+---- QUERY
+show column stats iceberg_v3_row_lineage_orc;
+---- RESULTS
+'i','INT',3,0,4,4.0,-1,-1
+---- TYPES
+STRING,STRING,BIGINT,BIGINT,BIGINT,DOUBLE,BIGINT,BIGINT
+====
+---- QUERY
+describe iceberg_v3_row_lineage_orc;
+---- RESULTS
+'i','int','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+describe formatted iceberg_v3_row_lineage_orc;
+---- RESULTS: VERIFY_IS_SUBSET
+'i','int','NULL'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+describe formatted iceberg_v3_row_lineage_orc;
+---- RESULTS: VERIFY_IS_NOT_IN
+'_file_row_id',regex:.*,regex:.*
+'_file_last_updated_sequence_number',regex:.*,regex:.*
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+compute stats iceberg_v3_row_lineage_orc (_file_row_id);
+---- CATCH
+COMPUTE STATS not supported for hidden column _file_row_id
+====
+---- QUERY
+compute stats iceberg_v3_row_lineage_orc (_file_last_updated_sequence_number);
+---- CATCH
+COMPUTE STATS not supported for hidden column _file_last_updated_sequence_number
+====
+---- QUERY
+alter table iceberg_v3_row_lineage_orc change column _file_row_id _file_row_id INT;
+---- CATCH
+cannot be altered.
+====
+---- QUERY
+alter table iceberg_v3_row_lineage_orc change column _file_last_updated_sequence_number _file_last_updated_sequence_number INT;
+---- CATCH
+cannot be altered.
+====
+---- QUERY
+alter table iceberg_v3_row_lineage_orc drop column _file_row_id;
+---- CATCH
+cannot be dropped.
+====
+---- QUERY
+alter table iceberg_v3_row_lineage_orc drop column _file_last_updated_sequence_number;
+---- CATCH
+cannot be dropped.
+====

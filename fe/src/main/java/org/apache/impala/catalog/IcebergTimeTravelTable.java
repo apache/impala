@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 /**
  * Represents an Iceberg Table involved in Time Travel.
@@ -119,15 +120,29 @@ public class IcebergTimeTravelTable
       for (Column col : IcebergSchemaConverter.convertToImpalaSchema(icebergSchema)) {
         addColumn(col);
       }
+      addHiddenColumns();
     } catch (ImpalaRuntimeException e) {
       throw new AnalysisException("Could not create iceberg schema.", e);
+    }
+  }
+
+  private void addHiddenColumns() {
+    for (Column col : FeIcebergTable.getHiddenColumns(
+        getFormatVersion(), getColumns().size())) {
+      addColumn(col);
     }
   }
 
   @Override
   public List<Column> getColumnsInHiveOrder() {
     Preconditions.checkState(base_.getNumClusteringCols() == 0);
-    return colsByPos_;
+    if (getFormatVersion() < 3) {
+      return colsByPos_;
+    } else {
+      return colsByPos_.stream().
+          filter(col -> !col.isHidden()).
+          collect(Collectors.toList());
+    }
   }
 
   @Override

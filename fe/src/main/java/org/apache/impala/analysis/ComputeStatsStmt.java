@@ -437,6 +437,10 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
           throw new AnalysisException(colName + " not found in table: " +
               table_.getName());
         }
+        if (col.isHidden()) {
+          throw new AnalysisException("COMPUTE STATS not supported for hidden column " +
+              col.getName() + " of table " + table_.getName());
+        }
         if (table_ instanceof FeFsTable && table_.isClusteringColumn(col)) {
           throw new AnalysisException("COMPUTE STATS not supported for partitioning " +
               "column " + col.getName() + " of HDFS table.");
@@ -957,7 +961,7 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
    */
   private boolean ignoreColumn(Column c) {
     Type t = c.getType();
-    return !t.isValid() || !t.isSupported() || t.isComplexType();
+    return !t.isValid() || !t.isSupported() || t.isComplexType() || c.isHidden();
   }
 
   public double getEffectiveSamplingPerc() { return effectiveSamplePerc_; }

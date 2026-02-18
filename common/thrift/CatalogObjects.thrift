@@ -94,7 +94,8 @@ enum TVirtualColumnType {
   ICEBERG_PARTITION_SERIALIZED,
   ICEBERG_DATA_SEQUENCE_NUMBER,
   PARTITION_VALUE_SERIALIZED,
-  BUCKET_ID
+  BUCKET_ID,
+  ICEBERG_FIRST_ROW_ID
 }
 
 // TODO: Since compression is also enabled for Kudu columns, we should
@@ -714,6 +715,7 @@ struct TIcebergTable {
   8: optional i64 parquet_plain_page_size;
   9: optional i64 parquet_dict_page_size;
   10: optional map<string, TIcebergPartitionStats> partition_stats;
+  11: optional i32 format_version = -1;
 }
 
 // System Table identifiers.

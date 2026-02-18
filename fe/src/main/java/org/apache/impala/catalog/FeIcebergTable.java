@@ -54,6 +54,7 @@ import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.FileContent;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.MetadataColumns;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -307,6 +308,19 @@ public interface FeIcebergTable extends FeFsTable {
   @Override
   default ListMap<TNetworkAddress> getHostIndex() {
     return getFeFsTable().getHostIndex();
+  }
+
+  static List<Column> getHiddenColumns(int formatVersion, int startPosition) {
+    if (formatVersion < 3) return Collections.emptyList();
+    List<Column> ret = new ArrayList<>();
+    ret.add(new IcebergColumn("_file_row_id", Type.BIGINT,
+        "A unique long assigned for row lineage",
+        startPosition++, MetadataColumns.ROW_ID.fieldId(), -1, -1, true, true));
+    ret.add(new IcebergColumn("_file_last_updated_sequence_number", Type.BIGINT,
+        "The sequence number which last updated this row",
+        startPosition++, MetadataColumns.LAST_UPDATED_SEQUENCE_NUMBER.fieldId(),
+        -1, -1, true, true));
+    return ret;
   }
 
   /**
@@ -826,6 +840,7 @@ public interface FeIcebergTable extends FeFsTable {
     public static TIcebergTable getTIcebergTable(FeIcebergTable icebergTable,
         ThriftObjectType type) {
       TIcebergTable tIcebergTable = new TIcebergTable();
+      tIcebergTable.setFormat_version(icebergTable.getFormatVersion());
       tIcebergTable.setTable_location(icebergTable.getIcebergTableLocation());
 
       for (IcebergPartitionSpec partitionSpec : icebergTable.getPartitionSpecs()) {

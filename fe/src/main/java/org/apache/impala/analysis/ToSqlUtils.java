@@ -509,6 +509,7 @@ public class ToSqlUtils {
         table.getMetaStoreTable().getParameters());
     for (int i = 0; i < table.getColumns().size(); i++) {
       Column col = table.getColumns().get(i);
+      if (col.isHidden()) continue;
       if (!isHbaseTable && i < table.getNumClusteringCols()) {
         partitionColsSql.add(columnToSql(col));
       } else if (isFullAcid && i == table.getNumClusteringCols()) {

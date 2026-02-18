@@ -1125,19 +1125,15 @@ void HdfsScanPlanNode::ComputeSlotMaterializationOrder(
 bool HdfsScanPlanNode::HasVirtualColumnInTemplateTuple() const {
   for (SlotDescriptor* sd : virtual_column_slots_) {
     DCHECK(sd->IsVirtual());
-    if (sd->virtual_column_type() == TVirtualColumnType::INPUT_FILE_NAME) {
-      return true;
-    } else if (sd->virtual_column_type() == TVirtualColumnType::FILE_POSITION) {
+    if (sd->virtual_column_type() == TVirtualColumnType::FILE_POSITION) {
       // We return false at the end of the function if there are no virtual
       // columns in the template tuple.
       continue;
-    } else if (sd->virtual_column_type() == TVirtualColumnType::PARTITION_SPEC_ID) {
-      return true;
-    } else if (sd->virtual_column_type() ==
-        TVirtualColumnType::ICEBERG_PARTITION_SERIALIZED) {
-      return true;
-    } else if (sd->virtual_column_type() ==
-        TVirtualColumnType::ICEBERG_DATA_SEQUENCE_NUMBER) {
+    } else if (sd->virtual_column_type() == TVirtualColumnType::INPUT_FILE_NAME ||
+        sd->virtual_column_type() == TVirtualColumnType::PARTITION_SPEC_ID ||
+        sd->virtual_column_type() == TVirtualColumnType::ICEBERG_PARTITION_SERIALIZED ||
+        sd->virtual_column_type() == TVirtualColumnType::ICEBERG_DATA_SEQUENCE_NUMBER ||
+        sd->virtual_column_type() == TVirtualColumnType::ICEBERG_FIRST_ROW_ID) {
       return true;
     } else {
       // Adding DCHECK here so we don't forget to update this when adding new virtual

@@ -267,7 +267,7 @@ public class IcebergScanPlanner {
       if (column == null) continue;
       int fieldId = ((IcebergColumn) column).getFieldId();
       NestedField field = getIceTable().getIcebergApiTable().schema().findField(fieldId);
-      if (field.initialDefaultLiteral() != null) {
+      if (field != null && field.initialDefaultLiteral() != null) {
         throw new ImpalaRuntimeException(String.format(
             "Iceberg columns with default values not supported yet. " +
             "Table: %s Column: %s Default value: %s",

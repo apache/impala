@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
@@ -77,10 +78,14 @@ public class AlterTableDropColStmt extends AlterTableStmt {
           "Cannot drop column '%s' from %s. Tables must contain at least 1 column.",
           colName_, tableName));
     }
-
-    if (t.getColumn(colName_) == null) {
+    Column column = t.getColumn(colName_);
+    if (column == null) {
       throw new AnalysisException(String.format(
           "Column '%s' does not exist in table: %s", colName_, tableName));
+    }
+    if (column.isHidden()) {
+      throw new AnalysisException(String.format(
+          "Hidden column '%s' of table '%s' cannot be dropped.", colName_, t.getName()));
     }
   }
 }

@@ -40,14 +40,24 @@ public class IcebergColumn extends Column {
   private final int fieldMapValueId_;
   // False for required Iceberg field, true for optional Iceberg field
   private final boolean isNullable_;
+  // Until only Iceberg columns can be hidden, we can keep this flag here.
+  private final boolean isHidden_;
 
   public IcebergColumn(String name, Type type, String comment, int position,
       int fieldId, int fieldMapKeyId, int fieldMapValueId, boolean isNullable) {
+    this(name, type, comment, position, fieldId, fieldMapKeyId, fieldMapValueId,
+        isNullable, false);
+  }
+
+  public IcebergColumn(String name, Type type, String comment, int position,
+      int fieldId, int fieldMapKeyId, int fieldMapValueId, boolean isNullable,
+      boolean isHidden) {
     super(name.toLowerCase(), type, comment, position);
     fieldId_ = fieldId;
     fieldMapKeyId_ = fieldMapKeyId;
     fieldMapValueId_ = fieldMapValueId;
     isNullable_ = isNullable;
+    isHidden_ = isHidden;
   }
 
   public static IcebergColumn cloneWithNullability(IcebergColumn source,
@@ -62,6 +72,9 @@ public class IcebergColumn extends Column {
   }
 
   public boolean isNullable() { return isNullable_; }
+
+  @Override
+  public boolean isHidden() { return isHidden_; }
 
   @Override
   public TColumn toThrift() {

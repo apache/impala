@@ -344,6 +344,7 @@ public class InsertStmt extends DmlStatementBase {
       List<Column> tableColumns = table_.getColumns();
       for (int i = numClusteringCols; i < tableColumns.size(); ++i) {
         Column c = tableColumns.get(i);
+        if (c.isHidden()) continue;
         // Omit auto-incrementing column for Kudu table since the values of the column
         // will be assigned by Kudu engine.
         if (c instanceof KuduColumn && ((KuduColumn)c).isAutoIncrementing()) continue;
@@ -364,6 +365,11 @@ public class InsertStmt extends DmlStatementBase {
       if (column == null) {
         throw new AnalysisException(
             "Unknown column '" + columnName + "' in column permutation");
+      }
+      if (column.isHidden()) {
+        throw new AnalysisException(
+            "Column '" + columnName + "' in column permutation is hidden and cannot be " +
+                "targeted for insert");
       }
 
       if (!mentionedColumnNames.add(column.getName())) {
@@ -716,9 +722,9 @@ public class InsertStmt extends DmlStatementBase {
   private void checkColumnCoverage(List<Column> selectExprTargetColumns,
       Set<String> mentionedColumnNames, int numSelectListExprs,
       int numStaticPartitionExprs) throws AnalysisException {
+    int colCount = table_.getColumnsInHiveOrder().size();
     // Check that all required cols are mentioned by the permutation and partition clauses
-    if (selectExprTargetColumns.size() + numStaticPartitionExprs !=
-        table_.getColumns().size()) {
+    if (selectExprTargetColumns.size() + numStaticPartitionExprs != colCount) {
       // We've already ruled out too many columns in the permutation and partition clauses
       // by checking that there are no duplicates and that every column mentioned actually
       // exists. So all columns aren't mentioned in the query.
@@ -747,7 +753,7 @@ public class InsertStmt extends DmlStatementBase {
         throw new AnalysisException(String.format(
             "Target table '%s' has %s columns (%s) than the SELECT / VALUES clause %s" +
             " (%s)", table_.getFullName(), comparator,
-            table_.getColumns().size(), partitionClause, totalColumnsMentioned));
+            colCount, partitionClause, totalColumnsMentioned));
       } else {
         String partitionPrefix =
             (partitionKeyValues_ == null) ? "mentions" : "and PARTITION clause mention";

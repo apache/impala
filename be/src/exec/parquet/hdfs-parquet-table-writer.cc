@@ -1372,7 +1372,8 @@ Status HdfsParquetTableWriter::Init() {
     page_row_count_limit_ = query_options.parquet_page_row_count_limit;
   }
 
-  int num_cols = table_desc_->num_cols() - table_desc_->num_clustering_cols();
+  int num_cols = min<size_t>(output_expr_evals_.size(),
+      table_desc_->num_cols() - table_desc_->num_clustering_cols());
   // When opening files using the hdfsOpenFile() API, the maximum block size is limited to
   // 2GB.
   int64_t min_block_size = MinBlockSize(num_cols);
