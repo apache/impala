@@ -292,8 +292,9 @@ class EncryptionKey {
   Status EncryptInternal(bool encrypt, const uint8_t* data, int64_t len,
       uint8_t* out, int64_t* out_len) WARN_UNUSED_RESULT;
 
-  /// Check if mode m is supported at runtime
-  static bool IsModeSupported(AES_CIPHER_MODE m);
+  /// Check if mode m is supported at runtime. If 'allow_non_accelerated' is false,
+  /// gcm is not allowed if the cpu lacks PCLMULQDQ.
+  static bool IsModeSupported(AES_CIPHER_MODE m, bool allow_non_accelerated=false);
 
   /// Track whether this key has been initialized, to avoid accidentally using
   /// uninitialized keys.

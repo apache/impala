@@ -31,8 +31,10 @@ select base64encode(aes_encrypt(aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1
 STRING
 ====
 ---- QUERY
-select aes_decrypt(aes_encrypt('ABC', '12345678901234567890123456789012','AES_256_GCM','1234567890123456'),
-'12345678901234567890123456789012',NULL,'1234567890123456');
+# Check that the default mode is consistently encrypted and decrypted.
+# The default can vary based on openssl version and supported CPU instructions.
+select aes_decrypt(aes_encrypt('ABC', '12345678901234567890123456789012',NULL,'1234567890123456'),
+'12345678901234567890123456789012',NULL,'1234567890123456')
 ---- RESULTS
 'ABC'
 ---- TYPES
@@ -124,17 +126,13 @@ select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'123456789012345
 STRING
 ====
 ---- QUERY
-# Encryption/ decryption when mode is NULL, defaulting to GCM mode.
-select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012',NULL,'1234567890123456'));
+# Encryption/decryption when mode is NULL, defaulting to AES_256_GCM or AES_256_CTR mode.
+# Note that backend code suggests that AES_256_CFB is also possible as default, but that
+# could only happen with old openssl versions that are no longer supported (IMPALA-14772).
+select base64encode(aes_encrypt('ABC', '12345678901234567890123456789012',NULL,'1234567890123456'))
+in ('F/DLkSwEikFOlqzXVCysy1JX7Q==', 'jmML')
 ---- RESULTS
-'F/DLkSwEikFOlqzXVCysy1JX7Q=='
+true
 ---- TYPES
-STRING
-====
----- QUERY
-select aes_decrypt(base64decode('F/DLkSwEikFOlqzXVCysy1JX7Q=='),'12345678901234567890123456789012',NULL,'1234567890123456');
----- RESULTS
-'ABC'
----- TYPES
-STRING
+BOOLEAN
 ====

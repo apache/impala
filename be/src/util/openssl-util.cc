@@ -426,7 +426,7 @@ Status ValidateModeAndKeyLength(AES_CIPHER_MODE m, int key_len) {
 
 Status EncryptionKey::InitializeRandom(int iv_len, AES_CIPHER_MODE m) {
   mode_ = m;
-  if (!IsModeSupported(m)) {
+  if (!IsModeSupported(m, true)) {
     mode_ = GetSupportedDefaultMode();
     LOG(WARNING) << Substitute("$0 is not supported, fall back to $1.",
         ModeToString(m), ModeToString(mode_));
@@ -578,7 +578,7 @@ const EVP_CIPHER* EncryptionKey::GetCipher() const {
 Status EncryptionKey::InitializeFields(const uint8_t* key, int key_len, const uint8_t* iv,
     int iv_len, AES_CIPHER_MODE m) {
   RETURN_IF_ERROR(ValidateModeAndKeyLength(m, key_len));
-  if (!IsModeSupported(m)) {
+  if (!IsModeSupported(m, true)) {
     return Status(Substitute("AES mode $0 is not supported by OpenSSL version ($1) "
         "that Impala was built against.", ModeToString(m), OPENSSL_VERSION_TEXT));
   }
@@ -603,7 +603,8 @@ void EncryptionKey::GetGcmTag(uint8_t* out) const {
   memcpy(out, gcm_tag_, AES_BLOCK_SIZE);
 }
 
-bool EncryptionKey::IsModeSupported(AES_CIPHER_MODE m) {
+bool EncryptionKey::IsModeSupported(AES_CIPHER_MODE m, bool allow_non_accelerated) {
+  bool use_gcm_on_cpu = allow_non_accelerated || CpuInfo::IsSupported(CpuInfo::PCLMULQDQ);
   switch (m) {
       // It becomes a bit tricky for GCM mode, because GCM mode is enabled since
       // OpenSSL 1.0.1, but the tag validation only works since 1.0.1d. We have
@@ -615,11 +616,11 @@ bool EncryptionKey::IsModeSupported(AES_CIPHER_MODE m) {
       // SSLeay() for GCM mode here since in the worst case, we will be using
       // AES_256_CTR in a system that supports AES_256_GCM.
     case AES_CIPHER_MODE::AES_256_GCM:
-      return (CpuInfo::IsSupported(CpuInfo::PCLMULQDQ)
+      return (use_gcm_on_cpu
           && SSLeay() >= OPENSSL_VERSION_1_0_1D && EVP_aes_256_gcm);
 
     case AES_CIPHER_MODE::AES_128_GCM:
-      return (CpuInfo::IsSupported(CpuInfo::PCLMULQDQ)
+      return (use_gcm_on_cpu
           && SSLeay() >= OPENSSL_VERSION_1_0_1D && EVP_aes_128_gcm);
 
     case AES_CIPHER_MODE::AES_256_CTR:
