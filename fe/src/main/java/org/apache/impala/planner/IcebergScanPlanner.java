@@ -45,8 +45,7 @@ import org.apache.iceberg.expressions.ExpressionUtil;
 import org.apache.iceberg.expressions.ExpressionVisitors;
 import org.apache.iceberg.expressions.True;
 import org.apache.iceberg.io.CloseableIterable;
-import org.apache.iceberg.metrics.MetricsReport;
-import org.apache.iceberg.metrics.MetricsReporter;
+import org.apache.iceberg.metrics.InMemoryMetricsReporter;
 import org.apache.iceberg.metrics.ScanMetricsResult;
 import org.apache.iceberg.metrics.ScanReport;
 import org.apache.iceberg.types.Types.NestedField;
@@ -105,26 +104,6 @@ import org.slf4j.LoggerFactory;
  * class deals with such complexities.
  */
 public class IcebergScanPlanner {
-  // TODO: This class is available in the Iceberg library from release 1.4.0. We could
-  // drop this and use the one from Iceberg once we've done a version bump.
-  private static class InMemoryMetricsReporter implements MetricsReporter {
-    private MetricsReport metricsReport_;
-
-    @Override
-    public void report(MetricsReport report) {
-      Preconditions.checkArgument(
-          report == null || report instanceof ScanReport,
-          "Metrics report is not a scan report");
-      this.metricsReport_ = report;
-    }
-
-    public ScanMetricsResult scanMetricsResult() {
-      if (metricsReport_ == null) return null;
-
-      return ((ScanReport) metricsReport_).scanMetrics();
-    }
-  }
-
   private static final Logger LOG = LoggerFactory.getLogger(IcebergScanPlanner.class);
 
   private Analyzer analyzer_;
@@ -195,11 +174,23 @@ public class IcebergScanPlanner {
     snapshotId_ = IcebergUtil.getSnapshotId(getIceTable(), tblRef_.getTimeTravelSpec());
   }
 
+  private ScanMetricsResult getScanMetrics() {
+    ScanReport report = metricsReporter_.scanReport();
+    ScanMetricsResult metricsResult;
+    if (report == null) {
+      metricsResult = null;
+    } else {
+      metricsResult = report.scanMetrics();
+    }
+    return metricsResult;
+  }
+
   public PlanNode createIcebergScanPlan() throws ImpalaException {
     PlanNode res = createPlanNodeHelper();
     Preconditions.checkNotNull(res);
 
-    ScanMetricsResult metricsResult = metricsReporter_.scanMetricsResult();
+    ScanMetricsResult metricsResult = getScanMetrics();
+
     Preconditions.checkState(
         !needIcebergForPlanning() || snapshotId_ == -1 || metricsResult != null);
 
