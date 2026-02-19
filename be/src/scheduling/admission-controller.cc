@@ -1790,7 +1790,11 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     }
     queue->Enqueue(queue_node);
     // Clear the decompressed cache to save the memory after enqueue.
-    queue_node->admission_request.request.ClearDecompressedCache();
+    if (queue_node->admission_request.request.ClearDecompressedCache()) {
+      // If the request is compressed and cache being cleared, also clear
+      // the group states to avoid dangling references.
+      queue_node->group_states.clear();
+    }
 
     // Must be done while we still hold 'admission_ctrl_lock_' as the dequeue loop thread
     // can modify 'not_admitted_reason'.
@@ -2339,7 +2343,8 @@ Status AdmissionController::ComputeGroupScheduleStates(
 
   DCHECK_GT(current_membership_version, 0);
   DCHECK_GE(current_membership_version, previous_membership_version);
-  if (current_membership_version <= previous_membership_version) {
+  if (current_membership_version <= previous_membership_version
+      && !queue_node->group_states.empty()) {
     VLOG(3) << "No rescheduling necessary, previous membership version: "
             << previous_membership_version
             << ", current membership version: " << current_membership_version;

@@ -69,7 +69,9 @@ class AdmissionExecRequest {
   virtual const TQueryExecRequest* request() const = 0;
 
   /// For compressed only, clears the cached decompressed object to save memory.
-  virtual void ClearDecompressedCache() const = 0;
+  /// Returns true if cache is empty, returns false if no compressed data or non-empty
+  /// after operation.
+  virtual bool ClearDecompressedCache() const = 0;
 };
 
 class AdmissionExecRequestUncompressed : public AdmissionExecRequest {
@@ -88,8 +90,9 @@ class AdmissionExecRequestUncompressed : public AdmissionExecRequest {
     return req_;
   }
 
-  void ClearDecompressedCache() const override {
-    // we don't have a compressed data, so don't need to do anything.
+  bool ClearDecompressedCache() const override {
+    // we don't have a compressed data, so return false.
+    return false;
   }
 
  private:
@@ -114,13 +117,14 @@ class AdmissionExecRequestCompressed : public AdmissionExecRequest {
     return nullptr;
   }
 
-  void ClearDecompressedCache() const override {
+  bool ClearDecompressedCache() const override {
     std::lock_guard<std::mutex> l(lock_);
     if (decompressed_req_) {
       LOG(INFO) << "Cleared the decompressed request for query "
                 << PrintId(decompressed_req_->query_ctx.query_id);
       decompressed_req_.reset();
     }
+    return true;
   }
 
  private:

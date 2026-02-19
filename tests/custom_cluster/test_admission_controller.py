@@ -206,6 +206,16 @@ class TestAdmissionControllerBase(CustomClusterTestSuite):
     if IMPALAD_ARGS in method.__dict__:
       method.__dict__[ADMISSIOND_ARGS] = method.__dict__[IMPALAD_ARGS]
 
+  def enable_admission_compress(self, method, threshold):
+    """Inject argument to enable admission request compression.
+    Only works when admission service is enabled.
+    Must be called at setup_method() and before calling setup_method() of superclass."""
+    flag = '--admission_control_rpc_compress_threshold_bytes={0}'.format(threshold)
+    if IMPALAD_ARGS in method.__dict__:
+      method.__dict__[IMPALAD_ARGS] = method.__dict__[IMPALAD_ARGS] + ' ' + flag
+    else:
+      method.__dict__[IMPALAD_ARGS] = flag
+
 
 class TestAdmissionControllerRawHS2(TestAdmissionControllerBase, HS2TestSuite):
 
@@ -2097,12 +2107,6 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
   """Runs all of the tests from TestAdmissionController but with the second impalad in the
   minicluster configured to perform all admission control."""
 
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestAdmissionControllerWithACService, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('admission_control_rpc_compress_threshold_bytes', 0, 1))
-
   def get_ac_process(self):
     return self.cluster.admissiond
 
@@ -2540,6 +2544,24 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     # cleaned up and the second query should be admitted.
     impalad1.kill()
     client2.wait_for_impala_state(handle2, RUNNING, timeout_s)
+
+
+class TestAdmissionControllerWithACServiceCompress(TestAdmissionController):
+  """Runs all of the tests from TestAdmissionController but with the second impalad in the
+  minicluster configured to perform all admission control with compression."""
+
+  def get_ac_process(self):
+    return self.cluster.admissiond
+
+  def get_ac_log_name(self):
+    return "admissiond"
+
+  def setup_method(self, method):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    self.enable_admission_service(method)
+    self.enable_admission_compress(method, 1)
+    super(TestAdmissionControllerWithACServiceCompress, self).setup_method(method)
 
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
@@ -3225,3 +3247,21 @@ class TestAdmissionControllerStressWithACService(TestAdmissionControllerStress):
       pytest.skip('runs only in exhaustive')
     self.enable_admission_service(method)
     super(TestAdmissionControllerStressWithACService, self).setup_method(method)
+
+
+class TestAdmissionControllerStressWithACServiceCompress(TestAdmissionControllerStress):
+  """Runs all of the tests from TestAdmissionControllerStress but with the second impalad
+  in the minicluster configured to perform all admission control with compression."""
+
+  def get_ac_processes(self):
+    return [self.cluster.admissiond]
+
+  def get_ac_log_name(self):
+    return "admissiond"
+
+  def setup_method(self, method):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    self.enable_admission_service(method)
+    self.enable_admission_compress(method, 1)
+    super(TestAdmissionControllerStressWithACServiceCompress, self).setup_method(method)
