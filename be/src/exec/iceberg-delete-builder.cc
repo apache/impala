@@ -19,14 +19,16 @@
 
 #include <filesystem>
 
+#include "exec/blob-reader.h"
 #include "exec/exec-node.h"
 #include "exec/join-op.h"
+#include "runtime/exec-env.h"
 #include "runtime/fragment-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
 #include "util/debug-util.h"
-#include "util/pretty-printer.h"
+#include "util/flat_buffer.h"
 #include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/PlanNodes_types.h"

@@ -175,6 +175,11 @@ public:
     roaring64_bitmap_add_many(rbitmap_, elements.size(), elements.data());
   }
 
+
+  void Or(const RoaringBitmap64& other) {
+    roaring64_bitmap_or_inplace(rbitmap_, other.rbitmap_);
+  }
+
   bool ContainsBulk(uint64_t x, BulkContext* context) const {
     return roaring64_bitmap_contains_bulk(rbitmap_, &context->context_, x);
   }
@@ -182,6 +187,7 @@ public:
   bool IsEmpty() const { return roaring64_bitmap_is_empty(rbitmap_); }
   uint64_t Min() const { return roaring64_bitmap_minimum(rbitmap_); }
   uint64_t Max() const { return roaring64_bitmap_maximum(rbitmap_); }
+  uint64_t Cardinality() const { return roaring64_bitmap_get_cardinality(rbitmap_); }
 
   /// Returns serialized size in bytes.
   uint64_t BitmapSizeInBytes() const {

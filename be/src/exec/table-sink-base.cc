@@ -20,8 +20,10 @@
 #include "exec/hdfs-text-table-writer.h"
 #include "exec/output-partition.h"
 #include "exec/parquet/hdfs-parquet-table-writer.h"
+#include "exec/puffin/puffin-writer.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "gen-cpp/CatalogObjects_types.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
@@ -247,6 +249,11 @@ Status TableSinkBase::InitOutputPartition(RuntimeState* state,
     case THdfsFileFormat::PARQUET:
       output_partition->writer.reset(
           new HdfsParquetTableWriter(
+              this, state, output_partition, &partition_descriptor, table_desc_));
+      break;
+    case THdfsFileFormat::PUFFIN:
+      output_partition->writer.reset(
+          new PuffinWriter(
               this, state, output_partition, &partition_descriptor, table_desc_));
       break;
     default:

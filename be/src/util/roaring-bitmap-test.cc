@@ -424,4 +424,46 @@ TEST(RoaringBitmap64Test, SerializeDeserialize) {
       400000000000, 500000000000, std::numeric_limits<uint64_t>::max()});
 }
 
+TEST(RoaringBitmap64Test, OrBasic) {
+  // Test basic Or operation
+  RoaringBitmap64 rbm1;
+  rbm1.AddElements({1, 2, 3, 5, 10});
+
+  RoaringBitmap64 rbm2;
+  rbm2.AddElements({3, 4, 5, 6, 20});
+
+  rbm1.Or(rbm2);
+
+  // Expected result: union of both sets {1, 2, 3, 4, 5, 6, 10, 20}
+  vector<uint64_t> expected = {1, 2, 3, 4, 5, 6, 10, 20};
+  vector<uint64_t> actual = ExtractValues(rbm1);
+  ASSERT_EQ(expected, actual);
+  ASSERT_EQ(rbm1.Cardinality(), 8);
+}
+
+TEST(RoaringBitmap64Test, OrWithEmpty) {
+  // Test Or with empty bitmap
+  RoaringBitmap64 rbm1;
+  rbm1.AddElements({1, 2, 3});
+
+  RoaringBitmap64 rbm2;  // Empty bitmap
+
+  rbm1.Or(rbm2);
+
+  // Should remain unchanged
+  vector<uint64_t> expected = {1, 2, 3};
+  vector<uint64_t> actual = ExtractValues(rbm1);
+  ASSERT_EQ(expected, actual);
+
+  // Test Or empty with non-empty
+  RoaringBitmap64 rbm3;
+  RoaringBitmap64 rbm4;
+  rbm4.AddElements({5, 6, 7});
+
+  rbm3.Or(rbm4);
+  expected = {5, 6, 7};
+  actual = ExtractValues(rbm3);
+  ASSERT_EQ(expected, actual);
+}
+
 } // namespace impala

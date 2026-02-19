@@ -17,7 +17,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
+#include <map>
+#include <vector>
 
 #include <hdfs.h>
 #include <boost/scoped_ptr.hpp>
@@ -26,8 +29,24 @@
 #include "common/object-pool.h"
 
 #include "exec/hdfs-table-writer.h"
+#include "gen-cpp/CatalogObjects_types.h"
+#include "gen-cpp/Types_types.h"
 
 namespace impala {
+
+/// Stores metadata about deletion vectors written to a Puffin file.
+/// Tracks both old deletion vectors (that were merged and should be
+/// removed from metadata) and new deletion vectors (that were written
+/// and should be added to metadata).
+struct PuffinWriteResult {
+  /// Deletion vectors from old data files that were merged into new files.
+  /// Map from data file path to deletion vector metadata.
+  std::map<std::string, TIcebergDeletionVector> old_deletion_vectors;
+
+  /// Newly written deletion vectors that should be added to Iceberg metadata.
+  /// Map from data file path to deletion vector metadata.
+  std::map<std::string, TIcebergDeletionVector> new_deletion_vectors;
+};
 
 /// Records the temporary and final Hdfs file name, the opened temporary Hdfs file, and
 /// the number of appended rows of an output partition.
@@ -100,6 +119,13 @@ struct OutputPartition {
 
   /// The block size decided on for this file.
   int64_t block_size = 0;
+
+  /// Puffin write result containing metadata about blobs written (used for Puffin files)
+  PuffinWriteResult puffin_result;
+
+  /// Map from data file path hash to deletion vector metadata.
+  /// Used to track existing deletion vectors that need to be loaded and merged.
+  std::map<THash128, TIcebergDeletionVector> referenced_deletion_vectors;
 };
 
 }

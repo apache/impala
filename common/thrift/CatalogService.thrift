@@ -240,6 +240,14 @@ struct TIcebergOperationParam {
   // Iceberg delete files to append to the table, encoded in FlatBuffers.
   6: optional list<binary> iceberg_delete_files_fb;
 
+  // Deletion vectors to add to the table metadata,
+  // encoded as FlatBuffers FbIcebergDeletionVector.
+  9: optional list<binary> iceberg_added_deletion_vectors_fb;
+
+  // Deletion vectors to remove from the table metadata,
+  // encoded as FlatBuffers FbIcebergDeletionVector.
+  10: optional list<binary> iceberg_removed_deletion_vectors_fb;
+
   // Is overwrite operation
   3: required bool is_overwrite = false;
 

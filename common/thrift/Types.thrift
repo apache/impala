@@ -299,3 +299,13 @@ enum TSortingOrder {
   LEXICAL = 0
   ZORDER = 1
 }
+
+struct TIcebergDeletionVector {
+  1: required string path;
+  2: required i64 content_offset;
+  3: required i64 content_size_in_bytes;
+  // Number of rows deleted by the deletion vector. This is different from
+  // the number of deleted rows in the whole delete file as it can contain
+  // multiple deletion vectors.
+  4: optional i64 record_count;
+}

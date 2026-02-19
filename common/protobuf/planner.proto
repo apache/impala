@@ -82,4 +82,5 @@ message ScanRangePB {
   optional bytes kudu_scan_token = 3;
   optional bytes file_metadata = 4;
   optional bool is_system_scan = 5;
+  optional bytes iceberg_deletion_vector = 6;
 }

@@ -324,6 +324,9 @@ Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* stat
             case FbIcebergDataFileFormat::FbIcebergDataFileFormat_AVRO:
               file_desc->file_format = THdfsFileFormat::AVRO;
               break;
+            case FbIcebergDataFileFormat::FbIcebergDataFileFormat_PUFFIN:
+              file_desc->file_format = THdfsFileFormat::PUFFIN;
+              break;
             default:
               return Status(Substitute(
                   "Unknown Iceberg file format type: $0",

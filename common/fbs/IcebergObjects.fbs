@@ -20,7 +20,8 @@ namespace org.apache.impala.fb;
 enum FbIcebergDataFileFormat: byte {
   PARQUET,
   ORC,
-  AVRO
+  AVRO,
+  PUFFIN
 }
 
 enum FbIcebergTransformType : byte {
@@ -74,5 +75,18 @@ table FbIcebergDataFile {
   partition_path: string;
   raw_partition_fields: [FbIcebergPartitionField];
   per_column_stats: [FbIcebergColumnStats];
+  // DV to remove from metadata.
+  old_deletion_vector: FbIcebergDeletionVector;
+  // DV to add to metadata.
+  new_deletion_vector: FbIcebergDeletionVector;
+}
+
+table FbIcebergDeletionVector {
+  path: string;
+  content_offset: long;
+  content_size_in_bytes: long;
+  referenced_data_file_hash_high: long;
+  referenced_data_file_hash_low: long;
+  record_count: long;
 }
 

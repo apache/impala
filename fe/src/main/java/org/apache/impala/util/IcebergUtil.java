@@ -741,8 +741,10 @@ public class IcebergUtil {
   public static Hash128 getFilePathHash(String path) {
     net.openhft.hashing.LongTupleHashFunction hasher =
         net.openhft.hashing.LongTupleHashFunction.xx128();
-    long[] result = hasher.hashChars(path);
-    return new Hash128(result[0], result[1]);
+    ByteBuffer pathBuf = ByteBuffer.wrap(path.getBytes(StandardCharsets.UTF_8));
+    long[] result = hasher.hashBytes(pathBuf);
+    return new Hash128(result[1], result[0]);
+
   }
 
   /**

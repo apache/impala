@@ -88,7 +88,9 @@ public enum HdfsFileFormat {
       "org.apache.hadoop.hive.jdbc.JdbcSerDe", false, false, true),
   PAIMON("org.apache.paimon.hive.mapred.PaimonInputFormat",
       "org.apache.paimon.hive.mapred.PaimonOutputFormat",
-      "org.apache.paimon.hive.PaimonSerDe", true, false, true);
+      "org.apache.paimon.hive.PaimonSerDe", true, false, true),
+  PUFFIN("Puffin", "Puffin", "Puffin",
+      false, false, false);
 
   private final String inputFormat_;
   private final String outputFormat_;
@@ -201,6 +203,7 @@ public enum HdfsFileFormat {
       case JSON: return HdfsFileFormat.JSON;
       case JDBC: return HdfsFileFormat.JDBC;
       case PAIMON: return HdfsFileFormat.PAIMON;
+      case PUFFIN: return HdfsFileFormat.PUFFIN;
       default:
         throw new RuntimeException("Unknown THdfsFileFormat: "
             + thriftFormat + " - should never happen!");
@@ -221,6 +224,7 @@ public enum HdfsFileFormat {
       case JSON: return THdfsFileFormat.JSON;
       case JDBC: return THdfsFileFormat.JDBC;
       case PAIMON: return THdfsFileFormat.PAIMON;
+      case PUFFIN: return THdfsFileFormat.PUFFIN;
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");

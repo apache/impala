@@ -26,6 +26,7 @@ include "Descriptors.thrift"
 include "Partitions.thrift"
 include "PlanNodes.thrift"
 include "ResourceProfile.thrift"
+include "CatalogObjects.thrift"
 
 enum TDataSinkType {
   DATA_STREAM_SINK = 0
@@ -120,6 +121,7 @@ struct TIcebergDeleteSink {
   // Partition expressions of this sink. In case of Iceberg DELETEs these are the
   // partition spec id and the serialized partition data.
   1: required list<Exprs.TExpr> partition_key_exprs
+  2: optional map<CatalogObjects.THash128, Types.TIcebergDeletionVector> deletion_vectors;
 }
 
 // Structure to encapsulate specific options that are passed down to the KuduTableSink

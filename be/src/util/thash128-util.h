@@ -17,7 +17,11 @@
 
 #pragma once
 
+#include <string>
 #include "gen-cpp/CatalogObjects_types.h"
+#define XXH_INLINE_ALL
+#include "thirdparty/xxhash/xxhash.h"
+#undef XXH_INLINE_ALL
 
 namespace impala {
 
@@ -33,6 +37,22 @@ inline bool operator!=(const THash128& lhs, const THash128& rhs) {
 /// Required for using THash128 as std::map key
 inline bool operator<(const THash128& lhs, const THash128& rhs) {
   return std::tie(lhs.high, lhs.low) < std::tie(rhs.high, rhs.low);
+}
+
+/// Equality for THash128
+struct THash128Equal {
+  bool operator()(const THash128& lhs, const THash128& rhs) const {
+    return lhs.high == rhs.high && lhs.low == rhs.low;
+  }
+};
+
+/// Compute a THash128 from a file path string using XXH3_128bits.
+inline THash128 THash128FromFilePath(const std::string& path) {
+  XXH128_hash_t h = XXH3_128bits(path.c_str(), path.size());
+  THash128 result;
+  result.__set_high(h.high64);
+  result.__set_low(h.low64);
+  return result;
 }
 
 } // namespace impala
