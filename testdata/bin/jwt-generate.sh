@@ -44,6 +44,6 @@ export VIRTUAL_ENV_DISABLE_PROMPT
 source "${VENV_DIR}/bin/activate"
 
 # install necessary dependencies for the jwt generation python script
-python -m pip install -r "$(dirname "${0}")/jwt_requirements.txt"
+python3 -m pip install -r "$(dirname "${0}")/jwt_requirements.txt"
 
-python "$(dirname "${0}")/jwt-util.py" "${DATA_DIR}"
+python3 "$(dirname "${0}")/jwt-util.py" "${DATA_DIR}"

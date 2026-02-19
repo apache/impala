@@ -234,11 +234,11 @@ SET_SOURCE_FILES_PROPERTIES(beeswax.thrift PROPERTIES OBJECT_DEPENDS
     ${THIRDPARTY_THRIFT_DIR}/hive_metastore.thrift)
 
 add_custom_command(OUTPUT ErrorCodes.thrift
-  COMMAND python generate_error_codes.py
+  COMMAND python3 generate_error_codes.py
   DEPENDS generate_error_codes.py)
 
 add_custom_command(OUTPUT MetricDefs.thrift
-  COMMAND python generate_metrics.py
+  COMMAND python3 generate_metrics.py
   DEPENDS generate_metrics.py metrics.json)
 
 # The thrift-generated java classes defined in TCLIService are also pulled into our build

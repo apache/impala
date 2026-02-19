@@ -14,7 +14,7 @@
 # limitations under the License.
 
 #------------------------- DB CONFIG - BEGIN ----------------------------------
-PYTHON_COMMAND_INVOKER=python
+PYTHON_COMMAND_INVOKER=python3
 
 DB_FLAVOR=POSTGRES
 SQL_CONNECTOR_JAR=${POSTGRES_JDBC_DRIVER}

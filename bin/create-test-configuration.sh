@@ -223,7 +223,7 @@ if [ $CREATE_RANGER_POLICY_DB -eq 1 ]; then
   createdb -U hiveuser "${RANGER_POLICY_DB}"
   pushd "${RANGER_HOME}"
   generate_config "${RANGER_TEST_CONF_DIR}/install.properties.template" install.properties
-  python ./db_setup.py
+  python3 ./db_setup.py
   popd
 fi
 

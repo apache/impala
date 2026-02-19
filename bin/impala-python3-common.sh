@@ -24,7 +24,7 @@ setup_report_build_error
 
 . $IMPALA_HOME/bin/set-pythonpath.sh
 
-export LD_LIBRARY_PATH="$(python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
+export LD_LIBRARY_PATH="$(python3 "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
   --print-ld-library-path)"
 
 PY_DIR="$(dirname "$0")/../infra/python"

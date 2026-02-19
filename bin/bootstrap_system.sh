@@ -252,27 +252,6 @@ ubuntu apt-get --yes install ccache curl file gawk g++ gcc apt-utils git libffi-
         libxslt-dev openjdk-${UBUNTU_JAVA_VERSION}-jdk \
         openjdk-${UBUNTU_JAVA_VERSION}-source openjdk-${UBUNTU_JAVA_VERSION}-dbg
 
-# Regular python packages don't exist on Ubuntu 22. Everything is Python 3.
-ubuntu16 apt-get --yes install python python-dev python-setuptools
-ubuntu18 apt-get --yes install python python-dev python-setuptools
-ubuntu20 apt-get --yes install python python-dev python-setuptools
-
-# Ubuntu 20's Python 2.7.18-1~20.04.5 version has a bug in its tarfile support.
-# If we detect the affected tarfile.py, download a patched version and overwrite it.
-if [[ $UBUNTU20 == true ]]; then
-  if [[ -f /usr/lib/python2.7/tarfile.py ]]; then
-    TARFILE_PY_HASH=$(sha1sum /usr/lib/python2.7/tarfile.py | cut -d' ' -f1)
-    if [[ "${TARFILE_PY_HASH}" == "6e1a6d9ea2a535cbb17fe266ed9ac76eb5e27b89" ]]; then
-      TMP_DIR=$(mktemp -d)
-      pushd $TMP_DIR
-      wget -nv https://launchpadlibrarian.net/759546541/tarfile.py
-      sudo cp tarfile.py /usr/lib/python2.7/tarfile.py
-      popd
-      rm -rf $TMP_DIR
-    fi
-  fi
-fi
-
 # Required by Kudu in the minicluster. Older Kudu versions depend on libtinfo5,
 # versions that can be compiled for Ubuntu 24.04 depend on libtinfo6.
 ubuntu20 apt-get --yes install libtinfo5 libtinfo6
@@ -318,70 +297,6 @@ redhat8 sudo yum install -y fuse-devel curl
 # Redhat9 can have curl-minimal preinstalled, which can conflict with curl.
 # Adding --allowerasing allows curl to replace curl-minimal.
 redhat9 sudo yum install -y --allowerasing curl
-
-# RedHat / CentOS 8 exposes only specific versions of Python.
-# Set up unversioned default Python 2.x for older CentOS versions
-redhat7 sudo yum install -y python-devel python-setuptools python-argparse
-
-# Install Python 2.x explicitly for CentOS 8
-function setup_python2() {
-  if command -v python && [[ $(python --version 2>&1 | cut -d ' ' -f 2) =~ 2\. ]]; then
-    echo "We have Python 2.x";
-  else
-    if ! command -v python2; then
-      # Python2 needs to be installed
-      sudo dnf install -y python2
-    fi
-    # Here Python2 is installed, but is not the default Python.
-    # 1. Link pip's version to Python's version
-    sudo alternatives --add-slave python /usr/bin/python2 /usr/bin/pip pip /usr/bin/pip2
-    sudo alternatives --add-slave python /usr/libexec/no-python  /usr/bin/pip pip \
-        /usr/libexec/no-python
-    # 2. Set Python2 (with pip2) to be the system default.
-    sudo alternatives --set python /usr/bin/python2
-  fi
-  # Here the Python2 runtime is already installed, add the dev package
-  sudo dnf -y install python2-devel
-}
-
-# IMPALA-14606: Stop building using Python 2 and always run with
-# IMPALA_USE_PYTHON3_TESTS=true.
-# redhat8 setup_python2
-# redhat8 pip install --user argparse
-
-# Point Python to Python 3 for Redhat 9 and Ubuntu 22, or newer
-function setup_python3() {
-  # If python is already set, then use it. Otherwise, try to point python to python3.
-  if ! command -v python > /dev/null; then
-    if command -v python3 ; then
-      # Newer OSes (e.g. Redhat 9 and equivalents) make it harder to get Python 2, and we
-      # need to start using Python 3 by default.
-      # For these new OSes (Ubuntu 22+, Redhat 9), there is no alternative entry for
-      # python, so we need to create one from scratch.
-      if command -v alternatives > /dev/null; then
-        if sudo alternatives --list | grep python > /dev/null ; then
-          sudo alternatives --set python /usr/bin/python3
-        else
-          # The alternative doesn't exist, create it
-          sudo alternatives --install /usr/bin/python python /usr/bin/python3 20
-        fi
-      elif command -v update-alternatives > /dev/null; then
-        # This is what Ubuntu 20/22+ does. There is no official python alternative,
-        # so we need to create one.
-        sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 20
-      else
-        echo "ERROR: trying to set python to point to python3"
-        echo "ERROR: alternatives/update-alternatives don't exist, so giving up..."
-        exit 1
-      fi
-    fi
-  fi
-}
-
-redhat8 setup_python3
-redhat9 setup_python3
-ubuntu22 setup_python3
-ubuntu24 setup_python3
 
 # CentOS repos don't contain ccache, so install from EPEL
 redhat sudo yum install -y epel-release

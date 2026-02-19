@@ -57,8 +57,8 @@ pzf.extractall()
 __EOT__
 
 # Extract driver jar file from zip file.
-python ./unzip.py ${SIMBA_DRIVER_ZIP_FILENAME}.zip
-python ./unzip.py ${SIMBA_DRIVER_ZIP_FILENAME}/${INNER_SIMBA_DRIVER_ZIP_FILENAME}.zip
+python3 ./unzip.py ${SIMBA_DRIVER_ZIP_FILENAME}.zip
+python3 ./unzip.py ${SIMBA_DRIVER_ZIP_FILENAME}/${INNER_SIMBA_DRIVER_ZIP_FILENAME}.zip
 
 # Copy driver jar file to Hadoop FS.
 hadoop fs -put -f /tmp/impala_jdbc_driver/${SIMBA_DRIVER_JAR_FILENAME} \

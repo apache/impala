@@ -96,9 +96,9 @@ public class LdapImpalaShellTest {
    */
   protected boolean pythonSupportsSSLContext() throws Exception {
     // Runs the following command:
-    // python -c "import ssl; print hasattr(ssl, 'create_default_context')"
+    // python3 -c "import ssl; print hasattr(ssl, 'create_default_context')"
     String[] cmd = {
-        "python", "-c", "import ssl; print(hasattr(ssl, 'create_default_context'))"};
+        "python3", "-c", "import ssl; print(hasattr(ssl, 'create_default_context'))"};
     return Boolean.parseBoolean(
         RunShellCommand.Run(cmd, true, "", "").stdout.replace("\n", ""));
   }
