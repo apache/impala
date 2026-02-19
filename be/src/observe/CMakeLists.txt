@@ -22,12 +22,12 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/observe")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/observe")
 
 add_library(Observe
+  buffered-span.cc
   otel-flags.cc
   otel-flags-trace.cc
   otel-log-handler.cc
   otel.cc
   span-manager.cc
-  timed-span.cc
 )
 add_dependencies(Observe gen-deps)
 
@@ -37,8 +37,10 @@ endif()
 
 add_library(OtelTests STATIC
   otel-test.cc
+  span-manager-test.cc
 )
 
 add_dependencies(OtelTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(otel-test OtelTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(span-manager-test SpanManagerTest.*)

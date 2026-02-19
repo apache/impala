@@ -19,7 +19,6 @@
 
 #include <memory>
 #include <string>
-#include <string_view>
 
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_options.h>
 #include <opentelemetry/sdk/trace/batch_span_processor_options.h>
@@ -43,10 +42,12 @@ const std::string OTEL_EXPORTER_FILE = "file";
 const std::string SPAN_PROCESSOR_SIMPLE = "simple";
 const std::string SPAN_PROCESSOR_BATCH = "batch";
 
-// Returns true if an OpenTelemetry trace needs to be created for the given SQL query.
-// The sql string_view will be trimmed of leading whitespace and comments.
-bool should_otel_trace_query(std::string_view sql,
-    const TSessionType::type& session_type);
+// Determines if an OpenTelemetry trace needs to be created based on the session type
+// and HS2 metadata operation flag in the client request. If the session type is BEESWAX
+// or if the client request is an HS2 metadata operation, then false is returned.
+// Otherwise, true is returned.
+bool should_otel_trace_query(const TSessionType::type& session_type,
+    const TClientRequest& client_request);
 
 // Initializes the OpenTelemetry tracer with the configuration defined in the coordinator
 // startup flags (see otel-flags.cc and otel-flags-trace.cc for the list). Does not verify

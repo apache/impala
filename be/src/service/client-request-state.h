@@ -548,8 +548,14 @@ class ClientRequestState {
   /// Returns the OpenTelemetry SpanManager for this query.
   std::shared_ptr<SpanManager> otel_span_manager() { return otel_span_manager_; }
 
-  /// Returns true if OpenTelemetry tracing is enabled for this query.
-  inline bool otel_trace_query() const { return otel_span_manager_.get() != nullptr; }
+  /// Returns true if OpenTelemetry tracing is enabled for this query and the trace
+  /// has not yet ended.
+  inline bool otel_trace_query() const {
+    return otel_span_manager_.get() != nullptr && !otel_span_manager_->HasEnded();
+  }
+
+  /// Returns true if request is cancelled. Acquires lock_ to avoid dirty reads.
+  bool is_cancelled();
 
  protected:
   /// Updates the end_time_us_ of this query if it isn't set. The end time is determined
@@ -844,9 +850,6 @@ class ClientRequestState {
   /// Updates last_active_time_ms_ and ref_count_ to reflect that query is currently being
   /// actively processed. Takes expiration_data_lock_.
   void MarkActive();
-
-  /// Returns true if request is cancelled. Acquires lock_ to avoid dirty reads.
-  bool is_cancelled();
 
   /// Sets up profile and pre-execution counters, creates the query schedule, and calls
   /// FinishExecQueryOrDmlRequest() which contains the core logic of executing a QUERY or

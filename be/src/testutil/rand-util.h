@@ -20,7 +20,11 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <random>
+#include <vector>
+
+#include <gtest/gtest.h>
 
 #include "common/logging.h"
 
@@ -52,7 +56,45 @@ class RandTestUtil {
     for (std::mt19937& rng : rngs) rng.seed((*seed_rng)());
     return rngs;
   }
-};
-}
+
+  /// Create a random temporary directory with the given prefix returning the path to the
+  /// newly created directory. If 'rm_on_destruction' is true, the directory will be
+  /// removed when the program exits.
+  static std::filesystem::path CreateRandomTempDir(const std::string_view& prefix,
+      const bool rm_on_destruction = true) {
+    std::random_device rd;
+    std::minstd_rand gen(rd());
+    std::uniform_int_distribution<> distrib(100000, 999999);
+    std::filesystem::path tmpl = std::filesystem::temp_directory_path()
+        /= std::string(prefix) + "-" + std::to_string(distrib(gen));
+
+    EXPECT_TRUE(std::filesystem::create_directory(tmpl))
+        << "Failed to create temp directory: " << tmpl;
+
+    if (rm_on_destruction) {
+      if (temp_dirs_to_rm_.empty()) {
+        // Register the cleanup function to remove temp directories at program exit.
+        std::atexit([]() {
+          for (const auto& dir : temp_dirs_to_rm_) {
+            std::error_code ec;
+            std::filesystem::remove_all(dir, ec);
+            if (ec) {
+              LOG(WARNING) << "Failed to remove temp directory: " << dir
+                           << ", error: " << ec.message();
+            }
+          }
+        });
+      }
+      temp_dirs_to_rm_.emplace_back(tmpl);
+    }
+
+    return tmpl;
+  }
+
+ private:
+   inline static std::vector<std::filesystem::path> temp_dirs_to_rm_;
+}; // class RandTestUtil
+
+} // namespace impala
 
 #endif

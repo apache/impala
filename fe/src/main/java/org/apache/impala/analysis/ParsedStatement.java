@@ -42,6 +42,48 @@ public interface ParsedStatement {
   // true if this is a query (select) statement
   public boolean isQueryStmt();
 
+  // true if this is an alter table ddl statement
+  public boolean isAlterTableStmt();
+
+  // true if this is a compute stats statement
+  public boolean isComputeStatsStmt();
+
+  // true if this is a create database ddl statement
+  public boolean isCreateDbStmt();
+
+  // true if this is a create table as select ddl statement
+  public boolean isCreateTableAsSelectStmt();
+
+  // true if this is a create table like ddl statement
+  public boolean isCreateTableLikeStmt();
+
+  // true if this is a create table ddl statement
+  public boolean isCreateTableStmt();
+
+  // true if this is a create view ddl statement
+  public boolean isCreateViewStmt();
+
+  // true if this is a delete dml statement
+  public boolean isDeleteStmt();
+
+  // true if this is a drop database ddl statement
+  public boolean isDropDbStmt();
+
+  // true if this is a drop table or view ddl statement
+  public boolean isDropTableOrViewStmt();
+
+  // true if this is an insert dml statement
+  public boolean isInsertStmt();
+
+  // true if this is an invalidate metadata statement
+  public boolean isInvalidateMetadata();
+
+  // true if this is an update dml statement
+  public boolean isUpdateStmt();
+
+  // true if this is a statement where the first keyword is "values"
+  public boolean isValuesStmt();
+
   // returns the sql string (could be rewritten)
   public String toSql();
 

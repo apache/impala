@@ -74,6 +74,80 @@ public class ParsedStatementImpl implements ParsedStatement {
   }
 
   @Override
+  public boolean isAlterTableStmt() {
+    return stmt_ instanceof AlterTableStmt;
+  }
+
+  @Override
+  public boolean isComputeStatsStmt() {
+    return stmt_ instanceof ComputeStatsStmt;
+  }
+
+  @Override
+  public boolean isCreateDbStmt() {
+    return stmt_ instanceof CreateDbStmt;
+  }
+
+  @Override
+  public boolean isCreateTableAsSelectStmt() {
+    return stmt_ instanceof CreateTableAsSelectStmt;
+  }
+
+  @Override
+  public boolean isCreateTableLikeStmt() {
+    return stmt_ instanceof CreateTableLikeStmt;
+  }
+
+  @Override
+  public boolean isCreateTableStmt() {
+    return stmt_ instanceof CreateTableStmt;
+  }
+
+  @Override
+  public boolean isCreateViewStmt() {
+    return stmt_ instanceof CreateViewStmt;
+  }
+
+  @Override
+  public boolean isDeleteStmt() {
+    return stmt_ instanceof DeleteStmt;
+  }
+
+  @Override
+  public boolean isDropDbStmt() {
+    return stmt_ instanceof DropDbStmt;
+  }
+
+  @Override
+  public boolean isDropTableOrViewStmt() {
+    return stmt_ instanceof DropTableOrViewStmt;
+  }
+
+  @Override
+  public boolean isInsertStmt() {
+    return stmt_ instanceof InsertStmt;
+  }
+
+  @Override
+  public boolean isInvalidateMetadata() {
+    return stmt_ instanceof ResetMetadataStmt && stmt_ != null
+        && (((ResetMetadataStmt) stmt_).getAction()
+            == ResetMetadataStmt.Action.INVALIDATE_METADATA_ALL ||
+            ((ResetMetadataStmt) stmt_).getAction()
+                == ResetMetadataStmt.Action.INVALIDATE_METADATA_TABLE);
+  }
+
+  @Override
+  public boolean isUpdateStmt() {
+    return stmt_ instanceof UpdateStmt;
+  }
+
+  @Override
+  public boolean isValuesStmt() {
+    return stmt_ instanceof ValuesStmt;
+  }
+
+  @Override
   public String toSql() {
     return stmt_.toSql();
   }

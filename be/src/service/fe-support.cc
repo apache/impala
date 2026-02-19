@@ -850,6 +850,16 @@ Java_org_apache_impala_service_FeSupport_NativeDeleteThreadDebugInfo(JNIEnv* env
   delete (ThreadDebugInfo*)tdi;
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_org_apache_impala_service_FeSupport_NativeUpdateQueryOtelTracing(JNIEnv* env,
+    jclass fe_support_class, jbyteArray thrift_query_id, jboolean do_trace) {
+  TUniqueId query_id;
+  THROW_IF_ERROR(DeserializeThriftMsg(env, thrift_query_id, &query_id), env,
+      JniUtil::internal_exc_class());
+  ExecEnv::GetInstance()->impala_server()->DoTraceQuery(query_id, do_trace);
+}
+
+
 namespace impala {
 
 static JNINativeMethod native_methods[] = {
@@ -960,6 +970,10 @@ static JNINativeMethod native_methods[] = {
   {
     const_cast<char*>("NativeDeleteThreadDebugInfo"), const_cast<char*>("(J)V"),
     (void*)::Java_org_apache_impala_service_FeSupport_NativeDeleteThreadDebugInfo
+  },
+  {
+    const_cast<char*>("NativeUpdateQueryOtelTracing"), const_cast<char*>("([BZ)V"),
+    (void*)::Java_org_apache_impala_service_FeSupport_NativeUpdateQueryOtelTracing
   },
 };
 

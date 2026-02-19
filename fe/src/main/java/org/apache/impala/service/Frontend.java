@@ -262,6 +262,7 @@ import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.KuduTransaction;
 import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -336,6 +337,12 @@ public class Frontend {
     // incomplete structures (e.g. THdfsTable without nullPartitionKeyValue) that cannot
     // be serialized.
     protected boolean serializeDescTbl_ = true;
+    // Flag to indicate if the backend has been notified whether or not to create an
+    // OpenTelemetry trace for this query. This variable has three valid states:
+    // null (not yet notified)
+    // true (notified to create a trace),
+    // false (notified to not create a trace).
+    protected Boolean queryTraced_ = null;
 
     // The physical plan, divided by fragment, before conversion to
     // Thrift. For unit testing.
@@ -2992,8 +2999,10 @@ public class Frontend {
       throws ImpalaException {
     TQueryCtx queryCtx = planCtx.getQueryContext();
 
-    // Parse stmt and collect/load metadata to populate a stmt-local table cache
-    ParsedStatement parsedStmt = compilerFactory.createParsedStatement(queryCtx);
+    // Determine if an OpenTelemetry trace should be created for this query, and if so,
+    // create the trace.
+    ParsedStatement parsedStmt =
+        parseAndDoOtelTracing(compilerFactory, queryCtx, planCtx);
 
     User user = new User(TSessionStateUtil.getEffectiveUser(queryCtx.session));
     StmtMetadataLoader metadataLoader = new StmtMetadataLoader(
@@ -3278,6 +3287,106 @@ public class Frontend {
         }
       }
       throw e;
+    }
+  }
+
+  /**
+   * Parses the query text and determines if an OpenTelemetry trace should be created for
+   * the query. If a trace should be created, this function notifies the backend to
+   * start the trace.
+   *
+   * @param compilerFactory {@link CompilerFactory} to use for parsing the statement
+   * @param queryCtx        {@link TQueryCtx} of the statement to check
+   * @param planCtx         {@link PlanCtx} of the statement to check
+   *
+   * @return the {@link ParsedStatement} returned from the sql parser
+   * @throws {@link ImpalaException} if {@link CompilerFactory#createParsedStatement}
+   *                                 throws an exception.
+   */
+  private ParsedStatement parseAndDoOtelTracing(final CompilerFactory compilerFactory,
+      final TQueryCtx queryCtx, final PlanCtx planCtx) throws ImpalaException {
+    ParsedStatement parsedStmt;
+
+    // Parse stmt and collect/load metadata to populate a stmt-local table cache
+    try {
+      parsedStmt = compilerFactory.createParsedStatement(queryCtx);
+    } catch (ImpalaException e) {
+      if (planCtx.queryTraced_ == null && BackendConfig.INSTANCE.isOtelTraceEnabled()) {
+        planCtx.queryTraced_ = Boolean.FALSE;
+        updateQueryOtelTracingInBE(queryCtx.getQuery_id(), false);
+      }
+      throw e;
+    }
+
+    // Determine whether to enable OpenTelemetry tracing for the query.
+    if (planCtx.queryTraced_ == null) {
+      if (!BackendConfig.INSTANCE.isOtelTraceEnabled()) {
+        planCtx.queryTraced_ = Boolean.FALSE;
+      } else {
+        updateQueryOtelTracing(queryCtx.getQuery_id(), planCtx, parsedStmt);
+      }
+    }
+
+    return parsedStmt;
+  }
+
+  /**
+   * Determines if a statement should have an OpenTelemetry trace created for it and
+   * notifies the backend of the decision. Sets <code>planCtx.queryTraced_</code> with the
+   * result of the decision if it has not already been set.
+   *
+   * No-op if <code>planCtx.queryTraced_</code> is already set which means the first call
+   * of this function wins (if it is called multiple times).
+   *
+   * @param queryId    {@link TUniqueId} of the statement to check
+   * @param planCtx    {@link PlanCtx} of the statement to check
+   * @param parsedStmt {@link ParsedStatement} of the statement to check, returned from
+   *                    the sql parser
+   * @throws AnalysisException see {@link Frontend#updateQueryOtelTracingInBE}
+   */
+  private void updateQueryOtelTracing(final TUniqueId queryId, final PlanCtx planCtx,
+      final ParsedStatement parsedStmt) throws AnalysisException {
+    if (planCtx.queryTraced_ == null) {
+      planCtx.queryTraced_ = Boolean.valueOf(
+          !parsedStmt.isExplain()
+          && !parsedStmt.isValuesStmt()
+          && (
+              parsedStmt.isQueryStmt()
+              || parsedStmt.isAlterTableStmt()
+              || parsedStmt.isComputeStatsStmt()
+              || parsedStmt.isCreateDbStmt()
+              || parsedStmt.isCreateTableAsSelectStmt()
+              || parsedStmt.isCreateTableLikeStmt()
+              || parsedStmt.isCreateTableStmt()
+              || parsedStmt.isCreateViewStmt()
+              || parsedStmt.isDeleteStmt()
+              || parsedStmt.isDropDbStmt()
+              || parsedStmt.isDropTableOrViewStmt()
+              || parsedStmt.isInsertStmt()
+              || parsedStmt.isInvalidateMetadata()
+              || parsedStmt.isUpdateStmt()));
+
+      updateQueryOtelTracingInBE(queryId, planCtx.queryTraced_.booleanValue());
+    }
+  }
+
+  /**
+   * Wrapper around the native call to the backend to notify it of whether OpenTelemetry
+   * tracing should be enabled for a query.
+   *
+   * @param queryId {@link TUniqueId} of the statement to check
+   * @param shouldTrace {@code boolean} indicating if the query should be traced
+   * @throws AnalysisException if there is an error while serializing the
+   *                           <code>queryId</code>
+   */
+  private void updateQueryOtelTracingInBE(final TUniqueId queryId,
+      boolean shouldTrace) throws AnalysisException {
+    try {
+      FeSupport.NativeUpdateQueryOtelTracing(new TSerializer().serialize(queryId),
+          shouldTrace);
+    } catch (TException e) {
+      throw new AnalysisException("Failed to serialize query id '" +  PrintId(queryId)
+          + "' for OpenTelemetry tracing.", e);
     }
   }
 

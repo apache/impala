@@ -636,4 +636,8 @@ public class BackendConfig {
   public void setDisableHmsSyncByDefault(boolean disableHmsSyncByDefault) {
     backendCfg_.disable_hms_sync_by_default = disableHmsSyncByDefault;
   }
+
+  public boolean isOtelTraceEnabled() {
+    return backendCfg_.otel_trace_enabled;
+  }
 }

@@ -25,19 +25,18 @@
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include "gutil/strings/substitute.h"
+#include <gutil/strings/substitute.h>
 #include <opentelemetry/nostd/shared_ptr.h>
-#include <opentelemetry/trace/span_metadata.h>
 #include <opentelemetry/trace/scope.h>
 #include <opentelemetry/trace/tracer.h>
 
 #include "common/compiler-util.h"
+#include "common/status.h"
 #include "gen-cpp/Types_types.h"
-#include "observe/timed-span.h"
+#include "observe/buffered-span.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "scheduling/admission-control-client.h"
-#include "scheduling/admission-controller.h"
 #include "service/client-request-state.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
@@ -91,39 +90,32 @@ static constexpr char const* ATTR_NUM_DELETED_ROWS = "NumDeletedRows";
 static constexpr char const* ATTR_NUM_MODIFIED_ROWS = "NumModifiedRows";
 static constexpr char const* ATTR_NUM_ROWS_FETCHED = "NumRowsFetched";
 
-// Names of the child spans.
-static constexpr char const* CHILD_SPAN_NAMES[] = {
-    "None", "Init", "Submitted", "Planning", "AdmissionControl", "QueryExecution",
-    "Close"};
-
+// Checks the expected child span type is active and that no other child span is active.
+#ifndef NDEBUG
 #define DCHECK_CHILD_SPAN_TYPE(expected_type) \
-  DCHECK(child_span_type_ == expected_type) << "Expected child span type '" \
-      << expected_type << "' but received '" << child_span_type_ << "' instead."
+  DCHECK(child_spans_.at(expected_type).span) << "Expected child span type '" \
+      << to_string(expected_type) << "' was not active."; \
+  for (const auto& a : child_spans_) { \
+    if (a.first != expected_type) { \
+      DCHECK(!a.second.span || a.second.span->HasEnded()) << "Expected child span " \
+          "type '" << to_string(a.first) << "' to not be active."; \
+    } \
+  }
 // macro DCHECK_CHILD_SPAN_TYPE
+#endif
 
 namespace impala {
 
-// Helper function to convert ChildSpanType enum values to strings.
-static inline string to_string(const ChildSpanType& val) {
-  return CHILD_SPAN_NAMES[static_cast<int>(val)];
-} // function to_string
-
-// Helper functions to stream the string representation of ChildSpanType enum values.
-static inline ostream& operator<<(ostream& out, const ChildSpanType& val) {
-  out << to_string(val);
-  return out;
-} // operator<<
-
 // Helper function to log the start and end of a span with debug information. Callers
 // must hold the child_span_mu_ lock when calling this function.
-static inline void debug_log_span(const TimedSpan* span, const string& span_name,
+static void debug_log_span(const BufferedSpan* span, const string& span_name,
     const string& query_id, bool started) {
   DCHECK(span != nullptr) << "Cannot log null span.";
 
   if (LIKELY(span != nullptr)) {
     VLOG(2) << strings::Substitute("$0 '$1' span trace_id=\"$2\" span_id=\"$3\" "
-        "query_id=\"$4\"", (started ? "Started" : "Ended"), span_name, span->TraceId(),
-        span->SpanId(), query_id);
+        "query_id=\"$4\"", (started ? "Started" : "Submitted"), span_name,
+        span->TraceId(), span->SpanId(), query_id);
   } else {
     LOG(WARNING) << "Attempted to log span '" << span_name << "' but provided span is "
         "null.";
@@ -134,88 +126,180 @@ SpanManager::SpanManager(nostd::shared_ptr<trace::Tracer> tracer,
     ClientRequestState* client_request_state) : tracer_(std::move(tracer)),
     client_request_state_(client_request_state),
     query_id_(PrintId(client_request_state_->query_id())) {
-  child_span_type_ = ChildSpanType::NONE;
-
+  VLOG(2) << "Creating SpanManager for query_id='" << query_id_ << "'";
   DCHECK(client_request_state_ != nullptr) << "Cannot start root span without a valid "
       "client request state.";
 
+  // Initialize placeholders for the child spans.
+  child_spans_.emplace(ChildSpanType::INIT,
+      ChildSpanEntry(&SpanManager::DoEndChildSpanInit));
+  child_spans_.emplace(ChildSpanType::SUBMITTED,
+      ChildSpanEntry(&SpanManager::DoEndChildSpanSubmitted));
+  child_spans_.emplace(ChildSpanType::PLANNING,
+      ChildSpanEntry(&SpanManager::DoEndChildSpanPlanning));
+  child_spans_.emplace(ChildSpanType::ADMISSION_CONTROL,
+      ChildSpanEntry(&SpanManager::DoEndChildSpanAdmissionControl));
+  child_spans_.emplace(ChildSpanType::QUERY_EXEC,
+      ChildSpanEntry(&SpanManager::DoEndChildSpanQueryExecution));
+  child_spans_.emplace(ChildSpanType::CLOSE,
+      ChildSpanEntry(&SpanManager::DoEndChildSpanClose));
   {
     lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
 
-    root_ = make_shared<TimedSpan>(tracer_, query_id_, ATTR_QUERY_START_TIME,
+    span_root_ = make_unique<BufferedSpan>(tracer_, query_id_, ATTR_QUERY_START_TIME,
         ATTR_RUNTIME,
-        OtelAttributesMap{
+        BufferedSpan::BufferedAttributesMap{
           {ATTR_CLUSTER_ID, FLAGS_cluster_id},
           {ATTR_QUERY_ID, query_id_},
           {ATTR_REQUEST_POOL, client_request_state_->request_pool()},
           {ATTR_SESSION_ID, PrintId(client_request_state_->session_id())},
-          {ATTR_USER_NAME, client_request_state_->effective_user()}
-        },
+          {ATTR_USER_NAME, client_request_state_->effective_user()},
+          {ATTR_COORDINATOR, TNetworkAddressToString(
+              ExecEnv::GetInstance()->configured_backend_address())}},
+        context::Context().SetValue(trace::kIsRootSpanKey, true),
         trace::SpanKind::kServer);
   }
-
-  scope_ = make_unique<trace::Scope>(root_->SetActive());
-  debug_log_span(root_.get(), "Root", query_id_, true);
 } // ctor
 
 SpanManager::~SpanManager() {
   lock_guard<mutex> l(child_span_mu_);
 
-  root_->End();
-  debug_log_span(root_.get(), "Root", query_id_, false);
-  LOG(INFO) << strings::Substitute("Closed OpenTelemetry trace with trace_id=\"$0\" "
-      "span_id=\"$1\" query_id=\"$2\"", root_->TraceId(), root_->SpanId(), query_id_);
+  VLOG(2) << strings::Substitute("Destroying SpanManager for query_id=\"$0\", " \
+      "do_trace_=$1", query_id_, do_trace_);
 
-  scope_.reset();
-  root_.reset();
+  if (do_trace_) {
+    // Ensure all child spans have been submitted before submitting the root span.
+    for (auto& a : child_spans_) {
+      a.second.span.reset();
+    }
+
+    span_root_->Submit();
+    debug_log_span(span_root_.get(), "Root", query_id_, false);
+    LOG(INFO) << strings::Substitute("Closed OpenTelemetry trace with trace_id=\"$0\" "
+        "span_id=\"$1\" query_id=\"$2\"", span_root_->TraceId(), span_root_->SpanId(),
+        query_id_);
+
+    scope_.reset();
+    span_root_.reset();
+  } else {
+    VLOG(2) << strings::Substitute("Not submitting OpenTelemetry trace for "
+        "query_id='$0' because the trace was cancelled.", query_id_);
+  }
 
   tracer_->Close(chrono::seconds(FLAGS_otel_trace_retry_policy_max_backoff_s *
     FLAGS_otel_trace_retry_policy_max_attempts));
 } // dtor
 
+void SpanManager::TraceQuery(bool do_trace) {
+  lock_guard<mutex> l(child_span_mu_);
+  DoTraceQuery(do_trace);
+} // function TraceQuery
+
+void SpanManager::DoTraceQuery(bool do_trace) {
+  VLOG(2) << strings::Substitute("DoTraceQuery: do_trace=$0, started_=$1", \
+      do_trace, started_);
+
+  // In some cases, query analysis will happen more than once during planning.
+  if (started_) {
+    DCHECK(do_trace == do_trace_) << "TraceQuery was called more than once with "
+        "different do_trace values.";
+    return;
+  }
+
+  do_trace_ = do_trace;
+
+  if (do_trace_) {
+    DCHECK(child_spans_.at(ChildSpanType::INIT).span) << "Expected "
+        << to_string(ChildSpanType::INIT) << " child span to be active if query is to be "
+        "traced.";
+
+    span_root_->Start();
+    debug_log_span(span_root_.get(), "Root", query_id_, true);
+    scope_ = make_unique<trace::Scope>(span_root_->SetActive());
+
+    BufferedSpan* span = child_spans_.at(ChildSpanType::INIT).span.get();
+    span->SetParent(span_root_->GetContext());
+    span->Submit();
+    debug_log_span(span, to_string(ChildSpanType::INIT), query_id_, false);
+
+    // Retried queries do not have the SUBMITTED and PLANNING child spans since they
+    // re-use the plan from the original query.
+    span = child_spans_.at(ChildSpanType::SUBMITTED).span.get();
+    if (span != nullptr) {
+      span->SetParent(span_root_->GetContext());
+      span->Submit();
+      debug_log_span(span, to_string(ChildSpanType::SUBMITTED), query_id_, false);
+    }
+
+    span = child_spans_.at(ChildSpanType::PLANNING).span.get();
+    if (span != nullptr) {
+      span->SetParent(span_root_->GetContext());
+      span->Start();
+      debug_log_span(span, to_string(ChildSpanType::PLANNING), query_id_, true);
+    }
+    started_ = true;
+  } else {
+    for (auto& a : child_spans_) {
+      if (a.second.span) {
+        a.second.span->Cancel();
+        a.second.span.reset();
+      }
+    }
+    span_root_->Cancel();
+  }
+} // function DoTraceQuery
+
 void SpanManager::AddChildSpanEvent(const nostd::string_view& name) {
   lock_guard<mutex> l(child_span_mu_);
 
-  if (LIKELY(current_child_)) {
-    current_child_->AddEvent(name);
-    VLOG(2) << strings::Substitute("Adding event named '$0' to child span '$1' "
-        "trace_id=\"$2\" span_id=\"$3", name.data(), to_string(child_span_type_),
-        current_child_->TraceId(), current_child_->SpanId());
-  } else {
-    LOG(WARNING) << strings::Substitute("Attempted to add event '$0' with no active "
-        "child span trace_id=\"$1\" span_id=\"$2\"\n$3", name.data(), root_->TraceId(),
-        root_->SpanId(), GetStackTrace());
-#ifndef NDEBUG
-    if (FLAGS_otel_trace_exhaustive_dchecks) {
-      DCHECK(current_child_) << strings::Substitute("Cannot add event '$0' when child "
-          "span is not active.", name.data());
+  // Locate the current active child span, if any, where the event will be added.
+  for (const auto& a : child_spans_) {
+    const auto& span = a.second.span;
+    if (span && !span->HasEnded()) {
+      span->AddEvent(name);
+      VLOG(2) << strings::Substitute("Adding event named '$0' to child span '$1' "
+        "trace_id=\"$2\" span_id=\"$3\"", name.data(), to_string(a.first),
+        span->TraceId(), span->SpanId());
+      return;
     }
-#endif
   }
+
+  LOG(WARNING) << strings::Substitute("Attempted to add event '$0' with no active "
+      "child span trace_id=\"$1\" span_id=\"$2\"\n$3", name.data(),
+      span_root_->TraceId(), span_root_->SpanId(), GetStackTrace());
+#ifndef NDEBUG
+  if (FLAGS_otel_trace_exhaustive_dchecks) {
+    DCHECK(false) << strings::Substitute("Cannot add event '$0' when child "
+        "span is not active.", name.data());
+  }
+#endif
 } // function AddChildSpanEvent
 
 void SpanManager::StartChildSpanInit() {
   lock_guard<mutex> l(child_span_mu_);
-  ChildSpanBuilder(ChildSpanType::INIT,
-      {
+
+  BufferedSpan* span = ChildSpanBuilder(ChildSpanType::INIT,
+      BufferedSpan::BufferedAttributesMap{
         {ATTR_CLUSTER_ID, FLAGS_cluster_id},
         {ATTR_QUERY_ID, query_id_},
         {ATTR_COORDINATOR, TNetworkAddressToString(
-                     ExecEnv::GetInstance()->configured_backend_address())}
-      });
+          ExecEnv::GetInstance()->configured_backend_address())}});
 
+  // ChildSpanBuilder locks client_request_state_->lock() if another span is active,
+  // thus, to set the Init specific attributes, we need to acquire the lock here instead
+  // of acquiring it at the beginning of this function.
   {
     lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
 
-    current_child_->SetAttribute(ATTR_DEFAULT_DB,
+    span->SetAttribute(ATTR_DEFAULT_DB,
         client_request_state_->default_db());
-    current_child_->SetAttribute(ATTR_QUERY_STRING,
+    span->SetAttribute(ATTR_QUERY_STRING,
         client_request_state_->redacted_sql());
-    current_child_->SetAttribute(ATTR_REQUEST_POOL,
+    span->SetAttribute(ATTR_REQUEST_POOL,
         client_request_state_->request_pool());
-    current_child_->SetAttribute(ATTR_SESSION_ID,
+    span->SetAttribute(ATTR_SESSION_ID,
         PrintId(client_request_state_->session_id()));
-    current_child_->SetAttribute(ATTR_USER_NAME,
+    span->SetAttribute(ATTR_USER_NAME,
         client_request_state_->effective_user());
   }
 } // function StartChildSpanInit
@@ -226,16 +310,15 @@ void SpanManager::EndChildSpanInit() {
   DoEndChildSpanInit();
 } // function EndChildSpanInit
 
-inline void SpanManager::DoEndChildSpanInit(const Status* cause) {
+void SpanManager::DoEndChildSpanInit(const Status* cause) {
 #ifndef NDEBUG
   if (FLAGS_otel_trace_exhaustive_dchecks) {
     DCHECK_CHILD_SPAN_TYPE(ChildSpanType::INIT);
   }
 #endif
 
-  EndChildSpan(
-      cause,
-      OtelAttributesMap{
+  EndChildSpan(ChildSpanType::INIT, cause,
+      BufferedSpan::BufferedAttributesMap{
         {ATTR_ORIGINAL_QUERY_ID, (client_request_state_->IsRetriedQuery() ?
             PrintId(client_request_state_->original_id()) : "")}
       });
@@ -252,13 +335,13 @@ void SpanManager::EndChildSpanSubmitted() {
   DoEndChildSpanSubmitted();
 } // function EndChildSpanSubmitted
 
-inline void SpanManager::DoEndChildSpanSubmitted(const Status* cause) {
+void SpanManager::DoEndChildSpanSubmitted(const Status* cause) {
 #ifndef NDEBUG
   if (FLAGS_otel_trace_exhaustive_dchecks) {
     DCHECK_CHILD_SPAN_TYPE(ChildSpanType::SUBMITTED);
   }
 #endif
-  EndChildSpan(cause);
+  EndChildSpan(ChildSpanType::SUBMITTED, cause);
 } // function DoEndChildSpanSubmitted
 
 void SpanManager::StartChildSpanPlanning() {
@@ -272,22 +355,25 @@ void SpanManager::EndChildSpanPlanning() {
   DoEndChildSpanPlanning();
 } // function EndChildSpanPlanning
 
-inline void SpanManager::DoEndChildSpanPlanning(const Status* cause) {
+void SpanManager::DoEndChildSpanPlanning(const Status* cause) {
 #ifndef NDEBUG
   if (FLAGS_otel_trace_exhaustive_dchecks) {
     DCHECK_CHILD_SPAN_TYPE(ChildSpanType::PLANNING);
   }
 #endif
-  EndChildSpan(
-      cause,
-      OtelAttributesMap{
-        {ATTR_QUERY_TYPE, to_string(client_request_state_->exec_request().stmt_type)}
-      });
+
+  EndChildSpan(ChildSpanType::PLANNING, cause, BufferedSpan::BufferedAttributesMap{
+      {ATTR_QUERY_TYPE,
+          impala::to_string(client_request_state_->exec_request().stmt_type)}}, true);
 } // function DoEndChildSpanPlanning
 
 void SpanManager::StartChildSpanAdmissionControl() {
   lock_guard<mutex> l(child_span_mu_);
-  ChildSpanBuilder(ChildSpanType::ADMISSION_CONTROL);
+
+  BufferedSpan* span = ChildSpanBuilder(ChildSpanType::ADMISSION_CONTROL);
+  span->SetParent(span_root_->GetContext());
+  span->Start();
+  debug_log_span(span, to_string(ChildSpanType::ADMISSION_CONTROL), query_id_, true);
 } // function StartChildSpanAdmissionControl
 
 void SpanManager::EndChildSpanAdmissionControl(const Status& cause) {
@@ -296,7 +382,7 @@ void SpanManager::EndChildSpanAdmissionControl(const Status& cause) {
   DoEndChildSpanAdmissionControl(&cause);
 } // function EndChildSpanAdmissionControl
 
-inline void SpanManager::DoEndChildSpanAdmissionControl(const Status* cause) {
+void SpanManager::DoEndChildSpanAdmissionControl(const Status* cause) {
   if (IsClosing()) {
     // If we are already closing, silently return as some cases (such as FIRST_FETCH)
     // will end the admission control phase even though the query already finished.
@@ -334,13 +420,12 @@ inline void SpanManager::DoEndChildSpanAdmissionControl(const Status* cause) {
     }
   }
 
-  EndChildSpan(
-      cause,
-      OtelAttributesMap{
+  EndChildSpan(ChildSpanType::ADMISSION_CONTROL, cause,
+      BufferedSpan::BufferedAttributesMap{
         {ATTR_QUEUED, queued},
         {ATTR_ADM_RESULT, adm_result},
         {ATTR_REQUEST_POOL, client_request_state_->request_pool()}
-      });
+      }, true);
 } // function DoEndChildSpanAdmissionControl
 
 void SpanManager::StartChildSpanQueryExecution() {
@@ -352,7 +437,10 @@ void SpanManager::StartChildSpanQueryExecution() {
    return; // <-- EARLY RETURN
   }
 
-  ChildSpanBuilder(ChildSpanType::QUERY_EXEC, true);
+  BufferedSpan* span = ChildSpanBuilder(ChildSpanType::QUERY_EXEC, true);
+  span->SetParent(span_root_->GetContext());
+  span->Start();
+  debug_log_span(span, to_string(ChildSpanType::QUERY_EXEC), query_id_, true);
 } // function StartChildSpanQueryExecution
 
 void SpanManager::EndChildSpanQueryExecution() {
@@ -361,7 +449,7 @@ void SpanManager::EndChildSpanQueryExecution() {
   DoEndChildSpanQueryExecution();
 }  // function EndChildSpanQueryExecution
 
-inline void SpanManager::DoEndChildSpanQueryExecution(const Status* cause) {
+void SpanManager::DoEndChildSpanQueryExecution(const Status* cause) {
   if (IsClosing()) {
     // If we are already closing, silently return as some cases (such as FIRST_FETCH)
     // will end the query execution phase even though the query already failed.
@@ -373,16 +461,16 @@ inline void SpanManager::DoEndChildSpanQueryExecution(const Status* cause) {
     DCHECK_CHILD_SPAN_TYPE(ChildSpanType::QUERY_EXEC);
   }
 #endif
-  OtelAttributesMap attrs;
+  BufferedSpan::BufferedAttributesMap attrs;
 
   if (client_request_state_->exec_request().stmt_type == TStmtType::QUERY) {
-    attrs.emplace(ATTR_NUM_DELETED_ROWS, static_cast<int64_t>(0));
-    attrs.emplace(ATTR_NUM_MODIFIED_ROWS, static_cast<int64_t>(0));
+    attrs.insert_or_assign(ATTR_NUM_DELETED_ROWS, static_cast<int64_t>(0));
+    attrs.insert_or_assign(ATTR_NUM_MODIFIED_ROWS, static_cast<int64_t>(0));
   } else {
     int64_t num_deleted_rows = 0;
     int64_t num_modified_rows = 0;
 
-    if (client_request_state_->GetCoordinator() != nullptr
+    if (LIKELY(client_request_state_->GetCoordinator() != nullptr)
         && client_request_state_->GetCoordinator()->dml_exec_state() != nullptr) {
       num_deleted_rows =
       client_request_state_->GetCoordinator()->dml_exec_state()->GetNumDeletedRows();
@@ -390,40 +478,65 @@ inline void SpanManager::DoEndChildSpanQueryExecution(const Status* cause) {
           client_request_state_->GetCoordinator()->dml_exec_state()->GetNumModifiedRows();
     }
 
-    attrs.emplace(ATTR_NUM_DELETED_ROWS, num_deleted_rows);
-    attrs.emplace(ATTR_NUM_MODIFIED_ROWS, num_modified_rows);
+    attrs.insert_or_assign(ATTR_NUM_DELETED_ROWS, num_deleted_rows);
+    attrs.insert_or_assign(ATTR_NUM_MODIFIED_ROWS, num_modified_rows);
   }
 
   if (client_request_state_->stmt_type() == TStmtType::DDL) {
-    attrs.emplace(ATTR_NUM_ROWS_FETCHED, 0);
+    attrs.insert_or_assign(ATTR_NUM_ROWS_FETCHED, 0);
   } else {
-    attrs.emplace(ATTR_NUM_ROWS_FETCHED, client_request_state_->num_rows_fetched());
+    attrs.insert_or_assign(ATTR_NUM_ROWS_FETCHED,
+        client_request_state_->num_rows_fetched());
   }
 
-  EndChildSpan(cause, attrs);
+  EndChildSpan(ChildSpanType::QUERY_EXEC, cause, attrs, true);
 } // function DoEndChildSpanQueryExecution
 
 void SpanManager::StartChildSpanClose(const Status* cause) {
   lock_guard<mutex> l(child_span_mu_);
 
+  // In a query cancellation scenario, the query could be cancelled before TraceQuery()
+  // has been called. In that case, the Close span will be started during query
+  // finalization and before the root span is started. Since TraceQuery() has not been
+  // called, it is not possible to know if the query should be traced, thus default to
+  // not tracing the query.
+  if (!started_) {
+    DoTraceQuery(false);
+    return;
+  }
+
+  // If the query is ended during scheduling via an HS2 CancelOp() operation, the
+  // Admission Control span will have been started but not ended. The provided cause will
+  // be nullptr since HS2 CancelOp() operations do not set the query status as Cancelled.
+  // In this case, set the cause.
+  if (cause == nullptr && client_request_state_->is_cancelled()) {
+    cause = &Status::CANCELLED;
+  }
+
   // In an error scenario, another child span may still be active since the normal code
   // path was interrupted and thus the correct end child span function was not called.
   // In this case, we must first end the current child span.
-  if (UNLIKELY(current_child_)) {
-    DCHECK(cause != nullptr) << "Child span '" << child_span_type_ << "'is active when "
-        "starting the Close span, a non-null cause must be provided to indicate why the "
-        "query processing flow is being interrupted.";
-    DCHECK(!cause->ok()) << "Child span '" << child_span_type_ << "'is active when "
-        "starting the Close span, a non-OK cause must be provided to indicate why the "
-        "query processing flow is being interrupted.";
+  for (const auto& a : child_spans_) {
+    const auto& span = a.second.span;
+    if (span && !span->HasEnded()) {
+      DCHECK(cause != nullptr) << "Child span '" << to_string(a.first) << "' is active "
+          "when starting the Close span, a non-null cause must be provided to indicate "
+          "why the query processing flow is being interrupted.";
+      DCHECK(!cause->ok()) << "Child span '" << to_string(a.first) << "' is active when "
+          "starting the Close span, a non-OK cause must be provided to indicate why the "
+          "query processing flow is being interrupted.";
 
-    {
-      lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
-      EndActiveChildSpan(cause);
+      {
+        lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
+       (this->*a.second.end_func)(cause);
+      }
     }
   }
 
-  ChildSpanBuilder(ChildSpanType::CLOSE);
+  BufferedSpan* span = ChildSpanBuilder(ChildSpanType::CLOSE);
+  span->SetParent(span_root_->GetContext());
+  span->Start();
+  debug_log_span(span, to_string(ChildSpanType::CLOSE), query_id_, true);
 } // function StartChildSpanClose
 
 void SpanManager::EndChildSpanClose() {
@@ -434,74 +547,79 @@ void SpanManager::EndChildSpanClose() {
 #endif
 
   lock_guard<mutex> l(child_span_mu_);
+  lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
+  DoEndChildSpanClose();
+} // function EndChildSpanClose
 
-  root_->SetAttribute(ATTR_COORDINATOR, TNetworkAddressToString(
-                     ExecEnv::GetInstance()->configured_backend_address()));
+void SpanManager::DoEndChildSpanClose(const Status* cause) {
+  EndChildSpan(ChildSpanType::CLOSE, nullptr, {}, true);
 
-  {
-    lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
-    EndChildSpan();
+  // Set all root span attributes to avoid dereferencing the client_request_state_ in
+  // the dtor (as the dtor is invoked when client_request_state_ is destroyed).
+  span_root_->SetAttribute(ATTR_QUERY_TYPE,
+    impala::to_string(client_request_state_->exec_request().stmt_type));
 
-    // Set all root span attributes to avoid dereferencing the client_request_state_ in
-    // the dtor (as the dtor is invoked when client_request_state_ is destroyed).
-    root_->SetAttribute(ATTR_QUERY_TYPE,
-      to_string(client_request_state_->exec_request().stmt_type));
+  if (LIKELY(client_request_state_->query_status().ok())) {
+    span_root_->SetAttributeEmpty(ATTR_ERROR_MESSAGE);
+  } else {
+    string error_msg = client_request_state_->query_status().msg().msg();
 
-    if (client_request_state_->query_status().ok()) {
-      root_->SetAttributeEmpty(ATTR_ERROR_MESSAGE);
-    } else {
-      string error_msg = client_request_state_->query_status().msg().msg();
-
-      for (const auto& detail : client_request_state_->query_status().msg().details()) {
-        error_msg += "\n" + detail;
-      }
-
-      root_->SetAttribute(ATTR_ERROR_MESSAGE, error_msg);
+    for (const auto& detail : client_request_state_->query_status().msg().details()) {
+      error_msg += "\n" + detail;
     }
 
-    if (UNLIKELY(client_request_state_->WasRetried())) {
-      root_->SetAttribute(ATTR_STATE, ClientRequestState::RetryStateToString(
-          client_request_state_->retry_state()));
-      root_->SetAttribute(ATTR_RETRIED_QUERY_ID,
-          PrintId(client_request_state_->retried_id()));
-    } else {
-      root_->SetAttribute(ATTR_STATE,
-        ClientRequestState::ExecStateToString(client_request_state_->exec_state()));
-        root_->SetAttributeEmpty(ATTR_RETRIED_QUERY_ID);
-    }
+    span_root_->SetAttribute(ATTR_ERROR_MESSAGE, error_msg);
+  }
 
-    if (UNLIKELY(client_request_state_->IsRetriedQuery())) {
-      root_->SetAttribute(ATTR_ORIGINAL_QUERY_ID,
-          PrintId(client_request_state_->original_id()));
-    } else {
-      root_->SetAttributeEmpty(ATTR_ORIGINAL_QUERY_ID);
-    }
+  if (UNLIKELY(client_request_state_->WasRetried())) {
+    span_root_->SetAttribute(ATTR_STATE, ClientRequestState::RetryStateToString(
+        client_request_state_->retry_state()));
+    span_root_->SetAttribute(ATTR_RETRIED_QUERY_ID,
+        PrintId(client_request_state_->retried_id()));
+  } else {
+    span_root_->SetAttribute(ATTR_STATE,
+      ClientRequestState::ExecStateToString(client_request_state_->exec_state()));
+      span_root_->SetAttributeEmpty(ATTR_RETRIED_QUERY_ID);
+  }
+
+  if (UNLIKELY(client_request_state_->IsRetriedQuery())) {
+    span_root_->SetAttribute(ATTR_ORIGINAL_QUERY_ID,
+        PrintId(client_request_state_->original_id()));
+  } else {
+    span_root_->SetAttributeEmpty(ATTR_ORIGINAL_QUERY_ID);
   }
 } // function EndChildSpanClose
 
-inline void SpanManager::ChildSpanBuilder(const ChildSpanType& span_type,
-    OtelAttributesMap&& additional_attributes, bool running) {
+bool SpanManager::HasEnded() const {
+  lock_guard<mutex> l(child_span_mu_);
+  return span_root_ && span_root_->HasEnded();
+} // function HasEnded
+
+BufferedSpan* SpanManager::ChildSpanBuilder(const ChildSpanType& span_type,
+    BufferedSpan::BufferedAttributesMap&& additional_attributes, bool running) {
   DCHECK(client_request_state_ != nullptr) << "Cannot start child span without a valid "
       "client request state.";
-  DCHECK(span_type != ChildSpanType::NONE) << strings::Substitute("Span type cannot be "
-      "'$0'.", to_string(span_type));
 
-  if (UNLIKELY(current_child_)) {
-    LOG(WARNING) << strings::Substitute("Attempted to start child span '$0' while "
-        "another child span '$1' is still active trace_id=\"$2\" span_id=\"$3\"\n$4",
-        to_string(span_type), to_string(child_span_type_), root_->TraceId(),
-        root_->SpanId(), GetStackTrace());
+  // If any other child spans are active, log a warning and end it. This should not happen
+  // in normal execution but could in edge cases.
+  for (const auto& a : child_spans_) {
+    const auto& span = a.second.span;
+    if (UNLIKELY(span && !span->HasEnded())) {
+      LOG(WARNING) << strings::Substitute("Attempted to start child span '$0' while "
+          "another child span '$1' is still active trace_id=\"$2\" span_id=\"$3\"\n$4",
+          to_string(span_type), to_string(a.first), span->TraceId(),
+          span->SpanId(), GetStackTrace());
 #ifndef NDEBUG
-    if (FLAGS_otel_trace_exhaustive_dchecks) {
-      DCHECK(false) << strings::Substitute("Should not start child span '$0' when "
-          "child span '$1' is already active.", to_string(span_type),
-          to_string(child_span_type_));
-    }
+      if (FLAGS_otel_trace_exhaustive_dchecks) {
+        DCHECK(false) << strings::Substitute("Should not start child span '$0' when "
+            "child span '$1' is already active.", to_string(span_type),
+            to_string(a.first));
+      }
 #endif
-
-    {
-      lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
-      EndActiveChildSpan();
+      {
+        lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
+        (this->*a.second.end_func)(nullptr);
+      }
     }
   }
 
@@ -510,27 +628,26 @@ inline void SpanManager::ChildSpanBuilder(const ChildSpanType& span_type,
   additional_attributes.insert_or_assign(ATTR_NAME, full_span_name);
   additional_attributes.insert_or_assign(ATTR_RUNNING, running);
 
-  current_child_ = make_unique<TimedSpan>(tracer_, full_span_name, ATTR_BEGIN_TIME,
-    ATTR_ELAPSED_TIME, std::move(additional_attributes), trace::SpanKind::kInternal,
-    root_);
-  child_span_type_ = span_type;
+  child_spans_.at(span_type).span = make_unique<BufferedSpan>(tracer_, full_span_name,
+    ATTR_BEGIN_TIME, ATTR_ELAPSED_TIME, std::move(additional_attributes),
+    trace::SpanContext::GetInvalid(), trace::SpanKind::kInternal);
 
-  debug_log_span(current_child_.get(), to_string(span_type), query_id_, true);
+  return child_spans_.at(span_type).span.get();
 } // function ChildSpanBuilder
 
-inline void SpanManager::ChildSpanBuilder(const ChildSpanType& span_type, bool running) {
-  ChildSpanBuilder(span_type, {}, running);
+BufferedSpan* SpanManager::ChildSpanBuilder(const ChildSpanType& span_type,
+    bool running) {
+  return ChildSpanBuilder(span_type, {}, running);
 } // function ChildSpanBuilder
 
-inline void SpanManager::EndChildSpan(const Status* cause,
-    const OtelAttributesMap& additional_attributes) {
+void SpanManager::EndChildSpan(const ChildSpanType& span_type, const Status* cause,
+    const BufferedSpan::BufferedAttributesMap& additional_attributes, bool submit) {
   DCHECK(client_request_state_ != nullptr) << "Cannot end child span without a valid "
       "client request state.";
 
-  if (LIKELY(current_child_)) {
-    for (const auto& a : additional_attributes) {
-      current_child_->SetAttribute(a.first, a.second);
-    }
+  unique_ptr<BufferedSpan>& span = child_spans_.at(span_type).span;
+  if (LIKELY(span && !span->HasEnded())) {
+    span->SetAttributes(additional_attributes);
 
     const Status* query_status;
     if (cause != nullptr) {
@@ -539,9 +656,9 @@ inline void SpanManager::EndChildSpan(const Status* cause,
       query_status = &client_request_state_->query_status();
     }
 
-    if (query_status->ok()) {
-      current_child_->SetAttributeEmpty(ATTR_ERROR_MSG);
-      current_child_->SetAttribute(ATTR_STATUS,
+    if (LIKELY(query_status->ok())) {
+      span->SetAttributeEmpty(ATTR_ERROR_MSG);
+      span->SetAttribute(ATTR_STATUS,
         ClientRequestState::ExecStateToString(client_request_state_->exec_state()));
     } else {
       string error_msg = query_status->msg().msg();
@@ -550,62 +667,29 @@ inline void SpanManager::EndChildSpan(const Status* cause,
         error_msg += "\n" + detail;
       }
 
-      current_child_->SetAttribute(ATTR_ERROR_MSG, error_msg);
-      current_child_->SetAttribute(ATTR_STATUS,
+      span->SetAttribute(ATTR_ERROR_MSG, error_msg);
+      span->SetAttribute(ATTR_STATUS,
             ClientRequestState::ExecStateToString(ClientRequestState::ExecState::ERROR));
     }
 
-    current_child_->End();
+    span->SetEnd();
 
-    debug_log_span(current_child_.get(), to_string(child_span_type_), query_id_, false);
-
-    current_child_.reset();
-    child_span_type_ = ChildSpanType::NONE;
+    if (submit) {
+      span->Submit();
+      debug_log_span(span.get(), to_string(span_type), query_id_, false);
+      span.reset();
+    }
   } else {
     LOG(WARNING) << strings::Substitute("Attempted to end a non-active child span "
-        "trace_id=\"$0\" span_id=\"$1\"\n$2", root_->TraceId(), root_->SpanId(),
+        "trace_id=\"$0\" span_id=\"$1\"\n$2", span_root_->TraceId(), span_root_->SpanId(),
         GetStackTrace());
 #ifndef NDEBUG
     if (FLAGS_otel_trace_exhaustive_dchecks) {
-      DCHECK(current_child_) << "Cannot end child span when one is not active.";
+      DCHECK(false) << strings::Substitute("Cannot end child span '$0' when it is not "
+          "already active.", to_string(span_type));
     }
 #endif
   }
 } // function EndChildSpan
-
-inline void SpanManager::EndActiveChildSpan(const Status* cause) {
-  switch (child_span_type_) {
-    case ChildSpanType::INIT:
-      DoEndChildSpanInit(cause);
-      break;
-    case ChildSpanType::SUBMITTED:
-      DoEndChildSpanSubmitted(cause);
-      break;
-    case ChildSpanType::PLANNING:
-      DoEndChildSpanPlanning(cause);
-      break;
-    case ChildSpanType::ADMISSION_CONTROL:
-      DoEndChildSpanAdmissionControl(cause);
-      break;
-    case ChildSpanType::QUERY_EXEC:
-      DoEndChildSpanQueryExecution(cause);
-      break;
-    case ChildSpanType::CLOSE:
-      // If we are already in a Close child span, we cannot start a new one.
-      LOG(WARNING) << "Attempted to start Close child span while another Close child "
-          "span is already active trace_id=\"$0\" span_id=\"$1\"\n$2", root_->TraceId(),
-          current_child_->SpanId(), GetStackTrace();
-#ifndef NDEBUG
-      if (FLAGS_otel_trace_exhaustive_dchecks) {
-        DCHECK(false) << "Cannot start a new Close child span while a Close child span "
-            "is already active.";
-      }
-#endif
-      break;
-    default:
-      // No-op, no active child span to end.
-      break;
-  }
-} // function EndActiveChildSpan
 
 } // namespace impala

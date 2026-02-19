@@ -275,6 +275,8 @@ void QueryDriver::RetryQueryFromThread(
   // original query while the new query is being created. This is necessary as it might
   // take a non-trivial amount of time to setup and start running the new query.
 
+  bool orig_do_trace = false;
+
   DCHECK(query_driver.get() == this);
   const TUniqueId& query_id = client_request_state_->query_id();
   VLOG_QUERY << Substitute(
@@ -287,6 +289,7 @@ void QueryDriver::RetryQueryFromThread(
     DCHECK(retried_client_request_state_ == nullptr);
     DCHECK(client_request_state_ != nullptr);
     request_state = client_request_state_.get();
+    orig_do_trace = request_state->otel_trace_query();
   }
   DCHECK(request_state->retry_state() == ClientRequestState::RetryState::RETRYING)
       << Substitute("query=$0 unexpected state $1", PrintId(request_state->query_id()),
@@ -342,6 +345,14 @@ void QueryDriver::RetryQueryFromThread(
   // Copy pending RPCs to the retry request. Whichever query ends up succeding
   // will reap them.
   retry_request_state->CopyRPCs(*client_request_state_);
+
+  // Trace the retried query if the original query is being traced.
+  if (retry_request_state->otel_trace_query()) {
+    if (orig_do_trace) {
+      retry_request_state->otel_span_manager()->EndChildSpanInit();
+    }
+    retry_request_state->otel_span_manager()->TraceQuery(orig_do_trace);
+  }
 
   // Run the new query.
   status = retry_request_state->Exec();
@@ -483,10 +494,6 @@ void QueryDriver::CreateRetriedClientRequestState(ClientRequestState* request_st
       retry_exec_request_->user_has_profile_access);
   if (retry_exec_request_->__isset.result_set_metadata) {
     (*retry_request_state)->set_result_metadata(retry_exec_request_->result_set_metadata);
-  }
-
-  if ((*retry_request_state)->otel_trace_query()) {
-    (*retry_request_state)->otel_span_manager()->EndChildSpanInit();
   }
 }
 

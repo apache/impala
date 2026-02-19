@@ -360,7 +360,7 @@ def parse_trace_file(file_path, query_id):
 
 def assert_trace(log_file_path, trace_file_path, trace_file_count, query_id,
     query_profile, cluster_id, trace_cnt=1, err_span="", missing_spans=[],
-    async_close=False, exact_trace_cnt=False):
+    async_close=False, exact_trace_cnt=False, adm_result_missing=False):
   # Parse common values needed in multiple asserts.
   session_id = parse_session_id(query_profile)
   db_user = parse_db_user(query_profile)
@@ -452,9 +452,10 @@ def assert_trace(log_file_path, trace_file_path, trace_file_count, query_id,
       span_err_msg = query_status
       status = ERROR
       in_error = True
+    assert adm_result_missing is not None, "adm_result_missing must not be None"
     __assert_admissioncontrol_attrs(trace.child_spans, root_span_id, query_id,
-      "default-pool", parse_admission_result(query_profile), span_err_msg, status,
-      log_file_path)
+      "default-pool", parse_admission_result(query_profile, adm_result_missing),
+      span_err_msg, status, log_file_path, adm_result_missing)
 
   # Assert QueryExecution span.
   if "QueryExecution" not in missing_spans:
@@ -579,11 +580,11 @@ def __assert_scopespan_common(span, query_id, is_root, name, attributes_count,
 
 def __find_span_log(log_file_path, span_name, query_id):
   """
-    Finds the start span log entry for the given span name and query id in the Impalad
+    Finds the end span log entry for the given span name and query id in the Impalad
     logs. This log line contains the trace id and span id for the span which are used
     as the expected values when asserting the span properties in the trace file.
   """
-  span_regex = r'Started \'{}\' span trace_id="(.*?)" span_id="(.*?)" query_id="{}"' \
+  span_regex = r'Submitted \'{}\' span trace_id="(.*?)" span_id="(.*?)" query_id="{}"' \
       .format(span_name, query_id)
 
   max_retries = 10
@@ -725,14 +726,17 @@ def __assert_planningspan_attrs(spans, root_span_id, query_id, query_type, err_m
 
 
 def __assert_admissioncontrol_attrs(spans, root_span_id, query_id, request_pool,
-    adm_result, err_msg, status, log_file_path):
+    adm_result, err_msg, status, log_file_path, adm_result_missing):
   """
     Helper function that asserts the common and span-specific attributes in the
     admission control span.
   """
 
+  if adm_result is None and adm_result_missing:
+    adm_result = ""
+
   queued = False if adm_result == "Admitted immediately" \
-      or adm_result == "Admitted as a trivial query" else True
+      or adm_result == "Admitted as a trivial query" or adm_result_missing else True
 
   adm_ctrl_span = __find_span(spans, "AdmissionControl", query_id)
   __assert_scopespan_common(adm_ctrl_span, query_id, False, "AdmissionControl", 3, status,

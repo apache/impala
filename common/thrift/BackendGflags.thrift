@@ -365,4 +365,6 @@ struct TBackendGflags {
   167: required bool disable_hms_sync_by_default
 
   168: required i32 hms_event_catchup_threshold_s
+
+  169: required bool otel_trace_enabled
 }

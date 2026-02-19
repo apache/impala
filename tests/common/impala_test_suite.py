@@ -1684,12 +1684,12 @@ class ImpalaTestSuite(BaseTestSuite):
           count, timeout_s, error_msg_str))
 
   def assert_impalad_log_contains(self, level, line_regex, expected_count=1, timeout_s=6,
-      dry_run=False):
+      dry_run=False, sleep_s=1):
     """
     Convenience wrapper around assert_log_contains for impalad logs.
     """
     return self.assert_log_contains(
-        "impalad", level, line_regex, expected_count, timeout_s, dry_run)
+        "impalad", level, line_regex, expected_count, timeout_s, dry_run, sleep_s)
 
   def assert_catalogd_ha_contains(self, level, line_regex, timeout_s=6):
     """
@@ -1756,7 +1756,7 @@ class ImpalaTestSuite(BaseTestSuite):
         "contents matching the regex '{}'".format(line_regex)
 
   def assert_log_contains(self, daemon, level, line_regex, expected_count=1, timeout_s=6,
-      dry_run=False):
+      dry_run=False, sleep_s=1):
     """
     Assert that the daemon log with specified level (e.g. ERROR, WARNING, INFO) contains
     expected_count lines with a substring matching the regex. When expected_count is -1,
@@ -1814,7 +1814,7 @@ class ImpalaTestSuite(BaseTestSuite):
           raise
         LOG.info("Expected log lines could not be found, sleeping before retrying: %s",
             str(e))
-        time.sleep(1)
+        time.sleep(sleep_s)
 
   @staticmethod
   def validate_exec_option_dimension(vector):

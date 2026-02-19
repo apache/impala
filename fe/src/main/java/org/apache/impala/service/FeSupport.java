@@ -175,6 +175,10 @@ public class FeSupport {
   // that has initialized ThreadDebugInfo.
   public native static void NativeDeleteThreadDebugInfo(long ptr);
 
+  // Informs the backend of an OpenTelemetry trace should be created for this query.
+  public native static void NativeUpdateQueryOtelTracing(byte[] thriftQueryId,
+      boolean doTrace);
+
   /**
    * Locally caches the jar at the specified HDFS location.
    *

@@ -18,14 +18,10 @@
 #include "otel.h"
 
 #include <chrono>
-#include <functional>
 #include <memory>
-#include <regex>
 #include <string>
-#include <string_view>
 #include <utility>
 
-#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <gflags/gflags_declare.h>
@@ -38,7 +34,6 @@
 #include <opentelemetry/exporters/otlp/otlp_http_exporter.h>
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_factory.h>
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_options.h>
-#include <opentelemetry/exporters/otlp/otlp_http_exporter_runtime_options.h>
 #include <opentelemetry/nostd/shared_ptr.h>
 #include <opentelemetry/sdk/common/global_log_handler.h>
 #include <opentelemetry/sdk/resource/resource.h>
@@ -104,29 +99,9 @@ DECLARE_string(ssl_minimum_version);
 
 // Constants
 static const string SCOPE_SPAN_NAME = "org.apache.impala.impalad.query";
-static const regex query_newline(
-    "(select|alter|compute|create|delete|drop|insert|invalidate|update|with)\\s*"
-    "(\n|\\s*\\\\*\\/)", regex::icase | regex::optimize | regex::nosubs);
 
 // Holds the custom log handler for OpenTelemetry internal logs.
 static nostd::shared_ptr<LogHandler> otel_log_handler_;
-
-// Lambda function to check if SQL starts with relevant keywords for tracing
-static const function<bool(std::string_view)> is_traceable_sql =
-    [](std::string_view sql_str) -> bool {
-      return
-          LIKELY(boost::algorithm::istarts_with(sql_str, "select ")
-              || boost::algorithm::istarts_with(sql_str, "alter ")
-              || boost::algorithm::istarts_with(sql_str, "compute ")
-              || boost::algorithm::istarts_with(sql_str, "create ")
-              || boost::algorithm::istarts_with(sql_str, "delete ")
-              || boost::algorithm::istarts_with(sql_str, "drop ")
-              || boost::algorithm::istarts_with(sql_str, "insert ")
-              || boost::algorithm::istarts_with(sql_str, "invalidate ")
-              || boost::algorithm::istarts_with(sql_str, "update ")
-              || boost::algorithm::istarts_with(sql_str, "with "))
-          || regex_search(sql_str.cbegin(), sql_str.cend(), query_newline);
-    };
 
 namespace impala {
 
@@ -140,60 +115,11 @@ static inline bool otel_tls_enabled() {
   return boost::algorithm::istarts_with(FLAGS_otel_trace_collector_url, "https://");
 } // function otel_tls_enabled
 
-bool should_otel_trace_query(std::string_view sql,
-    const TSessionType::type& session_type) {
-  if (UNLIKELY(session_type == TSessionType::BEESWAX)) {
-    return false;
-  }
-
-  if (LIKELY(is_traceable_sql(sql))) {
-    return true;
-  }
-
-  // Loop until all leading comments and whitespace are skipped.
-  while (true) {
-    if (boost::algorithm::istarts_with(sql, "/*")) {
-      // Handle leading inline comments
-      size_t end_comment = sql.find("*/");
-      if (end_comment != string_view::npos) {
-        sql = sql.substr(end_comment + 2);
-        continue;
-      }
-    } else if (boost::algorithm::istarts_with(sql, "--")) {
-      // Handle leading comment lines
-      size_t end_comment = sql.find("\n");
-      if (end_comment != string_view::npos) {
-        sql = sql.substr(end_comment + 1);
-        continue;
-      }
-    } else if (UNLIKELY(boost::algorithm::istarts_with(sql, " "))) {
-      // Handle leading whitespace. Since Impala removes leading whitespace from the SQL
-      // statement, this case only happens if the sql statement starts with inline
-      // comments or there is a leading space on the first non-comment line.
-      size_t end_comment = sql.find_first_not_of(" ");
-      if (end_comment != string_view::npos) {
-        sql = sql.substr(end_comment);
-        continue;
-      }
-    } else if (boost::algorithm::istarts_with(sql, "\n")) {
-      // Handline newlines after inline comments.
-      size_t end_comment = sql.find_first_not_of("\n");
-      if (end_comment != string_view::npos) {
-        sql = sql.substr(end_comment);
-        continue;
-      }
-    }
-
-    // Check if the SQL statement starts with any of the keywords we want to trace
-    if (LIKELY(is_traceable_sql(sql))) {
-      return true;
-    }
-
-    // No more patterns to check
-    break;
-  }
-
-  return false;
+bool should_otel_trace_query(const TSessionType::type& session_type,
+  const TClientRequest& client_request) {
+  return LIKELY(session_type != TSessionType::BEESWAX
+    && (!client_request.__isset.hs2_metadata_op
+      || !client_request.hs2_metadata_op));
 } // function should_otel_trace_query
 
 // Creates an OtlpHttpExporterOptions struct instance with configuration from global
@@ -377,7 +303,7 @@ void shutdown_otel_tracer() {
   // Force a reset of the provider_ shared_ptr to ensure that the
   // TracerProvider destructor is called, which will flush any remaining spans.
   provider_.reset();
-}
+} // function shutdown_otel_tracer
 
 shared_ptr<SpanManager> build_span_manager(ClientRequestState* crs) {
   DCHECK(provider_) << "OpenTelemetry tracer was not initialized.";

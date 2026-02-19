@@ -215,9 +215,9 @@ DEFINE_validator(otel_trace_retry_policy_backoff_multiplier, ge_one);
 // This flag is hidden because simple span processor blocks the query processing while
 // communicating with the OTel collector.
 DEFINE_string_hidden(otel_trace_span_processor, impala::SPAN_PROCESSOR_BATCH.c_str(),
-    strings::Substitute("The span processor implementation to use for exporting spans to "
-    "the OTel Collector. Supported values: '$0' and '$1'.", impala::SPAN_PROCESSOR_BATCH,
-    impala::SPAN_PROCESSOR_SIMPLE).c_str());
+    "The span processor implementation to use for exporting spans to the OTel Collector. "
+    "Supported values are impala::SPAN_PROCESSOR_BATCH and "
+    "impala::SPAN_PROCESSOR_SIMPLE");
 DEFINE_validator(otel_trace_span_processor, [](const char* flagname,
     const string& value) {
   const std::string trimmed = boost::algorithm::trim_copy(value);

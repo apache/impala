@@ -19,7 +19,9 @@ package org.apache.impala.calcite.service;
 
 import java.util.Set;
 
+import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlExplain;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisDriver;
@@ -77,6 +79,51 @@ public class CalciteParsedStatement implements ParsedStatement {
   @Override
   public boolean isQueryStmt() {
     return true;
+  }
+
+  @Override
+  public boolean isAlterTableStmt() { return false; }
+
+  @Override
+  public boolean isComputeStatsStmt() { return false; }
+
+  @Override
+  public boolean isCreateDbStmt() { return false; }
+
+  @Override
+  public boolean isCreateTableAsSelectStmt() { return false; }
+
+  @Override
+  public boolean isCreateTableLikeStmt() { return false; }
+
+  @Override
+  public boolean isCreateTableStmt() { return false; }
+
+  @Override
+  public boolean isCreateViewStmt() { return false; }
+
+  @Override
+  public boolean isDeleteStmt() { return false; }
+
+  @Override
+  public boolean isDropDbStmt() { return false; }
+
+  @Override
+  public boolean isDropTableOrViewStmt() { return false; }
+
+  @Override
+  public boolean isInsertStmt() { return false; }
+
+  @Override
+  public boolean isInvalidateMetadata() { return false; }
+
+  @Override
+  public boolean isUpdateStmt() {return false; }
+
+  @Override
+  public boolean isValuesStmt() {
+    return parsedNode_ instanceof SqlBasicCall
+        && ((SqlBasicCall) parsedNode_).getOperator().getKind() == SqlKind.VALUES;
   }
 
   @Override

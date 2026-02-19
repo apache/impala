@@ -570,6 +570,10 @@ class ImpalaServer : public ImpalaServiceIf,
   void GetAllConnectionContexts(
       ThriftServer::ConnectionContextList* connection_contexts);
 
+  /// If OpenTelemetry query tracing is enabled, specifies if a query should have a trace
+  /// generated for it.
+  void DoTraceQuery(const TUniqueId& query_id, bool do_trace);
+
   // Mapping between query option names and levels
   QueryOptionLevels query_option_levels_;
 
