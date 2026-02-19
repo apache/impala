@@ -22,6 +22,7 @@
 
 import argparse
 import glob
+import platform
 import os
 import shutil
 from subprocess import check_call
@@ -161,6 +162,25 @@ for libgcc_so in glob.glob(os.path.join(GCC_HOME, "lib64/{0}*.so*".format("libgc
 if not found_libgcc_so:
   raise Exception("No libgcc.so found in search path: {0}".format(
       os.path.join(GCC_HOME, "lib64")))
+
+# libquadmath is needed for Boost charconv / locale on x86_64 (but not ARM)
+# platform.machine() is based on "uname -m".
+if platform.machine() == "x86_64":
+  # Add libquadmath binaries to LIB_DIR (needed for Boost charconv / locale)
+  found_libquadmath_so = False
+  for libquadmath_so in glob.glob(os.path.join(
+      GCC_HOME, "lib64/{0}*.so*".format("libquadmath"))):
+    found_libquadmath_so = True
+    symlink_file_into_dirs(libquadmath_so, TARGET_LIB_DIRS)
+
+  if not found_libquadmath_so:
+    raise Exception("No libquadmath.so found in search path: {0}".format(
+        os.path.join(GCC_HOME, "lib64")))
+elif platform.machine() == "aarch64":
+  if len(glob.glob(os.path.join(GCC_HOME, "lib64/{0}*.so*".format("libquadmath")))) != 0:
+    raise Exception("Found libquadmath.so, but it is not expected to exist on ARM64")
+else:
+  raise Exception("Unknown platform {0}".format(platform.machine()))
 
 # Add libkudu_client binaries to LIB_DIR. Strip debug symbols for release builds.
 found_kudu_so = False

@@ -178,7 +178,7 @@ class DataCacheBaseTest : public testing::Test {
     ASSERT_OK(cache->CloseFilesAndVerifySizes());
   }
 
-  void MockDisk(std::string name, bool is_rotational) {
+  void MockDisk(const std::string& name, bool is_rotational) {
     mock_fs_ = "/tmp" / boost::filesystem::unique_path();
     ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(mock_fs_.string()));
     boost::filesystem::path proc_fs = mock_fs_ / "proc";

@@ -348,10 +348,12 @@ add_definitions(-DKUDU_HEADERS_USE_RICH_SLICE -DKUDU_HEADERS_NO_STUBS)
 #  -Wno-return-type-c-linkage: UDFs return C++ classes but use C linkage to prevent
 #       mangling
 #  -DBOOST_NO_EXCEPTIONS: call a custom error handler for exceptions in codegen'd code.
+#  -DBOOST_ALL_NO_EMBEDDED_GDB_SCRIPTS: don't embed gdb pretty-printer scripts for Boost
+#       types. They bloat codegen sizes without providing any value.
 set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-std=c++17" "-DIR_COMPILE" "-DHAVE_INTTYPES_H"
   "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG" "-DBOOST_NO_EXCEPTIONS"
   "-DBOOST_BIND_GLOBAL_PLACEHOLDERS" "-DBOOST_ALLOW_DEPRECATED_HEADERS"
-  "-DKUDU_HEADERS_NO_STUBS" "-fcolor-diagnostics"
+  "-DBOOST_ALL_NO_EMBEDDED_GDB_SCRIPTS" "-DKUDU_HEADERS_NO_STUBS" "-fcolor-diagnostics"
   "-Wno-return-type-c-linkage" "-fsigned-char")
 #  -Wno-deprecated-declarations: OpenSSL3 deprecated various APIs currently used by
 #      Impala, so this disables those warnings when using OpenSSL3 until they can be

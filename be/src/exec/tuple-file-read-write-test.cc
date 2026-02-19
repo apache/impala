@@ -76,7 +76,7 @@ public:
     ASSERT_OK(FileSystemUtil::RemovePaths({tmp_dir_.string()}));
   }
 
-  string Path(string filename) const {
+  string Path(const string& filename) const {
     return (tmp_dir_ / filename).string();
   }
 

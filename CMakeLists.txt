@@ -212,7 +212,7 @@ if (CMAKE_DEBUG)
 endif()
 
 find_package(Boost CONFIG REQUIRED
-  COMPONENTS thread regex filesystem system date_time random locale serialization
+  COMPONENTS thread regex filesystem date_time random locale serialization
   NO_SYSTEM_ENVIRONMENT_PATH NO_CMAKE_SYSTEM_PATH)
 # Mark Boost as a system header to avoid compile warnings.
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})

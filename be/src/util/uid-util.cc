@@ -24,7 +24,7 @@
 namespace impala {
 
 string GenerateUUIDString() {
-  boost::uuids::basic_random_generator<boost::mt19937> gen;
+  boost::uuids::basic_random_generator<std::mt19937> gen;
   boost::uuids::uuid u = gen();
   string uuid(u.begin(), u.end());
   return uuid;

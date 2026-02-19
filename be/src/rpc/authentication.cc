@@ -77,7 +77,7 @@ using boost::mt19937;
 using boost::uniform_int;
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
-using namespace boost::filesystem;   // for is_regular(), is_absolute()
+using namespace boost::filesystem;   // for is_regular_file(), is_absolute()
 using namespace strings;
 
 DECLARE_bool(skip_external_kerberos_auth);
@@ -1365,7 +1365,7 @@ Status AuthManager::InitKerberosEnv() {
   }
 
   if (!FLAGS_keytab_file.empty()) {
-    if (!is_regular(FLAGS_keytab_file)) {
+    if (!is_regular_file(FLAGS_keytab_file)) {
       return Status(Substitute("Bad --keytab_file value: The file $0 is not a "
           "regular file", FLAGS_keytab_file));
     }
@@ -1396,7 +1396,7 @@ Status AuthManager::InitKerberosEnv() {
   // JAVA_TOOL_OPTIONS in the environment.
   if (!FLAGS_krb5_conf.empty()) {
     // Ensure it points to a regular file
-    if (!is_regular(FLAGS_krb5_conf)) {
+    if (!is_regular_file(FLAGS_krb5_conf)) {
       return Status(Substitute("Bad --krb5_conf value: The file $0 is not a "
           "regular file", FLAGS_krb5_conf));
     }

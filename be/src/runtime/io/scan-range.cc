@@ -27,7 +27,6 @@
 
 using namespace impala;
 using namespace impala::io;
-using namespace std;
 using std::mutex;
 using std::unique_lock;
 

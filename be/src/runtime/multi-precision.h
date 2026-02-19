@@ -44,6 +44,11 @@
 #else
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
+// Boost multiprecision defines these macros, but these interfere with kudu/util/int128.h
+#undef INT128_MIN
+#undef INT128_MAX
+#undef UINT128_MIN
+#undef UINT128_MAX
 #endif
 
 #include <functional>

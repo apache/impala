@@ -42,6 +42,15 @@ if("${cpp_lib}" STREQUAL "")
 endif()
 install(FILES ${cpp_lib} DESTINATION ${IMPALA_INSTALLDIR}/lib/native)
 
+# Boost requires libquadmath on x86_64 (libquadmath is not supported on ARM)
+if ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+  FILE(GLOB quadmath_lib ${IMPALA_GCC_HOME}/lib64/libquadmath.so*)
+  if("${quadmath_lib}" STREQUAL "")
+    message(FATAL_ERROR "libquadmath.so was not found in '${IMPALA_GCC_HOME}/lib64'!")
+  endif()
+  install(FILES ${quadmath_lib} DESTINATION ${IMPALA_INSTALLDIR}/lib/native)
+endif()
+
 set(KUDU_HOME $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-$ENV{IMPALA_KUDU_VERSION}/release)
 # The parent folder is lib64 on centos/redhat, while on ubuntu it's lib.
 FILE(GLOB kudu_lib ${KUDU_HOME}/lib*/libkudu_client.so*)
