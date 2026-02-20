@@ -47,6 +47,6 @@ int main(int argc, char** argv) {
   }
 
   cerr << "Unknown daemon name: " << daemon
-       << " (valid options: impalad, catalogd, statestored)" << endl;
+       << " (valid options: impalad, catalogd, statestored, admissiond)" << endl;
   exit(1);
 }
