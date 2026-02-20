@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import java.util.Set;
 
+import org.apache.impala.analysis.ColumnLineageGraph.OperationType;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
@@ -81,5 +82,10 @@ public class ParsedStatementImpl implements ParsedStatement {
   public void handleAuthorizationException(
       AnalysisContext.AnalysisResult analysisResult) {
     stmt_.handleAuthorizationException(analysisResult);
+  }
+
+  @Override
+  public OperationType getOperationType() {
+    return ColumnLineageGraph.computeOperationType(stmt_);
   }
 }

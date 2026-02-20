@@ -279,7 +279,8 @@ public class Planner {
       }
       List<Expr> outputExprs = new ArrayList<>();
       rootFragment.getSink().collectExprs(outputExprs);
-      graph.computeLineageGraph(outputExprs, ctx_.getRootAnalyzer());
+      graph.computeLineageGraph(outputExprs, ctx_.getRootAnalyzer(),
+          ctx_.getAnalysisResult().getParsedStmt().getOperationType());
       if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
       ctx_.getTimeline().markEvent("Lineage info computed");
     }

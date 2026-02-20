@@ -26,6 +26,7 @@ import org.apache.impala.analysis.AnalysisDriver;
 import org.apache.impala.analysis.ParsedStatement;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.StmtMetadataLoader;
+import org.apache.impala.analysis.ColumnLineageGraph.OperationType;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TQueryCtx;
@@ -87,6 +88,12 @@ public class CalciteParsedStatement implements ParsedStatement {
   public void handleAuthorizationException(
       AnalysisContext.AnalysisResult analysisResult) {
     // Do nothing.
+  }
+
+  @Override
+  public OperationType getOperationType() {
+    // Currently, we only support SELECT queries when Calcite is the planner.
+    return OperationType.SELECT;
   }
 
   public SqlNode getParsedSqlNode() {

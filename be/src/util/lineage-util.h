@@ -90,6 +90,8 @@ class LineageUtil {
       writer.StartObject();
       writer.String("queryText");
       writer.String(lineage.query_text);
+      writer.String("operationType");
+      writer.String(lineage.operation_type);
       writer.String("queryId");
       writer.String(PrintId(lineage.query_id));
       writer.String("hash");

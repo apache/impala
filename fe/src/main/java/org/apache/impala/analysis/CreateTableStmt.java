@@ -328,7 +328,7 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
 
     // If lineage logging is enabled, compute minimal lineage graph.
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
-       computeLineageGraph(analyzer);
+      computeLineageGraph(analyzer, this);
     }
 
     analyzeSerializationEncoding();
@@ -339,9 +339,10 @@ public class CreateTableStmt extends StatementBase implements SingleTableStmt {
    * populate a few fields of the graph including query text. If this is a CTAS,
    * the graph is enhanced during the "insert" phase of CTAS.
    */
-  protected void computeLineageGraph(Analyzer analyzer) {
+  protected void computeLineageGraph(Analyzer analyzer, StatementBase stmt) {
     ColumnLineageGraph graph = analyzer.getColumnLineageGraph();
-    graph.computeLineageGraph(new ArrayList(), analyzer);
+    graph.computeLineageGraph(new ArrayList(), analyzer,
+        ColumnLineageGraph.computeOperationType(stmt));
   }
 
   /**

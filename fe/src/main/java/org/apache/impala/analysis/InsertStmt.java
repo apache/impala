@@ -1146,6 +1146,8 @@ public class InsertStmt extends DmlStatementBase {
   public boolean isTargetTableKuduTable() { return (table_ instanceof FeKuduTable); }
   public void setWriteId(long writeId) { this.writeId_ = writeId; }
   public boolean isOverwrite() { return overwrite_; }
+  public boolean isUpsert() { return isUpsert_; }
+
   @Override
   public TSortingOrder getSortingOrder() { return sortingOrder_; }
 

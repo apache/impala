@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.util.Set;
 
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
+import org.apache.impala.analysis.ColumnLineageGraph.OperationType;
 
 /**
  * ParsedStatement interface that holds the parsed query statement.
@@ -47,4 +48,8 @@ public interface ParsedStatement {
   // Could be overridden to handle an AuthorizationException thrown for a registered
   // masked privilege request.
   public void handleAuthorizationException(AnalysisResult analysisResult);
+
+  // Returns the type of the operation that will be used to produce the column lineage
+  // graph when applicable.
+  public OperationType getOperationType();
 }

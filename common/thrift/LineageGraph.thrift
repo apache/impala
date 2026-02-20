@@ -86,4 +86,7 @@ struct TLineageGraph {
   // Set only for external tables to establish
   // lineage between the table and it's location.
   9: optional string table_location
+
+  // Operation type of the query.
+  10: required string operation_type
 }

@@ -29,6 +29,7 @@ create table lineage_test_db.iceberg_partitioned like functional_parquet.iceberg
   "queryId": "7547f4882e03cdde:941c4bad00000000",
   "user": "anurag",
   "queryText": "create table lineage_test_db.foo (id int)",
+  "operationType": "CREATETABLE",
   "endTime": 1687533491
 }
 ---- QUERY
@@ -44,6 +45,7 @@ create table lineage_test_db.foo (id int)
   "queryId": "554879b21cb9ae72:5e564c9200000000",
   "user": "anurag",
   "queryText": "create external table lineage_test_db.ext_tbl_loc (id int) location '/test-warehouse/lineage_test_db.db/'",
+  "operationType": "CREATETABLE",
   "endTime": 1687533496,
   "tableLocation": "hdfs://localhost:20500/test-warehouse/lineage_test_db.db"
 }
@@ -61,6 +63,7 @@ create external table lineage_test_db.ext_tbl_loc (id int) location
   "queryId": "1948dbf64fdfe0c2:2cbbe10700000000",
   "user": "anurag",
   "queryText": "create external table lineage_test_db.ext_tbl (id int)",
+  "operationType": "CREATETABLE",
   "endTime": 1687533501,
   "tableLocation": "hdfs://localhost:20500/test-warehouse/lineage_test_db.db/ext_tbl"
 }
@@ -456,6 +459,7 @@ create external table lineage_test_db.ext_tbl (id int)
   "queryId": "c0450321c0d12cbe:30419c8200000000",
   "user": "anurag",
   "queryText": "create external table lineage_test_db.ext_ctas as select * from lineage_test_db.alltypes",
+  "operationType": "CREATETABLE_AS_SELECT",
   "endTime": 1687533508,
   "tableLocation": "hdfs://localhost:20500/test-warehouse/lineage_test_db.db/ext_ctas"
 }
@@ -523,6 +527,7 @@ create view lineage_test_db.alltypes_view as select * from lineage_test_db.allty
   "queryId": "8e4d008c58bff1cc:1eb556a200000000",
   "user": "anurag",
   "queryText": "select * from (   select tinyint_col + int_col x from functional.alltypes   union all   select sum(bigint_col) y from (select bigint_col from functional.alltypes) v1) v2",
+  "operationType": "SELECT",
   "endTime": 1687533513
 }
 ---- QUERY
@@ -716,6 +721,7 @@ select * from (
   "queryId": "374d7d4cfcda6f00:11963b1000000000",
   "user": "anurag",
   "queryText": "select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),   count(b.string_col), b.timestamp_col from functional.alltypes a join functional.alltypessmall b on (a.id = b.id) where a.year = 2010 and b.float_col > 0 group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col having count(a.int_col) > 10 order by b.bigint_col limit 10",
+  "operationType": "SELECT",
   "endTime": 1687533519
 }
 ---- QUERY
@@ -799,6 +805,7 @@ order by b.bigint_col limit 10
   "queryId": "5341037bc766b0c5:5b9b5c6a00000000",
   "user": "anurag",
   "queryText": "create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col from functional.alltypes",
+  "operationType": "CREATETABLE_AS_SELECT",
   "endTime": 1687533524
 }
 ---- QUERY
@@ -927,6 +934,7 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
   "queryId": "2545984dd298803d:532b0b6100000000",
   "user": "anurag",
   "queryText": "create table lineage_test_db.lineage_test_tbl2 as select distinct a.int_col, a.string_col from functional.alltypes a inner join functional.alltypessmall b on (a.id = b.id) where a.year = 2009 and b.month = 2",
+  "operationType": "CREATETABLE_AS_SELECT",
   "endTime": 1687533530
 }
 ---- QUERY
@@ -975,6 +983,7 @@ where a.year = 2009 and b.month = 2
   "queryId": "e741f71c0e666916:abefa06a00000000",
   "user": "anurag",
   "queryText": "create table lineage_test_db.lineage_test_tbl3 as select * from   (select * from      (select int_col from functional.alltypestiny limit 1) v1 ) v2",
+  "operationType": "CREATETABLE_AS_SELECT",
   "endTime": 1687533535
 }
 ---- QUERY
@@ -1371,6 +1380,7 @@ select * from
   "queryId": "a940f90c620a7259:2137273d00000000",
   "user": "anurag",
   "queryText": "create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase.alltypes limit 5",
+  "operationType": "CREATETABLE_AS_SELECT",
   "endTime": 1687533540
 }
 ---- QUERY
@@ -1609,6 +1619,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
   "queryId": "664e64cfb1d3fd09:ef8dd84600000000",
   "user": "anurag",
   "queryText": "insert into lineage_test_db.alltypes   values (1, 1, true, \"1999-12-01\", 2.0, 1.0, 1, 12, 2, \"abs\",   cast(now() as timestamp), 1, 1999)",
+  "operationType": "INSERT",
   "endTime": 1687533546
 }
 ---- QUERY
@@ -1852,6 +1863,7 @@ lineage_test_db.alltypes
   "queryId": "784e59087868d497:418a666800000000",
   "user": "anurag",
   "queryText": "insert into table lineage_test_db.alltypesnopart (id, bool_col, timestamp_col) select id, bool_col, timestamp_col from functional.alltypes",
+  "operationType": "INSERT",
   "endTime": 1687533551
 }
 ---- QUERY
@@ -2157,6 +2169,7 @@ from functional.alltypes
   "queryId": "50459cec26bebcb8:6d71e38a00000000",
   "user": "anurag",
   "queryText": "insert into table lineage_test_db.alltypessmall (smallint_col, int_col) partition (year=2009, month=04) select smallint_col, int_col from functional.alltypes where year=2009 and month=05",
+  "operationType": "INSERT",
   "endTime": 1687533556
 }
 ---- QUERY
@@ -2480,6 +2493,7 @@ where year=2009 and month=05
   "queryId": "ca4e2ac78776624d:6e44f11c00000000",
   "user": "anurag",
   "queryText": "insert into table lineage_test_db.alltypessmall (id, string_col, int_col) partition (year, month) select id, string_col, int_col, year, month from functional_seq_snap.alltypes where year=2009 and month>10",
+  "operationType": "INSERT",
   "endTime": 1687533562
 }
 ---- QUERY
@@ -2898,6 +2912,7 @@ where year=2009 and month>10
   "queryId": "e64b728b24bbd5e9:d50607e600000000",
   "user": "anurag",
   "queryText": "insert into table lineage_test_db.alltypessmall partition (year=2009, month) select min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col), month from functional.alltypes where year=2009 and month>10 group by month having min(id) > 10",
+  "operationType": "INSERT",
   "endTime": 1687533567
 }
 ---- QUERY
@@ -2965,6 +2980,7 @@ having min(id) > 10
   "queryId": "b4403b6c2b81f788:b8af2f7700000000",
   "user": "anurag",
   "queryText": "select max(tinyint_col) over(partition by int_col) from functional.alltypes group by int_col, tinyint_col",
+  "operationType": "SELECT",
   "endTime": 1687533573
 }
 ---- QUERY
@@ -3030,6 +3046,7 @@ group by int_col, tinyint_col
   "queryId": "fb4794254fb75b20:d1daf37500000000",
   "user": "anurag",
   "queryText": "select int_col, rank() over(order by int_col) from functional.alltypesagg",
+  "operationType": "SELECT",
   "endTime": 1687533578
 }
 ---- QUERY
@@ -3160,6 +3177,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
   "queryId": "8d4ddc6897bb8c9f:2f295b1700000000",
   "user": "anurag",
   "queryText": "select a.tinyint_col, a.int_col, count(a.double_col)   over(partition by a.tinyint_col order by a.int_col desc rows between 1 preceding and 1 following) from functional.alltypes a inner join functional.alltypessmall b on a.id = b.id order by a.tinyint_col, a.int_col",
+  "operationType": "SELECT",
   "endTime": 1687533583
 }
 ---- QUERY
@@ -3310,6 +3328,7 @@ order by a.tinyint_col, a.int_col
   "queryId": "c14107654ce903b7:9bd3363200000000",
   "user": "anurag",
   "queryText": "with v2 as   (select    double_col,    count(int_col) over() a,    sum(int_col + bigint_col) over(partition by bool_col) b    from      (select * from functional.alltypes) v1) select double_col, a, b, a + b, double_col + a from v2 order by 2, 3, 4",
+  "operationType": "SELECT",
   "endTime": 1687533589
 }
 ---- QUERY
@@ -3465,6 +3484,7 @@ order by 2, 3, 4
   "queryId": "1744e089e7cc73a9:ed50bff000000000",
   "user": "anurag",
   "queryText": "select double_col, a, b, a + b, double_col + a from   (select    double_col,    count(int_col) over() a,    sum(int_col + bigint_col) over(partition by bool_col) b    from      (select * from functional.alltypes) v1) v2 order by 2, 3, 4",
+  "operationType": "SELECT",
   "endTime": 1687533594
 }
 ---- QUERY
@@ -3591,6 +3611,7 @@ order by 2, 3, 4
   "queryId": "4740735360ac58fe:543457eb00000000",
   "user": "anurag",
   "queryText": "select a.month, a.year, b.int_col, b.month from   (select year, month from functional.alltypes    union all    select year, month from functional.alltypes) a   inner join   functional.alltypessmall b   on (a.month = b.month) where b.month = 1",
+  "operationType": "SELECT",
   "endTime": 1687533599
 }
 ---- QUERY
@@ -3712,6 +3733,7 @@ where b.month = 1
   "queryId": "704c9e102ed9744a:97d7530700000000",
   "user": "anurag",
   "queryText": "select t1.int_col, t2.month, t2.int_col + 1 from (   select int_col, count(*)   from functional.alltypessmall   where month = 1   group by int_col   having count(*) > 1   order by count(*) desc limit 5   ) t1 join functional.alltypes t2 on (t1.int_col = t2.int_col) where month = 1",
+  "operationType": "SELECT",
   "endTime": 1687533604
 }
 ---- QUERY
@@ -3933,6 +3955,7 @@ where month = 1
   "queryId": "d5413148c4203ab5:24a6dc2f00000000",
   "user": "anurag",
   "queryText": "select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col from functional.alltypessmall c join (    select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,            a.int_col int_col, a.month month, b.float_col float_col, b.id id    from ( select * from functional.alltypesagg a where month=1 ) a    join functional.alltypessmall b on (a.smallint_col = b.id)  ) x on (x.tinyint_col = c.id) where x.day=1 and x.int_col > 899 and x.float_col > 4.5 and c.string_col < '7' and x.int_col + x.float_col + cast(c.string_col as float) < 1000",
+  "operationType": "SELECT",
   "endTime": 1687533610
 }
 ---- QUERY
@@ -4035,6 +4058,7 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
   "queryId": "d94c43f20a44f454:87b6d0d300000000",
   "user": "anurag",
   "queryText": "select c1, c2, c3 from   (select c1, c2, c3    from      (select int_col c1, sum(float_col) c2, min(float_col) c3       from functional_hbase.alltypessmall       group by 1) x     order by 2,3 desc     limit 5 ) y",
+  "operationType": "SELECT",
   "endTime": 1687533616
 }
 ---- QUERY
@@ -4119,6 +4143,7 @@ from
   "queryId": "674320549904c2a7:e85c13d400000000",
   "user": "anurag",
   "queryText": "select c1, x2 from (   select c1, min(c2) x2   from (     select c1, c2, c3     from (       select int_col c1, tinyint_col c2, min(float_col) c3       from functional_hbase.alltypessmall       group by 1, 2       order by 1,2       limit 1     ) x   ) x2   group by c1 ) y order by 2,1 desc limit 0",
+  "operationType": "SELECT",
   "endTime": 1687533621
 }
 ---- QUERY
@@ -4175,6 +4200,7 @@ limit 0
   "queryId": "1f45c1b8f43f6b96:a19ff31600000000",
   "user": "anurag",
   "queryText": "select id from functional.view_view",
+  "operationType": "SELECT",
   "endTime": 1687533626
 }
 ---- QUERY
@@ -4225,6 +4251,7 @@ select id from functional.view_view
   "queryId": "b7476b57060dceb7:b59a484600000000",
   "user": "anurag",
   "queryText": "select t.id from (select id from functional.alltypes_view) t where t.id < 10",
+  "operationType": "SELECT",
   "endTime": 1687533631
 }
 ---- QUERY
@@ -4346,6 +4373,7 @@ where t.id < 10
   "queryId": "09489cc02e60feec:c8ddfb0b00000000",
   "user": "anurag",
   "queryText": "select string_col, float_col, bool_col from functional.alltypes where id in   (select id from functional.alltypesagg)",
+  "operationType": "SELECT",
   "endTime": 1687533637
 }
 ---- QUERY
@@ -4408,6 +4436,7 @@ where id in
   "queryId": "684366081fd04903:ce9b652700000000",
   "user": "anurag",
   "queryText": "select 1 from functional.alltypesagg a where exists   (select id, count(int_col) over (partition by bool_col)    from functional.alltypestiny b    where a.tinyint_col = b.tinyint_col    group by id, int_col, bool_col) and tinyint_col < 10",
+  "operationType": "SELECT",
   "endTime": 1687533642
 }
 ---- QUERY
@@ -4522,6 +4551,7 @@ and tinyint_col < 10
   "queryId": "bc4aa55c595aa11f:b69f692600000000",
   "user": "anurag",
   "queryText": "select int_col + 1, tinyint_col - 1 from functional.alltypes a where a.int_col <   (select max(int_col) from functional.alltypesagg g where g.bool_col = true) and a.bigint_col > 10",
+  "operationType": "SELECT",
   "endTime": 1687533647
 }
 ---- QUERY
@@ -4590,6 +4620,7 @@ and a.bigint_col > 10
   "queryId": "a54406d43e4870fb:cf7baf2100000000",
   "user": "anurag",
   "queryText": "with t as (select int_col x, bigint_col y from functional.alltypes) select x, y from t",
+  "operationType": "SELECT",
   "endTime": 1687533652
 }
 ---- QUERY
@@ -4888,6 +4919,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
   "queryId": "7d4e988e98626451:c0be63a200000000",
   "user": "anurag",
   "queryText": "with t1 as (select * from functional.alltypestiny) insert into lineage_test_db.alltypesinsert (id, int_col, string_col) partition(year, month) select id, int_col, string_col, year, month from t1",
+  "operationType": "INSERT",
   "endTime": 1687533658
 }
 ---- QUERY
@@ -4994,6 +5026,7 @@ select id, int_col, string_col, year, month from t1
   "queryId": "cf494d06aa9e201a:7047aec600000000",
   "user": "anurag",
   "queryText": "select lead(a) over (partition by b order by c) from   (select lead(id) over (partition by int_col order by bigint_col) as a,    max(id) over (partition by tinyint_col order by int_col) as b,    min(int_col) over (partition by string_col order by bool_col) as c    from functional.alltypes) v",
+  "operationType": "SELECT",
   "endTime": 1687533663
 }
 ---- QUERY
@@ -5045,6 +5078,7 @@ from
   "queryId": "574dce023537d84c:5de5f32b00000000",
   "user": "anurag",
   "queryText": "create view lineage_test_db.lineage_test_view1 as select id from functional.alltypestiny",
+  "operationType": "CREATEVIEW",
   "endTime": 1687533668
 }
 ---- QUERY
@@ -5131,6 +5165,7 @@ create view lineage_test_db.lineage_test_view1 as select id from functional.allt
   "queryId": "b54cc29caca2cf8a:99ff97ae00000000",
   "user": "anurag",
   "queryText": "create view lineage_test_db.lineage_test_view2 (a, b) as select c1, x2 from (   select c1, min(c2) x2   from (     select c1, c2, c3     from (       select int_col c1, tinyint_col c2, min(float_col) c3       from functional_hbase.alltypessmall       group by 1, 2       order by 1,2       limit 1     ) x   ) x2   group by c1 ) y order by 2,1 desc limit 0",
+  "operationType": "CREATEVIEW",
   "endTime": 1687533673
 }
 ---- QUERY
@@ -5399,6 +5434,7 @@ limit 0
   "queryId": "2a43cfbaea01dda0:c08ec40600000000",
   "user": "anurag",
   "queryText": "create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as   select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col   from functional.alltypessmall c   join (      select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,            a.int_col int_col, a.month month, b.float_col float_col, b.id id      from ( select * from functional.alltypesagg a where month=1 ) a      join functional.alltypessmall b on (a.smallint_col = b.id)    ) x on (x.tinyint_col = c.id)   where x.day=1   and x.int_col > 899   and x.float_col > 4.5   and c.string_col < '7'   and x.int_col + x.float_col + cast(c.string_col as float) < 1000",
+  "operationType": "CREATEVIEW",
   "endTime": 1687533679
 }
 ---- QUERY
@@ -5616,6 +5652,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
   "queryId": "d448e01e4832881e:59ee2b4a00000000",
   "user": "anurag",
   "queryText": "create view lineage_test_db.lineage_test_view4 as   select * from (     select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),       count(b.string_col), b.timestamp_col     from functional.alltypes a join functional.alltypessmall b on (a.id = b.id)     where a.year = 2010 and b.float_col > 0     group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col     having count(a.int_col) > 10     order by b.bigint_col limit 10) t",
+  "operationType": "CREATEVIEW",
   "endTime": 1687533684
 }
 ---- QUERY
@@ -5670,6 +5707,7 @@ create view lineage_test_db.lineage_test_view4 as
   "queryId": "b54e1dc4a678c946:eb23e54700000000",
   "user": "anurag",
   "queryText": "alter view lineage_test_db.alltypes_view as select id from functional.alltypestiny",
+  "operationType": "ALTERVIEW_AS",
   "endTime": 1687533689
 }
 ---- QUERY
@@ -5763,6 +5801,7 @@ alter view lineage_test_db.alltypes_view as select id from functional.alltypesti
   "queryId": "ee4f63ccf2181e85:2b38e8dd00000000",
   "user": "anurag",
   "queryText": "select * from (   select int_struct_col.f1 + int_struct_col.f2 x from functional.allcomplextypes   where year = 2000   order by nested_struct_col.f2.f12.f21 limit 10   union all   select sum(f1) y from     (select complex_struct_col.f1 f1 from functional.allcomplextypes      group by 1) v1) v2",
+  "operationType": "SELECT",
   "endTime": 1687533694
 }
 ---- QUERY
@@ -5896,6 +5935,7 @@ select * from (
   "queryId": "394a9bd88d04af98:9452981700000000",
   "user": "anurag",
   "queryText": "select * from functional.allcomplextypes.int_array_col a inner join   functional.allcomplextypes.struct_map_col m on (a.item = m.f1)",
+  "operationType": "SELECT",
   "endTime": 1687533700
 }
 ---- QUERY
@@ -6121,6 +6161,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
   "queryId": "b043e925908e15a2:1a5b1afe00000000",
   "user": "anurag",
   "queryText": "select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col m   where a.item = m.f1",
+  "operationType": "SELECT",
   "endTime": 1687533705
 }
 ---- QUERY
@@ -6301,6 +6342,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
   "queryId": "04414cb7de8797d4:4caad29500000000",
   "user": "anurag",
   "queryText": "select a + b as ab, c, d, e from functional.allcomplextypes t,   (select sum(item) a from t.int_array_col    where item < 10) v1,   (select count(f1) b from t.struct_map_col    group by key) v2,   (select avg(value) over(partition by key) c from t.map_map_col.value) v3,   (select item d from t.int_array_col    union all    select value from t.int_map_col) v4,   (select f21 e from t.complex_nested_struct_col.f2.f12 order by key limit 10) v5",
+  "operationType": "SELECT",
   "endTime": 1687533710
 }
 ---- QUERY
@@ -6365,6 +6407,7 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
   "queryId": "764a4986b0d631c2:a52f087b00000000",
   "user": "anurag",
   "queryText": "create view lineage_test_db.lineage_test_view5 as select id from functional.alltypes_view v where not exists (select 1 from functional.alltypes a where v.id = a.id)",
+  "operationType": "CREATEVIEW",
   "endTime": 1687533715
 }
 ---- QUERY
@@ -6471,6 +6514,7 @@ where not exists (select 1 from functional.alltypes a where v.id = a.id)
   "queryId": "db47d0dcf9aa4267:6cfbbef700000000",
   "user": "boroknagyz",
   "queryText": "create table lineage_test_db.ice_ctas partitioned by spec (truncate(1, string_col)) stored by iceberg as select id, string_col, timestamp_col from functional_parquet.alltypes",
+  "operationType": "CREATETABLE_AS_SELECT",
   "endTime": 1687615427
 }
 ---- QUERY
@@ -6605,6 +6649,7 @@ select id, string_col, timestamp_col from functional_parquet.alltypes
   "queryId": "1942b41abdcfba11:1d8e573d00000000",
   "user": "boroknagyz",
   "queryText": "insert into lineage_test_db.iceberg_partitioned select * from functional_parquet.iceberg_partitioned",
+  "operationType": "INSERT",
   "endTime": 1687615432
 }
 ---- QUERY
@@ -6738,6 +6783,7 @@ select * from functional_parquet.iceberg_partitioned
   "queryId": "5e4febca0b4e3922:96171f9700000000",
   "user": "boroknagyz",
   "queryText": "insert into lineage_test_db.iceberg_partitioned select * from functional_parquet.iceberg_partitioned",
+  "operationType": "INSERT",
   "endTime": 1687615438
 }
 ---- QUERY
@@ -6784,9 +6830,268 @@ select * from functional_parquet.iceberg_partitioned
   "queryId": "46450d3ee417fa15:9c00c0ce00000000",
   "user": "boroknagyz",
   "queryText": "insert into lineage_test_db.foo select id from lineage_test_db.iceberg_partitioned",
+  "operationType": "INSERT",
   "endTime": 1687615443
 }
 ---- QUERY
 insert into lineage_test_db.foo
 select id from lineage_test_db.iceberg_partitioned
+====
+---- LINEAGE
+{
+  "queryText": "insert overwrite table lineage_test_db.alltypesnopart (id, bool_col, timestamp_col) select id, bool_col, timestamp_col from functional.alltypes",
+  "operationType": "INSERT_OVERWRITE",
+  "queryId": "44426aacddcb94ec:1d961ec800000000",
+  "hash": "b28dcb636dce5104778696cde4ed4802",
+  "user": "fangyurao",
+  "timestamp": 1772141117,
+  "endTime": 1772141117,
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        5
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        9
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        10
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        11
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        13
+      ],
+      "targets": [
+        12
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "metadata": {
+        "tableName": "functional.alltypes",
+        "tableType": "hive",
+        "tableCreateTime": 1766691526
+      }
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bool_col",
+      "metadata": {
+        "tableName": "functional.alltypes",
+        "tableType": "hive",
+        "tableCreateTime": 1766691526
+      }
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "bigint_col",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 8,
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 9,
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 10,
+      "vertexType": "COLUMN",
+      "vertexId": "date_string_col",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 11,
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 12,
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "metadata": {
+        "tableName": "lineage_test_db.alltypesnopart",
+        "tableType": "hive",
+        "tableCreateTime": 1772140870
+      }
+    },
+    {
+      "id": 13,
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.timestamp_col",
+      "metadata": {
+        "tableName": "functional.alltypes",
+        "tableType": "hive",
+        "tableCreateTime": 1766691526
+      }
+    }
+  ]
+}
+---- QUERY
+insert overwrite table lineage_test_db.alltypesnopart (id, bool_col, timestamp_col)
+select id, bool_col, timestamp_col
+from functional.alltypes
+====
+---- LINEAGE
+{
+  "queryText": "create table lineage_test_db.like_alltypestiny_file like parquet '/test-warehouse/schemas/alltypestiny.parquet'",
+  "operationType": "CREATETABLE",
+  "queryId": "1d48cc246ea3d03d:e73a74ad00000000",
+  "hash": "85b96955243dd853bb653f379d433f13",
+  "user": "fangyurao",
+  "timestamp": 1772480467,
+  "endTime": 1772480467,
+  "edges": [],
+  "vertices": []
+}
+---- QUERY
+create table lineage_test_db.like_alltypestiny_file like parquet
+'$FILESYSTEM_PREFIX/test-warehouse/schemas/alltypestiny.parquet'
 ====

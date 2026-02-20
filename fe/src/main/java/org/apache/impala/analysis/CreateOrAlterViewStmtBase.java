@@ -179,7 +179,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   /**
    * Computes the column lineage graph for a create/alter view statement.
    */
-  protected void computeLineageGraph(Analyzer analyzer) {
+  protected void computeLineageGraph(Analyzer analyzer, StatementBase stmt) {
     ColumnLineageGraph graph = analyzer.getColumnLineageGraph();
     List<ColumnLabel> colDefs = new ArrayList<>();
     for (ColumnDef colDef: finalColDefs_) {
@@ -187,7 +187,8 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
           ColumnLineageGraph.VIEW));
     }
     graph.addTargetColumnLabels(colDefs);
-    graph.computeLineageGraph(viewDefStmt_.getResultExprs(), analyzer);
+    graph.computeLineageGraph(viewDefStmt_.getResultExprs(), analyzer,
+        ColumnLineageGraph.computeOperationType(stmt));
     if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
   }
 

@@ -7,6 +7,7 @@ select * from (
 ---- LINEAGE
 {
     "queryText":"select * from (\n  select tinyint_col + int_col x from functional.alltypes\n  union all\n  select sum(bigint_col) y from (select bigint_col from functional.alltypes) v1) v2",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"1a88e455569d619b268157867d97489d",
     "user":"dummy_user",
@@ -76,6 +77,7 @@ order by b.bigint_col limit 10
 ---- LINEAGE
 {
     "queryText":"select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),\n  count(b.string_col), b.timestamp_col\nfrom functional.alltypes a join functional.alltypessmall b on (a.id = b.id)\nwhere a.year = 2010 and b.float_col > 0\ngroup by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col\nhaving count(a.int_col) > 10\norder by b.bigint_col limit 10",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"ea11605d73c3e77c40d2905de9a1f008",
     "user":"dummy_user",
@@ -263,6 +265,7 @@ create table lineage_test_tbl as select int_col, tinyint_col from functional.all
 ---- LINEAGE
 {
     "queryText":"create table lineage_test_tbl as select int_col, tinyint_col from functional.alltypes",
+    "operationType": "CREATETABLE_AS_SELECT",
     "queryId":"0:0",
     "hash":"2f673a20092048a5035f4a01edd612fd",
     "user":"dummy_user",
@@ -338,6 +341,7 @@ where a.year = 2009 and b.month = 2
 ---- LINEAGE
 {
     "queryText":"create table lineage_test_tbl as\nselect distinct a.int_col, a.string_col from functional.alltypes a\ninner join functional.alltypessmall b on (a.id = b.id)\nwhere a.year = 2009 and b.month = 2",
+    "operationType": "CREATETABLE_AS_SELECT",
     "queryId":"0:0",
     "hash":"2c547ba840dfc511483fd1a5909da15f",
     "user":"dummy_user",
@@ -466,6 +470,7 @@ select * from
 ---- LINEAGE
 {
     "queryText":"create table lineage_test_tbl as\nselect * from\n  (select * from\n     (select int_col from functional.alltypestiny limit 1) v1 ) v2",
+    "operationType": "CREATETABLE_AS_SELECT",
     "queryId":"0:0",
     "hash":"d34ab281d4fcf088efe7b558a5786a00",
     "user":"dummy_user",
@@ -510,6 +515,7 @@ create table lineage_test_tblm as select * from functional_hbase.alltypes limit 
 ---- LINEAGE
 {
     "queryText":"create table lineage_test_tblm as select * from functional_hbase.alltypes limit 5",
+    "operationType": "CREATETABLE_AS_SELECT",
     "queryId":"0:0",
     "hash":"b69259e85dac890c7df82ca94dcf8c54",
     "user":"dummy_user",
@@ -905,6 +911,7 @@ functional_hbase.alltypes
 ---- LINEAGE
 {
     "queryText":"insert into\nfunctional_hbase.alltypes\n  values (1, 1, true, \"1999-12-01\", 2.0, 1.0, 1, 12, 2, \"abs\",\n  cast(now() as timestamp), 1, 1999)",
+    "operationType": "INSERT",
     "queryId":"0:0",
     "hash":"7eacea08a1e442fae1edb6734cd15551",
     "user":"dummy_user",
@@ -1155,6 +1162,7 @@ from functional.alltypes
 ---- LINEAGE
 {
     "queryText":"insert into table functional.alltypesnopart (id, bool_col, timestamp_col)\nselect id, bool_col, timestamp_col\nfrom functional.alltypes",
+    "operationType": "INSERT",
     "queryId":"0:0",
     "hash":"24d103f36450208bfb8cccfa2db687c4",
     "user":"dummy_user",
@@ -1404,6 +1412,7 @@ where year=2009 and month=05
 ---- LINEAGE
 {
     "queryText":"insert into table functional.alltypessmall (smallint_col, int_col)\npartition (year=2009, month=04)\nselect smallint_col, int_col\nfrom functional.alltypes\nwhere year=2009 and month=05",
+    "operationType": "INSERT",
     "queryId":"0:0",
     "hash":"1d7f2ed12efeb2876353734d7f1fca33",
     "user":"dummy_user",
@@ -1720,6 +1729,7 @@ where year=2009 and month>10
 ---- LINEAGE
 {
     "queryText":"insert into table functional.alltypessmall (id, string_col, int_col)\npartition (year, month)\nselect id, string_col, int_col, year, month\nfrom functional_seq_snap.alltypes\nwhere year=2009 and month>10",
+    "operationType": "INSERT",
     "queryId":"0:0",
     "hash":"adbda5f55e1de85c20b63ef02baa49b1",
     "user":"dummy_user",
@@ -2053,6 +2063,7 @@ having min(id) > 10
 ---- LINEAGE
 {
     "queryText":"insert into table functional.alltypessmall\npartition (year=2009, month)\nselect min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col),\nmin(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col),\nmin(timestamp_col), month\nfrom functional.alltypes\nwhere year=2009 and month>10\ngroup by month\nhaving min(id) > 10",
+    "operationType": "INSERT",
     "queryId":"0:0",
     "hash":"7059dbbaa22bdf0c2d4c5b08baf11ef2",
     "user":"dummy_user",
@@ -2470,6 +2481,7 @@ group by int_col, tinyint_col
 ---- LINEAGE
 {
     "queryText":"select\nmax(tinyint_col) over(partition by int_col)\nfrom functional.alltypes\ngroup by int_col, tinyint_col",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"4de56e1b4b44d31bf3851fb46deed110",
     "user":"dummy_user",
@@ -2527,6 +2539,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
 ---- LINEAGE
 {
     "queryText":"select int_col, rank() over(order by int_col) from functional.alltypesagg",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"6c646de10e62d1155b5216ae8589ff6d",
     "user":"dummy_user",
@@ -2590,6 +2603,7 @@ order by a.tinyint_col, a.int_col
 ---- LINEAGE
 {
     "queryText":"select a.tinyint_col, a.int_col, count(a.double_col)\n  over(partition by a.tinyint_col order by a.int_col desc rows between 1 preceding and 1 following)\nfrom functional.alltypes a inner join functional.alltypessmall b on a.id = b.id\norder by a.tinyint_col, a.int_col",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"57958e2fb9f6dd0277f91593b59ed66e",
     "user":"dummy_user",
@@ -2726,6 +2740,7 @@ order by 2, 3, 4
 ---- LINEAGE
 {
     "queryText":"with v2 as\n  (select\n   double_col,\n   count(int_col) over() a,\n   sum(int_col + bigint_col) over(partition by bool_col) b\n   from\n     (select * from functional.alltypes) v1)\nselect double_col, a, b, a + b, double_col + a from v2\norder by 2, 3, 4",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"94cd8f86dbdf00a40b9d935bccffcbaa",
     "user":"dummy_user",
@@ -2878,6 +2893,7 @@ order by 2, 3, 4
 ---- LINEAGE
 {
     "queryText":"select double_col, a, b, a + b, double_col + a from\n  (select\n   double_col,\n   count(int_col) over() a,\n   sum(int_col + bigint_col) over(partition by bool_col) b\n   from\n     (select * from functional.alltypes) v1) v2\norder by 2, 3, 4",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"4c67b7dddb64d9f584c1e6bd9e182fc6",
     "user":"dummy_user",
@@ -3032,6 +3048,7 @@ where b.month = 1
 ---- LINEAGE
 {
     "queryText":"select a.month, a.year, b.int_col, b.month\nfrom\n  (select year, month from functional.alltypes\n   union all\n   select year, month from functional.alltypes) a\n  inner join\n  functional.alltypessmall b\n  on (a.month = b.month)\nwhere b.month = 1",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"6f38ebd361a51366f80a9f889f302424",
     "user":"dummy_user",
@@ -3160,6 +3177,7 @@ where month = 1
 ---- LINEAGE
 {
     "queryText":"select t1.int_col, t2.month, t2.int_col + 1\nfrom (\n  select int_col, count(*)\n  from functional.alltypessmall\n  where month = 1\n  group by int_col\n  having count(*) > 1\n  order by count(*) desc limit 5\n  ) t1\njoin functional.alltypes t2 on (t1.int_col = t2.int_col)\nwhere month = 1",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"90ceff377b6984b0c3eb7306c3711b38",
     "user":"dummy_user",
@@ -3282,6 +3300,7 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
 ---- LINEAGE
 {
     "queryText":"select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col\nfrom functional.alltypessmall c\njoin (\n   select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,\n           a.int_col int_col, a.month month, b.float_col float_col, b.id id\n   from ( select * from functional.alltypesagg a where month=1 ) a\n   join functional.alltypessmall b on (a.smallint_col = b.id)\n ) x on (x.tinyint_col = c.id)\nwhere x.day=1\nand x.int_col > 899\nand x.float_col > 4.5\nand c.string_col < '7'\nand x.int_col + x.float_col + cast(c.string_col as float) < 1000",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"154323930680f2bff235d4abcf5afa62",
     "user":"dummy_user",
@@ -3499,6 +3518,7 @@ from
 ---- LINEAGE
 {
     "queryText":"select c1, c2, c3\nfrom\n  (select c1, c2, c3\n   from\n     (select int_col c1, sum(float_col) c2, min(float_col) c3\n      from functional_hbase.alltypessmall\n      group by 1) x\n    order by 2,3 desc\n    limit 5\n) y",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"412ef8a4c54e66f19a0065c3fecc5c76",
     "user":"dummy_user",
@@ -3603,6 +3623,7 @@ limit 0
 ---- LINEAGE
 {
     "queryText":"select c1, x2\nfrom (\n  select c1, min(c2) x2\n  from (\n    select c1, c2, c3\n    from (\n      select int_col c1, tinyint_col c2, min(float_col) c3\n      from functional_hbase.alltypessmall\n      group by 1, 2\n      order by 1,2\n      limit 1\n    ) x\n  ) x2\n  group by c1\n) y\norder by 2,1 desc\nlimit 0",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"44626c1f89757d07604a3f054e98d67d",
     "user":"dummy_user",
@@ -3677,6 +3698,7 @@ select int_col, string_col from functional.view_view
 ---- LINEAGE
 {
     "queryText":"select int_col, string_col from functional.view_view",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"05d4986bc7d30b32d8780d787af559d9",
     "user":"dummy_user",
@@ -3740,6 +3762,7 @@ where t.id < 10
 ---- LINEAGE
 {
     "queryText":"select t.id from (select id from functional.alltypes_view) t\nwhere t.id < 10",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"0c505dc14adb7f037eea4b3c77c39bff",
     "user":"dummy_user",
@@ -3791,6 +3814,7 @@ where id in
 ---- LINEAGE
 {
     "queryText":"select string_col, float_col, bool_col\nfrom functional.alltypes\nwhere id in\n  (select id from functional.alltypesagg)",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"ae4a1b83a50d2ce727117d0387c8e098",
     "user":"dummy_user",
@@ -3916,6 +3940,7 @@ and tinyint_col < 10
 ---- LINEAGE
 {
     "queryText":"select 1\nfrom functional.alltypesagg a\nwhere exists\n  (select id, count(int_col) over (partition by bool_col)\n   from functional.alltypestiny b\n   where a.tinyint_col = b.tinyint_col\n   group by id, int_col, bool_col)\nand tinyint_col < 10",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"ce3e78ae349dd67613458acb0dac572f",
     "user":"dummy_user",
@@ -3977,6 +4002,7 @@ and a.bigint_col > 10
 ---- LINEAGE
 {
     "queryText":"select int_col + 1, tinyint_col - 1\nfrom functional.alltypes a\nwhere a.int_col <\n  (select max(int_col) from functional.alltypesagg g where g.bool_col = true)\nand a.bigint_col > 10",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"2301fac73ccbb692c19615733c977c14",
     "user":"dummy_user",
@@ -4083,6 +4109,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
 ---- LINEAGE
 {
     "queryText":"with t as (select int_col x, bigint_col y from functional.alltypes) select x, y from t",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"ff421b2c2b249764028350613be74fb8",
     "user":"dummy_user",
@@ -4147,6 +4174,7 @@ select id, int_col, string_col, year, month from t1
 ---- LINEAGE
 {
     "queryText":"with t1 as (select * from functional.alltypestiny)\ninsert into functional.alltypesinsert (id, int_col, string_col) partition(year, month)\nselect id, int_col, string_col, year, month from t1",
+    "operationType": "INSERT",
     "queryId":"0:0",
     "hash":"0fa8fc72001bde1a8745956bccc77820",
     "user":"dummy_user",
@@ -4456,6 +4484,7 @@ from
 ---- LINEAGE
 {
     "queryText":"select lead(a) over (partition by b order by c)\nfrom\n  (select lead(id) over (partition by int_col order by bigint_col) as a,\n   max(id) over (partition by tinyint_col order by int_col) as b,\n   min(int_col) over (partition by string_col order by bool_col) as c\n   from functional.alltypes) v",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"6891082bb252b6fce39d846bf89c497d",
     "user":"dummy_user",
@@ -4559,6 +4588,7 @@ create view test_view_lineage as select id from functional.alltypestiny
 ---- LINEAGE
 {
     "queryText":"create view test_view_lineage as select id from functional.alltypestiny",
+    "operationType": "CREATEVIEW",
     "queryId":"0:0",
     "hash":"fd85383983eafa8a57731e87fba7b7b6",
     "user":"dummy_user",
@@ -4619,6 +4649,7 @@ limit 0
 ---- LINEAGE
 {
     "queryText":"create view test_view_lineage (a, b) as select c1, x2\nfrom (\n  select c1, min(c2) x2\n  from (\n    select c1, c2, c3\n    from (\n      select int_col c1, tinyint_col c2, min(float_col) c3\n      from functional_hbase.alltypessmall\n      group by 1, 2\n      order by 1,2\n      limit 1\n    ) x\n  ) x2\n  group by c1\n) y\norder by 2,1 desc\nlimit 0",
+    "operationType": "CREATEVIEW",
     "queryId":"0:0",
     "hash":"a3cdac0fcdaef861d783d0ef91ad1919",
     "user":"dummy_user",
@@ -4716,6 +4747,7 @@ create view test_view_lineage (a1, a2, a3, a4, a5, a6, a7) as
 ---- LINEAGE
 {
     "queryText":"create view test_view_lineage (a1, a2, a3, a4, a5, a6, a7) as\n  select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col\n  from functional.alltypessmall c\n  join (\n     select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,\n           a.int_col int_col, a.month month, b.float_col float_col, b.id id\n     from ( select * from functional.alltypesagg a where month=1 ) a\n     join functional.alltypessmall b on (a.smallint_col = b.id)\n   ) x on (x.tinyint_col = c.id)\n  where x.day=1\n  and x.int_col > 899\n  and x.float_col > 4.5\n  and c.string_col < '7'\n  and x.int_col + x.float_col + cast(c.string_col as float) < 1000",
+    "operationType": "CREATEVIEW",
     "queryId":"0:0",
     "hash":"687637d408bf427f7851f9dfafb4d637",
     "user":"dummy_user",
@@ -4974,6 +5006,7 @@ create view test_view_lineage as
 ---- LINEAGE
 {
     "queryText":"create view test_view_lineage as\n  select * from (\n    select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),\n      count(b.string_col), b.timestamp_col\n    from functional.alltypes a join functional.alltypessmall b on (a.id = b.id)\n    where a.year = 2010 and b.float_col > 0\n    group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col\n    having count(a.int_col) > 10\n    order by b.bigint_col limit 10) t",
+    "operationType": "CREATEVIEW",
     "queryId":"0:0",
     "hash":"663b053e02a33d9bbd58ddc23ccbc101",
     "user":"dummy_user",
@@ -5176,6 +5209,7 @@ alter view functional.alltypes_view as select id from functional.alltypestiny
 ---- LINEAGE
 {
     "queryText":"alter view functional.alltypes_view as select id from functional.alltypestiny",
+    "operationType": "ALTERVIEW_AS",
     "queryId":"0:0",
     "hash":"f12ecfd6e5357c92cbd14f52b2637e1a",
     "user":"dummy_user",
@@ -5227,6 +5261,7 @@ select * from (
 ---- LINEAGE
 {
     "queryText":"select * from (\n  select int_struct_col.f1 + int_struct_col.f2 x from functional.allcomplextypes\n  where year = 2000\n  order by nested_struct_col.f2.f12.f21 limit 10\n  union all\n  select sum(f1) y from\n    (select complex_struct_col.f1 f1 from functional.allcomplextypes\n     group by 1) v1) v2",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"c32c80f6a02e5f11b920d658daa4a5c3",
     "user":"dummy_user",
@@ -5320,6 +5355,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
 ---- LINEAGE
 {
     "queryText":"select * from functional.allcomplextypes.int_array_col a inner join\n  functional.allcomplextypes.struct_map_col m on (a.item = m.f1)",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"f0e1c9c0c94732cfb0e44792a1339d3e",
     "user":"dummy_user",
@@ -5446,6 +5482,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
 ---- LINEAGE
 {
     "queryText":"select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col m\n  where a.item = m.f1",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"58bf06d90d336cd80b24a2ea6404aa32",
     "user":"dummy_user",
@@ -5676,6 +5713,7 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
 ---- LINEAGE
 {
     "queryText":"select a + b as ab, c, d, e from functional.allcomplextypes t,\n  (select sum(item) a from t.int_array_col\n   where item < 10) v1,\n  (select count(f1) b from t.struct_map_col\n   group by key) v2,\n  (select avg(value) over(partition by key) c from t.map_map_col.value) v3,\n  (select item d from t.int_array_col\n   union all\n   select value from t.int_map_col) v4,\n  (select f21 e from t.complex_nested_struct_col.f2.f12 order by key limit 10) v5",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"17f8a4d5d7a82a254e377d2dd9f3ca66",
     "user":"dummy_user",
@@ -5854,6 +5892,7 @@ where not exists (select 1 from functional.alltypes a where v.id = a.id)
 ---- LINEAGE
 {
     "queryText":"create view test_view_lineage as\nselect id from functional.alltypes_view v\nwhere not exists (select 1 from functional.alltypes a where v.id = a.id)",
+    "operationType": "CREATEVIEW",
     "queryId":"0:0",
     "hash":"41a074680a8eedce05db55fde68669e0",
     "user":"dummy_user",
@@ -5908,6 +5947,7 @@ where k.int_col < 10
 ---- LINEAGE
 {
     "queryText":"select count(*) from functional_kudu.alltypes k join functional.alltypes h on k.id = h.id\nwhere k.int_col < 10",
+    "operationType":"SELECT",
     "queryId":"0:0",
     "hash":"0528557b137722769f5df029d4816c7a",
     "user":"dummy_user",
@@ -5978,6 +6018,7 @@ functional.alltypes a where a.id < 100
 ---- LINEAGE
 {
     "queryText":"insert into functional_kudu.testtbl select id, string_col as name, int_col as zip from\nfunctional.alltypes a where a.id < 100",
+    "operationType": "INSERT",
     "queryId":"0:0",
     "hash":"dd40a5127a7a1abe4708ac58811680ae",
     "user":"dummy_user",
@@ -6092,6 +6133,7 @@ functional.alltypes where id < 10
 ---- LINEAGE
 {
     "queryText":"insert into functional_kudu.testtbl (name, id) select string_col as name, id from\nfunctional.alltypes where id < 10",
+    "operationType": "INSERT",
     "queryId":"0:0",
     "hash":"111bc2413ac3bc54cdca8c0f0fc3cb8c",
     "user":"dummy_user",
@@ -6176,6 +6218,7 @@ functional.alltypes where id < 10
 ---- LINEAGE
 {
     "queryText":"upsert into functional_kudu.testtbl (name, id) select string_col as name, id from\nfunctional.alltypes where id < 10",
+    "operationType": "UPSERT",
     "queryId":"0:0",
     "hash":"848add05dd236efd79bffd369a0bdb69",
     "user":"dummy_user",
@@ -6262,6 +6305,7 @@ from functional.alltypestiny
 ---- LINEAGE
 {
     "queryText":"create table kudu_ctas primary key (id) partition by hash (id) partitions 3\nstored as kudu as select id, bool_col, tinyint_col, smallint_col, int_col,\nbigint_col, float_col, double_col, date_string_col, string_col\nfrom functional.alltypestiny",
+    "operationType": "CREATETABLE_AS_SELECT",
     "queryId":"0:0",
     "hash":"1baf83a160e93356a7b12a393f147355",
     "user":"dummy_user",
@@ -6570,6 +6614,7 @@ from functional_hbase.alltypestiny
 ---- LINEAGE
 {
     "queryText":"create table ice_ctas_from_hbase partitioned by spec (bucket(7,id))\nstored as iceberg as select id, bool_col, int_col,\nbigint_col, float_col, double_col, date_string_col, string_col\nfrom functional_hbase.alltypestiny",
+    "operationType": "CREATETABLE_AS_SELECT",
     "queryId":"0:0",
     "hash":"fc2031078e9801a8965cd81a415955d0",
     "user":"dummy_user",
@@ -6820,6 +6865,7 @@ from functional_kudu.alltypestiny
 ---- LINEAGE
 {
     "queryText":"create table ice_ctas_from_kudu partitioned by spec (truncate(100, id))\nstored as iceberg as select id, bool_col, int_col,\nbigint_col, float_col, double_col, date_string_col, string_col\nfrom functional_kudu.alltypestiny",
+    "operationType": "CREATETABLE_AS_SELECT",
     "queryId":"0:0",
     "hash":"5f8edff98099449082049dda676428b0",
     "user":"dummy_user",
@@ -7069,6 +7115,7 @@ string_col from functional_kudu.alltypestiny
 ---- LINEAGE
 {
     "queryText":"INSERT INTO functional_parquet.iceberg_alltypes_part SELECT id, bool_col, int_col,\nbigint_col, float_col, double_col, 3.14, cast(date_string_col as date format 'MM/DD/YYYY'),\nstring_col from functional_kudu.alltypestiny",
+    "operationType": "INSERT",
     "queryId":"0:0",
     "hash":"58cca98fbd61b04a38cce3c6d33db56d",
     "user":"dummy_user",
@@ -7335,6 +7382,7 @@ from functional_parquet.iceberg_partitioned a where a.id < 100
 ---- LINEAGE
 {
     "queryText":"insert into functional_kudu.testtbl select id, user as name, cast(id*2 as INT) as zip\nfrom functional_parquet.iceberg_partitioned a where a.id < 100",
+    "operationType": "INSERT",
     "queryId":"0:0",
     "hash":"e1c26e3c7ec88ea6ffe339402631655b",
     "user":"dummy_user",

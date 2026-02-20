@@ -66,7 +66,7 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
 
     createColumnAndViewDefs(analyzer);
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
-      computeLineageGraph(analyzer);
+      computeLineageGraph(analyzer, this);
     }
   }
 

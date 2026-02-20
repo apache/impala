@@ -99,6 +99,30 @@ public class ColumnLineageGraph {
   public static final String VIEW = "view";
   public static final String VIRTUAL = "virtual";
   public static final String EXTERNAL_DATASOURCE = "external-datasource";
+
+  public enum OperationType {
+    CREATEVIEW("CREATEVIEW"),
+    CREATETABLE_AS_SELECT("CREATETABLE_AS_SELECT"),
+    ALTERVIEW_AS("ALTERVIEW_AS"),
+    INSERT_OVERWRITE("INSERT_OVERWRITE"),
+    UPSERT("UPSERT"),
+    INSERT("INSERT"),
+    SELECT("SELECT"),
+    CREATETABLE("CREATETABLE"),
+    UNKNOWN("UNKNOWN");
+
+    private final String operationType_;
+
+    OperationType(String operationType) {
+      operationType_ = operationType;
+    }
+
+    @Override
+    public String toString() {
+      return operationType_;
+    }
+  }
+
   /**
    * Represents a vertex in the column lineage graph. A Vertex may correspond to a base
    * table column, a column in the destination table (for the case of INSERT or CTAS
@@ -452,6 +476,8 @@ public class ColumnLineageGraph {
   // Query statement
   private String queryStr_;
 
+  private String operationType_;
+
   private TUniqueId queryId_;
 
   // Name of the user that issued this query
@@ -487,12 +513,14 @@ public class ColumnLineageGraph {
   /**
    * Private c'tor, used only for testing.
    */
-  private ColumnLineageGraph(String stmt, TUniqueId queryId, String user, long timestamp)
+  private ColumnLineageGraph(String stmt, TUniqueId queryId, String user, long timestamp,
+      String operationType)
   {
     queryStr_ = stmt;
     queryId_ = queryId;
     user_ = user;
     timestamp_ = timestamp;
+    operationType_ = operationType;
   }
 
   private void setVertices(Set<Vertex> vertices) {
@@ -573,8 +601,9 @@ public class ColumnLineageGraph {
    * Computes the column lineage graph of a query from the list of query result exprs.
    * 'rootAnalyzer' is the Analyzer that was used for the analysis of the query.
    */
-  public void computeLineageGraph(List<Expr> resultExprs, Analyzer rootAnalyzer) {
-    init(rootAnalyzer);
+  public void computeLineageGraph(List<Expr> resultExprs, Analyzer rootAnalyzer,
+      OperationType operationType) {
+    init(rootAnalyzer, operationType);
     // Compute the dependencies only if result expressions are available.
     if (resultExprs != null && !resultExprs.isEmpty()) {
       computeProjectionDependencies(resultExprs, rootAnalyzer);
@@ -585,7 +614,7 @@ public class ColumnLineageGraph {
   /**
    * Initialize the ColumnLineageGraph from the root analyzer of a query.
    */
-  private void init(Analyzer analyzer) {
+  private void init(Analyzer analyzer, OperationType operationType) {
     Preconditions.checkNotNull(analyzer);
     Preconditions.checkState(analyzer.isRootAnalyzer());
     TQueryCtx queryCtx = analyzer.getQueryCtx();
@@ -599,7 +628,10 @@ public class ColumnLineageGraph {
     descTbl_ = analyzer.getDescTbl();
     user_ = analyzer.getUser().getName();
     queryId_ = queryCtx.query_id;
+    operationType_ = operationType.toString();
   }
+
+
 
   private void computeProjectionDependencies(List<Expr> resultExprs, Analyzer analyzer) {
     Preconditions.checkNotNull(resultExprs);
@@ -731,6 +763,7 @@ public class ColumnLineageGraph {
     if (Strings.isNullOrEmpty(queryStr_)) return "";
     Map<String, Object> obj = new LinkedHashMap<>();
     obj.put("queryText", queryStr_);
+    obj.put("operationType", operationType_);
     obj.put("queryId", TUniqueIdUtil.PrintId(queryId_));
     obj.put("hash", getQueryHash(queryStr_));
     obj.put("user", user_);
@@ -758,6 +791,7 @@ public class ColumnLineageGraph {
     TLineageGraph graph = new TLineageGraph();
     if (Strings.isNullOrEmpty(queryStr_)) return graph;
     graph.setQuery_text(queryStr_);
+    graph.setOperation_type(operationType_);
     graph.setQuery_id(queryId_);
     graph.setHash(getQueryHash(queryStr_));
     graph.setUser(user_);
@@ -783,7 +817,8 @@ public class ColumnLineageGraph {
    */
   public static ColumnLineageGraph fromThrift(TLineageGraph obj) {
     ColumnLineageGraph lineage =
-        new ColumnLineageGraph(obj.query_text, obj.query_id, obj.user, obj.started);
+        new ColumnLineageGraph(obj.query_text, obj.query_id, obj.user, obj.started,
+            obj.operation_type);
     Map<TVertex, Vertex> vertexMap = new HashMap<>();
     TreeSet<Vertex> vertices = Sets.newTreeSet();
     for (TVertex vertex: obj.vertices) {
@@ -821,10 +856,12 @@ public class ColumnLineageGraph {
     if (!(obj instanceof JSONObject)) return null;
     JSONObject jsonObj = (JSONObject) obj;
     String stmt = (String) jsonObj.get("queryText");
+    String operationType = (String) jsonObj.get("operationType");
     TUniqueId queryId = TUniqueIdUtil.ParseId((String) jsonObj.get("queryId"));
     String user = (String) jsonObj.get("user");
     long timestamp = (Long) jsonObj.get("timestamp");
-    ColumnLineageGraph graph = new ColumnLineageGraph(stmt, queryId, user, timestamp);
+    ColumnLineageGraph graph = new ColumnLineageGraph(stmt, queryId, user, timestamp,
+        operationType);
     JSONArray serializedVertices = (JSONArray) jsonObj.get("vertices");
     Set<Vertex> vertices = new HashSet<>();
     for (int i = 0; i < serializedVertices.size(); ++i) {
@@ -870,6 +907,8 @@ public class ColumnLineageGraph {
     if (obj == null) return false;
     if (obj.getClass() != this.getClass()) return false;
     ColumnLineageGraph g = (ColumnLineageGraph) obj;
+    if (!this.queryStr_.equals(g.queryStr_)) return false;
+    if (!this.operationType_.equals(g.operationType_)) return false;
     if (!mapEqualsForTests(this.vertices_, g.vertices_) ||
         !listEqualsForTests(this.edges_, g.edges_)) {
       return false;
@@ -944,6 +983,30 @@ public class ColumnLineageGraph {
     for (String columnName: dstTable.getColumnNames()) {
       targetColumnLabels_.add(new ColumnLabel(columnName, dstTable.getTableName(),
           getTableType(dstTable)));
+    }
+  }
+
+  public static OperationType computeOperationType(StatementBase stmt) {
+    if (stmt instanceof CreateViewStmt) {
+      return OperationType.CREATEVIEW;
+    } else if (stmt instanceof CreateTableAsSelectStmt) {
+      return OperationType.CREATETABLE_AS_SELECT;
+    } else if (stmt instanceof AlterViewStmt) {
+      return OperationType.ALTERVIEW_AS;
+    } else if (stmt instanceof InsertStmt) {
+      if (((InsertStmt) stmt).isOverwrite()) {
+        return OperationType.INSERT_OVERWRITE;
+      } else if (((InsertStmt) stmt).isUpsert()) {
+        return OperationType.UPSERT;
+      } else {
+        return OperationType.INSERT;
+      }
+    } else if (stmt instanceof SelectStmt) {
+      return OperationType.SELECT;
+    } else if (stmt instanceof CreateTableStmt) {
+      return OperationType.CREATETABLE;
+    } else {
+      return OperationType.UNKNOWN;
     }
   }
 }
