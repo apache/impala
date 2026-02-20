@@ -2295,7 +2295,8 @@ class TestIcebergV2Table(IcebergTestSuite):
       data_files = self.filesystem_client.ls(DATA_PATH)
       self.filesystem_client.delete_file_dir(DATA_PATH + "/" + data_files[0])
       self.filesystem_client.delete_file_dir(DATA_PATH + "/" + data_files[1])
-      self.execute_query_expect_success(impalad_client, "invalidate metadata")
+      self.execute_query_expect_success(
+          impalad_client, "invalidate metadata {0}".format(db_tbl))
       result = self.execute_query_expect_success(
           impalad_client, repair_query.format(db_tbl))
       assert result.data[0] == \
