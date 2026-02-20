@@ -119,7 +119,7 @@ def categorize_error_string(error_string):
 
 def process_single_test_node(before_json_contents, after_json_contents, out_filename):
   test_node_id = before_json_contents["test_node_id"]
-  test_file, test_class, _, test_function = test_node_id.split("[")[0].split("::")
+  test_file, test_class, test_function = test_node_id.split("[")[0].split("::")
   result_category_counts = {}
   for result_category in RESULT_CATEGORIES:
     # Total count, number increased, number decreased
@@ -314,7 +314,7 @@ def main():
 
         # Break apart the test node id to allow aggregating at various levels and
         # organizing the directory structure
-        test_file, test_class, _, test_function = test_node_id.split("[")[0].split("::")
+        test_file, test_class, test_function = test_node_id.split("[")[0].split("::")
 
         # Step 1: Write out individual test html files
         # (When this becomes a diff, we'll have pairs of files to put into this)
