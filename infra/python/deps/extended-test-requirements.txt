@@ -21,7 +21,7 @@
 Fabric==1.14.0
 # The leopard framework, which runs a webui to view random query generator
 # reports, requires Flask.
-Flask==1.0.2
+Flask==2.3.2
 # Fabric depends on Paramiko. Additionally, the stress test uses
 # Paramiko directly to keep a persistent SSH connection open to each
 # Impalad host to run in-test monitoring.
