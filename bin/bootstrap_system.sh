@@ -18,7 +18,7 @@
 # under the License.
 
 # This script bootstraps a system for Impala development from almost nothing; it is known
-# to work on Ubuntu 16.04. It clobbers some local environment and system
+# to work on Ubuntu 20.04. It clobbers some local environment and system
 # configurations, so it is best to run this in a fresh install. It also sets up the
 # ~/.bashrc for the calling user and impala-config-local.sh with some environment
 # variables to make Impala compile and run after this script is complete.
@@ -37,10 +37,6 @@
 #      adduser --disabled-password --gecos '' impdev
 #      echo 'impdev ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 #   3. Run this script as that user: su - impdev -c /bootstrap_development.sh
-#
-# This script has some specializations for CentOS/Redhat 6/7 and Ubuntu.
-# Of note, inside of Docker, Redhat 7 doesn't allow you to start daemons
-# with systemctl, so sshd and postgresql are started manually in those cases.
 
 set -eu -o pipefail
 
@@ -70,12 +66,9 @@ set -x
 
 # Determine whether we're running on redhat or ubuntu
 REDHAT=
-REDHAT7=
 REDHAT8=
 REDHAT9=
 UBUNTU=
-UBUNTU16=
-UBUNTU18=
 UBUNTU20=
 UBUNTU22=
 UBUNTU24=
@@ -86,16 +79,12 @@ if [[ -f /etc/redhat-release ]]; then
   if grep 'release 9\.' /etc/redhat-release; then
     REDHAT9=true
     echo "Identified redhat9 system."
-  fi
-  if grep 'release 8\.' /etc/redhat-release; then
+  elif grep 'release 8\.' /etc/redhat-release; then
     REDHAT8=true
     echo "Identified redhat8 system."
+  else
+    echo "This script only supports Redhat releases 8 or 9 (or equivalents)."
   fi
-  if grep 'release 7\.' /etc/redhat-release; then
-    REDHAT7=true
-    echo "Identified redhat7 system."
-  fi
-  # TODO: restrict redhat versions
 else
   source /etc/lsb-release
   if [[ $DISTRIB_ID = Ubuntu ]]
@@ -104,15 +93,7 @@ else
     echo "Identified Ubuntu system."
     # Kerberos setup would pop up dialog boxes without this
     export DEBIAN_FRONTEND=noninteractive
-    if [[ $DISTRIB_RELEASE = 16.04 ]]
-    then
-      UBUNTU16=true
-      echo "Identified Ubuntu 16.04 system."
-    elif [[ $DISTRIB_RELEASE = 18.04 ]]
-    then
-      UBUNTU18=true
-      echo "Identified Ubuntu 18.04 system."
-    elif [[ $DISTRIB_RELEASE = 20.04 ]]
+    if [[ $DISTRIB_RELEASE = 20.04 ]]
     then
       UBUNTU20=true
       echo "Identified Ubuntu 20.04 system."
@@ -125,7 +106,7 @@ else
       UBUNTU24=true
       echo "Identified Ubuntu 24.04 system."
     else
-      echo "This script supports Ubuntu versions 16.04, 18.04, 20.04, 22.04, or 24.04" >&2
+      echo "This script supports Ubuntu versions 20.04, 22.04, or 24.04" >&2
       exit 1
     fi
   else
@@ -141,20 +122,6 @@ fi
 # Helper function to execute following command only on Ubuntu
 function ubuntu {
   if [[ "$UBUNTU" == true ]]; then
-    "$@"
-  fi
-}
-
-# Helper function to execute following command only on Ubuntu 16.04
-function ubuntu16 {
-  if [[ "$UBUNTU16" == true ]]; then
-    "$@"
-  fi
-}
-
-# Helper function to execute following command only on Ubuntu 18.04
-function ubuntu18 {
-  if [[ "$UBUNTU18" == true ]]; then
     "$@"
   fi
 }
@@ -184,12 +151,6 @@ function redhat {
   fi
 }
 
-# Helper function to execute following command only on RedHat7
-function redhat7 {
-  if [[ "$REDHAT7" == true ]]; then
-    "$@"
-  fi
-}
 # Helper function to execute following command only on RedHat8
 function redhat8 {
   if [[ "$REDHAT8" == true ]]; then
@@ -214,6 +175,8 @@ function notindocker {
     "$@"
   fi
 }
+
+ARCH_NAME=$(uname -p)
 
 # X permission on home directory is needed for some uses of postgresql (IMPALA-13693)
 chmod o+X ~
@@ -258,13 +221,6 @@ ubuntu20 apt-get --yes install libtinfo5 libtinfo6
 ubuntu22 apt-get --yes install libtinfo5 libtinfo6
 ubuntu24 apt-get --yes install libtinfo6
 
-ARCH_NAME=$(uname -p)
-if [[ $ARCH_NAME == 'aarch64' ]]; then
-  ubuntu apt-get --yes install unzip pkg-config flex maven python3-pip build-essential \
-          texinfo bison autoconf automake libtool libz-dev libncurses-dev \
-          libncurses5-dev libreadline-dev
-fi
-
 ubuntu sudo update-java-alternatives -l || true
 
 # Configure the default Java version to be the version we selected.
@@ -292,7 +248,6 @@ which javac
 javac -version
 
 # fuse-devel doesn't exist for Redhat 9
-redhat7 sudo yum install -y fuse-devel curl
 redhat8 sudo yum install -y fuse-devel curl
 # Redhat9 can have curl-minimal preinstalled, which can conflict with curl.
 # Adding --allowerasing allows curl to replace curl-minimal.
@@ -385,14 +340,10 @@ function setup_postgresql() {
     sudo -u postgres psql -c "CREATE ROLE hiveuser LOGIN PASSWORD 'password';"
   fi
   sudo -u postgres psql -c "ALTER ROLE hiveuser WITH CREATEDB;"
-  # On Ubuntu 18.04 aarch64 version, the sql 'select * from pg_roles' blocked,
-  # because output of 'select *' is too long to display in 1 line.
-  # So here just change it to 'select count(*)' as a work around.
-  if [[ $ARCH_NAME == 'aarch64' ]]; then
-    sudo -u postgres psql -c "SELECT count(*) FROM pg_roles WHERE rolname = 'hiveuser';"
-  else
-    sudo -u postgres psql -c "SELECT * FROM pg_roles WHERE rolname = 'hiveuser';"
-  fi
+  # The output of "select * from pg_roles" may cause psql to block waiting for
+  # something to dismiss the terminal output. To avoid that, send output through
+  # tee.
+  sudo -u postgres psql -c "SELECT * FROM pg_roles WHERE rolname = 'hiveuser';" | tee
   echo ">>> Configuring postgresql finished."
 }
 
@@ -463,8 +414,6 @@ echo -e "${USER} - memlock 65536" | sudo tee /etc/security/limits.d/10-memlock.c
 
 # Default on CentOS limits a user to 1024 or 4096 processes (threads) , which isn't
 # enough for minicluster with all of its friends.
-redhat7 sudo sed -i 's,\*\s*soft\s*nproc\s*[0-9]*$,* soft nproc unlimited,' \
-  /etc/security/limits.d/*-nproc.conf
 redhat8 echo -e "* soft nproc unlimited" | sudo tee -a /etc/security/limits.conf
 redhat9 echo -e "* soft nproc unlimited" | sudo tee -a /etc/security/limits.conf
 
