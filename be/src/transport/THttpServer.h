@@ -115,6 +115,12 @@ public:
       return false;
     };
 
+    // Function that stores the connection's 'X-Request-Id' header in the Connection
+    // Context so that it can be tracked.
+    std::function<bool(std::string)> set_http_request_id_fn = [&](const std::string&) {
+      return false;
+    };
+
     // Function that takes the connection's 'Authorization' header and returns true if
     // the basic auth header contains a valid username.
     std::function<bool(const std::string&)> trusted_auth_header_handle_fn =

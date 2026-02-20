@@ -199,4 +199,10 @@ private:
   bool started_ = false;
 };  // class OtelTraceManager
 
+namespace test {
+// Testing helper function to process X-Request-Id header values.
+// Removes iteration count suffix while preserving the UUID portion.
+std::string process_request_id_for_attribute_for_testing(const std::string& request_id);
+} // namespace test
+
 } // namespace impala

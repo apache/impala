@@ -722,6 +722,12 @@ bool SetOrigin(
   return false;
 }
 
+bool SetRequestId(ThriftServer::ConnectionContext* connection_context,
+    const std::string& request_id) {
+  connection_context->http_request_id = request_id;
+  return false;
+}
+
 static bool TrustedDomainCheck(ThriftServer::ConnectionContext* connection_context,
     const AuthenticationHash& hash, const std::string& origin,
     const string& auth_header) {
@@ -1619,6 +1625,8 @@ void SecureAuthProvider::SetupConnectionContext(
       }
       callbacks.set_http_origin_fn = std::bind(SetOrigin, connection_ptr.get(),
           std::placeholders::_1);
+      callbacks.set_http_request_id_fn = std::bind(SetRequestId, connection_ptr.get(),
+          std::placeholders::_1);
       http_input_transport->setCallbacks(callbacks);
       http_output_transport->setCallbacks(callbacks);
       socket = down_cast<TSocket*>(http_input_transport->getUnderlyingTransport().get());
@@ -1681,6 +1689,8 @@ void NoAuthProvider::SetupConnectionContext(
           std::placeholders::_2, std::placeholders::_3);
       callbacks.return_headers_fn = std::bind(ReturnHeaders, connection_ptr.get());
       callbacks.set_http_origin_fn = std::bind(SetOrigin, connection_ptr.get(),
+          std::placeholders::_1);
+      callbacks.set_http_request_id_fn = std::bind(SetRequestId, connection_ptr.get(),
           std::placeholders::_1);
       http_input_transport->setCallbacks(callbacks);
       http_output_transport->setCallbacks(callbacks);

@@ -344,6 +344,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   }
   state->network_address = ThriftServer::GetThreadConnectionContext()->network_address;
   state->http_origin = ThriftServer::GetThreadConnectionContext()->http_origin;
+  state->http_request_id = ThriftServer::GetThreadConnectionContext()->http_request_id;
   state->last_accessed_ms = UnixMillis();
   // request.client_protocol is not guaranteed to be a valid TProtocolVersion::type, so
   // loading it can cause undefined behavior. Instead, we copy it to a value of the

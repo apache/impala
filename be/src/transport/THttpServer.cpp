@@ -281,15 +281,19 @@ void THttpServer::headersDone() {
   }
 
   // Trim and truncate the value of the 'X-Forwarded-For' header.
-  string origin = origin_;
-  // After copying origin, reset the value so that it can be reused for the next message.
-  origin_ = "";
+  string origin;
+  std::swap(origin, origin_);
   StripWhiteSpace(&origin);
   if (origin.length() > MAX_X_FORWARDED_HEADER_LENGTH) {
     origin = origin.substr(0, MAX_X_FORWARDED_HEADER_LENGTH);
   }
   // Store the truncated value of the 'X-Forwarded-For' header in the Connection Context.
   callbacks_.set_http_origin_fn(origin);
+
+  // Store the value of the 'X-Request-Id' header in the Connection Context.
+  string request_id;
+  std::swap(request_id, header_x_request_id_);
+  callbacks_.set_http_request_id_fn(request_id);
 
   if (!has_ldap_ && !has_kerberos_ && !has_saml_ && !has_jwt_ && !has_oauth_) {
     // We don't need to authenticate.

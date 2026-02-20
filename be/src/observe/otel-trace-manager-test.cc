@@ -119,3 +119,65 @@ TEST(OtelTraceManagerTest, TraceQueryNotCalled) {
   EXPECT_FALSE(filesystem::exists(trace_file));
 } // test OtelTraceManagerTest.TraceQueryNotCalled
 
+// Test processing of X-Request-Id header values to remove iteration count.
+TEST(OtelTraceManagerTest, ProcessRequestIdForAttribute) {
+  // Test with a valid UUID without iteration count
+  string result = test::process_request_id_for_attribute_for_testing(
+      "18bb03c8-7de6-11f0-9112-8b736586fd91");
+  EXPECT_EQ("18bb03c8-7de6-11f0-9112-8b736586fd91", result);
+
+  // Test with a valid UUID with iteration count
+  result = test::process_request_id_for_attribute_for_testing(
+      "18bb03c8-7de6-11f0-9112-8b736586fd91-8");
+  EXPECT_EQ("18bb03c8-7de6-11f0-9112-8b736586fd91", result);
+
+  // Test with a valid UUID with multi-digit iteration count
+  result = test::process_request_id_for_attribute_for_testing(
+      "18bb03c8-7de6-11f0-9112-8b736586fd91-123");
+  EXPECT_EQ("18bb03c8-7de6-11f0-9112-8b736586fd91", result);
+
+  // Test with zero as iteration count
+  result = test::process_request_id_for_attribute_for_testing(
+      "18bb03c8-7de6-11f0-9112-8b736586fd91-0");
+  EXPECT_EQ("18bb03c8-7de6-11f0-9112-8b736586fd91", result);
+
+  // Test with uppercase UUID
+  result = test::process_request_id_for_attribute_for_testing(
+      "18BB03C8-7DE6-11F0-9112-8B736586FD91");
+  EXPECT_EQ("18BB03C8-7DE6-11F0-9112-8B736586FD91", result);
+
+  // Test with mixed case UUID
+  result = test::process_request_id_for_attribute_for_testing(
+      "18Bb03C8-7dE6-11f0-9112-8B736586fD91-5");
+  EXPECT_EQ("18Bb03C8-7dE6-11f0-9112-8B736586fD91", result);
+
+  // Test with empty string
+  result = test::process_request_id_for_attribute_for_testing("");
+  EXPECT_EQ("", result);
+
+  // Test with non-numeric suffix (should not be removed)
+  result = test::process_request_id_for_attribute_for_testing(
+      "18bb03c8-7de6-11f0-9112-8b736586fd91-abc");
+  EXPECT_EQ("18bb03c8-7de6-11f0-9112-8b736586fd91-abc", result);
+
+  // Test with UUID that has no hyphens
+  result = test::process_request_id_for_attribute_for_testing(
+      "18bb03c87de611f091128b736586fd91");
+  EXPECT_EQ("18bb03c87de611f091128b736586fd91", result);
+
+  // Test with UUID that has no hyphens but has iteration count appended with hyphen
+  result = test::process_request_id_for_attribute_for_testing(
+      "18bb03c87de611f091128b736586fd91-5");
+  EXPECT_EQ("18bb03c87de611f091128b736586fd91", result);
+
+  // Test with UUID where last segment is all decimal digits (should NOT be removed)
+  // Per RFC9562, UUID last segment is always 12 chars
+  result = test::process_request_id_for_attribute_for_testing(
+      "a6dd52ba-18d1-11f1-ba97-665407384305");
+  EXPECT_EQ("a6dd52ba-18d1-11f1-ba97-665407384305", result);
+
+  // Test with UUID where last segment is all decimal digits, plus iteration count
+  result = test::process_request_id_for_attribute_for_testing(
+      "a6dd52ba-18d1-11f1-ba97-665407384305-2");
+  EXPECT_EQ("a6dd52ba-18d1-11f1-ba97-665407384305", result);
+}

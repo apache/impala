@@ -28,6 +28,7 @@ from thrift.transport.TTransport import TBufferedTransport
 from impala_thrift_gen.ImpalaService import ImpalaHiveServer2Service
 from impala_thrift_gen.TCLIService import TCLIService
 from impala.error import HiveServer2Error
+from shell.impala_shell.impala_client import ImpalaHS2Client
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.file_utils import count_lines, wait_for_file_line_count
 from tests.common.impala_connection import \
@@ -57,13 +58,13 @@ class TestOtelTraceBase(CustomClusterTestSuite):
 
   def assert_trace(self, query_id, query_profile, cluster_id, trace_cnt=1, err_span="",
       missing_spans=[], async_close=False, exact_trace_cnt=False,
-      adm_result_missing=False):
+      adm_result_missing=False, http_request_id=None):
     """Helper method to assert a trace exists in the trace file with the required inputs
        for log file path, trace file path, and trace file line count (that was determined
        before the test ran)."""
     assert_trace(self.build_log_path("impalad", "INFO"), self.trace_file_path,
         self.trace_file_count, query_id, query_profile, cluster_id, trace_cnt, err_span,
-        missing_spans, async_close, exact_trace_cnt, adm_result_missing)
+        missing_spans, async_close, exact_trace_cnt, adm_result_missing, http_request_id)
 
 
 @CustomClusterTestSuite.with_args(
@@ -544,6 +545,56 @@ class TestOtelTraceSelectsDMLs(TestOtelTraceBase):
           missing_spans=["QueryExecution"],
           err_span="AdmissionControl",
           adm_result_missing=True)
+
+  def test_http_request_id_attribute(self):
+    """Asserts that when X-Request-Id header is provided via hs2-http protocol,
+       it is added as an attribute named HttpRequestId on the root span with
+       the iteration count removed."""
+
+    # Python implementation of process_request_id_for_attribute
+    def process_request_id_py(request_id):
+      if not request_id:
+        return ""
+      last_hyphen = request_id.rfind('-')
+      if last_hyphen == -1:
+        return request_id
+      return request_id[:last_hyphen]
+
+    # Create hs2-http client with http_tracing enabled to send X-Request-Id headers
+    impalad_service = self.cluster.impalads[0].service
+    client = ImpalaHS2Client(
+        (impalad_service.external_interface, impalad_service.hs2_http_port),
+        fetch_size=1024,
+        kerberos_host_fqdn=None,
+        use_http_base_transport=True,
+        http_path='cliservice',
+        http_tracing=True)
+
+    try:
+      client.connect()
+      query = "SELECT COUNT(*) FROM functional.alltypes"
+      query_handle = client.execute_query(query, {})
+      query_id = client.get_query_id_str(query_handle)
+
+      client.wait_to_finish(query_handle)
+
+      runtime_profile, _ = client.get_runtime_profile(query_handle)
+      client.close_query(query_handle)
+
+      # Get the X-Request-Id from the client
+      raw_request_id = client._current_request_id
+      assert raw_request_id is not None, "Client request ID should be set"
+
+      expected_http_request_id = process_request_id_py(raw_request_id)
+
+      self.assert_trace(
+          query_id=query_id,
+          query_profile=runtime_profile,
+          cluster_id="select_dml",
+          http_request_id=expected_http_request_id)
+
+    finally:
+      client.close_connection()
 
 
 class TestOtelTraceSelectQueued(TestOtelTraceBase):

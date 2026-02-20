@@ -631,6 +631,10 @@ class ImpalaServer : public ImpalaServiceIf,
     /// as recorded in the X-Forwarded-For http message header.
     std::string http_origin;
 
+    /// If using hs2-http protocol, this is the request ID from the
+    /// X-Request-Id http message header.
+    std::string http_request_id;
+
     /// Protects all fields below. See "Locking" in the class comment for lock
     /// acquisition order.
     std::mutex lock;

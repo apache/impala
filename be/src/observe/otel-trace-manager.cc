@@ -54,6 +54,7 @@ DECLARE_bool(otel_trace_exhaustive_dchecks);
 
 // Names of attributes only on Root spans.
 static constexpr char const* ATTR_ERROR_MESSAGE = "ErrorMessage";
+static constexpr char const* ATTR_HTTP_REQUEST_ID = "HttpRequestId";
 static constexpr char const* ATTR_QUERY_START_TIME = "QueryStartTime";
 static constexpr char const* ATTR_RETRIED_QUERY_ID = "RetriedQueryId";
 static constexpr char const* ATTR_RUNTIME = "Runtime";
@@ -122,6 +123,37 @@ static void debug_log_span(const BufferedSpan* span, const string& span_name,
   }
 } // function debug_log_span
 
+// Helper function to process X-Request-Id header value by removing the iteration count.
+// The Impala shell appends an iteration count to the request ID (e.g., "-8" in
+// "18bb03c8-7de6-11f0-9112-8b736586fd91-8"). This function removes that suffix.
+// Per RFC9562, a UUID in hex-and-dash format has a 12-character final segment.
+// We distinguish iteration count from UUID last segment by length.
+static string process_request_id_for_attribute(const string& request_id) {
+  if (request_id.empty()) return "";
+
+  size_t last_hyphen = request_id.rfind('-');
+  if (last_hyphen == string::npos || last_hyphen >= request_id.length() - 1) {
+    return request_id;
+  }
+
+  string suffix = request_id.substr(last_hyphen + 1);
+
+  // UUID last segment is always 12 hex characters
+  if (suffix.length() == 12) {
+    return request_id;  // This is the UUID's last segment, not an iteration count
+  }
+
+  // Check if suffix is all decimal digits (iteration count)
+  for (char c : suffix) {
+    if (!isdigit(c)) {
+      return request_id;  // Not all digits, return original
+    }
+  }
+
+  // All digits and not 12 chars long - it's an iteration count
+  return request_id.substr(0, last_hyphen);
+} // function process_request_id_for_attribute
+
 OtelTraceManager::OtelTraceManager(nostd::shared_ptr<trace::Tracer> tracer,
     ClientRequestState* client_request_state) : tracer_(std::move(tracer)),
     client_request_state_(client_request_state),
@@ -158,6 +190,13 @@ OtelTraceManager::OtelTraceManager(nostd::shared_ptr<trace::Tracer> tracer,
               ExecEnv::GetInstance()->configured_backend_address())}},
         context::Context().SetValue(trace::kIsRootSpanKey, true),
         trace::SpanKind::kServer);
+
+    // Add HttpRequestId if X-Request-Id header was provided via hs2-http
+    if (client_request_state_->session() != nullptr &&
+        !client_request_state_->session()->http_request_id.empty()) {
+      span_root_->SetAttribute(ATTR_HTTP_REQUEST_ID, process_request_id_for_attribute(
+          client_request_state_->session()->http_request_id));
+    }
   }
 } // ctor
 
@@ -301,6 +340,16 @@ void OtelTraceManager::StartChildSpanInit() {
         PrintId(client_request_state_->session_id()));
     span->SetAttribute(ATTR_USER_NAME,
         client_request_state_->effective_user());
+
+    // Add HttpRequestId if X-Request-Id header was provided via hs2-http
+    if (client_request_state_->session() != nullptr &&
+        !client_request_state_->session()->http_request_id.empty()) {
+      string processed_request_id = process_request_id_for_attribute(
+          client_request_state_->session()->http_request_id);
+      if (!processed_request_id.empty()) {
+        span->SetAttribute(ATTR_HTTP_REQUEST_ID, processed_request_id);
+      }
+    }
   }
 } // function StartChildSpanInit
 
@@ -692,5 +741,11 @@ void OtelTraceManager::EndChildSpan(const ChildSpanType& span_type,
 #endif
   }
 } // function EndChildSpan
+
+namespace test {
+string process_request_id_for_attribute_for_testing(const string& request_id) {
+  return process_request_id_for_attribute(request_id);
+}
+} // namespace test
 
 } // namespace impala

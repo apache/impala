@@ -20,6 +20,7 @@ import logging
 import os
 import sys
 from time import sleep
+from uuid import UUID
 
 from tests.common.environ import IMPALA_LOCAL_BUILD_VERSION
 from tests.common.file_utils import grep_file_first, wait_for_file_line_count
@@ -348,7 +349,16 @@ def parse_trace_file(file_path, query_id):
 
 def assert_trace(log_file_path, trace_file_path, trace_file_count, query_id,
     query_profile, cluster_id, trace_cnt=1, err_span="", missing_spans=[],
-    async_close=False, exact_trace_cnt=False, adm_result_missing=False):
+    async_close=False, exact_trace_cnt=False, adm_result_missing=False,
+    http_request_id=None):
+  # Validate http_request_id is a valid UUID if provided
+  if http_request_id is not None:
+    try:
+      UUID(http_request_id)
+    except ValueError as e:
+      assert False, "http_request_id should be a valid UUID, got: '{}'. Error: {}".format(
+          http_request_id, str(e))
+
   # Parse common values needed in multiple asserts.
   session_id = parse_session_id(query_profile)
   db_user = parse_db_user(query_profile)
@@ -400,7 +410,7 @@ def assert_trace(log_file_path, trace_file_path, trace_file_count, query_id,
   # Assert root span.
   root_span_id = __assert_rootspan_attrs(trace.root_span, query_id, session_id,
     cluster_id, db_user, "default-pool", impala_query_state, query_status,
-    original_query_id, retried_query_id, coordinator, log_file_path)
+    original_query_id, retried_query_id, coordinator, log_file_path, http_request_id)
 
   # Assert Init span.
   if "Init" not in missing_spans:
@@ -411,7 +421,7 @@ def assert_trace(log_file_path, trace_file_path, trace_file_count, query_id,
     __assert_initspan_attrs(trace.child_spans, root_span_id, query_id, session_id,
         cluster_id, db_user, "default-pool", parse_default_db(query_profile),
         parse_sql(query_profile).replace('\n', ' '), original_query_id, coordinator,
-        log_file_path)
+        log_file_path, http_request_id)
 
   # Assert Submitted span.
   if "Submitted" not in missing_spans:
@@ -636,14 +646,16 @@ def __assert_span_events(span, expected_events=[]):
 
 def __assert_rootspan_attrs(span, query_id, session_id, cluster_id, user_name,
     request_pool, state, err_msg, original_query_id, retried_query_id, coordinator,
-    log_file_path):
+    log_file_path, http_request_id=None):
   """
     Helper function that asserts the common attributes in the root span.
   """
 
   root_span_id, _ = __find_span_log(log_file_path, "Root", query_id)
-  __assert_scopespan_common(span, query_id, True, "Root", 14, "", log_file_path, None,
-      err_msg)
+  # Root span has 14 base attributes, plus 1 if HttpRequestId is present
+  expected_attr_count = 15 if http_request_id is not None else 14
+  __assert_scopespan_common(span, query_id, True, "Root", expected_attr_count, "",
+      log_file_path, None, err_msg)
 
   __assert_attr(span.name, span.attributes, "QueryId", query_id)
   __assert_attr(span.name, span.attributes, "SessionId", session_id)
@@ -655,12 +667,24 @@ def __assert_rootspan_attrs(span, query_id, session_id, cluster_id, user_name,
   __assert_attr(span.name, span.attributes, "RetriedQueryId", retried_query_id)
   __assert_attr(span.name, span.attributes, "Coordinator", coordinator)
 
+  # If http_request_id is expected, validate it exists and matches the expected value
+  if http_request_id is not None:
+    assert "HttpRequestId" in span.attributes, \
+        "Root span should have HttpRequestId attribute"
+    actual_http_request_id = span.attributes["HttpRequestId"].value
+    assert actual_http_request_id == http_request_id, \
+        "HttpRequestId mismatch. Expected: '{}', Actual: '{}'".format(
+            http_request_id, actual_http_request_id)
+  else:
+    assert "HttpRequestId" not in span.attributes, \
+        "Root span should not have HttpRequestId attribute when not expected"
+
   return root_span_id
 
 
 def __assert_initspan_attrs(spans, root_span_id, query_id, session_id, cluster_id,
     user_name, request_pool, default_db, query_string, original_query_id, coordinator,
-    log_file_path):
+    log_file_path, http_request_id=None):
   """
     Helper function that asserts the common and span-specific attributes in the
     init span.
@@ -669,8 +693,10 @@ def __assert_initspan_attrs(spans, root_span_id, query_id, session_id, cluster_i
   # Locate the init span and assert.
   init_span = __find_span(spans, "Init", query_id)
 
-  __assert_scopespan_common(init_span, query_id, False, "Init", 9, INITIALIZED,
-      log_file_path, root_span_id)
+  # Init span has 9 base attributes, plus 1 if HttpRequestId is present
+  expected_attr_count = 10 if http_request_id is not None else 9
+  __assert_scopespan_common(init_span, query_id, False, "Init", expected_attr_count,
+      INITIALIZED, log_file_path, root_span_id)
 
   __assert_attr(init_span.name, init_span.attributes, "QueryId", query_id)
   __assert_attr(init_span.name, init_span.attributes, "SessionId", session_id)
@@ -682,6 +708,18 @@ def __assert_initspan_attrs(spans, root_span_id, query_id, session_id, cluster_i
   __assert_attr(init_span.name, init_span.attributes, "OriginalQueryId",
       original_query_id)
   __assert_attr(init_span.name, init_span.attributes, "Coordinator", coordinator)
+
+  # If http_request_id is expected, validate it exists and matches the expected value
+  if http_request_id is not None:
+    assert "HttpRequestId" in init_span.attributes, \
+        "Init span should have HttpRequestId attribute"
+    actual_http_request_id = init_span.attributes["HttpRequestId"].value
+    assert actual_http_request_id == http_request_id, \
+        "Init span HttpRequestId mismatch. Expected: '{}', Actual: '{}'".format(
+            http_request_id, actual_http_request_id)
+  else:
+    assert "HttpRequestId" not in init_span.attributes, \
+        "Init span should not have HttpRequestId attribute when not expected"
 
   __assert_span_events(init_span)
 
