@@ -86,14 +86,14 @@ public class RexCallConverter {
       case CAST:
         return createCastExpr(rexCall, params, analyzer);
       case NOT_IN:
-        return createInExpr(rexCall, params, analyzer);
+        return createInExpr(rexCall, params);
       case IS_NULL:
         return new IsNullPredicate(params.get(0), false);
       case IS_NOT_NULL:
         return new IsNullPredicate(params.get(0), true);
       case OTHER:
         if (rexCall.getOperator() instanceof ImpalaInOperator) {
-          return createInExpr(rexCall, params, analyzer);
+          return createInExpr(rexCall, params);
         }
     }
 
@@ -183,9 +183,9 @@ public class RexCallConverter {
   /**
    * Create In Expr
    */
-  private static Expr createInExpr(RexCall call, List<Expr> params, Analyzer analyzer
+  private static Expr createInExpr(RexCall call, List<Expr> params
       ) throws ImpalaException {
-    return new AnalyzedInPredicate(call, params, analyzer);
+    return new AnalyzedInPredicate(call, params);
   }
 
   private static Expr createCastExpr(RexCall call, List<Expr> params, Analyzer analyzer)

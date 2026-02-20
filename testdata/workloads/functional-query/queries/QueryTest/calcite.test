@@ -1224,3 +1224,12 @@ string
 ---- RUNTIME_PROFILE
 row_regex: .*PlannerType: CalcitePlanner.*
 ====
+---- QUERY
+# IMPALA-14758: make sure server doesn't crash
+# can probably remove this test once tests are run through
+# jenkins, since this is repeated in a different file.
+SELECT a.id, a.int_col, a.string_col FROM functional.alltypessmall a
+WHERE 1 NOT IN
+(SELECT CASE WHEN id = 1 then null ELSE id END FROM functional.alltypestiny);
+---- RESULTS
+====
