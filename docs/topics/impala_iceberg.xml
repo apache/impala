@@ -271,6 +271,49 @@ ALTER TABLE ice_v1_to_v2 SET TBLPROPERTIES('format-version'='2');
     </conbody>
   </concept>
 
+  <concept id="iceberg_convert">
+    <title>Converting existing tables to Iceberg tables</title>
+    <conbody>
+      <p>
+        Since <keyword keyref="impala43"/> Impala also supports converting legacy Hive
+        tables to Iceberg tables. The target Iceberg tables inherit the location of the
+        original Hive tables. The Hive table to be converted must follow these
+        requirements:
+        <ul>
+          <li>table is not a transactional table,</li>
+          <li>InputFormat must be either PARQUET, ORC, or AVRO,</li>
+          <li>the user has “ALL” privileges on the database containing the table.</li>
+        </ul>
+        If the Hive table meets these requirements, then it can be converted to an Iceberg
+        table via an
+        <codeph>ALTER TABLE [dbname.]table_name CONVERT TO ICEBERG [TBLPROPERTIES(...)];</codeph>
+        statement, e.g.:
+        <codeblock>
+ALTER TABLE non_iceberg_table CONVERT TO ICEBERG;
+ALTER TABLE non_iceberg_table CONVERT TO ICEBERG TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
+        </codeblock>
+      </p>
+      <p>
+        This command only accepts 'iceberg.catalog' (from <keyword keyref="impala43"/>)
+        and 'format-version' (from <keyword keyref="impala50"/>) as table properties.
+      </p>
+      <p>
+        This is an in-place migration so the original data files of the legacy Hive table
+        are re-used and not moved, copied or re-created by this operation. The new Iceberg
+        table will have the 'external.table.purge' property set to 'true' after the
+        migration.
+      </p>
+      <p>
+        From <keyword keyref="impala50"/> one can also specify the 'format-version' of the
+        new Iceberg table during conversion, e.g.:
+        <codeblock>
+ALTER TABLE non_iceberg_table CONVERT TO ICEBERG TBLPROPERTIES('format-version'='1');
+        </codeblock>
+        If 'format-version' is omitted, Impala will use the default Iceberg format version.
+      </p>
+    </conbody>
+  </concept>
+
   <concept id="iceberg_drop">
     <title>Dropping Iceberg tables</title>
     <conbody>
