@@ -603,7 +603,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
   // pool options.
   AddPoolConfiguration(query_ctx, ~set_query_options_mask);
   VLOG_QUERY << "TClientRequest.queryOptions: "
-             << ThriftDebugString(query_ctx->client_request.query_options);
+             << DebugQueryOptions(query_ctx->client_request.query_options);
   return Status::OK();
 }
 
