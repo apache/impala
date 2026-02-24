@@ -100,6 +100,20 @@ public class JniUtil {
   }
 
   /**
+   * Clears the interrupted status of the current thread and returns whether
+   * the thread was interrupted. This is used to prevent interrupt flag poisoning
+   * when threads are reused across different JNI operations.
+   */
+  public static boolean clearInterruptStatus() {
+    if (Thread.interrupted()) {
+      LOG.warn("Thread {} was interrupted. Clearing interrupt status to prevent " +
+          "interrupt flag poisoning.", Thread.currentThread().getId());
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Serializes input into a byte[] using the default protocol factory.
    */
   public static <T extends TBase<?, ?>>

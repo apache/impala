@@ -95,6 +95,7 @@ jclass JniUtil::internal_exc_cl_ = NULL;
 jmethodID JniUtil::get_jvm_metrics_id_ = NULL;
 jmethodID JniUtil::get_jvm_threads_id_ = NULL;
 jmethodID JniUtil::get_jmx_json_ = NULL;
+jmethodID JniUtil::clear_interrupt_status_id_ = NULL;
 jmethodID JniUtil::throwable_to_string_id_ = NULL;
 jmethodID JniUtil::throwable_to_stack_trace_id_ = NULL;
 
@@ -236,6 +237,19 @@ Status JniUtil::Init() {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
     return Status("Failed to find JniUtil.getJMXJson method.");
   }
+
+  clear_interrupt_status_id_ =
+      env->GetStaticMethodID(jni_util_cl_, "clearInterruptStatus", "()Z");
+  if (clear_interrupt_status_id_ == NULL) {
+    if (env->ExceptionOccurred()) {
+      env->ExceptionDescribe();
+      env->ExceptionClear();
+    }
+    // We don't return error Status beause when Hive loads Impala FE stuff,
+    // it won't find JniUtil.clearInterruptStatus(). We can return error
+    // once Hive stops depending on Impala FE.
+    LOG(WARNING) << "Failed to find JniUtil.clearInterruptStatus method.";
+  }
   jvm_inited_ = true;
   return Status::OK();
 }
@@ -356,5 +370,17 @@ Status JniUtil::LoadStaticJniMethod(JNIEnv* env, const jclass& jni_class,
       descriptor->name.c_str(), descriptor->signature.c_str());
   RETURN_ERROR_IF_EXC(env);
   return Status::OK();
+}
+
+void JniUtil::ClearThreadInterruptStatus(JNIEnv* env) {
+  DCHECK(env != nullptr);
+  if (clear_interrupt_status_id_ == nullptr) return;
+  // Calls Thread.interrupted() which both checks and clears the interrupt status.
+  jboolean was_interrupted = env->CallStaticBooleanMethod(jni_util_cl_,
+      clear_interrupt_status_id_);
+  if (was_interrupted) {
+    VLOG(1) << "Cleared interrupt flag on thread " << pthread_self();
+    DCHECK(false) << "JVM thread had interrupt flag set.";
+  }
 }
 }

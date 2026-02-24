@@ -424,6 +424,10 @@ class JniUtil {
   static Status CallJniMethod(const jobject& obj, const jmethodID& method,
       const T& arg, jobject* response) WARN_UNUSED_RESULT;
 
+  /// Clears the Java thread's interrupt status to prevent interrupt flag poisoning
+  /// when threads are reused.
+  static void ClearThreadInterruptStatus(JNIEnv* env);
+
  private:
   // Slow-path for GetJNIEnv, used on the first call by any thread.
   static JNIEnv* GetJNIEnvSlowPath();
@@ -437,6 +441,7 @@ class JniUtil {
   static jmethodID get_jvm_metrics_id_;
   static jmethodID get_jvm_threads_id_;
   static jmethodID get_jmx_json_;
+  static jmethodID clear_interrupt_status_id_;
 
   // Thread-local cache of the JNIEnv for this thread.
   static __thread JNIEnv* tls_env_;
@@ -531,6 +536,8 @@ template<class T>
 inline Status JniCall::Call(T* result) {
   RETURN_IF_ERROR(status_);
   DCHECK((instance_ != nullptr) ^ (class_ != nullptr));
+  // Clear interrupt status of JNI thread.
+  JniUtil::ClearThreadInterruptStatus(env_);
 
   // Even if the function takes no arguments, it's OK to pass an array here.
   // The JNI API doesn't take a length and just assumes that you've passed
@@ -543,6 +550,10 @@ inline Status JniCall::Call(T* result) {
   }
   RETURN_ERROR_IF_EXC(env_);
   RETURN_IF_ERROR(ObjectToResult(ret, result));
+#ifndef NDEBUG
+    // Clear interrupt status again.
+    JniUtil::ClearThreadInterruptStatus(env_);
+#endif
   return Status::OK();
 }
 
