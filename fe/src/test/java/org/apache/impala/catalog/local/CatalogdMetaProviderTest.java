@@ -438,21 +438,11 @@ public class CatalogdMetaProviderTest {
 
   @Test
   public void testPiggybackSuccess() throws Exception {
-    // TODO: investigate the cause of flakiness (IMPALA-8794)
-    Assume.assumeTrue(
-        "Skipping this test because it is flaky with Hive3",
-        TestUtils.getHiveMajorVersion() == 2);
-
     doTestPiggyback(/*success=*/true);
   }
 
   @Test
   public void testPiggybackFailure() throws Exception {
-    // TODO: investigate the cause of flakiness (IMPALA-8794)
-    Assume.assumeTrue(
-        "Skipping this test because it is flaky with Hive3",
-        TestUtils.getHiveMajorVersion() == 2);
-
     doTestPiggyback(/*success=*/false);
   }
 
