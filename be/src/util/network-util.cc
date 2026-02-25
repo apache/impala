@@ -233,7 +233,7 @@ NetworkAddressPB MakeNetworkAddressPB(const std::string& hostname, int port,
 }
 
 bool IsWildcardAddress(const string& ipaddress) {
-  return ipaddress == "0.0.0.0";
+  return ipaddress == "0.0.0.0" || ipaddress == "::";
 }
 
 string TNetworkAddressToString(const TNetworkAddress& address) {

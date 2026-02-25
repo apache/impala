@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import pytest
+import re
 import requests
 import sys
 
@@ -104,17 +105,25 @@ class TestIPv6Base(CustomClusterTestSuite):
 
   def _webui_smoke(self, url, err=None):
     """Tests to check glibc version and locale is available"""
+    verify_param = self.ca_cert if self.ca_cert else False
     try:
-      if self.ca_cert:
-        other_info_page = requests.get(url + "/?json", verify=self.ca_cert).text
-      else:
-        other_info_page = requests.get(url + "/?json", verify=False).text
+      json_resp = requests.get(url + "/?json", verify=verify_param).text
       assert err is None
-      other_info = json.loads(other_info_page)
+      other_info = json.loads(json_resp)
       assert "glibc_version" in other_info
     except Exception as ex:
       if not err: raise ex
       assert err in str(ex)
+
+    if err: return
+    # If successful, also check with x-forwarded-context to verify that
+    # links are to the host name and not to "::" in the result (IMPALA-14781)
+    # With x-forwarded-context absolute links are used instead of relative
+    # ones. See TestWebPage.test_knox_compatibility for a more complex test about this.
+    headers = {'x-forwarded-context': 'abc'}
+    html_resp = requests.get(url, headers=headers, verify=verify_param).text
+    assert re.search(r'href="https?://.+:', html_resp)
+    assert not re.search(r'href="https?://\[?::\]?:', html_resp)
 
   def _shell_smoke(self, host, vector, expected_errors=[]):
     proto = vector.get_value('protocol')
