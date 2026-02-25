@@ -44,7 +44,7 @@ PLAN-ROOT SINK
 |  in pipelines: 11(GETNEXT), 08(OPEN)
 |
 10:SELECT
-|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(3,0)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1))
+|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,12 row-size=137B cardinality=298.51K cost=2985120
 |  in pipelines: 08(GETNEXT)
@@ -173,7 +173,7 @@ max-parallelism=10 segment-costs=[18890602, 9031203, 389] cpu-comparison-result=
 |  in pipelines: 11(GETNEXT), 08(OPEN)
 |
 10:SELECT
-|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(3,0)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1))
+|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,12 row-size=137B cardinality=298.51K cost=2985120
 |  in pipelines: 08(GETNEXT)
@@ -377,7 +377,7 @@ max-parallelism=10 segment-costs=[18890602, 9031203, 389] cpu-comparison-result=
 |  in pipelines: 11(GETNEXT), 08(OPEN)
 |
 10:SELECT
-|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(3,0)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1))
+|  predicates: CASE WHEN avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)) != CAST(0 AS DECIMAL(38,6)) THEN divide(abs(subtract(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price)))), avg(sum(tpcds_partitioned_parquet_snap.store_sales.ss_sales_price))) ELSE NULL END > CAST(0.1 AS DECIMAL(2,1))
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=13,12 row-size=137B cardinality=298.51K cost=2985120
 |  in pipelines: 08(GETNEXT)

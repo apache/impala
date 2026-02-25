@@ -1233,3 +1233,9 @@ WHERE 1 NOT IN
 (SELECT CASE WHEN id = 1 then null ELSE id END FROM functional.alltypestiny);
 ---- RESULTS
 ====
+---- QUERY
+# IMPALA-14429: Ensure correct type is used when decimal and ints are in an IN clause.
+select count(*) from tpch.lineitem where l_quantity in (1, 2)
+---- RESULTS
+239861
+====

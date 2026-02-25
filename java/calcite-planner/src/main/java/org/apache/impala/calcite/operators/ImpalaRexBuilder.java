@@ -67,7 +67,7 @@ public class ImpalaRexBuilder extends RexBuilder {
     // folding, if a '1 + 1' is folded to a '2', the '2' will be explicitly set to a
     // smallint rather than a tinyint because of the "+" operation.
     if (!postAnalysis_) {
-      if (SqlTypeUtil.isExactNumeric(type) && o instanceof BigDecimal) {
+      if (SqlTypeUtil.isIntType(type) && o instanceof BigDecimal) {
         BigDecimal bd0 = (BigDecimal) o;
         type = ImpalaTypeConverter.getLiteralDataType(bd0, type);
       }

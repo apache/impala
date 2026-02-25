@@ -148,13 +148,13 @@ SumCost: cost-total=673 max-instances=1 adj-instances=1 cost/inst=673 #cons:#pro
   |  cost-total=54 max-instances=1 adj-instances=1 cost/inst=54 #cons:#prod=336:336 reduction=1.0 cost/cons=0.16071428 cost/prod=0.16071428 raw-cost=54.3753
   03:SCAN HDFS [tpcds_partitioned_parquet_snap.store, RANDOM]
      HDFS partitions=1/1 files=1 size=119.76KB
-     predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-6 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+     predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-6 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
      stored statistics:
        table: rows=1.35K size=119.76KB
        columns: all
      extrapolated-rows=disabled max-scan-range-rows=1.35K
-     parquet statistics predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-6 AS DECIMAL(3,0))
-     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-6 AS DECIMAL(3,0)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
+     parquet statistics predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-6 AS DECIMAL(5,2))
+     parquet dictionary predicates: tpcds_partitioned_parquet_snap.store.s_gmt_offset = CAST(-6 AS DECIMAL(5,2)), tpcds_partitioned_parquet_snap.store.s_store_sk IS NOT NULL
      file formats: [PARQUET]
      mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
      cost-total=619 max-instances=1 adj-instances=1 cost/inst=619 #cons:#prod=1350:336 reduction=4.017857 cost/cons=0.4585185 cost/prod=1.8422619 raw-cost=619.0092
