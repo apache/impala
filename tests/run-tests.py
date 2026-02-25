@@ -344,7 +344,7 @@ if __name__ == "__main__":
     # Run the remaining query tests in parallel
     if not skip_parallel:
       base_args = conf_args + ['-m', 'not execute_serially and not stress',
-                               '-n', NUM_CONCURRENT_TESTS]
+                               '-n', NUM_CONCURRENT_TESTS, '--dist=worksteal']
       run(base_args + build_test_args("parallel{0}".format(shard_identifier)))
 
     # The total number of tests executed at this point is expected to be >0
