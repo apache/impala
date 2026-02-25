@@ -257,6 +257,12 @@ public class CatalogdMetaProvider implements MetaProvider {
   private static final String RPC_TIME =
       CATALOG_FETCH_PREFIX + "." + RPC_STATS_CATEGORY + ".Time";
 
+  // Weight is an integer and can't be > 2GB. Catalog objects greater than
+  // that are not totally unrealistic (tested with 1M file Iceberg table that
+  // was measuered as ~500MB). Dividing size by 16 allows correctly tracking
+  // entries up to 32GB while not affecting precision significantly.
+  private static final int BYTES_PER_WEIGHT_UNIT = 16;
+
   /**
    * File descriptors store replicas using a compressed format that references hosts
    * by index in a "host index" list rather than by their full addresses. Since we cache
@@ -390,7 +396,7 @@ public class CatalogdMetaProvider implements MetaProvider {
     // and size-triggered) and make sure results are still correct.
     cache_ = CacheBuilder.newBuilder()
         .concurrencyLevel(concurrencyLevel)
-        .maximumWeight(cacheSizeBytes)
+        .maximumWeight((cacheSizeBytes - 1) / BYTES_PER_WEIGHT_UNIT + 1)
         .expireAfterAccess(expirationSecs, TimeUnit.SECONDS)
         .weigher(new SizeOfWeigher(
             BackendConfig.INSTANCE.useJammWeigher(), cacheEntrySize_))
@@ -613,7 +619,9 @@ public class CatalogdMetaProvider implements MetaProvider {
         // Assuming we were able to load the value, store it back into the map
         // as a plain-old object. This is important to get the proper weight in the
         // map. If someone invalidated this load concurrently, this 'replace' will
-        // fail because 'f' will not be the current value.
+        // fail because 'f' will not be the current value. Eviction can also cause
+        // failures - while size based eviction should not happen as CompletableFuture
+        // is weighed as 0, time based eviction can still occur.
         cache_.asMap().replace(key, f, f.get());
       } catch (Exception e) {
         // If there was an exception, remove it from the map so that any later loads
@@ -2301,7 +2309,23 @@ public class CatalogdMetaProvider implements MetaProvider {
     // Cache the reflected sizes of classes seen.
     private static final boolean CACHE_SIZES = true;
 
+    // TODO: consider Compressed OOPs?
+    // actually the JVM uses 4 byte references, at least in my dev setup
+    //   import org.openjdk.jol.vm.VM;
+    //   VM.current().details() ->
+    // VM mode: 64 bits
+    // Compressed references (oops): 3-bit shift
+    // Compressed class pointers: 3-bit shift
+    // WARNING | Compressed references base/shifts are guessed by the experiment!
+    // WARNING | Therefore, computed addresses are just guesses, and ARE NOT RELIABLE.
+    // WARNING | Make sure to attach Serviceability Agent to get the reliable addresses.
+    // Object alignment: 8 bytes
+    //                       ref, bool, byte, char, shrt,  int,  flt,  lng,  dbl
+    // Field sizes:            4,    1,    1,    2,    2,    4,    4,    8,    8
+    // Array element sizes:    4,    1,    1,    2,    2,    4,    4,    8,    8
+    // Array base offsets:    16,   16,   16,   16,   16,   16,   16,   16,   16
     private static final int BYTES_PER_WORD = 8; // Assume 64-bit VM.
+
     // Guava cache overhead based on:
     // http://code-o-matic.blogspot.com/2012/02/updated-memory-cost-per-javaguava.html
     private static final int OVERHEAD_PER_ENTRY =
@@ -2334,6 +2358,30 @@ public class CatalogdMetaProvider implements MetaProvider {
 
     @Override
     public int weigh(Object key, Object value) {
+      // Return 0 weight for CompletableFuture to avoid size based eviction during
+      // loading. CompletableFuture is only 24 byte (based on jamm) and there is at
+      // least 1 thread waiting for each, so there should be a limited number of them.
+      // With keys included it should be just 100-200 bytes per entry.
+      long size = (value instanceof CompletableFuture) ? 0 : measureSize(key, value);
+      LOG.trace("size: {} key class: {} value class: {}", size,
+          key.getClass().getName(), value == null ? "NULL" : value.getClass().getName());
+
+      // Also return on negative (the cache handles it as error).
+      if (size <= 0) return (int)size;
+
+      if (entrySize_ != null) {
+        entrySize_.update(size);
+      }
+      // Round up weight to avoid returning 0.
+      long weight = (size - 1) / BYTES_PER_WEIGHT_UNIT + 1;
+      if (weight > Integer.MAX_VALUE) {
+        LOG.warn("weight exceeded Integer.MAX_VALUE: {}", size);
+        return Integer.MAX_VALUE;
+      }
+      return (int)weight;
+    }
+
+    long measureSize(Object key, Object value) {
       long size = OVERHEAD_PER_ENTRY;
       try {
         if (useJamm_) {
@@ -2349,15 +2397,7 @@ public class CatalogdMetaProvider implements MetaProvider {
         // Thrown by ehcache for lambdas in Java 17.
         LOG.warn("Unable to weigh cache entry", e);
       }
-
-      if (entrySize_ != null) {
-        entrySize_.update(size);
-      }
-      if (size > Integer.MAX_VALUE) {
-        LOG.warn("weight exceeded Integer.MAX_VALUE: {}", size);
-        return Integer.MAX_VALUE;
-      }
-      return (int)size;
+      return size;
     }
   }
 

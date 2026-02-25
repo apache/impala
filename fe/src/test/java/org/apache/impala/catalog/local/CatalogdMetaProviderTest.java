@@ -272,14 +272,14 @@ public class CatalogdMetaProviderTest {
     // TPartialPartitionInfo in future.
     SizeOfWeigher weigher = new SizeOfWeigher();
     int weigh = weigher.weigh(refs, null);
-    assertTrue("Actual weigh: " + weigh, weigh > 4000);
-    assertTrue("Actual weigh: " + weigh, weigh < 5000);
+    assertTrue("Actual weigh: " + weigh, weigh > 4000 / 16);
+    assertTrue("Actual weigh: " + weigh, weigh < 5000 / 16);
 
     // Also continue to test ehcache.
     weigher = new SizeOfWeigher(false, null);
     weigh = weigher.weigh(refs, null);
-    assertTrue("Actual weigh: " + weigh, weigh > 4000);
-    assertTrue("Actual weigh: " + weigh, weigh < 5000);
+    assertTrue("Actual weigh: " + weigh, weigh > 4000 / 16);
+    assertTrue("Actual weigh: " + weigh, weigh < 5000 / 16);
   }
 
   @Test
