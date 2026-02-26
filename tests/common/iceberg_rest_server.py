@@ -75,11 +75,10 @@ class IcebergRestServer(object):
     sleep_interval_s = 0.5
     start_time = time.time()
     while time.time() - start_time < timeout_s:
-      s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-      if s.connect_ex(('localhost', self.port)) == 0:
-        LOG.info("Iceberg REST server is available.")
-        return
-      s.close()
+      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if s.connect_ex(('localhost', self.port)) == 0:
+          LOG.info("Iceberg REST server is available.")
+          return
       time.sleep(sleep_interval_s)
     raise Exception("Webserver did not become available within {} "
         "seconds.".format(timeout_s))
@@ -88,11 +87,10 @@ class IcebergRestServer(object):
     sleep_interval_s = 0.5
     start_time = time.time()
     while time.time() - start_time < timeout_s:
-      s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-      if s.connect_ex(('localhost', self.port)) != 0:
-        LOG.info("Iceberg REST server has stopped.")
-        return
-      s.close()
+      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if s.connect_ex(('localhost', self.port)) != 0:
+          LOG.info("Iceberg REST server has stopped.")
+          return
       time.sleep(sleep_interval_s)
     # Let's not throw an exception as this is typically invoked during cleanup, and we
     # want the rest of the cleanup code to be executed.

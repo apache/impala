@@ -26,12 +26,12 @@ from tests.common.environ import IS_REDHAT_DERIVATIVE
 # Retrieves the host external IP rather than localhost/127.0.0.1 so we have an IP that
 # Impala will consider distinct from storage backends to force remote scheduling.
 def get_external_ip():
-  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  s.settimeout(0)
-  # This address is used to get the networking stack to identify a return IP address.
-  # Timeout=0 means it doesn't need to resolve.
-  s.connect(('10.254.254.254', 1))
-  return s.getsockname()[0]
+  with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+    s.settimeout(0)
+    # This address is used to get the networking stack to identify a return IP address.
+    # Timeout=0 means it doesn't need to resolve.
+    s.connect(('10.254.254.254', 1))
+    return s.getsockname()[0]
 
 
 def split_host_port(host_port):

@@ -20,6 +20,7 @@
 from __future__ import absolute_import, division, print_function
 import json
 from time import time
+from urllib.request import urlopen
 
 import pytest
 
@@ -27,11 +28,6 @@ from impala_thrift_gen.TCLIService import TCLIService
 from tests.common.environ import IS_DOCKERIZED_TEST_CLUSTER
 from tests.common.impala_cluster import ImpalaCluster
 from tests.hs2.hs2_test_suite import HS2TestSuite
-
-try:
-  from urllib.request import urlopen
-except ImportError:
-  from urllib2 import urlopen
 
 
 class TestJsonEndpoints(HS2TestSuite):
@@ -42,9 +38,9 @@ class TestJsonEndpoints(HS2TestSuite):
       cluster = ImpalaCluster.get_e2e_test_cluster()
       return cluster.impalads[0].service.get_debug_webpage_json("/queries")
     else:
-      resp = urlopen("http://%s/queries?json" % http_addr)
-      assert resp.msg == 'OK'
-      return json.loads(resp.read())
+      with urlopen("http://%s/queries?json" % http_addr) as resp:
+        assert resp.msg == 'OK'
+        return json.loads(resp.read())
 
   @pytest.mark.execute_serially
   def test_waiting_in_flight_queries(self):

@@ -39,9 +39,7 @@ class TestKrpcOptions(CustomClusterTestSuite):
     self.client.execute("select min(int_col) from functional_parquet.alltypes")
 
     # Check that we can connect on multiple interfaces.
-    sock = socket.socket()
-    sock.connect(("127.0.0.1", DEFAULT_KRPC_PORT))
-    sock.close()
-    sock = socket.socket()
-    sock.connect((socket.gethostname(), DEFAULT_KRPC_PORT))
-    sock.close()
+    with socket.socket() as sock:
+      sock.connect(("127.0.0.1", DEFAULT_KRPC_PORT))
+    with socket.socket() as sock:
+      sock.connect((socket.gethostname(), DEFAULT_KRPC_PORT))

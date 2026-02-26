@@ -131,6 +131,7 @@ class TestMetastoreService(CustomClusterTestSuite):
             if catalog_hms_client is not None:
                 catalog_hms_client.drop_database(db_name, True, True)
                 catalog_hms_client.shutdown()
+                hive_transport.close()
 
     @pytest.mark.execute_serially
     @CustomClusterTestSuite.with_args(
@@ -229,6 +230,7 @@ class TestMetastoreService(CustomClusterTestSuite):
       finally:
         if catalog_hms_client is not None:
             catalog_hms_client.shutdown()
+            hive_transport.close()
         if self.__get_database_no_throw(db_name) is not None:
           self.hive_client.drop_database(db_name, True, True)
 
@@ -378,6 +380,7 @@ class TestMetastoreService(CustomClusterTestSuite):
       finally:
         if catalog_hms_client is not None:
           catalog_hms_client.shutdown()
+          hive_transport.close()
         if self.__get_database_no_throw(db_name) is not None:
           self.hive_client.drop_database(db_name, True, True)
         if self.__get_database_no_throw(new_db_name) is not None:
@@ -403,6 +406,7 @@ class TestMetastoreService(CustomClusterTestSuite):
       finally:
         if catalog_hms_client is not None:
           catalog_hms_client.shutdown()
+          hive_transport.close()
 
     @pytest.mark.execute_serially
     @CustomClusterTestSuite.with_args(
@@ -430,6 +434,7 @@ class TestMetastoreService(CustomClusterTestSuite):
       finally:
         if catalog_client is not None:
           catalog_client.shutdown()
+          hive_transport.close()
 
     @pytest.mark.execute_serially
     @CustomClusterTestSuite.with_args(
@@ -688,6 +693,7 @@ class TestMetastoreService(CustomClusterTestSuite):
         finally:
             if catalog_hms_client is not None:
                 catalog_hms_client.shutdown()
+                hive_transport.close()
             if self.__get_database_no_throw(db_name) is not None:
                 self.hive_client.drop_database(db_name, True, True)
 
@@ -786,6 +792,7 @@ class TestMetastoreService(CustomClusterTestSuite):
         finally:
             if catalog_hms_client is not None:
                 catalog_hms_client.shutdown()
+                hive_transport.close()
             if self.__get_database_no_throw(db_name) is not None:
                 self.hive_client.drop_database(db_name, True, True)
 
@@ -913,6 +920,7 @@ class TestMetastoreService(CustomClusterTestSuite):
         finally:
             if catalog_hms_client is not None:
                 catalog_hms_client.shutdown()
+                hive_transport.close()
             if self.__get_database_no_throw(db_name) is not None:
                 self.hive_client.drop_database(db_name, True, True)
 
@@ -1002,6 +1010,7 @@ class TestMetastoreService(CustomClusterTestSuite):
         finally:
             if catalog_hms_client is not None:
                 catalog_hms_client.shutdown()
+                hive_transport.close()
             if self.__get_database_no_throw(db_name) is not None:
                 self.hive_client.drop_database(db_name, True, True)
 
@@ -1061,6 +1070,7 @@ class TestMetastoreService(CustomClusterTestSuite):
         finally:
             if catalog_hms_client is not None:
                 catalog_hms_client.shutdown()
+                hive_transport.close()
 
     def __create_test_tbls_from_hive(self, db_name):
       """Util method to create test tables from hive in the given database. It creates

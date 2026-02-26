@@ -66,6 +66,7 @@ class TestHS2(CustomClusterTestSuite):
     # Run another query, which should fail since the session is closed.
     conn.execute_statement("select 2", expected_error_prefix="Invalid session id",
         expected_status_code=TCLIService.TStatusCode.ERROR_STATUS)
+    conn.teardown()
 
     # Check that the query was cancelled correctly.
     query_id = operation_id_to_query_id(execute_resp.operationHandle.operationId)

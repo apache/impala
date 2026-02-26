@@ -24,6 +24,7 @@ import sys
 import threading
 import time
 import traceback
+from urllib.request import urlopen
 import uuid
 
 import pytest
@@ -46,10 +47,6 @@ from tests.common.base_test_suite import BaseTestSuite
 from tests.common.environ import build_flavor_timeout
 from tests.common.skip import SkipIfDockerizedCluster
 
-try:
-  from urllib.request import urlopen
-except ImportError:
-  from urllib2 import urlopen
 
 LOG = logging.getLogger('test_statestore')
 
@@ -71,9 +68,9 @@ LOG = logging.getLogger('test_statestore')
 
 
 def get_statestore_subscribers(host='localhost', port=25010):
-  response = urlopen("http://{0}:{1}/subscribers?json".format(host, port))
-  page = response.read()
-  return json.loads(page)
+  with urlopen("http://{0}:{1}/subscribers?json".format(host, port)) as response:
+    page = response.read()
+    return json.loads(page)
 
 
 STATUS_OK = TStatus(TErrorCode.OK)
@@ -135,6 +132,8 @@ class KillableThreadedServer(TServer):
         return
       except Exception:
         if i == num_tries - 1: raise
+      finally:
+        cnxn.close()
       time.sleep(0.5)
 
   def wait_until_down(self, num_tries=10):
@@ -145,6 +144,8 @@ class KillableThreadedServer(TServer):
       except Exception:
         LOG.info('Server localhost:{} is down'.format(cnxn.port))
         return
+      finally:
+        cnxn.close()
       time.sleep(0.5)
     raise Exception("Server localhost:{} did not stop".format(cnxn.port))
 
@@ -154,7 +155,9 @@ class KillableThreadedServer(TServer):
       client = self.serverTransport.accept()
       # Since accept() can take a while, check again if the server is shutdown to avoid
       # starting an unnecessary thread.
-      if self.is_shutdown: return
+      if self.is_shutdown:
+        client.close()
+        return
       t = None
       if sys.version_info.major < 3:
         t = threading.Thread(target=self.handle, args=(client,))

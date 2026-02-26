@@ -58,6 +58,8 @@ class TestStatestoredHA(CustomClusterTestSuite):
       return client.SetStatestoreDebugAction(request)
     except Exception as e:
       assert False, str(e)
+    finally:
+      client_transport.close()
 
   # Return port of the active catalogd of statestore
   def __get_active_catalogd_port(self, statestore_service):

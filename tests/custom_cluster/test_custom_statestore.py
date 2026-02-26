@@ -71,6 +71,8 @@ class TestCustomStatestore(CustomClusterTestSuite):
       # supported. Exception "Invalid method name: 'GetProtocolVersion'" is thrown
       # by Thrift client.
       assert False, str(e)
+    finally:
+      client_transport.close()
 
   def __register_subscriber(self, ss_protocol=Subscriber.StatestoreServiceVersion.V2,
                             in_v2_format=True, expect_exception=False):
@@ -98,6 +100,8 @@ class TestCustomStatestore(CustomClusterTestSuite):
       return response
     except Exception as e:
       assert expect_exception, str(e)
+    finally:
+      client_transport.close()
 
   @CustomClusterTestSuite.with_args(statestored_args="-statestore_max_subscribers=3")
   def test_statestore_max_subscribers(self):

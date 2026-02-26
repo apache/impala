@@ -25,6 +25,7 @@ import logging
 import random
 import threading
 import time
+from urllib.request import urlopen
 import uuid
 
 from builtins import range
@@ -43,11 +44,6 @@ from tests.hs2.hs2_test_suite import (
     needs_session_cluster_properties,
     operation_id_to_query_id,
 )
-
-try:
-  from urllib.request import urlopen
-except ImportError:
-  from urllib2 import urlopen
 
 LOG = logging.getLogger('test_hs2')
 
@@ -185,9 +181,9 @@ class TestHS2(HS2TestSuite):
     with ScopedSession(self.hs2_client) as session:
       TestHS2.check_response(session)
       http_addr = session.configuration['http_addr']
-      resp = urlopen("http://%s/queries?json" % http_addr)
-      assert resp.msg == 'OK'
-      queries_json = json.loads(resp.read())
+      with urlopen("http://%s/queries?json" % http_addr) as resp:
+        assert resp.msg == 'OK'
+        queries_json = json.loads(resp.read())
       assert 'completed_queries' in queries_json
       assert 'in_flight_queries' in queries_json
 
@@ -1356,6 +1352,8 @@ class TestHS2(HS2TestSuite):
     rows = cursor.fetchall()
     assert rows == [(1,)]
     profile = cursor.get_profile()
+    cursor.close()
+    impyla_conn.close()
     assert profile is not None
     assert "Http Origin: value1" in profile
     assert "Http Origin: value2" not in profile
