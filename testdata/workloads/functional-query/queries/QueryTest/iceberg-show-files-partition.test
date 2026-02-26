@@ -471,3 +471,54 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_with_deletes/
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
+---- QUERY
+# Test LIKE predicate with simple prefix pattern (should work)
+CREATE TABLE $DATABASE.iceberg_showfiles_like_test (s STRING)
+PARTITIONED BY SPEC (s)
+STORED AS ICEBERG;
+====
+---- QUERY
+INSERT INTO $DATABASE.iceberg_showfiles_like_test VALUES ('download'), ('delete'), ('data123'), ('upload');
+====
+---- QUERY
+# Simple prefix patterns should work - shows files from partitions starting with 'd'
+SHOW FILES IN $DATABASE.iceberg_showfiles_like_test PARTITION (s LIKE 'd%');
+---- TYPES
+STRING, STRING, STRING, STRING
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_like_test/data/.*s=data123.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_like_test/data/.*s=delete.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_like_test/data/.*s=download.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+====
+---- QUERY
+# Negative test: Literal values are not allowed after wildcard in LIKE pattern for SHOW FILES
+SHOW FILES IN $DATABASE.iceberg_showfiles_like_test PARTITION (s LIKE 'd%d');
+---- CATCH
+AnalysisException: Predicate 's LIKE 'd%d'' can only be partially converted to Iceberg expression
+====
+---- QUERY
+# Test LIKE predicate with TRUNCATE partition spec
+CREATE TABLE $DATABASE.iceberg_showfiles_like_truncate (s STRING)
+PARTITIONED BY SPEC (TRUNCATE(3, s))
+STORED AS ICEBERG;
+====
+---- QUERY
+INSERT INTO $DATABASE.iceberg_showfiles_like_truncate VALUES ('download'), ('delete'), ('data123'), ('upload'), ('document');
+====
+---- QUERY
+# Shows files from partitions where truncate(3,s) matches
+SHOW FILES IN $DATABASE.iceberg_showfiles_like_truncate PARTITION (s LIKE 'd%');
+---- TYPES
+STRING, STRING, STRING, STRING
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_like_truncate/data/.*s_trunc=dat.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_like_truncate/data/.*s_trunc=del.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_like_truncate/data/.*s_trunc=doc.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/iceberg_showfiles_like_truncate/data/.*s_trunc=dow.*_data.*.parq','.*','','$ERASURECODE_POLICY'
+====
+---- QUERY
+# Negative test
+SHOW FILES IN $DATABASE.iceberg_showfiles_like_truncate PARTITION (s LIKE 'd%d');
+---- CATCH
+AnalysisException: Predicate 's LIKE 'd%d'' can only be partially converted to Iceberg expression
+====

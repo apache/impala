@@ -34,6 +34,7 @@ import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.paimon.FePaimonTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IcebergPartitionPredicateConverter;
+import org.apache.impala.common.IcebergPredicateConverter;
 import org.apache.impala.planner.HdfsPartitionPruner;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCompoundVerticalBarExprRule;
@@ -291,8 +292,23 @@ public class ShowStatsStmt extends StatementBase implements SingleTableStmt {
       // BoolLiterals are handled by the converter and optimized in getPartitionStats
       IcebergPartitionPredicateConverter converter =
           new IcebergPartitionPredicateConverter(table.getIcebergSchema(), analyzer);
+      IcebergPredicateConverter.ConverterResult result = converter.convert(foldedExpr);
+
+      if (result.isFailed()) {
+        throw new AnalysisException(String.format(
+            "Invalid SHOW STATS expression: %s. %s",
+            foldedExpr.toSql(), result.getErrorMessage()));
+      }
+
+      if (result.isPartiallyConverted()) {
+        throw new AnalysisException(String.format(
+            "Cannot use LIKE predicate with literal content after wildcard in SHOW " +
+            "STATS. Given predicate %s cannot be converted to an Iceberg expression.",
+            foldedExpr.toSql()));
+      }
+
       org.apache.iceberg.expressions.Expression icebergExpr =
-          converter.convert(foldedExpr);
+          result.getIcebergExpression();
 
       // Compute the filtered partition stats using the Iceberg Expression
       filteredIcebergPartitionStats_ =

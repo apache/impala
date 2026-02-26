@@ -327,23 +327,32 @@ INT, STRING
 20,'Alex'
 ====
 ---- QUERY
+# Test: LIKE with literal after wildcard (árvíz%p) - pushes down relaxed prefix
+# Pattern is relaxed to startsWith('árvíz') for Iceberg pruning,
+# but full LIKE 'árvíz%p' is still evaluated by Impala to ensure 'p' at end
 # Verify árvíz%p returns correct results (should only match 'árvíztűrőtükörfúrógép' and not 'árvíztűrő')
-# Checks pattern not being pushed down, else startsWith('árvíz') would incorrectly match 'árvíztűrő'
 SELECT s FROM ice_utf8_test WHERE s LIKE 'árvíz%p';
 ---- TYPES
 STRING
 ---- RESULTS: RAW_STRING
 'árvíztűrőtükörfúrógép'
+---- RUNTIME_PROFILE
+row_regex: .*partitions=1.*files=.*
+row_regex: .*predicates:.*s LIKE.*
 ====
 ---- QUERY
-# Negative Test: LIKE with suffix after wildcard - cannot be pushed down
-# Using escaped wildcard test table to verify patterns with literal content after wildcard
+# Test: LIKE with suffix after wildcard - pushes down relaxed prefix
+# Pattern 'test%value' is relaxed to startsWith('test') for Iceberg pruning
+# Verify test%value returns correct results
 SELECT s FROM ice_utf8_test WHERE s LIKE 'test%value' ORDER BY s;
 ---- TYPES
 STRING
 ---- RESULTS
 'test%value'
 'test_value'
+---- RUNTIME_PROFILE
+row_regex: .*partitions=2.*files=.*
+row_regex: .*predicates:.*s LIKE.*
 ====
 ---- QUERY
 # Negative Test: Complex pattern with wildcards and literal content

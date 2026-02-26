@@ -147,12 +147,24 @@ public class ShowFilesStmt extends StatementBase implements SingleTableStmt {
       expr = rewriter.rewrite(expr);
       expr.analyze(analyzer);
       analyzer.getConstantFolder().rewrite(expr, analyzer);
-      try {
-        icebergPartitionExprs.add(converter.convert(expr));
-      } catch (ImpalaException e) {
-        throw new AnalysisException(
-            "Invalid partition filtering expression: " + expr.toSql(), e);
+
+      IcebergPredicateConverter.ConverterResult result = converter.convert(expr);
+
+      if (result.isFailed()) {
+        throw new AnalysisException(String.format(
+            "Invalid partition filtering expression: %s. %s",
+            expr.toSql(), result.getErrorMessage()));
       }
+
+      if (result.isPartiallyConverted()) {
+        throw new AnalysisException(String.format(
+            "Predicate '%s' can only be partially converted to Iceberg expression: " +
+            "'%s'. Partially converted predicates are not allowed in SHOW FILES as " +
+            "they could show more files than intended. Use a fully convertible " +
+            "predicate instead.", expr.toSql(), result.getIcebergExpression()));
+      }
+
+      icebergPartitionExprs.add(result.getIcebergExpression());
     }
 
     try (CloseableIterable<FileScanTask> fileScanTasks = IcebergUtil.planFiles(table,

@@ -58,16 +58,81 @@ public class IcebergPredicateConverter {
   private final Schema schema_;
   private final Analyzer analyzer_;
 
+  /**
+   * Status of the conversion result.
+   * FULLY_CONVERTED: The predicate was fully converted to an Iceberg expression that is
+   *   semantically equivalent to the original predicate. No additional evaluation needed
+   *   by Impala.
+   * PARTIALLY_CONVERTED: The predicate was partially converted to a relaxed Iceberg
+   *   expression that is less restrictive than the original. The original predicate must
+   *   still be evaluated by Impala on surviving rows.
+   * FAILED: The predicate could not be converted to an Iceberg expression.
+   */
+  public enum ConversionStatus {
+    FULLY_CONVERTED,
+    PARTIALLY_CONVERTED,
+    FAILED
+  }
+
+  /**
+   * Result of converting an Impala predicate to an Iceberg expression.
+   */
+  public static class ConverterResult {
+    private final Expression icebergExpression;
+    private final ConversionStatus status;
+    private final String errorMessage;
+
+    public ConverterResult(Expression icebergExpression, ConversionStatus status) {
+      this(icebergExpression, status, null);
+    }
+
+    public ConverterResult(ConversionStatus status, String errorMessage) {
+      this(null, status, errorMessage);
+    }
+
+    private ConverterResult(Expression icebergExpression, ConversionStatus status,
+        String errorMessage) {
+      this.icebergExpression = icebergExpression;
+      this.status = status;
+      this.errorMessage = errorMessage;
+    }
+
+    public Expression getIcebergExpression() {
+      return icebergExpression;
+    }
+
+    public ConversionStatus getStatus() {
+      return status;
+    }
+
+    public String getErrorMessage() {
+      return errorMessage;
+    }
+
+    public boolean isFullyConverted() {
+      return status == ConversionStatus.FULLY_CONVERTED;
+    }
+
+    public boolean isPartiallyConverted() {
+      return status == ConversionStatus.PARTIALLY_CONVERTED;
+    }
+
+    public boolean isFailed() {
+      return status == ConversionStatus.FAILED;
+    }
+  }
+
   public IcebergPredicateConverter(Schema schema, Analyzer analyzer) {
     this.schema_ = schema;
     this.analyzer_ = analyzer;
   }
 
-  public Expression convert(Expr expr) throws ImpalaRuntimeException {
+  public ConverterResult convert(Expr expr) {
     if (expr instanceof BoolLiteral) {
       BoolLiteral boolLiteral = (BoolLiteral) expr;
-      return boolLiteral.getValue() ? Expressions.alwaysTrue() :
+      Expression iceExpr = boolLiteral.getValue() ? Expressions.alwaysTrue() :
           Expressions.alwaysFalse();
+      return new ConverterResult(iceExpr, ConversionStatus.FULLY_CONVERTED);
     } else if (expr instanceof BinaryPredicate) {
       return convert((BinaryPredicate) expr);
     } else if (expr instanceof InPredicate) {
@@ -79,78 +144,119 @@ public class IcebergPredicateConverter {
     } else if (expr instanceof LikePredicate) {
       return convert((LikePredicate) expr);
     } else {
-      throw new ImpalaRuntimeException(String.format(
-          "Unsupported expression: %s", expr.toSql()));
+      return new ConverterResult(ConversionStatus.FAILED,
+          String.format("Unsupported expression: %s", expr.toSql()));
     }
   }
 
-  protected Expression convert(BinaryPredicate predicate) throws ImpalaRuntimeException {
-    Term term = getTerm(predicate.getChild(0));
-    IcebergColumn column = term.referencedColumn_;
+  protected ConverterResult convert(BinaryPredicate predicate) {
+    try {
+      Term term = getTerm(predicate.getChild(0));
+      IcebergColumn column = term.referencedColumn_;
 
-    LiteralExpr literal = getSecondChildAsLiteralExpr(predicate);
-    checkNullLiteral(literal);
-    Operation op = getOperation(predicate);
-    Object value = getIcebergValue(column, literal);
-
-    List<Object> literals = Collections.singletonList(value);
-    return Expressions.predicate(op, term.term_, literals);
-  }
-
-  protected UnboundPredicate<Object> convert(InPredicate predicate)
-      throws ImpalaRuntimeException {
-    Term term = getTerm(predicate.getChild(0));
-    IcebergColumn column = term.referencedColumn_;
-    // Expressions takes a list of values as Objects
-    List<Object> values = new ArrayList<>();
-    for (int i = 1; i < predicate.getChildren().size(); ++i) {
-      if (!Expr.IS_LITERAL.apply(predicate.getChild(i))) {
-        throw new ImpalaRuntimeException(
-            String.format("Expression is not a literal: %s",
-                predicate.getChild(i)));
-      }
-      LiteralExpr literal = (LiteralExpr) predicate.getChild(i);
+      LiteralExpr literal = getSecondChildAsLiteralExpr(predicate);
       checkNullLiteral(literal);
+      Operation op = getOperation(predicate);
       Object value = getIcebergValue(column, literal);
-      values.add(value);
-    }
 
-    // According to the method:
-    // 'org.apache.iceberg.expressions.InclusiveMetricsEvaluator.MetricsEvalVisitor#notIn'
-    // Expressions.notIn only works when the push-down column is the partition column
-    if (predicate.isNotIn()) {
-      return Expressions.notIn(term.term_, values);
-    } else {
-      return Expressions.in(term.term_, values);
+      List<Object> literals = Collections.singletonList(value);
+      Expression iceExpr = Expressions.predicate(op, term.term_, literals);
+      return new ConverterResult(iceExpr, ConversionStatus.FULLY_CONVERTED);
+    } catch (ImpalaRuntimeException e) {
+      return new ConverterResult(ConversionStatus.FAILED, e.getMessage());
     }
   }
 
-  protected UnboundPredicate<Object> convert(IsNullPredicate predicate)
-      throws ImpalaRuntimeException {
-    Term term = getTerm(predicate.getChild(0));
-    if (predicate.isNotNull()) {
-      return Expressions.notNull(term.term_);
-    } else {
-      return Expressions.isNull(term.term_);
+  protected ConverterResult convert(InPredicate predicate) {
+    try {
+      Term term = getTerm(predicate.getChild(0));
+      IcebergColumn column = term.referencedColumn_;
+      // Expressions takes a list of values as Objects
+      List<Object> values = new ArrayList<>();
+      for (int i = 1; i < predicate.getChildren().size(); ++i) {
+        if (!Expr.IS_LITERAL.apply(predicate.getChild(i))) {
+          return new ConverterResult(ConversionStatus.FAILED,
+              String.format("Expression is not a literal: %s",
+                  predicate.getChild(i)));
+        }
+        LiteralExpr literal = (LiteralExpr) predicate.getChild(i);
+        checkNullLiteral(literal);
+        Object value = getIcebergValue(column, literal);
+        values.add(value);
+      }
+
+      // According to the method:
+      // 'org.apache.iceberg.expressions.InclusiveMetricsEvaluator
+      // .MetricsEvalVisitor#notIn'
+      // Expressions.notIn only works when the push-down column is the partition column
+      UnboundPredicate<Object> iceExpr;
+      if (predicate.isNotIn()) {
+        iceExpr = Expressions.notIn(term.term_, values);
+      } else {
+        iceExpr = Expressions.in(term.term_, values);
+      }
+      return new ConverterResult(iceExpr, ConversionStatus.FULLY_CONVERTED);
+    } catch (ImpalaRuntimeException e) {
+      return new ConverterResult(ConversionStatus.FAILED, e.getMessage());
     }
   }
 
-  protected Expression convert(CompoundPredicate predicate)
-      throws ImpalaRuntimeException {
-    Operation op = getOperation(predicate);
-
-    Expr leftExpr = predicate.getChild(0);
-    Expression left = convert(leftExpr);
-
-    if (op.equals(Operation.NOT)) {
-      return Expressions.not(left);
+  protected ConverterResult convert(IsNullPredicate predicate) {
+    try {
+      Term term = getTerm(predicate.getChild(0));
+      UnboundPredicate<Object> iceExpr;
+      if (predicate.isNotNull()) {
+        iceExpr = Expressions.notNull(term.term_);
+      } else {
+        iceExpr = Expressions.isNull(term.term_);
+      }
+      return new ConverterResult(iceExpr, ConversionStatus.FULLY_CONVERTED);
+    } catch (ImpalaRuntimeException e) {
+      return new ConverterResult(ConversionStatus.FAILED, e.getMessage());
     }
+  }
 
-    Expr rightExpr = predicate.getChild(1);
-    Expression right = convert(rightExpr);
+  protected ConverterResult convert(CompoundPredicate predicate) {
+    try {
+      Operation op = getOperation(predicate);
 
-    return op.equals(Operation.AND) ? Expressions.and(left, right) :
-        Expressions.or(left, right);
+      Expr leftExpr = predicate.getChild(0);
+      ConverterResult leftResult = convert(leftExpr);
+
+      // If left child failed, propagate failure
+      if (leftResult.isFailed()) {
+        return leftResult;
+      }
+
+      if (op.equals(Operation.NOT)) {
+        Expression iceExpr = Expressions.not(leftResult.getIcebergExpression());
+        return new ConverterResult(iceExpr, leftResult.getStatus());
+      }
+
+      Expr rightExpr = predicate.getChild(1);
+      ConverterResult rightResult = convert(rightExpr);
+
+      // If right child failed, propagate failure
+      if (rightResult.isFailed()) {
+        return rightResult;
+      }
+
+      Expression iceExpr = op.equals(Operation.AND) ?
+          Expressions.and(leftResult.getIcebergExpression(),
+              rightResult.getIcebergExpression()) :
+          Expressions.or(leftResult.getIcebergExpression(),
+              rightResult.getIcebergExpression());
+
+      // If either child is partially converted, the compound predicate
+      // is partially converted
+      ConversionStatus status = ConversionStatus.FULLY_CONVERTED;
+      if (leftResult.isPartiallyConverted() || rightResult.isPartiallyConverted()) {
+        status = ConversionStatus.PARTIALLY_CONVERTED;
+      }
+      return new ConverterResult(iceExpr, status);
+    } catch (ImpalaRuntimeException e) {
+      return new ConverterResult(ConversionStatus.FAILED, e.getMessage());
+    }
   }
 
   /**
@@ -258,64 +364,71 @@ public class IcebergPredicateConverter {
     return sb.toString();
   }
 
-  protected Expression convert(LikePredicate predicate)
-      throws ImpalaRuntimeException {
-    // Only LIKE operator is supported, not RLIKE, REGEXP, etc.
-    if (predicate.getOp() != LikePredicate.Operator.LIKE) {
-      throw new ImpalaRuntimeException(String.format(
-          "Only LIKE operator is supported for Iceberg pushdown, got: %s",
-          predicate.getOp()));
+  protected ConverterResult convert(LikePredicate predicate) {
+    try {
+      // Only LIKE operator is supported, not RLIKE, REGEXP, etc.
+      if (predicate.getOp() != LikePredicate.Operator.LIKE) {
+        return new ConverterResult(ConversionStatus.FAILED,
+            String.format("Only LIKE operator is supported for Iceberg pushdown, got: %s",
+                predicate.getOp()));
+      }
+
+      Term term = getTerm(predicate.getChild(0));
+      IcebergColumn column = term.referencedColumn_;
+
+      // Check if the column is a string type
+      if (!column.getType().isStringType()) {
+        return new ConverterResult(ConversionStatus.FAILED,
+            String.format("LIKE predicate pushdown only supports string columns, got: %s",
+                column.getType()));
+      }
+
+      LiteralExpr literal = getSecondChildAsLiteralExpr(predicate);
+      checkNullLiteral(literal);
+
+      if (!(literal instanceof StringLiteral)) {
+        return new ConverterResult(ConversionStatus.FAILED,
+            String.format("LIKE pattern must be a string literal, got: %s",
+                literal.toSql()));
+      }
+
+      String pattern = ((StringLiteral) literal).getUnescapedValue();
+      if (pattern == null || pattern.isEmpty()) {
+        return new ConverterResult(ConversionStatus.FAILED,
+            "LIKE pattern cannot be null or empty");
+      }
+
+      // Find first unescaped wildcard position
+      int firstWildcard = findFirstUnescapedWildcard(pattern);
+
+      // Case 1: Pattern starts with wildcard - cannot push down
+      if (firstWildcard == 0) {
+        return new ConverterResult(ConversionStatus.FAILED,
+            String.format("LIKE pattern '%s' cannot be pushed down to Iceberg. " +
+                "Patterns must start with at least one literal character.", pattern));
+      }
+
+      // Case 2: No wildcards - exact match
+      if (firstWildcard == -1) {
+        String unescapedPattern = unescapeLikePattern(pattern, -1);
+        Expression iceExpr = Expressions.equal(column.getName(), unescapedPattern);
+        return new ConverterResult(iceExpr, ConversionStatus.FULLY_CONVERTED);
+      }
+
+      // Case 3: Wildcard in middle with literal content after - push down relaxed prefix
+      // This allows Iceberg to prune partitions/files, but the original LIKE predicate
+      // will still be evaluated by Impala on the surviving rows.
+      // Example: LIKE 'd%d' pushes down startsWith('d'), keeps LIKE 'd%d' in scan
+      boolean hasContentAfterWildcard = hasLiteralContentAfterWildcard(pattern,
+          firstWildcard);
+      ConversionStatus status = hasContentAfterWildcard ?
+          ConversionStatus.PARTIALLY_CONVERTED : ConversionStatus.FULLY_CONVERTED;
+      String unescapedPattern = unescapeLikePattern(pattern, firstWildcard);
+      Expression iceExpr = Expressions.startsWith(column.getName(), unescapedPattern);
+      return new ConverterResult(iceExpr, status);
+    } catch (ImpalaRuntimeException e) {
+      return new ConverterResult(ConversionStatus.FAILED, e.getMessage());
     }
-
-    Term term = getTerm(predicate.getChild(0));
-    IcebergColumn column = term.referencedColumn_;
-
-    // Check if the column is a string type
-    if (!column.getType().isStringType()) {
-      throw new ImpalaRuntimeException(String.format(
-          "LIKE predicate pushdown only supports string columns, got: %s",
-          column.getType()));
-    }
-
-    LiteralExpr literal = getSecondChildAsLiteralExpr(predicate);
-    checkNullLiteral(literal);
-
-    if (!(literal instanceof StringLiteral)) {
-      throw new ImpalaRuntimeException(String.format(
-          "LIKE pattern must be a string literal, got: %s", literal.toSql()));
-    }
-
-    String pattern = ((StringLiteral) literal).getUnescapedValue();
-    if (pattern == null || pattern.isEmpty()) {
-      throw new ImpalaRuntimeException("LIKE pattern cannot be null or empty");
-    }
-
-    // Find first unescaped wildcard position
-    int firstWildcard = findFirstUnescapedWildcard(pattern);
-
-    // Case 1: Pattern starts with wildcard - cannot push down
-    if (firstWildcard == 0) {
-      throw new ImpalaRuntimeException(String.format(
-          "LIKE pattern '%s' cannot be pushed down to Iceberg. Patterns must start "
-          + "with at least one literal character.", pattern));
-    }
-
-    // Case 2: No wildcards - exact match
-    if (firstWildcard == -1) {
-      String unescapedPattern = unescapeLikePattern(pattern, -1);
-      return Expressions.equal(column.getName(), unescapedPattern);
-    }
-
-    // Case 3: Wildcard in middle with literal content after - cannot push down
-    if (hasLiteralContentAfterWildcard(pattern, firstWildcard)) {
-      throw new ImpalaRuntimeException(String.format(
-          "LIKE pattern '%s' cannot be pushed down to Iceberg. Only prefix patterns "
-          + "(e.g., 'prefix%%') are supported.", pattern));
-    }
-
-    // Case 4: Pure prefix pattern (wildcard only at end) - use startsWith
-    String unescapedPattern = unescapeLikePattern(pattern, firstWildcard);
-    return Expressions.startsWith(column.getName(), unescapedPattern);
   }
 
   protected void checkNullLiteral(LiteralExpr literal) throws ImpalaRuntimeException {

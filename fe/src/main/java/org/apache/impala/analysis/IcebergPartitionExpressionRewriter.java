@@ -87,8 +87,12 @@ class IcebergPartitionExpressionRewriter {
       return rewrite(isNullPredicate);
     }
     if (expr instanceof InPredicate) {
-      InPredicate isNullPredicate = (InPredicate) expr;
-      return rewrite(isNullPredicate);
+      InPredicate inPredicate = (InPredicate) expr;
+      return rewrite(inPredicate);
+    }
+    if (expr instanceof LikePredicate) {
+      LikePredicate likePredicate = (LikePredicate) expr;
+      return rewrite(likePredicate);
     }
     throw new AnalysisException(
         "Invalid partition filtering expression: " + expr.toSql());
@@ -158,6 +162,20 @@ class IcebergPartitionExpressionRewriter {
               .set(affectedChildId, numericLiteral));
     }
     return inPredicate;
+  }
+
+  private LikePredicate rewrite(LikePredicate likePredicate)
+      throws AnalysisException {
+    Expr term = likePredicate.getChild(0);
+    IcebergPartitionExpr partitionExpr;
+    if (term instanceof SlotRef) {
+      partitionExpr = rewrite((SlotRef) term);
+      likePredicate.getChildren().set(0, partitionExpr);
+    } else if (term instanceof FunctionCallExpr) {
+      partitionExpr = rewrite((FunctionCallExpr) term);
+      likePredicate.getChildren().set(0, partitionExpr);
+    }
+    return likePredicate;
   }
 
   private void rewriteDateTransformConstants(LiteralExpr literal,

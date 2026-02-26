@@ -143,6 +143,10 @@ public class IcebergScanPlanner {
   private final List<Expr> skippedExpressions_ = new ArrayList<>();
   // Impala expressions that can't be translated into Iceberg expressions
   private final List<Expr> untranslatedExpressions_ = new ArrayList<>();
+  // Impala expressions that were relaxed when pushed to Iceberg
+  // (e.g., LIKE 'd%d' -> startsWith('d'))
+  // These must be evaluated by Impala on the surviving rows
+  private final List<Expr> relaxedExpressions_ = new ArrayList<>();
   // Conjuncts on columns not involved in IDENTITY-partitioning.
   private List<Expr> nonIdentityConjuncts_ = new ArrayList<>();
 
@@ -790,7 +794,11 @@ public class IcebergScanPlanner {
 
   private void filterConjuncts() {
     if (residualExpressions_.isEmpty()) {
-      conjuncts_.removeAll(impalaIcebergPredicateMapping_.values());
+      // Remove fully pushed predicates but keep relaxed ones for evaluation
+      List<Expr> toRemove = impalaIcebergPredicateMapping_.values().stream()
+          .filter(expr -> !relaxedExpressions_.contains(expr))
+          .collect(Collectors.toList());
+      conjuncts_.removeAll(toRemove);
       return;
     }
     if (!analyzer_.getQueryOptions().iceberg_predicate_pushdown_subsetting) return;
@@ -800,6 +808,8 @@ public class IcebergScanPlanner {
   private boolean trySubsettingPredicatesBeingPushedDown() {
     long startTime = System.currentTimeMillis();
     List<Expr> expressionsToRetain = new ArrayList<>(untranslatedExpressions_);
+    // Add relaxed predicates - they were pushed to Iceberg but must still be evaluated
+    expressionsToRetain.addAll(relaxedExpressions_);
     for (Expression expression : residualExpressions_) {
       List<Expression> locatedExpressions = ExpressionVisitors.visit(expression,
           new IcebergExpressionCollector());
@@ -822,7 +832,10 @@ public class IcebergScanPlanner {
 
   private List<Expr> getSkippedConjuncts() {
     if (!residualExpressions_.isEmpty()) return skippedExpressions_;
-    return new ArrayList<>(impalaIcebergPredicateMapping_.values());
+    // Return all pushed predicates except relaxed ones (which still need evaluation)
+    return impalaIcebergPredicateMapping_.values().stream()
+        .filter(expr -> !relaxedExpressions_.contains(expr))
+        .collect(Collectors.toList());
   }
 
   private void updateDeleteStatistics() {
@@ -1088,21 +1101,33 @@ public class IcebergScanPlanner {
   }
 
   /**
-   * Transform Impala predicate to Iceberg predicate
+   * Transform Impala predicate to Iceberg predicate.
+   * Returns true if a predicate was pushed to Iceberg (even if partially converted).
+   * If the predicate was partially converted (e.g., LIKE 'd%d' -> startsWith('d')),
+   * the original predicate is kept in relaxedExpressions_ so it will
+   * be evaluated by Impala on the surviving rows after Iceberg pruning.
    */
   private boolean tryConvertIcebergPredicate(Expr expr) {
     IcebergPredicateConverter converter =
         new IcebergPredicateConverter(getIceTable().getIcebergSchema(), analyzer_);
-    try {
-      Expression predicate = converter.convert(expr);
-      impalaIcebergPredicateMapping_.put(predicate, expr);
-      LOG.debug("Push down the predicate: {} to iceberg", predicate);
-      return true;
-    }
-    catch (ImpalaException e) {
+    IcebergPredicateConverter.ConverterResult result = converter.convert(expr);
+
+    if (result.isFailed()) {
       untranslatedExpressions_.add(expr);
       return false;
     }
+
+    Expression icebergExpr = result.getIcebergExpression();
+    impalaIcebergPredicateMapping_.put(icebergExpr, expr);
+    LOG.debug("Push down the predicate: {} to iceberg (status={})",
+        icebergExpr, result.getStatus());
+
+    // If the predicate was partially converted, we must keep the original predicate
+    // for evaluation by Impala on the pruned data
+    if (result.isPartiallyConverted()) {
+      relaxedExpressions_.add(expr);
+    }
+    return true;
   }
 
 }

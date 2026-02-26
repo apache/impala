@@ -496,3 +496,63 @@ ALTER TABLE $DATABASE.iceberg_drop_partition_between_bucket_test DROP PARTITION 
 ---- CATCH
 AnalysisException: $DATABASE.bucket() unknown for database $DATABASE. Currently this db has 0 functions.
 ====
+---- QUERY
+# Test LIKE predicate with simple prefix pattern (should work)
+CREATE TABLE $DATABASE.iceberg_drop_partition_like_test (s STRING)
+PARTITIONED BY SPEC (s)
+STORED AS ICEBERG;
+====
+---- QUERY
+INSERT INTO $DATABASE.iceberg_drop_partition_like_test VALUES ('download'), ('delete'), ('data123'), ('upload');
+====
+---- QUERY
+# Simple prefix patterns should work fine - drops partitions starting with 'd'
+ALTER TABLE $DATABASE.iceberg_drop_partition_like_test DROP PARTITION (s LIKE 'd%');
+---- RESULTS
+'Dropped 3 partition(s)'
+====
+---- QUERY
+# Verify only partitions starting with 'd' were dropped
+SELECT s FROM $DATABASE.iceberg_drop_partition_like_test ORDER BY s;
+---- RESULTS
+'upload'
+====
+---- QUERY
+# Negative test: Literal values are not allowed after wildcard in LIKE pattern for DROP PARTITION
+ALTER TABLE $DATABASE.iceberg_drop_partition_like_test DROP PARTITION (s LIKE 'd%d');
+---- CATCH
+AnalysisException: Predicate 's LIKE 'd%d'' can only be partially converted to Iceberg expression
+====
+---- QUERY
+# Negative test: pattern 'test%value' also has literal after the wildcard
+ALTER TABLE $DATABASE.iceberg_drop_partition_like_test DROP PARTITION (s LIKE 'test%value');
+---- CATCH
+AnalysisException: Predicate 's LIKE 'test%value'' can only be partially converted to Iceberg expression
+====
+---- QUERY
+# Test LIKE predicate with TRUNCATE partition spec
+CREATE TABLE $DATABASE.iceberg_drop_partition_like_truncate (s STRING)
+PARTITIONED BY SPEC (TRUNCATE(1, s))
+STORED AS ICEBERG;
+====
+---- QUERY
+INSERT INTO $DATABASE.iceberg_drop_partition_like_truncate VALUES ('download'), ('delete'), ('data123'), ('upload'), ('document');
+====
+---- QUERY
+# All values starting with 'd' truncate to 'd' and share the same partition
+ALTER TABLE $DATABASE.iceberg_drop_partition_like_truncate DROP PARTITION (s LIKE 'd%');
+---- RESULTS
+'Dropped 1 partition(s)'
+====
+---- QUERY
+# Verify correct partition was dropped
+SELECT s FROM $DATABASE.iceberg_drop_partition_like_truncate ORDER BY s;
+---- RESULTS
+'upload'
+====
+---- QUERY
+# Negative test
+ALTER TABLE $DATABASE.iceberg_drop_partition_like_truncate DROP PARTITION (s LIKE 'd%d');
+---- CATCH
+AnalysisException: Predicate 's LIKE 'd%d'' can only be partially converted to Iceberg expression
+====
