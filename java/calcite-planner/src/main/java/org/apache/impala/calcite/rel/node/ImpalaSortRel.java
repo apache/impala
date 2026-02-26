@@ -108,6 +108,7 @@ public class ImpalaSortRel extends Sort
       // all PlanNodes containing the limit so the PlanNode constructor can set the
       // limit, or leave the code here to mutate.
       inputNodeWithExprs.planNode_.setLimit(limit_);
+      inputNodeWithExprs.planNode_.computeStats(context.ctx_.getRootAnalyzer());
       return NodeCreationUtils.wrapInSelectNodeIfNeeded(context,
           inputNodeWithExprs, getCluster().getRexBuilder());
     }
