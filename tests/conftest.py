@@ -394,7 +394,7 @@ def unique_database(request, testid_checksum):
     request.instance.filesystem_client.delete_file_dir(db_location, recursive=True)
 
   def cleanup():
-    with request.cls.create_impala_client(protocol=HS2) as client:
+    with request.instance.create_impala_client(protocol=HS2) as client:
       client.set_configuration({'sync_ddl': sync_ddl})
       for db_name in db_names:
         cleanup_database(client, db_name, True)
@@ -403,7 +403,7 @@ def unique_database(request, testid_checksum):
 
   request.addfinalizer(cleanup)
 
-  with request.cls.create_impala_client(protocol=HS2) as client:
+  with request.instance.create_impala_client(protocol=HS2) as client:
     client.set_configuration({'sync_ddl': sync_ddl})
     for db_name in db_names:
       cleanup_database(client, db_name, False)

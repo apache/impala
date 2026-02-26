@@ -49,3 +49,4 @@ class TestInsertQueriesWithPermutation(ImpalaTestSuite):
 
   def teardown_method(self, method):
     list(map(self.cleanup_db, ["insert_permutation_test"]))
+    super(TestInsertQueriesWithPermutation, self).teardown_method(method)

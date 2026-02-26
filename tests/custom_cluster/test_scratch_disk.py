@@ -28,6 +28,7 @@ import subprocess
 import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf
 from tests.util.hdfs_util import NAMENODE
 from tests.util.parse_util import bytes_to_str
@@ -87,13 +88,17 @@ class TestScratchDir(CustomClusterTestSuite):
         os.chmod(dir_path, stat.S_IREAD)
     return result
 
-  def setup_method(self, method):  # noqa: U100
+  def setup_method(self, method):
     # Don't call the superclass method to prevent starting Impala before each test. In
     # this file, each test is responsible for doing that because we want to generate
-    # the parameter string to start-impala-cluster in each test method.
-    pass
+    # the parameter string to start-impala-cluster in each test method. This is still
+    # required to call ImpalaTestSuite::setup_method() (and the corresponding
+    # teardown_method()).
+    ImpalaTestSuite.setup_method(self, method)
 
-  def teardown_method(self, method):  # noqa: U100
+  def teardown_method(self, method):
+    # See comment in setup_method()
+    ImpalaTestSuite.teardown_method(self, method)
     self.clear_tmp_dirs()
     self.check_deleted_file_fd()
 

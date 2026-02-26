@@ -39,9 +39,11 @@ class TestHdfsPermissions(ImpalaTestSuite):
         create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
+    super().setup_method(method)
     self._cleanup()
 
   def teardown_method(self, method):
+    super().teardown_method(method)
     self._cleanup()
 
   def _cleanup(self):

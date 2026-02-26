@@ -79,6 +79,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     self.__cleanup()
     self.close_impala_clients()
     self.clear_tmp_dirs()
+    super(TestUdfPersistence, self).teardown_method(method)
 
   def __cleanup(self):
     self.client.execute("DROP DATABASE IF EXISTS %s CASCADE" % self.DATABASE)

@@ -409,6 +409,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
           raise e
 
   def setup_method(self, method):
+    super().setup_method(method)
     if not self.SHARED_CLUSTER_ARGS:
       # Store the test method name so that we can put logs in different directories for
       # different tests. This only applies if the cluster is being restarted per test
@@ -445,6 +446,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       super(CustomClusterTestSuite, cls).teardown_class()
 
   def teardown_method(self, method):
+    super().teardown_method(method)
     if not self.SHARED_CLUSTER_ARGS:
       self.cluster_teardown(method.__name__, method.__dict__)
     self.set_current_test_method_name(None)

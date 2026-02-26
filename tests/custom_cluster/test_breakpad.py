@@ -28,6 +28,7 @@ from signal import SIGSEGV, SIGKILL, SIGUSR1, SIGTERM
 from subprocess import CalledProcessError
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_test_suite import ImpalaTestSuite
 
 DAEMONS = ['impalad', 'statestored', 'catalogd']
 DAEMON_ARGS = ['impalad_args', 'state_store_args', 'catalogd_args']
@@ -36,12 +37,18 @@ DAEMON_ARGS = ['impalad_args', 'state_store_args', 'catalogd_args']
 class TestBreakpadBase(CustomClusterTestSuite):
   """Base class with utility methods for all breakpad tests."""
   def setup_method(self, method):
+    # Skip CustomClusterTestSuite's setup_method() as we start the cluster
+    # manually. This is still required to call ImpalaTestSuite's setup_method()
+    # (and teardown_method()).
+    ImpalaTestSuite.setup_method(self, method)
     # Override parent
     # The temporary directory gets removed in teardown_method() after each test.
     self.tmp_dir = self.make_tmp_dir('breakpad')
 
   def teardown_method(self, method):
-    # Override parent
+    # Skip CustomClusterTestSuite's teardown_method(), but this is required to
+    # call ImpalaTestSuite's teardown_method().
+    ImpalaTestSuite.teardown_method(self, method)
     # Stop the cluster to prevent future accesses to self.tmp_dir.
     self.kill_cluster(SIGKILL)
     assert len(self.TMP_DIRS) > 0

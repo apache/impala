@@ -61,8 +61,10 @@ class TestLoadData(ImpalaTestSuite):
 
   def teardown_method(self, method):
     self._clean_test_tables()
+    super().teardown_method(method)
 
   def setup_method(self, method):
+    super().setup_method(method)
     # Defensively clean the data dirs if they exist.
     self._clean_test_tables()
 
@@ -125,8 +127,10 @@ class TestLoadDataExternal(ImpalaTestSuite):
 
   def teardown_method(self, method):
     self._clean_test_tables()
+    super().teardown_method(method)
 
   def setup_method(self, method):
+    super().setup_method(method)
     # Defensively clean the data dirs if they exist.
     self._clean_test_tables()
 

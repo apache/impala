@@ -27,6 +27,7 @@ from time import sleep
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.file_utils import grep_file, assert_file_in_dir_contains,\
     assert_no_files_in_dir_contain
+from tests.common.impala_test_suite import ImpalaTestSuite
 
 LOG = logging.getLogger(__name__)
 
@@ -60,12 +61,17 @@ class TestRedaction(CustomClusterTestSuite):
     return os.path.join(self.tmp_dir, "redaction_rules.json")
 
   def setup_method(self, method):
+    # Since this test starts the cluster itself, it doesn't want to use
+    # CustomClusterTestSuite's setup_method(). However, it is still required to
+    # call ImpalaTestSuite::setup_method() (and the corresponding teardown_method()).
+    ImpalaTestSuite.setup_method(self, method)
     # Override parent
     # The temporary directory gets removed in teardown_method() after each test.
     self.tmp_dir = self.make_tmp_dir('redaction')
 
   def teardown_method(self, method):
-    # Parent method would fail, nothing needs to be done.
+    # See comment in setup_method()
+    ImpalaTestSuite.teardown_method(self, method)
     # Cleanup any temporary dirs.
     self.clear_tmp_dirs()
 

@@ -71,6 +71,7 @@ class TestHdfsEncryption(ImpalaTestSuite):
         v.get_value('key_tbl_dir') is not None)
 
   def setup_method(self, method):
+    super().setup_method(method)
     self.__cleanup()
     self.client.execute('create database if not exists %s' % TEST_DB)
     self.client.execute('use %s' % TEST_DB)
@@ -89,6 +90,7 @@ class TestHdfsEncryption(ImpalaTestSuite):
     rc, stdout, stderr = exec_process(
             "hadoop fs -rmr /user/{0}/.Trash/".format(getpass.getuser()))
     assert rc == 0, 'Error deleting Trash: %s %s' % (stdout, stderr)
+    super().teardown_method(method)
 
   def create_encryption_zone(self, key, path):
     """Creates an encryption zone using key 'key' on path 'path'"""

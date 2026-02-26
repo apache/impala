@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_test_suite import ImpalaTestSuite
 
 import pytest
 import re
@@ -226,13 +227,17 @@ class TestBlacklistFaultyDisk(CustomClusterTestSuite):
     return result
 
   def setup_method(self, method):  # noqa: U100
-    # Don't call the superclass method to prevent starting Impala before each test. In
-    # this class, each test is responsible for doing that because we want to generate
-    # the parameter string to start-impala-cluster in each test method.
-    pass
+    # Skip the call to CustomClusterTestSuite setup_method() to prevent starting Impala
+    # before each test. In this class, each test is responsible for doing that because
+    # we want to generate the parameter string to start-impala-cluster in each test
+    # method. However, we are required to call ImpalaTestSuite's setup_method() (and
+    # ImpalaTestSuite's teardown_method()).
+    ImpalaTestSuite.setup_method(self, method)
 
   def teardown_method(self, method):  # noqa: U100
     self.clear_tmp_dirs()
+    # See comment in setup_method()
+    ImpalaTestSuite.teardown_method(self, method)
 
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially

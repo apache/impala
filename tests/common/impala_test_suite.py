@@ -41,6 +41,7 @@ from getpass import getuser
 from impala.hiveserver2 import HiveServer2Cursor
 from random import choice
 from subprocess import check_call
+from threading import Lock
 import tests.common
 from tests.common.base_test_suite import BaseTestSuite
 from tests.common.environ import (
@@ -359,14 +360,34 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.close_impala_clients()
 
   def setup_method(self, test_method):  # noqa: U100
-    """Setup for all test method."""
+    """
+    Setup for all test method. All classes inheriting from this class with a custom
+    setup_method() must call this ImpalaTestSuite::setup_method() either via their
+    super() or directly (same for teardown_method()).
+    """
+    # List of clients to be closed at the end of the test method. This avoids resource
+    # leaks of clients and sessions. This is protected by a lock to avoid concurrent
+    # modification
+    self.test_method_scoped_clients_lock = Lock()
+    self.test_method_scoped_clients = []
     self._reset_impala_clients()
 
   def teardown_method(self, test_method):  # noqa: U100
-    """Teardown for all test method.
-    Currently, it is only here as a placeholder for future use and complement
-    setup_method() declaration."""
-    pass
+    """
+    Teardown for all test methods. This closes all test scoped clients to avoid
+    socket/session leaks. All classes inheriting from this class with a custom
+    teardown_method() must call this ImpalaTestSuite::teardown_method() either via
+    their super() or directly (same for setup_method()).
+    """
+    # This is taking advantage of the fact that close() is idempotent. Many clients
+    # in this list have been closed by other means. Teardown is expected to be single
+    # threaded, as all threads used by tests should be cleaned up prior to this. So,
+    # it should not be necessary to take the lock and no thread is racing with this
+    # thread to close the client. Even so, taking the lock is harmless, so do it anyway.
+    with self.test_method_scoped_clients_lock:
+      for client in self.test_method_scoped_clients:
+        client.close()
+      self.test_method_scoped_clients = None
 
   @classmethod
   def need_default_clients(cls):
@@ -379,11 +400,17 @@ class ImpalaTestSuite(BaseTestSuite):
     return True
 
   @classmethod
-  def create_impala_client(cls, host_port=None, protocol=None, is_hive=False, user=None):
+  def create_impala_client_internal(cls, host_port=None, protocol=None, is_hive=False,
+      user=None):
     """
     Create a new ImpalaConnection client.
-    Make sure to always call this method using a with-as statement or manually close
-    the returned connection before discarding it."""
+    This method mostly should not be used directly outside of test infrastructure code.
+    Unlike other signatures, this is a classmethod and can be used from other
+    classmethod code.
+
+    It comes with no protection against leaking the client, so it must be used with
+    a with-as statement, a try-finally block, or manual logic to close the connection.
+    """
     if protocol is None:
       protocol = cls.default_test_protocol()
     if host_port is None:
@@ -397,14 +424,33 @@ class ImpalaTestSuite(BaseTestSuite):
     client.connect()
     return client
 
-  @classmethod
-  def create_impala_client_from_vector(cls, vector):
+  def create_impala_client(self, host_port=None, protocol=None, is_hive=False, user=None):
+    """
+    Create a new ImpalaConnection client. This client is registered at the class level
+    and will be cleaned up during test method teardown. This still works properly using
+    a with-as statement or with manual close statements."""
+    client = self.create_impala_client_internal(host_port=host_port, protocol=protocol,
+        is_hive=is_hive, user=user)
+    # If the appropriate fields haven't been set, then the caller hasn't called
+    # setup_method(). Give a clearer error.
+    if not hasattr(self, 'test_method_scoped_clients') or \
+       self.test_method_scoped_clients is None:
+      assert False, "ImpalaTestSuite::setup_method() has not been called. " \
+        "All test classes must call ImpalaTestSuite::setup_method()/teardown_method()."
+    # Register this client to be closed at test method teardown. Some tests use a
+    # threadpool that could be opening clients concurrently, so this takes a lock.
+    with self.test_method_scoped_clients_lock:
+      self.test_method_scoped_clients.append(client)
+    return client
+
+  def create_impala_client_from_vector(self, vector):
     """A shorthand for create_impala_client with test vector as input.
     Vector must have 'protocol' and 'exec_option' dimension.
     Return a client of specified 'protocol' and with cofiguration 'exec_option' set.
-    Make sure to always call this method using a with-as statement or manually close
-    the returned connection before discarding it."""
-    client = cls.create_impala_client(protocol=vector.get_protocol())
+    This client is registered at the class level and will be cleaned up during test
+    method teardown. This still works properly using a with-as statement or with
+    manual close statements."""
+    client = self.create_impala_client(protocol=vector.get_protocol())
     client.set_configuration(vector.get_exec_option_dict())
     return client
 
@@ -412,11 +458,15 @@ class ImpalaTestSuite(BaseTestSuite):
   def get_impalad_cluster_size(cls):
     return len(cls.__get_cluster_host_ports(cls.default_test_protocol()))
 
-  @classmethod
-  def create_client_for_nth_impalad(cls, nth=0, protocol=None):
+  def create_client_for_nth_impalad(self, nth=0, protocol=None):
+    """
+    Create a new ImpalaConnection client for the specified impalad.
+    This client is registered at the class level and will be cleaned up during test
+    method teardown. This still works properly using a with-as statement or with
+    manual close statements."""
     if protocol is None:
-      protocol = cls.default_test_protocol()
-    host_ports = cls.__get_cluster_host_ports(protocol)
+      protocol = self.default_test_protocol()
+    host_ports = self.__get_cluster_host_ports(protocol)
     if nth < len(IMPALAD_HOST_PORT_LIST):
       host_port = host_ports[nth]
     else:
@@ -426,23 +476,38 @@ class ImpalaTestSuite(BaseTestSuite):
       host, port = host_port.split(':')
       port = str(int(port) + nth)
       host_port = host + ':' + port
-    return cls.create_impala_client(host_port, protocol=protocol)
+    return self.create_impala_client(host_port, protocol=protocol)
 
   @classmethod
   def create_impala_clients(cls):
     """Creates Impala clients for all supported protocols."""
-    # The default connection (self.client) is Beeswax so that existing tests, which assume
-    # Beeswax do not need modification (yet).
-    cls.beeswax_client = cls.create_impala_client(protocol=BEESWAX)
-    cls.hs2_client = None
+    # These built-in clients are scoped at the class level. They specifically
+    # use the create_impala_client_internal() API to allow the clients to
+    # be reused across multiple test methods. They are cleaned up in the class
+    # teardown method.
+
+    # If the beeswax client already exists, close it to avoid leaks
+    if cls.beeswax_client:
+      cls.beeswax_client.close()
+      cls.beeswax_client = None
+    cls.beeswax_client = cls.create_impala_client_internal(protocol=BEESWAX)
+
+    # If the HS2 client already exists, close it to avoid leaks
+    if cls.hs2_client:
+      cls.hs2_client.close()
+      cls.hs2_client = None
     try:
-      cls.hs2_client = cls.create_impala_client(protocol=HS2)
+      cls.hs2_client = cls.create_impala_client_internal(protocol=HS2)
     except Exception as e:
       # HS2 connection can fail for benign reasons, e.g. running with unsupported auth.
       LOG.info("HS2 connection setup failed, continuing...: {0}".format(e))
-    cls.hs2_http_client = None
+
+    # If the HS2-HTTP client already exists, close it to avoid leaks
+    if cls.hs2_http_client:
+      cls.hs2_http_client.close()
+      cls.hs2_http_client = None
     try:
-      cls.hs2_http_client = cls.create_impala_client(protocol=HS2_HTTP)
+      cls.hs2_http_client = cls.create_impala_client_internal(protocol=HS2_HTTP)
     except Exception as e:
       # HS2 HTTP connection can fail for benign reasons, e.g. running with unsupported
       # auth.
@@ -451,11 +516,13 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @classmethod
   def _reset_impala_clients(cls):
-    if cls.beeswax_client:
+    # Reset the configuration for built-in clients. This tolerates when the fields are
+    # not set, as CustomClusterTestSuite can call this before the cluster starts up.
+    if hasattr(cls, 'beeswax_client') and cls.beeswax_client:
       cls.beeswax_client.clear_configuration()
-    if cls.hs2_client:
+    if hasattr(cls, 'hs2_client') and cls.hs2_client:
       cls.hs2_client.clear_configuration()
-    if cls.hs2_http_client:
+    if hasattr(cls, 'hs2_http_client') and cls.hs2_http_client:
       cls.hs2_http_client.clear_configuration()
 
   @classmethod
@@ -541,12 +608,11 @@ class ImpalaTestSuite(BaseTestSuite):
   @classmethod
   def cleanup_db(cls, db_name, sync_ddl=1):
     # Create a new client to avoid polluting query options of existing clients.
-    client = cls.create_impala_client()
-    client.set_configuration({'sync_ddl': sync_ddl})
-    try:
+    # This uses the internal API because this method is used in cleanup functions,
+    # and it should work even if teardown_method() has already run.
+    with cls.create_impala_client_internal() as client:
+      client.set_configuration({'sync_ddl': sync_ddl})
       client.execute("drop database if exists `" + db_name + "` cascade")
-    finally:
-      client.close()
 
   def __restore_query_options(self, query_options_changed, impalad_client):
     """

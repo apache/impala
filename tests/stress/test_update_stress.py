@@ -211,7 +211,7 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
 
   def _hive_role_concurrent_writer(self, tbl_name, all_rows_deleted):
     """Increments j's value with each iteration until all rows are deleted"""
-    hive_client = ImpalaTestSuite.create_impala_client(
+    hive_client = self.create_impala_client(
       host_port=DEFAULT_HIVE_SERVER2, protocol='hs2', is_hive=True)
     while all_rows_deleted.value != 1:
       try:
@@ -224,7 +224,7 @@ class TestIcebergConcurrentOperations(ImpalaTestSuite):
     hive_client.close()
 
   def _hive_role_concurrent_deleter(self, tbl_name, all_rows_deleted, num_rows):
-    hive_client = ImpalaTestSuite.create_impala_client(
+    hive_client = self.create_impala_client(
       host_port=DEFAULT_HIVE_SERVER2, protocol='hs2', is_hive=True)
     i = 0
     while i < num_rows:

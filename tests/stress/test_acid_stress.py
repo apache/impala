@@ -241,7 +241,7 @@ class TestConcurrentAcidInserts(TestAcidStress):
     """Writes ascending numbers into column 'i'. To column 'wid' it writes its identifier
     passed in parameter 'wid'. Occasionally it truncates the table."""
     target_impalad = wid % ImpalaTestSuite.get_impalad_cluster_size()
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     try:
       num_inserts = 0
       while num_inserts < 50:
@@ -269,7 +269,7 @@ class TestConcurrentAcidInserts(TestAcidStress):
           "wid: %d" % wid
 
     target_impalad = cid % ImpalaTestSuite.get_impalad_cluster_size()
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     try:
       while counter.value != writers:
         result = impalad_client.execute("select * from %s" % tbl_name)
@@ -322,7 +322,7 @@ class TestFailingAcidInserts(TestAcidStress):
     INSERTs with the value -1 must fail with a debug action.
     Occasionally it truncates the table."""
     FAIL_ACTION = "CLIENT_REQUEST_UPDATE_CATALOG:FAIL@1.0"
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     try:
       num_inserts = 0
       while num_inserts < 50:
@@ -347,7 +347,7 @@ class TestFailingAcidInserts(TestAcidStress):
 
   def _impala_role_checker(self, tbl_name, target_impalad, counter, writers):
     """Checks that the table doesn't contain other values than 1."""
-    impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
+    impalad_client = self.create_client_for_nth_impalad(target_impalad)
     try:
       while counter.value != writers:
         result = impalad_client.execute("select * from %s where i != 1" % tbl_name)

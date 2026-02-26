@@ -224,6 +224,7 @@ class TestLargeCompressedFile(ImpalaTestSuite):
 
   def teardown_method(self, method):
     self.__drop_test_table()
+    super(TestLargeCompressedFile, self).teardown_method(method)
 
   def __generate_file(self, file_name, file_size):
     """Generate file with random data and a specified size."""
