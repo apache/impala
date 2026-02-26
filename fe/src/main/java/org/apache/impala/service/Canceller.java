@@ -66,6 +66,8 @@ public final class Canceller {
       Preconditions.checkState(curr.first == Thread.currentThread());
       Preconditions.checkState(curr.second == cancelled_.get());
       cancelled_.remove();
+      // Clear interrupt status of the thread to prevent it from affecting future work.
+      Thread.interrupted();
     }
   }
 
@@ -85,18 +87,22 @@ public final class Canceller {
    */
   public static void cancel(TUniqueId queryId) {
     if (queryId == null) return;
-    Pair<Thread, AtomicBoolean> queryPair = queryThreads_.get(queryId);
-    if (queryPair == null) {
+    Pair<Thread, AtomicBoolean> queryPair = queryThreads_.computeIfPresent(queryId,
+        (k, v) -> {
+          // Set cancellation flag and interrupt the thread. Prevents access to
+          // queryPair while interrupting to prevent a race in close() between remove()
+          // and completing execution of the thread.
+          v.second.set(true);
+          v.first.interrupt();
+          return v;
+        });
+    if (queryPair != null) {
+      LOG.debug(
+          "Cancelled request: thread {} for query {}", queryPair.first, PrintId(queryId));
+    } else {
       LOG.info(
           "Unable to cancel request: thread for query {} not found", PrintId(queryId));
-      return;
     }
-
-    Thread queryThread = queryPair.first;
-    LOG.debug(
-        "Cancelling request: thread {} for query {}", queryThread, PrintId(queryId));
-    queryPair.second.set(true);
-    queryThread.interrupt();
   }
 
   /**
