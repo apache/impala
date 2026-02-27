@@ -2598,6 +2598,19 @@ class TestAdmissionControllerWithACServiceCompress(TestAdmissionController):
     self.enable_admission_compress(method, 1)
     super(TestAdmissionControllerWithACServiceCompress, self).setup_method(method)
 
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--vmodule admission-controller=3 --mem_limit=20MB ")
+  def test_admission_service_safeguard_large_compressed_query(self):
+    """Test compressed request being rejected at Submission due to memory
+    pressure."""
+    large_query = " union all ".join(["select * from functional.alltypes"] * 30)
+    handle = self.client.execute_async(large_query)
+    self.client.wait_for_impala_state(handle, ERROR, 20)
+    profile = self.client.get_runtime_profile(handle)
+    # Only compressed requests rejected will end up with pool N/A.
+    assert "pool N/A: Admission rejected due to memory pressure" in profile
+
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions

@@ -353,6 +353,36 @@ static inline bool ParsePoolTopicKey(
   return true;
 }
 
+// Checks a query will exceed the admission service process memory limit.
+// If the limit is exceeded, returns true and the 'rejection_reason'.
+// 'additional_mem' allows to preserve the memory needed like from decompression.
+static bool RejectForAdmissionServiceMemory(
+    int64_t additional_mem, string* rejection_reason) {
+  // Only works when in a admissiond process.
+  if (AdmissiondEnv::GetInstance() == nullptr) return false;
+  DCHECK(rejection_reason != nullptr);
+
+  int64_t mem_limit = AdmissiondEnv::GetInstance()->admission_service_mem_limit();
+  if (mem_limit <= 0) return false;
+
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+  DCHECK(SanitizerMallocMetric::BYTES_ALLOCATED != nullptr);
+  int64_t bytes_inuse = SanitizerMallocMetric::BYTES_ALLOCATED->GetValue();
+#else
+  DCHECK(TcmallocMetric::BYTES_IN_USE != nullptr);
+  int64_t bytes_inuse = TcmallocMetric::BYTES_IN_USE->GetValue();
+#endif
+
+  if (bytes_inuse + additional_mem > mem_limit) {
+    LOG(INFO) << "Rejected admission with additional_mem: " << additional_mem
+              << ", bytes_inuse: " << bytes_inuse << ", mem_limit: " << mem_limit;
+    *rejection_reason =
+        Substitute(REASON_EXCEED_MEMORY_LIMIT, bytes_inuse + additional_mem, mem_limit);
+    return true;
+  }
+  return false;
+}
+
 Status AdmissionExecRequestCompressed::GetQueryExecRequest(
     const TQueryExecRequest** out_req) const {
   lock_guard<std::mutex> l(lock_);
@@ -362,23 +392,36 @@ Status AdmissionExecRequestCompressed::GetQueryExecRequest(
   }
   DCHECK(req_ != nullptr);
 
+  int64_t uncomp_size = req_->uncompressed_size;
+  MemTracker* tracker = admission_controller_->pending_decompression_mem_tracker_.get();
+  DCHECK(tracker != nullptr);
+  tracker->Consume(uncomp_size);
+  const auto tracker_releaser =
+      MakeScopeExitTrigger([&]() { tracker->Release(uncomp_size); });
+  string rejection_reason;
+  if (RejectForAdmissionServiceMemory(tracker->consumption(), &rejection_reason)) {
+    // It is okay we set the pool's name to N/A as the pool is not related.
+    return Status::Expected(
+        ErrorMsg(TErrorCode::ADMISSION_REJECTED, "N/A", rejection_reason));
+  }
+
   unique_ptr<TQueryExecRequest> new_req = std::make_unique<TQueryExecRequest>();
   RETURN_IF_ERROR(DecompressThrift(*req_, new_req.get()));
+  DCHECK(new_req != nullptr);
 
   int64_t comp_size = req_->compressed_data.size();
-  int64_t uncomp_size = req_->uncompressed_size;
   float ratio = (comp_size > 0) ? (static_cast<float>(uncomp_size) / comp_size) : 0.0f;
-
   LOG(INFO) << "Decompress TQueryExecRequest for query "
             << PrintId(new_req->query_ctx.query_id) << ": Compressed size=" << comp_size
-            << " B"
-            << ", Uncompressed size=" << uncomp_size << " B"
-            << ", Ratio=" << ratio << "x";
+            << " B, Uncompressed size=" << uncomp_size << " B, Ratio=" << ratio << "x";
 
   // Update the compression stats only once.
-  if (first_decompress_ && admission_controller_ != nullptr) {
-    admission_controller_->UpdateAdmissionRequestCompressionStats(
-        comp_size, uncomp_size, ratio);
+  if (first_decompress_) {
+    cached_query_options_ = new_req->query_ctx.client_request.query_options;
+    if (admission_controller_ != nullptr) {
+      admission_controller_->UpdateAdmissionRequestCompressionStats(
+          comp_size, uncomp_size, ratio);
+    }
   }
 
   // Store the object in our cache.
@@ -806,6 +849,11 @@ Status AdmissionController::Init() {
       filter_prefix, cb);
   if (!status.ok()) {
     status.AddDetail("AdmissionController failed to register request queue topic");
+  }
+  if (AdmissiondEnv::GetInstance() != nullptr) {
+    DCHECK(AdmissiondEnv::GetInstance()->process_mem_tracker() != nullptr);
+    pending_decompression_mem_tracker_.reset(new MemTracker(-1, "Pending Decompression",
+        AdmissiondEnv::GetInstance()->process_mem_tracker()));
   }
   return status;
 }
@@ -1718,31 +1766,19 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
       return Status::Expected(rejected_msg);
     }
 
-    if (AdmissiondEnv::GetInstance() != nullptr) {
-      // See RegisterMemoryMetrics() in memory-metrics.cc for where the relevant metrics
-      // are registered.
-#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
-      DCHECK(SanitizerMallocMetric::BYTES_ALLOCATED != nullptr);
-      int64_t bytes_inuse = SanitizerMallocMetric::BYTES_ALLOCATED->GetValue();
-#else
-      DCHECK(TcmallocMetric::BYTES_IN_USE != nullptr);
-      int64_t bytes_inuse = TcmallocMetric::BYTES_IN_USE->GetValue();
-#endif
-      if (!is_trivial && AdmissiondEnv::GetInstance()->admission_service_mem_limit() > 0
-          && bytes_inuse > AdmissiondEnv::GetInstance()->admission_service_mem_limit()) {
-        queue_node->not_admitted_reason = Substitute(REASON_EXCEED_MEMORY_LIMIT,
-            bytes_inuse, AdmissiondEnv::GetInstance()->admission_service_mem_limit());
-        request.summary_profile->AddInfoString(
-            PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_REJECTED);
-        stats->metrics()->total_rejected->Increment(1);
-        const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_REJECTED,
-            queue_node->pool_name, queue_node->not_admitted_reason);
-        VLOG_QUERY << "query_id=" << PrintId(request.query_id) << " "
-                   << rejected_msg.msg();
-        return Status::Expected(rejected_msg);
-      }
+    // Check if the admissiond is at capacity and reject immediately to prevent OOM.
+    // Only needed when in admissiond mode, RejectForAdmissionServiceMemory() will return
+    // false immediately if not in admissiond process.
+    if (!is_trivial
+        && RejectForAdmissionServiceMemory(0, &queue_node->not_admitted_reason)) {
+      request.summary_profile->AddInfoString(
+          PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_REJECTED);
+      stats->metrics()->total_rejected->Increment(1);
+      const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_REJECTED,
+          queue_node->pool_name, queue_node->not_admitted_reason);
+      VLOG_QUERY << "query_id=" << PrintId(request.query_id) << " " << rejected_msg.msg();
+      return Status::Expected(rejected_msg);
     }
-
     string user;
     const TQueryExecRequest* exec_req_queue_node = nullptr;
     RETURN_IF_ERROR(
@@ -1861,12 +1897,8 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
     queue_nodes_.erase(query_id);
   });
 
-  const TQueryExecRequest* exec_req_queue_node = nullptr;
-  RETURN_IF_ERROR(
-      queue_node->admission_request.request.GetQueryExecRequest(&exec_req_queue_node));
-  DCHECK(exec_req_queue_node != nullptr);
   // Disallow the FAIL action here. It would leave the queue in an inconsistent state.
-  DebugActionNoFail(exec_req_queue_node->query_ctx.client_request.query_options,
+  DebugActionNoFail(queue_node->admission_request.request.GetQueryOptions(),
       "AC_AFTER_ADMISSION_OUTCOME");
 
   {
@@ -2686,11 +2718,27 @@ void AdmissionController::TryDequeue() {
 
       bool coordinator_resource_limited = false;
       bool is_trivial = false;
-      bool is_rejected = !is_cancelled
-          && !FindGroupToAdmitOrReject(membership_snapshot, pool_config,
+      bool is_rejected = false;
+      const UniqueIdPB& query_id = queue_node->admission_request.query_id;
+      const TQueryExecRequest* exec_req = nullptr;
+      if (!is_cancelled) {
+        Status status =
+            queue_node->admission_request.request.GetQueryExecRequest(&exec_req);
+        if (!status.ok()) {
+          LOG(WARNING) << "Failed to get query execution request for dequeued query "
+                       << PrintId(query_id) << ": " << status.GetDetail();
+          // Fall to rejection handling.
+          queue_node->not_admitted_reason =
+              Substitute("Failed to get query execution request: $0", status.GetDetail());
+          is_rejected = true;
+        }
+        if (!is_rejected) {
+          is_rejected = !FindGroupToAdmitOrReject(membership_snapshot, pool_config,
               queue_node->root_cfg,
               /* admit_from_queue=*/true, stats, queue_node, coordinator_resource_limited,
               &is_trivial);
+        }
+      }
 
       if (!is_cancelled && !is_rejected
           && queue_node->admitted_schedule.get() == nullptr) {
@@ -2712,18 +2760,6 @@ void AdmissionController::TryDequeue() {
       --max_to_dequeue;
       VLOG(3) << "Dequeueing from stats for pool " << pool_name;
       stats->Dequeue(false);
-      const UniqueIdPB& query_id = queue_node->admission_request.query_id;
-      const TQueryExecRequest* exec_req = nullptr;
-      Status status =
-          queue_node->admission_request.request.GetQueryExecRequest(&exec_req);
-      if (!status.ok()) {
-        LOG(WARNING) << "Failed to get query execution request for dequeued query "
-                     << PrintId(query_id) << ": " << status.GetDetail();
-        // Fall to rejection handling.
-        queue_node->not_admitted_reason =
-            Substitute("Failed to get query execution request: $0", status.GetDetail());
-        is_rejected = true;
-      }
       if (is_rejected) {
         AdmissionOutcome outcome =
             queue_node->admit_outcome->Set(AdmissionOutcome::REJECTED);
@@ -2762,8 +2798,9 @@ void AdmissionController::TryDequeue() {
       DCHECK(!is_cancelled);
       DCHECK(!is_rejected);
       DCHECK(queue_node->admitted_schedule != nullptr);
+      DCHECK(exec_req != nullptr);
       string user;
-      status = GetEffectiveShortUser(exec_req->query_ctx.session, &user);
+      Status status = GetEffectiveShortUser(exec_req->query_ctx.session, &user);
       DCHECK_OK(status); // Should never happen because user name was checked at query
                          // entry.
       AdmitQuery(queue_node, user, true /* was_queued */, is_trivial);

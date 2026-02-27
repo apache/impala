@@ -68,10 +68,17 @@ class AdmissionExecRequest {
   /// Avoids Status checks, DCHECKs if called on compressed requests.
   virtual const TQueryExecRequest* request() const = 0;
 
+  // Returns the query options. For compressed requests, this returns a cached
+  // copy to help unnecessary decompression.
+  virtual const TQueryOptions& GetQueryOptions() const = 0;
+
   /// For compressed only, clears the cached decompressed object to save memory.
   /// Returns true if cache is empty, returns false if no compressed data or non-empty
   /// after operation.
   virtual bool ClearDecompressedCache() const = 0;
+
+  /// Returns if the request is compressed
+  virtual bool IsCompressed() const = 0;
 };
 
 class AdmissionExecRequestUncompressed : public AdmissionExecRequest {
@@ -90,10 +97,17 @@ class AdmissionExecRequestUncompressed : public AdmissionExecRequest {
     return req_;
   }
 
+  const TQueryOptions& GetQueryOptions() const override {
+    DCHECK(req_ != nullptr);
+    return req_->query_ctx.client_request.query_options;
+  }
+
   bool ClearDecompressedCache() const override {
     // we don't have a compressed data, so return false.
     return false;
   }
+
+  bool IsCompressed() const override { return false; }
 
  private:
   const TQueryExecRequest* req_;
@@ -117,6 +131,12 @@ class AdmissionExecRequestCompressed : public AdmissionExecRequest {
     return nullptr;
   }
 
+  const TQueryOptions& GetQueryOptions() const override {
+    std::lock_guard<std::mutex> l(lock_);
+    DCHECK(!first_decompress_) << "GetQueryOptions() called before first decompression";
+    return cached_query_options_;
+  }
+
   bool ClearDecompressedCache() const override {
     std::lock_guard<std::mutex> l(lock_);
     if (decompressed_req_) {
@@ -127,12 +147,15 @@ class AdmissionExecRequestCompressed : public AdmissionExecRequest {
     return true;
   }
 
+  bool IsCompressed() const override { return true; }
+
  private:
   const TQueryExecRequestCompressed* req_;
   const AdmissionController* admission_controller_;
   mutable std::mutex lock_;
   mutable std::unique_ptr<TQueryExecRequest> decompressed_req_;
   mutable bool first_decompress_ = true;
+  mutable TQueryOptions cached_query_options_;
 };
 
 /// The AdmissionController is used to throttle requests (e.g. queries, DML) based
@@ -579,6 +602,7 @@ class AdmissionController {
  private:
   class PoolStats;
   friend class PoolStats;
+  friend class AdmissionExecRequestCompressed;
 
   /// Pointer to the cluster membership manager. Not owned by the AdmissionController.
   ClusterMembershipMgr* cluster_membership_mgr_;
@@ -628,6 +652,10 @@ class AdmissionController {
   /// issue on the coordinator (which therefore cannot be resolved by adding more
   /// executor groups).
   IntCounter* total_dequeue_failed_coordinator_limited_ = nullptr;
+
+  /// MemTracker tracking the size of uncompressed requests that have been approved for
+  /// decompression, but haven't been allocated by tcmalloc yet.
+  mutable std::unique_ptr<MemTracker> pending_decompression_mem_tracker_;
 
   /// Histograms for tracking the compressed/uncompressed sizes and compression ratios
   /// of the admission requests of TQueryExecRequest.
