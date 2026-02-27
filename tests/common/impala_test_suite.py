@@ -615,6 +615,26 @@ class ImpalaTestSuite(BaseTestSuite):
     assert response.status_code == requests.codes.ok
     return json.loads(response.text)
 
+  def run_query_and_get_debug_page(self, query, page_url, query_options=None,
+                                     expected_state=None, timeout=100):
+    """Runs a query to obtain the content of the debug page pointed to by page_url, then
+    cancels the query. Optionally takes in an expected_state parameter, if specified the
+    method waits for the query to reach the expected state before getting its debug
+    information."""
+    with self.create_impala_client(protocol=HS2) as client:
+      if query_options:
+        client.set_configuration(query_options)
+      query_handle = client.execute_async(query)
+      if expected_state:
+        client.wait_for_impala_state(query_handle, expected_state, timeout)
+      query_id = client.handle_id(query_handle)
+      response_json = self.get_debug_page(
+          "{0}?query_id={1}&json".format(page_url, query_id).
+          format(25000))
+      client.cancel(query_handle)
+      client.close_query(query_handle)
+      return (query_id, response_json)
+
   def get_var_current_val(self, var):
     """Returns the current value of a given Impalad flag variable."""
     # Parse the /varz endpoint to get the flag information.

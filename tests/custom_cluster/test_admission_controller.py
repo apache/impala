@@ -542,6 +542,36 @@ class TestAdmissionController(TestAdmissionControllerBase):
       assert re.search("Rejected query from pool default-pool: request memory needed "
                        ".* is greater than pool max mem resources 10.00 MB", str(ex))
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
+          pool_max_mem=10 * 1024 * 1024, proc_mem_limit=1024 * 1024 * 1024),
+      statestored_args=_STATESTORED_ARGS)
+  def test_rejected_statements_and_web_ui(self, unique_database):
+    def verify_json_plan(query, error_msg):
+      (_, response_json) = self.run_query_and_get_debug_page(
+          query, "http://localhost:{0}/query_plan", expected_state='ERROR')
+      # Verify that we have a non-empty plan_json.
+      assert 'plan_json' in response_json
+      assert 'plan_nodes' in response_json['plan_json']
+      assert 'label' in response_json['plan_json']['plan_nodes'][0]
+      # Summary is empty as execution could not start.
+      assert 'summary' in response_json
+      assert response_json['summary'] == ''
+      # Verify error message
+      assert error_msg in response_json['status']
+
+    target_tbl = unique_database + ".ctas_target_fail"
+    verify_json_plan("""create table {0} stored as iceberg as select id
+                      from functional_parquet.alltypes""".format(target_tbl),
+                      "Rejected query from pool")
+    insert_fail = unique_database + ".insert_fail"
+    self.execute_query_expect_success(self.client,
+        """create table {0} as select 100000""".format(insert_fail))
+    verify_json_plan("""insert into {0} select id from functional_parquet.alltypes"""
+        .format(insert_fail),
+        "Rejected query from pool")
+
   @SkipIfFS.hdfs_block_size
   @SkipIfEC.parquet_file_size
   @pytest.mark.execute_serially

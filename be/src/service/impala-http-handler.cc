@@ -1185,8 +1185,12 @@ void SinkToJsonHelper(const TDataSink& sink,
 
   map<TPlanNodeId, TPlanNodeExecSummary>::const_iterator summary_it =
       summaries.find(SINK_ID);
-  DCHECK(summary_it != summaries.end());
-  ExecStatsToJsonHelper(summary_it->second, document, value);
+  if (summary_it != summaries.end()) {
+    // Sometimes we don't have a summary for the sink, e.g.:
+    // - Query was rejected by admission control
+    // - CTAS query failed to create the target table, so the sink was never executed
+    ExecStatsToJsonHelper(summary_it->second, document, value);
+  }
 
   Value children(kArrayType);
 
