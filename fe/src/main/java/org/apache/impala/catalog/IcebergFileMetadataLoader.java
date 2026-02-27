@@ -69,7 +69,10 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
       IcebergFileMetadataLoader.class);
 
   private final org.apache.iceberg.Table iceTbl_;
+  // Store Path as both String and Path to be able to use the more efficient one in
+  // functions.
   private final Path tablePath_;
+  private final String tablePathStr_;
   private final GroupedContentFiles icebergFiles_;
   private final List<TIcebergPartition> oldIcebergPartitions_;
   private AtomicInteger nextPartitionId_ = new AtomicInteger(0);
@@ -84,7 +87,8 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     super(iceTbl.location(), true, oldFds, hostIndex, null, null,
         HdfsFileFormat.ICEBERG);
     iceTbl_ = iceTbl;
-    tablePath_ = FileSystemUtil.createFullyQualifiedPath(new Path(iceTbl.location()));
+    tablePathStr_ = iceTbl.location();
+    tablePath_ = FileSystemUtil.createFullyQualifiedPath(new Path(tablePathStr_));
     icebergFiles_ = icebergFiles;
     oldIcebergPartitions_ = partitions;
     requiresDataFilesInTableLocation_ = requiresDataFilesInTableLocation;
@@ -125,7 +129,7 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     fileMetadataStats_ = new FileMetadataStats();
 
     // Process the existing Fd ContentFile and return the newly added ContentFile
-    Iterable<ContentFile<?>> newContentFiles = loadContentFilesWithOldFds(tablePath_);
+    Iterable<ContentFile<?>> newContentFiles = loadContentFilesWithOldFds();
     // Iterate through all the newContentFiles, determine if StorageIds are supported,
     // and use different handling methods accordingly.
     // This considers that different ContentFiles are on different FileSystems
@@ -173,14 +177,14 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
    *  Iceberg tables are a collection of immutable, uniquely identifiable data files,
    *  which means we can safely reuse the old FDs.
    */
-  private Iterable<ContentFile<?>> loadContentFilesWithOldFds(Path partPath)
+  private Iterable<ContentFile<?>> loadContentFilesWithOldFds()
       throws TableLoadingException {
     if (forceRefreshLocations || oldFdsByPath_.isEmpty()) {
       return icebergFiles_.getAllContentFiles();
     }
     List<ContentFile<?>> newContentFiles = Lists.newArrayList();
     for (ContentFile<?> contentFile : icebergFiles_.getAllContentFiles()) {
-      IcebergFileDescriptor fd = getOldFd(contentFile, partPath);
+      IcebergFileDescriptor fd = getOldFd(contentFile);
       if (fd == null) {
         newContentFiles.add(contentFile);
       } else {
@@ -348,19 +352,26 @@ public class IcebergFileMetadataLoader extends FileMetadataLoader {
     return ret;
   }
 
-  IcebergFileDescriptor getOldFd(ContentFile<?> contentFile, Path partPath)
-      throws TableLoadingException {
-    Path contentFilePath = FileSystemUtil.createFullyQualifiedPath(
-        new Path(contentFile.path().toString()));
-    String lookupPath = FileSystemUtil.relativizePathNoThrow(contentFilePath, partPath);
-    if (lookupPath == null) {
-      if (requiresDataFilesInTableLocation_) {
-        throw new TableLoadingException(String.format("Failed to load Iceberg datafile " +
-            "%s, because it's outside of the table location", contentFilePath));
-      } else {
-        lookupPath = contentFilePath.toString();
-      }
+  private String toLookupPath(String path) throws TableLoadingException {
+    if (path.startsWith(tablePathStr_)
+        && path.length() > tablePathStr_.length()
+        && path.charAt(tablePathStr_.length()) == Path.SEPARATOR_CHAR) {
+      // Quick path for relativize fully qualified paths starting with the table path.
+      return path.substring(tablePathStr_.length() + 1);
+    } else {
+      // Slow path to handle paths outside the table dir and non fully qualified paths.
+      Path fqpath = FileSystemUtil.createFullyQualifiedPath(new Path(path));
+      String result = FileSystemUtil.relativizePathNoThrow(fqpath, tablePath_);
+      if (result != null) return result;
+      if (!requiresDataFilesInTableLocation_) return fqpath.toString();
+      throw new TableLoadingException(String.format("Failed to load Iceberg datafile " +
+          "%s, because it's outside of the table location",  fqpath.toString()));
     }
+  }
+
+  IcebergFileDescriptor getOldFd(ContentFile<?> contentFile)
+      throws TableLoadingException {
+    String lookupPath = toLookupPath(contentFile.location());
     FileDescriptor fd = oldFdsByPath_.get(lookupPath);
     if (fd == null) return null;
 

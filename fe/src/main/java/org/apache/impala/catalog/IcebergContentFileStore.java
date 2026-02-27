@@ -54,12 +54,18 @@ import org.apache.impala.util.Hash128;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Helper class for storing Iceberg file descriptors. It stores data and delete files
  * separately, while also storing file descriptors belonging to earlier snapshots.
  * Shared between queries on the Coordinator side.
  */
 public class IcebergContentFileStore {
+
+  private final static Logger LOG = LoggerFactory.getLogger(
+      IcebergContentFileStore.class);
 
   private static class EncodedFileDescriptor {
     public final byte[] fileDesc_;
@@ -189,9 +195,11 @@ public class IcebergContentFileStore {
     partitions_ = partitions;
 
     Map<String, IcebergFileDescriptor> fileDescMap = new HashMap<>();
+    String apiTableLocation = iceApiTable.location();
     for (IcebergFileDescriptor fileDesc : fileDescriptors) {
-      Path path = new Path(fileDesc.getAbsolutePath(iceApiTable.location()));
-      fileDescMap.put(path.toUri().getPath(), fileDesc);
+      String absPathStr = fileDesc.getAbsolutePath(apiTableLocation);
+      String pathStr = quickGetPath(absPathStr);
+      fileDescMap.put(pathStr, fileDesc);
     }
 
     for (DataFile dataFile : icebergFiles.dataFilesWithoutDeletes) {
@@ -348,11 +356,31 @@ public class IcebergContentFileStore {
         getIcebergFd(fileDescMap, contentFile));
   }
 
+  private static String quickGetPath(String uri) {
+    int pos1 = uri.indexOf('/');
+    int pos2 = uri.indexOf('/', pos1 + 1);
+    if (pos2 != pos1 + 1) {
+      // Assume no scheme and authority, return whole path.
+      return uri;
+    }
+    int pos3 = uri.indexOf('/', pos2 + 1);
+
+    if (pos3 != -1) {
+        // Return everything starting from the 3rd slash.
+        return uri.substring(pos3);
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("quickGetPath couldn't parse uri, falling back to slow path: {}", uri);
+    }
+    // Something is off, use slow path.
+    return new Path(uri).toUri().getPath();
+  }
+
   private EncodedFileDescriptor getIcebergFd(
       Map<String, IcebergFileDescriptor> fileDescMap,
       ContentFile<?> contentFile) {
-    Path path = new Path(contentFile.path().toString());
-    IcebergFileDescriptor fileDesc = fileDescMap.get(path.toUri().getPath());
+    String pathStr = quickGetPath(contentFile.location());
+    IcebergFileDescriptor fileDesc = fileDescMap.get(pathStr);
 
     if (fileDesc == null) return null;
 

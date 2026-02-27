@@ -220,12 +220,13 @@ public class FileDescriptor implements Comparable<FileDescriptor> {
   }
 
   public String getAbsolutePath(String rootPath) {
-    if (StringUtils.isEmpty(fbFileDescriptor_.relativePath())
-        && StringUtils.isNotEmpty(fbFileDescriptor_.absolutePath())) {
-      return fbFileDescriptor_.absolutePath();
-    } else {
-      return rootPath + Path.SEPARATOR + fbFileDescriptor_.relativePath();
+    String relativePath = fbFileDescriptor_.relativePath();
+    if (StringUtils.isNotEmpty(relativePath)) {
+      return rootPath + Path.SEPARATOR + relativePath;
     }
+    String absolutePath = fbFileDescriptor_.absolutePath();
+    if(StringUtils.isEmpty(absolutePath)) return rootPath + Path.SEPARATOR;
+    return absolutePath;
   }
 
   public String getPath() {
