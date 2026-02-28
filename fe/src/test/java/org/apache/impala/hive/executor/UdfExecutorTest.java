@@ -18,6 +18,7 @@
 package org.apache.impala.hive.executor;
 
 import java.lang.reflect.Method;
+import java.lang.StrictMath;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -464,25 +465,25 @@ public class UdfExecutorTest {
       throws ImpalaException, MalformedURLException, TException {
     TestHiveUdfNoValidate(UDFRand.class, createDouble(0));
     TestHiveUdfNoValidate(UDFRand.class, createDouble(0), createBigInt(10));
-    TestHiveUdf(UDFExp.class, createDouble(Math.exp(10)), createDouble(10));
-    TestHiveUdf(UDFLn.class, createDouble(Math.log(10)), createDouble(10));
-    TestHiveUdf(UDFLog10.class, createDouble(Math.log10(10)), createDouble(10));
-    TestHiveUdf(UDFLog2.class, createDouble(Math.log(10) / Math.log(2)),
+    TestHiveUdf(UDFExp.class, createDouble(StrictMath.exp(10)), createDouble(10));
+    TestHiveUdf(UDFLn.class, createDouble(StrictMath.log(10)), createDouble(10));
+    TestHiveUdf(UDFLog10.class, createDouble(StrictMath.log10(10)), createDouble(10));
+    TestHiveUdf(UDFLog2.class, createDouble(StrictMath.log(10) / StrictMath.log(2)),
         createDouble(10));
-    TestHiveUdf(UDFLog.class, createDouble(Math.log(3) / Math.log(10)),
+    TestHiveUdf(UDFLog.class, createDouble(StrictMath.log(3) / StrictMath.log(10)),
         createDouble(10), createDouble(3));
-    TestHiveUdf(UDFSqrt.class, createDouble(Math.sqrt(3)), createDouble(3));
-    TestHiveUdf(UDFSin.class, createDouble(Math.sin(1)), createDouble(1));
-    TestHiveUdf(UDFAsin.class, createDouble(Math.asin(1)), createDouble(1));
-    TestHiveUdf(UDFCos.class, createDouble(Math.cos(1)), createDouble(1));
-    TestHiveUdf(UDFAcos.class, createDouble(Math.acos(1)), createDouble(1));
-    TestHiveUdf(UDFTan.class, createDouble(Math.tan(1)), createDouble(1));
-    TestHiveUdf(UDFAtan.class, createDouble(Math.atan(1)), createDouble(1));
+    TestHiveUdf(UDFSqrt.class, createDouble(StrictMath.sqrt(3)), createDouble(3));
+    TestHiveUdf(UDFSin.class, createDouble(StrictMath.sin(1)), createDouble(1));
+    TestHiveUdf(UDFAsin.class, createDouble(StrictMath.asin(1)), createDouble(1));
+    TestHiveUdf(UDFCos.class, createDouble(StrictMath.cos(1)), createDouble(1));
+    TestHiveUdf(UDFAcos.class, createDouble(StrictMath.acos(1)), createDouble(1));
+    TestHiveUdf(UDFTan.class, createDouble(StrictMath.tan(1)), createDouble(1));
+    TestHiveUdf(UDFAtan.class, createDouble(StrictMath.atan(1)), createDouble(1));
     TestHiveUdf(UDFDegrees.class, createDouble(0), createDouble(0));
     TestHiveUdf(UDFRadians.class, createDouble(0), createDouble(0));
 
-    TestHiveUdf(UDFPI.class, createDouble(Math.PI));
-    TestHiveUdf(UDFE.class, createDouble(Math.E));
+    TestHiveUdf(UDFPI.class, createDouble(StrictMath.PI));
+    TestHiveUdf(UDFE.class, createDouble(StrictMath.E));
     TestHiveUdf(UDFSign.class, createDouble(1), createDouble(3));
 
     TestHiveUdf(UDFBin.class, createText("1100100"), createBigInt(100));
