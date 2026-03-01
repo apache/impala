@@ -20,8 +20,8 @@ BIGINT
 ---- RESULTS
 124999
 ---- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
+aggregation(SUM, RowsPassedThrough)> 0
 ====
 ---- QUERY
 # IMPALA-5823: make sure that SET_DENY_RESERVATION_PROBABILITY takes effect on OPEN.
@@ -34,8 +34,8 @@ BIGINT
 ---- RESULTS
 124999
 ---- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
+aggregation(SUM, RowsPassedThrough)> 0
 ====
 ---- QUERY
 # IMPALA-5823: make sure that SET_DENY_RESERVATION_PROBABILITY takes effect on GETNEXT.
@@ -50,5 +50,5 @@ BIGINT
 ---- RESULTS
 124999
 ---- RUNTIME_PROFILE
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+aggregation(SUM, RowsPassedThrough)> 0
 ====

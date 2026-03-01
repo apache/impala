@@ -85,7 +85,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*Files rejected: 0 .*
+aggregation(SUM, Files rejected): 0
 ---- RUNTIME_PROFILE: table_format=kudu
 row_regex: .*RowsRead: 2.43K .*
 ====

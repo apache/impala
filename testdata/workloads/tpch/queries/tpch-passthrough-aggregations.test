@@ -22,7 +22,7 @@ limit 10
 bigint,bigint,string,bigint,decimal
 ---- RUNTIME_PROFILE
 # Verify that passthrough was activated.
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+aggregation(SUM, RowsPassedThrough)> 0
 ====
 ---- QUERY
 # Test for preaggregation passthrough optimization - the group by keys are nearly unique.
@@ -47,7 +47,7 @@ limit 10;
 bigint,bigint,bigint,string
 ---- RUNTIME_PROFILE
 # Verify that passthrough was activated.
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+aggregation(SUM, RowsPassedThrough)> 0
 ====
 ---- QUERY
 # IMPALA-12960: Test the case of rollup.
@@ -83,7 +83,7 @@ from part
 bigint
 ---- RUNTIME_PROFILE
 # Verify that passthrough was activated.
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+aggregation(SUM, RowsPassedThrough)> 0
 ====
 ---- QUERY
 # Test for preaggregation passthrough optimization: count distinct aggregation with
@@ -108,7 +108,7 @@ limit 10;
 string,string,int,bigint
 ---- RUNTIME_PROFILE
 # Verify that passthrough was activated.
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+aggregation(SUM, RowsPassedThrough)> 0
 ====
 ---- QUERY
 # Test that, without preagg_bytes_limit, this query does not pass through rows.
@@ -133,5 +133,5 @@ select count(distinct l_orderkey) from tpch_parquet.lineitem
 BIGINT
 ---- RUNTIME_PROFILE
 # Verify that passthrough was activated.
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+aggregation(SUM, RowsPassedThrough)> 0
 ====

@@ -293,7 +293,7 @@ limit 50
 STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, BIGINT
 ---- RUNTIME_PROFILE
 # Confirm that heaps were not evicted thanks to Small String Optimization.
-row_regex: .*InMemoryHeapsEvicted: 0 \(0\)
+aggregation(SUM, InMemoryHeapsEvicted): 0
 ====
 ---- QUERY
 # Same as above, but calculate aggregates over all the result columns to ensure that the right
@@ -395,7 +395,7 @@ limit 50
 STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, BIGINT
 ---- RUNTIME_PROFILE
 # Confirm that heaps were actually evicted due to memory pressure.
-row_regex: .*InMemoryHeapsEvicted: .* \([1-9][0-9]*\)
+aggregation(SUM, InMemoryHeapsEvicted)> 0
 ====
 ---- QUERY
 # Same as above with in-memory heaps evicted, but calculate aggregates over all the result
@@ -424,7 +424,7 @@ where rnk < 700
 STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
 ---- RUNTIME_PROFILE
 # Confirm that heaps were actually evicted due to memory pressure.
-row_regex: .*InMemoryHeapsEvicted: .* \([1-9][0-9]*\)
+aggregation(SUM, InMemoryHeapsEvicted)> 0
 ====
 ---- QUERY
 # IMPALA-11230: This is a minimal reproducing case for a crash in

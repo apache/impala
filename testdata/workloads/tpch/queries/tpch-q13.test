@@ -67,5 +67,5 @@ order by
 ---- TYPES
 BIGINT, BIGINT
 ---- RUNTIME_PROFILE
-!row_regex: .*CollectionItemsRead: [^0].*
+aggregation(SUM, CollectionItemsRead): 0
 ====

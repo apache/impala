@@ -19,7 +19,7 @@ l1.l_shipdate = l3.l_shipdate
 BIGINT
 ---- RUNTIME_PROFILE
 # Verify that at least one of the joins was spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 set buffer_pool_limit=50m;
@@ -206,7 +206,7 @@ limit 100
 string, bigint
 ---- RUNTIME_PROFILE
 # Verify that at least one of the joins was spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # IMPALA-1346/IMPALA-1546: fix sorter memory management so that it can complete
@@ -242,8 +242,8 @@ limit 20
 BIGINT,BIGINT,BIGINT,INT,DECIMAL,DECIMAL,DECIMAL,DECIMAL,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,BIGINT,BIGINT,STRING,DECIMAL,STRING,STRING,STRING,INT,STRING
 ---- RUNTIME_PROFILE
 # Verify that the sort and join actually spilled
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
+aggregation(SUM, TotalMergesPerformed)> 0
 ====
 ---- QUERY
 # IMPALA-5173: spilling hash join feeding into right side of nested loop join.
@@ -292,7 +292,7 @@ limit 50000000
 ---- RUNTIME_PROFILE
 row_regex: .*Query State: FINISHED.*
 row_regex: .*Query Status: OK.*
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Test spilling join with many duplicates in join key. We don't expect this to succeed
@@ -368,7 +368,7 @@ BIGINT
 # Verify that at least one of the joins was spilled.
 # TODO(IMPALA-12549): Make this query spill again after the estimations and
 # min reservations are adjusted.
-# row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+# aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Spilling partitioned top-N.
@@ -433,8 +433,8 @@ order by s_name
 STRING,DECIMAL,DECIMAL,DECIMAL,DECIMAL,BIGINT
 ---- RUNTIME_PROFILE
 # Verify that at least one of the Top-N operators spilled.
-row_regex: .*InMemoryHeapsEvicted: .* \([1-9][0-9]*\)
-#row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
+aggregation(SUM, InMemoryHeapsEvicted)> 0
+# aggregation(SUM, SpilledRuns)> 0
 ====
 ---- QUERY
 # Test spilling an agg with a LIMIT; see IMPALA-2581
@@ -448,6 +448,6 @@ limit 5
 BIGINT
 ---- RUNTIME_PROFILE
 # Verify that spilling was activated.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 row_regex: .*FastLimitCheckExceededRows: [0-9]+
 ====

@@ -36,5 +36,5 @@ order by
 ---- TYPES
 BIGINT, STRING, STRING, STRING, DECIMAL
 ---- RUNTIME_PROFILE
-!row_regex: .*CollectionItemsRead: [^0].*
+aggregation(SUM, CollectionItemsRead): 0
 ====

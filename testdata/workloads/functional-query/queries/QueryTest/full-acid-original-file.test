@@ -111,7 +111,7 @@ where id < 10;
 ---- TYPES
 INT, BIGINT, INT, BIGINT, BIGINT, INT
 ---- RUNTIME_PROFILE
-row_regex: .*NumScannersWithNoReads: [1-9].*
+aggregation(SUM, NumScannersWithNoReads)> 0
 ====
 ---- QUERY
 set MAX_SCAN_RANGE_LENGTH=1000;
@@ -130,7 +130,7 @@ where id > 990 and id < 1000;
 ---- TYPES
 INT, BIGINT, INT, BIGINT, BIGINT
 ---- RUNTIME_PROFILE
-row_regex: .*NumScannersWithNoReads: [1-9].*
+aggregation(SUM, NumScannersWithNoReads)> 0
 ====
 ---- QUERY
 set MAX_SCAN_RANGE_LENGTH=1000;
@@ -149,7 +149,7 @@ where id > 7200 and id < 7210;
 ---- TYPES
 INT, BIGINT, INT, BIGINT, BIGINT
 ---- RUNTIME_PROFILE
-row_regex: .*NumScannersWithNoReads: [1-9].*
+aggregation(SUM, NumScannersWithNoReads)> 0
 ====
 ---- QUERY
 set MAX_SCAN_RANGE_LENGTH=1000;
@@ -168,7 +168,7 @@ where row__id.rowid > 1200 and row__id.rowid < 1210;
 ---- TYPES
 INT, BIGINT, INT, BIGINT, BIGINT
 ---- RUNTIME_PROFILE
-row_regex: .*NumScannersWithNoReads: [1-9].*
+aggregation(SUM, NumScannersWithNoReads)> 0
 ====
 ---- QUERY
 set MAX_SCAN_RANGE_LENGTH=1000;
@@ -187,7 +187,7 @@ where row__id.rowid > 7200 and row__id.rowid < 7210;
 ---- TYPES
 INT, BIGINT, INT, BIGINT, BIGINT, INT
 ---- RUNTIME_PROFILE
-row_regex: .*NumScannersWithNoReads: [1-9].*
+aggregation(SUM, NumScannersWithNoReads)> 0
 ====
 ---- QUERY
 select count(*) from functional_orc_def.alltypes_promoted where id % 2 = 0;

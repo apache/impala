@@ -35,7 +35,7 @@ limit 20
 STRING,BIGINT
 ---- RUNTIME_PROFILE
 # Verify that at least one of the joins was spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Spilling broadcast join that will repartition.
@@ -65,8 +65,8 @@ limit 10
 BIGINT, BIGINT, STRING, DECIMAL, STRING, STRING, STRING, INT, STRING, SMALLINT, STRING, STRING
 ---- RUNTIME_PROFILE
 # Verify that at least one of the joins was spilled and repartitioned.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
+aggregation(SUM, NumRepartitions)> 0
 ====
 ---- QUERY
 # Spilling broadcast join with empty probe-side partitions.
@@ -83,8 +83,8 @@ BIGINT
 ---- RUNTIME_PROFILE
 # Verify that at least one of the joins was spilled and that same hash table builds
 # were *not* skipped - that optimization is disabled for shared broadcast joins.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*NumHashTableBuildsSkipped: 0 
+aggregation(SUM, SpilledPartitions)> 0
+aggregation(SUM, NumHashTableBuildsSkipped): 0
 ====
 ---- QUERY
 # Spilling broadcast join that has some empty build partitions.
@@ -123,5 +123,5 @@ order by count(*) desc, s_name, o_clerk limit 20;
 STRING, STRING, BIGINT
 ---- RUNTIME_PROFILE
 # Verify that at least one of the joins was spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====

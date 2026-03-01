@@ -19,5 +19,5 @@ where
 ---- TYPES
 decimal
 ---- RUNTIME_PROFILE
-!row_regex: .*CollectionItemsRead: [^0].*
+aggregation(SUM, CollectionItemsRead): 0
 ====

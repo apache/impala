@@ -12,5 +12,5 @@ from (select distinct o_orderdate, o_custkey, o_comment
 BIGINT
 ---- RUNTIME_PROFILE
 # Verify that spilling was activated.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====

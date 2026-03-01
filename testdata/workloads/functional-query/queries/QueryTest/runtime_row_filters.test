@@ -370,7 +370,7 @@ select STRAIGHT_JOIN count(a.l_comment)
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: [1-9]\d* .*
+aggregation(SUM, SpilledPartitions)> 0
 row_regex: .*Rows processed: 16.38K.*
 aggregation(SUM, Rows rejected): 0
 row_regex: .*1 of 1 Runtime Filter Published.*

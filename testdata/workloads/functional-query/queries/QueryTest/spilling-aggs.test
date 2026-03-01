@@ -20,8 +20,8 @@ order by 1 limit 10
 BIGINT, BIGINT
 ---- RUNTIME_PROFILE
 # Verify that spilling and passthrough were activated.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
+aggregation(SUM, RowsPassedThrough)> 0
 ====
 ---- QUERY
 # Test query with string grouping column and string agg columns
@@ -38,7 +38,7 @@ order by 1,2 limit 3
 ---- TYPES
 STRING, BIGINT, DECIMAL, STRING
 ---- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Test query with string grouping column
@@ -57,7 +57,7 @@ order by count(*) desc limit 5
 ---- TYPES
 STRING, BIGINT
 ---- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Test query with string grouping column and string agg columns
@@ -75,7 +75,7 @@ order by 1,2 limit 3;
 STRING, BIGINT, DECIMAL, STRING
 ---- RUNTIME_PROFILE
 # Verify that spilling happened in the agg.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Test with non-scalar intermediate state (avg() uses fixed intermediate value).
@@ -94,8 +94,8 @@ order by 1 limit 5
 BIGINT, DOUBLE
 ---- RUNTIME_PROFILE
 # Verify that passthrough and spilling happened in the pre and merge agg.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
+aggregation(SUM, RowsPassedThrough)> 0
 ====
 ---- QUERY
 # Test aggregation spill with group_concat distinct
@@ -119,7 +119,7 @@ order by 1 limit 10
 BIGINT, BIGINT, STRING
 ---- RUNTIME_PROFILE
 # Verify that at least one of the aggs spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Test aggregation with minimum required reservation to exercise IMPALA-2708.
@@ -134,7 +134,7 @@ BIGINT
 ---- RESULTS
 1500000
 ---- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Multiple distinct
@@ -145,8 +145,8 @@ BIGINT,BIGINT
 ---- RESULTS
 1500000,200000
 ---- RUNTIME_PROFILE
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, RowsPassedThrough)> 0
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Multiple distinct with string col and group by
@@ -162,8 +162,8 @@ INT,BIGINT,BIGINT
 4,857015,753374
 5,643287,574337
 ---- RUNTIME_PROFILE
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, RowsPassedThrough)> 0
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Multiple distinct and non-distinct, with an intermediate tuple (avg)
@@ -175,8 +175,8 @@ DOUBLE,BIGINT,DECIMAL,BIGINT
 ---- RESULTS
 2999991.5,200000,240129.67,6001215
 ---- RUNTIME_PROFILE
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, RowsPassedThrough)> 0
+aggregation(SUM, SpilledPartitions)> 0
 ====
 ---- QUERY
 # Multiple distinct and non-distinct, with a group by
@@ -193,6 +193,6 @@ INT,DOUBLE,BIGINT,DECIMAL,BIGINT
 4,3000330.547357981,197222,34279.36,857015
 5,2999188.900650876,191905,25745.25,643287
 ---- RUNTIME_PROFILE
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+aggregation(SUM, RowsPassedThrough)> 0
+aggregation(SUM, SpilledPartitions)> 0
 ====

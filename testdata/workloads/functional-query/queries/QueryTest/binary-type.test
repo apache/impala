@@ -164,7 +164,7 @@ BIGINT
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE: table_format=kudu
-!row_regex:.*TotalKuduScanRoundTrips: 1.*
+aggregation(SUM, TotalKuduScanRoundTrips): 0
 ====
 ---- QUERY
 # Check that filters with constant folding and non ascii (utf8) characters can
@@ -176,7 +176,7 @@ BIGINT
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex:.*TotalKuduScanRoundTrips: 0.*
+aggregation(SUM, TotalKuduScanRoundTrips): 0
 ====
 ---- QUERY
 # Check that filters with constant folding and not valid utf8 characters can
@@ -188,5 +188,5 @@ BIGINT
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE: table_format=kudu
-row_regex:.*TotalKuduScanRoundTrips: 0.*
+aggregation(SUM, TotalKuduScanRoundTrips): 0
 ====

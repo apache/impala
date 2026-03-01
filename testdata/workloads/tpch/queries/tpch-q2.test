@@ -149,5 +149,5 @@ limit 100
 ---- TYPES
 DECIMAL, STRING, STRING, BIGINT, STRING, STRING, STRING, STRING
 ---- RUNTIME_PROFILE
-!row_regex: .*CollectionItemsRead: [^0].*
+aggregation(SUM, CollectionItemsRead): 0
 ====
