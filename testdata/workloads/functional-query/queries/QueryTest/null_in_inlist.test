@@ -1,0 +1,70 @@
+====
+---- QUERY
+# Verify that the query works with a null literal in an in-list for a string column.
+select * from functional_orc_def.alltypestiny
+where string_col in ('', null)
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+---- RESULTS
+====
+---- QUERY
+# Verify that the query works if there is only a null literal in an in-list for a string
+# column.
+select * from functional_orc_def.alltypestiny
+where string_col in (null)
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+---- RESULTS
+====
+---- QUERY
+# Verify that the query works with a null literal in an in-list for a decimal column.
+select * from functional_orc_def.decimal_tbl where d1 in (1234, null)
+---- TYPES
+DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+---- RESULTS
+1234,2222,1.2345678900,0.12345678900000000000000000000000000000,12345.78900,1
+====
+---- QUERY
+# Verify that the query works if there is only a null literal in an in-list for a decimal
+# column.
+select * from functional_orc_def.decimal_tbl where d1 in (null)
+---- TYPES
+DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+---- RESULTS
+====
+---- QUERY
+# Verify that the query works with a null literal in an in-list for a date column.
+select * from functional_orc_def.date_tbl where date_col in ('0002-01-01', null);
+---- TYPES
+INT, DATE, DATE
+---- RESULTS
+2,0002-01-01,0001-01-01
+====
+---- QUERY
+# Verify that the query works if there is only a null literal in an in-list for a date
+# column.
+select * from functional_orc_def.date_tbl where date_col in (null);
+---- TYPES
+INT, DATE, DATE
+---- RESULTS
+====
+---- QUERY
+# Verify that the query works with a null literal in an in-list for a string column in a
+# map.
+select * from functional_orc_def.complextypestbl.int_map where key in ('k1', null);
+---- TYPES
+STRING, INT
+---- RESULTS
+'k1',1
+'k1',2
+'k1',NULL
+'k1',-1
+====
+---- QUERY
+# Verify that the query works if there is only a null literal in an in-list for a string
+# column in a map.
+select * from functional_orc_def.complextypestbl.int_map where key in (null);
+---- TYPES
+STRING, INT
+---- RESULTS
+====

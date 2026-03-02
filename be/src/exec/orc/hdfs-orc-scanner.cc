@@ -1180,10 +1180,10 @@ orc::Literal HdfsOrcScanner::GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
     // IMPALA-10915.
     case TYPE_TIMESTAMP: {
       DCHECK(false) << "Timestamp predicate is not supported: IMPALA-10915";
-      return orc::Literal(predicate_type);
+      return orc::Literal(*predicate_type);
     }
     case TYPE_DATE: {
-      if (UNLIKELY(!val)) return orc::Literal(predicate_type);
+      if (UNLIKELY(!val)) return orc::Literal(*predicate_type);
       const DateValue* dv = reinterpret_cast<const DateValue*>(val);
       int32_t value = 0;
       // The date should be valid at this point.
@@ -1192,7 +1192,7 @@ orc::Literal HdfsOrcScanner::GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
       return orc::Literal(*predicate_type, value);
     }
     case TYPE_STRING: {
-      if (UNLIKELY(!val)) return orc::Literal(predicate_type);
+      if (UNLIKELY(!val)) return orc::Literal(*predicate_type);
       const StringValue* sv = reinterpret_cast<StringValue*>(val);
       return orc::Literal(sv->Ptr(), sv->Len());
     }
@@ -1200,17 +1200,18 @@ orc::Literal HdfsOrcScanner::GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
     // IMPALA-10882.
     case TYPE_VARCHAR: {
       DCHECK(false) << "Varchar predicate is not supported: IMPALA-10882";
-      return orc::Literal(predicate_type);
+      return orc::Literal(*predicate_type);
     }
     case TYPE_CHAR: {
       DCHECK(false) << "Char predicate is not supported: IMPALA-10882";
-      if (UNLIKELY(!val)) return orc::Literal(predicate_type);
+      if (UNLIKELY(!val)) return orc::Literal(*predicate_type);
       const StringValue* sv = reinterpret_cast<StringValue*>(val);
       StringValue::SimpleString s = sv->ToSimpleString();
       char* dst_ptr;
       if (dst_type.len > s.len) {
         dst_ptr = reinterpret_cast<char*>(search_args_pool_->TryAllocate(dst_type.len));
-        if (dst_ptr == nullptr) return orc::Literal(predicate_type);
+        // TODO: We should handle memory allocation failure correctly in IMPALA-10882.
+        if (dst_ptr == nullptr) return orc::Literal(*predicate_type);
         memcpy(dst_ptr, s.ptr, s.len);
         StringValue::PadWithSpaces(dst_ptr, dst_type.len, s.len);
       } else {
@@ -1219,7 +1220,7 @@ orc::Literal HdfsOrcScanner::GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
       return orc::Literal(dst_ptr, s.len);
     }
     case TYPE_DECIMAL: {
-      if (!val) return orc::Literal(predicate_type);
+      if (!val) return orc::Literal(*predicate_type);
       orc::Int128 value;
       switch (type.GetByteSize()) {
         case 4: {

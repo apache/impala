@@ -1918,6 +1918,11 @@ class TestOrc(ImpalaTestSuite):
     assert len(result.data) == 1
     assert '6001215' in result.data
 
+  def test_null_in_inlist(self, vector):
+    """Verifies that Impala does not crash if a NULL is in an IN-list against a string
+    column of an ORC table."""
+    self.run_test_case('QueryTest/null_in_inlist', vector)
+
 
 class TestScannerReservation(ImpalaTestSuite):
   @classmethod

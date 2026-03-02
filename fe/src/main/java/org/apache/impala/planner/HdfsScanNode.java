@@ -679,12 +679,19 @@ public class HdfsScanNode extends ScanNode {
       // If any child is not a literal, then nothing can be done
       if (!Expr.IS_LITERAL.apply(child)) return;
       if (isUnsupportedStatsType(child.getType())) return;
+      // Skip this child if it is NULL, since no row should match the null literal in an
+      // IN-list.
+      if (Expr.IS_NULL_LITERAL.apply(child)) continue;
       inList.add(child);
     }
     // Make a new slot descriptor, which adds it to the tuple descriptor.
     SlotDescriptor slotDesc = analyzer.getDescTbl().copySlotDescriptor(statsTuple_,
         inputSlot.getDesc());
     SlotRef slot = new SlotRef(slotDesc);
+    // We return directly to avoid creating an InPredicate without any literal, which
+    // will violate a Preconditions check when we analyze the newly instantiated
+    // InPredicate below.
+    if (inList.isEmpty()) return;
     InPredicate inPred = new InPredicate(slot, inList, inputPred.isNotIn());
     inPred.analyzeNoThrow(analyzer);
     statsConjuncts_.add(inPred);
