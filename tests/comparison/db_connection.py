@@ -36,7 +36,7 @@ from logging import getLogger
 from os import symlink, unlink
 from pyparsing import (
     alphanums,
-    delimitedList,
+    DelimitedList,
     Forward,
     Group,
     Literal,
@@ -346,11 +346,11 @@ class DbCursor(object):
     struct_field_name = Word(alphanums + '_')
     struct_field_pair = Group(struct_field_name + COLON + any_type)
 
-    t_struct << Group(Literal('struct') + LPAR + delimitedList(struct_field_pair) + RPAR)
+    t_struct << Group(Literal('struct') + LPAR + DelimitedList(struct_field_pair) + RPAR)
     t_array << Group(Literal('array') + LPAR + any_type + RPAR)
     t_map << Group(Literal('map') + LPAR + any_type + COMMA + any_type + RPAR)
 
-    return any_type.parseString(data_type)[0]
+    return any_type.parse_string(data_type)[0]
 
   def create_column(self, col_name, col_type):
     ''' Takes the output from parse_col_desc and creates the right column type. This

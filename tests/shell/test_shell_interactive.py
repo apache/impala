@@ -148,6 +148,9 @@ def shutdown_server(server):
     server.httpd.shutdown()
   if server.http_server_thread is not None:
     server.http_server_thread.join()
+  # Shutdown stopped the thread's main loop, so now free the socket (which is not
+  # done by shutdown()).
+  server.httpd.server_close()
 
 
 @pytest.fixture

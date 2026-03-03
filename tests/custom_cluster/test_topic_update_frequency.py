@@ -133,6 +133,9 @@ class TestTopicUpdateFrequency(CustomClusterTestSuite):
     assert slow_query_future.get() > blocking_query_min_time, \
       "{0} query took less time than {1} msec".format(slow_blocking_query,
         blocking_query_min_time)
+    # Shutdown the thread pools
+    pool.terminate()
+    slow_query_pool.terminate()
     # we wait for some time here to make sure that the topic updates from the last
     # query have been propagated so that next run of this method starts from a clean
     # state.
@@ -177,6 +180,7 @@ class TestTopicUpdateFrequency(CustomClusterTestSuite):
       for i in range(len(durations)):
         assert durations[i] < timeout, "Query {0} iteration {1} did " \
                                        "not complete within {2}.".format(q, i, timeout)
+    slow_query_pool.terminate()
 
   def loop_exec(self, query, query_options, iterations=3, impalad=0):
     durations = []
@@ -254,3 +258,4 @@ class TestTopicUpdateFrequency(CustomClusterTestSuite):
     self.execute_query_expect_success(self.client, sync_ddl_query_2,
       {"sync_ddl": "false"})
     slow_query_future.get()
+    slow_query_pool.terminate()

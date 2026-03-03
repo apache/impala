@@ -1107,6 +1107,7 @@ class TestImpalaShell(ImpalaTestSuite):
       finally:
         if impala_shell.poll() is None:
           impala_shell.kill()
+          impala_shell.wait()
         if connection is not None:
           connection.close()
 
@@ -1642,7 +1643,8 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(vector, args)
 
     stdout_data = result.stdout.strip()
-    rpc_file_data = open(tmp_file, "r").read().strip()
+    with open(tmp_file, "r") as f:
+      rpc_file_data = f.read().strip()
 
     # compare the rpc details from stdout and file to ensure they match
     # stdout contains additional output such as query results, remove all non-rpc details

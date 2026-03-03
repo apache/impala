@@ -152,4 +152,5 @@ class TestShellInteractive(CustomClusterTestSuite):
     wait_for_query_state(vector, query, "RUNNING")
     self.cluster.impalads[
         randint(1, ImpalaTestSuite.get_impalad_cluster_size() - 1)].kill()
+    pool.terminate()
     return proc

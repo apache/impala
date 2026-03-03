@@ -582,6 +582,7 @@ class TestDdlStatements(TestDdlBase):
       except TimeoutError:
         dump_server_stacktraces()
         assert False, "Timeout in thread run_ddls(%d)" % i
+    pool.terminate()
 
   @SkipIfFS.hbase
   @UniqueDatabase.parametrize(sync_ddl=True)

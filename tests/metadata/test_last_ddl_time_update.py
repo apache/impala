@@ -48,7 +48,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
   # Convenience class to make calls to TestLastDdlTimeUpdate.run_test() shorter by
   # storing common arguments as members and substituting table name and HDFS warehouse
   # path to the query string.
-  class TestHelper:
+  class Helper:
     class TimeState:
       CHANGED = "Changed"
       UNCHANGED = "Unchanged"
@@ -187,7 +187,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
           % fq_tbl_name)
 
   def _create_and_init_test_helper(self, unique_database, tbl_name, table_format):
-    helper = TestLastDdlTimeUpdate.TestHelper(self, unique_database, tbl_name)
+    helper = TestLastDdlTimeUpdate.Helper(self, unique_database, tbl_name)
     self._create_table(helper.fq_tbl_name, table_format)
 
     # compute statistics to fill table property impala.lastComputeStatsTime

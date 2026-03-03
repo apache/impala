@@ -195,6 +195,7 @@ class TestConcurrentDdls(CustomClusterTestSuite):
         dump_server_stacktraces()
         assert False, "Timeout in thread run_ddls(%d)" % i
     stop = True
+    pool.terminate()
 
   @classmethod
   def is_transient_error(cls, err):

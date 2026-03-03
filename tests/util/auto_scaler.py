@@ -23,7 +23,7 @@ import time
 import logging
 import os
 import shlex
-from subprocess import check_call
+from subprocess import check_call, DEVNULL
 from tests.common.impala_cluster import ImpalaCluster
 from threading import Event, Thread
 
@@ -262,7 +262,7 @@ class AutoScaler(object):
     log_debug = logging.getLogger().getEffectiveLevel() == logging.DEBUG
     log_file = None
     if not log_debug:
-      log_file = open("/dev/null", "w")
+      log_file = DEVNULL
 
     check_call(cmd + options, close_fds=True, stdout=log_file, stderr=log_file)
 

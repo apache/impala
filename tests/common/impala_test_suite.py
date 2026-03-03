@@ -1493,7 +1493,7 @@ class ImpalaTestSuite(BaseTestSuite):
         # is specified; explicitly make sure there's nothing to
         # read to avoid hanging, especially when running interactively
         # with py.test.
-        stdin=open("/dev/null"),
+        stdin=subprocess.DEVNULL,
         universal_newlines=True,
         env=env)
     (stdout, stderr) = call.communicate()

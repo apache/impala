@@ -42,6 +42,6 @@ class Task:
 def run_tasks(tasks, timeout_seconds=600):
   """Runs a list of Tasks in parallel in a thread pool."""
   start = time.time()
-  pool = ThreadPool(processes=len(tasks))
-  pool.map_async(Task.run, tasks).get(timeout_seconds)
+  with ThreadPool(processes=len(tasks)) as pool:
+    pool.map_async(Task.run, tasks).get(timeout_seconds)
   return time.time() - start

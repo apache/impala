@@ -115,6 +115,7 @@ def compute_stats(client_factory, db_names=None, table_names=None,
           log_completion(completed, total_tables, e)
           raise e
     log_completion(completed, total_tables)
+    pool.terminate()
 
 
 if __name__ == "__main__":

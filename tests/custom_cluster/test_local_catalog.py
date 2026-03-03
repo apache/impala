@@ -496,6 +496,7 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     NUM_ITERS = 100
     for i in t.imap_unordered(do_table, range(NUM_ITERS)):
       pass
+    t.terminate()
 
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true "
@@ -531,6 +532,7 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
         pass
       # Refresh to invalidate the partition in local catalog cache
       self.execute_query("refresh {0}.tbl partition(p=0)".format(unique_database))
+    t.terminate()
 
 
 class TestLocalCatalogObservability(CustomClusterTestSuite):

@@ -439,7 +439,7 @@ class TestInvalidStatsFromHms(ImpalaTestSuite):
     tbl = unique_database + ".tbl"
     self.execute_query("create table {} as select 1 as id, 'aaa' as name".format(tbl))
     # Add invalid stats in HMS
-    hms_client, _ = ImpalaTestSuite.create_hive_client(9083)
+    hms_client, hms_transport = ImpalaTestSuite.create_hive_client(9083)
     cs = ColumnStatistics()
     cs.engine = "impala"
     isTblLevel = True
@@ -460,3 +460,4 @@ class TestInvalidStatsFromHms(ImpalaTestSuite):
     assert res.data == [
       'id\tTINYINT\t-1\t-1\t1\t1\t-1\t-1',
       'name\tSTRING\t-1\t-1\t-1\t-1\t-1\t-1']
+    hms_transport.close()

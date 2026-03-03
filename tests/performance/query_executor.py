@@ -41,7 +41,7 @@ LOG = logging.getLogger('query_executor')
 LOG.setLevel(level=logging.INFO)
 
 # Globals.
-hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
+hive_result_regex = r'Time taken: (\d*).(\d*) seconds'
 # Match any CRUD statement that can follow EXPLAIN.
 # The statement may begin with SQL line comments starting with --
 COMMENT_LINES_REGEX = r'(?:\s*--.*\n)*'
