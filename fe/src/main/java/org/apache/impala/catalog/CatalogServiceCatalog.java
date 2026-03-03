@@ -1919,8 +1919,6 @@ public class CatalogServiceCatalog extends Catalog {
     Preconditions.checkState(tbl.isReadLockedByCurrentThread(),
         "Topic update thread does not hold a lock on table " + tbl.getFullName()
             + " while generating catalog delta");
-    TCatalogObject catalogTbl =
-        new TCatalogObject(TABLE, Catalog.INITIAL_CATALOG_VERSION);
     long tblVersion = tbl.getCatalogVersion();
     if (tblVersion <= ctx.fromVersion) {
       LOG.trace("Table {} version {} skipping the update ({}, {}]",
@@ -1942,25 +1940,25 @@ public class CatalogServiceCatalog extends Catalog {
               topicUpdateEntry.getNumSkippedUpdatesLockContention()));
       return;
     }
+    TCatalogObject catalogTbl = null;
     try {
       if (BackendConfig.INSTANCE.isIncrementalMetadataUpdatesEnabled()
           && tbl instanceof HdfsTable) {
+        catalogTbl =
+            new TCatalogObject(TABLE, tbl.getCatalogVersion());
+        catalogTbl.setLast_modified_time_ms(tbl.getLastLoadedTimeMs());
         catalogTbl.setTable(((HdfsTable) tbl).toThriftWithMinimalPartitions());
         addHdfsPartitionsToCatalogDelta((HdfsTable) tbl, ctx);
+      } else if (topicMode_ == TopicMode.MINIMAL) {
+        catalogTbl = tbl.toInvalidationObject();
       } else {
-        catalogTbl.setTable(tbl.toThrift());
-      }
-      // Update catalog object type from TABLE to VIEW if it's indeed a view.
-      if (TImpalaTableType.VIEW == tbl.getTableType()) {
-        catalogTbl.setType(TCatalogObjectType.VIEW);
+        catalogTbl = tbl.toTCatalogObject();
       }
     } catch (Exception e) {
       LOG.error(String.format("Error calling toThrift() on table %s: %s",
           tbl.getFullName(), e.getMessage()), e);
       return;
     }
-    catalogTbl.setCatalog_version(tbl.getCatalogVersion());
-    catalogTbl.setLast_modified_time_ms(tbl.getLastLoadedTimeMs());
     ctx.addCatalogObject(catalogTbl, false);
   }
 
