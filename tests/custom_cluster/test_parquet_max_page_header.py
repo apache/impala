@@ -60,9 +60,9 @@ class TestParquetMaxPageHeader(CustomClusterTestSuite):
     self.__create_test_tbls()
 
   def teardown_method(self, method):
-    super(TestParquetMaxPageHeader, self).teardown_method(method)
     self.__drop_test_tbls()
     self.close_impala_clients()
+    super(TestParquetMaxPageHeader, self).teardown_method(method)
 
   def __drop_test_tbls(self):
     self.client.execute("DROP TABLE IF EXISTS %s PURGE" % self.TEXT_TABLE_NAME)
