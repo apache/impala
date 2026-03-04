@@ -102,6 +102,10 @@ public class ImpalaRelMdNonCumulativeCost implements NonCumulativeCost.Handler {
     // IO cost = cost of transferring small tables to join node
     final double ioCost = rightRCount * rightRAverageSize * netCost;
 
+    LOG.trace("calculating join cost, left row count = {}, left size = {}, " +
+        "right row count = {}, right size = {}", leftRCount, leftRAverageSize,
+        rightRCount, rightRAverageSize);
+
     // Result
     RelOptCost finalCost = ImpalaCost.FACTORY.makeCost(1.0, cpuCost, ioCost);
     return finalCost;
@@ -125,6 +129,9 @@ public class ImpalaRelMdNonCumulativeCost implements NonCumulativeCost.Handler {
     } else {
       avgTupleSize = mq.getAverageRowSize(scan);
     }
+
+    LOG.trace("calculating scan cost for {}, cardinality = {}, avgTupleSize = {}",
+        scan.getTable(), cardinality, avgTupleSize);
 
     return new ImpalaCost(0, hdfsRead * cardinality * avgTupleSize);
   }
@@ -158,6 +165,9 @@ public class ImpalaRelMdNonCumulativeCost implements NonCumulativeCost.Handler {
     ioCost += rCount * rAverageSize * localFSRead;
     // Net transfer cost
     ioCost += rCount * rAverageSize * netCost;
+
+    LOG.trace("calculating aggregate cost: row count = {}, average size = {} ",
+        rCount, rAverageSize);
 
     // Result
     return ImpalaCost.FACTORY.makeCost(1.0, cpuCost, ioCost);

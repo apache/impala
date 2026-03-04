@@ -307,4 +307,9 @@ public class CalciteTable extends RelOptAbstractTable
     }
     return true;
   }
+
+  @Override
+  public String toString() {
+    return getName();
+  }
 }

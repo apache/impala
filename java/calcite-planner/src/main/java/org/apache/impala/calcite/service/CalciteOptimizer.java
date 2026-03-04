@@ -20,6 +20,7 @@ package org.apache.impala.calcite.service;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.RuleEventLogger;
 import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
@@ -297,6 +298,11 @@ public class CalciteOptimizer implements CompilerStep {
         true, null,
         ImpalaCost.FACTORY);
     planner.setRoot(currentNode);
+    // Within Calcite, the RuleEventLogger logs at DEBUG level, but that would
+    // be too much logging for the Impala DEBUG level.
+    if (LOG.isTraceEnabled()) {
+      planner.addListener(new RuleEventLogger());
+    }
     planner.setExecutor(simplifier.getRexExecutor());
 
     return planner.findBestExp();
