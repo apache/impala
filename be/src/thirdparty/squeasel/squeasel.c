@@ -68,8 +68,7 @@
 
 #include <openssl/crypto.h>
 #include <openssl/err.h>
-#include <openssl/md5.h>
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 #if defined(__MACH__)
 #define SSL_LIB   "libssl.dylib"
@@ -174,6 +173,21 @@ static const char *http_500_error = "Internal Server Error";
 
 #define OPENSSL_MIN_VERSION_WITH_TLS_1_1 0x10001000L
 #define OPENSSL_MIN_VERSION_WITH_TLS_1_3 0x10101000L
+
+// MD5, 128-bit output, RFC 1321
+#define SQ_MD5_DIGEST_LENGTH 16
+// SHA-1, 160-bit output, RFC 3174
+#define SQ_SHA1_DIGEST_LENGTH 20
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define EVP_MD_CTX_new EVP_MD_CTX_create
+#define EVP_MD_CTX_free EVP_MD_CTX_destroy
+#endif
+
+// OpenSSL EVP_Digest* functions return 1 for success.
+#ifndef EVP_DIGEST_OK
+#define EVP_DIGEST_OK 1
+#endif
 
 static const char *month_names[] = {
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -1541,21 +1555,42 @@ static void bin2str(char *to, const unsigned char *p, size_t len) {
 
 // Return stringified MD5 hash for list of strings. Buffer must be 33 bytes.
 char *sq_md5(char buf[33], ...) {
-  unsigned char hash[16];
   const char *p;
   va_list ap;
-  MD5_CTX ctx;
 
-  MD5_Init(&ctx);
-
+  unsigned char hash[EVP_MAX_MD_SIZE];
+  unsigned int hash_len = 0;
+  // Set a safe default for exception return, comparisons will fail safely.
+  buf[0] = '\0';
+  EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+  if (ctx == NULL) {
+    fprintf(stderr, "sq_md5: EVP_MD_CTX_new() failed\n");
+    return buf;
+  }
+  if (EVP_DigestInit_ex(ctx, EVP_md5(), NULL) != EVP_DIGEST_OK) {
+    fprintf(stderr, "sq_md5: EVP_DigestInit_ex() failed\n");
+    EVP_MD_CTX_free(ctx);
+    return buf;
+  }
   va_start(ap, buf);
-  while ((p = va_arg(ap, const char *)) != NULL) {
-    MD5_Update(&ctx, (const unsigned char *) p, (unsigned) strlen(p));
+  while ((p = va_arg(ap, const char*)) != NULL) {
+    if (EVP_DigestUpdate(ctx, (const unsigned char*)p, strlen(p)) != EVP_DIGEST_OK) {
+      fprintf(stderr, "sq_md5: EVP_DigestUpdate() failed\n");
+      va_end(ap);
+      EVP_MD_CTX_free(ctx);
+      return buf;
+    }
   }
   va_end(ap);
-
-  MD5_Final(hash, &ctx);
-  bin2str(buf, hash, sizeof(hash));
+  if (EVP_DigestFinal_ex(ctx, hash, &hash_len) != EVP_DIGEST_OK) {
+    fprintf(stderr, "sq_md5: EVP_DigestFinal_ex() failed\n");
+    EVP_MD_CTX_free(ctx);
+    return buf;
+  }
+  EVP_MD_CTX_free(ctx);
+  // EVP_md5() output should be always SQ_MD5_DIGEST_LENGTH bytes.
+  assert(hash_len == SQ_MD5_DIGEST_LENGTH);
+  bin2str(buf, hash, SQ_MD5_DIGEST_LENGTH);
   return buf;
 }
 
@@ -3078,16 +3113,43 @@ static void base64_encode(const unsigned char *src, int src_len, char *dst) {
 }
 
 static void send_websocket_handshake(struct sq_connection *conn) {
-  static const char *magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-  char buf[100], sha[20], b64_sha[sizeof(sha) * 2];
-  SHA_CTX sha_ctx;
+  static const char* magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+  char buf[100], b64_sha[SQ_SHA1_DIGEST_LENGTH * 2 + 1];
 
   sq_snprintf(conn, buf, sizeof(buf), "%s%s",
               sq_get_header(conn, "Sec-WebSocket-Key"), magic);
-  SHA1_Init(&sha_ctx);
-  SHA1_Update(&sha_ctx, (unsigned char *) buf, strlen(buf));
-  SHA1_Final((unsigned char *) sha, &sha_ctx);
-  base64_encode((unsigned char *) sha, sizeof(sha), b64_sha);
+
+  char sha[EVP_MAX_MD_SIZE];
+  unsigned int sha_len = 0;
+  EVP_MD_CTX* sha_ctx;
+  sha_ctx = EVP_MD_CTX_new();
+  if (sha_ctx == NULL) {
+    send_http_error(conn, 500, http_500_error, "Crypto context failed");
+    return;
+  }
+  if (EVP_DigestInit_ex(sha_ctx, EVP_sha1(), NULL) != EVP_DIGEST_OK) {
+    fprintf(stderr, "EVP_DigestInit_ex() failed for websocket handshake\n");
+    EVP_MD_CTX_free(sha_ctx);
+    send_http_error(conn, 500, http_500_error, "Crypto digest init failed");
+    return;
+  }
+  if (EVP_DigestUpdate(sha_ctx, (unsigned char*)buf, strlen(buf)) != EVP_DIGEST_OK) {
+    fprintf(stderr, "EVP_DigestUpdate() failed for websocket handshake\n");
+    EVP_MD_CTX_free(sha_ctx);
+    send_http_error(conn, 500, http_500_error, "Crypto digest update failed");
+    return;
+  }
+  if (EVP_DigestFinal_ex(sha_ctx, (unsigned char*)sha, &sha_len) != EVP_DIGEST_OK) {
+    fprintf(stderr, "EVP_DigestFinal_ex() failed for websocket handshake\n");
+    EVP_MD_CTX_free(sha_ctx);
+    send_http_error(conn, 500, http_500_error, "Crypto digest final failed");
+    return;
+  }
+  EVP_MD_CTX_free(sha_ctx);
+  // EVP_sha1() output should be always SQ_SHA1_DIGEST_LENGTH bytes.
+  assert(sha_len == SQ_SHA1_DIGEST_LENGTH);
+  base64_encode((unsigned char*)sha, SQ_SHA1_DIGEST_LENGTH, b64_sha);
+
   sq_printf(conn, "%s%s%s",
             "HTTP/1.1 101 Switching Protocols\r\n"
             "Upgrade: websocket\r\n"
