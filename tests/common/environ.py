@@ -452,6 +452,10 @@ class ImpalaTestClusterProperties(object):
         return False
       raise
 
+  def is_erasure_coding_enabled(self):
+    """Return whether the test cluster was built with erasure coding enabled."""
+    return os.getenv("ERASURE_CODING") == "true"
+
 
 def build_flavor_timeout(default_timeout, slow_build_timeout=None,
         asan_build_timeout=None, code_coverage_build_timeout=None):

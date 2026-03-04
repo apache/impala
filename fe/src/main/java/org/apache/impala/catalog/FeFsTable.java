@@ -125,9 +125,13 @@ public interface FeFsTable extends FeTable {
     public long minAccessTime = Long.MAX_VALUE;
     // Max access time
     public long maxAccessTime = 0;
+    // Set of unique host indices (for HDFS/Ozone only)
+    public Set<Integer> uniqueHostIndices = new HashSet<>();
     // Set of unique host:disk pairs (for HDFS/Ozone only)
     // Stores pairs as Pair<hostIndex, diskId> for efficient tracking
     // Disk IDs are 0-based per host, so pairs must be tracked together
+    // Note: With erasure coding, disk IDs may not be available, so this may be empty
+    // even when uniqueHostIndices is populated
     public Set<Pair<Integer, Short>> uniqueHostDiskPairs = new HashSet<>();
 
     public FileMetadataStats() {}
@@ -153,6 +157,7 @@ public interface FeFsTable extends FeTable {
       maxModificationTime = 0;
       minAccessTime = Long.MAX_VALUE;
       maxAccessTime = 0;
+      uniqueHostIndices.clear();
       uniqueHostDiskPairs.clear();
     }
 
@@ -166,6 +171,7 @@ public interface FeFsTable extends FeTable {
       maxModificationTime = stats.maxModificationTime;
       minAccessTime = stats.minAccessTime;
       maxAccessTime = stats.maxAccessTime;
+      uniqueHostIndices = new HashSet<>(stats.uniqueHostIndices);
       uniqueHostDiskPairs = new HashSet<>(stats.uniqueHostDiskPairs);
     }
 
@@ -179,6 +185,7 @@ public interface FeFsTable extends FeTable {
       maxModificationTime = Math.max(maxModificationTime, other.maxModificationTime);
       minAccessTime = Math.min(minAccessTime, other.minAccessTime);
       maxAccessTime = Math.max(maxAccessTime, other.maxAccessTime);
+      uniqueHostIndices.addAll(other.uniqueHostIndices);
       uniqueHostDiskPairs.addAll(other.uniqueHostDiskPairs);
     }
 
@@ -207,14 +214,15 @@ public interface FeFsTable extends FeTable {
       minModificationTime = Math.min(minModificationTime, modTime);
       maxModificationTime = Math.max(maxModificationTime, modTime);
 
-      // Track unique host:disk pairs from file blocks
+      // Track unique hosts and host:disk pairs from file blocks
       for (int i = 0; i < fd.getNumFileBlocks(); ++i) {
         FbFileBlock block = fd.getFbFileBlock(i);
         int numReplicas = block.replicaHostIdxsLength();
         int numDiskIds = block.diskIdsLength();
-        // Pair up host indices with disk IDs
+        // Track host indices and pair them with disk IDs when available
         for (int j = 0; j < numReplicas; ++j) {
           int hostIdx = FileBlock.getReplicaHostIdx(block, j);
+          uniqueHostIndices.add(hostIdx);
           short diskId = (j < numDiskIds) ? block.diskIds(j) : -1;
           if (diskId >= 0) {  // Only track valid disk IDs
             uniqueHostDiskPairs.add(Pair.create(hostIdx, diskId));
@@ -228,11 +236,7 @@ public interface FeFsTable extends FeTable {
     }
 
     public int getNumUniqueHosts() {
-      Set<Integer> uniqueHosts = new HashSet<>();
-      for (Pair<Integer, Short> pair : uniqueHostDiskPairs) {
-        uniqueHosts.add(pair.first);
-      }
-      return uniqueHosts.size();
+      return uniqueHostIndices.size();
     }
 
     public int getNumUniqueHostDiskPairs() {

@@ -129,9 +129,6 @@ public class FileMetadataLoaderTest {
     // Host and host:disk pair stats (for HDFS tables these should be populated)
     assertTrue(stats.getNumUniqueHosts() >= 0);
     assertTrue(stats.getNumUniqueHostDiskPairs() >= 0);
-    // Number of hosts should be <= number of host:disk pairs
-    // (hosts are derived from pairs)
-    assertTrue(stats.getNumUniqueHosts() <= stats.getNumUniqueHostDiskPairs());
   }
 
   @Test
