@@ -1173,14 +1173,14 @@ public interface FeIcebergTable extends FeFsTable {
         TimeTravelSpec travelSpec) throws AnalysisException {
       if (travelSpec == null) {
         IcebergContentFileStore fileStore = table.getContentFileStore();
-        return !fileStore.getPositionDeleteFiles().isEmpty()
-            || !fileStore.getEqualityDeleteFiles().isEmpty();
+        return fileStore.hasDeletes();
       } else {
         try {
           GroupedContentFiles groupedFiles =
               IcebergUtil.getIcebergFiles(table, Lists.newArrayList(), travelSpec);
           return !groupedFiles.positionDeleteFiles.isEmpty()
-              || !groupedFiles.equalityDeleteFiles.isEmpty();
+              || !groupedFiles.equalityDeleteFiles.isEmpty()
+              || !groupedFiles.dataFileToDV.isEmpty();
         } catch (TableLoadingException e) {
           throw new AnalysisException("Failed to get record count of Iceberg V2 table: "
               + table.getFullName(), e);

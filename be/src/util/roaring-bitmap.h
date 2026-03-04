@@ -194,6 +194,10 @@ public:
     return roaring64_bitmap_portable_size_in_bytes(rbitmap_);
   }
 
+  bool Optimize() {
+    return roaring64_bitmap_run_optimize(rbitmap_);
+  }
+
   /// Serializes this bitmap to 'buf'.
   /// Caller must ensure that 'buf' has at least 'BitmapSizeInBytes()' bytes.
   uint64_t Serialize(uint8_t* buf) {

@@ -148,7 +148,8 @@ struct DeletionVectorDeserializer {
     DCHECK(data != nullptr);
     DCHECK(output != nullptr);
 
-    RETURN_IF_ERROR(RoaringBitmap64::Deserialize(data, length, output));
+    RETURN_IF_ERROR(RoaringBitmap64::Deserialize(data + DELETION_VECTOR_BLOB_HEADER_SIZE,
+        length - DELETION_VECTOR_BLOB_HEADER_SIZE, output));
 
     VLOG(2) << "Deserialized deletion vector with " << output->Cardinality()
                << " deleted positions (min: " << output->Min()

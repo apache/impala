@@ -88,5 +88,7 @@ table FbIcebergDeletionVector {
   referenced_data_file_hash_high: long;
   referenced_data_file_hash_low: long;
   record_count: long;
+  // Total size of the Puffin file containing this deletion vector, in bytes.
+  file_size_in_bytes: long;
 }
 

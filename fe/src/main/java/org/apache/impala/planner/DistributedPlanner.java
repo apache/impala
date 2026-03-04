@@ -153,9 +153,9 @@ public class DistributedPlanner {
           ctx_.getNextFragmentId(), root, DataPartition.UNPARTITIONED);
     } else if (root instanceof CardinalityCheckNode) {
       result = createCardinalityCheckNodeFragment((CardinalityCheckNode) root, childFragments);
-    } else if (root instanceof IcebergDeleteNode) {
+    } else if (root instanceof IcebergDeleteJoinNode) {
       Preconditions.checkState(childFragments.size() == 2);
-      result = createIcebergDeleteFragment((IcebergDeleteNode) root,
+      result = createIcebergDeleteFragment((IcebergDeleteJoinNode) root,
           childFragments.get(0), childFragments.get(1));
     } else if (root instanceof IcebergMergeNode) {
       childFragments.get(0).addPlanRoot(root);
@@ -677,7 +677,7 @@ public class DistributedPlanner {
    * Similarly to a BROADCAST join, the left child of the join is in the same fragment
    * with the join itself, while the right child is in a separate fragment.
    */
-  private PlanFragment createIcebergDeleteFragment(IcebergDeleteNode node,
+  private PlanFragment createIcebergDeleteFragment(IcebergDeleteJoinNode node,
       PlanFragment leftChildFragment, PlanFragment rightChildFragment)
           throws ImpalaException {
     Preconditions.checkState(node.getEqJoinConjuncts().size() == 2);

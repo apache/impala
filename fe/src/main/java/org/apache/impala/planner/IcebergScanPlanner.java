@@ -18,6 +18,8 @@
 package org.apache.impala.planner;
 
 import com.google.common.base.Joiner;
+import static org.apache.impala.util.IcebergUtil.getFilePathHash;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -149,7 +151,13 @@ public class IcebergScanPlanner {
 
   // Statistics about the data and delete files. Useful for memory estimates of the
   // ANTI JOIN
+  // Record count of legacy position-delete files only (not deletion vectors).
   private long positionDeletesRecordCount_ = 0;
+  // Record count contributed solely by deletion vectors, tracked separately so it can
+  // be passed to IcebergDeleteJoinNode for cardinality estimation. The delete scan
+  // node's fileDescs_ only contains legacy position-delete files, so its cardinality_
+  // misses DV-deleted rows; the join node adds dvDeletesRecordCount_ to compensate.
+  private long dvDeletesRecordCount_ = 0;
   private long dataFilesWithDeletesSumPaths_ = 0;
   private long dataFilesWithDeletesMaxPath_ = 0;
   // Stores how many delete records are involved broken down by equality field ID lists.
@@ -268,18 +276,15 @@ public class IcebergScanPlanner {
           aggInfo_, dataFilesWithoutDeletes_,
           getIceTable().getContentFileStore().getNumPartitions(),
           nonIdentityConjuncts_,
-          getSkippedConjuncts(), snapshotId_, isPartitionKeyScan);
+          getSkippedConjuncts(), snapshotId_, isPartitionKeyScan, dataFileToDV_);
       ret.init(analyzer_);
       return ret;
     }
-    if (!dataFileToDV_.isEmpty()) {
-      throw new ImpalaRuntimeException(
-          "Iceberg tables with Deletion Vectors are not supported yet: " +
-          getIceTable().getFullName());
-    }
 
     PlanNode joinNode = null;
-    if (!positionDeleteFiles_.isEmpty()) joinNode = createPositionJoinNode();
+    if (!positionDeleteFiles_.isEmpty() || !dataFileToDV_.isEmpty()) {
+      joinNode = createPositionJoinNode();
+    }
 
     if (!equalityIdsToDeleteFiles_.isEmpty()) joinNode = createEqualityJoinNode(joinNode);
     Preconditions.checkNotNull(joinNode);
@@ -298,7 +303,8 @@ public class IcebergScanPlanner {
     IcebergScanNode dataScanNode = new IcebergScanNode(
         ctx_.getNextNodeId(), tblRef_, conjuncts_, aggInfo_, dataFilesWithoutDeletes_,
         getIceTable().getContentFileStore().getNumPartitions(),
-        nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_, isPartitionKeyScan);
+        nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_,
+        isPartitionKeyScan, dataFileToDV_);
     dataScanNode.init(analyzer_);
     List<Expr> outputExprs = tblRef_.getDesc().getSlots().stream().map(
         SlotRef::new).collect(Collectors.toList());
@@ -360,7 +366,8 @@ public class IcebergScanPlanner {
   }
 
   private PlanNode createPositionJoinNode() throws ImpalaException {
-    Preconditions.checkState(positionDeletesRecordCount_ != 0);
+    Preconditions.checkState(
+        positionDeletesRecordCount_ != 0 || !dataFileToDV_.isEmpty());
     Preconditions.checkState(dataFilesWithDeletesSumPaths_ != 0);
     Preconditions.checkState(dataFilesWithDeletesMaxPath_ != 0);
     // The followings just create separate scan nodes for data files and position delete
@@ -381,7 +388,7 @@ public class IcebergScanPlanner {
         dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
         getIceTable().getContentFileStore().getNumPartitions(),
         nonIdentityConjuncts_, getSkippedConjuncts(), deleteScanNodeId, snapshotId_,
-        false /*isPartitionKeyScan*/);
+        false /*isPartitionKeyScan*/, dataFileToDV_);
     dataScanNode.init(analyzer_);
     IcebergScanNode deleteScanNode = new IcebergScanNode(
         deleteScanNodeId,
@@ -393,7 +400,7 @@ public class IcebergScanPlanner {
         Collections.emptyList(), /*nonIdentityConjuncts*/
         Collections.emptyList(), /*skippedConjuncts*/
         snapshotId_,
-        false /*isPartitionKeyScan*/);
+        false /*isPartitionKeyScan*/, dataFileToDV_);
     deleteScanNode.init(analyzer_);
 
     // Now let's create the JOIN node
@@ -402,13 +409,15 @@ public class IcebergScanPlanner {
 
     TQueryOptions queryOpts = analyzer_.getQueryCtx().client_request.query_options;
     JoinNode joinNode = null;
-    if (queryOpts.disable_optimized_iceberg_v2_read) {
+    if (queryOpts.disable_optimized_iceberg_v2_read
+        && getIceTable().getFormatVersion() == 2) {
       joinNode = new HashJoinNode(dataScanNode, deleteScanNode,
           /*straight_join=*/true, DistributionMode.NONE, JoinOperator.LEFT_ANTI_JOIN,
           positionJoinConjuncts, /*otherJoinConjuncts=*/Collections.emptyList());
     } else {
       joinNode =
-          new IcebergDeleteNode(dataScanNode, deleteScanNode, positionJoinConjuncts);
+          new IcebergDeleteJoinNode(dataScanNode, deleteScanNode, positionJoinConjuncts,
+              dvDeletesRecordCount_);
     }
     joinNode.setId(ctx_.getNextNodeId());
     joinNode.init(analyzer_);
@@ -596,7 +605,7 @@ public class IcebergScanPlanner {
           dataScanNodeId, tblRef_, conjuncts_, aggInfo_, dataFilesWithDeletes_,
           getIceTable().getContentFileStore().getNumPartitions(),
           nonIdentityConjuncts_, getSkippedConjuncts(), snapshotId_,
-          false /*isPartitionKeyScan*/);
+          false /*isPartitionKeyScan*/, dataFileToDV_);
       addAllSlotsForEqualityDeletes(tblRef_);
       dataScanNode.init(analyzer_);
 
@@ -637,8 +646,7 @@ public class IcebergScanPlanner {
           getIceTable().getContentFileStore().getNumPartitions(),
           Collections.emptyList(), /*nonIdentityConjuncts*/
           Collections.emptyList(), /*skippedConjuncts*/
-          snapshotId_,
-          false /*isPartitionKeyScan*/);
+          snapshotId_, false /*isPartitionKeyScan*/, dataFileToDV_);
       deleteScanNode.init(analyzer_);
 
       Pair<List<BinaryPredicate>, List<Expr>> equalityJoinConjuncts =
@@ -726,10 +734,15 @@ public class IcebergScanPlanner {
               addEqualityDeletesAndIds(delFileDesc.first);
             } else {
               if (delFile.format() == FileFormat.PUFFIN) {
-                Preconditions.checkState(fileScanTask.deletes().size() == 1);
-                dataFileToDV_.put(
-                    IcebergUtil.getFilePathHash(dataFile.location()),
+                // A data file can have at most one DV, but may also be covered by legacy
+                // position-delete files simultaneously (e.g. after a partial V3 migration
+                // by an external engine). Assert there is no second DV for this file.
+                Hash128 dataFileHash = IcebergUtil.getFilePathHash(dataFile.location());
+                TIcebergDeletionVector dv = dataFileToDV_.put(dataFileHash,
                     IcebergUtil.createTIcebergDeletionVector(delFile));
+                Preconditions.checkState(dv == null,
+                    "More than one deletion vector found for data file: %s",
+                    dataFile.location());
               } else {
                 positionDeleteFiles_.add(delFileDesc.first);
               }
@@ -828,6 +841,15 @@ public class IcebergScanPlanner {
     for (Map.Entry<List<Integer>, Set<IcebergFileDescriptor>> entry :
         equalityIdsToDeleteFiles_.entrySet()) {
       updateEqualityDeleteFilesStatistics(entry.getKey(), entry.getValue());
+    }
+    updateDeletionVectorStatistics();
+  }
+
+  private void updateDeletionVectorStatistics() {
+    for (TIcebergDeletionVector dv : dataFileToDV_.values()) {
+      if (dv.isSetRecord_count()) {
+        dvDeletesRecordCount_ += dv.getRecord_count();
+      }
     }
   }
 

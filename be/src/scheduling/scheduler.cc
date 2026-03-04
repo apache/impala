@@ -1728,6 +1728,9 @@ void TScanRangeToScanRangePB(const TScanRange& tscan_range, ScanRangePB* scan_ra
   if (tscan_range.__isset.is_system_scan) {
     scan_range_pb->set_is_system_scan(tscan_range.is_system_scan);
   }
+  if (tscan_range.__isset.iceberg_deletion_vector) {
+    scan_range_pb->set_iceberg_deletion_vector(tscan_range.iceberg_deletion_vector);
+  }
 }
 
 void Scheduler::AssignmentCtx::RecordScanRangeAssignment(

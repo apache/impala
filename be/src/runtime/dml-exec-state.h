@@ -136,6 +136,14 @@ class DmlExecState {
   // Encodes delete file list info in flatbuffer format expected by Iceberg API.
   std::vector<std::string> CreateIcebergDeleteFilesVector();
 
+  // Creates list of deletion vectors to add to Iceberg metadata.
+  // Each entry is a FlatBuffer-encoded FbIcebergDeletionVector.
+  std::vector<std::string> CreateIcebergAddedDeletionVectors();
+
+  // Creates list of deletion vectors to remove from Iceberg metadata.
+  // Each entry is a FlatBuffer-encoded FbIcebergDeletionVector.
+  std::vector<std::string> CreateIcebergRemovedDeletionVectors();
+
   // Returns vector of Iceberg data files referenced by position delete records by
   // this DML statement.
   const std::vector<std::string>& DataFilesReferencedByPositionDeletes() const {
@@ -156,6 +164,17 @@ class DmlExecState {
   /// Auxiliary function used by 'AddCreatedFile' and 'AddCreatedDeleteFile'.
   void AddFileAux(const OutputPartition& partition, bool is_iceberg,
     const IcebergFileStats& insert_stats, bool is_delete);
+
+  /// Helper function to add puffin file entries with deletion vectors.
+  /// Creates one FbIcebergDataFile entry per data file that has deletion vectors.
+  /// Called by AddFileAux for puffin files only. Assumes lock_ is held.
+  void AddPuffinDeletionVectorEntries(const OutputPartition& partition);
+
+  /// Collects FlatBuffer-serialized FbIcebergDeletionVector entries from all created
+  /// delete files. 'get_dv' selects which deletion vector to extract from each
+  /// FbIcebergDataFile entry (e.g. new_deletion_vector or old_deletion_vector).
+  template<typename GetDV>
+  std::vector<std::string> CollectDeletionVectors(GetDV get_dv);
 
   /// protects all fields below
   std::mutex lock_;

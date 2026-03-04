@@ -1,0 +1,423 @@
+====
+---- QUERY
+SELECT * FROM iceberg_v3_deletion_vectors;
+---- RESULTS
+1
+3
+5
+---- TYPES
+INT
+====
+---- QUERY
+# Basic DELETE creates deletion vector (Puffin file)
+CREATE TABLE ice_v3_dv (i int, s string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four'), (5, 'five');
+DELETE FROM ice_v3_dv WHERE i = 3;
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM ice_v3_dv ORDER BY i;
+---- RESULTS
+1,'one'
+2,'two'
+4,'four'
+5,'five'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Count after deletion
+SELECT count(*) FROM ice_v3_dv;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Verify that the DV file is a PUFFIN position-delete entry with referenced_data_file
+# and content_offset populated; the data file has neither of those DV-specific fields.
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv.`files`
+ORDER BY content;
+---- RESULTS
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Multiple deletes accumulate in deletion vector (merge test)
+DELETE FROM ice_v3_dv WHERE i IN (1, 4);
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 2
+====
+---- QUERY
+SELECT * FROM ice_v3_dv ORDER BY i;
+---- RESULTS
+2,'two'
+5,'five'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Third delete - cumulative DV merge
+DELETE FROM ice_v3_dv WHERE i = 5;
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM ice_v3_dv ORDER BY i;
+---- RESULTS
+2,'two'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# WHERE clause with multiple conditions
+CREATE TABLE ice_v3_dv_where (id int, cat string, val int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_where VALUES
+  (1, 'A', 10), (2, 'A', 20), (3, 'B', 30), (4, 'B', 40), (5, 'C', 50);
+
+DELETE FROM ice_v3_dv_where WHERE cat = 'B' AND val > 35;
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM ice_v3_dv_where ORDER BY id;
+---- RESULTS
+1,'A',10
+2,'A',20
+3,'B',30
+5,'C',50
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# DELETE with subquery
+CREATE TABLE ice_v3_dv_sub (id int, value int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_sub VALUES (1, 100), (2, 200), (3, 150), (4, 250);
+DELETE FROM ice_v3_dv_sub WHERE id IN (SELECT id FROM ice_v3_dv_sub WHERE value > 180);
+SELECT * FROM ice_v3_dv_sub ORDER BY id;
+---- RESULTS
+1,100
+3,150
+---- TYPES
+INT,INT
+====
+---- QUERY
+# JOIN with deletion vectors
+CREATE TABLE ice_v3_dv_join1 (id int, name string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE ice_v3_dv_join2 (id int, detail string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_join1 VALUES (1, 'a'), (2, 'b'), (3, 'c');
+INSERT INTO ice_v3_dv_join2 VALUES (2, 'd2'), (3, 'd3'), (4, 'd4');
+
+DELETE FROM ice_v3_dv_join1 WHERE id = 2;
+DELETE FROM ice_v3_dv_join2 WHERE id = 4;
+
+SELECT j1.id, j1.name, j2.detail
+FROM ice_v3_dv_join1 j1
+JOIN ice_v3_dv_join2 j2 ON j1.id = j2.id
+ORDER BY j1.id;
+---- RESULTS
+3,'c','d3'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Verify that ice_v3_dv_join1 has one data file and one DV file after the delete.
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_join1.`files`
+ORDER BY content;
+---- RESULTS
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Verify that ice_v3_dv_join2 also got its own DV file.
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_join2.`files`
+ORDER BY content;
+---- RESULTS
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Aggregates with deletion vectors
+CREATE TABLE ice_v3_dv_agg (cat string, val int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_agg VALUES
+  ('A', 10), ('A', 20), ('B', 30), ('B', 40), ('C', 50);
+
+DELETE FROM ice_v3_dv_agg WHERE val = 20;
+
+SELECT cat, sum(val), count(*) FROM ice_v3_dv_agg GROUP BY cat ORDER BY cat;
+---- RESULTS
+'A',10,1
+'B',70,2
+'C',50,1
+---- TYPES
+STRING,BIGINT,BIGINT
+====
+---- QUERY
+# MIN/MAX with deletion vectors
+SELECT min(val), max(val) FROM ice_v3_dv_agg;
+---- RESULTS
+10,50
+---- TYPES
+INT,INT
+====
+---- QUERY
+# FILE__POSITION delete
+CREATE TABLE ice_v3_dv_pos (id int, string_data string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_pos VALUES (10, 'a'), (20, 'b'), (30, 'c');
+DELETE FROM ice_v3_dv_pos WHERE FILE__POSITION = 0;
+SELECT * FROM ice_v3_dv_pos ORDER BY id;
+---- RESULTS
+20,'b'
+30,'c'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Verify that the FILE__POSITION delete also produces a valid DV Puffin file.
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_pos.`files`
+ORDER BY content;
+---- RESULTS
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Merge with overlapping deletes (large scale)
+CREATE TABLE ice_v3_dv_merge (id int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_merge SELECT id FROM functional.alltypes ORDER BY id LIMIT 1000;
+DELETE FROM ice_v3_dv_merge WHERE id < 300;
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 300
+====
+---- QUERY
+SELECT count(*) FROM ice_v3_dv_merge;
+---- RESULTS
+700
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Second delete with overlap - tests DV merge
+DELETE FROM ice_v3_dv_merge WHERE id >= 200 AND id < 500;
+SELECT count(*) FROM ice_v3_dv_merge;
+---- RESULTS
+500
+---- TYPES
+BIGINT
+====
+---- QUERY
+# NULL handling with deletion vectors
+CREATE TABLE ice_v3_dv_null (id int, nullable string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_null VALUES (1, 'a'), (2, NULL), (3, 'c'), (4, NULL);
+DELETE FROM ice_v3_dv_null WHERE nullable IS NULL;
+SELECT * FROM ice_v3_dv_null ORDER BY id;
+---- RESULTS
+1,'a'
+3,'c'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Verify DV and data file entries in the files metadata table after NULL-value delete
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_null.`files`
+ORDER BY content;
+---- RESULTS
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# DELETE with LIKE pattern
+CREATE TABLE ice_v3_dv_like (id int, text string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_like VALUES (1, 'apple'), (2, 'banana'), (3, 'apricot'), (4, 'cherry');
+DELETE FROM ice_v3_dv_like WHERE text LIKE 'a%';
+SELECT * FROM ice_v3_dv_like ORDER BY id;
+---- RESULTS
+2,'banana'
+4,'cherry'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# DELETE no matching rows (no-op)
+CREATE TABLE ice_v3_dv_noop (id int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_noop VALUES (1), (2), (3);
+DELETE FROM ice_v3_dv_noop WHERE id = 999;
+SELECT count(*) FROM ice_v3_dv_noop;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+# No-op delete should not create any DV/Puffin files; only the data file remains
+SELECT count(*) FROM $DATABASE.ice_v3_dv_noop.`files` WHERE content = 1;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# DELETE from empty table
+CREATE TABLE ice_v3_dv_empty (id int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+DELETE FROM ice_v3_dv_empty WHERE id = 1;
+SELECT count(*) FROM ice_v3_dv_empty;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Empty table delete should produce no files at all
+SELECT count(*) FROM $DATABASE.ice_v3_dv_empty.`files`;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# ORDER BY and LIMIT with deletion vectors
+CREATE TABLE ice_v3_dv_order (id int, score int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_order VALUES (1, 85), (2, 90), (3, 75), (4, 95), (5, 80);
+DELETE FROM ice_v3_dv_order WHERE score < 85;
+SELECT * FROM ice_v3_dv_order ORDER BY score DESC LIMIT 2;
+---- RESULTS
+4,95
+2,90
+---- TYPES
+INT,INT
+====
+---- QUERY
+# DISTINCT with deletion vectors
+CREATE TABLE ice_v3_dv_distinct (cat string, val int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_distinct VALUES ('A', 1), ('A', 2), ('B', 3), ('B', 4);
+DELETE FROM ice_v3_dv_distinct WHERE val IN (2, 4);
+SELECT DISTINCT cat FROM ice_v3_dv_distinct ORDER BY cat;
+---- RESULTS
+'A'
+'B'
+---- TYPES
+STRING
+====
+---- QUERY
+# Sequential deletes with inserts between
+CREATE TABLE ice_v3_dv_seq (id int, batch int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_seq VALUES (1, 1), (2, 1);
+DELETE FROM ice_v3_dv_seq WHERE id = 2;
+
+INSERT INTO ice_v3_dv_seq VALUES (3, 2), (4, 2);
+DELETE FROM ice_v3_dv_seq WHERE id = 4;
+
+SELECT * FROM ice_v3_dv_seq ORDER BY id;
+---- RESULTS
+1,1
+3,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Sequential inserts+deletes produce one DV per data file batch
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_seq.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Large delete batch - tests RoaringBitmap serialization
+CREATE TABLE ice_v3_dv_large (id bigint)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_large
+SELECT id FROM functional.alltypes ORDER BY id LIMIT 5000;
+
+DELETE FROM ice_v3_dv_large WHERE id % 3 = 0;
+SELECT count(*) FROM ice_v3_dv_large;
+---- RESULTS
+3333
+---- TYPES
+BIGINT
+====
+---- QUERY
+# v2 table with position delete upgraded to v3, DELETE must be blocked.
+CREATE TABLE ice_v3_upgraded_from_v2 (id int, val string)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='2');
+
+INSERT INTO ice_v3_upgraded_from_v2 VALUES (1, 'a'), (2, 'b'), (3, 'c');
+DELETE FROM ice_v3_upgraded_from_v2 WHERE id = 2;
+ALTER TABLE ice_v3_upgraded_from_v2 SET TBLPROPERTIES ('format-version'='3');
+DELETE FROM ice_v3_upgraded_from_v2 WHERE id = 1;
+---- CATCH
+DELETE is not allowed on Iceberg format version 3 table
+====

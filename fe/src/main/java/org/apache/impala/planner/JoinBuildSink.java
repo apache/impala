@@ -77,7 +77,7 @@ public class JoinBuildSink extends DataSink implements SpillableOperator {
     tBuildSink.setDest_node_id(joinNode_.getId().asInt());
     tBuildSink.setJoin_op(joinNode_.getJoinOp().toThrift());
     if (joinNode_ instanceof HashJoinNode ||
-        joinNode_ instanceof IcebergDeleteNode) {
+        joinNode_ instanceof IcebergDeleteJoinNode) {
       tBuildSink.setEq_join_conjuncts(
           joinNode_.getThriftEquiJoinConjuncts(new ThriftSerializationCtx()));
       tBuildSink.setHash_seed(joinNode_.getFragment().getHashSeed());
@@ -97,7 +97,7 @@ public class JoinBuildSink extends DataSink implements SpillableOperator {
     } else if (joinNode_ instanceof NestedLoopJoinNode) {
       return TDataSinkType.NESTED_LOOP_JOIN_BUILDER;
     } else {
-      Preconditions.checkState(joinNode_ instanceof IcebergDeleteNode);
+      Preconditions.checkState(joinNode_ instanceof IcebergDeleteJoinNode);
       return TDataSinkType.ICEBERG_DELETE_BUILDER;
     }
   }

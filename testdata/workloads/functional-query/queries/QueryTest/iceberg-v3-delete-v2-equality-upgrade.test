@@ -1,0 +1,102 @@
+====
+---- QUERY
+# The iceberg_v2_delete_equality table was written by Flink with equality deletes.
+# Verify the initial visible state: equality deletes produced the final view of 2 rows.
+SELECT * FROM iceberg_v2_delete_equality ORDER BY id;
+---- RESULTS
+1,'test_1_base'
+2,'test_2_updated'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# Verify the file structure: 3 data files (content=0) and 3 equality delete files
+# (content=2) written by Flink. No position or DV delete files yet.
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.iceberg_v2_delete_equality.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+2,'PARQUET',false,false
+2,'PARQUET',false,false
+2,'PARQUET',false,false
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Upgrade the table from v2 to v3.
+ALTER TABLE iceberg_v2_delete_equality SET TBLPROPERTIES ('format-version'='3');
+====
+---- QUERY
+# After upgrade, the existing equality deletes are still applied correctly.
+SELECT * FROM iceberg_v2_delete_equality ORDER BY id;
+---- RESULTS
+1,'test_1_base'
+2,'test_2_updated'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# Delete one of the remaining rows using Impala. On a v3 table Impala writes a
+# deletion vector (Puffin file) for this delete.
+DELETE FROM iceberg_v2_delete_equality WHERE id = 1;
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM iceberg_v2_delete_equality ORDER BY id;
+---- RESULTS
+2,'test_2_updated'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# The file structure now contains the original equality delete files (content=2) from
+# Flink and a new Puffin DV file (content=1) written by Impala.
+# The Puffin DV's record_count equals the data file's record_count, confirming every
+# record in that data file is covered by the delete.
+SELECT content, file_format, record_count, referenced_data_file IS NOT NULL,
+    content_offset IS NOT NULL
+FROM $DATABASE.iceberg_v2_delete_equality.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',1,false,false
+0,'PARQUET',1,false,false
+0,'PARQUET',1,false,false
+1,'PUFFIN',1,true,true
+2,'PARQUET',1,false,false
+2,'PARQUET',1,false,false
+2,'PARQUET',1,false,false
+---- TYPES
+INT,STRING,BIGINT,BOOLEAN,BOOLEAN
+====
+---- QUERY
+OPTIMIZE TABLE iceberg_v2_delete_equality;
+SELECT * FROM iceberg_v2_delete_equality ORDER BY id;
+---- RESULTS
+2,'test_2_updated'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# After OPTIMIZE: 2 equality delete files (content=2) remain due to the
+# bug IMPALA-14908. The DV (content=1) is correctly removed. TODO:
+SELECT COUNT(*) FROM $DATABASE.iceberg_v2_delete_equality.`files`
+WHERE content = 2;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# No position delete file remains in the table.
+SELECT COUNT(*) FROM $DATABASE.iceberg_v2_delete_equality.`files`
+WHERE content = 1;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

@@ -36,6 +36,10 @@ Status IcebergDeleteSinkConfig::Init(
   RETURN_IF_ERROR(DataSinkConfig::Init(tsink, input_row_desc, state));
   DCHECK(tsink_->__isset.table_sink);
   DCHECK(tsink_->table_sink.__isset.iceberg_delete_sink);
+  if (tsink_->table_sink.iceberg_delete_sink.__isset.deletion_vectors) {
+    referenced_deletion_vectors =
+        tsink_->table_sink.iceberg_delete_sink.deletion_vectors;
+  }
   RETURN_IF_ERROR(
       ScalarExpr::Create(tsink_->table_sink.iceberg_delete_sink.partition_key_exprs,
           *input_row_desc_, state, &partition_key_exprs_));

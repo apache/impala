@@ -28,6 +28,9 @@
 #include "common/logging.h"
 #include "exec/data-sink.h"
 #include "exec/output-partition.h"
+#define XXH_INLINE_ALL
+#include "thirdparty/xxhash/xxhash.h"
+#undef XXH_INLINE_ALL
 #include "util/pretty-printer.h"
 #include "util/container-util.h"
 #include "util/hdfs-bulk-ops.h"
@@ -574,6 +577,81 @@ createIcebergColumnStats(
   return stats_builder.Finish();
 }
 
+// Helper function to create an Iceberg data file FlatBuffer with deletion vectors.
+// Used for puffin files where we need to create one entry per data file with DVs.
+// Parameters:
+//   partition: The output partition (for partition info)
+//   puffin_file_path: Path to the puffin file containing the deletion vector blobs
+//   puffin_file_size: Total size of the puffin file in bytes
+//   referenced_data_file: Path to the data file that this deletion vector references
+//   old_dv: Old deletion vector to remove (can be nullptr)
+//   new_dv: New deletion vector to add
+string createIcebergDataFileWithDeletionVectorString(
+    const OutputPartition& partition,
+    const string& puffin_file_path,
+    int64_t puffin_file_size,
+    const string& referenced_data_file,
+    const TIcebergDeletionVector* old_dv,
+    const TIcebergDeletionVector* new_dv) {
+  DCHECK(new_dv != nullptr);
+  using namespace org::apache::impala::fb;
+  flatbuffers::FlatBufferBuilder fbb;
+
+  // For puffin files with deletion vectors, we don't have column stats
+  vector<flatbuffers::Offset<FbIcebergColumnStats>> ice_col_stats_vec;
+
+  vector<flatbuffers::Offset<FbIcebergPartitionField>> raw_partition_fields;
+  for (const string& partition_name : partition.raw_partition_names) {
+    auto data = reinterpret_cast<const uint8_t*>(partition_name.data());
+    auto fb_vector = fbb.CreateVector(data, partition_name.size());
+    raw_partition_fields.push_back(CreateFbIcebergPartitionField(fbb, fb_vector));
+  }
+
+  THash128 hash = THash128FromFilePath(referenced_data_file);
+
+  // Create FlatBuffer deletion vector reference for old DV
+  flatbuffers::Offset<FbIcebergDeletionVector> old_dv_fb = 0;
+  if (old_dv != nullptr) {
+    old_dv_fb = CreateFbIcebergDeletionVector(fbb,
+        fbb.CreateString(old_dv->path),
+        old_dv->content_offset,
+        old_dv->content_size_in_bytes,
+        hash.high,
+        hash.low,
+        old_dv->__isset.record_count ? old_dv->record_count : 0);
+  }
+
+  // Create FlatBuffer deletion vector reference for new DV
+  flatbuffers::Offset<FbIcebergDeletionVector> new_dv_fb = CreateFbIcebergDeletionVector(
+      fbb,
+      fbb.CreateString(puffin_file_path),
+      new_dv->content_offset,
+      new_dv->content_size_in_bytes,
+      hash.high,
+      hash.low,
+      new_dv->__isset.record_count ? new_dv->record_count : 0,
+      puffin_file_size);
+
+  // For puffin files, use the deletion vector record count and the total
+  // Puffin file size.
+  int64_t num_rows = new_dv->__isset.record_count ? new_dv->record_count : 0;
+
+  flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
+      fbb.CreateString(puffin_file_path),
+      FbIcebergDataFileFormat::FbIcebergDataFileFormat_PUFFIN,
+      num_rows,
+      puffin_file_size,
+      partition.iceberg_spec_id,
+      fbb.CreateString(partition.partition_name),
+      fbb.CreateVector(raw_partition_fields),
+      fbb.CreateVector(ice_col_stats_vec),
+      old_dv_fb,
+      new_dv_fb);
+  fbb.Finish(data_file);
+  return string(reinterpret_cast<char*>(fbb.GetBufferPointer()), fbb.GetSize());
+}
+
+// Creates an Iceberg data file FlatBuffer for regular (non-puffin) data files.
 string createIcebergDataFileString(
     const OutputPartition& partition, const string& final_path, int64_t num_rows,
     int64_t file_size, const IcebergFileStats& insert_stats) {
@@ -595,14 +673,15 @@ string createIcebergDataFileString(
 
   flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
       fbb.CreateString(final_path),
-      // Currently we can only write Parquet to Iceberg
       FbIcebergDataFileFormat::FbIcebergDataFileFormat_PARQUET,
       num_rows,
       file_size,
       partition.iceberg_spec_id,
       fbb.CreateString(partition.partition_name),
       fbb.CreateVector(raw_partition_fields),
-      fbb.CreateVector(ice_col_stats_vec));
+      fbb.CreateVector(ice_col_stats_vec),
+      0,  // No old_deletion_vector for regular files
+      0); // No new_deletion_vector for regular files
   fbb.Finish(data_file);
   return string(reinterpret_cast<char*>(fbb.GetBufferPointer()), fbb.GetSize());
 }
@@ -619,9 +698,73 @@ void DmlExecState::AddCreatedDeleteFile(const OutputPartition& partition,
   AddFileAux(partition, /*is_iceberg=*/true, insert_stats, /*is_delete=*/true);
 }
 
+// Helper function to add puffin file entries with deletion vectors.
+// Creates one FbIcebergDataFile entry per data file that has deletion vectors.
+// This is called for puffin files only.
+void DmlExecState::AddPuffinDeletionVectorEntries(const OutputPartition& partition) {
+  // Note: lock_ is already held by AddFileAux
+
+  const string& puffin_path = partition.current_file_final_name.empty()
+      ? partition.current_file_name
+      : partition.current_file_final_name;
+
+  // Build a unified map of all data files with deletion vectors (old and/or new)
+  // Map: data_file_path -> (old_dv_ptr, new_dv_ptr)
+  std::map<std::string,
+      std::pair<const TIcebergDeletionVector*, const TIcebergDeletionVector*>>
+      data_file_to_dvs;
+
+  // Collect old deletion vectors
+  for (const auto& entry : partition.puffin_result.old_deletion_vectors) {
+    data_file_to_dvs[entry.first].first = &entry.second;
+  }
+
+  // Collect new deletion vectors
+  for (const auto& entry : partition.puffin_result.new_deletion_vectors) {
+    data_file_to_dvs[entry.first].second = &entry.second;
+  }
+
+  // Create one FbIcebergDataFile entry per data file with deletion vectors
+  PartitionStatusMap::iterator partition_entry =
+      per_partition_status_.find(partition.partition_name);
+  DCHECK(partition_entry != per_partition_status_.end());
+
+  for (const auto& entry : data_file_to_dvs) {
+    const string& referenced_data_file = entry.first;
+    const TIcebergDeletionVector* old_dv = entry.second.first;
+    const TIcebergDeletionVector* new_dv = entry.second.second;
+
+    DmlFileStatusPb* file = partition_entry->second.add_created_delete_files();
+
+    file->set_final_path(puffin_path);
+    if (!partition.current_file_final_name.empty()) {
+      file->set_staging_path(partition.current_file_name);
+    }
+
+    // For deletion vectors, use the DV record count and the total puffin file size.
+    file->set_num_rows(new_dv && new_dv->__isset.record_count ? new_dv->record_count : 0);
+    file->set_size(partition.current_file_bytes);
+
+    file->set_iceberg_data_file_fb(
+        createIcebergDataFileWithDeletionVectorString(
+            partition, puffin_path, partition.current_file_bytes,
+            referenced_data_file, old_dv, new_dv));
+  }
+}
+
 void DmlExecState::AddFileAux(const OutputPartition& partition, bool is_iceberg,
     const IcebergFileStats& insert_stats, bool is_delete) {
   lock_guard<mutex> l(lock_);
+
+  // Special handling for puffin files with deletion vectors
+  bool is_puffin = partition.writer && partition.writer->file_extension() == "puffin";
+  if (is_puffin && is_delete && is_iceberg) {
+    // For puffin files, create one entry per data file with deletion vectors
+    AddPuffinDeletionVectorEntries(partition);
+    return;
+  }
+
+  // Regular file handling (non-puffin or non-delete files)
   PartitionStatusMap::iterator entry =
       per_partition_status_.find(partition.partition_name);
   DCHECK(entry != per_partition_status_.end());
@@ -672,6 +815,55 @@ vector<string> DmlExecState::CreateIcebergDeleteFilesVector() {
     }
   }
   return ret;
+}
+
+template<typename GetDV>
+vector<string> DmlExecState::CollectDeletionVectors(GetDV get_dv) {
+  using namespace org::apache::impala::fb;
+  vector<string> ret;
+
+  for (const PartitionStatusMap::value_type& partition : per_partition_status_) {
+    for (int i = 0; i < partition.second.created_delete_files_size(); ++i) {
+      const DmlFileStatusPb& file = partition.second.created_delete_files(i);
+      if (!file.has_iceberg_data_file_fb()) continue;
+
+      const string& fb_data = file.iceberg_data_file_fb();
+      const FbIcebergDataFile* data_file =
+          flatbuffers::GetRoot<FbIcebergDataFile>(fb_data.data());
+
+      const FbIcebergDeletionVector* dv = get_dv(data_file);
+      if (dv == nullptr) continue;
+
+      // Serialize the DV into its own FlatBuffer.
+      flatbuffers::FlatBufferBuilder builder(256);
+      auto path_offset = builder.CreateString(dv->path()->c_str());
+      auto dv_offset = CreateFbIcebergDeletionVector(builder,
+          path_offset,
+          dv->content_offset(),
+          dv->content_size_in_bytes(),
+          dv->referenced_data_file_hash_high(),
+          dv->referenced_data_file_hash_low(),
+          dv->record_count(),
+          data_file->file_size_in_bytes());
+      builder.Finish(dv_offset);
+
+      ret.push_back(string(reinterpret_cast<const char*>(builder.GetBufferPointer()),
+          builder.GetSize()));
+    }
+  }
+  return ret;
+}
+
+vector<string> DmlExecState::CreateIcebergAddedDeletionVectors() {
+  using namespace org::apache::impala::fb;
+  return CollectDeletionVectors(
+      [](const FbIcebergDataFile* f) { return f->new_deletion_vector(); });
+}
+
+vector<string> DmlExecState::CreateIcebergRemovedDeletionVectors() {
+  using namespace org::apache::impala::fb;
+  return CollectDeletionVectors(
+      [](const FbIcebergDataFile* f) { return f->old_deletion_vector(); });
 }
 
 void DmlExecState::MergeDmlStats(const DmlStatsPB& src, DmlStatsPB* dst) {

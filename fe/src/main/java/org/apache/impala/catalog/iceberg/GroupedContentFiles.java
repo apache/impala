@@ -32,8 +32,6 @@ import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.io.CloseableIterable;
 
-import org.apache.impala.thrift.TIcebergDeletionVector;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import org.apache.impala.util.Hash128;
@@ -54,7 +52,7 @@ public class GroupedContentFiles {
   public List<DataFile> dataFilesWithDeletes = new ArrayList<>();
   public Set<DeleteFile> positionDeleteFiles = new HashSet<>();
   public Set<DeleteFile> equalityDeleteFiles = new HashSet<>();
-  public Map<Hash128, TIcebergDeletionVector> dataFileToDV = new HashMap<>();
+  public Map<Hash128, DeleteFile> dataFileToDV = new HashMap<>();
 
   public GroupedContentFiles() { }
 
@@ -68,10 +66,14 @@ public class GroupedContentFiles {
         for (DeleteFile delFile : scanTask.deletes()) {
           if (delFile.content() == FileContent.POSITION_DELETES) {
             if (delFile.format() == FileFormat.PUFFIN) {
-              Preconditions.checkState(scanTask.deletes().size() == 1);
-              dataFileToDV.put(
-                  IcebergUtil.getFilePathHash(dataFile),
-                  IcebergUtil.createTIcebergDeletionVector(delFile));
+              // A data file can have at most one DV, but may also be covered by legacy
+              // position-delete files simultaneously (e.g. after a partial V3 migration
+              // by an external engine). Assert there is no second DV for this file.
+              Hash128 dataFileHash = IcebergUtil.getFilePathHash(dataFile);
+              DeleteFile existing = dataFileToDV.put(dataFileHash, delFile);
+              Preconditions.checkState(existing == null,
+                  "More than one deletion vector found for data file: %s",
+                  dataFile.location());
             } else {
               positionDeleteFiles.add(delFile);
             }

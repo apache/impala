@@ -17,26 +17,35 @@
 
 package org.apache.impala.planner;
 
+import com.google.common.base.Preconditions;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.stream.Collectors;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.IcebergDeleteTable;
 import org.apache.impala.common.ByteUnits;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.THash128;
 import org.apache.impala.thrift.TIcebergDeleteSink;
+import org.apache.impala.thrift.TIcebergDeletionVector;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTableSinkType;
 
 import java.util.List;
+import org.apache.impala.util.Hash128;
 
 public class IcebergBufferedDeleteSink extends TableSink {
 
-  final private int deleteTableId_;
+  private final int deleteTableId_;
 
   // Exprs for computing the output partition(s).
   protected final List<Expr> partitionKeyExprs_;
+  protected final Map<Hash128, TIcebergDeletionVector> referencedDVs_;
 
   public IcebergBufferedDeleteSink(FeIcebergTable targetTable,
       List<Expr> partitionKeyExprs, List<Expr> outputExprs) {
@@ -47,6 +56,9 @@ public class IcebergBufferedDeleteSink extends TableSink {
       List<Expr> partitionKeyExprs, List<Expr> outputExprs,
       int deleteTableId) {
     super(targetTable, Op.DELETE, outputExprs);
+    Preconditions.checkState(targetTable instanceof IcebergDeleteTable);
+    FeIcebergTable originalTable = ((IcebergDeleteTable) targetTable).getBaseTable();
+    referencedDVs_ = originalTable.getContentFileStore().getDataFileToDV();
     partitionKeyExprs_ = partitionKeyExprs;
     deleteTableId_ = deleteTableId;
   }
@@ -113,6 +125,12 @@ public class IcebergBufferedDeleteSink extends TableSink {
   protected void toThriftImpl(TDataSink tsink) {
     TIcebergDeleteSink icebergDeleteSink = new TIcebergDeleteSink();
     icebergDeleteSink.setPartition_key_exprs(Expr.treesToThrift(partitionKeyExprs_));
+    Map<THash128, TIcebergDeletionVector> thriftDVs = referencedDVs_.entrySet().stream()
+        .collect(Collectors.toMap(
+            entry -> entry.getKey().toThrift(),
+            Entry::getValue
+        ));
+    icebergDeleteSink.setDeletion_vectors(thriftDVs);
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.iceberg_delete_sink = icebergDeleteSink;

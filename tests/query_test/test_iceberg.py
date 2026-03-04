@@ -23,7 +23,9 @@ import logging
 import os
 import random
 import re
+import struct
 from subprocess import check_call, check_output
+import tempfile
 import time
 
 from avro.datafile import DataFileReader
@@ -1780,6 +1782,7 @@ class TestIcebergV2Table(IcebergTestSuite):
     if IS_HDFS and self.should_run_for_hive(vector):
       self._delete_partitioned_hive_tests(unique_database)
 
+
   def _delete_partitioned_hive_tests(self, db):
     hive_output = self.run_stmt_in_hive("SELECT * FROM {}.{} ORDER BY i".format(
         db, "id_part"))
@@ -2340,6 +2343,31 @@ class TestIcebergV3Table(IcebergTestSuite):
     self.load_table(unique_database, "iceberg_v3_row_lineage_orc", format="orc")
     self.run_test_case('QueryTest/iceberg-v3-row-lineage', vector, unique_database)
 
+  def test_v3_delete(self, vector, unique_database):
+    """Test Iceberg V3 deletion vectors (Puffin files)."""
+    self.load_table(unique_database, "iceberg_v3_deletion_vectors")
+    self.run_test_case('QueryTest/iceberg-v3-delete', vector, unique_database)
+    self.run_test_case('QueryTest/iceberg-v3-delete-partition-sort',
+        vector, unique_database)
+
+  def test_v3_delete_on_existing_dv_table(self, vector, unique_database):
+    """Test DELETE on a table that already has deletion vectors written by Spark.
+    Verifies that Impala correctly reads and extends pre-existing Puffin DV files
+    produced by an external engine."""
+    self.load_table(unique_database, "iceberg_v3_deletion_vectors")
+    self.run_test_case('QueryTest/iceberg-v3-delete-existing-dv', vector, unique_database)
+
+  def test_v3_delete_on_v2_equality_delete_table(self, vector, unique_database):
+    """Test that a v2 table with Flink-written equality delete files can be upgraded to
+    v3 and that both the existing equality deletes and new Impala DV-based deletes are
+    applied correctly after the upgrade."""
+    create_iceberg_table_from_directory(self.client, unique_database,
+        "iceberg_v2_delete_equality", "parquet",
+        table_location="${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice",
+        warehouse_prefix=os.getenv("FILESYSTEM_PREFIX"))
+    self.run_test_case('QueryTest/iceberg-v3-delete-v2-equality-upgrade',
+        vector, unique_database)
+
   @SkipIf.not_dfs
   def test_v3_row_lineage_file_schema(self, unique_database):
     """Test that plain INSERTs only write user columns, not hidden metadata columns."""
@@ -2380,6 +2408,116 @@ class TestIcebergV3Table(IcebergTestSuite):
     self.load_table(unique_database, "test_default_part")
     self.load_table(unique_database, "test_complex_default")
     self.run_test_case('QueryTest/iceberg-v3-default-values', vector, unique_database)
+
+  def _assert_puffin_file_layout(self, local_file, reported_size,
+                                   content_offset, content_size):
+    """Validate the binary layout of a downloaded Puffin file.
+
+    Checks:
+    - Actual on-disk size matches manifest-reported file_size_in_bytes.
+    - DV blob extent (content_offset, content_size) fits within the file.
+    - PFA1 magic bytes at both ends.
+    - Blob bytes are readable at content_offset.
+    - Full structural size reconstruction from footer size field matches actual size.
+    """
+    actual_size = os.path.getsize(local_file)
+
+    assert actual_size == reported_size, (
+        "Puffin file size mismatch: actual=%d, manifest-reported=%d"
+        % (actual_size, reported_size))
+
+    assert content_offset >= 0, \
+        "content_offset must be non-negative, got %d" % content_offset
+    assert content_size > 0, \
+        "content_size_in_bytes must be positive, got %d" % content_size
+    assert content_offset + content_size <= actual_size, (
+        "DV blob extent [%d, %d) exceeds file size %d"
+        % (content_offset, content_offset + content_size, actual_size))
+
+    PUFFIN_MAGIC = b'\x50\x46\x41\x31'
+    with open(local_file, 'rb') as f:
+      header = f.read(4)
+      assert header == PUFFIN_MAGIC, \
+          "Unexpected Puffin header magic: %r" % header
+      f.seek(-4, 2)
+      trailer = f.read(4)
+      assert trailer == PUFFIN_MAGIC, \
+          "Unexpected Puffin trailer magic: %r" % trailer
+
+      # Read the footer size field (uint32 LE) at bytes [-12:-8], then reconstruct
+      # the expected total file size from first principles:
+      #
+      # Puffin file layout:
+      #   [File magic: 4]
+      #   [Blobs: total_blobs_size bytes]
+      #   [Footer leading magic: 4]
+      #   [Footer JSON: footer_json_len bytes]
+      #   [Footer size field (LE uint32): 4]  <- at bytes [-12:-8]
+      #   [Flags (reserved): 4]               <- at bytes [-8:-4]
+      #   [Trailing magic: 4]                 <- at bytes [-4:]
+      f.seek(-12, 2)
+      footer_json_len = struct.unpack('<I', f.read(4))[0]
+
+      # The footer leading magic sits immediately before the footer JSON.
+      # Everything between the file magic and the footer leading magic is blob data.
+      total_blobs_size = actual_size - 4 - 4 - footer_json_len - 4 - 4 - 4
+
+      expected_size = (
+          4                   # file magic
+          + total_blobs_size  # all blob data
+          + 4                 # footer leading magic
+          + footer_json_len   # footer JSON
+          + 4                 # footer size field
+          + 4                 # flags
+          + 4                 # trailing magic
+      )
+      assert actual_size == expected_size, (
+          "Puffin file size does not match structural calculation: "
+          "actual=%d, expected=%d "
+          "(content_offset=%d, content_size=%d, footer_json_len=%d)"
+          % (actual_size, expected_size,
+             content_offset, content_size, footer_json_len))
+
+  @SkipIf.not_dfs
+  def test_v3_delete_puffin_file_size(self, unique_database):
+    """Test that the Puffin file size recorded in the manifest matches the actual binary
+    size of the file on the filesystem, and that the DV blob extent (content_offset +
+    content_size_in_bytes) fits within that file. This guards against off-by-N bugs in
+    current_offset_ tracking inside PuffinWriter (e.g. the leading footer magic not being
+    accounted for)."""
+    table = "ice_puffin_size"
+    fqn = "%s.%s" % (unique_database, table)
+
+    self.client.execute("""
+        CREATE TABLE {fqn} (id INT, val STRING)
+        STORED BY ICEBERG
+        TBLPROPERTIES ('format-version'='3')
+    """.format(fqn=fqn))
+    self.client.execute(
+        "INSERT INTO {fqn} VALUES (1, 'a'), (2, 'b'), (3, 'c')".format(fqn=fqn))
+    self.client.execute(
+        "DELETE FROM {fqn} WHERE id = 2".format(fqn=fqn))
+
+    # Retrieve the Puffin file path, manifest-reported size, and DV blob extent.
+    result = self.client.execute("""
+        SELECT file_path, file_size_in_bytes, content_offset, content_size_in_bytes
+        FROM {fqn}.`files`
+        WHERE content = 1 AND file_format = 'PUFFIN'
+    """.format(fqn=fqn))
+    assert len(result.data) == 1, \
+        "Expected exactly one Puffin DV file, got: %s" % result.data
+    row = result.data[0].split('\t')
+    hdfs_path = row[0]
+    reported_size = int(row[1])
+    content_offset = int(row[2])
+    content_size = int(row[3])
+
+    # Download the Puffin file to a temporary directory and run layout checks.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+      local_file = os.path.join(tmp_dir, "dv.puffin")
+      check_call(['hadoop', 'fs', '-copyToLocal', hdfs_path, local_file])
+      self._assert_puffin_file_layout(local_file, reported_size,
+                                      content_offset, content_size)
 
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most

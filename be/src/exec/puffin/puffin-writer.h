@@ -149,6 +149,14 @@ class PuffinWriter : public HdfsTableWriter {
   /// Timer for loading existing deletion vectors
   RuntimeProfile::Counter* load_dv_timer_;
 
+  /// Data cache counters, wired into io_request_context_ so HdfsFileReader can
+  /// update per-context cache statistics when loading existing deletion vectors.
+  RuntimeProfile::Counter* data_cache_hit_count_ = nullptr;
+  RuntimeProfile::Counter* data_cache_partial_hit_count_ = nullptr;
+  RuntimeProfile::Counter* data_cache_miss_count_ = nullptr;
+  RuntimeProfile::Counter* data_cache_hit_bytes_ = nullptr;
+  RuntimeProfile::Counter* data_cache_miss_bytes_ = nullptr;
+
   /// Magic bytes "PFA1" as per Puffin spec
   static constexpr uint32_t PUFFIN_MAGIC = 0x50464131;
 

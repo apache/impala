@@ -112,6 +112,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.fb.FbFileMetadata;
 import org.apache.impala.fb.FbIcebergDataFile;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
+import org.apache.impala.fb.FbIcebergDeletionVector;
 import org.apache.impala.fb.FbIcebergMetadata;
 import org.apache.impala.fb.FbIcebergPartitionTransformValue;
 import org.apache.impala.fb.FbIcebergTransformType;
@@ -759,6 +760,8 @@ public class IcebergUtil {
     switch (fbFileFormat){
       case org.apache.impala.fb.FbIcebergDataFileFormat.PARQUET:
           return org.apache.iceberg.FileFormat.PARQUET;
+      case FbIcebergDataFileFormat.PUFFIN:
+        return FileFormat.PUFFIN;
       default:
           throw new ImpalaRuntimeException(String.format("Unexpected file format: %s",
               org.apache.impala.fb.FbIcebergDataFileFormat.name(fbFileFormat)));
@@ -1146,7 +1149,7 @@ public class IcebergUtil {
    */
   public static FbFileMetadata createIcebergMetadata(
       Table iceApiTbl, ContentFile cf, int partId) {
-    FlatBufferBuilder fbb = new FlatBufferBuilder(1);
+    FlatBufferBuilder fbb = new FlatBufferBuilder();
     int iceOffset = createIcebergMetadata(iceApiTbl, fbb, cf, partId);
     fbb.finish(FbFileMetadata.createFbFileMetadata(fbb, iceOffset));
     ByteBuffer bb = fbb.dataBuffer().slice();
@@ -1173,6 +1176,8 @@ public class IcebergUtil {
     if (cf.format() == FileFormat.PARQUET) fileFormat = FbIcebergDataFileFormat.PARQUET;
     else if (cf.format() == FileFormat.ORC) fileFormat = FbIcebergDataFileFormat.ORC;
     else if (cf.format() == FileFormat.AVRO) fileFormat = FbIcebergDataFileFormat.AVRO;
+    else if (cf.format() == FileFormat.PUFFIN) fileFormat =
+        FbIcebergDataFileFormat.PUFFIN;
     if (fileFormat != -1) {
       FbIcebergMetadata.addFileFormat(fbb, fileFormat);
     }
@@ -1352,6 +1357,24 @@ public class IcebergUtil {
     return props;
   }
 
+  public static FbIcebergDeletionVector createFbIcebergDeletionVector(
+      String path, long contentOffset, long contentSizeInBytes,
+      long referencedDataFileHashHigh, long referencedDataFileHashLow,
+      long recordCount) {
+    FlatBufferBuilder fbb = new FlatBufferBuilder();
+    int pathOffset = fbb.createString(path);
+
+    fbb.finish(
+        FbIcebergDeletionVector.createFbIcebergDeletionVector(fbb, pathOffset,
+            contentOffset, contentSizeInBytes, referencedDataFileHashHigh,
+            referencedDataFileHashLow, recordCount, 0));
+    ByteBuffer bb = fbb.dataBuffer().slice();
+    ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
+    compressedBb.put(bb);
+    return FbIcebergDeletionVector.getRootAsFbIcebergDeletionVector(
+        compressedBb.flip());
+  }
+
   /**
    * Checks the table before insert for unsupported types and file formats.
    */
@@ -1474,9 +1497,11 @@ public class IcebergUtil {
       DeleteFile delFile) {
     Preconditions.checkState(delFile.content() == FileContent.POSITION_DELETES);
     Preconditions.checkState(delFile.format() == FileFormat.PUFFIN);
-    return new TIcebergDeletionVector(
+    TIcebergDeletionVector dv = new TIcebergDeletionVector(
         delFile.location(),
         delFile.contentOffset(), delFile.contentSizeInBytes());
+    dv.setRecord_count(delFile.recordCount());
+    return dv;
   }
 
   /**

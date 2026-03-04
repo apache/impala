@@ -44,12 +44,18 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import org.apache.impala.util.ExprUtil;
 
-public class IcebergDeleteNode extends JoinNode {
-  private final static Logger LOG = LoggerFactory.getLogger(IcebergDeleteNode.class);
-  public IcebergDeleteNode(
-      PlanNode outer, PlanNode inner, List<BinaryPredicate> eqJoinConjuncts) {
+public class IcebergDeleteJoinNode extends JoinNode {
+  private final static Logger LOG = LoggerFactory.getLogger(IcebergDeleteJoinNode.class);
+
+  // Record count from deletion vectors associated with the scanned data files.
+  private final long dvDeletesRecordCount_;
+
+  public IcebergDeleteJoinNode(
+      PlanNode outer, PlanNode inner, List<BinaryPredicate> eqJoinConjuncts,
+      long dvDeletesRecordCount) {
     super(outer, inner, true, DistributionMode.NONE, JoinOperator.ICEBERG_DELETE_JOIN,
         eqJoinConjuncts, Collections.emptyList(), "ICEBERG DELETE");
+    dvDeletesRecordCount_ = dvDeletesRecordCount;
     Preconditions.checkNotNull(eqJoinConjuncts);
     Preconditions.checkState(joinOp_ == JoinOperator.ICEBERG_DELETE_JOIN);
     Preconditions.checkState(conjuncts_.isEmpty());
@@ -101,6 +107,7 @@ public class IcebergDeleteNode extends JoinNode {
     TableSampleClause leftSampleParams = leftScanChild.getSampleParams();
     long leftCardWithSelectivity = leftScanChild.cardinality_;
     long rightCard = getChild(1).cardinality_;
+    rightCard = MathUtil.addCardinalities(rightCard, dvDeletesRecordCount_);
     // Both sides should have non-negative cardinalities.
     Preconditions.checkState(leftCardWithSelectivity >= 0);
     Preconditions.checkState(rightCard >= 0);

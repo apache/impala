@@ -1,0 +1,882 @@
+====
+---- QUERY
+# Identity partition - deletion vector created in the correct partition directory
+CREATE TABLE ice_v3_dv_id_part (id int, cat string, val int)
+PARTITIONED BY SPEC (cat)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_id_part VALUES
+  (1, 'A', 10), (2, 'A', 20), (3, 'B', 30), (4, 'B', 40), (5, 'C', 50);
+
+DELETE FROM ice_v3_dv_id_part WHERE cat = 'A' AND id = 1;
+SELECT * FROM ice_v3_dv_id_part ORDER BY id;
+---- RESULTS
+2,'A',20
+3,'B',30
+4,'B',40
+5,'C',50
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# After the first DELETE (only partition 'A' touched), we have 3 data files (one per
+# identity partition A/B/C) and 1 DV file for the affected partition.
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_id_part.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Second delete in the same partition - DV merge within a single partition
+DELETE FROM ice_v3_dv_id_part WHERE cat = 'A' AND id = 2;
+SELECT * FROM ice_v3_dv_id_part ORDER BY id;
+---- RESULTS
+3,'B',30
+4,'B',40
+5,'C',50
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Cross-partition delete - deletion vectors created per partition
+DELETE FROM ice_v3_dv_id_part WHERE id IN (3, 5);
+SELECT * FROM ice_v3_dv_id_part ORDER BY id;
+---- RESULTS
+4,'B',40
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Delete remaining partition to empty the table, verify count is zero
+DELETE FROM ice_v3_dv_id_part WHERE cat = 'B';
+SELECT count(*) FROM ice_v3_dv_id_part;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Truncate partition transform - rows sharing a truncated key go to same partition
+CREATE TABLE ice_v3_dv_trunc_part (id int, name string, val int)
+PARTITIONED BY SPEC (truncate(2, name))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_trunc_part VALUES
+  (1, 'apple', 10), (2, 'apricot', 20), (3, 'banana', 30), (4, 'berry', 40), (5, 'cherry', 50);
+
+# 'apple' and 'apricot' share truncated key 'ap'; deleting by LIKE hits the same partition
+DELETE FROM ice_v3_dv_trunc_part WHERE name LIKE 'ap%';
+SELECT * FROM ice_v3_dv_trunc_part ORDER BY id;
+---- RESULTS
+3,'banana',30
+4,'berry',40
+5,'cherry',50
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Second delete in the truncated partition - DV merge on truncated partition
+DELETE FROM ice_v3_dv_trunc_part WHERE name LIKE 'ba%';
+SELECT * FROM ice_v3_dv_trunc_part ORDER BY id;
+---- RESULTS
+4,'berry',40
+5,'cherry',50
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Bucket partition - deletes distribute across buckets
+CREATE TABLE ice_v3_dv_bucket_part (id int, hash_col int, string_data string)
+PARTITIONED BY SPEC (bucket(5, hash_col))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_bucket_part VALUES
+  (1, 10, 'a'), (2, 20, 'b'), (3, 30, 'c'), (4, 40, 'd'), (5, 50, 'e');
+
+DELETE FROM ice_v3_dv_bucket_part WHERE hash_col IN (20, 40);
+SELECT * FROM ice_v3_dv_bucket_part ORDER BY id;
+---- RESULTS
+1,10,'a'
+3,30,'c'
+5,50,'e'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Second delete - cumulative DV merge across buckets
+DELETE FROM ice_v3_dv_bucket_part WHERE id = 3;
+SELECT * FROM ice_v3_dv_bucket_part ORDER BY id;
+---- RESULTS
+1,10,'a'
+5,50,'e'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Multi-column partition spec - deletion vectors per (col1, col2) partition cell
+CREATE TABLE ice_v3_dv_multi_part (id int, region string, yr int, val int)
+PARTITIONED BY SPEC (region, bucket(3, yr))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_multi_part VALUES
+  (1, 'US', 2022, 100), (2, 'US', 2023, 200),
+  (3, 'EU', 2022, 300), (4, 'EU', 2023, 400),
+  (5, 'AP', 2022, 500);
+
+# Partition-pruning delete: only touches EU partitions
+DELETE FROM ice_v3_dv_multi_part WHERE region = 'EU';
+SELECT * FROM ice_v3_dv_multi_part ORDER BY id;
+---- RESULTS
+1,'US',2022,100
+2,'US',2023,200
+5,'AP',2022,500
+---- TYPES
+INT,STRING,INT,INT
+====
+---- QUERY
+# Cross-partition delete on non-partition column
+DELETE FROM ice_v3_dv_multi_part WHERE yr = 2022;
+SELECT * FROM ice_v3_dv_multi_part ORDER BY id;
+---- RESULTS
+2,'US',2023,200
+---- TYPES
+INT,STRING,INT,INT
+====
+---- QUERY
+# Temporal partition (DAY transform) - delete within and across day partitions
+CREATE TABLE ice_v3_dv_day_part (id int, ts timestamp, payload string)
+PARTITIONED BY SPEC (day(ts))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_day_part VALUES
+  (1, '2024-01-01 08:00:00', 'a'),
+  (2, '2024-01-01 20:00:00', 'b'),
+  (3, '2024-01-02 10:00:00', 'c'),
+  (4, '2024-01-03 12:00:00', 'd');
+
+DELETE FROM ice_v3_dv_day_part WHERE id IN (1, 3);
+SELECT * FROM ice_v3_dv_day_part ORDER BY id;
+---- RESULTS
+2,2024-01-01 20:00:00,'b'
+4,2024-01-03 12:00:00,'d'
+---- TYPES
+INT,TIMESTAMP,STRING
+====
+---- QUERY
+# YEAR partition transform - multiple rows per year, DV merge across years
+CREATE TABLE ice_v3_dv_year_part (id int, event_date date, amount decimal(10,2))
+PARTITIONED BY SPEC (year(event_date))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_year_part VALUES
+  (1, '2022-03-15', 100.00),
+  (2, '2022-09-20', 200.00),
+  (3, '2023-01-10', 300.00),
+  (4, '2023-11-05', 400.00),
+  (5, '2024-06-01', 500.00);
+
+DELETE FROM ice_v3_dv_year_part WHERE year(event_date) = 2022;
+SELECT * FROM ice_v3_dv_year_part ORDER BY id;
+---- RESULTS
+3,2023-01-10,300.00
+4,2023-11-05,400.00
+5,2024-06-01,500.00
+---- TYPES
+INT,DATE,DECIMAL
+====
+---- QUERY
+# Second delete - merges DV with prior vector in 2023 partition
+DELETE FROM ice_v3_dv_year_part WHERE id = 4;
+SELECT count(*) FROM ice_v3_dv_year_part;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# NULL partition values with deletion vectors
+CREATE TABLE ice_v3_dv_null_part (id int, part_key string, val int)
+PARTITIONED BY SPEC (part_key)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_null_part VALUES
+  (1, 'X', 10), (2, NULL, 20), (3, 'X', 30), (4, NULL, 40);
+
+# Delete from NULL partition
+DELETE FROM ice_v3_dv_null_part WHERE part_key IS NULL;
+SELECT * FROM ice_v3_dv_null_part ORDER BY id;
+---- RESULTS
+1,'X',10
+3,'X',30
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# NULL-partition delete: 2 data files (partition 'X' and NULL partition) + 1 DV for the NULL partition
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_null_part.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Aggregate correctness after partition-specific deletes
+CREATE TABLE ice_v3_dv_agg_part (region string, category string, sales int)
+PARTITIONED BY SPEC (region)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_agg_part VALUES
+  ('US', 'A', 100), ('US', 'A', 200), ('US', 'B', 150),
+  ('EU', 'A', 300), ('EU', 'B', 50), ('EU', 'B', 75);
+
+DELETE FROM ice_v3_dv_agg_part WHERE region = 'US' AND sales < 150;
+
+SELECT region, category, sum(sales), count(*)
+FROM ice_v3_dv_agg_part
+GROUP BY region, category
+ORDER BY region, category;
+---- RESULTS
+'EU','A',300,1
+'EU','B',125,2
+'US','A',200,1
+'US','B',150,1
+---- TYPES
+STRING,STRING,BIGINT,BIGINT
+====
+---- QUERY
+# Large-scale partitioned delete - stress RoaringBitmap per-partition
+CREATE TABLE ice_v3_dv_large_part (id bigint, part_key int)
+PARTITIONED BY SPEC (bucket(10, part_key))
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_large_part
+SELECT id, id % 100
+FROM functional.alltypes
+ORDER BY id LIMIT 5000;
+
+# Delete roughly half the rows spread across all 10 buckets
+DELETE FROM ice_v3_dv_large_part WHERE id % 2 = 0;
+SELECT count(*) FROM ice_v3_dv_large_part;
+---- RESULTS
+2500
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Second large delete - DV merge per partition bucket
+DELETE FROM ice_v3_dv_large_part WHERE id % 3 = 0;
+SELECT count(*) FROM ice_v3_dv_large_part;
+---- RESULTS
+1667
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Basic SORT BY (linear sort) - deletion vectors on a sorted table
+CREATE TABLE ice_v3_dv_sorted (id int, score int, label string)
+SORT BY (score)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_sorted VALUES
+  (1, 85, 'good'), (2, 90, 'great'), (3, 75, 'ok'), (4, 95, 'excellent'), (5, 60, 'poor');
+
+DELETE FROM ice_v3_dv_sorted WHERE score < 80;
+SELECT * FROM ice_v3_dv_sorted ORDER BY id;
+---- RESULTS
+1,85,'good'
+2,90,'great'
+4,95,'excellent'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Unpartitioned sorted table: 1 data file + 1 DV file after first delete
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_sorted.`files`
+ORDER BY content;
+---- RESULTS
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Second delete - DV merge on sorted file
+DELETE FROM ice_v3_dv_sorted WHERE id = 2;
+SELECT * FROM ice_v3_dv_sorted ORDER BY id;
+---- RESULTS
+1,85,'good'
+4,95,'excellent'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Multi-column SORT BY - deletion vector covers rows sorted by (cat, score)
+CREATE TABLE ice_v3_dv_multi_sort (id int, cat string, score int, ts timestamp)
+SORT BY (cat, score)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_multi_sort VALUES
+  (1, 'A', 85, '2024-01-01 10:00:00'),
+  (2, 'A', 90, '2024-01-01 11:00:00'),
+  (3, 'A', 70, '2024-01-01 12:00:00'),
+  (4, 'B', 80, '2024-01-02 09:00:00'),
+  (5, 'B', 95, '2024-01-02 10:00:00');
+
+# Delete rows from the middle of the sort order
+DELETE FROM ice_v3_dv_multi_sort WHERE cat = 'A' AND score < 90;
+SELECT * FROM ice_v3_dv_multi_sort ORDER BY id;
+---- RESULTS
+2,'A',90,2024-01-01 11:00:00
+4,'B',80,2024-01-02 09:00:00
+5,'B',95,2024-01-02 10:00:00
+---- TYPES
+INT,STRING,INT,TIMESTAMP
+====
+---- QUERY
+# Second delete across both sort-key groups
+DELETE FROM ice_v3_dv_multi_sort WHERE score > 85;
+SELECT * FROM ice_v3_dv_multi_sort ORDER BY id;
+---- RESULTS
+4,'B',80,2024-01-02 09:00:00
+---- TYPES
+INT,STRING,INT,TIMESTAMP
+====
+---- QUERY
+# SORT BY ZORDER - deletion vectors on a Z-order-sorted table
+CREATE TABLE ice_v3_dv_zorder (id int, x int, y int, string_data string)
+SORT BY ZORDER (x, y)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_zorder VALUES
+  (1, 10, 20, 'a'), (2, 15, 25, 'b'), (3, 10, 30, 'c'),
+  (4, 20, 20, 'd'), (5, 20, 30, 'e');
+
+DELETE FROM ice_v3_dv_zorder WHERE x <= 10;
+SELECT * FROM ice_v3_dv_zorder ORDER BY id;
+---- RESULTS
+2,15,25,'b'
+4,20,20,'d'
+5,20,30,'e'
+---- TYPES
+INT,INT,INT,STRING
+====
+---- QUERY
+# Z-order sorted unpartitioned table: 1 data file + 1 DV file after first delete
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_zorder.`files`
+ORDER BY content;
+---- RESULTS
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Second ZORDER delete - DV merge with previous vector
+DELETE FROM ice_v3_dv_zorder WHERE y > 25;
+SELECT * FROM ice_v3_dv_zorder ORDER BY id;
+---- RESULTS
+2,15,25,'b'
+4,20,20,'d'
+---- TYPES
+INT,INT,INT,STRING
+====
+---- QUERY
+# SORT BY ZORDER with more dimensions and cumulative deletes
+CREATE TABLE ice_v3_dv_zorder3d (id int, a int, b int, c int)
+SORT BY ZORDER (a, b, c)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_zorder3d VALUES
+  (1, 1, 1, 1), (2, 1, 2, 3), (3, 2, 1, 4),
+  (4, 2, 3, 1), (5, 3, 2, 2), (6, 3, 3, 3);
+
+DELETE FROM ice_v3_dv_zorder3d WHERE a = 1;
+DELETE FROM ice_v3_dv_zorder3d WHERE b = 3;
+SELECT * FROM ice_v3_dv_zorder3d ORDER BY id;
+---- RESULTS
+3,2,1,4
+5,3,2,2
+---- TYPES
+INT,INT,INT,INT
+====
+---- QUERY
+# SORT BY on a timestamp column - verify correctness after deletes
+CREATE TABLE ice_v3_dv_ts_sort (id int, created timestamp, status string)
+SORT BY (created)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_ts_sort VALUES
+  (1, '2024-01-01 08:00:00', 'active'),
+  (2, '2024-01-02 09:00:00', 'inactive'),
+  (3, '2024-01-03 10:00:00', 'active'),
+  (4, '2024-01-04 11:00:00', 'inactive');
+
+DELETE FROM ice_v3_dv_ts_sort WHERE status = 'inactive';
+SELECT * FROM ice_v3_dv_ts_sort ORDER BY id;
+---- RESULTS
+1,2024-01-01 08:00:00,'active'
+3,2024-01-03 10:00:00,'active'
+---- TYPES
+INT,TIMESTAMP,STRING
+====
+---- QUERY
+# Sequential inserts and deletes on sorted table - multiple data files with DVs
+CREATE TABLE ice_v3_dv_sort_seq (id int, batch int, val int)
+SORT BY (val)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_sort_seq VALUES (1, 1, 100), (2, 1, 200), (3, 1, 300);
+DELETE FROM ice_v3_dv_sort_seq WHERE val = 200;
+
+INSERT INTO ice_v3_dv_sort_seq VALUES (4, 2, 150), (5, 2, 250), (6, 2, 350);
+DELETE FROM ice_v3_dv_sort_seq WHERE val > 300;
+
+SELECT * FROM ice_v3_dv_sort_seq ORDER BY id;
+---- RESULTS
+1,1,100
+3,1,300
+4,2,150
+5,2,250
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+# Identity partition + single-column sort - per-partition DVs on sorted data
+CREATE TABLE ice_v3_dv_part_sort (id int, region string, score int, label string)
+PARTITIONED BY SPEC (region)
+SORT BY (score)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_part_sort VALUES
+  (1, 'US', 85, 'a'), (2, 'US', 90, 'b'), (3, 'US', 70, 'c'),
+  (4, 'EU', 80, 'd'), (5, 'EU', 95, 'e'), (6, 'EU', 60, 'f');
+
+# Delete within a single partition, from a non-boundary position in sort order
+DELETE FROM ice_v3_dv_part_sort WHERE region = 'US' AND score < 85;
+SELECT * FROM ice_v3_dv_part_sort ORDER BY id;
+---- RESULTS
+1,'US',85,'a'
+2,'US',90,'b'
+4,'EU',80,'d'
+5,'EU',95,'e'
+6,'EU',60,'f'
+---- TYPES
+INT,STRING,INT,STRING
+====
+---- QUERY
+# Identity-partitioned sorted table: 2 data files (US and EU) + 1 DV for the US partition
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_part_sort.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Cross-partition delete - DVs created in both partition directories
+DELETE FROM ice_v3_dv_part_sort WHERE score > 88;
+SELECT * FROM ice_v3_dv_part_sort ORDER BY id;
+---- RESULTS
+1,'US',85,'a'
+4,'EU',80,'d'
+6,'EU',60,'f'
+---- TYPES
+INT,STRING,INT,STRING
+====
+---- QUERY
+# Aggregate correctness after partition+sort deletes
+SELECT region, avg(score), count(*)
+FROM ice_v3_dv_part_sort
+GROUP BY region
+ORDER BY region;
+---- RESULTS
+'EU',70.0,2
+'US',85.0,1
+---- TYPES
+STRING,DOUBLE,BIGINT
+====
+---- QUERY
+# Bucket partition + multi-column sort - DV interacts with both dimensions
+CREATE TABLE ice_v3_dv_bucket_msort (id int, user_id int, category string, amount double)
+PARTITIONED BY SPEC (bucket(4, user_id))
+SORT BY (category, amount)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_bucket_msort VALUES
+  (1, 100, 'A', 1.5), (2, 100, 'B', 2.5), (3, 200, 'A', 3.5),
+  (4, 200, 'B', 4.5), (5, 300, 'A', 5.5), (6, 300, 'B', 6.5);
+
+DELETE FROM ice_v3_dv_bucket_msort WHERE category = 'A' AND amount < 4.0;
+SELECT * FROM ice_v3_dv_bucket_msort ORDER BY id;
+---- RESULTS
+2,100,'B',2.5
+4,200,'B',4.5
+5,300,'A',5.5
+6,300,'B',6.5
+---- TYPES
+INT,INT,STRING,DOUBLE
+====
+---- QUERY
+# Second delete - DV merge for buckets already written in previous delete
+DELETE FROM ice_v3_dv_bucket_msort WHERE user_id = 200;
+SELECT * FROM ice_v3_dv_bucket_msort ORDER BY id;
+---- RESULTS
+2,100,'B',2.5
+5,300,'A',5.5
+6,300,'B',6.5
+---- TYPES
+INT,INT,STRING,DOUBLE
+====
+---- QUERY
+# Truncate partition + SORT BY - truncated keys route rows; sort order is
+#           per-file within each truncated partition
+CREATE TABLE ice_v3_dv_trunc_sort (id int, name string, val int)
+PARTITIONED BY SPEC (truncate(3, name))
+SORT BY (val)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_trunc_sort VALUES
+  (1, 'alpha', 30), (2, 'almond', 10), (3, 'beta', 50),
+  (4, 'belong', 20), (5, 'gamma', 40);
+
+# 'alpha' and 'almond' share truncated key 'alm'/'alp'... truncate(3,'alpha')='alp', truncate(3,'almond')='alm'
+# delete within two different truncated partitions
+DELETE FROM ice_v3_dv_trunc_sort WHERE val IN (10, 50);
+SELECT * FROM ice_v3_dv_trunc_sort ORDER BY id;
+---- RESULTS
+1,'alpha',30
+4,'belong',20
+5,'gamma',40
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Year partition + SORT BY - time-series pattern
+CREATE TABLE ice_v3_dv_year_sort (id int, event_date date, metric string, value int)
+PARTITIONED BY SPEC (year(event_date))
+SORT BY (event_date, metric)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_year_sort VALUES
+  (1, '2022-03-01', 'cpu',  80),
+  (2, '2022-07-15', 'mem',  60),
+  (3, '2023-02-10', 'cpu',  70),
+  (4, '2023-08-20', 'mem',  90),
+  (5, '2024-01-05', 'cpu',  50);
+
+DELETE FROM ice_v3_dv_year_sort WHERE year(event_date) = 2022 AND metric = 'cpu';
+SELECT * FROM ice_v3_dv_year_sort ORDER BY id;
+---- RESULTS
+2,2022-07-15,'mem',60
+3,2023-02-10,'cpu',70
+4,2023-08-20,'mem',90
+5,2024-01-05,'cpu',50
+---- TYPES
+INT,DATE,STRING,INT
+====
+---- QUERY
+# Cross-year delete - multiple partition DVs created in one statement
+DELETE FROM ice_v3_dv_year_sort WHERE metric = 'mem';
+SELECT * FROM ice_v3_dv_year_sort ORDER BY id;
+---- RESULTS
+3,2023-02-10,'cpu',70
+5,2024-01-05,'cpu',50
+---- TYPES
+INT,DATE,STRING,INT
+====
+---- QUERY
+# Multi-column partition + ZORDER sort - most complex structural combination
+CREATE TABLE ice_v3_dv_mc_part_zorder (
+  id int, country string, yr int, x int, y int, val double)
+PARTITIONED BY SPEC (country, bucket(3, yr))
+SORT BY ZORDER (x, y)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_mc_part_zorder VALUES
+  (1, 'US', 2023, 10, 10, 1.1),
+  (2, 'US', 2023, 20, 20, 2.2),
+  (3, 'US', 2024, 10, 30, 3.3),
+  (4, 'EU', 2023, 15, 15, 4.4),
+  (5, 'EU', 2024, 25, 25, 5.5);
+
+DELETE FROM ice_v3_dv_mc_part_zorder WHERE country = 'US' AND x <= 10;
+SELECT * FROM ice_v3_dv_mc_part_zorder ORDER BY id;
+---- RESULTS
+2,'US',2023,20,20,2.2
+4,'EU',2023,15,15,4.4
+5,'EU',2024,25,25,5.5
+---- TYPES
+INT,STRING,INT,INT,INT,DOUBLE
+====
+---- QUERY
+# Cross-partition ZORDER delete
+DELETE FROM ice_v3_dv_mc_part_zorder WHERE y > 20;
+SELECT * FROM ice_v3_dv_mc_part_zorder ORDER BY id;
+---- RESULTS
+2,'US',2023,20,20,2.2
+4,'EU',2023,15,15,4.4
+---- TYPES
+INT,STRING,INT,INT,INT,DOUBLE
+====
+---- QUERY
+# Cumulative DV merges - partition+sort table with many sequential deletes
+CREATE TABLE ice_v3_dv_cumulative (id int, grp string, sort_key int, string_data string)
+PARTITIONED BY SPEC (grp)
+SORT BY (sort_key)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_cumulative VALUES
+  (1, 'X', 10, 'a'), (2, 'X', 20, 'b'), (3, 'X', 30, 'c'),
+  (4, 'Y', 10, 'd'), (5, 'Y', 20, 'e'), (6, 'Y', 30, 'f');
+
+# Delete 1
+DELETE FROM ice_v3_dv_cumulative WHERE sort_key = 10;
+SELECT count(*) FROM ice_v3_dv_cumulative;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+# First cumulative delete hits both partitions (X and Y): 2 data files + 2 DV files
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.ice_v3_dv_cumulative.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Delete 2 - merges with existing DV per partition
+DELETE FROM ice_v3_dv_cumulative WHERE sort_key = 30;
+SELECT count(*) FROM ice_v3_dv_cumulative;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Delete 3 - removes the remaining row in one partition entirely
+DELETE FROM ice_v3_dv_cumulative WHERE grp = 'X';
+SELECT * FROM ice_v3_dv_cumulative ORDER BY id;
+---- RESULTS
+5,'Y',20,'e'
+---- TYPES
+INT,STRING,INT,STRING
+====
+---- QUERY
+# Sequential inserts between deletes on partitioned+sorted table
+CREATE TABLE ice_v3_dv_ps_seq (id int, part_key string, sort_key int)
+PARTITIONED BY SPEC (part_key)
+SORT BY (sort_key)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_ps_seq VALUES (1, 'A', 100), (2, 'A', 200), (3, 'B', 100);
+DELETE FROM ice_v3_dv_ps_seq WHERE sort_key = 200;
+
+INSERT INTO ice_v3_dv_ps_seq VALUES (4, 'A', 300), (5, 'B', 200);
+DELETE FROM ice_v3_dv_ps_seq WHERE sort_key = 100;
+
+SELECT * FROM ice_v3_dv_ps_seq ORDER BY id;
+---- RESULTS
+4,'A',300
+5,'B',200
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# DELETE with subquery on partitioned+sorted table
+CREATE TABLE ice_v3_dv_ps_sub (id int, part_key string, value int)
+PARTITIONED BY SPEC (part_key)
+SORT BY (value)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_ps_sub VALUES
+  (1, 'A', 10), (2, 'A', 50), (3, 'B', 20), (4, 'B', 80);
+
+DELETE FROM ice_v3_dv_ps_sub
+WHERE id IN (SELECT id FROM ice_v3_dv_ps_sub WHERE value > 40);
+SELECT * FROM ice_v3_dv_ps_sub ORDER BY id;
+---- RESULTS
+1,'A',10
+3,'B',20
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# FILE__POSITION delete on partitioned+sorted table
+CREATE TABLE ice_v3_dv_ps_filepos (id int, part_key string, sort_key int)
+PARTITIONED BY SPEC (part_key)
+SORT BY (sort_key)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_ps_filepos VALUES (10, 'A', 300), (20, 'A', 100), (30, 'B', 200);
+
+# FILE__POSITION=0 refers to the first record in a file; on sorted data that is the
+# row with the lowest sort_key written by the INSERT above ('A',100)
+DELETE FROM ice_v3_dv_ps_filepos WHERE part_key = 'A' AND FILE__POSITION = 0;
+SELECT * FROM ice_v3_dv_ps_filepos ORDER BY id;
+---- RESULTS: VERIFY_IS_SUBSET
+10,'A',300
+30,'B',200
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# Large-scale delete on partitioned+sorted table - RoaringBitmap at scale
+CREATE TABLE ice_v3_dv_ps_large (id bigint, bucket_key int, sort_key int)
+PARTITIONED BY SPEC (bucket(8, bucket_key))
+SORT BY (sort_key)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_ps_large
+SELECT id, id % 80, id % 500
+FROM functional.alltypes
+ORDER BY id LIMIT 8000;
+
+# Delete about half the rows across all 8 buckets
+DELETE FROM ice_v3_dv_ps_large WHERE id % 2 = 0;
+SELECT count(*) FROM ice_v3_dv_ps_large;
+---- RESULTS
+3650
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Second large batch delete - DV merge per bucket partition
+DELETE FROM ice_v3_dv_ps_large WHERE sort_key < 100;
+SELECT count(*) FROM ice_v3_dv_ps_large;
+---- RESULTS
+2900
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Partition evolution from unpartitioned to partitioned+sorted
+CREATE TABLE ice_v3_dv_evolve (id int, cat string, val int)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+# Phase 1: unpartitioned, no sort
+INSERT INTO ice_v3_dv_evolve VALUES (1, 'A', 10), (2, 'B', 20), (3, 'A', 30);
+DELETE FROM ice_v3_dv_evolve WHERE id = 2;
+SELECT * FROM ice_v3_dv_evolve ORDER BY id;
+---- RESULTS
+1,'A',10
+3,'A',30
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+ALTER TABLE ice_v3_dv_evolve SET PARTITION SPEC (cat);
+# Phase 2: new inserts go into identity partition; old unpartitioned data still readable
+INSERT INTO ice_v3_dv_evolve VALUES (4, 'A', 40), (5, 'B', 50);
+DELETE FROM ice_v3_dv_evolve WHERE val = 40;
+SELECT * FROM ice_v3_dv_evolve ORDER BY id;
+---- RESULTS
+1,'A',10
+3,'A',30
+5,'B',50
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# JOIN between two partitioned+sorted v3 tables - DVs applied on both sides
+CREATE TABLE ice_v3_dv_ps_join1 (id int, grp string, score int)
+PARTITIONED BY SPEC (grp)
+SORT BY (score)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+CREATE TABLE ice_v3_dv_ps_join2 (id int, grp string, detail string)
+PARTITIONED BY SPEC (grp)
+SORT BY (id)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_ps_join1 VALUES
+  (1, 'X', 80), (2, 'X', 90), (3, 'Y', 70), (4, 'Y', 95);
+INSERT INTO ice_v3_dv_ps_join2 VALUES
+  (1, 'X', 'detail_1'), (2, 'X', 'detail_2'), (3, 'Y', 'detail_3'), (4, 'Y', 'detail_4');
+
+DELETE FROM ice_v3_dv_ps_join1 WHERE score < 80;
+DELETE FROM ice_v3_dv_ps_join2 WHERE id IN (2, 4);
+
+SELECT j1.id, j1.grp, j1.score, j2.detail
+FROM ice_v3_dv_ps_join1 j1
+JOIN ice_v3_dv_ps_join2 j2 ON j1.id = j2.id
+ORDER BY j1.id;
+---- RESULTS
+1,'X',80,'detail_1'
+---- TYPES
+INT,STRING,INT,STRING
+====
+---- QUERY
+# Window function correctness after partition+sort deletes
+CREATE TABLE ice_v3_dv_ps_window (id int, grp string, sort_key int, val int)
+PARTITIONED BY SPEC (grp)
+SORT BY (sort_key)
+STORED BY ICEBERG
+TBLPROPERTIES ('format-version'='3');
+
+INSERT INTO ice_v3_dv_ps_window VALUES
+  (1, 'A', 1, 10), (2, 'A', 2, 20), (3, 'A', 3, 30),
+  (4, 'B', 1, 40), (5, 'B', 2, 50);
+
+DELETE FROM ice_v3_dv_ps_window WHERE id IN (1, 4);
+
+SELECT id, grp, val,
+       row_number() OVER (PARTITION BY grp ORDER BY sort_key) AS rn
+FROM ice_v3_dv_ps_window
+ORDER BY id;
+---- RESULTS
+2,'A',20,1
+3,'A',30,2
+5,'B',50,1
+---- TYPES
+INT,STRING,INT,BIGINT
+====

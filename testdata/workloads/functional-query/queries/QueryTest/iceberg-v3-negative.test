@@ -9,11 +9,6 @@ INSERT INTO ice_v3 VALUES (2, 'iceberg');
 INSERT INTO ice_v3 VALUES (3, 'spark');
 ====
 ---- QUERY
-DELETE FROM ice_v3 WHERE i = 1;
----- CATCH
-Impala does not support DELETE statements on Iceberg tables with format version 3
-====
----- QUERY
 UPDATE ice_v3 SET s = 'updated' WHERE i = 1;
 ---- CATCH
 Impala does not support UPDATE statements on Iceberg tables with format version 3
@@ -24,11 +19,6 @@ USING (SELECT 1 AS i, 'updated' AS s) AS source ON target.i = source.i
 WHEN MATCHED THEN UPDATE SET target.s = source.s;
 ---- CATCH
 Impala does not support MERGE statements on Iceberg tables with format version 3
-====
----- QUERY
-SELECT * FROM iceberg_v3_deletion_vectors;
----- CATCH
-Iceberg tables with Deletion Vectors are not supported yet
 ====
 ---- QUERY
 # The first snapshot has no deletion vectors.

@@ -17,7 +17,10 @@
 
 #pragma once
 
+#include <map>
 #include "exec/table-sink-base.h"
+#include "gen-cpp/CatalogObjects_types.h"
+#include "gen-cpp/Types_types.h"
 
 namespace impala {
 
@@ -26,6 +29,8 @@ class IcebergDeleteSinkConfig : public TableSinkBaseConfig {
   DataSink* CreateSink(RuntimeState* state) const override;
 
   ~IcebergDeleteSinkConfig() override {}
+
+  std::map<THash128, TIcebergDeletionVector> referenced_deletion_vectors;
 
  protected:
   Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,

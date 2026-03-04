@@ -74,6 +74,25 @@ Status PuffinWriter::Init() {
   obj_pool_ = state_->obj_pool();
   DCHECK(obj_pool_ != nullptr);
 
+  // Wire data cache counters into the request context so HdfsFileReader can update
+  // per-context cache statistics when reading existing deletion vectors.
+  RuntimeProfile* profile = state_->runtime_profile();
+  data_cache_hit_count_ =
+      ADD_COUNTER(profile, "DataCacheHitCount", TUnit::UNIT);
+  data_cache_partial_hit_count_ =
+      ADD_COUNTER(profile, "DataCachePartialHitCount", TUnit::UNIT);
+  data_cache_miss_count_ =
+      ADD_COUNTER(profile, "DataCacheMissCount", TUnit::UNIT);
+  data_cache_hit_bytes_ =
+      ADD_COUNTER(profile, "DataCacheHitBytes", TUnit::BYTES);
+  data_cache_miss_bytes_ =
+      ADD_COUNTER(profile, "DataCacheMissBytes", TUnit::BYTES);
+  io_request_context_->set_data_cache_hit_counter(data_cache_hit_count_);
+  io_request_context_->set_data_cache_partial_hit_counter(data_cache_partial_hit_count_);
+  io_request_context_->set_data_cache_miss_counter(data_cache_miss_count_);
+  io_request_context_->set_data_cache_hit_bytes_counter(data_cache_hit_bytes_);
+  io_request_context_->set_data_cache_miss_bytes_counter(data_cache_miss_bytes_);
+
   // Initialize deletion vector blob reader
   dv_blob_reader_.reset(new DeletionVectorBlobReader());
 
@@ -173,9 +192,9 @@ Status PuffinWriter::Finalize() {
     const std::string& data_file_path = entry.first;
 
     // Check if this data file has an old DV that needs to be loaded and merged
-    auto old_dv_it = output_->referenced_deletion_vectors.find(
+    auto old_dv_it = output_->referenced_deletion_vectors->find(
         THash128FromFilePath(data_file_path));
-    if (old_dv_it != output_->referenced_deletion_vectors.end()) {
+    if (old_dv_it != output_->referenced_deletion_vectors->end()) {
       const TIcebergDeletionVector& old_dv_metadata = old_dv_it->second;
 
       VLOG(2) << "Loading old DV for data file with new deletes: " << data_file_path;
@@ -184,7 +203,7 @@ Status PuffinWriter::Finalize() {
       SCOPED_TIMER(load_dv_timer_);
       RETURN_IF_ERROR(LoadExistingDeletionVector(
           old_dv_metadata.path, data_file_path,
-          old_dv_metadata.content_offset + DELETION_VECTOR_BLOB_HEADER_SIZE,
+          old_dv_metadata.content_offset,
           old_dv_metadata.content_size_in_bytes));
 
       // Track that this old DV is being replaced
@@ -215,6 +234,8 @@ Status PuffinWriter::Finalize() {
   // Write the footer containing blob metadata
   RETURN_IF_ERROR(WriteFooter());
 
+  output_->current_file_bytes = current_offset_;
+
   blob_mem_pool_->Clear();
 
   return Status::OK();
@@ -236,6 +257,7 @@ Status PuffinWriter::AddBlob(puffin::Blob& blob) {
 Status PuffinWriter::AddDeletionVector(const std::string& data_file_path,
     RoaringBitmap64& bitmap, int64_t snapshot_id, int64_t sequence_number) {
   // Get the serialized size of the bitmap
+  bitmap.Optimize(); // Optimize the bitmap before serialization for better compression
   size_t bitmap_serialized_size = bitmap.BitmapSizeInBytes();
   if (bitmap_serialized_size == 0) {
     return Status("Cannot add deletion vector: bitmap is empty");
@@ -253,6 +275,7 @@ Status PuffinWriter::AddDeletionVector(const std::string& data_file_path,
   const size_t total_blob_size =
       length_field_size + magic_size + bitmap_serialized_size + crc_size;
 
+  DCHECK_GT(total_blob_size, 0);
   // Allocate buffer for the complete serialized blob
   uint8_t* data = blob_mem_pool_->TryAllocate(total_blob_size);
   if (UNLIKELY(data == nullptr)) {
@@ -315,10 +338,13 @@ Status PuffinWriter::WriteFooter() {
   uint32_t magic_be = htonl(PUFFIN_MAGIC);
   RETURN_IF_ERROR(Write(magic_be));
   RETURN_IF_ERROR(Write(footer_json.data(), footer_json.size()));
+
   uint32_t footer_size = static_cast<uint32_t>(footer_json.size());
   RETURN_IF_ERROR(Write(footer_size));
-  RETURN_IF_ERROR(Write(0));
+  RETURN_IF_ERROR(Write(0)); //flags (reserved for future use)
   RETURN_IF_ERROR(Write(magic_be));
+  current_offset_ += 4 /*leading magic*/ + footer_size
+      + 4 /*footer size field*/ + 4 /*flags*/ + 4 /*trailing magic*/;
 
   return Status::OK();
 }

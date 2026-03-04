@@ -112,7 +112,7 @@ public class ExchangeNode extends PlanNode {
   }
 
   protected boolean isChildOfIcebergDeleteNode(PlanNode currNode) {
-    if (currNode instanceof IcebergDeleteNode) {
+    if (currNode instanceof IcebergDeleteJoinNode) {
       Preconditions.checkState(currNode.getChildCount() == 2);
       if (currNode.getChild(1) == this) return true;
     }

@@ -17,7 +17,9 @@
 
 #pragma once
 
+#include <map>
 #include "exec/table-sink-base.h"
+#include "gen-cpp/CatalogObjects_types.h"
 
 namespace impala {
 
@@ -61,6 +63,8 @@ class IcebergDeleteSinkBase : public TableSinkBase {
   std::string HumanReadablePartitionValue(
       const TIcebergPartitionField& part_field, const std::string& value,
       Status* transform_result);
+ private:
+  const std::map<THash128, TIcebergDeletionVector>* referenced_deletion_vectors_;
 };
 
 }

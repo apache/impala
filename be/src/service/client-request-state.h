@@ -920,14 +920,21 @@ class ClientRequestState {
   bool CreateIcebergCatalogOps(const TFinalizeParams& finalize_params,
       TIcebergOperationParam* cat_ice_op);
 
+  /// Sets either the deletion vector fields or the pos-delete fields on 'cat_ice_op'
+  /// (the two are mutually exclusive). Also populates
+  /// data_files_referenced_by_position_deletes. Returns true iff any delete artifacts
+  /// were produced (i.e. the delete side of the operation is not a no-op).
+  bool SetDeleteArtifacts(DmlExecState* dml_exec_state,
+      TIcebergOperationParam* cat_ice_op);
+
   /// Copies results into request_result_set_
   /// TODO: Have the FE return list<Data.TResultRow> so that this isn't necessary
   void SetResultSet(const TDdlExecResponse* ddl_resp);
   void SetResultSet(const std::vector<std::string>& results);
   void SetResultSet(const std::vector<std::string>& col1,
       const std::vector<std::string>& col2);
-  void SetResultSet(const vector<string>& col1,
-      const vector<string>& col2, const vector<string>& col3);
+  void SetResultSet(const std::vector<std::string>& col1,
+      const std::vector<std::string>& col2, const std::vector<std::string>& col3);
   void SetResultSet(const std::vector<std::string>& col1,
       const std::vector<std::string>& col2, const std::vector<std::string>& col3,
       const std::vector<std::string>& col4);

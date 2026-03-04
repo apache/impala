@@ -32,9 +32,8 @@ namespace impala {
 
 IcebergDeleteSinkBase::IcebergDeleteSinkBase(TDataSinkId sink_id,
     const IcebergDeleteSinkConfig& sink_config, const std::string& name,
-    RuntimeState* state) :
-    TableSinkBase(sink_id, sink_config, name, state) {
-}
+    RuntimeState* state): TableSinkBase(sink_id, sink_config, name, state),
+    referenced_deletion_vectors_(&sink_config.referenced_deletion_vectors) {}
 
 Status IcebergDeleteSinkBase::Prepare(RuntimeState* state,
     MemTracker* parent_mem_tracker) {
@@ -133,6 +132,9 @@ Status IcebergDeleteSinkBase::ConstructPartitionInfo(
 
 Status IcebergDeleteSinkBase::ConstructPartitionInfo(int32_t spec_id,
     const std::string& partition_values_str, OutputPartition* output_partition) {
+
+  output_partition->referenced_deletion_vectors = referenced_deletion_vectors_;
+
   if (partition_key_expr_evals_.empty()) {
     DCHECK_EQ(spec_id, table_desc_->IcebergSpecId());
     output_partition->iceberg_spec_id = spec_id;

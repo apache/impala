@@ -1,0 +1,116 @@
+====
+---- QUERY
+# Verify the file structure of the Spark-written table: 5 data files and the
+# single Puffin DV file that Spark created (it covers 2 data files, marking rows
+# 2 and 4 as deleted). The Puffin file references two data files, so it appears
+# as 2 entries in the virtual 'files' table.
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.iceberg_v3_deletion_vectors.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Verify initial visible rows: Spark DVs already deleted rows 2 and 4.
+SELECT * FROM iceberg_v3_deletion_vectors ORDER BY i;
+---- RESULTS
+1
+3
+5
+---- TYPES
+INT
+====
+---- QUERY
+# Delete row i=1 from the Spark-written DV table. Row 1 lives in a data file that
+# has no prior DV, so Impala creates a new Puffin DV entry for it.
+DELETE FROM iceberg_v3_deletion_vectors WHERE i = 1;
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM iceberg_v3_deletion_vectors ORDER BY i;
+---- RESULTS
+3
+5
+---- TYPES
+INT
+====
+---- QUERY
+# After Impala's first delete: the original Spark Puffin covers 2 data files (2
+# entries) and the new Impala Puffin covers 1 data file (1 entry) = 3 PUFFIN rows.
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.iceberg_v3_deletion_vectors.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+1,'PUFFIN',true,true
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Delete row i=3. Impala creates another new Puffin entry for row 3's data file.
+DELETE FROM iceberg_v3_deletion_vectors WHERE i = 3;
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumDeletedRows: 1
+====
+---- QUERY
+SELECT * FROM iceberg_v3_deletion_vectors ORDER BY i;
+---- RESULTS
+5
+---- TYPES
+INT
+====
+---- QUERY
+# After two Impala deletes: 2 (Spark) + 2 (Impala) = 4 PUFFIN rows total.
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.iceberg_v3_deletion_vectors.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+0,'PARQUET',false,false
+1,'PUFFIN',true,true
+1,'PUFFIN',true,true
+1,'PUFFIN',true,true
+1,'PUFFIN',true,true
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Compact the table: OPTIMIZE TABLE rewrites all 5 data files (merging out the 4
+# DV-deleted rows) into a single clean Parquet file with no deletion vectors.
+OPTIMIZE TABLE iceberg_v3_deletion_vectors;
+SELECT * FROM iceberg_v3_deletion_vectors ORDER BY i;
+---- RESULTS
+5
+---- TYPES
+INT
+====
+---- QUERY
+# After compaction: exactly 1 data file, no Puffin DV entries.
+SELECT content, file_format, referenced_data_file IS NOT NULL, content_offset IS NOT NULL
+FROM $DATABASE.iceberg_v3_deletion_vectors.`files`
+ORDER BY content, file_format;
+---- RESULTS
+0,'PARQUET',false,false
+---- TYPES
+INT,STRING,BOOLEAN,BOOLEAN
+====

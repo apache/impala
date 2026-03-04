@@ -264,7 +264,10 @@ public class IcebergContentFileStore {
     for (DeleteFile deleteFile : icebergFiles.equalityDeleteFiles) {
       storeFile(deleteFile, fileDescMap, equalityDeleteFiles_);
     }
-    dataFileToDV_ = icebergFiles.dataFileToDV;
+    for (Map.Entry<Hash128, DeleteFile> entry : icebergFiles.dataFileToDV.entrySet()) {
+      dataFileToDV_.put(entry.getKey(),
+          IcebergUtil.createTIcebergDeletionVector(entry.getValue()));
+    }
   }
 
   // Creates a new instance with shared immutable members but
@@ -347,6 +350,12 @@ public class IcebergContentFileStore {
 
   public List<IcebergFileDescriptor> getEqualityDeleteFiles() {
     return equalityDeleteFiles_.getList();
+  }
+
+  public boolean hasDeletes() {
+    return !positionDeleteFiles_.fileDescList_.isEmpty()
+        || !equalityDeleteFiles_.fileDescList_.isEmpty()
+        || !dataFileToDV_.isEmpty();
   }
 
   public boolean hasMissingFile() {

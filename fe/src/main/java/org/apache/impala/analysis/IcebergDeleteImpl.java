@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.iceberg.TableProperties;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
@@ -40,10 +41,24 @@ public class IcebergDeleteImpl extends IcebergModifyImpl {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    if (originalTargetTable_.getFormatVersion() > 2) {
+    if (originalTargetTable_.getFormatVersion() > 3) {
       throw new AnalysisException(String.format(
           "Impala does not support DELETE statements on Iceberg tables with format " +
               "version %d", originalTargetTable_.getFormatVersion()));
+    }
+
+    if (originalTargetTable_.getFormatVersion() >= 3) {
+      IcebergContentFileStore fileStore = originalTargetTable_.getContentFileStore();
+      int positionDeletes = fileStore.getPositionDeleteFiles().size();
+      if (positionDeletes > 0) {
+        throw new AnalysisException(String.format(
+            "DELETE is not allowed on Iceberg format version 3 table '%s' as it "
+                + "has existing version 2 position delete file(s): "
+                + "%d position delete file(s). Run 'OPTIMIZE TABLE %s' to rewrite the "
+                + "files and remove deletion files before attempting DELETE.",
+            originalTargetTable_.getFullName(), positionDeletes,
+            originalTargetTable_.getFullName()));
+      }
     }
 
     // Make the virtual position delete table the new target table.

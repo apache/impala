@@ -17,6 +17,8 @@
 
 package org.apache.impala.planner;
 
+import static org.apache.impala.util.IcebergUtil.getFilePathHash;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,8 +41,14 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.ThriftSerializationCtx;
 import org.apache.impala.fb.FbIcebergDataFileFormat;
+import org.apache.impala.fb.FbIcebergDeletionVector;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.THash128;
+import org.apache.impala.thrift.TIcebergDeletionVector;
 import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TScanRange;
+import org.apache.impala.util.Hash128;
+import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.MathUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +65,8 @@ public class IcebergScanNode extends HdfsScanNode {
   // partitioned tables, so partition range scans are scheduled more evenly.
   // See IMPALA-12765 for details.
   private List<IcebergFileDescriptor> fileDescs_;
+
+  private final Map<Hash128, TIcebergDeletionVector> dataFileToDV_;
 
   // Number of actual partitions in the table, inferred from file metadata.
   // We treat Iceberg tables as unpartitioned HDFS tables, so instead of storing the file
@@ -90,16 +100,18 @@ public class IcebergScanNode extends HdfsScanNode {
       MultiAggregateInfo aggInfo, List<IcebergFileDescriptor> fileDescs,
       int numPartitions,
       List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, long snapshotId,
-      boolean isPartitionKeyScan) {
+      boolean isPartitionKeyScan, Map<Hash128, TIcebergDeletionVector> dataFileToDV) {
     this(id, tblRef, conjuncts, aggInfo, fileDescs, numPartitions, nonIdentityConjuncts,
-        skippedConjuncts, null, snapshotId, isPartitionKeyScan);
+        skippedConjuncts, null, snapshotId, isPartitionKeyScan, dataFileToDV);
   }
 
   public IcebergScanNode(PlanNodeId id, TableRef tblRef, List<Expr> conjuncts,
       MultiAggregateInfo aggInfo, List<IcebergFileDescriptor> fileDescs,
       int numPartitions,
-      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts, PlanNodeId deleteId,
-      long snapshotId, boolean isPartitionKeyScan) {
+      List<Expr> nonIdentityConjuncts, List<Expr> skippedConjuncts,
+      PlanNodeId deleteId,
+      long snapshotId, boolean isPartitionKeyScan,
+      Map<Hash128, TIcebergDeletionVector> dataFileToDV) {
     super(id, tblRef.getDesc(), conjuncts,
         getIcebergPartition(((FeIcebergTable)tblRef.getTable()).getFeFsTable()), tblRef,
         aggInfo, null, isPartitionKeyScan);
@@ -122,6 +134,7 @@ public class IcebergScanNode extends HdfsScanNode {
     snapshotId_ = snapshotId;
     this.skippedConjuncts_ = skippedConjuncts;
     this.deleteFileScanNodeId = deleteId;
+    this.dataFileToDV_ = dataFileToDV;
   }
 
   /**
@@ -295,5 +308,24 @@ public class IcebergScanNode extends HdfsScanNode {
     if (hasParquet) fileFormats_.add(HdfsFileFormat.PARQUET);
     if (hasOrc) fileFormats_.add(HdfsFileFormat.ORC);
     if (hasAvro) fileFormats_.add(HdfsFileFormat.AVRO);
+  }
+  @Override
+  protected void decorateScanRange(FileDescriptor fileDesc, TScanRange scanRange) {
+    Preconditions.checkState(fileDesc instanceof IcebergFileDescriptor);
+    scanRange.setFile_metadata(
+        ((IcebergFileDescriptor)fileDesc).getFbFileMetadata().getByteBuffer());
+    if (dataFileToDV_ != null) {
+      String absPath = fileDesc.getAbsolutePath(tbl_.getLocation());
+      Hash128 pathHash = getFilePathHash(absPath);
+      TIcebergDeletionVector delVec = dataFileToDV_.get(pathHash);
+      if (delVec != null) {
+        long recordCount = delVec.isSetRecord_count() ? delVec.getRecord_count() : 0;
+        FbIcebergDeletionVector fbIceDelVec = IcebergUtil.createFbIcebergDeletionVector(
+            delVec.getPath(), delVec.getContent_offset(),
+            delVec.getContent_size_in_bytes(), pathHash.getHigh(),
+            pathHash.getLow(), recordCount);
+        scanRange.setIceberg_deletion_vector(fbIceDelVec.getByteBuffer());
+      }
+    }
   }
 }

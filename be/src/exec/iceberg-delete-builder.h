@@ -22,6 +22,7 @@
 
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "exec/blob-reader.h"
 #include "exec/join-builder.h"
 #include "util/roaring-bitmap.h"
 
@@ -30,6 +31,11 @@ namespace impala {
 class IcebergDeleteBuilder;
 class RowDescriptor;
 class RuntimeState;
+
+namespace io {
+class RequestContext;
+}
+
 
 /// Iceberg Delete Builder Config class. This has a few extra methods to be used
 /// directly by the IcebergDeletePlanNode.
@@ -93,9 +99,6 @@ class IcebergDeleteBuilder : public JoinBuilder {
       int64_t max_row_buffer_size, RuntimeState* state);
   ~IcebergDeleteBuilder();
 
-  // Collects the processed data files' file paths and fills 'deleted_rows_' with them.
-  Status CalculateDataFiles();
-
   /// Implementations of DataSink interface methods.
   Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) override;
   Status Open(RuntimeState* state) override;
@@ -112,9 +115,12 @@ class IcebergDeleteBuilder : public JoinBuilder {
   using DeleteRowHashTable =
       std::unordered_map<impala::StringValue, RoaringBitmap64>;
 
-  DeleteRowHashTable& deleted_rows() { return deleted_rows_; }
+  const DeleteRowHashTable& deleted_rows() const { return deleted_rows_; }
 
  private:
+  // Collects the processed data files' file paths and fills 'deleted_rows_' with them.
+  Status CalculateDataFiles();
+
   /// Reads the rows in build_batch and collects them into delete_hash_.
   Status ProcessBuildBatch(RuntimeState* state, RowBatch* build_batch);
 
@@ -126,6 +132,8 @@ class IcebergDeleteBuilder : public JoinBuilder {
 
   /// Helper method for FlushFinal() that does the actual work.
   Status FinalizeBuild(RuntimeState* state);
+
+  RuntimeProfile::Counter* dv_load_timer_ = nullptr;
 
   RuntimeState* const runtime_state_;
 
@@ -140,7 +148,22 @@ class IcebergDeleteBuilder : public JoinBuilder {
   int file_path_offset_;
   int pos_offset_;
 
-  // Stores {file_path: positions in roaring bitmap}
+  // Stores {file_path: deleted row positions as roaring bitmap}. Entries are
+  // pre-populated by CalculateDataFiles(): deletion vector bitmaps are loaded eagerly
+  // from Puffin files, while positional-delete bitmaps start empty and are filled
+  // incrementally during the build phase.
   DeleteRowHashTable deleted_rows_;
+  std::unique_ptr<io::RequestContext> reader_context_;
+
+  /// Blob reader for loading deletion vector bitmaps from Puffin files.
+  DeletionVectorBlobReader dv_reader_;
+
+  /// Data cache counters, wired into reader_context_ so HdfsFileReader can update
+  /// per-context cache statistics when reading deletion vector files.
+  RuntimeProfile::Counter* data_cache_hit_count_ = nullptr;
+  RuntimeProfile::Counter* data_cache_partial_hit_count_ = nullptr;
+  RuntimeProfile::Counter* data_cache_miss_count_ = nullptr;
+  RuntimeProfile::Counter* data_cache_hit_bytes_ = nullptr;
+  RuntimeProfile::Counter* data_cache_miss_bytes_ = nullptr;
 };
 } // namespace impala

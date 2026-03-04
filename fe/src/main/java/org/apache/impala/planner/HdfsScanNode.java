@@ -1574,10 +1574,7 @@ public class HdfsScanNode extends ScanNode {
         hdfsFileSplit.setIs_encrypted(fileDesc.getIsEncrypted());
         hdfsFileSplit.setIs_erasure_coded(fileDesc.getIsEc());
         scanRange.setHdfs_file_split(hdfsFileSplit);
-        if (fileDesc instanceof IcebergFileDescriptor) {
-          scanRange.setFile_metadata(
-              ((IcebergFileDescriptor)fileDesc).getFbFileMetadata().getByteBuffer());
-        }
+        decorateScanRange(fileDesc, scanRange);
         TScanRangeLocationList scanRangeLocations = new TScanRangeLocationList();
         scanRangeLocations.scan_range = scanRange;
         scanRangeLocations.locations = locations;
@@ -1600,6 +1597,8 @@ public class HdfsScanNode extends ScanNode {
 
     return new Pair<Boolean, Long>(fileDescMissingDiskIds, fileMaxScanRangeBytes);
   }
+
+  protected void decorateScanRange(FileDescriptor fileDesc, TScanRange scanRange) {}
 
   /**
    * Computes the average row size, input and output cardinalities, and estimates the

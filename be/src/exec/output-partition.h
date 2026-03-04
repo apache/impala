@@ -125,7 +125,8 @@ struct OutputPartition {
 
   /// Map from data file path hash to deletion vector metadata.
   /// Used to track existing deletion vectors that need to be loaded and merged.
-  std::map<THash128, TIcebergDeletionVector> referenced_deletion_vectors;
+  /// Points to the map owned by IcebergDeleteSinkConfig; not owned by this struct.
+  const std::map<THash128, TIcebergDeletionVector>* referenced_deletion_vectors = nullptr;
 };
 
 }
