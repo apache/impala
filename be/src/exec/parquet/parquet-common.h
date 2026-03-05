@@ -575,7 +575,12 @@ inline int ParquetPlainEncoder::Decode<StringValue, parquet::Type::BYTE_ARRAY>(
   int byte_size = ByteSize(*v);
   if (UNLIKELY(str_len < 0 || buffer_end - buffer < byte_size)) return -1;
   if (fixed_len_size > 0 && fixed_len_size < str_len) v->SetLen(fixed_len_size);
-  // we still read byte_size bytes, even if we truncate
+  // This is safe to smallify since the string points to the buffer's memory,
+  // and the decoding is already done, so the data will be in the buffer, only the string
+  // will not point to it, if the smallify succeeds.
+  v->Smallify();
+
+  // we still read byte_size bytes, even if we truncate and/or smallify
   return byte_size;
 }
 

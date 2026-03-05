@@ -73,17 +73,26 @@ Status ParquetColumnChunkReader::InitColumnChunk(const HdfsFileDesc& file_desc,
 }
 
 void ParquetColumnChunkReader::Close(MemPool* mem_pool) {
-  if (mem_pool != nullptr && value_mem_type_ == ValueMemoryType::VAR_LEN_STR) {
+  if (keep_data_page_pool_ && mem_pool != nullptr
+      && value_mem_type_ == ValueMemoryType::VAR_LEN_STR) {
     mem_pool->AcquireData(data_page_pool_.get(), false);
   } else {
     data_page_pool_->FreeAll();
+  }
+
+  if (UNLIKELY(dict_page_pool_.get())) {
+    if (mem_pool != nullptr) {
+      mem_pool->AcquireData(dict_page_pool_.get(), false);
+    } else {
+      dict_page_pool_->FreeAll();
+    }
   }
 
   if (decompressor_ != nullptr) decompressor_->Close();
 }
 
 void ParquetColumnChunkReader::ReleaseResourcesOfLastPage(MemPool& mem_pool) {
-  if (value_mem_type_ == ValueMemoryType::VAR_LEN_STR) {
+  if (keep_data_page_pool_ && value_mem_type_ == ValueMemoryType::VAR_LEN_STR) {
     mem_pool.AcquireData(data_page_pool_.get(), false);
   } else {
     data_page_pool_->FreeAll();
@@ -167,14 +176,18 @@ Status ParquetColumnChunkReader::ReadDictionaryData(ScopedBuffer* uncompressed_b
   if (decompressor_.get() != nullptr || copy_buffer) {
     int buffer_size = current_page_header.uncompressed_page_size;
     if (copy_buffer) {
-      *dict_values = parent_->dictionary_pool_->TryAllocate(buffer_size); // case 1.
+      // Allocate a buffer from dict_page_pool_. After decoding, if all strings
+      // are smallified, this will be freed. Otherwise, it will be acquired by
+      // the last row batch.
+      dict_page_pool_.reset(new MemPool(parent_->scan_node_->mem_tracker()));
+      *dict_values = dict_page_pool_->TryAllocate(buffer_size); // case 1.
     } else if (uncompressed_buffer->TryAllocate(buffer_size)) {
       *dict_values = uncompressed_buffer->buffer(); // case 2
     }
     if (UNLIKELY(*dict_values == nullptr)) {
       string details = Substitute(PARQUET_PAGE_MEM_LIMIT_EXCEEDED, "InitDictionary",
           buffer_size, "dictionary");
-      return parent_->dictionary_pool_->mem_tracker()->MemLimitExceeded(
+      return dict_page_pool_->mem_tracker()->MemLimitExceeded(
                parent_->state_, details, buffer_size);
     }
   } else {
@@ -402,6 +415,12 @@ Status ParquetColumnChunkReader::ReadDataPageData(DataPageInfo* page_info) {
     } else {
       data = compressed_data;
     }
+
+    // If the data is a string, the page pool only needs to be kept if there is
+    // at least one string that cannot be smallified.
+    // When such a string is encountered, this flag will be set to true.
+    keep_data_page_pool_ = false;
+
     if (has_slot_desc) {
       // Use original sizes (includes levels in v2) in the profile.
       parent_->scan_node_->UpdateBytesRead(slot_id_, orig_uncompressed_size, 0);

@@ -62,7 +62,7 @@ std::vector<NUM_T> RandomNumberVec(Generator& gen, const int length) {
 template <typename Generator = std::mt19937>
 std::vector<std::string> RandomStrVec(Generator& gen, const int length,
     const int max_str_length, const int min_str_length = 0) {
-  std::uniform_int_distribution<int> length_dist(0, max_str_length);
+  std::uniform_int_distribution<int> length_dist(min_str_length, max_str_length);
   std::uniform_int_distribution<char> letter_dist('a', 'z');
 
   std::vector<std::string> vec(length);

@@ -486,5 +486,45 @@ TEST(PlainEncoding, CorruptString) {
   EXPECT_EQ(decoded_size, -1);
 }
 
+/// Test that strings are smallified after decoding
+TEST(PlainEncoding, SmallString) {
+  std::mt19937 gen;
+  RandTestUtil::SeedRng("PARQUET_PLAIN_ENCODING_SMALL_STRING_TEST_RANDOM_SEED", &gen);
+
+  constexpr int NUM_ELEMENTS = 1024;
+
+  constexpr int min_small_str_length = 1;
+  constexpr int max_small_str_length = 10;
+  constexpr int min_large_str_length = 20;
+  constexpr int max_large_str_length = 100;
+
+  uint8_t buffer[sizeof(int32_t) + max_large_str_length];
+  StringValue result;
+
+  // Small enough strings should be smallified
+  const std::vector<std::string> small_str_vec = RandomStrVec(gen, NUM_ELEMENTS,
+      max_small_str_length, min_small_str_length);
+  for (const std::string& small_str: small_str_vec) {
+    StringValue small_str_val = StringValue(small_str);
+    int byte_size = sizeof(int32_t) + small_str_val.Len();
+    Encode(small_str_val, byte_size, buffer, parquet::Type::BYTE_ARRAY);
+    ParquetPlainEncoder::Decode<StringValue, parquet::Type::BYTE_ARRAY>(
+      buffer, buffer + byte_size, byte_size, &result);
+    EXPECT_TRUE(result.IsSmall());
+  }
+
+  // Large strings cannot be smallified
+  const std::vector<std::string> large_str_vec = RandomStrVec(gen, NUM_ELEMENTS,
+      max_large_str_length, min_large_str_length);
+  for (const std::string& large_str: large_str_vec) {
+    StringValue large_str_val = StringValue(large_str);
+    int byte_size = sizeof(int32_t) + large_str_val.Len();
+    Encode(large_str_val, byte_size, buffer, parquet::Type::BYTE_ARRAY);
+    ParquetPlainEncoder::Decode<StringValue, parquet::Type::BYTE_ARRAY>(
+      buffer, buffer + byte_size, byte_size, &result);
+    EXPECT_FALSE(result.IsSmall());
+  }
+}
+
 }
 

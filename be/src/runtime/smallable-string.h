@@ -120,6 +120,11 @@ class __attribute__((__packed__)) SmallableString {
     return last_char & MSB_CHAR;
   }
 
+  bool CanBeSmallified() const {
+    if (IsSmall()) return true;
+    return rep.long_rep.len <= SMALL_LIMIT;
+  }
+
   bool Smallify() {
     if (IsSmall()) return true;
     if (rep.long_rep.len > SMALL_LIMIT) return false;

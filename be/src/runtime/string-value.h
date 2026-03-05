@@ -91,6 +91,8 @@ public:
 
   bool IsSmall() const { return string_impl_.IsSmall(); }
 
+  bool CanBeSmallified() const { return string_impl_.CanBeSmallified(); }
+
   int Len() const { return string_impl_.Len(); }
 
   /// Returns the number of bytes needed outside the slot itself:
@@ -194,6 +196,7 @@ public:
 private:
   friend Tuple;
   friend StringValueTest;
+  friend class ParquetPlainEncoder;
   /// !!! THIS IS UNSAFE TO CALL ON EXISTING STRINGVALUE OBJECTS !!!
   /// Please make sure you only invoke it for newly created StringValues, e.g. on the
   /// target StringValue object of a deep copy operation.

@@ -150,6 +150,8 @@ class ParquetColumnChunkReader {
   }
 
  private:
+  friend class ScalarColumnReader<StringValue, parquet::Type::BYTE_ARRAY, true>;
+
   HdfsParquetScanner* parent_;
   std::string schema_name_;
 
@@ -162,6 +164,17 @@ class ParquetColumnChunkReader {
   /// compressed data pages or copies of the data page with var-len data to attach to
   /// batches.
   boost::scoped_ptr<MemPool> data_page_pool_;
+
+  /// Data page pool has to be kept for strings if there is any string pointing into it.
+  /// If all strings could be smallified, there is no need to keep data page pool.
+  /// This is reset to false when switching pages, and set to true when a long string is
+  /// found that could not be smallified.
+  bool keep_data_page_pool_ = false;
+
+  /// Pool to allocate a copy of the dictionary page. Only used for strings, which will
+  /// point to data in the copy. If all strings could be smallified during decoding, the
+  /// copy will be freed, otherwise it will be acquired by the last row batch.
+  boost::scoped_ptr<MemPool> dict_page_pool_;
 
   /// Reservation in bytes to use for I/O buffers in 'scan_range_'/'stream_'. Must be set
   /// with set_io_reservation() before 'stream_' is initialized. Reset for each row group

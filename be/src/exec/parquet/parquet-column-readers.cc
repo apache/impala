@@ -814,6 +814,71 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::DecodeValue(
   return true;
 }
 
+// For string values, check if all strings after decoding are small:
+// -if all strings are smallified, chunk reader's dict page pool can be freed
+// -otherwise, strings point to the buffer, so it has to be kept
+template<>
+Status ScalarColumnReader<StringValue, parquet::Type::BYTE_ARRAY, true>
+  ::CreateDictionaryDecoder(
+    uint8_t* values, int size, DictDecoderBase** decoder) {
+  if (!dict_decoder_.template Reset<parquet::Type::BYTE_ARRAY>
+      (values, size, fixed_len_size_)) {
+    return Status(TErrorCode::PARQUET_CORRUPT_DICTIONARY, filename(),
+        slot_desc_->type().DebugString(), "could not decode dictionary");
+  }
+  dict_decoder_init_ = true;
+  *decoder = &dict_decoder_;
+
+  bool all_strings_smallified = true;
+  StringValue val;
+  for (int i = 0; i < dict_decoder_.num_entries(); ++i) {
+    dict_decoder_.GetValue(i, &val);
+    if (!val.IsSmall()) {
+      DCHECK(!val.CanBeSmallified());
+      all_strings_smallified = false;
+      break;
+    }
+  }
+
+  if (col_chunk_reader_.dict_page_pool_.get()) {
+    if (all_strings_smallified) {
+      col_chunk_reader_.dict_page_pool_->FreeAll();
+    } else {
+      parent_->dictionary_pool_->AcquireData(col_chunk_reader_.dict_page_pool_.get(),
+          false);
+    }
+  }
+
+  return Status::OK();
+}
+
+// StringValue PLAIN: Check if string could be smallified.
+// If not, data page pool has to be kept, because string ptr points into it.
+template<>
+template<>
+bool ScalarColumnReader<StringValue, parquet::Type::BYTE_ARRAY, true>::
+    DecodeValue<Encoding::PLAIN>(uint8_t** RESTRICT data,
+      const uint8_t* RESTRICT data_end, StringValue* RESTRICT val) RESTRICT {
+  DCHECK_EQ(page_encoding_, Encoding::PLAIN);
+  int encoded_len = ParquetPlainEncoder::Decode<StringValue, parquet::Type::BYTE_ARRAY>(
+      *data, data_end, fixed_len_size_, val);
+  if (UNLIKELY(encoded_len < 0)) {
+    SetPlainDecodeError();
+    return false;
+  }
+
+  // If the string couldn't be smallified that means it points into the data buffer,
+  // so the buffer has to be kept
+  if (!val->IsSmall()) {
+    DCHECK(!val->CanBeSmallified());
+    col_chunk_reader_.keep_data_page_pool_ = true;
+  }
+
+  *data += encoded_len;
+
+  return true;
+}
+
 // Specialise for decoding INT64 timestamps from PLAIN decoding, which need to call
 // out to the timestamp decoder.
 template <>
@@ -875,6 +940,40 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::DecodeValues(
     data_ += encoded_len;
   }
   return true;
+}
+
+// StringValue PLAIN: Check if all strings could be smallified.
+// If not, data page pool has to be kept, because string ptr points into it.
+template <>
+template <>
+bool ScalarColumnReader<StringValue, parquet::Type::BYTE_ARRAY, true>
+  ::DecodeValues<Encoding::PLAIN>(int64_t stride, int64_t count,
+    StringValue* RESTRICT out_vals) RESTRICT {
+
+    DCHECK_EQ(page_encoding_, Encoding::PLAIN);
+    int64_t encoded_len = ParquetPlainEncoder
+        ::DecodeBatch<StringValue, parquet::Type::BYTE_ARRAY>(
+            data_, data_end_, fixed_len_size_, count, stride, out_vals);
+    if (UNLIKELY(encoded_len < 0)) {
+      SetPlainDecodeError();
+      return false;
+    }
+    data_ += encoded_len;
+
+    // If any string couldn't be smallified that means it points into the data buffer,
+    // so the buffer has to be kept
+    for (int i = 0; i < count; ++i) {
+      StringValue* val = reinterpret_cast<StringValue*>
+          (reinterpret_cast<uint8_t*>(out_vals) + stride * i);
+
+      if (!val->IsSmall()) {
+        DCHECK(!val->CanBeSmallified());
+        col_chunk_reader_.keep_data_page_pool_ = true;
+        break;
+      }
+    }
+
+    return true;
 }
 
 // Specialise for decoding INT64 timestamps from PLAIN decoding, which need to call
