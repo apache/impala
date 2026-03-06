@@ -90,7 +90,10 @@ class TestFragmentLifecycle(ImpalaTestSuite):
     # Due to IMPALA-5671, the limit must be a multiple of the row batch size - if it's
     # reached during production of a row batch, processing moves to the second child, and
     # the query will take a long time complete.
-    self.client.execute("with l as (select 1 from functional.alltypes), r as"
+    # A bigint_col is selected on the "l" alias so that the union pass-through code
+    # does not change the order, since both sides of the union have a slotRef and the
+    # size is the same
+    self.client.execute("with l as (select bigint_col from functional.alltypes), r as"
       " (select count(*) from tpch_parquet.lineitem a cross join tpch_parquet.lineitem b)"
       "select * from l union all (select * from r) LIMIT 1024")
     end = time.time()

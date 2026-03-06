@@ -33,4 +33,6 @@ explain select year, month from functional.alltypes
 select year, month from functional.alltypes where year=2009;
 ---- RESULTS: VERIFY_IS_SUBSET
 '04:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_SUBSET
+# Calcite planner has no rewrite, so this section is blank
 ====

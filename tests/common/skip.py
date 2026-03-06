@@ -28,7 +28,7 @@ from tests.common.environ import (ImpalaTestClusterProperties,
                                   IS_DOCKERIZED_TEST_CLUSTER, IS_BUGGY_EL6_KERNEL,
                                   HIVE_MAJOR_VERSION,
                                   IS_APACHE_HIVE, IS_TEST_JDK,
-                                  IS_TUPLE_CACHE)
+                                  IS_TUPLE_CACHE, IS_CALCITE_PLANNER)
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.kudu_test_suite import get_kudu_master_flag
 from tests.util.filesystem_utils import (
@@ -292,3 +292,10 @@ class SkipIfExploration:
     return pytest.mark.skipif(
         ImpalaTestSuite.exploration_strategy() != EXPLORATION_STRATEGY_EXHAUSTIVE,
         reason=skip_msg)
+
+
+class SkipIfCalcite:
+  hints_not_supported = pytest.mark.skipif(IS_CALCITE_PLANNER,
+      reason="hints not supported yet")
+  lineage_not_supported = pytest.mark.skipif(IS_CALCITE_PLANNER,
+      reason="lineage not supported yet")

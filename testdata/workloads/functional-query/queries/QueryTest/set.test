@@ -225,7 +225,7 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '05:EXCHANGE [UNPARTITIONED]'
 '02:AGGREGATE'
 '04:AGGREGATE'
-'03:EXCHANGE [HASH(double_col)]'
+row_regex:.*03:EXCHANGE \[HASH\(.*double_col\)].*
 '01:AGGREGATE [STREAMING]'
 '00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====
@@ -238,7 +238,7 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '05:EXCHANGE [UNPARTITIONED]'
 '02:AGGREGATE'
 '04:AGGREGATE'
-'03:EXCHANGE [HASH(double_col)]'
+row_regex:.*03:EXCHANGE \[HASH\(.*double_col\)].*
 '01:AGGREGATE [STREAMING]'
 '00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====
@@ -251,7 +251,7 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '05:EXCHANGE [UNPARTITIONED]'
 '02:AGGREGATE'
 '04:AGGREGATE'
-'03:EXCHANGE [HASH(double_col)]'
+row_regex:.*03:EXCHANGE \[HASH\(.*double_col\)].*
 '01:AGGREGATE'
 '00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====
@@ -264,7 +264,7 @@ explain select count(distinct double_col) from functional.alltypesagg;
 '05:EXCHANGE [UNPARTITIONED]'
 '02:AGGREGATE'
 '04:AGGREGATE'
-'03:EXCHANGE [HASH(double_col)]'
+row_regex:.*03:EXCHANGE \[HASH\(.*double_col\)].*
 '01:AGGREGATE'
 '00:SCAN $FILESYSTEM_NAME [functional.alltypesagg]'
 ====

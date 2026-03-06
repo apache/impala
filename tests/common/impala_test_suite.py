@@ -995,7 +995,7 @@ class ImpalaTestSuite(BaseTestSuite):
           raise
 
         if catch_section_name in test_section \
-            and '__NO_ERROR__' not in test_section[catch_section_name]:
+            and '__NO_ERROR__' not in str(test_section[catch_section_name]):
           expected_str = self.__do_replacements(
               " or ".join(test_section[catch_section_name]).strip(),
               use_db=use_db,

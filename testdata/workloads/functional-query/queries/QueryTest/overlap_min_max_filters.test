@@ -360,8 +360,8 @@ set explain_level=3;
 explain select count(*) from tpcds_parquet.store_sales
 where ss_sales_price < (select min(ss_wholesale_cost) from tpcds_parquet.store_sales);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF000\[min_max\] <- min\(ss_wholesale_cost\).*
-row_regex:.* RF000\[min_max\] -> ss_sales_price.*
+row_regex:.* RF000\[min_max\] <- min\(.*ss_wholesale_cost\).*
+row_regex:.* RF000\[min_max\] -> .*ss_sales_price.*
 ====
 ---- QUERY
 # INT data type
@@ -371,8 +371,8 @@ set explain_level=3;
 explain select count(*) from functional_parquet.alltypes
 where id < (select min(id) from functional_parquet.alltypes);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF000\[min_max\] <- min\(id\).*
-row_regex:.* RF000\[min_max\] -> id.*
+row_regex:.* RF000\[min_max\] <- min\(.*id\).*
+row_regex:.* RF000\[min_max\] -> .*id.*
 ====
 ---- QUERY
 # Bool data type
@@ -382,8 +382,8 @@ set explain_level=3;
 explain select count(*) from functional_parquet.alltypes
 where bool_col <= (select max(bool_col) from functional_parquet.alltypes);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF000\[min_max\] <- max\(bool_col\).*
-row_regex:.* RF000\[min_max\] -> bool_col.*
+row_regex:.* RF000\[min_max\] <- max\(.*bool_col\).*
+row_regex:.* RF000\[min_max\] -> .*bool_col.*
 ====
 ---- QUERY
 # Tiny INT data type
@@ -393,8 +393,8 @@ set explain_level=3;
 explain select count(*) from functional_parquet.alltypes
 where tinyint_col > (select max(tinyint_col) from functional_parquet.alltypes);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF000\[min_max\] <- max\(tinyint_col\).*
-row_regex:.* RF000\[min_max\] -> tinyint_col.*
+row_regex:.* RF000\[min_max\] <- max\(.*tinyint_col\).*
+row_regex:.* RF000\[min_max\] -> .*tinyint_col.*
 ====
 ---- QUERY
 # FLOAT data type
@@ -404,8 +404,8 @@ set explain_level=3;
 explain select count(*) from functional_parquet.alltypes
 where float_col >= (select max(float_col) from functional_parquet.alltypes);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF000\[min_max\] <- max\(float_col\).*
-row_regex:.* RF000\[min_max\] -> float_col.*
+row_regex:.* RF000\[min_max\] <- max\(.*float_col\).*
+row_regex:.* RF000\[min_max\] -> .*float_col.*
 ====
 ---- QUERY
 # Timestamp data type
@@ -415,8 +415,8 @@ set explain_level=3;
 explain select count(*) from functional_parquet.alltypes
 where timestamp_col < (select min(timestamp_col) from functional_parquet.alltypes);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF000\[min_max\] <- min\(timestamp_col\).*
-row_regex:.* RF000\[min_max\] -> timestamp_col.*
+row_regex:.* RF000\[min_max\] <- min\(.*timestamp_col\).*
+row_regex:.* RF000\[min_max\] -> .*timestamp_col.*
 ====
 ---- QUERY
 # Date data type
@@ -426,8 +426,8 @@ set explain_level=3;
 explain select count(*) from functional_parquet.date_tbl
 where date_col < (select min(date_col) from functional_parquet.date_tbl);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF000\[min_max\] <- min\(date_col\).*
-row_regex:.* RF000\[min_max\] -> date_col.*
+row_regex:.* RF000\[min_max\] <- min\(.*date_col\).*
+row_regex:.* RF000\[min_max\] -> .*date_col.*
 ====
 ---- QUERY
 # String data type
@@ -437,8 +437,8 @@ set explain_level=3;
 explain select count(*) from functional_parquet.alltypes
 where string_col < (select min(string_col) from functional_parquet.alltypes);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF000\[min_max\] <- min\(string_col\).*
-row_regex:.* RF000\[min_max\] -> string_col.*
+row_regex:.* RF000\[min_max\] <- min\(.*string_col\).*
+row_regex:.* RF000\[min_max\] -> .*string_col.*
 ====
 ---- QUERY
 # An equal predicate that gets translated into a hash join with bloom and min/max
@@ -449,8 +449,8 @@ set explain_level=3;
 explain select count(*) from functional_parquet.alltypes
 where string_col = (select min(string_col) from functional_parquet.alltypes);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF001\[min_max\] <- min\(string_col\).*
-row_regex:.* RF001\[min_max\] -> string_col.*
+row_regex:.* RF001\[min_max\] <- min\(.*string_col\).*
+row_regex:.* RF001\[min_max\] -> .*string_col.*
 ====
 ---- QUERY
 # Two subqueries that get translated into two min/max filters.
@@ -461,8 +461,8 @@ explain select count(*) from functional_parquet.alltypes where
 id > (select min(id) from functional_parquet.alltypes) and
 id < (select max(id) from functional_parquet.alltypes);
 ---- RESULTS: VERIFY_IS_SUBSET
-row_regex:.* RF000\[min_max\] <- max\(id\).*
-row_regex:.* RF001\[min_max\] <- min\(id\).*
+row_regex:.* RF000\[min_max\] <- max\(.*id\).*
+row_regex:.* RF001\[min_max\] <- min\(.*id\).*
 ====
 ---- QUERY
 # Regression test for IMPALA-11047: should compile successfully.

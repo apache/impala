@@ -30,6 +30,7 @@ import sys
 from tempfile import NamedTemporaryFile
 import threading
 from time import sleep
+from tests.common.environ import IS_CALCITE_PLANNER
 
 import pexpect
 import pytest
@@ -1094,11 +1095,14 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       assert '| \'--\' |' in result.stdout
       assert '| --   |' in result.stdout
 
+    # IMPALA-14405: The Calcite planner current creates its own header
+    # for the nested 'select count(*)'
+    header = '`v`.`expr$0`' if IS_CALCITE_PLANNER else 'count(*)'
     query = ('select * from (\n'
              'select count(*) from functional.alltypes\n'
              ') v; -- Incomplete SQL statement in this line')
     result = run_impala_shell_interactive(vector, query)
-    assert '| count(*) |' in result.stdout
+    assert '| ' + header + ' |' in result.stdout
 
     query = ('select id from functional.alltypes\n'
              'order by id; /*\n'

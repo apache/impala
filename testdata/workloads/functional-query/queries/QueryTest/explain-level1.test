@@ -27,6 +27,31 @@ row_regex:.*row-size=.* cardinality=.*
 row_regex:.*partitions=1/1 files=1 size=.*
 '   runtime filters: RF000 -> l_orderkey'
 row_regex:.*row-size=.* cardinality=.*
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_EQUAL
+row_regex:.*Max Per-Host Resource Reservation: Memory=[0-9.]*MB Threads=[0-9]*.*
+row_regex:.*Per-Host Resource Estimates: Memory=[0-9.]*MB.*
+''
+'PLAN-ROOT SINK'
+'|'
+'04:EXCHANGE [UNPARTITIONED]'
+'|'
+'02:HASH JOIN [INNER JOIN, BROADCAST]'
+'|  hash predicates: tpch.lineitem.l_orderkey = tpch.orders.o_orderkey'
+'|  runtime filters: RF000 <- tpch.orders.o_orderkey'
+row_regex:.*row-size=.* cardinality=.*
+'|'
+'|--03:EXCHANGE [BROADCAST]'
+'|  |'
+'|  01:SCAN $FILESYSTEM_NAME [tpch.orders]'
+row_regex:.*partitions=1/1 files=1 size=.*
+'|     predicates: tpch.orders.o_orderkey IS NOT NULL'
+row_regex:.*row-size=.* cardinality=.*
+'|'
+'00:SCAN $FILESYSTEM_NAME [tpch.lineitem]'
+row_regex:.*partitions=1/1 files=1 size=.*
+'   predicates: tpch.lineitem.l_orderkey IS NOT NULL'
+'   runtime filters: RF000 -> tpch.lineitem.l_orderkey'
+row_regex:.*row-size=.* cardinality=.*
 ====
 ---- QUERY
 # Tests the warning about missing table stats in the explain header.
@@ -46,6 +71,8 @@ explain select year, month from functional.alltypes
 select year, month from functional.alltypes where year=2009;
 ---- RESULTS: VERIFY_IS_SUBSET
 '04:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_SUBSET
+# Calcite planner has no rewrite, so this section is blank
 ====
 ---- QUERY
 # Tests for no cache key without ENABLE_TUPLE_CACHE

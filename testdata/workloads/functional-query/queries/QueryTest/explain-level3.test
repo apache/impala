@@ -64,6 +64,66 @@ row_regex:.*   extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
 row_regex:.*     mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=.*
 '     tuple-ids=1 row-size=171B cardinality=1.50M'
 '     in pipelines: 01(GETNEXT)'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_EQUAL
+row_regex:.*Max Per-Host Resource Reservation: Memory=[0-9.]*MB Threads=[0-9]*.*
+row_regex:.*Per-Host Resource Estimates: Memory=[0-9.]*MB.*
+''
+'F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
+row_regex:.*Per-Host Resources: mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=1
+'  PLAN-ROOT SINK'
+'  |  output exprs: tpch.lineitem.l_orderkey, tpch.lineitem.l_partkey, tpch.lineitem.l_suppkey, tpch.lineitem.l_linenumber, tpch.lineitem.l_quantity, tpch.lineitem.l_extendedprice, tpch.lineitem.l_discount, tpch.lineitem.l_tax, tpch.lineitem.l_returnflag, tpch.lineitem.l_linestatus, tpch.lineitem.l_shipdate, tpch.lineitem.l_commitdate, tpch.lineitem.l_receiptdate, tpch.lineitem.l_shipinstruct, tpch.lineitem.l_shipmode, tpch.lineitem.l_comment, tpch.orders.o_orderkey, tpch.orders.o_custkey, tpch.orders.o_orderstatus, tpch.orders.o_totalprice, tpch.orders.o_orderdate, tpch.orders.o_orderpriority, tpch.orders.o_clerk, tpch.orders.o_shippriority, tpch.orders.o_comment'
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B spill-buffer=[0-9.]*MB thread-reservation=0
+'  |'
+'  04:EXCHANGE [UNPARTITIONED]'
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
+'     tuple-ids=0,1 row-size=402B cardinality=5.76M'
+'     in pipelines: 00(GETNEXT)'
+''
+'F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3'
+row_regex:.*Per-Host Resources: mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=.*
+'  DATASTREAM SINK [FRAGMENT=F02, EXCHANGE=04, UNPARTITIONED]'
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
+'  02:HASH JOIN [INNER JOIN, BROADCAST]'
+'  |  hash predicates: tpch.lineitem.l_orderkey = tpch.orders.o_orderkey'
+'  |  fk/pk conjuncts: tpch.lineitem.l_orderkey = tpch.orders.o_orderkey'
+'  |  runtime filters: RF000[bloom] <- tpch.orders.o_orderkey'
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B spill-buffer=[0-9.]*MB thread-reservation=.*
+'  |  tuple-ids=0,1 row-size=402B cardinality=5.76M'
+'  |  in pipelines: 00(GETNEXT), 01(OPEN)'
+'  |'
+'  |--03:EXCHANGE [BROADCAST]'
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
+'  |     tuple-ids=1 row-size=171B cardinality=1.50M'
+'  |     in pipelines: 01(GETNEXT)'
+'  |'
+'  00:SCAN $FILESYSTEM_NAME [tpch.lineitem, RANDOM]'
+row_regex:.*partitions=1/1 files=1 size=.*
+'     predicates: tpch.lineitem.l_orderkey IS NOT NULL'
+'     runtime filters: RF000[bloom] -> tpch.lineitem.l_orderkey'
+'     stored statistics:'
+row_regex:.*table: rows=[0-9.]*[A-Z]* size=.*
+'       columns: all'
+row_regex:.*extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
+'     file formats: [TEXT]'
+row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=1.*
+'     tuple-ids=0 row-size=231B cardinality=6.00M'
+'     in pipelines: 00(GETNEXT)'
+''
+row_regex:.*F01:PLAN FRAGMENT \[RANDOM\] hosts=[1-2] instances=[1-2]
+row_regex:.*Per-Host Resources: mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=.*
+'  DATASTREAM SINK [FRAGMENT=F00, EXCHANGE=03, BROADCAST]'
+row_regex:.*  |  mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
+'  01:SCAN $FILESYSTEM_NAME [tpch.orders, RANDOM]'
+row_regex:.*partitions=1/1 files=1 size=.*
+'     predicates: tpch.orders.o_orderkey IS NOT NULL'
+'     stored statistics:'
+row_regex:.*table: rows=[0-9.]*[A-Z]* size=.*
+'       columns: all'
+row_regex:.*   extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
+'     file formats: [TEXT]'
+row_regex:.*     mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=.*
+'     tuple-ids=1 row-size=171B cardinality=1.50M'
+'     in pipelines: 01(GETNEXT)'
 ====
 ---- QUERY
 # Tests the warning about missing table stats in the explain header.
@@ -100,6 +160,8 @@ order by month(to_timestamp(cast(d_date AS string),'yyyy-MM-dd'))
 'Analyzed query: SELECT month(to_timestamp(d_date, 'yyyy-MM-dd')) a FROM'
 'tpcds_parquet.date_dim GROUP BY month(to_timestamp(d_date, 'yyyy-MM-dd')) ORDER'
 'BY month(to_timestamp(d_date, 'yyyy-MM-dd')) ASC'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_SUBSET
+# Calcite planner has no rewrite, so this section is blank
 ====
 ---- QUERY
 # Tests 'SimplifyCastExprRule' rewrite when group by and order by clauses contain aliases
@@ -114,6 +176,8 @@ order by a
 'Analyzed query: SELECT month(to_timestamp(d_date, 'yyyy-MM-dd')) a FROM'
 'tpcds_parquet.date_dim GROUP BY month(to_timestamp(d_date, 'yyyy-MM-dd')) ORDER'
 'BY a ASC'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_SUBSET
+# Calcite planner has no rewrite, so this section is blank
 ====
 ---- QUERY
 # Tests 'SimplifyCastExprRule' rewrite when group by and order by clauses contain exprs
@@ -128,6 +192,8 @@ order by month(to_timestamp(cast(d_date_sk AS string),'yyyy-MM-dd'))
 ''yyyy-MM-dd')) a FROM tpcds_parquet.date_dim GROUP BY'
 'month(to_timestamp(CAST(d_date_sk AS STRING), 'yyyy-MM-dd')) ORDER BY'
 'month(to_timestamp(CAST(d_date_sk AS STRING), 'yyyy-MM-dd')) ASC'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_SUBSET
+# Calcite planner has no rewrite, so this section is blank
 ====
 ---- QUERY
 # Tests 'SimplifyCastExprRule' rewrite when group by and order by clauses contain aliases
@@ -142,6 +208,8 @@ order by a
 'Analyzed query: SELECT month(to_timestamp(CAST(d_date_sk AS STRING),'
 ''yyyy-MM-dd')) a FROM tpcds_parquet.date_dim GROUP BY'
 'month(to_timestamp(CAST(d_date_sk AS STRING), 'yyyy-MM-dd')) ORDER BY a ASC'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_SUBSET
+# Calcite planner has no rewrite, so this section is blank
 ====
 ---- QUERY
 # Tests HIDE_ANALYZED_QUERY=TRUE

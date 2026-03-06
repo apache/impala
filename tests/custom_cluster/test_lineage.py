@@ -26,7 +26,7 @@ import re
 import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfFS
+from tests.common.skip import SkipIfFS, SkipIfCalcite
 
 LOG = logging.getLogger(__name__)
 
@@ -179,6 +179,8 @@ class TestLineage(CustomClusterTestSuite):
           lineage_json = json.load(log_file)
           assert lineage_json["queryId"] is not profile_query_id
 
+  # IMPALA-14328: need to implement lineage for Calcite planner
+  @SkipIfCalcite.lineage_not_supported
   @SkipIfFS.hbase
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

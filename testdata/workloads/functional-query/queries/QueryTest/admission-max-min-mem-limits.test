@@ -49,6 +49,10 @@ select * from functional_parquet.alltypes A, functional_parquet.alltypes B where
 ---- RUNTIME_PROFILE
 row_regex: Per-Host Resource Estimates: Memory=68MB
 row_regex: Cluster Memory Admitted: 67.88 MB
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# Calcite is a little different because it includes an is not null predicate in the plan
+row_regex: Per-Host Resource Estimates: Memory=67MB
+row_regex: Cluster Memory Admitted: 66.94 MB
 ====
 ---- QUERY
 # No mem_limit set
