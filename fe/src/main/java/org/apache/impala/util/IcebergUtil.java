@@ -74,6 +74,7 @@ import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.ArithmeticExpr;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
@@ -82,8 +83,10 @@ import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StringLiteral;
+import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.BuiltinsDb;
@@ -1583,5 +1586,63 @@ public class IcebergUtil {
         return sb_.toString();
       }
     }
+  }
+
+  public static void addRowLineageExprs(Analyzer analyzer, TableRef tableRef,
+      List<Expr> resultExprs) throws AnalysisException {
+    FeIcebergTable table = (FeIcebergTable) tableRef.getTable();
+    if (table.getFormatVersion() < 3) return;
+    resultExprs.add(IcebergUtil.getRowIdExpr(analyzer, tableRef));
+    resultExprs.add(IcebergUtil.getLastUpdatedSeqNoExpr(analyzer, tableRef));
+    Preconditions.checkState(resultExprs.size() == table.getColumns().size());
+  }
+
+  /**
+   * Returns COALESCE(_file_row_id, ICEBERG__FIRST__ROW__ID + FILE__POSITION).
+   */
+  public static Expr getRowIdExpr(Analyzer analyzer, TableRef tableRef)
+      throws AnalysisException {
+    Expr addExpr = new ArithmeticExpr(ArithmeticExpr.Operator.ADD,
+        createSlotRef(analyzer, tableRef, "ICEBERG__FIRST__ROW__ID"),
+        createSlotRef(analyzer, tableRef, "FILE__POSITION"));
+    return createCoalesceFn(analyzer,
+        createSlotRef(analyzer, tableRef, "_file_row_id"), addExpr);
+  }
+
+  /**
+   * Returns
+   * COALESCE(_file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER).
+   */
+  public static Expr getLastUpdatedSeqNoExpr(Analyzer analyzer, TableRef tableRef)
+      throws AnalysisException {
+    return createCoalesceFn(analyzer,
+        createSlotRef(analyzer, tableRef, "_file_last_updated_sequence_number"),
+        createSlotRef(analyzer, tableRef, "ICEBERG__DATA__SEQUENCE__NUMBER"));
+  }
+
+  /**
+   * Creates a COALESCE function call with the given expressions as parameters.
+   */
+  private static Expr createCoalesceFn(Analyzer analyzer, Expr... exprs)
+      throws AnalysisException {
+    FunctionName fnName = new FunctionName(BuiltinsDb.NAME, "coalesce");
+    List<Expr> paramList = new ArrayList<>();
+    for (Expr expr : exprs) {
+      paramList.add(expr);
+    }
+    FunctionCallExpr fnCall = new FunctionCallExpr(fnName, new FunctionParams(paramList));
+    fnCall.setIsInternalFnCall(true);
+    fnCall.analyze(analyzer);
+    analyzer.materializeSlots(fnCall);
+    return fnCall;
+  }
+
+  public static SlotRef createSlotRef(Analyzer analyzer, TableRef tableRef,
+      String colName) throws AnalysisException {
+    List<String> path = org.apache.impala.analysis.Path
+        .createRawPath(tableRef.getUniqueAlias(), colName);
+    SlotRef ref = new SlotRef(path);
+    ref.analyze(analyzer);
+    return ref;
   }
 }

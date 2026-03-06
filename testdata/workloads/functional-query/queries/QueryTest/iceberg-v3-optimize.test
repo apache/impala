@@ -1,0 +1,208 @@
+====
+---- QUERY
+CREATE TABLE optimize_nopart (i int)
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+
+INSERT INTO optimize_nopart VALUES (1);
+INSERT INTO optimize_nopart VALUES (2);
+INSERT INTO optimize_nopart VALUES (3);
+
+-- _file_row_id and _file_last_updated_sequence_number are missing from the initial data files.
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID, _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER, *
+FROM optimize_nopart;
+---- RESULTS
+NULL,0,NULL,1,1
+NULL,1,NULL,2,2
+NULL,2,NULL,3,3
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# OPTIMIZE should populate _file_row_id and _file_last_updated_sequence_number for all rows.
+OPTIMIZE TABLE optimize_nopart;
+
+SELECT _file_row_id, _file_last_updated_sequence_number, * FROM optimize_nopart;
+---- RESULTS
+0,1,1
+1,2,2
+2,3,3
+---- TYPES
+BIGINT,BIGINT,INT
+====
+---- QUERY
+# Further compaction shouldn't change the row lineage fields.
+OPTIMIZE TABLE optimize_nopart;
+
+SELECT _file_row_id, _file_last_updated_sequence_number, * FROM optimize_nopart;
+---- RESULTS
+0,1,1
+1,2,2
+2,3,3
+---- TYPES
+BIGINT,BIGINT,INT
+====
+---- QUERY
+CREATE TABLE optimize_nopart_multi_rows (i int)
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+
+INSERT INTO optimize_nopart_multi_rows VALUES (1),(2);
+INSERT INTO optimize_nopart_multi_rows VALUES (3),(4);
+INSERT INTO optimize_nopart_multi_rows VALUES (5),(6);
+
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID, _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER, *
+FROM optimize_nopart_multi_rows;
+---- RESULTS
+NULL,0,NULL,1,1
+NULL,0,NULL,1,2
+NULL,2,NULL,2,3
+NULL,2,NULL,2,4
+NULL,4,NULL,3,5
+NULL,4,NULL,3,6
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# OPTIMIZE should populate _file_row_id with ICEBERG__FIRST__ROW__ID + FILE__POSITION.
+OPTIMIZE TABLE optimize_nopart_multi_rows;
+
+SELECT _file_row_id, _file_last_updated_sequence_number, *
+FROM optimize_nopart_multi_rows;
+---- RESULTS
+0,1,1
+1,1,2
+2,2,3
+3,2,4
+4,3,5
+5,3,6
+---- TYPES
+BIGINT,BIGINT,INT
+====
+---- QUERY
+CREATE TABLE optimize_part (i int, s string)
+PARTITIONED BY SPEC (TRUNCATE(1,s))
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+
+INSERT INTO optimize_part VALUES (1,'aa'),(2,'ab');
+INSERT INTO optimize_part VALUES (3,'ac'),(4,'ad');
+INSERT INTO optimize_part VALUES (5,'ba'),(6,'bb');
+
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID, _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER, *
+FROM optimize_part;
+---- RESULTS
+NULL,0,NULL,1,1,'aa'
+NULL,0,NULL,1,2,'ab'
+NULL,2,NULL,2,3,'ac'
+NULL,2,NULL,2,4,'ad'
+NULL,4,NULL,3,5,'ba'
+NULL,4,NULL,3,6,'bb'
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT,STRING
+====
+---- QUERY
+# With FILE_SIZE_THRESHOLD_MB specified, OPTIMIZE only compact partitions with at least
+# two data files.
+OPTIMIZE TABLE optimize_part (FILE_SIZE_THRESHOLD_MB=10);
+
+SELECT _file_row_id, _file_last_updated_sequence_number, *
+FROM optimize_part;
+---- RESULTS
+0,1,1,'aa'
+1,1,2,'ab'
+2,2,3,'ac'
+3,2,4,'ad'
+NULL,NULL,5,'ba'
+NULL,NULL,6,'bb'
+---- TYPES
+BIGINT,BIGINT,INT,STRING
+====
+---- QUERY
+# Let's do a full compaction on the partially compacted table.
+OPTIMIZE TABLE optimize_part;
+
+SELECT _file_row_id, _file_last_updated_sequence_number, *
+FROM optimize_part;
+---- RESULTS
+0,1,1,'aa'
+1,1,2,'ab'
+2,2,3,'ac'
+3,2,4,'ad'
+4,3,5,'ba'
+5,3,6,'bb'
+---- TYPES
+BIGINT,BIGINT,INT,STRING
+====
+---- QUERY
+# Test compacting an upgraded table.
+CREATE TABLE optimize_upgraded (i int)
+-- Partitioning is needed for stable first-row-id assignment by Iceberg.
+PARTITIONED BY SPEC (i)
+STORED BY ICEBERG
+TBLPROPERTIES('format-version'='2');
+INSERT INTO optimize_upgraded VALUES (1);
+INSERT INTO optimize_upgraded VALUES (2);
+INSERT INTO optimize_upgraded VALUES (3);
+
+ALTER TABLE optimize_upgraded SET TBLPROPERTIES('format-version'='3');
+
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID,
+       _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER,
+       *
+FROM optimize_upgraded;
+---- RESULTS
+NULL,NULL,NULL,1,1
+NULL,NULL,NULL,2,2
+NULL,NULL,NULL,3,3
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# First OPTIMIZE cannot persist _file_row_id in the data files because both the
+# original _file_row_id and first-row-id are missing. First-row-id assignment happens
+# during the commit phase of the OPTIMIZE command.
+# However, OPTIMIZE should persist _file_last_updated_sequence_number with the original
+# data sequence number.
+OPTIMIZE TABLE optimize_upgraded;
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID,
+       _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER,
+       *
+FROM optimize_upgraded;
+---- RESULTS
+NULL,0,1,4,1
+NULL,1,2,4,2
+NULL,2,3,4,3
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# Second OPTIMIZE persists the implicitly assigned row-ids by the first OPTIMIZE.
+# The data files' first-row-id and data-sequence-number are updated independently.
+OPTIMIZE TABLE optimize_upgraded;
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID,
+       _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER,
+       *
+FROM optimize_upgraded;
+---- RESULTS
+0,3,1,5,1
+1,4,2,5,2
+2,5,3,5,3
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT
+====
+---- QUERY
+# Let's do a third compaction just for fun.
+# _file_row_id and _file_last_updated_sequence_number should remain intact.
+OPTIMIZE TABLE optimize_upgraded;
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID,
+       _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER,
+       *
+FROM optimize_upgraded;
+---- RESULTS
+0,6,1,6,1
+1,7,2,6,2
+2,8,3,6,3
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT
+====

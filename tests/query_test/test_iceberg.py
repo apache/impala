@@ -2368,6 +2368,9 @@ class TestIcebergV3Table(IcebergTestSuite):
     finally:
       os.remove(local_file)
 
+  def test_v3_optimize(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-v3-optimize', vector, unique_database)
+
 
 # Tests to exercise the DIRECTED distribution mode for V2 Iceberg tables. Note, that most
 # of the test coverage is in TestIcebergV2Table.test_read_position_deletes but since it
