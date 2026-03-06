@@ -2023,6 +2023,14 @@ class TestEventSyncFailures(TestEventProcessingCustomConfigsBase):
                               "debug_action": "0:PREPARE:INJECT_ERROR_LOG"})
     handle = client.execute_async(query)
     client.wait_for_finished_timeout(handle, 5)
+    # Note: There is a timing window immediately following the transition to
+    # FINISHED where get_log() would not return the INJECT_ERROR_LOG. This is
+    # exacerbated by long polling. This fetch avoids that window for this test.
+    results = client.fetch(query, handle)
+    assert results.success
+    assert len(results.data) == 1
+    assert int(results.data[0]) == 7300
+
     client_log = client.get_log(handle)
     expected_error += "\nDebug Action: INJECT_ERROR_LOG"
     assert expected_error in client_log

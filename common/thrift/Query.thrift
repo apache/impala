@@ -760,7 +760,7 @@ struct TQueryOptions {
   182: optional bool disable_optimized_json_count_star = false;
 
   // See comment in ImpalaService.thrift
-  183: optional i32 long_polling_time_ms = 0;
+  183: optional i32 long_polling_time_ms = 250;
 
   // See comment in ImpalaService.thrift
   184: optional bool enable_tuple_cache_verification = false;

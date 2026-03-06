@@ -2272,7 +2272,10 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     impalad_args="--vmodule admission-controller=3 --default_pool_max_requests=1 "
     "--queue_wait_timeout_ms=60000 ")
   def test_kill_statestore_with_queries_running(self):
-    long_query = "select count(*), sleep(10000) from functional.alltypes limit 1"
+    # The id=1 limits this to a single row. The sleep in the where clause executes
+    # in the scan node, keeping the query running for an extended period of time.
+    long_query = "select count(*) from functional.alltypes " \
+        "where id = 1 and int_col = sleep(20000)"
     short_query = "select count(*) from functional.alltypes limit 1"
     timeout_s = 60
 
@@ -2302,7 +2305,10 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     impalad_args="--vmodule admission-controller=3 --default_pool_max_requests=1 "
     "--queue_wait_timeout_ms=60000 ", disable_log_buffering=True)
   def test_kill_coord_with_queries_running(self):
-    long_query = "select count(*), sleep(1000000000) from functional.alltypes limit 1"
+    # The id=1 limits this to a single row. The sleep in the where clause executes
+    # in the scan node, keeping the query running indefinitely.
+    long_query = "select count(*) from functional.alltypes " \
+        "where id = 1 and int_col = sleep(1000000000)"
     short_query = "select count(*) from functional.alltypes limit 1"
     timeout_s = 10
 

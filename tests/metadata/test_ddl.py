@@ -1166,6 +1166,10 @@ class TestAsyncDDLTiming(TestDdlBase):
       handle = self.execute_query_async_using_client(client, alter_stmt, new_vector)
       exec_end = time.time()
       exec_time = exec_end - exec_start
+      # Exec is complete, so start tracking wait time. This needs to be before any
+      # call to get_impala_exec_state(), because that call can take measurable time
+      # with long polling.
+      wait_start = time.time()
       state = client.get_impala_exec_state(handle)
       if enable_async_ddl:
         assert state in [PENDING, RUNNING]
@@ -1173,7 +1177,6 @@ class TestAsyncDDLTiming(TestDdlBase):
         assert state in [RUNNING, FINISHED]
 
       # Wait for the statement to finish with a timeout of 20 seconds
-      wait_start = time.time()
       client.wait_for_impala_state(handle, FINISHED, 20)
       wait_end = time.time()
       wait_time = wait_end - wait_start
