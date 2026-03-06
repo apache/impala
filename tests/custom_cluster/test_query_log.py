@@ -930,7 +930,7 @@ class TestQueryLogTableBufferPool(WorkloadManagementTestSuite):
     # When buffer pool limit is not None, the test is forcing the query to spill. Thus,
     # a large number of records is needed to force the spilling.
     if buffer_pool_limit is not None:
-      test_sql = "select a.*,b.*,c.* from " \
+      test_sql = "select straight_join a.*,b.*,c.* from " \
         "functional.zipcode_incomes a inner join functional.zipcode_timezones b on " \
         "a.zip = b.zip inner join functional.alltimezones c on b.timezone = c.timezone"
 

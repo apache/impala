@@ -69,6 +69,9 @@ where l_suppkey = 4162 and l_shipmode = 'AIR' and l_returnflag = 'A' and
 order by 1,2,3,4
 ---- CATCH
 Unable to perform Null-Aware Anti-Join. Could not get enough reservation to fit all rows with NULLs from the build side in memory
+---- CALCITE_PLANNER_CATCH: ANY_OF
+# IMPALA-13573: Calcite doesn't create an anti-join plan
+__NO_ERROR__
 ====
 ---- QUERY
 # Execute NAAJ query 2 execute in-memory only.

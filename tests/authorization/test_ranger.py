@@ -34,7 +34,7 @@ import requests
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite, HIVE_CONF_DIR
 from tests.common.file_utils import copy_files_to_hdfs_dir
 from tests.common.iceberg_rest_server import IcebergRestServer
-from tests.common.skip import SkipIf, SkipIfFS, SkipIfHive2
+from tests.common.skip import SkipIf, SkipIfFS, SkipIfHive2, SkipIfCalcite
 from tests.common.test_dimensions import (
     create_client_protocol_dimension,
     create_orc_dimension,
@@ -3219,6 +3219,8 @@ class TestRangerLocalCatalog(TestRanger):
       while policy_names:
         TestRanger._remove_policy(policy_names.pop())
 
+  #IMPALA-14295: support row_filtering in Calcite planner
+  @SkipIfCalcite.row_filtering_not_supported
   @pytest.mark.execute_serially
   def test_row_filtering(self, vector, unique_name):
     user = getuser()
@@ -4045,8 +4047,8 @@ class TestRangerWithCalcite(TestRanger):
         self.create_impala_client(user=NON_OWNER) as non_owner_client:
       # Set the query option planner to CALCITE and ensure there is no fallback to
       # the original planner
-      non_owner_client.set_configuration({"planner": "CALCITE"})
-      non_owner_client.set_configuration({"fallback_planner": "CALCITE"})
+      non_owner_client.set_configuration({"planner": "CALCITE",
+          "fallback_planner": "CALCITE"})
       database = "functional"
       table_1 = database + "." + "alltypes"
       table_2 = database + "." "alltypestiny"
@@ -4083,8 +4085,8 @@ class TestRangerWithCalcite(TestRanger):
         non_owner_client.execute(test_query_4)
 
         # Set the query option planner back to ORIGINAL
-        non_owner_client.set_configuration({"planner": "ORIGINAL"})
-        non_owner_client.set_configuration({"fallback_planner": "ORIGINAL"})
+        non_owner_client.set_configuration({"planner": "ORIGINAL",
+            "fallback_planner": "ORIGINAL"})
         # Impala's classic frontend supports 'test_query_3'.
         non_owner_client.execute(test_query_3)
         # Impala's classic frontend could not support 'test_query_4'.

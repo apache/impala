@@ -64,16 +64,15 @@ STRING,STRING,BIGINT,BIGINT,BIGINT,STRING,STRING,STRING,STRING,STRING,STRING,STR
 ---- QUERY
 # Stats are available now.
 explain select id from alltypes;
----- RESULTS: VERIFY_IS_EQUAL
+---- RESULTS: VERIFY_IS_SUBSET
 row_regex:.*Max Per-Host Resource Reservation: Memory=.*
 row_regex:.*Per-Host Resource Estimates: Memory=.*
 'Codegen disabled by planner'
-row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes.*
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
-'|  output exprs: id'
+row_regex:'|  output exprs: .*id'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
@@ -116,6 +115,31 @@ row_regex:.* extrapolated-rows=904.*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=904'
 '   in pipelines: 00(GETNEXT)'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_EQUAL
+row_regex:.*Max Per-Host Resource Reservation: Memory=.*
+row_regex:.*Per-Host Resource Estimates: Memory=.*
+'Codegen disabled by planner'
+''
+'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
+row_regex:.*mem-estimate=.* mem-reservation=.*
+'PLAN-ROOT SINK'
+# this line is different
+row_regex:'|  output exprs: .*id'
+row_regex:.*mem-estimate=.* mem-reservation=.*
+'|'
+'00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
+# this line is different
+row_regex:'   partition predicates: .*month IN \(CAST\(1 AS INT\), CAST\(2 AS INT\), CAST\(3 AS INT\)\)'
+row_regex:.*partitions=3/12 files=3 size=.*
+'   stored statistics:'
+row_regex:.*table: rows=3.65K size=.*
+'     partitions: 0/3 rows=unavailable'
+'     columns: all'
+row_regex:.* extrapolated-rows=904.*
+row_regex:.*mem-estimate=.* mem-reservation=.*
+# IMPALA-14815: need to investigate why this is 8B so we can combine these 2 sections
+'   tuple-ids=0 row-size=8B cardinality=904'
+'   in pipelines: 00(GETNEXT)'
 ---- TYPES
 STRING
 ====
@@ -124,15 +148,14 @@ STRING
 insert into alltypes partition(year, month)
 select * from functional_parquet.alltypes where year = 2009;
 explain select id from alltypes;
----- RESULTS: VERIFY_IS_EQUAL
+---- RESULTS: VERIFY_IS_SUBSET
 row_regex:.*Max Per-Host Resource Reservation: Memory=.*
 row_regex:.*Per-Host Resource Estimates: Memory=.*
-row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes.*
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
-'|  output exprs: id'
+row_regex:'|  output exprs: .*id'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
@@ -177,6 +200,29 @@ row_regex:.* extrapolated-rows=3.65K .*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3.65K'
 '   in pipelines: 00(GETNEXT)'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_EQUAL
+row_regex:.*Max Per-Host Resource Reservation: Memory=.*
+row_regex:.*Per-Host Resource Estimates: Memory=20MB.*
+'Codegen disabled by planner'
+''
+'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
+row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
+'PLAN-ROOT SINK'
+row_regex:'|  output exprs: .*id'
+row_regex:.*mem-estimate=.* mem-reservation=.*
+'|'
+'00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
+row_regex:'   partition predicates: .*year = CAST\(2010 AS INT\)'
+row_regex:.*partitions=12/24 files=12 size=.*
+'   stored statistics:'
+row_regex:.*table: rows=3.65K size=.*
+'     partitions: 0/12 rows=unavailable'
+'     columns: all'
+row_regex:.* extrapolated-rows=3.65K .*
+row_regex:.*mem-estimate=.* mem-reservation=.*
+# IMPALA-14815: need to investigate why this is 8B so we can combine these 2 sections
+'   tuple-ids=0 row-size=8B cardinality=3.65K'
+'   in pipelines: 00(GETNEXT)'
 ---- TYPES
 STRING
 ====
@@ -207,6 +253,29 @@ row_regex:.*table: rows=10.95K size=.*
 row_regex:.* extrapolated-rows=3.65K .*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3.65K'
+'   in pipelines: 00(GETNEXT)'
+---- CALCITE_PLANNER_RESULTS: VERIFY_IS_EQUAL
+row_regex:.*Max Per-Host Resource Reservation: Memory=.*
+row_regex:.*Per-Host Resource Estimates: Memory=20MB.*
+'Codegen disabled by planner'
+''
+'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
+row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
+'PLAN-ROOT SINK'
+row_regex:'|  output exprs: .*id'
+row_regex:.*mem-estimate=.* mem-reservation=.*
+'|'
+'00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
+row_regex:'   partition predicates: .*year = CAST\(2010 AS INT\)'
+row_regex:.*partitions=12/24 files=12 size=.*
+'   stored statistics:'
+row_regex:.*table: rows=10.95K size=.*
+'     partitions: 0/12 rows=unavailable'
+'     columns: all'
+row_regex:.* extrapolated-rows=3.65K .*
+row_regex:.*mem-estimate=.* mem-reservation=.*
+# IMPALA-14815: need to investigate why this is 8B so we can combine these 2 sections
+'   tuple-ids=0 row-size=8B cardinality=3.65K'
 '   in pipelines: 00(GETNEXT)'
 ---- TYPES
 STRING

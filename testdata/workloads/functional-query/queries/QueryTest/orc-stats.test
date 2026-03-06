@@ -8,7 +8,7 @@ aggregation(SUM, RowsRead): 100
 set explain_level=2;
 explain select count(*) from functional_orc_def.alltypessmall where tinyint_col = 10
 ---- RESULTS: VERIFY_IS_SUBSET
-'   orc statistics predicates: tinyint_col = CAST(10 AS TINYINT)'
+row_regex: .*orc statistics predicates: .*tinyint_col = CAST\(10 AS TINYINT\)
 ====
 ---- QUERY
 # Test on predicate x < min_val for tinyint. No rows should be read by the ORC reader.
@@ -208,13 +208,19 @@ select count(*) from functional_orc_def.alltypessmall_bool_sorted where bool_col
 50
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 50
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14813: Calcite translates 'bool = true' to 'bool'.  This needs to be converted
+# to bool = true when analyzing orc statistics predicates in order to be picked up
+aggregation(SUM, RowsRead): 100
 ====
 ---- QUERY
 select count(*) from functional_orc_def.alltypessmall_bool_sorted where bool_col = false;
 ---- RESULTS
 50
----- RUNTIME_PROFILE
-aggregation(SUM, RowsRead): 50
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+# IMPALA-14813: Calcite translates 'bool = false' to '!bool'.  This needs to be converted
+# to bool = false when analyzing orc statistics predicates in order to be picked up
 ====
 ---- QUERY
 # Test on predicate x < min_val for float. No rows should be read by the ORC reader.
@@ -351,6 +357,10 @@ select count(*) from functional_orc_def.decimal_tbl where d1 > 132842.0
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14814: Calcite planner is casting d1 to a decimal to match d1, but this
+# shouldn't be necessary
+aggregation(SUM, RowsRead): 5
 ====
 ---- QUERY
 # Test on predicate x < min_val for decimal(20,10). No rows should be read by the ORC
@@ -392,6 +402,10 @@ select count(*) from functional_orc_def.decimal_tbl where d4 > 0.123456789
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14814: Calcite planner is casting d4 to a decimal to match the constant, but this
+# shouldn't be necessary
+aggregation(SUM, RowsRead): 5
 ====
 ---- QUERY
 select count(*) from functional_orc_def.decimal_tbl where d4 < 0.123456789
@@ -399,6 +413,10 @@ select count(*) from functional_orc_def.decimal_tbl where d4 < 0.123456789
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14814: Calcite planner is casting d4 to a decimal to match the constant, but this
+# shouldn't be necessary
+aggregation(SUM, RowsRead): 5
 ====
 ---- QUERY
 select count(*) from functional_orc_def.decimal_tbl where d4 >= 0.12345678
@@ -413,6 +431,10 @@ select count(*) from functional_orc_def.decimal_tbl where d4 >= 0.12345679
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14814: Calcite planner is casting d4 to a decimal to match the constant, but this
+# shouldn't be necessary
+aggregation(SUM, RowsRead): 5
 ====
 ---- QUERY
 # Test with inverted predicate
@@ -449,6 +471,9 @@ select id, bool_col from functional_orc_def.alltypessmall where int_col < 3 - 3
 ---- RESULTS
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 100
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# Calcite planner always does constant folding
+aggregation(SUM, RowsRead): 0
 ====
 ---- QUERY
 select id, bool_col from functional_orc_def.alltypessmall where 5 + 5 < int_col
@@ -464,6 +489,9 @@ select id, bool_col from functional_orc_def.alltypessmall where 5 + 5 < int_col
 ---- RESULTS
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 100
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# Calcite planner always does constant folding
+aggregation(SUM, RowsRead): 0
 ====
 ---- QUERY
 # Query that has an implicit cast to a larger integer type
@@ -472,6 +500,13 @@ select count(*) from functional_orc_def.alltypessmall where tinyint_col > 100000
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14814: Needs to be investigated. An implicit cast is being placed on tinyint_col
+# and there is code that does not unwrap the SlotRef because of this cast. Simply getting
+# rid of that code may cause other failures, that needs to be investigated. Another way
+# to fix this is by putting in a rule that simplifies this filter into a false expression
+# since there is no way that this can return any rows.
+aggregation(SUM, RowsRead): 100
 ====
 ---- QUERY
 # Predicates with explicit casts are not supported when evaluating orc statistics.
@@ -686,6 +721,10 @@ select count(*) from functional_orc_def.alltypessmall_bool_sorted where bool_col
 50
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 50
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14813: Calcite translates this to 'bool'.  This needs to be converted
+# to bool = true when analyzing orc statistics predicates in order to be picked up
+aggregation(SUM, RowsRead): 100
 ====
 ---- QUERY
 select count(*) from functional_orc_def.alltypessmall_bool_sorted where bool_col in (false);
@@ -693,6 +732,10 @@ select count(*) from functional_orc_def.alltypessmall_bool_sorted where bool_col
 50
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 50
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14813: Calcite translates this to '!bool'.  This needs to be converted
+# to bool = true when analyzing orc statistics predicates in order to be picked up
+aggregation(SUM, RowsRead): 100
 ====
 ---- QUERY
 # Test pushing down IN-list predicate with literals outside the value range.

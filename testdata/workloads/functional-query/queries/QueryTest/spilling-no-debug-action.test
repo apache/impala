@@ -35,6 +35,9 @@ BIGINT
 287
 ---- RUNTIME_PROFILE
 row_regex: NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-13573: Anti-join not supported yet for Calcite, the plan
+# created is different.
 ====
 ---- QUERY
 # spilled partition with 0 probe rows, RIGHT OUTER JOIN
@@ -49,6 +52,11 @@ BIGINT
 12138
 ---- RUNTIME_PROFILE
 row_regex: NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# The calcite planner has a rule that changes an outer join to an inner join if there is
+# a condition above the join that will filter out all null rows.  In this case, the where
+# clause with 's_acctbal' gets applied after the join, so all outer join rows created
+# s_acctbal set to null will be filtered out, so the "skipped' rows won't match.
 ====
 ---- QUERY
 # spilled partition with 0 probe rows, RIGHT OUTER JOIN
@@ -65,6 +73,11 @@ BIGINT
 12138
 ---- RUNTIME_PROFILE
 row_regex: NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# The calcite planner has a rule that changes an outer join to an inner join if there is
+# a condition above the join that will filter out all null rows.  In this case, the where
+# clause with 's_acctbal' gets applied after the join, so all outer join rows created
+# s_acctbal set to null will be filtered out, so the "skipped' rows won't match.
 ====
 ---- QUERY
 # spilled partition with 0 probe rows, RIGHT ANTI JOIN

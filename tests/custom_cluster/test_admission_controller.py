@@ -47,6 +47,7 @@ from tests.common.custom_cluster_test_suite import (
     WORKLOAD_MGMT_IMPALAD_FLAGS,
 )
 from tests.common.environ import build_flavor_timeout, ImpalaTestClusterProperties
+from tests.common.environ import IS_CALCITE_PLANNER
 from tests.common.impala_connection import (
     ERROR,
     FINISHED,
@@ -1715,8 +1716,11 @@ class TestAdmissionController(TestAdmissionControllerBase):
     self._test_trivial_queries_helper(
             "select 1 from functional.alltypes limit 0 union all select sleep(1)",
             False)
-    self._test_trivial_queries_helper(
-            "select a from (select 1 a, sleep(1)) s", False)
+    # Calcite is simplifying this at validation time to remove the sleep, not worth
+    # fixing.
+    if not IS_CALCITE_PLANNER:
+      self._test_trivial_queries_helper(
+              "select a from (select 1 a, sleep(1)) s", False)
     self._test_trivial_queries_helper("select sleep(1)", False)
     self._test_trivial_queries_helper("select ISTRUE(sleep(1))", False)
     self._test_trivial_queries_helper(

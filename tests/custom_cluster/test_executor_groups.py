@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import IS_CALCITE_PLANNER
 from tests.common.impala_connection import FINISHED, RUNNING
 from tests.common.parametrize import UniqueDatabase
 from tests.common.test_result_verifier import error_msg_startswith
@@ -680,7 +681,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
 
     def assert_hash_join():
       ret = self.execute_query_expect_success(self.client, QUERY)
-      assert ":EXCHANGE [HASH(b.id)]" in str(ret.data)
+      assert re.search(":EXCHANGE \[HASH\(.*\.id\)\]", str(ret.data))
 
     # Without any executors we default to a hash join.
     assert_hash_join()
@@ -719,7 +720,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Predicate to assert that the planner decided on a hash join.
     def assert_hash_join():
       ret = self.execute_query_expect_success(self.client, QUERY)
-      assert ":EXCHANGE [HASH(b.id)]" in str(ret.data)
+      assert re.search(":EXCHANGE \[HASH\(.*\.id\)\]", str(ret.data))
 
     # Without any executors we default to a hash join.
     assert_hash_join()
@@ -1310,72 +1311,74 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # BEGIN test memory capping.
     # Set MAX_FRAGMENT_INSTANCES_PER_NODE=4 and
     # disable MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR.
-    self._set_query_options({
-      'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 0.0,
-      'MAX_FRAGMENT_INSTANCES_PER_NODE': 4})
-    self._run_query_and_verify_profile(
-      TPCDS_Q67,
-      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-       "Per-Host Resource Estimates: Memory=9.25GB",
-       "mem-estimate=1.38GB",  # memory estimate of 17:AGGREGATE.
-       "mem-estimate=1.11GB",  # memory estimate of 07:AGGREGATE.
-       "MemoryAsk: 27.76 GB"])
+    # IMPALA-14816: Calcite planner produces different memory estimates.
+    if not IS_CALCITE_PLANNER:
+      self._set_query_options({
+        'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 0.0,
+        'MAX_FRAGMENT_INSTANCES_PER_NODE': 4})
+      self._run_query_and_verify_profile(
+        TPCDS_Q67,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+         "Per-Host Resource Estimates: Memory=9.25GB",
+         "mem-estimate=1.38GB",  # memory estimate of 17:AGGREGATE.
+         "mem-estimate=1.11GB",  # memory estimate of 07:AGGREGATE.
+         "MemoryAsk: 27.76 GB"])
 
-    # Set very low MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR.
-    self._set_query_options({'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 0.00001})
-    self._run_query_and_verify_profile(
-      TPCDS_Q67,
-      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-       "Per-Host Resource Estimates: Memory=1.86GB",
-       "mem-estimate=210.92MB",  # memory estimate of 17:AGGREGATE.
-       "mem-estimate=211.13MB",  # memory estimate of 07:AGGREGATE.
-       "MemoryAsk: 5.57 GB"])
+      # Set very low MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR.
+      self._set_query_options({'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 0.00001})
+      self._run_query_and_verify_profile(
+        TPCDS_Q67,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+         "Per-Host Resource Estimates: Memory=1.86GB",
+         "mem-estimate=210.92MB",  # memory estimate of 17:AGGREGATE.
+         "mem-estimate=211.13MB",  # memory estimate of 07:AGGREGATE.
+         "MemoryAsk: 5.57 GB"])
 
-    # Set MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR to maximum.
-    self._set_query_options({'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 1.0})
-    self._run_query_and_verify_profile(
-      TPCDS_Q67,
-      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-       "Per-Host Resource Estimates: Memory=9.25GB",
-       "mem-estimate=1.38GB",  # memory estimate of 17:AGGREGATE.
-       "mem-estimate=1.11GB",  # memory estimate of 07:AGGREGATE.
-       "MemoryAsk: 27.76 GB"])
+      # Set MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR to maximum.
+      self._set_query_options({'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 1.0})
+      self._run_query_and_verify_profile(
+        TPCDS_Q67,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+         "Per-Host Resource Estimates: Memory=9.25GB",
+         "mem-estimate=1.38GB",  # memory estimate of 17:AGGREGATE.
+         "mem-estimate=1.11GB",  # memory estimate of 07:AGGREGATE.
+         "MemoryAsk: 27.76 GB"])
 
-    # Set MEM_LIMIT_EXECUTORS to 3GB, lower than --mem_limit=4g of root.large's
-    # backend executors.
-    self._set_query_options({'MEM_LIMIT_EXECUTORS': '3GB'})
-    self._run_query_and_verify_profile(
-      TPCDS_Q67,
-      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-       "Per-Host Resource Estimates: Memory=6.68GB",
-       "mem-estimate=1.00GB",  # memory estimate of 17:AGGREGATE.
-       "mem-estimate=768.00MB",  # memory estimate of 07:AGGREGATE.
-       "MemoryAsk: 20.03 GB"])
+      # Set MEM_LIMIT_EXECUTORS to 3GB, lower than --mem_limit=4g of root.large's
+      # backend executors.
+      self._set_query_options({'MEM_LIMIT_EXECUTORS': '3GB'})
+      self._run_query_and_verify_profile(
+        TPCDS_Q67,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+         "Per-Host Resource Estimates: Memory=6.68GB",
+         "mem-estimate=1.00GB",  # memory estimate of 17:AGGREGATE.
+         "mem-estimate=768.00MB",  # memory estimate of 07:AGGREGATE.
+         "MemoryAsk: 20.03 GB"])
 
-    # Set MEM_LIMIT to 2GB, lower than MEM_LIMIT_EXECUTORS.
-    self._set_query_options({'MEM_LIMIT': '2GB'})
-    self._run_query_and_verify_profile(
-      TPCDS_Q67,
-      ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
-       "Per-Host Resource Estimates: Memory=4.68GB",
-       "mem-estimate=682.67MB",  # memory estimate of 17:AGGREGATE.
-       "mem-estimate=512.00MB",  # memory estimate of 07:AGGREGATE.
-       "MemoryAsk: 14.03 GB"])
+      # Set MEM_LIMIT to 2GB, lower than MEM_LIMIT_EXECUTORS.
+      self._set_query_options({'MEM_LIMIT': '2GB'})
+      self._run_query_and_verify_profile(
+        TPCDS_Q67,
+        ["Executor Group: root.large-group", "ExecutorGroupsConsidered: 3",
+         "Per-Host Resource Estimates: Memory=4.68GB",
+         "mem-estimate=682.67MB",  # memory estimate of 17:AGGREGATE.
+         "mem-estimate=512.00MB",  # memory estimate of 07:AGGREGATE.
+         "MemoryAsk: 14.03 GB"])
 
-    self._set_query_options({
-      'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 0.0,
-      'MAX_FRAGMENT_INSTANCES_PER_NODE': '',
-      'MEM_LIMIT_EXECUTORS': '',
-      'MEM_LIMIT': ''})
-    # END test memory capping.
+      self._set_query_options({
+        'MEM_ESTIMATE_SCALE_FOR_SPILLING_OPERATOR': 0.0,
+        'MAX_FRAGMENT_INSTANCES_PER_NODE': '',
+        'MEM_LIMIT_EXECUTORS': '',
+        'MEM_LIMIT': ''})
+      # END test memory capping.
 
-    # Check resource pools on the Web queries site and admission site
-    self._verify_query_num_for_resource_pool("root.tiny", 17)
-    self._verify_query_num_for_resource_pool("root.small", 3)
-    self._verify_query_num_for_resource_pool("root.large", 13)
-    self._verify_total_admitted_queries("root.tiny", 17)
-    self._verify_total_admitted_queries("root.small", 3)
-    self._verify_total_admitted_queries("root.large", 13)
+      # Check resource pools on the Web queries site and admission site
+      self._verify_query_num_for_resource_pool("root.tiny", 17)
+      self._verify_query_num_for_resource_pool("root.small", 3)
+      self._verify_query_num_for_resource_pool("root.large", 13)
+      self._verify_total_admitted_queries("root.tiny", 17)
+      self._verify_total_admitted_queries("root.small", 3)
+      self._verify_total_admitted_queries("root.large", 13)
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
@@ -1630,9 +1633,17 @@ class TestExecutorGroups(CustomClusterTestSuite):
       "-gen_experimental_profile=true -query_cpu_count_divisor=0.01 "
       "-skip_resource_checking_on_last_executor_group_set=false ")
     self._setup_three_exec_group_cluster(coordinator_test_args)
-    self._set_query_options({
-      'COMPUTE_PROCESSING_COST': 'true',
-      'SLOT_COUNT_STRATEGY': 'PLANNER_CPU_ASK'})
+    # if the calcite planner is being used, we don't want to run the query after
+    # the AnalysisException is thrown.
+    if IS_CALCITE_PLANNER:
+      self._set_query_options({
+        'COMPUTE_PROCESSING_COST': 'true',
+        'SLOT_COUNT_STRATEGY': 'PLANNER_CPU_ASK',
+        'FALLBACK_PLANNER': 'calcite'})
+    else:
+      self._set_query_options({
+        'COMPUTE_PROCESSING_COST': 'true',
+        'SLOT_COUNT_STRATEGY': 'PLANNER_CPU_ASK'})
     result = self.execute_query_expect_failure(self.hs2_client, CPU_TEST_QUERY)
     assert ("AnalysisException: The query does not fit largest executor group sets. "
         "Reason: not enough cpu cores (require=300, max=192).") in str(result)

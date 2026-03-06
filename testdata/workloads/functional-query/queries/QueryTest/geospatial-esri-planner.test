@@ -15,6 +15,9 @@ select * from functional.binary_tbl
 where st_disjoint(binary_col, st_point(1, 1))
 ---- RUNTIME_PROFILE
 predicates: st_disjoint('unhex("000000000101000000000000000000F03F000000000000F03F")', binary_col)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14812: need to implement rewrites for Calcite planner
+predicates: st_disjoint(functional.binary_tbl.binary_col, st_point(CAST(1 AS DOUBLE), CAST(1 AS DOUBLE)))
 ====
 ---- QUERY
 # Check that AddEnvIntersectsRule adds st_envintersects() before relations.
@@ -22,6 +25,9 @@ select * from functional.binary_tbl
 where st_touches(binary_col, st_point(id, id))
 ---- RUNTIME_PROFILE
 predicates: st_envintersects(binary_col, st_point(CAST(id AS DOUBLE), CAST(id AS DOUBLE))), st_touches(binary_col, st_point(CAST(id AS DOUBLE), CAST(id AS DOUBLE)))
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14812: need to implement rewrites for Calcite planner
+predicates: st_touches(functional.binary_tbl.binary_col, st_point(CAST(functional.binary_tbl.id AS DOUBLE), CAST(functional.binary_tbl.id AS DOUBLE)))
 ====
 ---- QUERY
 # Check that AddEnvIntersectsRule doesn't duplicate st_envintersects() when it is
@@ -30,6 +36,8 @@ select * from functional.binary_tbl
 where st_envintersects(binary_col, st_point(id, id)) and st_touches(binary_col, st_point(id, id))
 ---- RUNTIME_PROFILE
 predicates: st_envintersects(binary_col, st_point(CAST(id AS DOUBLE), CAST(id AS DOUBLE))), st_touches(binary_col, st_point(CAST(id AS DOUBLE), CAST(id AS DOUBLE)))
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+predicates: st_envintersects(functional.binary_tbl.binary_col, st_point(CAST(functional.binary_tbl.id AS DOUBLE), CAST(functional.binary_tbl.id AS DOUBLE))), st_touches(functional.binary_tbl.binary_col, st_point(CAST(functional.binary_tbl.id AS DOUBLE), CAST(functional.binary_tbl.id AS DOUBLE)))
 ====
 ---- QUERY
 # Check that AddEnvIntersectsRule does NOT add st_envintersects() if child expressions
@@ -38,6 +46,8 @@ select * from functional.alltypestiny
 where st_touches(st_point(string_col), st_point(string_col))
 ---- RUNTIME_PROFILE
 predicates: st_touches(st_point(string_col), st_point(string_col))
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+predicates: st_touches(st_point(functional.alltypestiny.string_col), st_point(functional.alltypestiny.string_col))
 ====
 ---- QUERY
 # Check that PointEnvIntersectsRule is applied and st_envintersects() on st_point(x,y)
@@ -59,6 +69,9 @@ INT,DOUBLE,FLOAT
 predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
 parquet statistics predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
 parquet dictionary predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14812: need to implement rewrites for Calcite planner
+predicates: st_envintersects(st_geomfromtext('polygon ((-1 0, 20 0, 20 20.5, -1 20.5, -1 0))'), st_point(functional_parquet.alltypessmall.double_col, CAST(functional_parquet.alltypessmall.float_col AS DOUBLE)))
 ====
 ---- QUERY
 # Check that PointEnvIntersectsRule is applied on the st_envintersects() added by
@@ -80,6 +93,9 @@ INT,DOUBLE,FLOAT
 row_regex: predicates: double_col <= CAST\(20 AS DOUBLE\), double_col >= CAST\(-1 AS DOUBLE\), CAST\(float_col AS DOUBLE\) <= CAST\(20.5 AS DOUBLE\), CAST\(float_col AS DOUBLE\) >= CAST\(0 AS DOUBLE\), st_intersects
 parquet statistics predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
 parquet dictionary predicates: double_col <= CAST(20 AS DOUBLE), double_col >= CAST(-1 AS DOUBLE), CAST(float_col AS DOUBLE) <= CAST(20.5 AS DOUBLE), CAST(float_col AS DOUBLE) >= CAST(0 AS DOUBLE)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14812: need to implement rewrites for Calcite planner
+predicates: st_intersects(st_point(functional_parquet.alltypessmall.double_col, CAST(functional_parquet.alltypessmall.float_col AS DOUBLE)), st_geomfromtext('polygon ((-1 0, 20 0, 20 20.5, -1 20.5, -1 0))'))
 =====
 ---- QUERY
 # Check that PointEnvIntersectsRule is NOT applied if children are expensive.
@@ -93,4 +109,7 @@ BIGINT
 25
 ---- RUNTIME_PROFILE
 row_regex: predicates: st_envintersects\(\'unhex\(\".*\"\)\', st_point\(sqrt\(double_col\), sqrt\(CAST\(float_col AS DOUBLE\)\)\)\)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14812: need to implement rewrites for Calcite planner
+predicates: st_envintersects(st_point(sqrt(functional_parquet.alltypessmall.double_col), sqrt(CAST(functional_parquet.alltypessmall.float_col AS DOUBLE))), st_geomfromtext('polygon ((-1 0, 20 0, 20 20.5, -1 20.5, -1 0))'))
 =====

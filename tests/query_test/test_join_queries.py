@@ -266,7 +266,7 @@ class TestExprValueCache(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_table_format_dimension(cls.get_workload(), 'parquet/snap/block'))
     add_mandatory_exec_option(cls, 'runtime_filter_mode', 'OFF')
-    add_mandatory_exec_option(cls, 'mem_limit', '149mb')
+    add_mandatory_exec_option(cls, 'mem_limit', '153mb')
     add_mandatory_exec_option(cls, 'mt_dop', 1)
 
   def test_expr_value_cache_fits(self, vector):

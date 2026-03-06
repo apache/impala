@@ -27,7 +27,8 @@ from impala_thrift_gen.RuntimeProfile.ttypes import TRuntimeProfileFormat
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_connection import IMPALA_CONNECTION_EXCEPTION
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster
+from tests.common.skip import (SkipIfFS, SkipIfLocal, SkipIfNotHdfsMinicluster,
+                               SkipIfCalcite)
 from tests.common.test_vector import HS2
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.parse_util import get_duration_us_from_str
@@ -163,7 +164,8 @@ class TestObservability(ImpalaTestSuite):
     """Test that the query profile shows expected non-default query options, both set
     explicitly through client and those set by planner"""
     # Set mem_limit and runtime_filter_wait_time_ms to non-default and default value.
-    query_opts = {'mem_limit': 8589934592, 'runtime_filter_wait_time_ms': 0}
+    query_opts = {'mem_limit': 8589934592, 'runtime_filter_wait_time_ms': 0,
+        'PLANNER': 'ORIGINAL'}
     profile = self.execute_query("select 1", query_opts).runtime_profile
     assert "Query Options (set by configuration): MEM_LIMIT=8589934592" in profile,\
         profile
@@ -192,6 +194,9 @@ class TestObservability(ImpalaTestSuite):
     expected_str = expected_str.format(timezone=server_timezone)
     assert expected_str in profile, profile
 
+  # IMPALA-14817
+  # Calcite planner does not populate these profile columns yet
+  @SkipIfCalcite.observability_info_missing
   def test_profile(self):
     """Test that expected fields are populated in the profile."""
     query = """select a.month, sum(a.int_col) from functional.alltypes a join
@@ -309,6 +314,9 @@ class TestObservability(ImpalaTestSuite):
     assert results.runtime_profile.count("AGGREGATION_NODE") == 2
     assert results.runtime_profile.count("PLAN_ROOT_SINK") == 2
 
+  # IMPALA-14817
+  # Calcite planner populates different static events
+  @SkipIfCalcite.observability_info_missing
   def test_query_profile_contains_query_compilation_static_events(self):
     """Test that the expected events show up in a query profile. These lines are static
     and should appear in this exact order."""

@@ -299,3 +299,9 @@ class SkipIfCalcite:
       reason="hints not supported yet")
   lineage_not_supported = pytest.mark.skipif(IS_CALCITE_PLANNER,
       reason="lineage not supported yet")
+  kudu_not_supported = pytest.mark.skipif(IS_CALCITE_PLANNER,
+      reason="kudu not supported yet")
+  row_filtering_not_supported = pytest.mark.skipif(IS_CALCITE_PLANNER,
+      reason="row filtering not supported yet")
+  observability_info_missing = pytest.mark.skipif(IS_CALCITE_PLANNER,
+      reason="some observability test information is missing")

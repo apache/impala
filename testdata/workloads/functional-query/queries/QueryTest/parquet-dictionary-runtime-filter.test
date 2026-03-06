@@ -41,6 +41,10 @@ SELECT * FROM parquet_dict_runtime_filter a
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumDictFilteredRowGroups): 5
 aggregation(SUM, RowGroups total): 5
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# Calcite plan has a 'col_2 IS NOT NULL' parquet dictionary filter
+aggregation(SUM, NumDictFilteredRowGroups): 5
+aggregation(SUM, RowGroups total): 4
 ====
 ---- QUERY
 # Multiple columns in the join predicate, runtime filter should be skipped because only

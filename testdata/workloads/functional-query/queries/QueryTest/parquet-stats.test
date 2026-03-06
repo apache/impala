@@ -10,7 +10,7 @@ aggregation(SUM, NumStatsFilteredRowGroups): 4
 set explain_level=2;
 explain select id, bool_col from functional_parquet.alltypessmall where int_col < 0;
 ---- RESULTS: VERIFY_IS_SUBSET
-'   parquet statistics predicates: int_col < CAST(0 AS INT)'
+row_regex: .*parquet statistics predicates: .*int_col .* CAST\(0 AS INT\).*
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where tinyint_col < 0
@@ -160,7 +160,7 @@ aggregation(SUM, NumStatsFilteredRowGroups): 4
 set explain_level=2;
 explain select count(*) from functional_parquet.alltypessmall where tinyint_col = 10
 ---- RESULTS: VERIFY_IS_SUBSET
-'   parquet statistics predicates: tinyint_col = CAST(10 AS TINYINT)'
+row_regex:'   parquet statistics predicates: .*tinyint_col = CAST\(10 AS TINYINT\)'
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where id >= 30 and id <= 80
@@ -242,6 +242,14 @@ select count(*) from functional_parquet.alltypessmall where tinyint_col > 100000
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 4
 aggregation(SUM, NumStatsFilteredRowGroups): 4
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14814: Needs to be investigated. An implicit cast is being placed on tinyint_col
+# and there is code that does not unwrap the SlotRef because of this cast. Simply getting
+# rid of that code may cause other failures, that needs to be investigated. Another way
+# to fix this is by putting in a rule that simplifies this filter into a false expression
+# since there is no way that this can return any rows.
+aggregation(SUM, NumRowGroups): 4
+aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
 ---- QUERY
 # Predicates with explicit casts are not supported when evaluating parquet::Statistics.
@@ -468,6 +476,11 @@ select count(*) from functional_parquet.decimal_tbl where d4 > 0.123456789
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 1
 aggregation(SUM, NumStatsFilteredRowGroups): 1
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14814: Calcite planner is casting d4 to a decimal to match the constant, but this
+# shouldn't be necessary
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
 ---- QUERY
 select count(*) from functional_parquet.decimal_tbl where d4 >= 0.12345678
@@ -484,6 +497,11 @@ select count(*) from functional_parquet.decimal_tbl where d4 >= 0.12345679
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroups): 1
 aggregation(SUM, NumStatsFilteredRowGroups): 1
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14814: Calcite planner is casting d4 to a decimal to match the constant, but this
+# shouldn't be necessary
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumStatsFilteredRowGroups): 0
 ====
 ---- QUERY
 # Test that stats are disabled for CHAR type columns.

@@ -26,7 +26,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_connection import FINISHED, IMPALA_CONNECTION_EXCEPTION
 from tests.common.kudu_test_suite import KuduTestSuite
-from tests.common.skip import SkipIfKudu, SkipIfBuildType, SkipIf
+from tests.common.skip import SkipIfKudu, SkipIfBuildType, SkipIf, SkipIfCalcite
 from tests.common.test_dimensions import HS2, add_mandatory_exec_option
 from tests.common.test_result_verifier import error_msg_startswith
 
@@ -143,6 +143,7 @@ class TestKuduClientTimeout(CustomKuduTest):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="-kudu_operation_timeout_ms=1")
   @SkipIfKudu.hms_integration_enabled()
+  @SkipIfCalcite.kudu_not_supported
   def test_impalad_timeout(self, vector):
     """Check impalad behavior when -kudu_operation_timeout_ms is too low."""
     self.run_test_case('QueryTest/kudu-timeouts-impalad', vector)

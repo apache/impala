@@ -33,6 +33,11 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RUNTIME_PROFILE
 row_regex: 1 of 1 Runtime Filter Published
 row_regex: Filter 0 \(128.00 KB\)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14811: Calcite planner produces different results because a SelectNode is created
+# in the plan that contains an IS NOT NULL in it.
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(64.00 KB\)
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -46,6 +51,11 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RUNTIME_PROFILE
 row_regex: 1 of 1 Runtime Filter Published
 row_regex: Filter 0 \(512.00 KB\)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14811: Calcite planner produces different results because a SelectNode is created
+# in the plan that contains an IS NOT NULL in it.
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(64.00 KB\)
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -59,6 +69,11 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RUNTIME_PROFILE
 row_regex: 1 of 1 Runtime Filter Published
 row_regex: Filter 0 \(1.00 MB\)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14811: Calcite planner produces different results because a SelectNode is created
+# in the plan that contains an IS NOT NULL in it.
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(128.00 KB\)
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -73,6 +88,11 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RUNTIME_PROFILE
 row_regex: 1 of 1 Runtime Filter Published
 row_regex: Filter 0 \(2.00 MB\)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14811: Calcite planner produces different results because a SelectNode is created
+# in the plan that contains an IS NOT NULL in it.
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(256.00 KB\)
 ====
 
 
@@ -155,4 +175,9 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RUNTIME_PROFILE
 row_regex: 1 of 1 Runtime Filter Published
 row_regex: Filter 0 \(256.00 KB\)
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# IMPALA-14811: Calcite planner produces different results because a SelectNode is created
+# in the plan that contains an IS NOT NULL in it.
+row_regex: 1 of 1 Runtime Filter Published
+row_regex: Filter 0 \(64.00 KB\)
 ====
