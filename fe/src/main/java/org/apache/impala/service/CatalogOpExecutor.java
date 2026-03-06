@@ -2851,6 +2851,7 @@ public class CatalogOpExecutor {
           IcebergCatalogOpExecutor.addCatalogVersionToTxn(
               iceTxn, catalog_.getCatalogServiceId(), modification.newVersionNumber());
           iceTxn.commitTransaction();
+          catalogTimeline.markEvent("Committed Iceberg transaction");
         } else {
           dropTableStats(table, catalogTimeline);
         }
@@ -3679,6 +3680,7 @@ public class CatalogOpExecutor {
             iceTxn, catalog_.getCatalogServiceId(), modification.newVersionNumber());
       }
       iceTxn.commitTransaction();
+      catalogTimeline.markEvent("Committed Iceberg transaction");
       modification.markInflightEventRegistrationComplete();
       modification.validateInProgressModificationComplete();
     } catch (ImpalaException ex) {
@@ -8066,6 +8068,7 @@ public class CatalogOpExecutor {
 
       DebugUtils.executeDebugAction(update.getDebug_action(), DebugUtils.ICEBERG_COMMIT);
       iceTxn.commitTransaction();
+      catalogTimeline.markEvent("Committed Iceberg transaction");
     // If we have no information about the success of the commit, we should not delete
     // anything.
     } catch (CommitStateUnknownException u) {
