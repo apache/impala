@@ -5,7 +5,7 @@
 select * from functional.binary_tbl
 where st_geomfromwkb(binary_col) is not null and sqrt(id) = 1;
 ---- RUNTIME_PROFILE
-predicates: sqrt(CAST(id AS DOUBLE)) = CAST(1 AS DOUBLE), st_geomfromwkb(binary_col) IS NOT NULL
+row_regex: .*predicates: sqrt\(CAST\(.*id AS DOUBLE\)\) = CAST\(1 AS DOUBLE\), st_geomfromwkb\(.*binary_col\) IS NOT NULL
 ====
 ---- QUERY
 # Check that NormalizeGeospatialRelationsRule is applied and the const argument is moved

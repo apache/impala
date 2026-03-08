@@ -48,6 +48,7 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
   public static Set<String> IMPALA_OVERRIDE_CONVERTLETS =
       ImmutableSet.<String> builder()
       .add("||")
+      .add("SQRT")
       .build();
 
   public static final ImpalaConvertletTable INSTANCE =
@@ -59,6 +60,7 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
     registerOp(SqlStdOperatorTable.IS_DISTINCT_FROM, this::convertIsDistinctFrom);
     registerOp(SqlStdOperatorTable.IS_NOT_DISTINCT_FROM, this::convertIsNotDistinctFrom);
     registerOp(ImpalaConcatOrOperator.INSTANCE, this::convertConcatOr);
+    registerOp(SqlStdOperatorTable.SQRT, this::convertSqrt);
   }
 
   @Override
@@ -145,5 +147,16 @@ public class ImpalaConvertletTable extends ReflectiveConvertletTable {
         ? SqlStdOperatorTable.OR
         : SqlStdOperatorTable.CONCAT;
     return rexBuilder.makeCall(returnType, op, operands);
+  }
+
+  protected RexNode convertSqrt(
+      SqlRexContext cx, SqlCall call) {
+    final SqlNode expr1 = call.operand(0);
+    final RexBuilder rexBuilder = cx.getRexBuilder();
+    RelDataType returnType =
+        cx.getValidator().getValidatedNodeTypeIfKnown(call);
+    List<RexNode> operands = Lists.newArrayList(cx.convertExpression(expr1));
+    return rexBuilder.makeCall(returnType, SqlStdOperatorTable.SQRT,
+        operands);
   }
 }
