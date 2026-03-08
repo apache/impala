@@ -27,7 +27,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.common.Pair;
+
 import org.apache.impala.thrift.TRangePartition;
 import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.KuduUtil;
@@ -51,6 +51,11 @@ import com.google.common.collect.Lists;
  * - Single value (no range):
  *   PARTITION VALUE = val
  *   PARTITION VALUE = (val1, val2, ..., valn)
+ *
+ * Additionally, reversed comparator forms are accepted (IMPALA-7618) and normalized
+ * to the canonical form above:
+ *   PARTITION VALUES >[=] l_val  (equivalent to l_val <[=] VALUES)
+ *   PARTITION u_val >[=] VALUES  (equivalent to VALUES <[=] u_val)
  *
  * Internally, all these cases are represented using the quadruplet:
  * [(l_val1,..., l_valn), l_bound_type, (u_val1,..., u_valn), u_bound_type],
@@ -87,27 +92,38 @@ public class RangePartition extends StmtNode {
   }
 
   /**
-   * Constructs a range partition. The range is specified in the CREATE/ALTER TABLE
-   * statement using the 'PARTITION <expr> OP VALUES OP <expr>' clause or using the
-   * 'PARTITION (<expr>,....,<expr>) OP VALUES OP (<expr>,...,<expr>)' clause. 'lower'
-   * corresponds to the '<expr> OP' or '(<expr>,...,<expr>) OP' pair which defines an
-   * optional lower bound, and similarly 'upper' corresponds to the optional upper bound.
-   * Since only '<' and '<=' operators are allowed, operators are represented with boolean
-   * values that indicate inclusive or exclusive bounds.
+   * Constructs a range partition from RangeBound objects parsed by the SQL grammar.
+   * Handles normalization of reversed comparator forms (IMPALA-7618): when a bound
+   * was specified with '>' or '>=' operators (e.g., 'VALUES >= X' or 'X > VALUES'),
+   * the RangeBound's reversed flag is set, and this method swaps it to the correct
+   * position. For example, 'VALUES >= X' appears in the upper bound position but
+   * semantically defines a lower bound (inclusive), so it is moved to the lower
+   * bound position.
    */
-  public static RangePartition createFromRange(Pair<List<Expr>, Boolean> lower,
-      Pair<List<Expr>, Boolean> upper, List<KuduPartitionParam> hashSpec) {
+  public static RangePartition createFromRangeWithNormalization(RangeBound lower,
+      RangeBound upper, List<KuduPartitionParam> hashSpec) {
+    // Normalize reversed bounds: a reversed lower bound is actually an upper bound
+    // and vice versa. Swap them into the correct positions.
+    RangeBound actualLower = null;
+    RangeBound actualUpper = null;
+    if (lower != null && !lower.isReversed()) actualLower = lower;
+    if (upper != null && !upper.isReversed()) actualUpper = upper;
+    // A reversed bound in the lower position is actually an upper bound.
+    if (lower != null && lower.isReversed()) actualUpper = lower;
+    // A reversed bound in the upper position is actually a lower bound.
+    if (upper != null && upper.isReversed()) actualLower = upper;
+
     List<Expr> lowerBoundExprs = Lists.newArrayListWithCapacity(1);
     boolean lowerBoundInclusive = false;
     List<Expr> upperBoundExprs = Lists.newArrayListWithCapacity(1);
     boolean upperBoundInclusive = false;
-    if (lower != null) {
-      lowerBoundExprs = lower.first;
-      lowerBoundInclusive = lower.second;
+    if (actualLower != null) {
+      lowerBoundExprs = actualLower.getValues();
+      lowerBoundInclusive = actualLower.isInclusive();
     }
-    if (upper != null) {
-      upperBoundExprs = upper.first;
-      upperBoundInclusive = upper.second;
+    if (actualUpper != null) {
+      upperBoundExprs = actualUpper.getValues();
+      upperBoundInclusive = actualUpper.isInclusive();
     }
     return new RangePartition(lowerBoundExprs, lowerBoundInclusive, upperBoundExprs,
         upperBoundInclusive, hashSpec);

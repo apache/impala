@@ -188,6 +188,18 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalyzesOk("create table tab (id int, name string, valf float, vali bigint, " +
         "primary key (id, name)) partition by range (name) " +
         "(partition 'aa' < values <= 'bb') stored as kudu", isExternalPurgeTbl);
+    // Reversed comparator forms (IMPALA-7618): '>' and '>=' should be accepted
+    // and produce the same internal representation as the canonical '<' / '<=' forms.
+    AnalyzesOk("create table tab (a int, b int, c int, d int, primary key(a, b, c, d))" +
+        "partition by hash (a, b, c) partitions 8, " +
+        "range (a) (partition values >= 1, partition 4 > values) " +
+        "stored as kudu", isExternalPurgeTbl);
+    AnalyzesOk("create table tab (id int, name string, primary key(id, name)) " +
+        "partition by range (name) " +
+        "(partition values >= 'aa') stored as kudu", isExternalPurgeTbl);
+    AnalyzesOk("create table tab (id int, name string, primary key(id, name)) " +
+        "partition by range (name) " +
+        "(partition 'zz' >= values) stored as kudu", isExternalPurgeTbl);
     // Null values in range partition values
     AnalysisError("create table tab (id int, name string, primary key(id, name)) " +
         "partition by hash (id) partitions 3, range (name) " +

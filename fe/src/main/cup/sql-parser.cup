@@ -34,6 +34,7 @@ import org.apache.impala.analysis.ColumnDef.Option;
 import org.apache.impala.analysis.SetOperationStmt.Qualifier;
 import org.apache.impala.analysis.SetOperationStmt.SetOperand;
 import org.apache.impala.analysis.SetOperationStmt.SetOperator;
+import org.apache.impala.analysis.RangeBound;
 import org.apache.impala.analysis.RangePartition;
 import org.apache.impala.analysis.TableSampleClause;
 import org.apache.impala.analysis.AlterTableAddDropRangePartitionStmt.Operation;
@@ -545,8 +546,7 @@ nonterminal StructField struct_field_def;
 nonterminal KuduPartitionParam hash_partition_param;
 nonterminal List<RangePartition> range_params_list;
 nonterminal RangePartition range_param;
-nonterminal Pair<List<Expr>, Boolean> opt_lower_range_val,
-   opt_upper_range_val;
+nonterminal RangeBound opt_lower_range_val, opt_upper_range_val;
 nonterminal List<KuduPartitionParam> hash_partition_param_list, custom_hash_partition_param_list;
 nonterminal List<KuduPartitionParam> partition_param_list;
 nonterminal KuduPartitionParam range_partition_param;
@@ -2050,7 +2050,8 @@ range_params_list ::=
 
 range_param ::=
   KW_PARTITION opt_lower_range_val:lower_val KW_VALUES opt_upper_range_val:upper_val custom_hash_partition_param_list:hashspec
-  {: RESULT = RangePartition.createFromRange(lower_val, upper_val, hashspec); :}
+  {: RESULT = RangePartition.createFromRangeWithNormalization(
+         lower_val, upper_val, hashspec); :}
   // Use dotted_path to avoid reduce/reduce conflicts with expr
   | KW_PARTITION dotted_path:val EQUAL expr:l custom_hash_partition_param_list:hashspec
   {:
@@ -2081,26 +2082,48 @@ custom_hash_partition_param_list ::=
 
 opt_lower_range_val ::=
   expr:l LESSTHAN
-  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), false); :}
+  {: RESULT = new RangeBound(Lists.newArrayList(l), false); :}
   | expr:l LESSTHAN EQUAL
-  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), true); :}
+  {: RESULT = new RangeBound(Lists.newArrayList(l), true); :}
   | LPAREN expr_list:l RPAREN LESSTHAN
-  {: RESULT = new Pair<List<Expr>, Boolean>(l, false); :}
+  {: RESULT = new RangeBound(l, false); :}
   | LPAREN expr_list:l RPAREN LESSTHAN EQUAL
-  {: RESULT = new Pair<List<Expr>, Boolean>(l, true); :}
+  {: RESULT = new RangeBound(l, true); :}
+  // Reversed comparator forms (IMPALA-7618): expr >= VALUES, expr > VALUES
+  // These are syntactically in the lower bound position but semantically define
+  // an upper bound. The 'reversed' flag signals this to the range_param rule.
+  | expr:l GREATERTHAN EQUAL
+  {: RESULT = new RangeBound(Lists.newArrayList(l), true, true); :}
+  | expr:l GREATERTHAN
+  {: RESULT = new RangeBound(Lists.newArrayList(l), false, true); :}
+  | LPAREN expr_list:l RPAREN GREATERTHAN EQUAL
+  {: RESULT = new RangeBound(l, true, true); :}
+  | LPAREN expr_list:l RPAREN GREATERTHAN
+  {: RESULT = new RangeBound(l, false, true); :}
   | /* empty */
   {: RESULT = null; :}
   ;
 
 opt_upper_range_val ::=
   LESSTHAN expr:l
-  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), false); :}
+  {: RESULT = new RangeBound(Lists.newArrayList(l), false); :}
   | LESSTHAN EQUAL expr:l
-  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), true); :}
+  {: RESULT = new RangeBound(Lists.newArrayList(l), true); :}
   | LESSTHAN LPAREN expr_list:l RPAREN
-  {: RESULT = new Pair<List<Expr>, Boolean>(l, false); :}
+  {: RESULT = new RangeBound(l, false); :}
   | LESSTHAN EQUAL LPAREN expr_list:l RPAREN
-  {: RESULT = new Pair<List<Expr>, Boolean>(l, true); :}
+  {: RESULT = new RangeBound(l, true); :}
+  // Reversed comparator forms (IMPALA-7618): VALUES >= expr, VALUES > expr
+  // These are syntactically in the upper bound position but semantically define
+  // a lower bound. The 'reversed' flag signals this to the range_param rule.
+  | GREATERTHAN EQUAL expr:l
+  {: RESULT = new RangeBound(Lists.newArrayList(l), true, true); :}
+  | GREATERTHAN expr:l
+  {: RESULT = new RangeBound(Lists.newArrayList(l), false, true); :}
+  | GREATERTHAN EQUAL LPAREN expr_list:l RPAREN
+  {: RESULT = new RangeBound(l, true, true); :}
+  | GREATERTHAN LPAREN expr_list:l RPAREN
+  {: RESULT = new RangeBound(l, false, true); :}
   | /* empty */
   {: RESULT = null; :}
   ;
