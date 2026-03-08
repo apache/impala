@@ -34,6 +34,7 @@ import org.apache.impala.analysis.ColumnDef.Option;
 import org.apache.impala.analysis.SetOperationStmt.Qualifier;
 import org.apache.impala.analysis.SetOperationStmt.SetOperand;
 import org.apache.impala.analysis.SetOperationStmt.SetOperator;
+import org.apache.impala.analysis.RangeBound;
 import org.apache.impala.analysis.RangePartition;
 import org.apache.impala.analysis.TableSampleClause;
 import org.apache.impala.analysis.AlterTableAddDropRangePartitionStmt.Operation;
@@ -547,8 +548,7 @@ nonterminal StructField struct_field_def;
 nonterminal KuduPartitionParam hash_partition_param;
 nonterminal List<RangePartition> range_params_list;
 nonterminal RangePartition range_param;
-nonterminal Pair<List<Expr>, Boolean> opt_lower_range_val,
-   opt_upper_range_val;
+nonterminal RangeBound expr_cmp_range_val, cmp_expr_range_val;
 nonterminal List<KuduPartitionParam> hash_partition_param_list, custom_hash_partition_param_list;
 nonterminal List<KuduPartitionParam> partition_param_list;
 nonterminal KuduPartitionParam range_partition_param;
@@ -2059,8 +2059,9 @@ range_params_list ::=
   ;
 
 range_param ::=
-  KW_PARTITION opt_lower_range_val:lower_val KW_VALUES opt_upper_range_val:upper_val custom_hash_partition_param_list:hashspec
-  {: RESULT = RangePartition.createFromRange(lower_val, upper_val, hashspec); :}
+  KW_PARTITION expr_cmp_range_val:first_val KW_VALUES cmp_expr_range_val:second_val custom_hash_partition_param_list:hashspec
+  {: RESULT = RangePartition.createFromRangeWithNormalization(
+         first_val, second_val, hashspec); :}
   // Use dotted_path to avoid reduce/reduce conflicts with expr
   | KW_PARTITION dotted_path:val EQUAL expr:l custom_hash_partition_param_list:hashspec
   {:
@@ -2089,28 +2090,57 @@ custom_hash_partition_param_list ::=
   {: RESULT = Lists.newArrayList(); :}
   ;
 
-opt_lower_range_val ::=
+// The bound that appears before the VALUES keyword: 'expr <cmp> VALUES'. The comparator
+// is stored verbatim, which already matches the normalized 'bound <cmp> VALUES' form
+// expected by RangeBound (see cmp_expr_range_val for the mirrored case). Thus '<' / '<='
+// yield a lower bound and '>' / '>=' (IMPALA-7618) yield an upper bound.
+expr_cmp_range_val ::=
   expr:l LESSTHAN
-  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), false); :}
+  {: RESULT = new RangeBound(Lists.newArrayList(l), RangeBound.Comparator.LESS_THAN); :}
   | expr:l LESSTHAN EQUAL
-  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), true); :}
+  {: RESULT = new RangeBound(Lists.newArrayList(l), RangeBound.Comparator.LESS_EQUAL); :}
   | LPAREN expr_list:l RPAREN LESSTHAN
-  {: RESULT = new Pair<List<Expr>, Boolean>(l, false); :}
+  {: RESULT = new RangeBound(l, RangeBound.Comparator.LESS_THAN); :}
   | LPAREN expr_list:l RPAREN LESSTHAN EQUAL
-  {: RESULT = new Pair<List<Expr>, Boolean>(l, true); :}
+  {: RESULT = new RangeBound(l, RangeBound.Comparator.LESS_EQUAL); :}
+  // Reversed comparator forms (IMPALA-7618): 'expr > VALUES', 'expr >= VALUES' define an
+  // upper bound, which the '>' / '>=' comparator encodes directly.
+  | expr:l GREATERTHAN EQUAL
+  {: RESULT = new RangeBound(Lists.newArrayList(l), RangeBound.Comparator.GREATER_EQUAL); :}
+  | expr:l GREATERTHAN
+  {: RESULT = new RangeBound(Lists.newArrayList(l), RangeBound.Comparator.GREATER_THAN); :}
+  | LPAREN expr_list:l RPAREN GREATERTHAN EQUAL
+  {: RESULT = new RangeBound(l, RangeBound.Comparator.GREATER_EQUAL); :}
+  | LPAREN expr_list:l RPAREN GREATERTHAN
+  {: RESULT = new RangeBound(l, RangeBound.Comparator.GREATER_THAN); :}
   | /* empty */
   {: RESULT = null; :}
   ;
 
-opt_upper_range_val ::=
+// The bound that appears after the VALUES keyword: 'VALUES <cmp> expr'. To keep the
+// RangeBound comparator normalized to the 'bound <cmp> expr' form (i.e. as if the bound
+// were written before VALUES), the comparator is flipped here: 'VALUES < expr' is
+// equivalent to 'expr > VALUES', so it yields an upper bound, and 'VALUES > expr'
+// (IMPALA-7618) is equivalent to 'expr < VALUES', so it yields a lower bound.
+cmp_expr_range_val ::=
   LESSTHAN expr:l
-  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), false); :}
+  {: RESULT = new RangeBound(Lists.newArrayList(l), RangeBound.Comparator.GREATER_THAN); :}
   | LESSTHAN EQUAL expr:l
-  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), true); :}
+  {: RESULT = new RangeBound(Lists.newArrayList(l), RangeBound.Comparator.GREATER_EQUAL); :}
   | LESSTHAN LPAREN expr_list:l RPAREN
-  {: RESULT = new Pair<List<Expr>, Boolean>(l, false); :}
+  {: RESULT = new RangeBound(l, RangeBound.Comparator.GREATER_THAN); :}
   | LESSTHAN EQUAL LPAREN expr_list:l RPAREN
-  {: RESULT = new Pair<List<Expr>, Boolean>(l, true); :}
+  {: RESULT = new RangeBound(l, RangeBound.Comparator.GREATER_EQUAL); :}
+  // Reversed comparator forms (IMPALA-7618): 'VALUES > expr', 'VALUES >= expr' define a
+  // lower bound, i.e. the equivalent 'expr < VALUES' / 'expr <= VALUES'.
+  | GREATERTHAN EQUAL expr:l
+  {: RESULT = new RangeBound(Lists.newArrayList(l), RangeBound.Comparator.LESS_EQUAL); :}
+  | GREATERTHAN expr:l
+  {: RESULT = new RangeBound(Lists.newArrayList(l), RangeBound.Comparator.LESS_THAN); :}
+  | GREATERTHAN EQUAL LPAREN expr_list:l RPAREN
+  {: RESULT = new RangeBound(l, RangeBound.Comparator.LESS_EQUAL); :}
+  | GREATERTHAN LPAREN expr_list:l RPAREN
+  {: RESULT = new RangeBound(l, RangeBound.Comparator.LESS_THAN); :}
   | /* empty */
   {: RESULT = null; :}
   ;

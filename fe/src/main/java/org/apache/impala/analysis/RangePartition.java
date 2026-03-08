@@ -27,7 +27,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.TypeCompatibility;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.common.Pair;
+
 import org.apache.impala.thrift.TRangePartition;
 import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.KuduUtil;
@@ -51,6 +51,11 @@ import com.google.common.collect.Lists;
  * - Single value (no range):
  *   PARTITION VALUE = val
  *   PARTITION VALUE = (val1, val2, ..., valn)
+ *
+ * Additionally, reversed comparator forms are accepted (IMPALA-7618) and normalized
+ * to the canonical form above:
+ *   PARTITION VALUES >[=] l_val  (equivalent to l_val <[=] VALUES)
+ *   PARTITION u_val >[=] VALUES  (equivalent to VALUES <[=] u_val)
  *
  * Internally, all these cases are represented using the quadruplet:
  * [(l_val1,..., l_valn), l_bound_type, (u_val1,..., u_valn), u_bound_type],
@@ -87,27 +92,53 @@ public class RangePartition extends StmtNode {
   }
 
   /**
-   * Constructs a range partition. The range is specified in the CREATE/ALTER TABLE
-   * statement using the 'PARTITION <expr> OP VALUES OP <expr>' clause or using the
-   * 'PARTITION (<expr>,....,<expr>) OP VALUES OP (<expr>,...,<expr>)' clause. 'lower'
-   * corresponds to the '<expr> OP' or '(<expr>,...,<expr>) OP' pair which defines an
-   * optional lower bound, and similarly 'upper' corresponds to the optional upper bound.
-   * Since only '<' and '<=' operators are allowed, operators are represented with boolean
-   * values that indicate inclusive or exclusive bounds.
+   * Constructs a range partition from the two RangeBound objects parsed by the SQL
+   * grammar. 'first' is the bound specified before the VALUES keyword and 'second' the
+   * one specified after it; either may be null when the corresponding side is unbounded.
+   * Each RangeBound already carries a normalized comparator, so its boundType() tells
+   * whether it constrains the lower or the upper end of the range, regardless of the
+   * syntactic position it appeared in. This handles the reversed comparator forms
+   * accepted by IMPALA-7618 (e.g. 'VALUES >= X' or 'X > VALUES'). Throws if both bounds
+   * end up constraining the same side (e.g. '4 > VALUES < 2').
    */
-  public static RangePartition createFromRange(Pair<List<Expr>, Boolean> lower,
-      Pair<List<Expr>, Boolean> upper, List<KuduPartitionParam> hashSpec) {
+  public static RangePartition createFromRangeWithNormalization(RangeBound first,
+      RangeBound second, List<KuduPartitionParam> hashSpec) throws AnalysisException {
+    RangeBound lower = null;
+    RangeBound upper = null;
+    if (first != null) {
+      if (first.boundType() == RangeBound.BoundType.LOWER_BOUND) {
+        lower = first;
+      } else {
+        upper = first;
+      }
+    }
+    if (second != null) {
+      if (second.boundType() == RangeBound.BoundType.LOWER_BOUND) {
+        if (lower != null) {
+          throw new AnalysisException(
+              "Multiple lower bounds specified for a range partition.");
+        }
+        lower = second;
+      } else {
+        if (upper != null) {
+          throw new AnalysisException(
+              "Multiple upper bounds specified for a range partition.");
+        }
+        upper = second;
+      }
+    }
+
     List<Expr> lowerBoundExprs = Lists.newArrayListWithCapacity(1);
     boolean lowerBoundInclusive = false;
     List<Expr> upperBoundExprs = Lists.newArrayListWithCapacity(1);
     boolean upperBoundInclusive = false;
     if (lower != null) {
-      lowerBoundExprs = lower.first;
-      lowerBoundInclusive = lower.second;
+      lowerBoundExprs = lower.getValues();
+      lowerBoundInclusive = lower.isInclusive();
     }
     if (upper != null) {
-      upperBoundExprs = upper.first;
-      upperBoundInclusive = upper.second;
+      upperBoundExprs = upper.getValues();
+      upperBoundInclusive = upper.isInclusive();
     }
     return new RangePartition(lowerBoundExprs, lowerBoundInclusive, upperBoundExprs,
         upperBoundInclusive, hashSpec);

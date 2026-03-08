@@ -2529,6 +2529,15 @@ public class ParserTest extends FrontendTestBase {
           option));
       ParsesOk(String.format("ALTER TABLE Foo ADD %s RANGE PARTITION VALUE = 100",
           option));
+      // Reversed comparator forms (IMPALA-7618)
+      ParsesOk(String.format(
+          "ALTER TABLE Foo ADD %s RANGE PARTITION VALUES >= 10", option));
+      ParsesOk(String.format(
+          "ALTER TABLE Foo ADD %s RANGE PARTITION VALUES > 10", option));
+      ParsesOk(String.format(
+          "ALTER TABLE Foo ADD %s RANGE PARTITION 20 >= VALUES", option));
+      ParsesOk(String.format(
+          "ALTER TABLE Foo ADD %s RANGE PARTITION 20 > VALUES", option));
       ParserError(String.format("ALTER TABLE Foo ADD %s RANGE PARTITION 10 < VALUES " +
           "<= 20, PARTITION 20 < VALUES <= 30", option));
       ParserError(String.format("ALTER TABLE Foo ADD %s (RANGE PARTITION 10 < VALUES " +
@@ -2619,6 +2628,15 @@ public class ParserTest extends FrontendTestBase {
           option));
       ParsesOk(String.format("ALTER TABLE Foo DROP %s RANGE PARTITION VALUE = 100",
           option));
+      // Reversed comparator forms (IMPALA-7618)
+      ParsesOk(String.format(
+          "ALTER TABLE Foo DROP %s RANGE PARTITION VALUES >= 10", option));
+      ParsesOk(String.format(
+          "ALTER TABLE Foo DROP %s RANGE PARTITION VALUES > 10", option));
+      ParsesOk(String.format(
+          "ALTER TABLE Foo DROP %s RANGE PARTITION 20 >= VALUES", option));
+      ParsesOk(String.format(
+          "ALTER TABLE Foo DROP %s RANGE PARTITION 20 > VALUES", option));
       ParserError(String.format("ALTER TABLE Foo DROP %s RANGE PARTITION 10 < VALUES " +
           "<= 20, PARTITION 20 < VALUES <= 30", option));
       ParserError(String.format("ALTER TABLE Foo DROP %s (RANGE PARTITION 10 < VALUES " +
@@ -3188,6 +3206,19 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION now() <= VALUES, PARTITION VALUE = add_months(now(), 2)) " +
         "STORED AS KUDU");
+    // Reversed comparator forms (IMPALA-7618)
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE(a) " +
+        "(PARTITION VALUES >= 10)");
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE(a) " +
+        "(PARTITION VALUES > 10)");
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE(a) " +
+        "(PARTITION 20 >= VALUES)");
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE(a) " +
+        "(PARTITION 20 > VALUES)");
+    ParsesOk("CREATE TABLE Foo (a int, b int) PARTITION BY RANGE(a, b) " +
+        "(PARTITION VALUES >= (1, 2))");
+    ParsesOk("CREATE TABLE Foo (a int, b int) PARTITION BY RANGE(a, b) " +
+        "(PARTITION (1, 2) >= VALUES)");
 
     ParserError("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) ()");
     ParserError("CREATE TABLE Foo (a int) PARTITION BY HASH (a) PARTITIONS 4, " +

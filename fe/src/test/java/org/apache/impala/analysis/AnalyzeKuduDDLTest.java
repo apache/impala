@@ -188,6 +188,35 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalyzesOk("create table tab (id int, name string, valf float, vali bigint, " +
         "primary key (id, name)) partition by range (name) " +
         "(partition 'aa' < values <= 'bb') stored as kudu", isExternalPurgeTbl);
+    // Reversed comparator forms (IMPALA-7618): '>' and '>=' should be accepted
+    // and produce the same internal representation as the canonical '<' / '<=' forms.
+    AnalyzesOk("create table tab (a int, b int, c int, d int, primary key(a, b, c, d))" +
+        "partition by hash (a, b, c) partitions 8, " +
+        "range (a) (partition values >= 1, partition 4 > values) " +
+        "stored as kudu", isExternalPurgeTbl);
+    AnalyzesOk("create table tab (id int, name string, primary key(id, name)) " +
+        "partition by range (name) " +
+        "(partition values >= 'aa') stored as kudu", isExternalPurgeTbl);
+    AnalyzesOk("create table tab (id int, name string, primary key(id, name)) " +
+        "partition by range (name) " +
+        "(partition 'zz' >= values) stored as kudu", isExternalPurgeTbl);
+    // Both bounds reversed (IMPALA-7618)
+    AnalyzesOk("create table tab (a int, b int, c int, d int, primary key(a, b, c, d))" +
+        "partition by hash (a, b, c) partitions 8, " +
+        "range (a) (partition 4 > values >= 1) " +
+        "stored as kudu", isExternalPurgeTbl);
+    // Two bounds that both constrain the same side of the range are rejected
+    // (IMPALA-7618).
+    AnalysisError("create table tab (a int, b int, c int, d int, " +
+        "primary key(a, b, c, d))" +
+        "partition by hash (a, b, c) partitions 8, " +
+        "range (a) (partition 4 > values < 2) stored as kudu",
+        "Multiple upper bounds specified for a range partition.", isExternalPurgeTbl);
+    AnalysisError("create table tab (a int, b int, c int, d int, " +
+        "primary key(a, b, c, d))" +
+        "partition by hash (a, b, c) partitions 8, " +
+        "range (a) (partition 4 < values > 1) stored as kudu",
+        "Multiple lower bounds specified for a range partition.", isExternalPurgeTbl);
     // Null values in range partition values
     AnalysisError("create table tab (id int, name string, primary key(id, name)) " +
         "partition by hash (id) partitions 3, range (name) " +
