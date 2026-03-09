@@ -382,9 +382,10 @@ Status ParquetColumnChunkReader::ReadDataPageData(DataPageInfo* page_info) {
           compressed_size, uncompressed_size));
     }
 
-    // TODO: could skip copying when the data page is dict encoded as strings
-    //       will point to the dictionary instead of the data buffer (IMPALA-12137)
-    const bool copy_buffer = value_mem_type_ == ValueMemoryType::VAR_LEN_STR;
+    // If data page is dict encoded, strings will point to the dictionary instead of
+    // the data buffer, so there is no need to make a copy of page data.
+    const bool copy_buffer = (value_mem_type_ == ValueMemoryType::VAR_LEN_STR) &&
+        !IsDictionaryEncoding(page_info->data_encoding);
 
     if (copy_buffer) {
       // In this case returned batches will have pointers into the data page itself.
