@@ -349,9 +349,9 @@ void QueryDriver::RetryQueryFromThread(
   // Trace the retried query if the original query is being traced.
   if (retry_request_state->otel_trace_query()) {
     if (orig_do_trace) {
-      retry_request_state->otel_span_manager()->EndChildSpanInit();
+      retry_request_state->otel_trace_manager()->EndChildSpanInit();
     }
-    retry_request_state->otel_span_manager()->TraceQuery(orig_do_trace);
+    retry_request_state->otel_trace_manager()->TraceQuery(orig_do_trace);
   }
 
   // Run the new query.

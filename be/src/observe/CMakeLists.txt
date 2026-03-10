@@ -27,7 +27,7 @@ add_library(Observe
   otel-flags-trace.cc
   otel-log-handler.cc
   otel.cc
-  span-manager.cc
+  otel-trace-manager.cc
 )
 add_dependencies(Observe gen-deps)
 
@@ -37,10 +37,10 @@ endif()
 
 add_library(OtelTests STATIC
   otel-test.cc
-  span-manager-test.cc
+  otel-trace-manager-test.cc
 )
 
 add_dependencies(OtelTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(otel-test OtelTest.*)
-ADD_UNIFIED_BE_LSAN_TEST(span-manager-test SpanManagerTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(otel-trace-manager-test OtelTraceManagerTest.*)

@@ -21,7 +21,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/catalog-op-executor.h"
-#include "observe/span-manager.h"
+#include "observe/otel-trace-manager.h"
 #include "rpc/rpc-trace.h"
 #include "service/child-query.h"
 #include "service/impala-server.h"
@@ -545,13 +545,13 @@ class ClientRequestState {
     client_fetch_lock_wait_timer_->Add(lock_wait_time_ns);
   }
 
-  /// Returns the OpenTelemetry SpanManager for this query.
-  std::shared_ptr<SpanManager> otel_span_manager() { return otel_span_manager_; }
+  /// Returns the OpenTelemetry OtelTraceManager for this query.
+  std::shared_ptr<OtelTraceManager> otel_trace_manager() { return otel_trace_manager_; }
 
   /// Returns true if OpenTelemetry tracing is enabled for this query and the trace
   /// has not yet ended.
   inline bool otel_trace_query() const {
-    return otel_span_manager_.get() != nullptr && !otel_span_manager_->HasEnded();
+    return otel_trace_manager_.get() != nullptr && !otel_trace_manager_->HasEnded();
   }
 
   /// Returns true if request is cancelled. Acquires lock_ to avoid dirty reads.
@@ -836,8 +836,8 @@ class ClientRequestState {
   /// remote.
   std::unique_ptr<AdmissionControlClient> admission_control_client_;
 
-  /// SpanManager instance for this query.
-  std::shared_ptr<SpanManager> otel_span_manager_;
+  /// OtelTraceManager instance for this query.
+  std::shared_ptr<OtelTraceManager> otel_trace_manager_;
 
   /// Executes a local catalog operation (an operation that does not need to execute
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.

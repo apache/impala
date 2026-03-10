@@ -17,7 +17,7 @@
 
 #include "scheduling/local-admission-control-client.h"
 
-#include "observe/span-manager.h"
+#include "observe/otel-trace-manager.h"
 #include "runtime/exec-env.h"
 #include "util/runtime-profile-counters.h"
 #include "util/uid-util.h"
@@ -35,7 +35,8 @@ Status LocalAdmissionControlClient::SubmitForAdmission(
     const AdmissionController::AdmissionRequest& request,
     RuntimeProfile::EventSequence* query_events,
     std::unique_ptr<QuerySchedulePB>* schedule_result,
-    int64_t* wait_start_time_ms, int64_t* wait_end_time_ms, SpanManager* span_mgr) {
+    int64_t* wait_start_time_ms, int64_t* wait_end_time_ms,
+    OtelTraceManager* otel_trace_mgr) {
   ScopedEvent completedEvent(
       query_events, AdmissionControlClient::QUERY_EVENT_COMPLETED_ADMISSION);
   query_events->MarkEvent(QUERY_EVENT_SUBMIT_FOR_ADMISSION);
@@ -44,8 +45,8 @@ Status LocalAdmissionControlClient::SubmitForAdmission(
       request, &admit_outcome_, schedule_result, queued);
   if (queued) {
     was_queued_ = true;
-    if (span_mgr != nullptr) {
-      span_mgr->AddChildSpanEvent(QUERY_EVENT_QUEUED);
+    if (otel_trace_mgr != nullptr) {
+      otel_trace_mgr->AddChildSpanEvent(QUERY_EVENT_QUEUED);
     }
     query_events->MarkEvent(QUERY_EVENT_QUEUED);
     DCHECK(status.ok());

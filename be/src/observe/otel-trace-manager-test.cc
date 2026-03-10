@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "observe/span-manager.h"
+#include "observe/otel-trace-manager.h"
 
 #include <filesystem>
 #include <memory>
@@ -55,13 +55,13 @@ using namespace impala;
 static InProcessImpalaServer* impala_server_ = nullptr;
 
 static std::filesystem::path CreateRandomTempDir() {
-  return RandTestUtil::CreateRandomTempDir("span-manager-test", false)
+  return RandTestUtil::CreateRandomTempDir("otel-trace-manager-test", false)
       / "export-trace.jsonl";
 } // function CreateRandomTempDir
 
 // Tests the case where a query is cancelled after planning starts but before the
 // planner calls TraceQuery(). In this case, no trace will be generated.
-TEST(SpanManagerTest, TraceQueryNotCalled) {
+TEST(OtelTraceManagerTest, TraceQueryNotCalled) {
   const std::filesystem::path trace_file = CreateRandomTempDir();
   ASSERT_FALSE(trace_file.empty());
 
@@ -105,17 +105,17 @@ TEST(SpanManagerTest, TraceQueryNotCalled) {
 
     ClientRequestState crs(query_ctx, ExecEnv::GetInstance()->frontend(),
         impala_server_->impala_server(), session, &query_driver);
-    crs.otel_span_manager()->EndChildSpanInit();
-    crs.otel_span_manager()->StartChildSpanSubmitted();
-    crs.otel_span_manager()->EndChildSpanSubmitted();
-    crs.otel_span_manager()->StartChildSpanPlanning();
+    crs.otel_trace_manager()->EndChildSpanInit();
+    crs.otel_trace_manager()->StartChildSpanSubmitted();
+    crs.otel_trace_manager()->EndChildSpanSubmitted();
+    crs.otel_trace_manager()->StartChildSpanPlanning();
     query_driver.Abandon();
     crs.Finalize(&Status::CANCELLED);
     crs.UnRegisterRemainingRPCs();
-  } // SpanManager dtor runs here.
+  } // OtelTraceManager dtor runs here.
 
   shutdown_otel_tracer();
 
   EXPECT_FALSE(filesystem::exists(trace_file));
-} // test SpanManagerTest.TraceQueryNotCalled
+} // test OtelTraceManagerTest.TraceQueryNotCalled
 

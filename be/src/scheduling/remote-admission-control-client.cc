@@ -103,7 +103,8 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
     const AdmissionController::AdmissionRequest& request,
     RuntimeProfile::EventSequence* query_events,
     std::unique_ptr<QuerySchedulePB>* schedule_result,
-    int64_t* wait_start_time_ms, int64_t* wait_end_time_ms, SpanManager* span_mgr) {
+    int64_t* wait_start_time_ms, int64_t* wait_end_time_ms,
+    OtelTraceManager* otel_trace_mgr) {
   ScopedEvent completedEvent(
       query_events, AdmissionControlClient::QUERY_EVENT_COMPLETED_ADMISSION);
 
@@ -189,8 +190,8 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
 
     if (!was_queued_) {
       query_events->MarkEvent(QUERY_EVENT_QUEUED);
-      if (span_mgr != nullptr) {
-        span_mgr->AddChildSpanEvent(QUERY_EVENT_QUEUED);
+      if (otel_trace_mgr != nullptr) {
+        otel_trace_mgr->AddChildSpanEvent(QUERY_EVENT_QUEUED);
       }
       was_queued_ = true;
     }

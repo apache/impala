@@ -1372,8 +1372,8 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
   QueryDriver::CreateNewDriver(this, query_handle, query_ctx, session_state);
 
   if ((*query_handle)->otel_trace_query()) {
-    (*query_handle)->otel_span_manager()->EndChildSpanInit();
-    (*query_handle)->otel_span_manager()->StartChildSpanSubmitted();
+    (*query_handle)->otel_trace_manager()->EndChildSpanInit();
+    (*query_handle)->otel_trace_manager()->StartChildSpanSubmitted();
   }
 
   bool is_external_req = external_exec_request != nullptr;
@@ -1385,8 +1385,8 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
   (*query_handle)->query_events()->MarkEvent("Query submitted");
 
   if ((*query_handle)->otel_trace_query()) {
-    (*query_handle)->otel_span_manager()->EndChildSpanSubmitted();
-    (*query_handle)->otel_span_manager()->StartChildSpanPlanning();
+    (*query_handle)->otel_trace_manager()->EndChildSpanSubmitted();
+    (*query_handle)->otel_trace_manager()->StartChildSpanPlanning();
   }
 
   {
@@ -1440,7 +1440,7 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
   }
 
   if ((*query_handle)->otel_trace_query()) {
-    (*query_handle)->otel_span_manager()->EndChildSpanPlanning();
+    (*query_handle)->otel_trace_manager()->EndChildSpanPlanning();
   }
 
   VLOG(2) << "Execution request: "
@@ -3714,9 +3714,9 @@ void ImpalaServer::DoTraceQuery(const TUniqueId& query_id, bool do_trace) {
     crs = query_driver->GetActiveClientRequestState();
 
     if (crs != nullptr && crs->otel_trace_query()) {
-      crs->otel_span_manager()->TraceQuery(do_trace);
+      crs->otel_trace_manager()->TraceQuery(do_trace);
       if (!do_trace) {
-        crs->otel_span_manager().reset();
+        crs->otel_trace_manager().reset();
       }
     }
   }

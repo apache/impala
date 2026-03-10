@@ -42,14 +42,14 @@ class ClientRequestState;
 // frontend planner communicates whether the query should be traced or not. If the query
 // should be traced, the root span is started via the OpenTelemetry SDK and made the
 // active span. The Init and Submitted spans are also started/ended via the SDK, and the
-// Planning span is started via the SDK. When SpanManager instance is destructed, any open
-// child spans and the root span are ended.
-class SpanManager {
+// Planning span is started via the SDK. When OtelTraceManager instance is destroyed, any
+// open child spans and the root span are ended.
+class OtelTraceManager {
 public:
-  SpanManager(
+  OtelTraceManager(
       opentelemetry::nostd::shared_ptr<opentelemetry::trace::Tracer> tracer,
       ClientRequestState* client_request_state);
-  ~SpanManager();
+  ~OtelTraceManager();
 
   // Adds an event to the currently active child span. If no child span is active,
   // logs a warning and does nothing else. The event time is set to the current time.
@@ -92,7 +92,7 @@ public:
   // Returns true if the root span has been initialized and also has ended.
   bool HasEnded() const;
 
-  // Sets whether the query associated with this SpanManager should be traced.
+  // Sets whether the query associated with this OtelTraceManager should be traced.
   // This function must be called during planning after the Planning child span has
   // started but before it has ended.
   void TraceQuery(bool do_trace);
@@ -111,7 +111,7 @@ private:
   // Struct to hold a BufferedSpan instance of child span and the corresponding end
   // function that populates the appropriate attributes and submits the span.
   struct ChildSpanEntry {
-    using EndFuncType = void (SpanManager::*)(const Status*);
+    using EndFuncType = void (OtelTraceManager::*)(const Status*);
 
     std::unique_ptr<BufferedSpan> span;
     EndFuncType end_func;
@@ -174,29 +174,29 @@ private:
   // Scope to make the root span active and to deactivate the root span when it finishes.
   std::unique_ptr<opentelemetry::trace::Scope> scope_;
 
-  // ClientRequestState for the query this SpanManager is tracking.
+  // ClientRequestState for the query this OtelTraceManager is tracking.
   ClientRequestState* client_request_state_;
 
-  // Query ID of the query this SpanManager is tracking.
+  // Query ID of the query this OtelTraceManager is tracking.
   const std::string query_id_;
 
   // BufferedSpan instance for the current child span and the mutex to protect it.
   // To ensure no deadlocks, locks must be acquired in the following order. Note that
   // ClientRequestState::lock_ only needs to be held when interacting with the
   // client_request_state_ variable. It should not be held otherwise.
-  // 1. SpanManager::child_span_mu_
+  // 1. OtelTraceManager::child_span_mu_
   // 2. ClientRequestState::lock_
   std::unique_ptr<BufferedSpan> span_root_;
   std::unordered_map<ChildSpanType, ChildSpanEntry> child_spans_;
   mutable std::mutex child_span_mu_;
 
-  // Indicator set when this SpanManager represents a query that should not have an
+  // Indicator set when this OtelTraceManager represents a query that should not have an
   // OpenTelemetry trace created for it.
   bool do_trace_ = false;
 
-  // Indicator set when a root span is created for this SpanManager. Will be false if the
-  // associated query will not be traced.
+  // Indicator set when a root span is created for this OtelTraceManager. Will be false if
+  // the associated query will not be traced.
   bool started_ = false;
-};  // class SpanManager
+};  // class OtelTraceManager
 
 } // namespace impala

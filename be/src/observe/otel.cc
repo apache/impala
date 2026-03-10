@@ -54,7 +54,7 @@
 #include "common/version.h"
 #include "gen-cpp/Query_types.h"
 #include "observe/otel-log-handler.h"
-#include "observe/span-manager.h"
+#include "observe/otel-trace-manager.h"
 #include "service/client-request-state.h"
 
 using namespace boost::algorithm;
@@ -98,7 +98,9 @@ DECLARE_string(tls_ciphersuites);
 DECLARE_string(ssl_minimum_version);
 
 // Constants
-static const string SCOPE_SPAN_NAME = "org.apache.impala.impalad.query";
+static const string TRACER_SCOPE_NAME = "org.apache.impala.impalad.query";
+// Version of Impala's spec for representing Impala queries as OpenTelemetry traces.
+static const string TRACER_SCOPE_VERSION = "1.0.0";
 
 // Holds the custom log handler for OpenTelemetry internal logs.
 static nostd::shared_ptr<LogHandler> otel_log_handler_;
@@ -305,12 +307,12 @@ void shutdown_otel_tracer() {
   provider_.reset();
 } // function shutdown_otel_tracer
 
-shared_ptr<SpanManager> build_span_manager(ClientRequestState* crs) {
+shared_ptr<OtelTraceManager> build_otel_trace_manager(ClientRequestState* crs) {
   DCHECK(provider_) << "OpenTelemetry tracer was not initialized.";
 
-  return make_shared<SpanManager>(
-      provider_->GetTracer(SCOPE_SPAN_NAME, SCOPE_SPAN_SPEC_VERSION), crs);
-} // function build_span_manager
+  return make_shared<OtelTraceManager>(
+      provider_->GetTracer(TRACER_SCOPE_NAME, TRACER_SCOPE_VERSION), crs);
+} // function build_otel_trace_manager
 
 namespace test {
 bool otel_tls_enabled_for_testing() {

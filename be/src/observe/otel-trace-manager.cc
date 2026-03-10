@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "observe/span-manager.h"
+#include "observe/otel-trace-manager.h"
 
 #include <chrono>
 #include <memory>
@@ -122,27 +122,27 @@ static void debug_log_span(const BufferedSpan* span, const string& span_name,
   }
 } // function debug_log_span
 
-SpanManager::SpanManager(nostd::shared_ptr<trace::Tracer> tracer,
+OtelTraceManager::OtelTraceManager(nostd::shared_ptr<trace::Tracer> tracer,
     ClientRequestState* client_request_state) : tracer_(std::move(tracer)),
     client_request_state_(client_request_state),
     query_id_(PrintId(client_request_state_->query_id())) {
-  VLOG(2) << "Creating SpanManager for query_id='" << query_id_ << "'";
+  VLOG(2) << "Creating OtelTraceManager for query_id='" << query_id_ << "'";
   DCHECK(client_request_state_ != nullptr) << "Cannot start root span without a valid "
       "client request state.";
 
   // Initialize placeholders for the child spans.
   child_spans_.emplace(ChildSpanType::INIT,
-      ChildSpanEntry(&SpanManager::DoEndChildSpanInit));
+      ChildSpanEntry(&OtelTraceManager::DoEndChildSpanInit));
   child_spans_.emplace(ChildSpanType::SUBMITTED,
-      ChildSpanEntry(&SpanManager::DoEndChildSpanSubmitted));
+      ChildSpanEntry(&OtelTraceManager::DoEndChildSpanSubmitted));
   child_spans_.emplace(ChildSpanType::PLANNING,
-      ChildSpanEntry(&SpanManager::DoEndChildSpanPlanning));
+      ChildSpanEntry(&OtelTraceManager::DoEndChildSpanPlanning));
   child_spans_.emplace(ChildSpanType::ADMISSION_CONTROL,
-      ChildSpanEntry(&SpanManager::DoEndChildSpanAdmissionControl));
+      ChildSpanEntry(&OtelTraceManager::DoEndChildSpanAdmissionControl));
   child_spans_.emplace(ChildSpanType::QUERY_EXEC,
-      ChildSpanEntry(&SpanManager::DoEndChildSpanQueryExecution));
+      ChildSpanEntry(&OtelTraceManager::DoEndChildSpanQueryExecution));
   child_spans_.emplace(ChildSpanType::CLOSE,
-      ChildSpanEntry(&SpanManager::DoEndChildSpanClose));
+      ChildSpanEntry(&OtelTraceManager::DoEndChildSpanClose));
   {
     lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
 
@@ -161,10 +161,10 @@ SpanManager::SpanManager(nostd::shared_ptr<trace::Tracer> tracer,
   }
 } // ctor
 
-SpanManager::~SpanManager() {
+OtelTraceManager::~OtelTraceManager() {
   lock_guard<mutex> l(child_span_mu_);
 
-  VLOG(2) << strings::Substitute("Destroying SpanManager for query_id=\"$0\", " \
+  VLOG(2) << strings::Substitute("Destroying OtelTraceManager for query_id=\"$0\", " \
       "do_trace_=$1", query_id_, do_trace_);
 
   if (do_trace_) {
@@ -190,12 +190,12 @@ SpanManager::~SpanManager() {
     FLAGS_otel_trace_retry_policy_max_attempts));
 } // dtor
 
-void SpanManager::TraceQuery(bool do_trace) {
+void OtelTraceManager::TraceQuery(bool do_trace) {
   lock_guard<mutex> l(child_span_mu_);
   DoTraceQuery(do_trace);
 } // function TraceQuery
 
-void SpanManager::DoTraceQuery(bool do_trace) {
+void OtelTraceManager::DoTraceQuery(bool do_trace) {
   VLOG(2) << strings::Substitute("DoTraceQuery: do_trace=$0, started_=$1", \
       do_trace, started_);
 
@@ -249,7 +249,7 @@ void SpanManager::DoTraceQuery(bool do_trace) {
   }
 } // function DoTraceQuery
 
-void SpanManager::AddChildSpanEvent(const nostd::string_view& name) {
+void OtelTraceManager::AddChildSpanEvent(const nostd::string_view& name) {
   lock_guard<mutex> l(child_span_mu_);
 
   // Locate the current active child span, if any, where the event will be added.
@@ -275,7 +275,7 @@ void SpanManager::AddChildSpanEvent(const nostd::string_view& name) {
 #endif
 } // function AddChildSpanEvent
 
-void SpanManager::StartChildSpanInit() {
+void OtelTraceManager::StartChildSpanInit() {
   lock_guard<mutex> l(child_span_mu_);
 
   BufferedSpan* span = ChildSpanBuilder(ChildSpanType::INIT,
@@ -304,13 +304,13 @@ void SpanManager::StartChildSpanInit() {
   }
 } // function StartChildSpanInit
 
-void SpanManager::EndChildSpanInit() {
+void OtelTraceManager::EndChildSpanInit() {
   lock_guard<mutex> l(child_span_mu_);
   lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
   DoEndChildSpanInit();
 } // function EndChildSpanInit
 
-void SpanManager::DoEndChildSpanInit(const Status* cause) {
+void OtelTraceManager::DoEndChildSpanInit(const Status* cause) {
 #ifndef NDEBUG
   if (FLAGS_otel_trace_exhaustive_dchecks) {
     DCHECK_CHILD_SPAN_TYPE(ChildSpanType::INIT);
@@ -324,18 +324,18 @@ void SpanManager::DoEndChildSpanInit(const Status* cause) {
       });
 } // function DoEndChildSpanInit
 
-void SpanManager::StartChildSpanSubmitted() {
+void OtelTraceManager::StartChildSpanSubmitted() {
   lock_guard<mutex> l(child_span_mu_);
   ChildSpanBuilder(ChildSpanType::SUBMITTED);
 } // function StartChildSpanSubmitted
 
-void SpanManager::EndChildSpanSubmitted() {
+void OtelTraceManager::EndChildSpanSubmitted() {
   lock_guard<mutex> l(child_span_mu_);
   lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
   DoEndChildSpanSubmitted();
 } // function EndChildSpanSubmitted
 
-void SpanManager::DoEndChildSpanSubmitted(const Status* cause) {
+void OtelTraceManager::DoEndChildSpanSubmitted(const Status* cause) {
 #ifndef NDEBUG
   if (FLAGS_otel_trace_exhaustive_dchecks) {
     DCHECK_CHILD_SPAN_TYPE(ChildSpanType::SUBMITTED);
@@ -344,18 +344,18 @@ void SpanManager::DoEndChildSpanSubmitted(const Status* cause) {
   EndChildSpan(ChildSpanType::SUBMITTED, cause);
 } // function DoEndChildSpanSubmitted
 
-void SpanManager::StartChildSpanPlanning() {
+void OtelTraceManager::StartChildSpanPlanning() {
   lock_guard<mutex> l(child_span_mu_);
   ChildSpanBuilder(ChildSpanType::PLANNING);
 } // function StartChildSpanPlanning
 
-void SpanManager::EndChildSpanPlanning() {
+void OtelTraceManager::EndChildSpanPlanning() {
   lock_guard<mutex> l(child_span_mu_);
   lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
   DoEndChildSpanPlanning();
 } // function EndChildSpanPlanning
 
-void SpanManager::DoEndChildSpanPlanning(const Status* cause) {
+void OtelTraceManager::DoEndChildSpanPlanning(const Status* cause) {
 #ifndef NDEBUG
   if (FLAGS_otel_trace_exhaustive_dchecks) {
     DCHECK_CHILD_SPAN_TYPE(ChildSpanType::PLANNING);
@@ -367,7 +367,7 @@ void SpanManager::DoEndChildSpanPlanning(const Status* cause) {
           impala::to_string(client_request_state_->exec_request().stmt_type)}}, true);
 } // function DoEndChildSpanPlanning
 
-void SpanManager::StartChildSpanAdmissionControl() {
+void OtelTraceManager::StartChildSpanAdmissionControl() {
   lock_guard<mutex> l(child_span_mu_);
 
   BufferedSpan* span = ChildSpanBuilder(ChildSpanType::ADMISSION_CONTROL);
@@ -376,17 +376,17 @@ void SpanManager::StartChildSpanAdmissionControl() {
   debug_log_span(span, to_string(ChildSpanType::ADMISSION_CONTROL), query_id_, true);
 } // function StartChildSpanAdmissionControl
 
-void SpanManager::EndChildSpanAdmissionControl(const Status& cause) {
+void OtelTraceManager::EndChildSpanAdmissionControl(const Status& cause) {
   lock_guard<mutex> l(child_span_mu_);
   lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
   DoEndChildSpanAdmissionControl(&cause);
 } // function EndChildSpanAdmissionControl
 
-void SpanManager::DoEndChildSpanAdmissionControl(const Status* cause) {
+void OtelTraceManager::DoEndChildSpanAdmissionControl(const Status* cause) {
   if (IsClosing()) {
     // If we are already closing, silently return as some cases (such as FIRST_FETCH)
     // will end the admission control phase even though the query already finished.
-   return; // <-- EARLY RETURN
+    return; // <-- EARLY RETURN
   }
 
 #ifndef NDEBUG
@@ -407,7 +407,7 @@ void SpanManager::DoEndChildSpanAdmissionControl(const Status* cause) {
     // because the summary profile may not be updated by the time this code runs.
     if (UNLIKELY(queued && cause != nullptr && cause->code() == TErrorCode::CANCELLED)) {
       adm_result = AdmissionController::PROFILE_INFO_VAL_CANCELLED_IN_QUEUE;
-    } else{
+    } else {
       const string* profile_adm_res = client_request_state_->summary_profile()->
           GetInfoString("Admission result");
       if (UNLIKELY(profile_adm_res == nullptr)) {
@@ -428,7 +428,7 @@ void SpanManager::DoEndChildSpanAdmissionControl(const Status* cause) {
       }, true);
 } // function DoEndChildSpanAdmissionControl
 
-void SpanManager::StartChildSpanQueryExecution() {
+void OtelTraceManager::StartChildSpanQueryExecution() {
   lock_guard<mutex> l(child_span_mu_);
 
   if (IsClosing()) {
@@ -443,13 +443,13 @@ void SpanManager::StartChildSpanQueryExecution() {
   debug_log_span(span, to_string(ChildSpanType::QUERY_EXEC), query_id_, true);
 } // function StartChildSpanQueryExecution
 
-void SpanManager::EndChildSpanQueryExecution() {
+void OtelTraceManager::EndChildSpanQueryExecution() {
   lock_guard<mutex> l(child_span_mu_);
   lock_guard<mutex> crs_lock(*(client_request_state_->lock()));
   DoEndChildSpanQueryExecution();
 }  // function EndChildSpanQueryExecution
 
-void SpanManager::DoEndChildSpanQueryExecution(const Status* cause) {
+void OtelTraceManager::DoEndChildSpanQueryExecution(const Status* cause) {
   if (IsClosing()) {
     // If we are already closing, silently return as some cases (such as FIRST_FETCH)
     // will end the query execution phase even though the query already failed.
@@ -473,7 +473,7 @@ void SpanManager::DoEndChildSpanQueryExecution(const Status* cause) {
     if (LIKELY(client_request_state_->GetCoordinator() != nullptr)
         && client_request_state_->GetCoordinator()->dml_exec_state() != nullptr) {
       num_deleted_rows =
-      client_request_state_->GetCoordinator()->dml_exec_state()->GetNumDeletedRows();
+          client_request_state_->GetCoordinator()->dml_exec_state()->GetNumDeletedRows();
       num_modified_rows =
           client_request_state_->GetCoordinator()->dml_exec_state()->GetNumModifiedRows();
     }
@@ -492,7 +492,7 @@ void SpanManager::DoEndChildSpanQueryExecution(const Status* cause) {
   EndChildSpan(ChildSpanType::QUERY_EXEC, cause, attrs, true);
 } // function DoEndChildSpanQueryExecution
 
-void SpanManager::StartChildSpanClose(const Status* cause) {
+void OtelTraceManager::StartChildSpanClose(const Status* cause) {
   lock_guard<mutex> l(child_span_mu_);
 
   // In a query cancellation scenario, the query could be cancelled before TraceQuery()
@@ -539,7 +539,7 @@ void SpanManager::StartChildSpanClose(const Status* cause) {
   debug_log_span(span, to_string(ChildSpanType::CLOSE), query_id_, true);
 } // function StartChildSpanClose
 
-void SpanManager::EndChildSpanClose() {
+void OtelTraceManager::EndChildSpanClose() {
 #ifndef NDEBUG
   if (FLAGS_otel_trace_exhaustive_dchecks) {
     DCHECK_CHILD_SPAN_TYPE(ChildSpanType::CLOSE);
@@ -551,7 +551,7 @@ void SpanManager::EndChildSpanClose() {
   DoEndChildSpanClose();
 } // function EndChildSpanClose
 
-void SpanManager::DoEndChildSpanClose(const Status* cause) {
+void OtelTraceManager::DoEndChildSpanClose(const Status* cause) {
   EndChildSpan(ChildSpanType::CLOSE, nullptr, {}, true);
 
   // Set all root span attributes to avoid dereferencing the client_request_state_ in
@@ -590,12 +590,12 @@ void SpanManager::DoEndChildSpanClose(const Status* cause) {
   }
 } // function EndChildSpanClose
 
-bool SpanManager::HasEnded() const {
+bool OtelTraceManager::HasEnded() const {
   lock_guard<mutex> l(child_span_mu_);
   return span_root_ && span_root_->HasEnded();
 } // function HasEnded
 
-BufferedSpan* SpanManager::ChildSpanBuilder(const ChildSpanType& span_type,
+BufferedSpan* OtelTraceManager::ChildSpanBuilder(const ChildSpanType& span_type,
     BufferedSpan::BufferedAttributesMap&& additional_attributes, bool running) {
   DCHECK(client_request_state_ != nullptr) << "Cannot start child span without a valid "
       "client request state.";
@@ -635,13 +635,14 @@ BufferedSpan* SpanManager::ChildSpanBuilder(const ChildSpanType& span_type,
   return child_spans_.at(span_type).span.get();
 } // function ChildSpanBuilder
 
-BufferedSpan* SpanManager::ChildSpanBuilder(const ChildSpanType& span_type,
+BufferedSpan* OtelTraceManager::ChildSpanBuilder(const ChildSpanType& span_type,
     bool running) {
   return ChildSpanBuilder(span_type, {}, running);
 } // function ChildSpanBuilder
 
-void SpanManager::EndChildSpan(const ChildSpanType& span_type, const Status* cause,
-    const BufferedSpan::BufferedAttributesMap& additional_attributes, bool submit) {
+void OtelTraceManager::EndChildSpan(const ChildSpanType& span_type,
+    const Status* cause, const BufferedSpan::BufferedAttributesMap& additional_attributes,
+    bool submit) {
   DCHECK(client_request_state_ != nullptr) << "Cannot end child span without a valid "
       "client request state.";
 

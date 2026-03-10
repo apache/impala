@@ -611,7 +611,7 @@ Status Coordinator::StartBackendExec() {
           num_backends, exec_params_.GetNumFragmentInstances()));
 
   if (parent_request_state_->otel_trace_query()) {
-    parent_request_state_->otel_span_manager()->AddChildSpanEvent("AllBackendsStarted");
+    parent_request_state_->otel_trace_manager()->AddChildSpanEvent("AllBackendsStarted");
   }
   return Status::OK();
 }
@@ -1039,7 +1039,7 @@ Status Coordinator::Wait() {
   query_profile_->AddInfoString(
       "DML Stats", dml_exec_state_.OutputPartitionStats("\n"));
   if (parent_request_state_->otel_trace_query()) {
-    parent_request_state_->otel_span_manager()->AddChildSpanEvent("LastRowFetched");
+    parent_request_state_->otel_trace_manager()->AddChildSpanEvent("LastRowFetched");
   }
   return Status::OK();
 }
@@ -1079,7 +1079,7 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos,
     query_events_->MarkEvent(Coordinator::PROFILE_EVENT_LABEL_FIRST_ROW_FETCHED);
     first_row_fetched_ = true;
     if (parent_request_state_->otel_trace_query()) {
-      parent_request_state_->otel_span_manager()->AddChildSpanEvent("FirstRowFetched");
+      parent_request_state_->otel_trace_manager()->AddChildSpanEvent("FirstRowFetched");
     }
   }
   RETURN_IF_ERROR(UpdateExecState(
@@ -1518,7 +1518,7 @@ void Coordinator::ReleaseQueryAdmissionControlResources() {
       ComputeQueryResourceUtilization().peak_per_host_mem_consumption);
   query_events_->MarkEvent("Released admission control resources");
   if (parent_request_state_->otel_trace_query()) {
-    parent_request_state_->otel_span_manager()->AddChildSpanEvent(
+    parent_request_state_->otel_trace_manager()->AddChildSpanEvent(
         "ReleasedAdmissionControlResources");
   }
 }

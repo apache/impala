@@ -26,13 +26,10 @@
 #include <opentelemetry/sdk/trace/processor.h>
 
 #include "gen-cpp/Query_types.h"
-#include "observe/span-manager.h"
+#include "observe/otel-trace-manager.h"
 #include "service/client-request-state.h"
 
 namespace impala {
-
-// Version of the spec for representing Impala queries as OpenTelemetry traces.
-const std::string SCOPE_SPAN_SPEC_VERSION = "1.0.0";
 
 // Constants representing the supported OpenTelemetry exporters.
 const std::string OTEL_EXPORTER_OTLP_HTTP = "otlp_http";
@@ -57,8 +54,8 @@ void init_otel_tracer();
 // Force flushes any buffered spans and shuts down the OpenTelemetry tracer.
 void shutdown_otel_tracer();
 
-// Builds a SpanManager instance for the given query.
-std::shared_ptr<SpanManager> build_span_manager(ClientRequestState*);
+// Builds an OtelTraceManager instance for the given query.
+std::shared_ptr<OtelTraceManager> build_otel_trace_manager(ClientRequestState*);
 
 namespace test {
 // Testing helper function to provide access to the static otel_tls_enabled() function.

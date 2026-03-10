@@ -34,7 +34,7 @@
 #include "gen-cpp/Types_types.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "observe/otel.h"
-#include "observe/span-manager.h"
+#include "observe/otel-trace-manager.h"
 #include "rpc/rpc-mgr.inline.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
@@ -129,8 +129,8 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
       query_ctx_.session.session_type, query_ctx_.client_request)) {
     // initialize OpenTelemetry for this query
     VLOG(2) << "Initializing OpenTelemetry trace for query " << PrintId(query_id());
-    otel_span_manager_ = build_span_manager(this);
-    otel_span_manager_->StartChildSpanInit();
+    otel_trace_manager_ = build_otel_trace_manager(this);
+    otel_trace_manager_->StartChildSpanInit();
   }
 
   bool is_external_fe = session_type() == TSessionType::EXTERNAL_FRONTEND;
@@ -323,7 +323,7 @@ Status ClientRequestState::Exec() {
     case TStmtType::DDL: {
       DCHECK(exec_req.__isset.catalog_op_request);
       if (otel_trace_query()) {
-        otel_span_manager_->StartChildSpanQueryExecution();
+        otel_trace_manager_->StartChildSpanQueryExecution();
       }
       LOG_AND_RETURN_IF_ERROR(ExecDdlRequest());
       break;
@@ -681,7 +681,7 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
   TUniqueIdToUniqueIdPB(query_id(), &query_id_pb);
 
   if (otel_trace_query() && !IsCTAS()) {
-    otel_span_manager_->StartChildSpanAdmissionControl();
+    otel_trace_manager_->StartChildSpanAdmissionControl();
   }
 
   TQueryExecRequest req;
@@ -720,10 +720,10 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
       {query_id_pb, ExecEnv::GetInstance()->backend_id(), *admission_exec_request_,
           summary_profile_, blacklisted_executor_addresses_},
       query_events_, &schedule_, &wait_start_time_ms_, &wait_end_time_ms_,
-      otel_span_manager_.get());
+      otel_trace_manager_.get());
 
   if (otel_trace_query() && !IsCTAS()) {
-    otel_span_manager_->EndChildSpanAdmissionControl(admit_status);
+    otel_trace_manager_->EndChildSpanAdmissionControl(admit_status);
   }
 
   {
@@ -734,7 +734,7 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
   // Don't start the query execution span for the insert portion of a CTAS query since it
   // was already started during the select portion.
   if (otel_trace_query() && !IsCTAS()) {
-    otel_span_manager_->StartChildSpanQueryExecution();
+    otel_trace_manager_->StartChildSpanQueryExecution();
   }
 
   DCHECK(schedule_.get() != nullptr);
@@ -850,7 +850,7 @@ void ClientRequestState::ExecDdlRequestImpl(bool exec_in_worker_thread) {
   Status status = catalog_op_executor_->Exec(exec_req.catalog_op_request);
   query_events_->MarkEvent("CatalogDdlRequest finished");
   if (otel_trace_query()) {
-    otel_span_manager_->AddChildSpanEvent("UpdateCatalogFinished");
+    otel_trace_manager_->AddChildSpanEvent("UpdateCatalogFinished");
   }
   AddCatalogTimeline();
   {
@@ -1210,12 +1210,12 @@ void ClientRequestState::Finalize(const Status* cause) {
   if (otel_trace_query()) {
     // In a non-error case, end the query execution span since it will be the active span.
     if (cause == nullptr || cause->ok()) {
-      otel_span_manager_->EndChildSpanQueryExecution();
+      otel_trace_manager_->EndChildSpanQueryExecution();
     }
 
     // No need to end previous child span in an error case. This function silently closes
     // the active child span if there is one.
-    otel_span_manager_->StartChildSpanClose(cause);
+    otel_trace_manager_->StartChildSpanClose(cause);
   }
 
   Cancel(cause, /*wait_until_finalized=*/true);
@@ -1273,11 +1273,11 @@ void ClientRequestState::Finalize(const Status* cause) {
   query_events_->MarkEvent("Unregister query");
   UnRegisterRemainingRPCs();
   if (otel_trace_query()) {
-   otel_span_manager_->AddChildSpanEvent("QueryUnregistered");
-   otel_span_manager_->EndChildSpanClose();
+   otel_trace_manager_->AddChildSpanEvent("QueryUnregistered");
+   otel_trace_manager_->EndChildSpanClose();
 
    // End the root span and thus the entire trace is also ended.
-   otel_span_manager_.reset();
+   otel_trace_manager_.reset();
   }
 }
 
@@ -1336,7 +1336,7 @@ void ClientRequestState::Wait() {
     if (returns_result_set()) {
       query_events()->MarkEvent("Rows available");
       if (LIKELY(status.code() != TErrorCode::CANCELLED) && otel_trace_query()) {
-        otel_span_manager_->AddChildSpanEvent("RowsAvailable");
+        otel_trace_manager_->AddChildSpanEvent("RowsAvailable");
       }
     } else {
       query_events()->MarkEvent("Request finished");
@@ -1811,7 +1811,7 @@ Status ClientRequestState::UpdateCatalog() {
   }
   query_events_->MarkEvent("DML Metastore update finished");
   if (otel_trace_query()) {
-     otel_span_manager_->AddChildSpanEvent("MetastoreUpdateFinished");
+     otel_trace_manager_->AddChildSpanEvent("MetastoreUpdateFinished");
   }
   return Status::OK();
 }
