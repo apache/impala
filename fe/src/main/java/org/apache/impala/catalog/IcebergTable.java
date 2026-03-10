@@ -422,7 +422,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public TTable toHumanReadableThrift() {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.ICEBERG_TABLE);
-    table.setIceberg_table(Utils.getTIcebergTable(this));
+    table.setIceberg_table(
+        Utils.getTIcebergTable(this, ThriftObjectType.DESCRIPTOR_ONLY));
     table.setHdfs_table(transformToTHdfsTable(true, ThriftObjectType.DESCRIPTOR_ONLY));
     return table;
   }
