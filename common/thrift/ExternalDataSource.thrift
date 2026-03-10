@@ -177,6 +177,16 @@ struct TGetNextResult {
   // A batch of rows to return, if any exist. The number of rows in the batch
   // should be less than or equal to the batch_size specified in TOpenParams.
   3: optional TRowBatch rows
+
+  // Time in nanoseconds that the calling thread held the Java-side fetchLock while
+  // iterating the JDBC cursor. This reflects pure JDBC cursor utilisation and can be
+  // compared against the total JNI round-trip time to detect serialisation or
+  // lock-contention overhead.
+  4: optional i64 cursor_fetch_time_ns
+
+  // Time in nanoseconds that the calling thread waited to acquire the Java-side
+  // fetchLock before gaining access to the JDBC cursor.
+  5: optional i64 lock_wait_time_ns
 }
 
 // Parameters to close()

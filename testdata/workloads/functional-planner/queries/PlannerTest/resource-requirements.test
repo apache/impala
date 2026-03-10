@@ -282,25 +282,25 @@ Per-Host Resources: mem-estimate=1.00GB mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=116B cardinality=5.00K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
-Per-Host Resource Estimates: Memory=1.01GB
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=3
+Per-Host Resource Estimates: Memory=2.01GB
 Codegen disabled by planner
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional.alltypes_datasource
 Analyzed query: SELECT * FROM functional.alltypes_datasource
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=4.67MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.79MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: functional.alltypes_datasource.id, functional.alltypes_datasource.bool_col, functional.alltypes_datasource.tinyint_col, functional.alltypes_datasource.smallint_col, functional.alltypes_datasource.int_col, functional.alltypes_datasource.bigint_col, functional.alltypes_datasource.float_col, functional.alltypes_datasource.double_col, functional.alltypes_datasource.timestamp_col, functional.alltypes_datasource.string_col, functional.alltypes_datasource.dec_col1, functional.alltypes_datasource.dec_col2, functional.alltypes_datasource.dec_col3, functional.alltypes_datasource.dec_col4, functional.alltypes_datasource.dec_col5, functional.alltypes_datasource.date_col
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=686.41KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=806.41KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=0 row-size=116B cardinality=5.00K
 |  in pipelines: 00(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
 Per-Instance Resources: mem-estimate=1.00GB mem-reservation=0B thread-reservation=1
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
    mem-estimate=1.00GB mem-reservation=0B thread-reservation=0

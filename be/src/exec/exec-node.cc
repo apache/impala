@@ -177,10 +177,12 @@ Status PlanNode::CreatePlanNode(
       *node = pool->Add(new HdfsScanPlanNode());
       break;
     case TPlanNodeType::HBASE_SCAN_NODE:
-    case TPlanNodeType::DATA_SOURCE_NODE:
     case TPlanNodeType::KUDU_SCAN_NODE:
     case TPlanNodeType::SYSTEM_TABLE_SCAN_NODE:
       *node = pool->Add(new ScanPlanNode());
+      break;
+    case TPlanNodeType::DATA_SOURCE_NODE:
+      *node = pool->Add(new DataSourceScanPlanNode());
       break;
     case TPlanNodeType::AGGREGATION_NODE:
       *node = pool->Add(new AggregationPlanNode());

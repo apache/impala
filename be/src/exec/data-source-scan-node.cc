@@ -37,6 +37,7 @@
 #include "util/jni-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
+#include "util/time.h"
 #include "util/ubsan.h"
 
 #include "common/names.h"
@@ -51,6 +52,26 @@ namespace impala {
 
 PROFILE_DEFINE_COUNTER(NumExternalDataSourceGetNext, DEBUG, TUnit::UNIT,
     "The total number of calls to ExternalDataSource::GetNext()");
+
+PROFILE_DEFINE_TIMER(JdbcJniWaitTime, UNSTABLE,
+    "Aggregate wall-clock time this scanner thread spent blocked inside the full "
+    "JNI/Java JDBC round-trip (Thrift serialization + fetchLock wait + JDBC cursor "
+    "fetch + Thrift deserialization). Use JdbcCursorFetchTime and JdbcLockWaitTime "
+    "for the Java-reported sub-components.");
+
+PROFILE_DEFINE_TIMER(JdbcCursorFetchTime, UNSTABLE,
+    "Aggregate time this scanner thread held the Java-side fetchLock while iterating "
+    "the JDBC cursor, as reported by the Java layer. Directly shows JDBC cursor "
+    "utilisation; divide by JdbcJniWaitTime to get the cursor-active fraction.");
+
+PROFILE_DEFINE_TIMER(JdbcLockWaitTime, UNSTABLE,
+    "Aggregate time this scanner thread waited to acquire the Java-side fetchLock "
+    "before gaining access to the JDBC cursor, as reported by the Java layer. "
+    "High values indicate cursor contention between concurrent scanner threads.");
+
+PROFILE_DEFINE_COUNTER(JdbcJniCallCount, DEBUG, TUnit::UNIT,
+    "Number of JNI GetNext() calls issued to the JDBC data source by "
+    "this scanner thread.");
 
 // $0 = num expected cols, $1 = actual num columns
 const string ERROR_NUM_COLUMNS = "Data source returned unexpected number of columns. "
@@ -73,9 +94,80 @@ const string ERROR_MEM_LIMIT_EXCEEDED = "DataSourceScanNode::$0() failed to allo
 // Size of an encoded TIMESTAMP
 const size_t TIMESTAMP_SIZE = sizeof(int64_t) + sizeof(int32_t);
 
-DataSourceScanNode::DataSourceScanNode(ObjectPool* pool, const ScanPlanNode& pnode,
-    const DescriptorTbl& descs)
+// -----------------------------------------------------------------------
+// SharedJdbcConnection
+// -----------------------------------------------------------------------
+
+Status SharedJdbcConnection::Open(const string& jar_path, const string& class_name,
+    const string& api_version, const string& init_string,
+    const extdatasource::TOpenParams& params, extdatasource::TOpenResult* result) {
+  ref_count_.fetch_add(1, std::memory_order_relaxed);
+
+  std::unique_lock<std::mutex> lk(open_mu_);
+  if (!open_done_) {
+    // First caller: initialize the executor and open the Java data source.
+    // All N C++ scanner threads share this single connection.
+    Status s = executor_.Init(jar_path, class_name, api_version, init_string);
+    if (s.ok()) s = executor_.Open(params, result);
+    if (s.ok()) s = Status(result->status);
+    if (s.ok()) scan_handle_ = result->scan_handle;
+    open_status_ = s;
+    open_done_ = true;
+    open_cv_.notify_all();
+    return s;
+  }
+
+  // Subsequent callers: wait for the first caller to finish, then reuse.
+  open_cv_.wait(lk, [this] { return open_done_; });
+  result->__set_scan_handle(scan_handle_);
+  return open_status_;
+}
+
+Status SharedJdbcConnection::FetchBatch(extdatasource::TGetNextResult* result) {
+  // Fast path: another thread already exhausted the stream.
+  if (eos_.load(std::memory_order_acquire)) {
+    result->__set_eos(true);
+    return Status::OK();
+  }
+
+  extdatasource::TGetNextParams params;
+  params.__set_scan_handle(scan_handle_);
+
+  // Multiple threads may call GetNext() concurrently. Serialization is provided by
+  // the Java-side fetchLock in JdbcRecordIterator::fetchBatch(), so only one thread
+  // holds the JDBC cursor at a time. Batch conversion happens in parallel in C++.
+  RETURN_IF_ERROR(executor_.GetNext(params, result));
+  if (result->eos) eos_.store(true, std::memory_order_release);
+  return Status(result->status);
+}
+
+Status SharedJdbcConnection::Close(const extdatasource::TCloseParams& params,
+    extdatasource::TCloseResult* result) {
+  // Only the last active instance closes the shared JDBC connection.
+  if (ref_count_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+    // Guard against the case where Open() was never called or failed: only invoke
+    // executor_.Close() if the Java data source was successfully opened.
+    std::unique_lock<std::mutex> lk(open_mu_);
+    bool should_close = open_done_ && open_status_.ok();
+    lk.unlock();
+    if (should_close) return executor_.Close(params, result);
+  }
+  return Status::OK();
+}
+
+// DataSourceScanPlanNode
+Status DataSourceScanPlanNode::CreateExecNode(RuntimeState* state,
+    ExecNode** node) const {
+  *node = state->obj_pool()->Add(
+      new DataSourceScanNode(state->obj_pool(), *this, state->desc_tbl()));
+  return Status::OK();
+}
+
+//DataSourceScanNode
+DataSourceScanNode::DataSourceScanNode(ObjectPool* pool,
+    const DataSourceScanPlanNode& pnode, const DescriptorTbl& descs)
     : ScanNode(pool, pnode, descs),
+      plan_node_(pnode),
       data_src_node_(pnode.tnode_->data_source_node),
       tuple_idx_(0),
       num_rows_(0),
@@ -90,14 +182,17 @@ Status DataSourceScanNode::Prepare(RuntimeState* state) {
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(data_src_node_.tuple_id);
   DCHECK(tuple_desc_ != NULL);
 
-  data_source_executor_.reset(new ExternalDataSourceExecutor());
-  RETURN_IF_ERROR(data_source_executor_->Init(data_src_node_.data_source.hdfs_location,
-      data_src_node_.data_source.class_name, data_src_node_.data_source.api_version,
-      data_src_node_.init_string));
+  // Point at the plan node's shared connection. The object is owned by the plan node
+  // and lives for the lifetime of the fragment; no construction needed here.
+  shared_conn_ = &plan_node_.shared_conn;
 
   cols_next_val_idx_.resize(tuple_desc_->slots().size(), 0);
   num_ext_data_source_get_next_ =
       PROFILE_NumExternalDataSourceGetNext.Instantiate(runtime_profile_);
+  jdbc_jni_wait_timer_ = PROFILE_JdbcJniWaitTime.Instantiate(runtime_profile_);
+  jdbc_cursor_fetch_timer_ = PROFILE_JdbcCursorFetchTime.Instantiate(runtime_profile_);
+  jdbc_lock_wait_timer_ = PROFILE_JdbcLockWaitTime.Instantiate(runtime_profile_);
+  jdbc_jni_call_count_ = PROFILE_JdbcJniCallCount.Instantiate(runtime_profile_);
   return Status::OK();
 }
 
@@ -107,7 +202,8 @@ Status DataSourceScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
 
-  // Prepare the schema for TOpenParams.row_schema
+  // Build TOpenParams. All N scanner threads share the single Java data source stream,
+  // with fetch serialization provided by the Java-side fetchLock in JdbcRecordIterator.
   vector<extdatasource::TColumnDesc> cols;
   for (const SlotDescriptor* slot: tuple_desc_->slots()) {
     extdatasource::TColumnDesc col;
@@ -128,10 +224,18 @@ Status DataSourceScanNode::Open(RuntimeState* state) {
   params.__set_batch_size(FLAGS_data_source_batch_size);
   params.__set_predicates(data_src_node_.accepted_predicates);
   params.__set_clean_dbcp_ds_cache(state->query_options().clean_dbcp_ds_cache);
+
+  // The first caller across all N scanner threads initializes the connection;
+  // all others block on open_cv_ until it is ready and then reuse it.
   TOpenResult result;
-  RETURN_IF_ERROR(data_source_executor_->Open(params, &result));
-  RETURN_IF_ERROR(Status(result.status));
-  scan_handle_ = result.scan_handle;
+  RETURN_IF_ERROR(shared_conn_->Open(
+      data_src_node_.data_source.hdfs_location,
+      data_src_node_.data_source.class_name,
+      data_src_node_.data_source.api_version,
+      data_src_node_.init_string,
+      params, &result));
+  scan_handle_ = shared_conn_->scan_handle();
+
   return GetNextInputBatch();
 }
 
@@ -161,15 +265,30 @@ Status DataSourceScanNode::ValidateRowBatchSize() {
 }
 
 Status DataSourceScanNode::GetNextInputBatch() {
-  input_batch_.reset(new TGetNextResult());
   next_row_idx_ = 0;
-  // Reset all the indexes into the column value arrays to 0
   Ubsan::MemSet(cols_next_val_idx_.data(), 0, sizeof(int) * cols_next_val_idx_.size());
-  TGetNextParams params;
-  params.__set_scan_handle(scan_handle_);
+
+  input_batch_.reset(new TGetNextResult());
+  // Short-circuit: another scanner thread already reached EOS on the shared stream.
+  if (shared_conn_->eos()) {
+    input_batch_->__set_eos(true);
+    return Status::OK();
+  }
+  // FetchBatch() serializes the JNI call via the Java-side fetchLock; this scan node
+  // then materializes the returned batch in parallel while others may be fetching.
   COUNTER_ADD(num_ext_data_source_get_next_, 1);
-  RETURN_IF_ERROR(data_source_executor_->GetNext(params, input_batch_.get()));
-  RETURN_IF_ERROR(Status(input_batch_->status));
+  COUNTER_ADD(jdbc_jni_call_count_, 1);
+  {
+    SCOPED_TIMER(jdbc_jni_wait_timer_);
+    RETURN_IF_ERROR(shared_conn_->FetchBatch(input_batch_.get()));
+  }
+  if (input_batch_->__isset.cursor_fetch_time_ns) {
+    COUNTER_ADD(jdbc_cursor_fetch_timer_, input_batch_->cursor_fetch_time_ns);
+  }
+  if (input_batch_->__isset.lock_wait_time_ns) {
+    COUNTER_ADD(jdbc_lock_wait_timer_, input_batch_->lock_wait_time_ns);
+  }
+
   RETURN_IF_ERROR(ValidateRowBatchSize());
   if (!InputBatchHasNext() && !input_batch_->eos) {
     // The data source should have set eos, but if it didn't we should just log a
@@ -416,7 +535,9 @@ void DataSourceScanNode::Close(RuntimeState* state) {
   TCloseParams params;
   params.__set_scan_handle(scan_handle_);
   TCloseResult result;
-  Status status = data_source_executor_->Close(params, &result);
+  // shared_conn_->Close() only calls executor_.Close() when the last active
+  // DataSourceScanNode in the fragment decrements the reference count to zero.
+  Status status = shared_conn_->Close(params, &result);
   if (!status.ok()) state->LogError(status.msg());
   ScanNode::Close(state);
 }

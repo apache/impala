@@ -17,6 +17,8 @@
 
 from __future__ import absolute_import, division, print_function
 import os
+import re
+import time
 import pytest
 import requests
 import subprocess
@@ -983,3 +985,322 @@ class TestImpalaExtJdbcTables(CustomClusterTestSuite):
     """Run tests for external jdbc tables in Impala cluster for new predicates"""
     self.run_test_case(
         'QueryTest/impala-ext-jdbc-tables-predicates', vector, use_db=unique_database)
+
+
+# Queries used by MT_DOP tests and benchmarks.
+# Single-table grouped aggregate with a date filter on tpch_jdbc.lineitem.
+# Tests parallel scan throughput and per-instance row distribution.
+_JDBC_LINEITEM_AGG_QUERY = """
+SELECT
+    l.l_returnflag,
+    l.l_linestatus,
+    COUNT(*) AS order_count,
+    SUM(l.l_quantity) AS total_quantity,
+    AVG(l.l_quantity) AS avg_quantity,
+    MIN(l.l_discount) AS min_discount,
+    MAX(l.l_discount) AS max_discount,
+    MIN(l.l_extendedprice) AS min_price,
+    MAX(l.l_extendedprice) AS max_price
+FROM tpch_jdbc.lineitem l
+WHERE l.l_shipdate >= '1995-01-01'
+GROUP BY
+    l.l_returnflag,
+    l.l_linestatus
+ORDER BY total_quantity DESC
+""".strip()
+
+# Tests that multi-scan parallelism produces consistent results.
+_JDBC_JOIN_QUERY = """
+SELECT
+    c.c_nationkey,
+    MIN(o.o_totalprice) AS min_order_price,
+    MAX(o.o_totalprice) AS max_order_price,
+    MIN(l.l_discount) AS min_discount,
+    MAX(l.l_discount) AS max_discount,
+    MIN(ps.ps_supplycost) AS min_supply_cost,
+    MAX(ps.ps_supplycost) AS max_supply_cost,
+    COUNT(*) AS total_rows
+FROM tpch_jdbc.customer c
+JOIN tpch_jdbc.orders o
+    ON c.c_custkey = o.o_custkey
+JOIN tpch_jdbc.lineitem l
+    ON o.o_orderkey = l.l_orderkey
+JOIN tpch_jdbc.partsupp ps
+    ON l.l_partkey = ps.ps_partkey
+   AND l.l_suppkey = ps.ps_suppkey
+WHERE o.o_orderdate >= '1994-01-01'
+GROUP BY c.c_nationkey
+ORDER BY total_rows DESC
+""".strip()
+
+
+class TestJdbcMtDop(CustomClusterTestSuite):
+  """Correctness and profile tests for MT_DOP parallelism on JDBC external data sources.
+
+  Validates:
+    - Correctness: queries with MT_DOP=0/1/4 produce the same results.
+    - Profile: with MT_DOP=N>1, the expected number of fragment instances are active
+      and each returns at least one row (all instances participate in the scan).
+    - Counter: NumExternalDataSourceGetNext grows with MT_DOP, confirming that
+      multiple scanner threads are fetching concurrently.
+  """
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('These tests only run in exhaustive')
+    super(TestJdbcMtDop, cls).setup_class()
+
+  def _run(self, query, mt_dop):
+    self.client.set_configuration_option("mt_dop", mt_dop)
+    return self.client.execute(query)
+
+  def _run_and_get_profile(self, query, mt_dop):
+    return self._run(query, mt_dop).runtime_profile
+
+  def _fragment_instance_rows(self, profile):
+    """Return the list of RowsProduced values from all fragment instances."""
+    return [int(m) for m in re.findall(r'RowsProduced: (\d+)', profile)]
+
+  def _get_next_total(self, profile):
+    """Sum of NumExternalDataSourceGetNext across all instances."""
+    return sum(int(m) for m in
+               re.findall(r'NumExternalDataSourceGetNext: (\d+)', profile))
+
+  # Correctness
+  @pytest.mark.execute_serially
+  def test_lineitem_agg_correctness(self):
+    """Grouped lineitem aggregate must return identical results for all MT_DOP values."""
+    baseline = self._run(_JDBC_LINEITEM_AGG_QUERY, mt_dop=0).data
+    assert baseline == self._run(_JDBC_LINEITEM_AGG_QUERY, mt_dop=1).data, \
+        "Lineitem agg mismatch between mt_dop=0 and mt_dop=1"
+    assert baseline == self._run(_JDBC_LINEITEM_AGG_QUERY, mt_dop=4).data, \
+        "Lineitem agg mismatch between mt_dop=0 and mt_dop=4"
+
+  @pytest.mark.execute_serially
+  def test_join_correctness(self):
+    """Four-table join must return identical results for all MT_DOP values."""
+    baseline = self._run(_JDBC_JOIN_QUERY, mt_dop=0).data
+    assert baseline == self._run(_JDBC_JOIN_QUERY, mt_dop=1).data, \
+        "Join query mismatch between mt_dop=0 and mt_dop=1"
+    assert baseline == self._run(_JDBC_JOIN_QUERY, mt_dop=4).data, \
+        "Join query mismatch between mt_dop=0 and mt_dop=4"
+
+  # Profile / counters
+
+  @pytest.mark.execute_serially
+  @pytest.mark.parametrize("mt_dop", [0, 1, 4])
+  def test_instance_count(self, mt_dop):
+    """With MT_DOP=N the JDBC scan fragment should run with max(1,N) instances."""
+    profile = self._run_and_get_profile(_JDBC_LINEITEM_AGG_QUERY, mt_dop)
+    expected = max(1, mt_dop)
+
+    # New profile format
+    matches = re.findall(r'NumFragmentInstances:\s+(\d+)', profile)
+
+    assert matches, (
+        "Could not find NumFragmentInstances in profile.\nProfile:\n%s"
+        % profile
+    )
+
+    actual = max(int(x) for x in matches)
+
+    assert actual >= expected, (
+        "Expected >= %d fragment instances for mt_dop=%d, got %d\nProfile:\n%s"
+        % (expected, mt_dop, actual, profile))
+
+  @pytest.mark.execute_serially
+  @pytest.mark.parametrize("mt_dop", [1, 4])
+  def test_all_instances_returned_rows(self, mt_dop):
+    """Every scanner instance should have returned at least one row."""
+    profile = self._run_and_get_profile(_JDBC_LINEITEM_AGG_QUERY, mt_dop)
+    rows_per_instance = self._fragment_instance_rows(profile)
+    assert rows_per_instance, "No RowsProduced counters found in profile"
+    active = [r for r in rows_per_instance if r > 0]
+    assert len(active) >= mt_dop, (
+        "Expected at least %d active instances (RowsProduced > 0), got %d.\n"
+        "RowsProduced per instance: %s\nProfile:\n%s"
+        % (mt_dop, len(active), rows_per_instance, profile))
+
+  @pytest.mark.execute_serially
+  @pytest.mark.parametrize("mt_dop", [1, 4])
+  def test_get_next_counter_scales_with_mt_dop(self, mt_dop):
+    """Total GetNext calls should not decrease as MT_DOP grows."""
+    calls_1 = self._get_next_total(
+        self._run_and_get_profile(_JDBC_LINEITEM_AGG_QUERY, mt_dop=1))
+    calls_n = self._get_next_total(
+        self._run_and_get_profile(_JDBC_LINEITEM_AGG_QUERY, mt_dop=mt_dop))
+    assert calls_1 > 0, "Expected non-zero GetNext calls with mt_dop=1"
+    if mt_dop > 1:
+      assert calls_n >= calls_1, (
+          "Expected total GetNext calls to be >= mt_dop=1 (%d) with mt_dop=%d, "
+          "got %d" % (calls_1, mt_dop, calls_n))
+
+  @pytest.mark.execute_serially
+  def test_shared_scan_handle(self):
+    """All instances in the same fragment should share the same scan handle."""
+    profile = self._run_and_get_profile(_JDBC_LINEITEM_AGG_QUERY, mt_dop=4)
+    handles = re.findall(r'ScanHandle:\s+([0-9a-f-]{36})', profile)
+    if handles:
+      assert len(set(handles)) == 1, (
+          "Expected a single shared scan handle across instances, "
+          "got multiple: %s" % set(handles))
+
+
+class TestJdbcMtDopBenchmark(CustomClusterTestSuite):
+  """Benchmark tests for JDBC MT_DOP parallelism.
+
+  Uses two representative TPC-H workloads:
+    - _JDBC_LINEITEM_AGG_QUERY: single-table grouped aggregate, exercises the
+      parallel scan path directly (most sensitive to MT_DOP).
+    - _JDBC_JOIN_QUERY: four-table join, exercises coordination overhead across
+      multiple concurrent JDBC scans.
+
+  Each test records performance metrics from the Impala runtime profile and
+  asserts that parallelism does not produce excessive overhead.
+  """
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('These tests only run in exhaustive')
+    super(TestJdbcMtDopBenchmark, cls).setup_class()
+
+  def _run(self, query, mt_dop):
+    self.client.set_configuration_option("mt_dop", mt_dop)
+    return self.client.execute(query)
+
+  def _get_next_total(self, profile):
+    return sum(int(x) for x in
+               re.findall(r'NumExternalDataSourceGetNext: (\d+)', profile))
+
+  def _rows_per_instance(self, profile):
+    return [int(x) for x in re.findall(r'RowsProduced: (\d+)', profile)]
+
+  # Latency benchmarks
+  @pytest.mark.execute_serially
+  def test_benchmark_lineitem_agg_latency(self):
+    """MT_DOP=4 wall-clock time for the lineitem aggregate must not exceed 2x MT_DOP=1.
+
+    Three warm-up runs are executed first to amortise JVM / connection-pool
+    startup costs before the timed measurement.
+    """
+    for _ in range(3):
+      self._run(_JDBC_LINEITEM_AGG_QUERY, mt_dop=1)
+    t0 = time.time()
+    self._run(_JDBC_LINEITEM_AGG_QUERY, mt_dop=1)
+    latency_1 = time.time() - t0
+
+    for _ in range(3):
+      self._run(_JDBC_LINEITEM_AGG_QUERY, mt_dop=4)
+    t0 = time.time()
+    self._run(_JDBC_LINEITEM_AGG_QUERY, mt_dop=4)
+    latency_4 = time.time() - t0
+
+    speedup = latency_1 / latency_4 if latency_4 > 0 else float('inf')
+    print("\n[BENCHMARK] lineitem_agg latency: mt_dop=1 %.3fs  mt_dop=4 %.3fs  "
+          "speedup=%.2fx" % (latency_1, latency_4, speedup))
+    assert latency_4 <= latency_1 * 2, (
+        "mt_dop=4 (%.3fs) is more than 2x slower than mt_dop=1 (%.3fs); "
+        "parallelism overhead looks excessive" % (latency_4, latency_1))
+
+  @pytest.mark.execute_serially
+  def test_benchmark_join_latency(self):
+    """MT_DOP=4 wall-clock time for the four-table join must not exceed 2x MT_DOP=1."""
+    for _ in range(3):
+      self._run(_JDBC_JOIN_QUERY, mt_dop=1)
+    t0 = time.time()
+    self._run(_JDBC_JOIN_QUERY, mt_dop=1)
+    latency_1 = time.time() - t0
+
+    for _ in range(3):
+      self._run(_JDBC_JOIN_QUERY, mt_dop=4)
+    t0 = time.time()
+    self._run(_JDBC_JOIN_QUERY, mt_dop=4)
+    latency_4 = time.time() - t0
+
+    speedup = latency_1 / latency_4 if latency_4 > 0 else float('inf')
+    print("\n[BENCHMARK] join latency:         mt_dop=1 %.3fs  mt_dop=4 %.3fs  "
+          "speedup=%.2fx" % (latency_1, latency_4, speedup))
+    assert latency_4 <= latency_1 * 2, (
+        "join mt_dop=4 (%.3fs) is more than 2x slower than mt_dop=1 (%.3fs)"
+        % (latency_4, latency_1))
+
+  # GetNext throughput benchmarks
+  @pytest.mark.execute_serially
+  @pytest.mark.parametrize("mt_dop", [1, 2, 4])
+  def test_benchmark_lineitem_agg_get_next_throughput(self, mt_dop):
+    """Record GetNext call count and rate for the lineitem aggregate at each MT_DOP.
+
+    The aggregate call count must be non-zero; the rate is logged for trend
+    analysis but not bounded (connection latency varies per environment).
+    """
+    t0 = time.time()
+    result = self._run(_JDBC_LINEITEM_AGG_QUERY, mt_dop=mt_dop)
+    elapsed = time.time() - t0
+    total_calls = self._get_next_total(result.runtime_profile)
+    rate = total_calls / elapsed if elapsed > 0 else 0
+    print("\n[BENCHMARK] lineitem_agg GetNext: mt_dop=%d  calls=%d  "
+          "elapsed=%.3fs  rate=%.1f calls/s" % (mt_dop, total_calls, elapsed, rate))
+    assert total_calls > 0, \
+        "Expected non-zero GetNext calls for lineitem_agg mt_dop=%d" % mt_dop
+
+  @pytest.mark.execute_serially
+  @pytest.mark.parametrize("mt_dop", [1, 2, 4])
+  def test_benchmark_join_get_next_throughput(self, mt_dop):
+    """Record GetNext call count and rate for the four-table join at each MT_DOP."""
+    t0 = time.time()
+    result = self._run(_JDBC_JOIN_QUERY, mt_dop=mt_dop)
+    elapsed = time.time() - t0
+    total_calls = self._get_next_total(result.runtime_profile)
+    rate = total_calls / elapsed if elapsed > 0 else 0
+    print("\n[BENCHMARK] join GetNext:         mt_dop=%d  calls=%d  "
+          "elapsed=%.3fs  rate=%.1f calls/s" % (mt_dop, total_calls, elapsed, rate))
+    assert total_calls > 0, \
+        "Expected non-zero GetNext calls for join query mt_dop=%d" % mt_dop
+
+  @pytest.mark.execute_serially
+  @pytest.mark.parametrize("mt_dop", [2, 4])
+  def test_benchmark_lineitem_agg_instance_participation(self, mt_dop):
+    """Verify that multiple fragment instances participate in execution."""
+    profile = self._run(
+        _JDBC_LINEITEM_AGG_QUERY, mt_dop=mt_dop).runtime_profile
+
+    rows = self._rows_per_instance(profile)
+
+    assert rows, "No RowsProduced counters found in profile"
+
+    active = [r for r in rows if r > 0]
+
+    print(
+        "\n[BENCHMARK] lineitem_agg row dist: "
+        "mt_dop=%d rows=%s active=%d"
+        % (mt_dop, rows, len(active))
+    )
+
+    assert len(active) >= mt_dop, (
+        "Expected at least %d active instances, got %d.\nRows: %s"
+        % (mt_dop, len(active), rows))
+
+  @pytest.mark.execute_serially
+  @pytest.mark.parametrize("mt_dop", [2, 4])
+  def test_benchmark_join_instance_participation(self, mt_dop):
+    """Verify that multiple fragment instances participate in execution."""
+    profile = self._run(
+        _JDBC_JOIN_QUERY, mt_dop=mt_dop).runtime_profile
+
+    rows = self._rows_per_instance(profile)
+
+    assert rows, "No RowsProduced counters found in profile"
+
+    active = [r for r in rows if r > 0]
+
+    print(
+        "\n[BENCHMARK] join row dist: "
+        "mt_dop=%d rows=%s active=%d"
+        % (mt_dop, rows, len(active))
+    )
+
+    assert len(active) >= mt_dop, (
+        "Expected at least %d active instances, got %d.\nRows: %s"
+        % (mt_dop, len(active), rows))

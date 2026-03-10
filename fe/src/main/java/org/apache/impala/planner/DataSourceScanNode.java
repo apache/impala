@@ -349,9 +349,15 @@ public class DataSourceScanNode extends ScanNode {
       LOG.trace("computeStats DataSourceScan: cardinality=" + Long.toString(cardinality_));
     }
 
-    numInstances_ = numNodes_ = table_.getNumNodes();
+    numNodes_ = table_.getNumNodes();
+    // JDBC tables are always scanned from a single executor node (numNodes_ == 1).
+    Preconditions.checkState(numNodes_ == 1,
+        "Expected 1 executor node for JDBC scan, got: %s", numNodes_);
+    int requestedParallelism = analyzer.getMaxParallelismPerNode();
+    numInstances_ = Math.max(1, requestedParallelism);
     if (LOG.isTraceEnabled()) {
-      LOG.trace("computeStats DataSourceScan: #nodes=" + Integer.toString(numNodes_));
+      LOG.trace("computeStats DataSourceScan: #nodes=" + numNodes_
+          + " #instances=" + numInstances_);
     }
   }
 
@@ -390,20 +396,32 @@ public class DataSourceScanNode extends ScanNode {
   protected void toThrift(TPlanNode msg) {
     Preconditions.checkNotNull(acceptedPredicates_);
     msg.node_type = TPlanNodeType.DATA_SOURCE_NODE;
-    msg.data_source_node = new TDataSourceScanNode(desc_.getId().asInt(),
+    TDataSourceScanNode node = new TDataSourceScanNode(desc_.getId().asInt(),
         table_.getDataSource(), table_.getInitString(), acceptedPredicates_);
+    msg.data_source_node = node;
   }
 
   /**
-   * Create a single scan range for the localhost.
+   * Generates one virtual scan range per fragment instance (up to mt_dop ranges).
+   *
+   * Each range carries is_data_source_scan=true so the scheduler pins all of them
+   * to the same executor host. All N instances then share a single SharedJdbcConnection
+   * on that executor; fetch calls are serialized via a C++ mutex.
+   *
+   * The host address (localhost:12345) is a placeholder; the scheduler ignores it
+   * for DATA_SOURCE ranges and picks an executor instead.
    */
   private void computeScanRangeLocations(Analyzer analyzer) {
-    // TODO: Does the port matter?
     TNetworkAddress networkAddress = addressToTNetworkAddress("localhost:12345");
     Integer hostIndex = analyzer.getHostIndex().getOrAddIndex(networkAddress);
+    int numSplits = Math.max(1, analyzer.getMaxParallelismPerNode());
     scanRangeSpecs_ = new TScanRangeSpec();
-    scanRangeSpecs_.addToConcrete_ranges(new TScanRangeLocationList(
-        new TScanRange(), Lists.newArrayList(new TScanRangeLocation(hostIndex))));
+    for (int i = 0; i < numSplits; i++) {
+      TScanRange range = new TScanRange();
+      range.setIs_data_source_scan(true);
+      scanRangeSpecs_.addToConcrete_ranges(new TScanRangeLocationList(
+          range, Lists.newArrayList(new TScanRangeLocation(hostIndex))));
+    }
   }
 
   @Override

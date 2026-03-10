@@ -1131,6 +1131,12 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
   // Holds scan ranges that must be assigned for remote reads.
   vector<const TScanRangeLocationList*> remote_scan_range_locations;
 
+  // For JDBC data source scans: all virtual split ranges for this scan node must land on
+  // the same executor. The executor is chosen by hashing node_id so that different JDBC
+  // scan nodes in a multi-table query are distributed across different executors.
+  bool jdbc_executor_selected = false;
+  BackendDescriptorPB jdbc_executor;
+
   // Loop over all scan ranges, select an executor for those with local impalads and
   // collect all others for later processing.
   for (const TScanRangeLocationList& scan_range_locations : locations) {
@@ -1164,6 +1170,28 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
       }
       assignment_ctx.RecordScanRangeAssignment(
         *coordinatorPB, node_id, host_list, scan_range_locations, assignment);
+    } else if (scan_range_locations.scan_range.__isset.is_data_source_scan &&
+               scan_range_locations.scan_range.is_data_source_scan) {
+      // All JDBC virtual scan ranges go to one executor so that a single shared JDBC
+      // connection can serve all N DataSourceScanNode instances in the same fragment.
+      // Select one executor on the first JDBC range and reuse it for the rest.
+      if (!jdbc_executor_selected) {
+        jdbc_executor_selected = true;
+        if (executor_config.group.NumExecutors() > 0) {
+          vector<BackendDescriptorPB> all_execs =
+              executor_config.group.GetAllExecutorDescriptors();
+          // Hash node_id to pick a consistent executor for this scan node.
+          // Different scan nodes (e.g. two JDBC tables in the same query) will hash to
+          // different executors, spreading the JDBC connections across the cluster.
+          size_t idx = std::hash<int>{}(node_id) % all_execs.size();
+          jdbc_executor = all_execs[idx];
+        } else {
+          // No executors available (coordinator-only mode): fall back to coordinator.
+          jdbc_executor = coord_desc;
+        }
+      }
+      assignment_ctx.RecordScanRangeAssignment(
+          jdbc_executor, node_id, host_list, scan_range_locations, assignment);
     } else {
       // Collect executor candidates with smallest memory distance.
       vector<IpAddr> executor_candidates;

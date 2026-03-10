@@ -124,9 +124,6 @@ Status ScanPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const 
     case TPlanNodeType::HBASE_SCAN_NODE:
       *node = pool->Add(new HBaseScanNode(pool, *this, state->desc_tbl()));
       break;
-    case TPlanNodeType::DATA_SOURCE_NODE:
-      *node = pool->Add(new DataSourceScanNode(pool, *this, state->desc_tbl()));
-      break;
     case TPlanNodeType::KUDU_SCAN_NODE:
       if (tnode_->kudu_scan_node.use_mt_scan_node) {
         DCHECK(is_mt_fragment());

@@ -14,6 +14,24 @@ PLAN-ROOT SINK
    HDFS partitions=24/24 files=24 size=478.45KB
    row-size=17B cardinality=7.30K
 ====
+select id, int_col, bool_col, year, month from functional.alltypes
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=6.12K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=17B cardinality=6.12K
+====
 select c_custkey from tpch_jdbc.customer
 ---- PLAN
 PLAN-ROOT SINK
@@ -92,6 +110,45 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.customer a]
    row-size=0B cardinality=150.00K
 ====
+select a.c_custkey, b.o_orderkey from tpch_jdbc.customer
+a join tpch_jdbc.orders b on a.c_custkey=b.o_custkey
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.c_custkey = b.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders b]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer a]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.c_custkey = b.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: b.o_custkey
+|  |
+|  04:EXCHANGE [HASH(b.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders b]
+|     row-size=0B cardinality=1.50M
+|
+03:EXCHANGE [HASH(a.c_custkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer a]
+   row-size=0B cardinality=150.00K
+====
 select a.c_custkey, b.o_orderkey, c.l_linenumber from
 tpch_jdbc.customer a join tpch_jdbc.orders b on
 a.c_custkey=b.o_custkey join tpch_jdbc.lineitem c on
@@ -137,6 +194,69 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN DATA SOURCE [tpch_jdbc.orders b]
 |     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer a]
+   row-size=0B cardinality=150.00K
+====
+select a.c_custkey, b.o_orderkey, c.l_linenumber from
+tpch_jdbc.customer a join tpch_jdbc.orders b on
+a.c_custkey=b.o_custkey join tpch_jdbc.lineitem c on
+b.o_orderkey=c.l_orderkey
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: b.o_orderkey = c.l_orderkey
+|  row-size=36B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem c]
+|     row-size=0B cardinality=6.00M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.c_custkey = b.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders b]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer a]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: b.o_orderkey = c.l_orderkey
+|  row-size=36B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: c.l_orderkey
+|  |
+|  08:EXCHANGE [HASH(c.l_orderkey)]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem c]
+|     row-size=0B cardinality=6.00M
+|
+07:EXCHANGE [HASH(b.o_orderkey)]
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.c_custkey = b.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: b.o_custkey
+|  |
+|  06:EXCHANGE [HASH(b.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders b]
+|     row-size=0B cardinality=1.50M
+|
+05:EXCHANGE [HASH(a.c_custkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.customer a]
    row-size=0B cardinality=150.00K
@@ -190,6 +310,63 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.customer a]
    row-size=0B cardinality=150.00K
 ====
+select a.c_name, count(b.o_orderkey) from tpch_jdbc.customer
+a left join tpch_jdbc.orders b on a.c_custkey=b.o_custkey
+group by a.c_name
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(b.o_orderkey)
+|  group by: a.c_name
+|  row-size=20B cardinality=150.00K
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.c_custkey = b.o_custkey
+|  row-size=36B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders b]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer a]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(b.o_orderkey)
+|  group by: a.c_name
+|  row-size=20B cardinality=150.00K
+|
+06:EXCHANGE [HASH(a.c_name)]
+|
+03:AGGREGATE [STREAMING]
+|  output: count(b.o_orderkey)
+|  group by: a.c_name
+|  row-size=20B cardinality=150.00K
+|
+02:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: a.c_custkey = b.o_custkey
+|  row-size=36B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: b.o_custkey
+|  |
+|  05:EXCHANGE [HASH(b.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders b]
+|     row-size=0B cardinality=1.50M
+|
+04:EXCHANGE [HASH(a.c_custkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer a]
+   row-size=0B cardinality=150.00K
+====
 select count(*) from tpch_jdbc.lineitem
 ---- PLAN
 PLAN-ROOT SINK
@@ -216,6 +393,34 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.lineitem]
    row-size=0B cardinality=6.00M
 ====
+select count(*) from tpch_jdbc.lineitem
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+00:SCAN DATA SOURCE [tpch_jdbc.lineitem]
+   row-size=0B cardinality=6.00M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=5
+|
+00:SCAN DATA SOURCE [tpch_jdbc.lineitem]
+   row-size=0B cardinality=6.00M
+====
 select avg(l_extendedprice) from tpch_jdbc.lineitem
 ---- PLAN
 PLAN-ROOT SINK
@@ -238,6 +443,34 @@ PLAN-ROOT SINK
 01:AGGREGATE
 |  output: avg(l_extendedprice)
 |  row-size=8B cardinality=1
+|
+00:SCAN DATA SOURCE [tpch_jdbc.lineitem]
+   row-size=0B cardinality=6.00M
+====
+select avg(l_extendedprice) from tpch_jdbc.lineitem
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: avg(l_extendedprice)
+|  row-size=8B cardinality=1
+|
+00:SCAN DATA SOURCE [tpch_jdbc.lineitem]
+   row-size=0B cardinality=6.00M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: avg:merge(l_extendedprice)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: avg(l_extendedprice)
+|  row-size=8B cardinality=5
 |
 00:SCAN DATA SOURCE [tpch_jdbc.lineitem]
    row-size=0B cardinality=6.00M
@@ -359,6 +592,45 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.region r]
    row-size=0B cardinality=10
 ====
+select r_name, n_name from tpch_jdbc.region r join
+tpch_jdbc.nation n on r.r_regionkey=n.n_regionkey
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: r.r_regionkey = n.n_regionkey
+|  row-size=28B cardinality=10
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.nation n]
+|     row-size=0B cardinality=25
+|
+00:SCAN DATA SOURCE [tpch_jdbc.region r]
+   row-size=0B cardinality=10
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: r.r_regionkey = n.n_regionkey
+|  row-size=28B cardinality=10
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: n.n_regionkey
+|  |
+|  04:EXCHANGE [HASH(n.n_regionkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.nation n]
+|     row-size=0B cardinality=25
+|
+03:EXCHANGE [HASH(r.r_regionkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.region r]
+   row-size=0B cardinality=10
+====
 select o_orderstatus, count(*) from tpch_jdbc.orders
 group by o_orderstatus
 ---- PLAN
@@ -417,6 +689,48 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=150.00K
 |
 |--04:EXCHANGE [HASH(c_custkey)]
+|  |
+|  00:SCAN DATA SOURCE [tpch_jdbc.customer]
+|     row-size=0B cardinality=150.00K
+|
+03:EXCHANGE [HASH(o_custkey)]
+|
+01:SCAN DATA SOURCE [tpch_jdbc.orders]
+   data source predicates: o_totalprice > 50000
+   row-size=8B cardinality=1.50M
+====
+select c_custkey, c_name from tpch_jdbc.customer where
+c_custkey in (select o_custkey from tpch_jdbc.orders
+where o_totalprice > 50000)
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: o_custkey = c_custkey
+|  row-size=20B cardinality=150.00K
+|
+|--00:SCAN DATA SOURCE [tpch_jdbc.customer]
+|     row-size=0B cardinality=150.00K
+|
+01:SCAN DATA SOURCE [tpch_jdbc.orders]
+   data source predicates: o_totalprice > 50000
+   row-size=8B cardinality=1.50M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  hash predicates: o_custkey = c_custkey
+|  row-size=20B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: c_custkey
+|  |
+|  04:EXCHANGE [HASH(c_custkey)]
 |  |
 |  00:SCAN DATA SOURCE [tpch_jdbc.customer]
 |     row-size=0B cardinality=150.00K
@@ -492,6 +806,85 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
 ====
+select c.c_custkey, count(l.l_orderkey) from tpch_jdbc.customer
+c join tpch_jdbc.orders o on c.c_custkey=o.o_custkey join
+tpch_jdbc.lineitem l on o.o_orderkey=l.l_orderkey group by c.c_custkey
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(l.l_orderkey)
+|  group by: c.c_custkey
+|  row-size=16B cardinality=150.00K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=32B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+11:AGGREGATE [FINALIZE]
+|  output: count:merge(l.l_orderkey)
+|  group by: c.c_custkey
+|  row-size=16B cardinality=150.00K
+|
+10:EXCHANGE [HASH(c.c_custkey)]
+|
+05:AGGREGATE [STREAMING]
+|  output: count(l.l_orderkey)
+|  group by: c.c_custkey
+|  row-size=16B cardinality=150.00K
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=32B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  09:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+08:EXCHANGE [HASH(o.o_orderkey)]
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  07:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+06:EXCHANGE [HASH(c.c_custkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
 select max(l_extendedprice), min(l_extendedprice) from tpch_jdbc.lineitem
 ---- PLAN
 PLAN-ROOT SINK
@@ -514,6 +907,34 @@ PLAN-ROOT SINK
 01:AGGREGATE
 |  output: max(l_extendedprice), min(l_extendedprice)
 |  row-size=16B cardinality=1
+|
+00:SCAN DATA SOURCE [tpch_jdbc.lineitem]
+   row-size=0B cardinality=6.00M
+====
+select max(l_extendedprice), min(l_extendedprice) from tpch_jdbc.lineitem
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: max(l_extendedprice), min(l_extendedprice)
+|  row-size=16B cardinality=1
+|
+00:SCAN DATA SOURCE [tpch_jdbc.lineitem]
+   row-size=0B cardinality=6.00M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: max:merge(l_extendedprice), min:merge(l_extendedprice)
+|  row-size=16B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: max(l_extendedprice), min(l_extendedprice)
+|  row-size=16B cardinality=5
 |
 00:SCAN DATA SOURCE [tpch_jdbc.lineitem]
    row-size=0B cardinality=6.00M
@@ -548,6 +969,48 @@ PLAN-ROOT SINK
 |  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
 |     data source predicates: o.o_orderdate > '1995-01-01'
 |     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
+select c.c_custkey, o.o_orderdate from tpch_jdbc.customer c
+join tpch_jdbc.orders o on c.c_custkey=o.o_custkey where
+o.o_orderdate > '1995-01-01'
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=28B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     data source predicates: o.o_orderdate > '1995-01-01'
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=28B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  04:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     data source predicates: o.o_orderdate > '1995-01-01'
+|     row-size=0B cardinality=1.50M
+|
+03:EXCHANGE [HASH(c.c_custkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
@@ -666,6 +1129,86 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
 ====
+select c.c_name, sum(l.l_extendedprice) from
+tpch_jdbc.customer c join tpch_jdbc.orders o on
+c.c_custkey=o.o_custkey join tpch_jdbc.lineitem l on
+o.o_orderkey=l.l_orderkey group by c.c_name
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(l.l_extendedprice)
+|  group by: c.c_name
+|  row-size=28B cardinality=150.00K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=52B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=36B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+11:AGGREGATE [FINALIZE]
+|  output: sum:merge(l.l_extendedprice)
+|  group by: c.c_name
+|  row-size=28B cardinality=150.00K
+|
+10:EXCHANGE [HASH(c.c_name)]
+|
+05:AGGREGATE [STREAMING]
+|  output: sum(l.l_extendedprice)
+|  group by: c.c_name
+|  row-size=28B cardinality=150.00K
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=52B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  09:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+08:EXCHANGE [HASH(o.o_orderkey)]
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=36B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  07:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+06:EXCHANGE [HASH(c.c_custkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
 select l.l_orderkey, o.o_orderpriority, count(*)
 from tpch_jdbc.orders o join tpch_jdbc.lineitem l on
 o.o_orderkey=l.l_orderkey group by l.l_orderkey, o.o_orderpriority
@@ -715,6 +1258,63 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.orders o]
    row-size=0B cardinality=1.50M
 ====
+select l.l_orderkey, o.o_orderpriority, count(*)
+from tpch_jdbc.orders o join tpch_jdbc.lineitem l on
+o.o_orderkey=l.l_orderkey group by l.l_orderkey, o.o_orderpriority
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: l.l_orderkey, o.o_orderpriority
+|  row-size=28B cardinality=1.50M
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=28B cardinality=1.50M
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.orders o]
+   row-size=0B cardinality=1.50M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: l.l_orderkey, o.o_orderpriority
+|  row-size=28B cardinality=1.50M
+|
+06:EXCHANGE [HASH(l.l_orderkey,o.o_orderpriority)]
+|
+03:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: l.l_orderkey, o.o_orderpriority
+|  row-size=28B cardinality=1.50M
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=28B cardinality=1.50M
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  05:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+04:EXCHANGE [HASH(o.o_orderkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.orders o]
+   row-size=0B cardinality=1.50M
+====
 select c.c_custkey from tpch_jdbc.customer c where
 exists (select 1 from tpch_jdbc.orders o where
 o.o_custkey=c.c_custkey)
@@ -740,6 +1340,46 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=150.00K
 |
 |--04:EXCHANGE [HASH(c.c_custkey)]
+|  |
+|  00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+|     row-size=0B cardinality=150.00K
+|
+03:EXCHANGE [HASH(o.o_custkey)]
+|
+01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+   row-size=8B cardinality=1.50M
+====
+select c.c_custkey from tpch_jdbc.customer c where
+exists (select 1 from tpch_jdbc.orders o where
+o.o_custkey=c.c_custkey)
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  row-size=8B cardinality=150.00K
+|
+|--00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+|     row-size=0B cardinality=150.00K
+|
+01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+   row-size=8B cardinality=1.50M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  hash predicates: o.o_custkey = c.c_custkey
+|  row-size=8B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: c.c_custkey
+|  |
+|  04:EXCHANGE [HASH(c.c_custkey)]
 |  |
 |  00:SCAN DATA SOURCE [tpch_jdbc.customer c]
 |     row-size=0B cardinality=150.00K
@@ -850,6 +1490,89 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
 ====
+select c.c_custkey, sum(l.l_extendedprice) from
+tpch_jdbc.customer c join tpch_jdbc.orders o on
+c.c_custkey=o.o_custkey join tpch_jdbc.lineitem l on
+o.o_orderkey=l.l_orderkey where l.l_discount > 0.05
+group by c.c_custkey
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(l.l_extendedprice)
+|  group by: c.c_custkey
+|  row-size=24B cardinality=150.00K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=40B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     data source predicates: l.l_discount > 0.05
+|     row-size=0B cardinality=6.00M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+11:AGGREGATE [FINALIZE]
+|  output: sum:merge(l.l_extendedprice)
+|  group by: c.c_custkey
+|  row-size=24B cardinality=150.00K
+|
+10:EXCHANGE [HASH(c.c_custkey)]
+|
+05:AGGREGATE [STREAMING]
+|  output: sum(l.l_extendedprice)
+|  group by: c.c_custkey
+|  row-size=24B cardinality=150.00K
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=40B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  09:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     data source predicates: l.l_discount > 0.05
+|     row-size=0B cardinality=6.00M
+|
+08:EXCHANGE [HASH(o.o_orderkey)]
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  07:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+06:EXCHANGE [HASH(c.c_custkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
 select c.c_name, o.o_orderstatus, count(*) from
 tpch_jdbc.customer c join tpch_jdbc.orders o on
 c.c_custkey=o.o_custkey group by c.c_name, o.o_orderstatus
@@ -895,6 +1618,63 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
 |     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
+select c.c_name, o.o_orderstatus, count(*) from
+tpch_jdbc.customer c join tpch_jdbc.orders o on
+c.c_custkey=o.o_custkey group by c.c_name, o.o_orderstatus
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: c.c_name, o.o_orderstatus
+|  row-size=32B cardinality=150.00K
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=40B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: c.c_name, o.o_orderstatus
+|  row-size=32B cardinality=150.00K
+|
+06:EXCHANGE [HASH(c.c_name,o.o_orderstatus)]
+|
+03:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: c.c_name, o.o_orderstatus
+|  row-size=32B cardinality=150.00K
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=40B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  05:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+04:EXCHANGE [HASH(c.c_custkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
@@ -948,6 +1728,56 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.orders o]
    row-size=0B cardinality=1.50M
 ====
+select o_orderkey, max(l_shipdate), min(l_commitdate)
+from tpch_jdbc.orders o join tpch_jdbc.lineitem l on
+o.o_orderkey=l.l_orderkey group by o_orderkey
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: max(l_shipdate), min(l_commitdate)
+|  group by: o_orderkey
+|  row-size=32B cardinality=1.50M
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=40B cardinality=1.50M
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.orders o]
+   row-size=0B cardinality=1.50M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: max(l_shipdate), min(l_commitdate)
+|  group by: o_orderkey
+|  row-size=32B cardinality=1.50M
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=40B cardinality=1.50M
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  05:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+04:EXCHANGE [HASH(o.o_orderkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.orders o]
+   row-size=0B cardinality=1.50M
+====
 select sum(o_totalprice), avg(o_totalprice) from tpch_jdbc.orders
 ---- PLAN
 PLAN-ROOT SINK
@@ -970,6 +1800,34 @@ PLAN-ROOT SINK
 01:AGGREGATE
 |  output: sum(o_totalprice), avg(o_totalprice)
 |  row-size=24B cardinality=1
+|
+00:SCAN DATA SOURCE [tpch_jdbc.orders]
+   row-size=0B cardinality=1.50M
+====
+select sum(o_totalprice), avg(o_totalprice) from tpch_jdbc.orders
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum(o_totalprice), avg(o_totalprice)
+|  row-size=24B cardinality=1
+|
+00:SCAN DATA SOURCE [tpch_jdbc.orders]
+   row-size=0B cardinality=1.50M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: sum:merge(o_totalprice), avg:merge(o_totalprice)
+|  row-size=24B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: sum(o_totalprice), avg(o_totalprice)
+|  row-size=24B cardinality=5
 |
 00:SCAN DATA SOURCE [tpch_jdbc.orders]
    row-size=0B cardinality=1.50M
@@ -1023,6 +1881,63 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
 ====
+select c.c_custkey, c.c_name, sum(o.o_totalprice)
+from tpch_jdbc.customer c join tpch_jdbc.orders o on
+c.c_custkey=o.o_custkey group by c.c_custkey, c.c_name
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: sum(o.o_totalprice)
+|  group by: c.c_custkey, c.c_name
+|  row-size=36B cardinality=150.00K
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=36B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: sum:merge(o.o_totalprice)
+|  group by: c.c_custkey, c.c_name
+|  row-size=36B cardinality=150.00K
+|
+06:EXCHANGE [HASH(c.c_custkey,c.c_name)]
+|
+03:AGGREGATE [STREAMING]
+|  output: sum(o.o_totalprice)
+|  group by: c.c_custkey, c.c_name
+|  row-size=36B cardinality=150.00K
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=36B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  05:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+04:EXCHANGE [HASH(c.c_custkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
 select c.c_custkey, o.o_orderkey, l.l_linenumber,
 l.l_extendedprice from tpch_jdbc.customer c join
 tpch_jdbc.orders o on c.c_custkey=o.o_custkey join
@@ -1071,6 +1986,72 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
 |     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
+select c.c_custkey, o.o_orderkey, l.l_linenumber,
+l.l_extendedprice from tpch_jdbc.customer c join
+tpch_jdbc.orders o on c.c_custkey=o.o_custkey join
+tpch_jdbc.lineitem l on o.o_orderkey=l.l_orderkey
+where l.l_shipdate > '1996-01-01'
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=44B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     data source predicates: l.l_shipdate > '1996-01-01'
+|     row-size=0B cardinality=6.00M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=44B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  08:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     data source predicates: l.l_shipdate > '1996-01-01'
+|     row-size=0B cardinality=6.00M
+|
+07:EXCHANGE [HASH(o.o_orderkey)]
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  06:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+05:EXCHANGE [HASH(c.c_custkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
@@ -1248,6 +2229,56 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
 ====
+select c.c_custkey, count(o.o_orderkey) from tpch_jdbc.customer
+c left join tpch_jdbc.orders o on c.c_custkey=o.o_custkey
+group by c.c_custkey
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(o.o_orderkey)
+|  group by: c.c_custkey
+|  row-size=16B cardinality=150.00K
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(o.o_orderkey)
+|  group by: c.c_custkey
+|  row-size=16B cardinality=150.00K
+|
+02:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  05:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+04:EXCHANGE [HASH(c.c_custkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
 select c.c_custkey, o.o_orderkey, l.l_extendedprice from
 tpch_jdbc.customer c join tpch_jdbc.orders o on
 c.c_custkey=o.o_custkey join tpch_jdbc.lineitem l on
@@ -1295,6 +2326,71 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
 |     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
+select c.c_custkey, o.o_orderkey, l.l_extendedprice from
+tpch_jdbc.customer c join tpch_jdbc.orders o on
+c.c_custkey=o.o_custkey join tpch_jdbc.lineitem l on
+o.o_orderkey=l.l_orderkey where l.l_discount < 0.07
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=40B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     data source predicates: l.l_discount < 0.07
+|     row-size=0B cardinality=6.00M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=40B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  08:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     data source predicates: l.l_discount < 0.07
+|     row-size=0B cardinality=6.00M
+|
+07:EXCHANGE [HASH(o.o_orderkey)]
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=24B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  06:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+05:EXCHANGE [HASH(c.c_custkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
@@ -1361,6 +2457,86 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
 |     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
+select c.c_name, sum(o.o_totalprice), sum(l.l_extendedprice)
+from tpch_jdbc.customer c join tpch_jdbc.orders
+o on c.c_custkey=o.o_custkey join tpch_jdbc.lineitem
+l on o.o_orderkey=l.l_orderkey group by c.c_name
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(o.o_totalprice), sum(l.l_extendedprice)
+|  group by: c.c_name
+|  row-size=44B cardinality=150.00K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=60B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=44B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+11:AGGREGATE [FINALIZE]
+|  output: sum:merge(o.o_totalprice), sum:merge(l.l_extendedprice)
+|  group by: c.c_name
+|  row-size=44B cardinality=150.00K
+|
+10:EXCHANGE [HASH(c.c_name)]
+|
+05:AGGREGATE [STREAMING]
+|  output: sum(o.o_totalprice), sum(l.l_extendedprice)
+|  group by: c.c_name
+|  row-size=44B cardinality=150.00K
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=60B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  09:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+08:EXCHANGE [HASH(o.o_orderkey)]
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=44B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  07:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+06:EXCHANGE [HASH(c.c_custkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
@@ -1449,6 +2625,56 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.orders o]
    row-size=0B cardinality=1.50M
 ====
+select o.o_orderkey, count(l.l_partkey) from
+tpch_jdbc.orders o join tpch_jdbc.lineitem l on
+o.o_orderkey=l.l_orderkey group by o.o_orderkey
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(l.l_partkey)
+|  group by: o.o_orderkey
+|  row-size=16B cardinality=1.50M
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=24B cardinality=1.50M
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.orders o]
+   row-size=0B cardinality=1.50M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(l.l_partkey)
+|  group by: o.o_orderkey
+|  row-size=16B cardinality=1.50M
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=24B cardinality=1.50M
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  05:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+04:EXCHANGE [HASH(o.o_orderkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.orders o]
+   row-size=0B cardinality=1.50M
+====
 select n.n_name, count(c.c_custkey) from tpch_jdbc.nation n
 join tpch_jdbc.customer c on n.n_nationkey=c.c_nationkey group by n.n_name
 ---- PLAN
@@ -1493,6 +2719,62 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN DATA SOURCE [tpch_jdbc.customer c]
 |     row-size=0B cardinality=150.00K
+|
+00:SCAN DATA SOURCE [tpch_jdbc.nation n]
+   row-size=0B cardinality=25
+====
+select n.n_name, count(c.c_custkey) from tpch_jdbc.nation n
+join tpch_jdbc.customer c on n.n_nationkey=c.c_nationkey group by n.n_name
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(c.c_custkey)
+|  group by: n.n_name
+|  row-size=20B cardinality=25
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: n.n_nationkey = c.c_nationkey
+|  row-size=24B cardinality=25
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.customer c]
+|     row-size=0B cardinality=150.00K
+|
+00:SCAN DATA SOURCE [tpch_jdbc.nation n]
+   row-size=0B cardinality=25
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(c.c_custkey)
+|  group by: n.n_name
+|  row-size=20B cardinality=25
+|
+06:EXCHANGE [HASH(n.n_name)]
+|
+03:AGGREGATE [STREAMING]
+|  output: count(c.c_custkey)
+|  group by: n.n_name
+|  row-size=20B cardinality=25
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: n.n_nationkey = c.c_nationkey
+|  row-size=24B cardinality=25
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: c.c_nationkey
+|  |
+|  05:EXCHANGE [HASH(c.c_nationkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.customer c]
+|     row-size=0B cardinality=150.00K
+|
+04:EXCHANGE [HASH(n.n_nationkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.nation n]
    row-size=0B cardinality=25
@@ -1542,6 +2824,63 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN DATA SOURCE [tpch_jdbc.nation n]
 |     row-size=0B cardinality=25
+|
+00:SCAN DATA SOURCE [tpch_jdbc.region r]
+   row-size=0B cardinality=10
+====
+select r.r_name, count(n.n_name) from tpch_jdbc.region r
+join tpch_jdbc.nation n on r.r_regionkey=n.n_regionkey
+group by r.r_name
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(n.n_name)
+|  group by: r.r_name
+|  row-size=20B cardinality=10
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: r.r_regionkey = n.n_regionkey
+|  row-size=28B cardinality=10
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.nation n]
+|     row-size=0B cardinality=25
+|
+00:SCAN DATA SOURCE [tpch_jdbc.region r]
+   row-size=0B cardinality=10
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(n.n_name)
+|  group by: r.r_name
+|  row-size=20B cardinality=10
+|
+06:EXCHANGE [HASH(r.r_name)]
+|
+03:AGGREGATE [STREAMING]
+|  output: count(n.n_name)
+|  group by: r.r_name
+|  row-size=20B cardinality=10
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: r.r_regionkey = n.n_regionkey
+|  row-size=28B cardinality=10
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: n.n_regionkey
+|  |
+|  05:EXCHANGE [HASH(n.n_regionkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.nation n]
+|     row-size=0B cardinality=25
+|
+04:EXCHANGE [HASH(r.r_regionkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.region r]
    row-size=0B cardinality=10
@@ -1597,6 +2936,71 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
 ====
+select c.c_name, o.o_orderdate, l.l_shipdate from
+tpch_jdbc.customer c join tpch_jdbc.orders o on
+c.c_custkey=o.o_custkey join tpch_jdbc.lineitem l
+on o.o_orderkey=l.l_orderkey where o.o_orderdate > '1993-01-01'
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=68B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=48B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     data source predicates: o.o_orderdate > '1993-01-01'
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=68B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  08:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+07:EXCHANGE [HASH(o.o_orderkey)]
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=48B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  06:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     data source predicates: o.o_orderdate > '1993-01-01'
+|     row-size=0B cardinality=1.50M
+|
+05:EXCHANGE [HASH(c.c_custkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
 select c.c_name, count(o.o_orderkey), sum(o.o_totalprice) from
 tpch_jdbc.customer c join tpch_jdbc.orders o on
 c.c_custkey=o.o_custkey group by c.c_name
@@ -1642,6 +3046,63 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
 |     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
+select c.c_name, count(o.o_orderkey), sum(o.o_totalprice) from
+tpch_jdbc.customer c join tpch_jdbc.orders o on
+c.c_custkey=o.o_custkey group by c.c_name
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(o.o_orderkey), sum(o.o_totalprice)
+|  group by: c.c_name
+|  row-size=36B cardinality=150.00K
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=44B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(o.o_orderkey), sum:merge(o.o_totalprice)
+|  group by: c.c_name
+|  row-size=36B cardinality=150.00K
+|
+06:EXCHANGE [HASH(c.c_name)]
+|
+03:AGGREGATE [STREAMING]
+|  output: count(o.o_orderkey), sum(o.o_totalprice)
+|  group by: c.c_name
+|  row-size=36B cardinality=150.00K
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=44B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  05:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+04:EXCHANGE [HASH(c.c_custkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
@@ -1727,6 +3188,69 @@ PLAN-ROOT SINK
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
 ====
+select c.c_name, o.o_orderstatus, l.l_returnflag from
+tpch_jdbc.customer c join tpch_jdbc.orders o on
+c.c_custkey=o.o_custkey join tpch_jdbc.lineitem l
+on o.o_orderkey=l.l_orderkey
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=68B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=48B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=68B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  08:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+07:EXCHANGE [HASH(o.o_orderkey)]
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=48B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  06:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+05:EXCHANGE [HASH(c.c_custkey)]
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
 select c.c_custkey, o.o_orderpriority, l.l_quantity from
 tpch_jdbc.customer c join tpch_jdbc.orders o on
 c.c_custkey=o.o_custkey join tpch_jdbc.lineitem l on
@@ -1774,6 +3298,69 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
 |     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
+select c.c_custkey, o.o_orderpriority, l.l_quantity from
+tpch_jdbc.customer c join tpch_jdbc.orders o on
+c.c_custkey=o.o_custkey join tpch_jdbc.lineitem l on
+o.o_orderkey=l.l_orderkey where l.l_shipdate < l.l_commitdate
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=76B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     predicates: l.l_shipdate < l.l_commitdate
+|     row-size=0B cardinality=600.12K
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=36B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=76B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  07:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     predicates: l.l_shipdate < l.l_commitdate
+|     row-size=0B cardinality=600.12K
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=36B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  06:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+05:EXCHANGE [HASH(c.c_custkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
@@ -1839,6 +3426,85 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
 |     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+====
+select c.c_name, sum(l.l_discount) from tpch_jdbc.customer c join
+tpch_jdbc.orders o on c.c_custkey=o.o_custkey join tpch_jdbc.lineitem
+l on o.o_orderkey=l.l_orderkey group by c.c_name
+---- QUERYOPTIONS
+MT_DOP=5
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(l.l_discount)
+|  group by: c.c_name
+|  row-size=28B cardinality=150.00K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=52B cardinality=150.00K
+|
+|--02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=36B cardinality=150.00K
+|
+|--01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+00:SCAN DATA SOURCE [tpch_jdbc.customer c]
+   row-size=0B cardinality=150.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+11:AGGREGATE [FINALIZE]
+|  output: sum:merge(l.l_discount)
+|  group by: c.c_name
+|  row-size=28B cardinality=150.00K
+|
+10:EXCHANGE [HASH(c.c_name)]
+|
+05:AGGREGATE [STREAMING]
+|  output: sum(l.l_discount)
+|  group by: c.c_name
+|  row-size=28B cardinality=150.00K
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: o.o_orderkey = l.l_orderkey
+|  row-size=52B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: l.l_orderkey
+|  |
+|  09:EXCHANGE [HASH(l.l_orderkey)]
+|  |
+|  02:SCAN DATA SOURCE [tpch_jdbc.lineitem l]
+|     row-size=0B cardinality=6.00M
+|
+08:EXCHANGE [HASH(o.o_orderkey)]
+|
+03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c.c_custkey = o.o_custkey
+|  row-size=36B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |  build expressions: o.o_custkey
+|  |
+|  07:EXCHANGE [HASH(o.o_custkey)]
+|  |
+|  01:SCAN DATA SOURCE [tpch_jdbc.orders o]
+|     row-size=0B cardinality=1.50M
+|
+06:EXCHANGE [HASH(c.c_custkey)]
 |
 00:SCAN DATA SOURCE [tpch_jdbc.customer c]
    row-size=0B cardinality=150.00K
@@ -2131,4 +3797,3 @@ PLAN-ROOT SINK
 01:SCAN DATA SOURCE [tpch_jdbc.orders o]
    data source predicates: o.o_orderdate >= '1995-01-01'
    row-size=24B cardinality=1.50M
-====

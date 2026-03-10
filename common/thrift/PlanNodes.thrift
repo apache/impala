@@ -304,6 +304,7 @@ struct TScanRange {
   4: optional binary file_metadata
   5: optional bool is_system_scan
   6: optional binary iceberg_deletion_vector
+  7: optional bool is_data_source_scan
 }
 
 // Specification of an overlap predicate desc.
