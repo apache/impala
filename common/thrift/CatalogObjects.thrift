@@ -683,6 +683,9 @@ struct TIcebergContentFileStore {
   8: optional list<string> missing_files
   9: optional list<TIcebergPartition> partitions
   10: optional map<THash128, TIcebergDeletionVector> data_path_hash_to_dv
+  // Total number of files in this content file store. Only set in the first partial
+  // response (offset 0) so the coordinator knows upfront how many pages to expect.
+  11: optional i64 total_file_count
 }
 
 // Represents a drop partition request for Iceberg tables

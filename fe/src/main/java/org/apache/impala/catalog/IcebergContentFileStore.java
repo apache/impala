@@ -32,6 +32,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.lang.ref.SoftReference;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.ContentFile;
@@ -108,6 +110,9 @@ public class IcebergContentFileStore {
     // Key is the ContentFile path hash, value is FileDescriptor transformed from DataFile
     private final Map<Hash128, EncodedFileDescriptor> fileDescMap_ = new HashMap<>();
     private final List<EncodedFileDescriptor> fileDescList_ = new ArrayList<>();
+    // Reverse map built lazily on first partial serialization and reused across pages.
+    // Held via SoftReference so the JVM can reclaim it under memory pressure.
+    private SoftReference<Map<EncodedFileDescriptor, Hash128>> reverseMap_;
 
     // Adds a file to the map. If this is a new entry, then add it to the list as well.
     // Return true if 'desc' was a new entry.
@@ -139,6 +144,39 @@ public class IcebergContentFileStore {
         ret.put(
             entry.getKey().toThrift(),
             decode(entry.getValue()).toThrift());
+      }
+      return ret;
+    }
+
+    /**
+     * Convert a range of files to thrift for partial RPC response.
+     *
+     * @param startOffset Index to start from (0-based)
+     * @param maxFiles Maximum files to include
+     * @return Thrift map for the requested range
+     */
+    Map<THash128, THdfsFileDesc> toThriftPartial(long startOffset, long maxFiles) {
+      if (startOffset >= fileDescList_.size()) return Collections.emptyMap();
+
+      long endOffset = Math.min(startOffset + maxFiles, fileDescList_.size());
+
+      // Fast path: if requesting the entire container, use toThrift() directly
+      if (startOffset == 0 && endOffset == fileDescList_.size()) return toThrift();
+
+      Map<EncodedFileDescriptor, Hash128> reverseMap =
+          (reverseMap_ != null) ? reverseMap_.get() : null;
+      if (reverseMap == null) {
+        reverseMap = fileDescMap_.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+        reverseMap_ = new SoftReference<>(reverseMap);
+      }
+
+      Map<THash128, THdfsFileDesc> ret = new HashMap<>();
+      for (int i = (int)startOffset; i < endOffset; i++) {
+        EncodedFileDescriptor encodedFd = fileDescList_.get(i);
+        Hash128 pathHash = reverseMap.get(encodedFd);
+        Preconditions.checkNotNull(pathHash, "FileDescriptor in list but not in map");
+        ret.put(pathHash.toThrift(), decode(encodedFd).toThrift());
       }
       return ret;
     }
@@ -398,10 +436,15 @@ public class IcebergContentFileStore {
 
   public TIcebergContentFileStore toThrift() {
     TIcebergContentFileStore ret = new TIcebergContentFileStore();
-    ret.setPath_hash_to_data_file_without_deletes(dataFilesWithoutDeletes_.toThrift());
-    ret.setPath_hash_to_data_file_with_deletes(dataFilesWithDeletes_.toThrift());
-    ret.setPath_hash_to_position_delete_file(positionDeleteFiles_.toThrift());
-    ret.setPath_hash_to_equality_delete_file(equalityDeleteFiles_.toThrift());
+    Map<THash128, THdfsFileDesc> m;
+    m = dataFilesWithoutDeletes_.toThrift();
+    if (!m.isEmpty()) ret.setPath_hash_to_data_file_without_deletes(m);
+    m = dataFilesWithDeletes_.toThrift();
+    if (!m.isEmpty()) ret.setPath_hash_to_data_file_with_deletes(m);
+    m = positionDeleteFiles_.toThrift();
+    if (!m.isEmpty()) ret.setPath_hash_to_position_delete_file(m);
+    m = equalityDeleteFiles_.toThrift();
+    if (!m.isEmpty()) ret.setPath_hash_to_equality_delete_file(m);
     ret.setHas_avro(hasAvro_);
     ret.setHas_orc(hasOrc_);
     ret.setHas_parquet(hasParquet_);
@@ -412,6 +455,75 @@ public class IcebergContentFileStore {
       tdeletion_vectors.put(entry.getKey().toThrift(), entry.getValue());
     }
     ret.setData_path_hash_to_dv(tdeletion_vectors);
+    return ret;
+  }
+
+  /**
+   * Helper class to track state during partial serialization
+   */
+  private static class PartialSerializationState {
+    long currentOffset = 0;
+    long filesCollected = 0;
+  }
+
+  /**
+   * Process a single container for partial serialization
+   */
+  private void processContainerPartial(
+      MapListContainer container,
+      long startOffset,
+      long maxFiles,
+      PartialSerializationState state,
+      java.util.function.Consumer<Map<THash128, THdfsFileDesc>> setter) {
+    long containerSize = container.getNumFiles();
+    if (startOffset < state.currentOffset + containerSize &&
+        state.filesCollected < maxFiles) {
+      long localOffset = Math.max(0, startOffset - state.currentOffset);
+      Map<THash128, THdfsFileDesc> result =
+          container.toThriftPartial(localOffset, maxFiles - state.filesCollected);
+      if (!result.isEmpty()) {
+        setter.accept(result);
+        state.filesCollected += result.size();
+      }
+    }
+    state.currentOffset += containerSize;
+  }
+
+  /**
+   * Convert to thrift representation with file range limiting for partial RPC.
+   * Files are paginated across all four file type collections.
+   *
+   * @param startOffset Global offset to start from (across all file types)
+   * @param maxFiles Maximum files to include in response
+   * @return Partial TIcebergContentFileStore with subset of files
+   */
+  public TIcebergContentFileStore toThriftPartial(long startOffset, long maxFiles) {
+    TIcebergContentFileStore ret = new TIcebergContentFileStore();
+    PartialSerializationState state = new PartialSerializationState();
+
+    processContainerPartial(dataFilesWithoutDeletes_, startOffset, maxFiles, state,
+        ret::setPath_hash_to_data_file_without_deletes);
+    processContainerPartial(dataFilesWithDeletes_, startOffset, maxFiles, state,
+        ret::setPath_hash_to_data_file_with_deletes);
+    processContainerPartial(positionDeleteFiles_, startOffset, maxFiles, state,
+        ret::setPath_hash_to_position_delete_file);
+    processContainerPartial(equalityDeleteFiles_, startOffset, maxFiles, state,
+        ret::setPath_hash_to_equality_delete_file);
+
+    // Only include metadata in first request to reduce response size
+    if (startOffset == 0) {
+      ret.setHas_avro(hasAvro_);
+      ret.setHas_orc(hasOrc_);
+      ret.setHas_parquet(hasParquet_);
+      ret.setMissing_files(new ArrayList<>(missingFiles_));
+      ret.setPartitions(convertPartitionMapToList(partitions_));
+      Map<THash128, TIcebergDeletionVector> tdeletion_vectors = new HashMap<>();
+      for (Map.Entry<Hash128, TIcebergDeletionVector> entry : dataFileToDV_.entrySet()) {
+        tdeletion_vectors.put(entry.getKey().toThrift(), entry.getValue());
+      }
+      ret.setData_path_hash_to_dv(tdeletion_vectors);
+    }
+
     return ret;
   }
 
@@ -475,5 +587,64 @@ public class IcebergContentFileStore {
       builder.put(partitionList.get(i), i);
     }
     return builder.build();
+  }
+
+  /**
+   * Count total files in a TIcebergContentFileStore.
+   */
+  public static long countContentFiles(TIcebergContentFileStore contentFiles) {
+    if (contentFiles == null) return 0;
+
+    return contentFiles.getPath_hash_to_data_file_without_deletesSize()
+        + contentFiles.getPath_hash_to_data_file_with_deletesSize()
+        + contentFiles.getPath_hash_to_position_delete_fileSize()
+        + contentFiles.getPath_hash_to_equality_delete_fileSize();
+  }
+
+  /**
+   * Merge file maps from nextContentFiles into baseContentFiles.
+   */
+  public static void mergeContentFiles(
+      TIcebergContentFileStore baseContentFiles,
+      TIcebergContentFileStore nextContentFiles) {
+    if (nextContentFiles.isSetPath_hash_to_data_file_without_deletes()) {
+      if (!baseContentFiles.isSetPath_hash_to_data_file_without_deletes()) {
+        baseContentFiles.setPath_hash_to_data_file_without_deletes(new HashMap<>());
+      }
+      baseContentFiles.path_hash_to_data_file_without_deletes.putAll(
+          nextContentFiles.path_hash_to_data_file_without_deletes);
+    }
+
+    if (nextContentFiles.isSetPath_hash_to_data_file_with_deletes()) {
+      if (!baseContentFiles.isSetPath_hash_to_data_file_with_deletes()) {
+        baseContentFiles.setPath_hash_to_data_file_with_deletes(new HashMap<>());
+      }
+      baseContentFiles.path_hash_to_data_file_with_deletes.putAll(
+          nextContentFiles.path_hash_to_data_file_with_deletes);
+    }
+
+    if (nextContentFiles.isSetPath_hash_to_position_delete_file()) {
+      if (!baseContentFiles.isSetPath_hash_to_position_delete_file()) {
+        baseContentFiles.setPath_hash_to_position_delete_file(new HashMap<>());
+      }
+      baseContentFiles.path_hash_to_position_delete_file.putAll(
+          nextContentFiles.path_hash_to_position_delete_file);
+    }
+
+    if (nextContentFiles.isSetPath_hash_to_equality_delete_file()) {
+      if (!baseContentFiles.isSetPath_hash_to_equality_delete_file()) {
+        baseContentFiles.setPath_hash_to_equality_delete_file(new HashMap<>());
+      }
+      baseContentFiles.path_hash_to_equality_delete_file.putAll(
+          nextContentFiles.path_hash_to_equality_delete_file);
+    }
+
+    if (nextContentFiles.isSetData_path_hash_to_dv()) {
+      if (!baseContentFiles.isSetData_path_hash_to_dv()) {
+        baseContentFiles.setData_path_hash_to_dv(new HashMap<>());
+      }
+      baseContentFiles.data_path_hash_to_dv.putAll(
+          nextContentFiles.data_path_hash_to_dv);
+    }
   }
 }

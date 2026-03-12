@@ -50,7 +50,7 @@ class StatestoreSubscriber;
 /// The CatalogService directly handles executing metadata update requests
 /// (DDL requests) from clients via a Thrift interface.
 /// The CatalogServer has two main components - a C++ daemon that has the Statestore
-/// integration code, Thrift service implementiation, and exporting of the debug
+/// integration code, Thrift service implementation, and exporting of the debug
 /// webpage/metrics.
 /// The other main component is written in Java and manages caching and updating of all
 /// metadata. For each Statestore heartbeat, the C++ Server queries the Java metadata

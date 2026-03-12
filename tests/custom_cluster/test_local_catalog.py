@@ -31,6 +31,7 @@ from multiprocessing.pool import ThreadPool
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfHive2, SkipIfFS
 from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.query_profile_util import parse_query_id
 
 RETRY_PROFILE_MSG = 'Retried query planning due to inconsistent metadata'
 CATALOG_VERSION_LOWER_BOUND = 'catalog.catalog-object-version-lower-bound'
@@ -721,6 +722,7 @@ class TestReusePartitionMetadata(CustomClusterTestSuite):
 
 
 class TestAllowIncompleteData(CustomClusterTestSuite):
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=true",
@@ -775,3 +777,80 @@ class TestAllowIncompleteData(CustomClusterTestSuite):
            ).format(tbl)
     assert err in str(exception)
     self.assert_catalogd_log_contains("ERROR", err)
+
+  def _assert_iceberg_pagination_logs(
+      self, query_id, tbl, files_per_page, total_files, num_requests=r"\d+"):
+    """Assert catalogd/impalad log messages for an Iceberg paginated file fetch.
+
+    Checks that catalogd warned about truncation at offset 0, that the coordinator
+    logged the first follow-up request, and that it logged the final summary.
+    """
+    self.assert_catalogd_log_contains(
+        "WARNING",
+        r"{0}\] Returning {1}/{2} files for Iceberg table {3} \(offset 0\). "
+        r"Coordinator will fetch remaining files in follow-up requests.".format(
+            query_id, files_per_page, total_files, tbl))
+    self.assert_impalad_log_contains(
+        "INFO",
+        r"{0}\] Fetched {1} files for Iceberg table TableMetaRef {2}@\d+ "
+        r"in request 1. Sending follow-up request for more files.".format(
+            query_id, files_per_page, tbl))
+    self.assert_impalad_log_contains(
+        "INFO",
+        r"{0}\] Fetched {1} total files for Iceberg table TableMetaRef {2}@\d+ "
+        r"across {3} requests".format(query_id, total_files, tbl, num_requests))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal --catalog_partial_fetch_max_files=20")
+  def test_incomplete_iceberg_file_list(self, unique_database):
+    """Test that coordinator can fetch missing Iceberg files when catalogd truncates
+    the file list in the response"""
+    # Create an Iceberg table with many data files
+    tbl = unique_database + ".iceberg_tbl"
+    self.execute_query(
+        "create table {0} (id int, `data` string) stored as iceberg".format(tbl))
+    # Insert multiple times to create multiple data files
+    for i in range(30):
+      self.execute_query("insert into {0} values ({1}, 'data{1}')".format(tbl, i))
+
+    res = self.execute_query_expect_success(self.client, "show files in " + tbl)
+    # Should have 30 files
+    assert len(res.data) == 30
+
+    # Extract query_id from SHOW FILES to precisely check only its log messages
+    query_id = parse_query_id(res.runtime_profile)
+    self._assert_iceberg_pagination_logs(query_id, tbl, 20, 30, num_requests=2)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal --catalog_partial_fetch_max_files=20")
+  def test_iceberg_with_delete_files(self, unique_database):
+    """Test partial fetch works correctly with Iceberg delete files"""
+    tbl = unique_database + ".iceberg_with_deletes"
+    self.execute_query(
+        "create table {0} (id int, `data` string) stored as iceberg".format(tbl))
+
+    # Insert data to create data files
+    for i in range(30):
+      self.execute_query("insert into {0} values ({1}, 'data{1}')".format(tbl, i))
+
+    # Delete some rows to create delete files
+    self.execute_query("delete from {0} where id < 15".format(tbl))
+
+    # Should successfully fetch all files (data + delete files) across multiple requests
+    res = self.execute_query_expect_success(self.client, "show files in " + tbl)
+    # Should have 30 data files + delete files
+    # (30 INSERTs + 1 DELETE creates some delete files)
+    # The exact count might vary slightly, just verify we got more than 30
+    assert len(res.data) > 30, "Expected > 30 files, got " + str(len(res.data))
+    actual_file_count = len(res.data)
+
+    # Extract query_id from SHOW FILES to precisely check only its log messages
+    query_id = parse_query_id(res.runtime_profile)
+    self._assert_iceberg_pagination_logs(query_id, tbl, 20, actual_file_count)
+    result = self.execute_query_expect_success(
+        self.client, "select count(*) from " + tbl)
+    assert result.data[0] == '15'  # 30 - 15 deleted

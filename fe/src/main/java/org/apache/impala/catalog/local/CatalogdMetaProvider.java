@@ -58,6 +58,7 @@ import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.AuthzCacheInvalidation;
+import org.apache.impala.catalog.IcebergContentFileStore;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogDeltaLog;
 import org.apache.impala.catalog.CatalogException;
@@ -1216,15 +1217,72 @@ public class CatalogdMetaProvider implements MetaProvider {
         new Callable<TPartialTableInfo>() {
           @Override
           public TPartialTableInfo call() throws Exception {
-            TGetPartialCatalogObjectRequest req = newReqForTable(table);
-            req.table_info_selector.want_iceberg_table = true;
-            TGetPartialCatalogObjectResponse resp = sendRequest(req);
-            checkResponse(resp.table_info != null &&
-                resp.table_info.iceberg_table != null, req,
-                "missing Iceberg table metadata");
-            return resp.getTable_info();
+            return loadIcebergTableWithPagination(table);
           }
     });
+  }
+
+  /**
+   * Load Iceberg table metadata, handling partial file responses with pagination.
+   * Similar to loadPartitionsFromCatalogd but for Iceberg file pagination.
+   */
+  private TPartialTableInfo loadIcebergTableWithPagination(TableMetaRef table)
+      throws TException {
+    TGetPartialCatalogObjectRequest req = newReqForTable(table);
+    req.table_info_selector.want_iceberg_table = true;
+    req.table_info_selector.setIceberg_file_offset(0);
+
+    TGetPartialCatalogObjectResponse resp = sendRequest(req);
+    checkResponse(resp.table_info != null &&
+        resp.table_info.iceberg_table != null, req,
+        "missing Iceberg table metadata");
+
+    // Count files in initial response
+    long filesReceived = IcebergContentFileStore.countContentFiles(
+        resp.table_info.iceberg_table.content_files);
+    long fileOffset = filesReceived;
+
+    // The first response must include the total file count so we know exactly how many
+    // pages to fetch without a trailing empty RPC.
+    checkResponse(resp.table_info.iceberg_table.content_files.isSetTotal_file_count(),
+        req, "missing total_file_count in first Iceberg file response");
+    long totalFiles =  resp.table_info.iceberg_table.content_files.getTotal_file_count();
+
+    int requestCount = 1;
+    while (fileOffset < totalFiles) {
+      LOG.info("Fetched {} files for Iceberg table {} in request {}. " +
+          "Sending follow-up request for more files.",
+          filesReceived, table, requestCount);
+
+      TGetPartialCatalogObjectRequest nextReq = newReqForTable(table);
+      nextReq.table_info_selector.want_iceberg_table = true;
+      nextReq.table_info_selector.setIceberg_file_offset(fileOffset);
+
+      TGetPartialCatalogObjectResponse nextResp = sendRequest(nextReq);
+      checkResponse(nextResp.table_info != null &&
+          nextResp.table_info.iceberg_table != null, nextReq,
+          "missing Iceberg table metadata in follow-up request");
+
+      // Merge the content files
+      IcebergContentFileStore.mergeContentFiles(
+          resp.table_info.iceberg_table.content_files,
+          nextResp.table_info.iceberg_table.content_files);
+
+      filesReceived = IcebergContentFileStore.countContentFiles(
+          nextResp.table_info.iceberg_table.content_files);
+      fileOffset += filesReceived;
+      requestCount++;
+    }
+
+    if (requestCount > 1) {
+      LOG.info("Fetched {} total files for Iceberg table {} across {} requests",
+          fileOffset, table, requestCount);
+    }
+
+    // total_file_count is a pagination transport hint; unset it before returning so
+    // callers see a clean TIcebergContentFileStore without transport-layer metadata.
+    resp.table_info.iceberg_table.content_files.unsetTotal_file_count();
+    return resp.getTable_info();
   }
 
   @Override

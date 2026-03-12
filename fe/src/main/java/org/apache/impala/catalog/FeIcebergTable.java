@@ -503,7 +503,9 @@ public interface FeIcebergTable extends FeFsTable {
       return result;
     }
 
-    // Method used when file paths are pre-collected during analysis
+    /**
+     * Method used when file paths are pre-collected during analysis
+     */
     public static TResultSet getIcebergTableFilesFromPaths(
         TResultSet result, List<String> filePaths, FeIcebergTable table) {
       // Sort the file paths for consistent output

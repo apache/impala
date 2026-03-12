@@ -59,6 +59,7 @@ import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
+import org.apache.impala.thrift.TIcebergContentFileStore;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
@@ -886,7 +887,39 @@ public class IcebergTable extends Table implements FeIcebergTable {
     }
 
     if (req.table_info_selector.want_iceberg_table) {
-      resp.table_info.setIceberg_table(Utils.getTIcebergTable(this));
+      // Only apply pagination if the coordinator explicitly opted in by setting
+      // iceberg_file_offset. This ensures callers that don't support pagination
+      // always receive the full file set.
+      boolean paginationRequested = req.table_info_selector.isSetIceberg_file_offset();
+      long fileOffset = paginationRequested
+          ? req.table_info_selector.iceberg_file_offset : 0;
+      long fileLimit = paginationRequested
+          ? BackendConfig.INSTANCE.getCatalogPartialFetchMaxFiles() : Long.MAX_VALUE;
+
+      long totalFiles = getContentFileStore().getNumFiles();
+
+      // Get partial content file store
+      TIcebergContentFileStore partialContentFiles =
+          getContentFileStore().toThriftPartial(fileOffset, fileLimit);
+
+      // Count files actually returned
+      long filesReturned = IcebergContentFileStore.countContentFiles(partialContentFiles);
+
+      resp.table_info.setIceberg_table(Utils.getTIcebergTable(this,
+          ThriftObjectType.DESCRIPTOR_ONLY));
+      resp.table_info.iceberg_table.setContent_files(partialContentFiles);
+
+      // On the first request, include total file count so the coordinator knows
+      // upfront how many pages to expect, avoiding a trailing empty RPC.
+      if (fileOffset == 0) {
+        partialContentFiles.setTotal_file_count(totalFiles);
+      }
+      if (filesReturned < totalFiles) {
+        LOG.warn("Returning {}/{} files for Iceberg table {} (offset {}). " +
+                "Coordinator will fetch remaining files in follow-up requests.",
+            filesReturned, totalFiles, getFullName(), fileOffset);
+      }
+
       if (!resp.table_info.isSetNetwork_addresses()) {
         resp.table_info.setNetwork_addresses(getHostIndex().getList());
       }
