@@ -60,6 +60,8 @@ public class FunctionCallExpr extends Expr {
   private boolean isAnalyticFnCall_ = false;
   private boolean isInternalFnCall_ = false;
 
+  public static final Set<String> NON_DETERMINISTIC_FNS =
+      ImmutableSet.of("rand", "random", "uuid");
   // cache prior shouldConvertToCNF checks to avoid repeat tree walking
   // omitted from clone in case cloner plans to mutate the expr
   protected Optional<Boolean> shouldConvertToCNF_ = Optional.empty();
@@ -382,7 +384,7 @@ public class FunctionCallExpr extends Expr {
    * about user defined functions.
    */
   public boolean isNondeterministicBuiltinFn() {
-    return functionNameInBuiltinSet(fnName_, ImmutableSet.of("rand", "random", "uuid"));
+    return functionNameInBuiltinSet(fnName_, NON_DETERMINISTIC_FNS);
   }
 
   /**
