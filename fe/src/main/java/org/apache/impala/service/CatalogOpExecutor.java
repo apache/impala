@@ -4650,6 +4650,10 @@ public class CatalogOpExecutor {
       tableProperties.remove(Catalogs.LOCATION);
       tableProperties.remove(IcebergTable.ICEBERG_CATALOG);
       tableProperties.remove(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
+      // Explicitly preserve the format version, since it is a metadata-level field
+      // in Iceberg and may not be present in iceApiTable.properties().
+      tableProperties.put(TableProperties.FORMAT_VERSION,
+          String.valueOf(srcIceTable.getFormatVersion()));
 
       // The table identifier of the new table will be 'database.table'
       TableIdentifier identifier = IcebergUtil
@@ -4667,8 +4671,10 @@ public class CatalogOpExecutor {
             .put(IcebergTable.ICEBERG_TABLE_IDENTIFIER, identifier.toString());
         tableProperties.put(IcebergTable.ICEBERG_TABLE_IDENTIFIER, identifier.toString());
       }
+      // Use getColumnsInHiveOrder() to exclude hidden V3 row lineage columns
+      // from the schema of the new table.
       List<TColumn> columns = new ArrayList<>();
-      for (Column col: srcIceTable.getColumns()) columns.add(col.toThrift());
+      for (Column col: srcIceTable.getColumnsInHiveOrder()) columns.add(col.toThrift());
       TIcebergPartitionSpec partitionSpec = srcIceTable.getDefaultPartitionSpec()
           .toThrift();
       createIcebergTable(tbl, wantMinimalResult, response, catalogTimeline,

@@ -29,3 +29,45 @@ SELECT * FROM ice_v3;
 ---- TYPES
 INT,STRING,STRING
 ====
+---- QUERY
+# CREATE TABLE LIKE an Iceberg V3 table must preserve the format version and
+# must not include the hidden row lineage columns (_file_row_id,
+# _file_last_updated_sequence_number) as regular user columns.
+# The cloned table must report format-version=3.
+CREATE TABLE ice_v3_like LIKE ice_v3;
+DESCRIBE FORMATTED ice_v3_like;
+---- RESULTS: VERIFY_IS_SUBSET
+'','format-version      ','3                   '
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+# The cloned table must expose only the user columns, not the hidden row
+# lineage metadata columns.
+DESCRIBE ice_v3_like;
+---- RESULTS
+'i','int','','true'
+'s','string','','true'
+'new_col','string','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# Data written into the cloned V3 table must be readable correctly.
+INSERT INTO ice_v3_like VALUES (10, 'hello', 'world');
+SELECT * FROM ice_v3_like;
+---- RESULTS
+10,'hello','world'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Verify that first-row-id is assigned to the V3 data file.
+SELECT _file_row_id, ICEBERG__FIRST__ROW__ID,
+       _file_last_updated_sequence_number, ICEBERG__DATA__SEQUENCE__NUMBER,
+       * FROM ice_v3_like;
+---- RESULTS
+NULL,0,NULL,1,10,'hello','world'
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,INT,STRING,STRING
+====
