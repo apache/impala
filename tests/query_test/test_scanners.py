@@ -1309,6 +1309,12 @@ class TestParquet(ImpalaTestSuite):
     query_sql = "SELECT * FROM {} where field1 = '123'".format(table_name)
     self.execute_query_expect_success(self.client, query_sql)
 
+  def test_lz4_raw_compression(self, vector, unique_database):
+    """IMPALA-14700: Test that we can read a parquet file with LZ4_Raw compression.
+    """
+    create_table_from_parquet(self.client, unique_database, 'lz4_raw_compressed')
+    self.run_test_case('QueryTest/parquet-lz4-raw-compression', vector, unique_database)
+
 
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:

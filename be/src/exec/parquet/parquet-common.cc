@@ -26,8 +26,9 @@ const THdfsCompression::type PARQUET_TO_IMPALA_CODEC[] = {
   THdfsCompression::GZIP,
   THdfsCompression::LZO,
   THdfsCompression::BROTLI,
-  THdfsCompression::LZ4_BLOCKED,
-  THdfsCompression::ZSTD
+  THdfsCompression::LZ4_BLOCKED, // LZ4
+  THdfsCompression::ZSTD,
+  THdfsCompression::LZ4          // LZ4_RAW
 };
 
 const int PARQUET_TO_IMPALA_CODEC_SIZE =

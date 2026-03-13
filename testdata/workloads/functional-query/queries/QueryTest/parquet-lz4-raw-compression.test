@@ -1,0 +1,11 @@
+====
+---- QUERY
+select * from lz4_raw_compressed
+---- TYPES
+bigint,string,double
+---- RESULTS
+1593604800,'abc',42
+1593604800,'def',7.7
+1593604801,'abc',42.125
+1593604801,'def',7.7
+====

@@ -50,6 +50,7 @@ class Codec {
   static const char* const SNAPPY_COMPRESSION;
   static const char* const LZ4_COMPRESSION;
   static const char* const ZSTD_COMPRESSION;
+  static const char* const LZ4_RAW_COMPRESSION;
   static const char* const UNKNOWN_CODEC_ERROR;
 
   // Output buffer size for streaming compressed file.

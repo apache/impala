@@ -48,6 +48,8 @@ const char* const Codec::SNAPPY_COMPRESSION = "org.apache.hadoop.io.compress.Sna
 const char* const Codec::LZ4_COMPRESSION = "org.apache.hadoop.io.compress.Lz4Codec";
 const char* const Codec::ZSTD_COMPRESSION =
     "org.apache.hadoop.io.compress.ZStandardCodec";
+const char* const Codec::LZ4_RAW_COMPRESSION =
+    "org.apache.parquet.hadoop.codec.Lz4RawCodec";
 const char* const Codec::UNKNOWN_CODEC_ERROR =
     "This compression codec is currently unsupported: ";
 const char* const NO_LZO_MSG = "LZO codecs may not be created via the Codec interface. "
@@ -60,7 +62,8 @@ const Codec::CodecMap Codec::CODEC_MAP = {{"", THdfsCompression::NONE},
     {BZIP2_COMPRESSION, THdfsCompression::BZIP2},
     {SNAPPY_COMPRESSION, THdfsCompression::SNAPPY_BLOCKED},
     {LZ4_COMPRESSION, THdfsCompression::LZ4_BLOCKED},
-    {ZSTD_COMPRESSION, THdfsCompression::ZSTD}};
+    {ZSTD_COMPRESSION, THdfsCompression::ZSTD},
+    {LZ4_RAW_COMPRESSION, THdfsCompression::LZ4}};
 
 string Codec::GetCodecName(THdfsCompression::type type) {
   return boost::algorithm::to_lower_copy(
