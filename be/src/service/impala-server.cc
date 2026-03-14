@@ -1638,30 +1638,61 @@ void ImpalaServer::UpdateExecSummary(const QueryHandle& query_handle) const {
   query_handle->summary_profile()->AddInfoStringRedacted("Errors", join(errors, "\n"));
 }
 
-// Returns the plan nodes that have HBO keys set in the Frontend.
-static void GetPlanNodesWithHboKeys(
-    const TExecRequest& request, vector<const TPlanNode*>* nodes) {
-  for (const TPlanExecInfo& plan_exec_info: request.query_exec_request.plan_exec_info) {
-    for (const TPlanFragment& fragment: plan_exec_info.fragments) {
-      for (const TPlanNode& node: fragment.plan.nodes) {
+// In a single pass over every plan node, collects (a) an index from plan node ID to the
+// TPlanNode, (b) a map from filter ID to the plan node ID that produces that filter, and
+// (c) the plan nodes that have HBO keys set in the Frontend (in plan order). The node
+// index supports walking parents via TPlanNode.node_parent_id, which is populated per
+// node by the frontend when store_hbo_stats is set and crosses fragment boundaries (a
+// fragment root's parent is the ExchangeNode that reads it).
+static void IndexPlanNodesForHbo(const TExecRequest& exec_req,
+    unordered_map<TPlanNodeId, const TPlanNode*>* id_to_node,
+    unordered_map<int32_t, TPlanNodeId>* filter_src_nodes,
+    vector<const TPlanNode*>* nodes_with_hbo_keys) {
+  for (const TPlanExecInfo& pei : exec_req.query_exec_request.plan_exec_info)
+    for (const TPlanFragment& frag : pei.fragments)
+      for (const TPlanNode& node : frag.plan.nodes) {
+        bool inserted = id_to_node->emplace(node.node_id, &node).second;
+        DCHECK(inserted) << "Duplicate plan node ID: " << node.node_id;
         if (node.__isset.hbo_hash_keys && !node.hbo_hash_keys.empty()) {
-          nodes->emplace_back(&node);
+          nodes_with_hbo_keys->emplace_back(&node);
         }
+        for (const TRuntimeFilterDesc& f : node.runtime_filters)
+          if (f.__isset.src_node_id)
+            filter_src_nodes->emplace(f.filter_id, f.src_node_id);
       }
-    }
-  }
 }
 
-static bool HasEffectiveRuntimeFilter(const TPlanNode& node,
-    const map<int32_t, set<TPlanNodeId>>& effective_filter_ids_to_node_ids) {
-  for (const TRuntimeFilterDesc& f : node.runtime_filters) {
-    auto it = effective_filter_ids_to_node_ids.find(f.filter_id);
-    if (it != effective_filter_ids_to_node_ids.end()
-        && it->second.find(node.node_id) != it->second.end()) {
-      return true;
+// Returns the set of plan nodes that have an effective runtime filter generated outside
+// their subtree. For each effective filter target, all ancestors up to (but not
+// including) the filter's source node are marked, following TPlanNode.node_parent_id via
+// the 'id_to_node' index.
+static void GetNodesWithEffectiveExtRf(
+    const unordered_map<TPlanNodeId, const TPlanNode*>& id_to_node,
+    const unordered_map<int32_t, TPlanNodeId>& filter_src_nodes,
+    const map<int32_t, set<TPlanNodeId>>& effective_filter_ids_to_node_ids,
+    unordered_set<const TPlanNode*>* nodes_with_effective_ext_rf) {
+  for (const auto& [filter_id, target_nodes] : effective_filter_ids_to_node_ids) {
+    auto src_it = filter_src_nodes.find(filter_id);
+    if (src_it == filter_src_nodes.end()) continue;
+    TPlanNodeId src_id = src_it->second;
+    for (TPlanNodeId target : target_nodes) {
+      auto cur_it = id_to_node.find(target);
+      DCHECK(cur_it != id_to_node.end()) << "Unknown target node: " << target;
+      const TPlanNode* cur = cur_it->second;
+      while (cur->node_id != src_id) {
+        // node_parent_id == -1 means the node is the root of the plan tree. It shouldn't
+        // be reached: the filter's source is always an ancestor of its targets.
+        DCHECK(cur->__isset.node_parent_id)
+            << "Missing parent ID for node: " << cur->node_id;
+        nodes_with_effective_ext_rf->insert(cur);
+        auto parent_it = id_to_node.find(cur->node_parent_id);
+        DCHECK(parent_it != id_to_node.end())
+            << "Unknown parent node: " << cur->node_parent_id;
+        cur = parent_it->second;
+      }
+      // src_id (the join node itself) is NOT inserted
     }
   }
-  return false;
 }
 
 static bool GetCardinalityIfComplete(const TPlanNodeExecSummary& node_summary,
@@ -1726,16 +1757,21 @@ Status ImpalaServer::StoreExecutionStats(const QueryHandle& query_handle) {
     exec_summaries[s.node_id] = s;
   }
 
-  const auto& effective_filter_ids_to_node_ids =
-      query_handle->GetCoordinator()->GetEffectiveFilterTargets();
+  unordered_map<TPlanNodeId, const TPlanNode*> id_to_node;
+  unordered_map<int32_t, TPlanNodeId> filter_src_nodes;
+  vector<const TPlanNode*> nodes_with_hbo_keys;
+  IndexPlanNodesForHbo(exec_req, &id_to_node, &filter_src_nodes, &nodes_with_hbo_keys);
+
+  unordered_set<const TPlanNode*> nodes_with_effective_ext_rf;
+  GetNodesWithEffectiveExtRf(id_to_node, filter_src_nodes,
+      query_handle->GetCoordinator()->GetEffectiveFilterTargets(),
+      &nodes_with_effective_ext_rf);
 
   THistoricalStatsUpdate history_stats;
-  vector<const TPlanNode*> nodes_with_hbo_keys;
-  GetPlanNodesWithHboKeys(exec_req, &nodes_with_hbo_keys);
   for (const TPlanNode* p : nodes_with_hbo_keys) {
     // Skip nodes if runtime filters have filtered some rows. The output cardinality
     // depends on when the runtime filters arrive, which is unreliable.
-    if (HasEffectiveRuntimeFilter(*p, effective_filter_ids_to_node_ids)) {
+    if (nodes_with_effective_ext_rf.count(p)) {
       LOG(INFO) << "Skip execution stats of " << p->label
           << " since it has effective runtime filters";
       continue;

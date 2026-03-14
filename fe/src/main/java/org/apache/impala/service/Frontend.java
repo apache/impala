@@ -173,6 +173,7 @@ import org.apache.impala.hooks.QueryEventHook;
 import org.apache.impala.hooks.QueryEventHookManager;
 import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanFragment;
+import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
 import org.apache.impala.service.catalogmanager.FeCatalogManager;
@@ -2071,6 +2072,14 @@ public class Frontend {
       queryCtx.addToTables_missing_diskids(tableName);
     }
 
+    // Populate each PlanNode's parent reference so that toThrift() can emit
+    // TPlanNode.node_parent_id for HBO stats collection. The plan tree is finalized at
+    // this point, and the DFS follows cross-fragment edges (through ExchangeNodes).
+    if (queryCtx.client_request.query_options.store_hbo_stats
+        && planRoot.getPlanRoot() != null) {
+      PlanNode.setParentIds(planRoot.getPlanRoot());
+    }
+
     // The fragment at this point has all state set, serialize it to thrift.
     for (PlanFragment fragment: fragments) {
       TPlanFragment thriftFragment =
@@ -2151,8 +2160,9 @@ public class Frontend {
       // can handle various planner fallback execution logic (e.g. allowing one
       // planner, if execution fails, to call a different planner)
       TExecRequest result = getTExecRequestWithFallback(planCtx, timeline);
-      DebugUtils.executeDebugAction(
-          planCtx.getQueryContext().client_request.query_options.getDebug_action(),
+      TQueryOptions queryOptions =
+          planCtx.getQueryContext().client_request.query_options;
+      DebugUtils.executeDebugAction(queryOptions.getDebug_action(),
           DebugUtils.PLAN_CREATE);
       timeline.markEvent("Planning finished");
       result.setTimeline(timeline.toThrift());

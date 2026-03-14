@@ -67,6 +67,17 @@ public class ExprCanonicalizer {
   }
 
   /**
+   * Canonicalizes a list of expressions for HBO keys on non-scan plan nodes,
+   * e.g. aggregation nodes.
+   */
+  public static List<String> canonicalizeExprs(List<Expr> exprs) {
+    // TODO: AggregationNode won't have partition predicates that need canonicalization
+    // since they are all applied on the scan node. Revisit this when we support more
+    // non-scan plan nodes.
+    return canonicalizeScanConjuncts(exprs, null, CanonicalizationStrategy.EXPR_REWRITE);
+  }
+
+  /**
    * Canonicalizes a single expression according to the strategy.
    */
   private static String canonicalizeExpr(Expr expr, FeTable table,

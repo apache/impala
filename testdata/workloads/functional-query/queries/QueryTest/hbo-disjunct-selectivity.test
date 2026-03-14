@@ -9,13 +9,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=3
+|  row-size=8B cardinality=3 (from HBO)
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
@@ -32,13 +32,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(bool_col)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(bool_col)
-|  row-size=8B cardinality=3
+|  row-size=8B cardinality=3 (from HBO)
 |
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB

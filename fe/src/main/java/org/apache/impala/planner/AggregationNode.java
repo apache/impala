@@ -48,7 +48,9 @@ import org.apache.impala.thrift.TAggregator;
 import org.apache.impala.thrift.TBackendResourceProfile;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
+import org.apache.impala.thrift.THboStatsType;
 import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeRun;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.BitUtil;
@@ -374,6 +376,8 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
       // IMPALA-2581: preAgg node can have limit.
       cardinality_ = capCardinalityAtLimit(cardinality_);
     }
+
+    tryUpdateCardinalityFromHbo(analyzer);
 
     if (LOG.isTraceEnabled()) {
       LOG.trace("{} cardinality=[BeforeConjunct={} AfterConjunct={} AfterLimit={}]",
@@ -781,6 +785,85 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
     return result;
   }
 
+  /**
+   * Returns the real child of this aggregation for HBO, skipping intermediate agg nodes
+   * that belong to the same logical aggregation (same multiAggInfo_ instance) and
+   * cardinality preserving nodes (e.g. ExchangeNode).
+   *
+   * Using the real child ensures the HBO key string is consistent before and after
+   * intermediate aggregation nodes are created.
+   *
+   * TODO: If the child belongs to a different aggregation but its grouping keys is a
+   * superset of the current aggregation, we can still skip it. E.g.
+   *   SELECT distinct a, b FROM (SELECT a, b, c, sum(d) FROM tbl GROUP BY a, b, c) t;
+   * should be able to use HBO stats of
+   *   SELECT distinct a, b FROM tbl;
+   */
+  private PlanNode getHboBaseChild() {
+    PlanNode baseChild = getChild(0);
+    while ((baseChild instanceof AggregationNode
+            && ((AggregationNode) baseChild).multiAggInfo_ == multiAggInfo_)
+        || baseChild.isCardinalityPreserving()) {
+      Preconditions.checkState(baseChild.getChildCount() == 1);
+      baseChild = baseChild.getChild(0);
+    }
+    return baseChild;
+  }
+
+  @Override
+  public void appendScanInputStats(TPlanNodeRun execStats) {
+    getHboBaseChild().appendScanInputStats(execStats);
+  }
+
+  /**
+   * Generates an HBO key string for this aggregation node. Returns null if any child node
+   * doesn't support HBO.
+   * TODO: cache the string instead of generating it every time.
+   */
+  @Override
+  public String generateHboKeyString(THboStatsType statsType,
+      CanonicalizationStrategy strategy) {
+    Preconditions.checkState(children_.size() == 1);
+    PlanNode baseChild = getHboBaseChild();
+    String childKey = baseChild.generateHboKeyString(statsType, strategy);
+    if (childKey == null) {
+      LOG.debug("Not tracking {} in HBO since the child doesn't support HBO: {}",
+          getDisplayLabel(), baseChild.getDisplayLabel());
+      return null;
+    }
+
+    StringBuilder sb = new StringBuilder(statsType.name())
+        .append(":AggregationNode:");
+
+    String logicalPhase = aggPhase_.isFirstPhase() ? "FIRST"
+        : aggPhase_.isTranspose() ? "TRANSPOSE" : "MERGE";
+    sb.append(logicalPhase)
+        .append("|preagg:").append(isPreagg_)
+        .append("|groupingSet:")
+        .append(multiAggInfo_.getIsGroupingSet())
+        .append("|");
+
+    List<String> aggClassStrings = new ArrayList<>(aggInfos_.size());
+    for (AggregateInfo aggInfo : aggInfos_) {
+      List<Expr> groupingExprs = aggInfo.getGroupingExprs();
+      List<String> groupingStrs = ExprCanonicalizer.canonicalizeExprs(groupingExprs);
+      aggClassStrings.add("GROUP:" + String.join(",", groupingStrs));
+    }
+    Collections.sort(aggClassStrings);
+    for (int i = 0; i < aggClassStrings.size(); ++i) {
+      aggClassStrings.set(i, i + ":" + aggClassStrings.get(i));
+    }
+    sb.append("AggClasses:[").append(String.join(",", aggClassStrings)).append("]|");
+
+    if (!conjuncts_.isEmpty()) {
+      List<String> conjunctStrs = ExprCanonicalizer.canonicalizeExprs(conjuncts_);
+      sb.append("HAVING:").append(String.join(",", conjunctStrs)).append("|");
+    }
+
+    sb.append("CHILD:[").append(childKey).append("]");
+    return sb.toString();
+  }
+
   @Override
   protected void toThrift(TPlanNode msg) {
     Preconditions.checkState(false, "Unexpected use of old toThrift() signature.");
@@ -790,6 +873,9 @@ public class AggregationNode extends PlanNode implements SpillableOperator {
   protected void toThrift(TPlanNode msg, ThriftSerializationCtx serialCtx) {
     msg.agg_node = new TAggregationNode();
     msg.node_type = TPlanNodeType.AGGREGATION_NODE;
+
+    populateHboThriftFields(msg, serialCtx);
+
     boolean replicateInput = aggPhase_ == AggPhase.FIRST && aggInfos_.size() > 1;
     msg.agg_node.setReplicate_input(replicateInput);
     // Normalize input cardinality estimate for caching in case stats change.

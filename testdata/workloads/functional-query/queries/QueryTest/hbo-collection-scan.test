@@ -6,13 +6,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -25,13 +25,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(pos)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(pos)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -44,13 +44,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(item)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(item)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -63,13 +63,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: max:merge(item)
-|  row-size=4B cardinality=1
+|  row-size=4B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: max(item)
-|  row-size=4B cardinality=2
+|  row-size=4B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -104,13 +104,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -124,13 +124,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(pos)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(pos)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -144,13 +144,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(item)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(item)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -164,13 +164,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: max:merge(item)
-|  row-size=4B cardinality=1
+|  row-size=4B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: max(item)
-|  row-size=4B cardinality=2
+|  row-size=4B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -208,13 +208,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -228,13 +228,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(pos)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(pos)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -248,13 +248,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(item)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(item)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -268,13 +268,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: max:merge(item)
-|  row-size=4B cardinality=1
+|  row-size=4B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: max(item)
-|  row-size=4B cardinality=2
+|  row-size=4B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -312,13 +312,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -332,13 +332,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(pos)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(pos)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -352,13 +352,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(item)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(item)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -372,13 +372,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: max:merge(item)
-|  row-size=4B cardinality=1
+|  row-size=4B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: max(item)
-|  row-size=4B cardinality=2
+|  row-size=4B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -416,13 +416,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -436,13 +436,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(pos)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(pos)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -456,13 +456,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(item)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(item)
-|  row-size=8B cardinality=2
+|  row-size=8B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB
@@ -476,13 +476,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: max:merge(item)
-|  row-size=4B cardinality=1
+|  row-size=4B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: max(item)
-|  row-size=4B cardinality=2
+|  row-size=4B cardinality=2 (from HBO)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
    HDFS partitions=1/1 files=2 size=6.92KB

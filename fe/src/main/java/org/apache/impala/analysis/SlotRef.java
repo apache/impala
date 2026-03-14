@@ -350,8 +350,22 @@ public class SlotRef extends Expr {
   public String toSqlImpl(ToSqlOptions options) {
     if (options.showForHbo()) {
       Preconditions.checkState(label_ != null || rawPath_ != null);
-      if (rawPath_ == null) return label_;
-      return ToSqlUtils.getIdentSql(Iterables.getLast(rawPath_));
+      // For HBO keys we want the underlying column reference stable across substitutions
+      // and independent of the alias written in the query. A non-scan slot (an inline
+      // view output slot, or an aggregation intermediate slot) is resolved through its
+      // single source expr. Only a base-table scan slot uses rawPath_ directly.
+      String col;
+      if (desc_ != null && !desc_.isScanSlot() && desc_.getSourceExprs().size() == 1) {
+        // Resolve through the slot's single source expr to reach the base column,
+        // recursing across inline-view boundaries. The size guard avoids mis-rendering
+        // slots without a single source, e.g. union slots.
+        col = desc_.getSourceExprs().get(0).toSql(options);
+      } else if (rawPath_ != null) {
+        col = ToSqlUtils.getIdentSql(Iterables.getLast(rawPath_));
+      } else {
+        col = label_;
+      }
+      return col;
     }
     if (label_ != null) return label_;
     if (rawPath_ != null) return ToSqlUtils.getPathSql(rawPath_);

@@ -8,13 +8,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=3
+|  row-size=8B cardinality=3 (from HBO)
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` = 2009
@@ -31,13 +31,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(id)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(id)
-|  row-size=8B cardinality=3
+|  row-size=8B cardinality=3 (from HBO)
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` = 2009
@@ -54,13 +54,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(id), min:merge(int_col)
-|  row-size=12B cardinality=1
+|  row-size=12B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(id), min(int_col)
-|  row-size=12B cardinality=3
+|  row-size=12B cardinality=3 (from HBO)
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` = 2009
@@ -141,13 +141,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=3
+|  row-size=8B cardinality=3 (from HBO)
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` = 2010
@@ -164,13 +164,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(id)
-|  row-size=8B cardinality=1
+|  row-size=8B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(id)
-|  row-size=8B cardinality=3
+|  row-size=8B cardinality=3 (from HBO)
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` = 2010
@@ -187,13 +187,13 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(id), min:merge(int_col)
-|  row-size=12B cardinality=1
+|  row-size=12B cardinality=1 (from HBO)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
 01:AGGREGATE
 |  output: count(id), min(int_col)
-|  row-size=12B cardinality=3
+|  row-size=12B cardinality=3 (from HBO)
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` = 2010

@@ -202,6 +202,18 @@ class TestHBO(ImpalaTestSuite):
         "explain select * from functional.alltypestiny where string_col < 'hbo_test'")
     assert "cardinality=8 (from HBO)" in '\n'.join(res.data), '\n'.join(res.data)
 
+    # Test runtime filters applied on scan of aggregation node.
+    agg_stmt = """select year, month, count(int_col)
+        from functional.alltypes group by year, month"""
+    self.execute_query("""with l as ({0})
+        select l.* from l join functional.alltypestiny t
+        on l.year = t.year and l.month = t.month
+        where t.id < 5""".format(agg_stmt))
+    # Wait for 1 second to ensure the stats are written to the cache.
+    time.sleep(1)
+    res = self.execute_query("explain " + agg_stmt)
+    assert "from HBO" not in '\n'.join(res.data), '\n'.join(res.data)
+
   def test_runtime_filter_annotation_with_hbo_cardinality(self):
     self.client.set_configuration(QUERY_OPTIONS)
     lineitem_preds = """l_shipdate >= '1994-01-01'
@@ -225,3 +237,28 @@ class TestHBO(ImpalaTestSuite):
         where o_custkey < 1000 and """ + lineitem_preds)
     assert "cardinality=37.88K(filtered from 114.16K from HBO)" in '\n'.join(res.data), \
         '\n'.join(res.data)
+
+  def test_agg_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select int_col, bigint_col, count(*) from functional.alltypes
+        where year = 2009 and string_col != 'test_agg'
+        group by 1,2""")
+    self._run_hbo_explains('QueryTest/hbo-single-agg')
+
+  def test_distinct_agg_cardinality(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select int_col, count(distinct string_col), count(distinct bigint_col)
+        from functional.alltypes
+        where year = 2009 and string_col != 'test_distinct_agg'
+        group by int_col""")
+    self._run_hbo_explains('QueryTest/hbo-distinct-agg')
+
+  def test_grouping_set(self):
+    self.client.set_configuration(QUERY_OPTIONS)
+    self.execute_query("""
+        select int_col, string_col, bigint_col, count(id) from functional.alltypes
+        where year = 2009 and string_col != 'test_grouping_set'
+        group by rollup(int_col, string_col, bigint_col)""")
+    self._run_hbo_explains('QueryTest/hbo-grouping-set')

@@ -145,4 +145,7 @@ public class TupleCacheNode extends PlanNode {
     processingCost_ = ProcessingCost.basicCost(getDisplayLabel(), getCardinality(), 0);
   }
 
+  @Override
+  public boolean isCardinalityPreserving() { return true; }
+
 }

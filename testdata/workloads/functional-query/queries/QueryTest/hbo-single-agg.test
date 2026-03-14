@@ -1,0 +1,244 @@
+====
+---- QUERY
+# EXPLAIN the same query that has been executed
+EXPLAIN SELECT int_col, bigint_col, count(*) FROM functional.alltypes
+ WHERE year = 2009 and string_col != 'test_agg' GROUP BY 1,2
+---- PLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: int_col, bigint_col
+|  row-size=20B cardinality=10 (from HBO)
+|
+02:EXCHANGE [HASH(int_col,bigint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: int_col, bigint_col
+|  row-size=20B cardinality=30 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_agg'
+   row-size=25B cardinality=3.65K (from HBO)
+====
+---- QUERY
+# Different order in GROUP BY keys
+EXPLAIN SELECT bigint_col, int_col, count(*) FROM functional.alltypes
+ WHERE year = 2009 and string_col != 'test_agg' GROUP BY 1,2
+---- PLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=10 (from HBO)
+|
+02:EXCHANGE [HASH(bigint_col,int_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: bigint_col, int_col
+|  row-size=20B cardinality=30 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_agg'
+   row-size=25B cardinality=3.65K (from HBO)
+====
+---- QUERY
+# Test alias
+EXPLAIN SELECT int_col a, bigint_col b, count(*) FROM functional.alltypes t
+ WHERE year = 2009 and string_col != 'test_agg' GROUP BY a, b
+---- PLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: int_col, bigint_col
+|  row-size=20B cardinality=10 (from HBO)
+|
+02:EXCHANGE [HASH(int_col,bigint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(*)
+|  group by: int_col, bigint_col
+|  row-size=20B cardinality=30 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes t]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_agg'
+   row-size=25B cardinality=3.65K (from HBO)
+====
+---- QUERY
+# Different agg functions
+EXPLAIN SELECT int_col, bigint_col, min(id), max(length(string_col))
+ FROM functional.alltypes
+ WHERE year = 2009 and string_col != 'test_agg' GROUP BY 1,2
+---- PLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: min:merge(id), max:merge(length(string_col))
+|  group by: int_col, bigint_col
+|  row-size=20B cardinality=10 (from HBO)
+|
+02:EXCHANGE [HASH(int_col,bigint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: min(id), max(length(string_col))
+|  group by: int_col, bigint_col
+|  row-size=20B cardinality=30 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_agg'
+   row-size=29B cardinality=3.65K (from HBO)
+====
+---- QUERY
+# First phase of a distinct agg can reuse the stats if the GROUP BY keys match.
+EXPLAIN SELECT int_col, count(distinct bigint_col) FROM functional.alltypes
+ WHERE year = 2009 and string_col != 'test_agg' GROUP BY int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(bigint_col)
+|  group by: int_col
+|  row-size=12B cardinality=10
+|
+05:EXCHANGE [HASH(int_col)]
+|
+02:AGGREGATE [STREAMING]
+|  output: count(bigint_col)
+|  group by: int_col
+|  row-size=12B cardinality=10
+|
+04:AGGREGATE
+|  group by: int_col, bigint_col
+|  row-size=12B cardinality=10 (from HBO)
+|
+03:EXCHANGE [HASH(int_col,bigint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: int_col, bigint_col
+|  row-size=12B cardinality=30 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_agg'
+   row-size=25B cardinality=3.65K (from HBO)
+====
+---- QUERY
+# Plain distinct on GROUP BY keys
+EXPLAIN SELECT distinct int_col, bigint_col FROM functional.alltypes
+WHERE year = 2009 and string_col != 'test_agg'
+---- PLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  group by: int_col, bigint_col
+|  row-size=12B cardinality=10 (from HBO)
+|
+02:EXCHANGE [HASH(int_col,bigint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: int_col, bigint_col
+|  row-size=12B cardinality=30 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_agg'
+   row-size=25B cardinality=3.65K (from HBO)
+====
+---- QUERY
+# inline view alias won't lead to wrong usage
+EXPLAIN SELECT distinct int_col, bigint_col FROM (
+  SELECT string_col as bigint_col, smallint_col as int_col
+  FROM functional.alltypes
+  WHERE year = 2009 and string_col != 'test_agg'
+  GROUP BY bigint_col, int_col) t
+---- PLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  group by: smallint_col, string_col
+|  row-size=15B cardinality=100
+|
+04:AGGREGATE [FINALIZE]
+|  group by: string_col, smallint_col
+|  row-size=15B cardinality=100
+|
+03:EXCHANGE [HASH(string_col,smallint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: string_col, smallint_col
+|  row-size=15B cardinality=300
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_agg'
+   row-size=15B cardinality=3.65K (from HBO)
+====
+---- QUERY
+# inline view alias won't lead to wrong usage
+EXPLAIN SELECT distinct int_col, bigint_col FROM (
+  SELECT string_col, count(int_col) int_col, count(bigint_col) as bigint_col
+  FROM functional.alltypes
+  WHERE year = 2009 and string_col != 'test_agg'
+  GROUP BY string_col) t
+---- PLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+06:AGGREGATE [FINALIZE]
+|  group by: int_col, bigint_col
+|  row-size=16B cardinality=10
+|
+05:EXCHANGE [HASH(int_col,bigint_col)]
+|
+02:AGGREGATE [STREAMING]
+|  group by: count(int_col), count(bigint_col)
+|  row-size=16B cardinality=10
+|
+04:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col), count:merge(bigint_col)
+|  group by: string_col
+|  row-size=29B cardinality=10
+|
+03:EXCHANGE [HASH(string_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: count(int_col), count(bigint_col)
+|  group by: string_col
+|  row-size=29B cardinality=30
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_agg'
+   row-size=25B cardinality=3.65K (from HBO)
+====

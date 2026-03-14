@@ -907,6 +907,11 @@ struct TPlanNode {
 
   // Execution stats with some input info that will be stored as historical stats for HBO.
   34: optional HBO.TPlanNodeRun exec_stats
+
+  // Parent node id. Value -1 for a plan root. For the root of a child fragment this is
+  // the ExchangeNode in the parent fragment that reads its output, so the relationship
+  // crosses fragment boundaries. Only set when the store_hbo_stats query option is true.
+  35: optional Types.TPlanNodeId node_parent_id
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

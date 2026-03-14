@@ -1,0 +1,107 @@
+====
+---- QUERY
+# EXPLAIN the same query that has been executed
+EXPLAIN select int_col, string_col, bigint_col, count(id)
+  from functional.alltypes where year = 2009 and string_col != 'test_grouping_set'
+  group by rollup(int_col, string_col, bigint_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(id) WHEN 2 THEN count(id) WHEN 3 THEN count(id) WHEN 4 THEN count(id) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN string_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bigint_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=36B cardinality=31 (from HBO)
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(id)
+|    group by: int_col, string_col, bigint_col
+|  Class 1
+|    output: count:merge(id)
+|    group by: int_col, string_col, NULL
+|  Class 2
+|    output: count:merge(id)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count:merge(id)
+|    group by: NULL, NULL, NULL
+|  row-size=130B cardinality=31 (from HBO)
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(int_col) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(string_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(bigint_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(id)
+|    group by: int_col, string_col, bigint_col
+|  Class 1
+|    output: count(id)
+|    group by: int_col, string_col, NULL
+|  Class 2
+|    output: count(id)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(id)
+|    group by: NULL, NULL, NULL
+|  row-size=130B cardinality=93 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_grouping_set'
+   row-size=29B cardinality=3.65K (from HBO)
+====
+---- QUERY
+# Different agg functions
+EXPLAIN select int_col, string_col, bigint_col, min(id), max(id)
+  from functional.alltypes where year = 2009 and string_col != 'test_grouping_set'
+  group by rollup(int_col, string_col, bigint_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN min(id) WHEN 2 THEN min(id) WHEN 3 THEN min(id) WHEN 4 THEN min(id) END), aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN max(id) WHEN 2 THEN max(id) WHEN 3 THEN max(id) WHEN 4 THEN max(id) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN string_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bigint_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=36B cardinality=31 (from HBO)
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: min:merge(id), max:merge(id)
+|    group by: int_col, string_col, bigint_col
+|  Class 1
+|    output: min:merge(id), max:merge(id)
+|    group by: int_col, string_col, NULL
+|  Class 2
+|    output: min:merge(id), max:merge(id)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: min:merge(id), max:merge(id)
+|    group by: NULL, NULL, NULL
+|  row-size=130B cardinality=31 (from HBO)
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(int_col) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(string_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(bigint_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: min(id), max(id)
+|    group by: int_col, string_col, bigint_col
+|  Class 1
+|    output: min(id), max(id)
+|    group by: int_col, string_col, NULL
+|  Class 2
+|    output: min(id), max(id)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: min(id), max(id)
+|    group by: NULL, NULL, NULL
+|  row-size=130B cardinality=93 (from HBO)
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: string_col != 'test_grouping_set'
+   row-size=29B cardinality=3.65K (from HBO)
+====

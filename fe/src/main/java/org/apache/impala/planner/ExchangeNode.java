@@ -412,4 +412,7 @@ public class ExchangeNode extends PlanNode {
 
   @Override
   public boolean omitTupleCache() { return true; }
+
+  @Override
+  public boolean isCardinalityPreserving() { return true; }
 }

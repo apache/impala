@@ -111,6 +111,13 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // unique w/in plan tree; assigned by planner, and not necessarily in c'tor
   protected PlanNodeId id_;
 
+  // Parent node in the plan tree, following cross-fragment edges (i.e. the parent of a
+  // fragment root is the ExchangeNode in the parent fragment). This is NOT maintained
+  // while the plan tree is still changing; it is populated once by setParentIds() at
+  // Thrift-serialization time (see createPlanExecInfo()) and read only in toThrift().
+  // null means either the plan root or that setParentIds() has not run.
+  protected PlanNode parent_;
+
   protected long limit_; // max. # of rows to be returned; -1: no limit_
 
   // ids materialized by the tree rooted at this node
@@ -265,6 +272,25 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public void setId(PlanNodeId id) {
     Preconditions.checkState(id_ == null);
     id_ = id;
+  }
+
+  // Only valid after setParentIds() has run; see the parent_ field comment.
+  public PlanNode getParent() { return parent_; }
+  public void setParent(PlanNode parent) { parent_ = parent; }
+
+  /**
+   * Populates parent_ for the whole plan tree rooted at 'root' via a depth-first
+   * traversal that follows getChildren(), which crosses fragment boundaries through
+   * ExchangeNodes. Must be called after the plan tree is finalized (no more structural
+   * changes) and before toThrift(), so each node can emit its node_parent_id. The root's
+   * parent_ is left null (serialized as -1).
+   */
+  public static void setParentIds(PlanNode root) {
+    Preconditions.checkNotNull(root);
+    for (PlanNode child : root.getChildren()) {
+      child.setParent(root);
+      setParentIds(child);
+    }
   }
   public long getLimit() { return limit_; }
   public boolean hasLimit() { return limit_ > -1; }
@@ -558,6 +584,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       msg.setLabel(getDisplayLabel());
       msg.setLabel_detail(getDisplayLabelDetail());
       msg.setEstimated_stats(estimatedStats);
+      // Emit the parent node id for HBO stats collection. The BE walks parents from a
+      // runtime-filter target up to its source join, so every node (not just HBO-key
+      // nodes) must carry this. parent_ is populated by setParentIds() before
+      // serialization; a null parent_ means this is a plan root (serialized as -1).
+      TQueryOptions queryOptions = serialCtx.getQueryOptions();
+      if (queryOptions != null && queryOptions.store_hbo_stats) {
+        msg.setNode_parent_id(parent_ != null ? parent_.getId().asInt() : -1);
+      }
     } else {
       // Do not set node_id for tuple caching, as it is a global index that is impacted
       // by the shape of the rest of the query.
@@ -988,6 +1022,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public boolean isBlockingNode() { return false; }
 
   /**
+   * Returns true if this plan node preserves the cardinality of its only input child.
+   */
+  public boolean isCardinalityPreserving() { return false; }
+
+  /**
    * Generates an HBO key string for this node, or null if HBO is not supported.
    * This key string represents the logical characteristics that identify similar
    * operations that could benefit from shared historical statistics.
@@ -1002,13 +1041,22 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   public String generateHboKeyString(THboStatsType statsType,
       CanonicalizationStrategy strategy) {
+    if (isCardinalityPreserving()) {
+      Preconditions.checkState(children_.size() == 1);
+      return getChild(0).generateHboKeyString(statsType, strategy);
+    }
     return null;
   }
 
   /**
    * Appends scan input stats of leaf ScanNodes in the current subtree.
    */
-  public void appendScanInputStats(TPlanNodeRun execStats) {}
+  public void appendScanInputStats(TPlanNodeRun execStats) {
+    if (isCardinalityPreserving()) {
+      Preconditions.checkState(children_.size() == 1);
+      getChild(0).appendScanInputStats(execStats);
+    }
+  }
 
   /**
    * Overrides cardinality_ with a value from HBO stats if a matching historical run is
