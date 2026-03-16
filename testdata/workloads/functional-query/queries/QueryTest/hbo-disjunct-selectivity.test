@@ -1,0 +1,47 @@
+====
+---- QUERY
+# EXPLAIN the same query that has been executed
+explain select count(*) from functional.alltypes
+where tinyint_col = 0 or smallint_col = 0 or int_col = 0 or bigint_col = 0
+  or string_col = '0'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=3
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: tinyint_col = 0 OR smallint_col = 0 OR int_col = 0 OR bigint_col = 0 OR string_col = '0'
+   row-size=28B cardinality=730 (from HBO)
+====
+---- QUERY
+# EXPLAIN a simialr query with different aggregation
+explain select count(bool_col) from functional.alltypes
+where tinyint_col = 0 or smallint_col = 0 or int_col = 0 or bigint_col = 0
+  or string_col = '0'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(bool_col)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(bool_col)
+|  row-size=8B cardinality=3
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: tinyint_col = 0 OR smallint_col = 0 OR int_col = 0 OR bigint_col = 0 OR string_col = '0'
+   row-size=29B cardinality=730 (from HBO)
+====

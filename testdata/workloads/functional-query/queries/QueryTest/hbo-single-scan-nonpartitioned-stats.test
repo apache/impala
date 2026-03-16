@@ -1,0 +1,127 @@
+====
+---- QUERY
+# EXPLAIN the same query that has been executed
+EXPLAIN SELECT count(*) FROM functional.alltypes_nonpartitioned
+ WHERE year=2009 AND int_col=1 AND string_col='1'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional.alltypes_nonpartitioned]
+   HDFS partitions=1/1 files=1 size=521.58KB
+   predicates: int_col = 1, string_col = '1', `year` = 2009
+   row-size=21B cardinality=365 (from HBO)
+====
+---- QUERY
+# Test query using a different aggregate function
+EXPLAIN SELECT count(id) FROM functional.alltypes_nonpartitioned
+ WHERE year=2009 AND int_col=1 AND string_col='1'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(id)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(id)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional.alltypes_nonpartitioned]
+   HDFS partitions=1/1 files=1 size=521.58KB
+   predicates: int_col = 1, string_col = '1', `year` = 2009
+   row-size=25B cardinality=365 (from HBO)
+====
+---- QUERY
+# Test query using multiple aggregate functions
+EXPLAIN SELECT count(id), min(int_col) FROM functional.alltypes_nonpartitioned
+ WHERE year=2009 AND int_col=1 AND string_col='1'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(id), min:merge(int_col)
+|  row-size=12B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(id), min(int_col)
+|  row-size=12B cardinality=1
+|
+00:SCAN HDFS [functional.alltypes_nonpartitioned]
+   HDFS partitions=1/1 files=1 size=521.58KB
+   predicates: int_col = 1, string_col = '1', `year` = 2009
+   row-size=25B cardinality=365 (from HBO)
+====
+---- QUERY
+# Test query using distinct aggregate functions
+EXPLAIN SELECT count(distinct id) FROM functional.alltypes_nonpartitioned
+ WHERE year=2009 AND int_col=1 AND string_col='1'
+---- PLAN
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(id)
+|  row-size=8B cardinality=1
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(id)
+|  row-size=8B cardinality=1
+|
+04:AGGREGATE
+|  group by: id
+|  row-size=4B cardinality=365
+|
+03:EXCHANGE [HASH(id)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: id
+|  row-size=4B cardinality=365
+|
+00:SCAN HDFS [functional.alltypes_nonpartitioned]
+   HDFS partitions=1/1 files=1 size=521.58KB
+   predicates: int_col = 1, string_col = '1', `year` = 2009
+   row-size=25B cardinality=365 (from HBO)
+====
+---- QUERY
+# Test query reading columns directly
+EXPLAIN SELECT id FROM functional.alltypes_nonpartitioned
+ WHERE year=2009 AND int_col=1 AND string_col='1'
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes_nonpartitioned]
+   HDFS partitions=1/1 files=1 size=521.58KB
+   predicates: int_col = 1, string_col = '1', `year` = 2009
+   row-size=25B cardinality=365 (from HBO)
+====
+---- QUERY
+# Test query reading columns directly
+EXPLAIN SELECT * FROM functional.alltypes_nonpartitioned
+ WHERE year=2009 AND int_col=1 AND string_col='1'
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes_nonpartitioned]
+   HDFS partitions=1/1 files=1 size=521.58KB
+   predicates: int_col = 1, string_col = '1', `year` = 2009
+   row-size=89B cardinality=365 (from HBO)
+====

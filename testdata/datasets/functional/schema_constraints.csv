@@ -449,3 +449,6 @@ table_name:paimon_primitive_alltypes, constraint:restrict_to, table_format:parqu
 table_name:paimon_decimal_tbl, constraint:restrict_to, table_format:parquet/none/none
 table_name:alltypes_paimon, constraint:restrict_to, table_format:parquet/none/none
 table_name:alltypes_structs_paimon, constraint:restrict_to, table_format:parquet/none/none
+
+table_name:alltypes_nonpartitioned, constraint:restrict_to, table_format:text/none/none
+table_name:alltypes_nonpartitioned, constraint:restrict_to, table_format:parquet/none/none

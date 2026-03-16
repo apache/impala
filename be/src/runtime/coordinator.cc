@@ -803,6 +803,10 @@ string Coordinator::FilterDebugString() {
   return Substitute("\n$0", table_printer.ToString());
 }
 
+const std::map<int32_t, std::set<TPlanNodeId>>& Coordinator::GetEffectiveFilterTargets() {
+  return effective_filter_targets_;
+}
+
 const char* Coordinator::ExecStateToString(const ExecState state) {
   static const unordered_map<ExecState, const char *> exec_state_to_str{
     {ExecState::EXECUTING,        "EXECUTING"},

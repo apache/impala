@@ -1453,6 +1453,14 @@ Status impala::SetQueryOption(TImpalaQueryOptions::type option, const string& va
         query_options->__set_enable_explain_calcite(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::USE_HBO_STATS: {
+        query_options->__set_use_hbo_stats(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::STORE_HBO_STATS: {
+        query_options->__set_store_hbo_stats(IsTrue(value));
+        break;
+      }
       default:
         string key = to_string(option);
         if (IsRemovedQueryOption(key)) {

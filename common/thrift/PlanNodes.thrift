@@ -29,6 +29,7 @@ include "CatalogObjects.thrift"
 include "Data.thrift"
 include "ExecStats.thrift"
 include "Exprs.thrift"
+include "HBO.thrift"
 include "Types.thrift"
 include "ExternalDataSource.thrift"
 include "ResourceProfile.thrift"
@@ -831,6 +832,12 @@ struct TPipelineMembership {
   3: required TExecNodePhase phase
 }
 
+// Pairs HBO statistics type with hash keys for that type
+struct THboHashKeys {
+  1: required HBO.THboStatsType stats_type
+  2: required map<HBO.TCanonicalizationStrategy, string> hash_keys
+}
+
 // This is essentially a union of all messages corresponding to subclasses
 // of PlanNode.
 struct TPlanNode {
@@ -888,9 +895,18 @@ struct TPlanNode {
   28: optional TTupleCacheNode tuple_cache_node
 
   29: optional TSystemTableScanNode system_table_scan_node
+
   31: optional TPaimonScanNode paimon_table_scan_node
 
   32: optional TUnpivotNode unpivot_node
+
+  // List of hash keys for History-Based Optimization (HBO), grouped by statistics type.
+  // Each entry contains hash keys for a specific statistics type (cardinality or memory),
+  // with keys ordered from most accurate to most aggressive matching.
+  33: optional list<THboHashKeys> hbo_hash_keys
+
+  // Execution stats with some input info that will be stored as historical stats for HBO.
+  34: optional HBO.TPlanNodeRun exec_stats
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -50,14 +51,20 @@ import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
 import org.apache.impala.planner.TupleCacheInfo.HashTraceElement;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.HistoricalStats;
 import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TCanonicalizationStrategy;
+import org.apache.impala.thrift.THboHashKeys;
+import org.apache.impala.thrift.THboStatsType;
 import org.apache.impala.thrift.TPlan;
 import org.apache.impala.thrift.TPlanNode;
+import org.apache.impala.thrift.TPlanNodeRun;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TQueryOptionsHash;
+import org.apache.impala.thrift.TScanInputStats;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.MathUtil;
@@ -68,6 +75,8 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
 
 /**
  * Each PlanNode represents a single relational operator
@@ -188,6 +197,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected boolean hasHardEstimates_ = false;
 
   protected TupleCacheInfo tupleCacheInfo_;
+
+  // True if the cardinality is from HBO stats.
+  protected boolean hasHboCard_ = false;
 
   protected PlanNode(PlanNodeId id, List<TupleId> tupleIds, String displayName) {
     this(id, displayName);
@@ -416,10 +428,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       if (filteredCardinality_ > -1) {
         expBuilder.append(PrintUtils.printEstCardinality(filteredCardinality_))
             .append("(filtered from ")
-            .append(PrintUtils.printEstCardinality(cardinality_))
-            .append(")");
+            .append(PrintUtils.printEstCardinality(cardinality_));
+        if (hasHboCard_) expBuilder.append(" from HBO");
+        expBuilder.append(")");
       } else {
         expBuilder.append(PrintUtils.printEstCardinality(cardinality_));
+        if (hasHboCard_) expBuilder.append(" (from HBO)");
       }
       if (Planner.isProcessingCostAvailable(queryOptions)) {
         // Show processing cost total.
@@ -518,9 +532,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   // Convert this plan node, including all children, to its Thrift representation.
-  public TPlan treeToThrift() {
+  public TPlan treeToThrift(TQueryOptions queryOptions) {
     TPlan result = new TPlan();
-    treeToThriftHelper(result);
+    treeToThriftHelper(result, queryOptions);
     return result;
   }
 
@@ -585,9 +599,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   // Append a flattened version of this plan node, including all children in the same
   // fragment, to 'container'.
-  private void treeToThriftHelper(TPlan container) {
+  private void treeToThriftHelper(TPlan container, TQueryOptions queryOptions) {
     TPlanNode msg = new TPlanNode();
-    ThriftSerializationCtx serialCtx = new ThriftSerializationCtx();
+    ThriftSerializationCtx serialCtx = new ThriftSerializationCtx(queryOptions);
     initThrift(msg, serialCtx);
     toThrift(msg, serialCtx);
     container.addToNodes(msg);
@@ -596,7 +610,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     int numChildren = 0;
     for (PlanNode child: children_) {
       if (child.getFragment() != getFragment()) continue;
-      child.treeToThriftHelper(container);
+      child.treeToThriftHelper(container, queryOptions);
       ++numChildren;
     }
     msg.num_children = numChildren;
@@ -972,6 +986,162 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * into pipelined units for resource estimation.
    */
   public boolean isBlockingNode() { return false; }
+
+  /**
+   * Generates an HBO key string for this node, or null if HBO is not supported.
+   * This key string represents the logical characteristics that identify similar
+   * operations that could benefit from shared historical statistics.
+   *
+   * Nodes that support HBO should override this method to return a descriptive
+   * key string (not hashed). The key will be incorporated into parent nodes'
+   * HBO keys to create a hierarchical identification system. The key string
+   * should include the stats type as a prefix.
+   *
+   * @return A key string identifying this node's characteristics, or null if
+   *         HBO is not supported for this node type.
+   */
+  public String generateHboKeyString(THboStatsType statsType,
+      CanonicalizationStrategy strategy) {
+    return null;
+  }
+
+  /**
+   * Appends scan input stats of leaf ScanNodes in the current subtree.
+   */
+  public void appendScanInputStats(TPlanNodeRun execStats) {}
+
+  /**
+   * Overrides cardinality_ with a value from HBO stats if a matching historical run is
+   * found.
+   */
+  protected void tryUpdateCardinalityFromHbo(Analyzer analyzer) {
+    if (!analyzer.getQueryOptions().use_hbo_stats) return;
+    Map<CanonicalizationStrategy, String> hashKeys =
+        generateHboHashStrings(THboStatsType.CARDINALITY);
+    if (hashKeys.isEmpty()) return;
+    TPlanNodeRun currRun = new TPlanNodeRun();
+    appendScanInputStats(currRun);
+    if (!currRun.isSetScan_input_stats() || currRun.getScan_input_stats().isEmpty()) {
+      return;
+    }
+    Long hboCardinality = HistoricalStats.INSTANCE.getPlanNodeOutputRows(
+        hashKeys, getDisplayLabel(), currRun);
+    if (hboCardinality != null) {
+      hasHboCard_ = true;
+      cardinality_ = capCardinalityAtLimit(hboCardinality);
+    } else {
+      LOG.debug("No HBO stats for {}. Keys: {}", getDisplayLabel(), hashKeys);
+    }
+  }
+
+  /**
+   * Returns true if any scan input row count is unknown (unset or negative).
+   */
+  protected boolean hasUnknownScanInputRows(TPlanNodeRun execStats) {
+    if (!execStats.isSetScan_input_stats() || execStats.getScan_input_stats().isEmpty()) {
+      return true;
+    }
+    for (TScanInputStats scanStats : execStats.getScan_input_stats()) {
+      if (!scanStats.isSetInput_rows() || scanStats.getInput_rows() < 0) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Populates exec_stats and hbo_hash_keys on a TPlanNode for HBO stats collection.
+   * Returns true if HBO keys were set, false if HBO is not supported for this node.
+   */
+  protected void populateHboThriftFields(TPlanNode msg,
+      ThriftSerializationCtx serialCtx) {
+    if (serialCtx.isTupleCache()) return;
+    TQueryOptions queryOptions = serialCtx.getQueryOptions();
+    if (queryOptions == null || !queryOptions.store_hbo_stats) return;
+    Map<CanonicalizationStrategy, String> hboHashKeys = generateHboHashStrings(
+        THboStatsType.CARDINALITY);
+    if (hboHashKeys.isEmpty()) return;
+    msg.exec_stats = new TPlanNodeRun();
+    appendScanInputStats(msg.exec_stats);
+    if (hasUnknownScanInputRows(msg.exec_stats)) {
+      // If numRows are unknown for some selected partitions, only allow identical
+      // matching. So only EXPR_REWRITE strategy is used here.
+      String identicalHashKey = generateHboHashString(THboStatsType.CARDINALITY,
+          CanonicalizationStrategy.EXPR_REWRITE);
+      if (identicalHashKey == null) return;
+      Map<TCanonicalizationStrategy, String> hashKeys = Collections.singletonMap(
+          CanonicalizationStrategy.EXPR_REWRITE.toThrift(), identicalHashKey);
+      msg.setHbo_hash_keys(Lists.newArrayList(new THboHashKeys(
+          THboStatsType.CARDINALITY, hashKeys)));
+    } else {
+      msg.setHbo_hash_keys(generateAllHboHashKeys());
+    }
+    return;
+  }
+
+  /**
+   * Generates a single hash string using the specified stats type and canonicalization
+   * strategy.
+   */
+  public String generateHboHashString(THboStatsType statsType,
+      CanonicalizationStrategy strategy) {
+    Hasher hasher = Hashing.murmur3_128().newHasher();
+    String keyString = generateHboKeyString(statsType, strategy);
+    if (keyString == null) return null;
+    LOG.trace("{} HBO Key string ({}, {}): {}", getDisplayLabel(), statsType, strategy,
+        keyString);
+    hasher.putUnencodedChars(keyString);
+    return hasher.hash().toString();
+  }
+
+  /**
+   * Returns hash strings for History-Based Optimization (HBO) for a specific statistics
+   * type, keyed by canonicalization strategy from most accurate to most aggressive.
+   */
+  public Map<CanonicalizationStrategy, String> generateHboHashStrings(
+      THboStatsType statsType) {
+    Map<CanonicalizationStrategy, String> hashStrings =
+        new EnumMap<>(CanonicalizationStrategy.class);
+    for (CanonicalizationStrategy strategy : CanonicalizationStrategy.values()) {
+      String hashString = generateHboHashString(statsType, strategy);
+      // Break if the node doesn't support HBO.
+      if (hashString == null) break;
+      LOG.trace("{} HBO Strategy {} statsType {} hash: {}", getDisplayLabel(), strategy,
+          statsType, hashString);
+      if (hashStrings.containsValue(hashString)) {
+        LOG.trace("Ignoring duplicate hash string for strategy {}: {}",
+            strategy, hashString);
+      } else {
+        hashStrings.put(strategy, hashString);
+      }
+    }
+    return hashStrings;
+  }
+
+  private static Map<TCanonicalizationStrategy, String> toThriftHashKeys(
+      Map<CanonicalizationStrategy, String> hashKeys) {
+    Map<TCanonicalizationStrategy, String> thriftKeys = new HashMap<>();
+    for (Map.Entry<CanonicalizationStrategy, String> entry : hashKeys.entrySet()) {
+      thriftKeys.put(entry.getKey().toThrift(), entry.getValue());
+    }
+    return thriftKeys;
+  }
+
+  /**
+   * Generates HBO hash keys for all statistics types (cardinality and peak memory).
+   * Returns a list of THboHashKeys, each containing the statistics type and
+   * corresponding hash keys for different canonicalization strategies.
+   */
+  public List<THboHashKeys> generateAllHboHashKeys() {
+    List<THboHashKeys> result = new ArrayList<>();
+
+    Map<CanonicalizationStrategy, String> cardinalityKeys =
+        generateHboHashStrings(THboStatsType.CARDINALITY);
+    if (!cardinalityKeys.isEmpty()) {
+      result.add(new THboHashKeys(THboStatsType.CARDINALITY,
+          toThriftHashKeys(cardinalityKeys)));
+    }
+
+    return result;
+  }
 
   /**
    * Fills in 'pipelines_' with the pipelines that this PlanNode is a member of.

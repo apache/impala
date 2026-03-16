@@ -2061,7 +2061,8 @@ public class Frontend {
 
     // The fragment at this point has all state set, serialize it to thrift.
     for (PlanFragment fragment: fragments) {
-      TPlanFragment thriftFragment = fragment.toThrift();
+      TPlanFragment thriftFragment =
+          fragment.toThrift(queryCtx.client_request.query_options);
       result.addToFragments(thriftFragment);
     }
 

@@ -197,6 +197,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Get a copy of the current exec summary. Thread-safe.
   void GetTExecSummary(TExecSummary* exec_summary);
 
+  /// Returns a map from filter ID to the set of target node IDs where the filter
+  /// rejected data. Calls ComputeEffectiveFilterTargets() if not already computed.
+  const std::map<int32_t, std::set<TPlanNodeId>>& GetEffectiveFilterTargets();
+
   /// Receive a local filter update from a fragment instance. Aggregate that filter update
   /// with others for the same filter ID into a global filter. If all updates for that
   /// filter ID have been received (may be 1 or more per filter), broadcast the global

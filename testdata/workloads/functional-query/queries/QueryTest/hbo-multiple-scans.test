@@ -1,0 +1,147 @@
+====
+---- QUERY
+# EXPLAIN the same query that has been executed
+EXPLAIN select count(*) from functional.alltypes a, functional.alltypes b
+where a.id = b.id
+  and a.year = 2010 and a.month = 1 and b.year = 2010
+  and a.int_col = 0 and b.int_col = 0 and b.string_col = '0'
+---- PLAN
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=2
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: b.id = a.id
+|  runtime filters: RF000 <- a.id
+|  row-size=29B cardinality=2
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [functional.alltypes a]
+|     partition predicates: a.`year` = 2010, a.`month` = 1
+|     HDFS partitions=1/24 files=1 size=20.36KB
+|     predicates: a.int_col = 0
+|     row-size=8B cardinality=31 (from HBO)
+|
+01:SCAN HDFS [functional.alltypes b]
+   partition predicates: b.`year` = 2010
+   HDFS partitions=12/24 files=12 size=239.77KB
+   predicates: b.int_col = 0, b.string_col = '0'
+   runtime filters: RF000 -> b.id
+   row-size=21B cardinality=365 (from HBO)
+====
+---- QUERY
+# Same conjuncts but different output exprs
+EXPLAIN select count(a.id), min(b.int_col)
+from functional.alltypes a, functional.alltypes b
+where a.id = b.id
+  and a.year = 2010 and a.month = 1 and b.year = 2010
+  and a.int_col = 0 and b.int_col = 0 and b.string_col = '0'
+---- PLAN
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(a.id), min:merge(b.int_col)
+|  row-size=12B cardinality=1
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: count(a.id), min(b.int_col)
+|  row-size=12B cardinality=2
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: b.id = a.id
+|  runtime filters: RF000 <- a.id
+|  row-size=29B cardinality=2
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [functional.alltypes a]
+|     partition predicates: a.`year` = 2010, a.`month` = 1
+|     HDFS partitions=1/24 files=1 size=20.36KB
+|     predicates: a.int_col = 0
+|     row-size=8B cardinality=31 (from HBO)
+|
+01:SCAN HDFS [functional.alltypes b]
+   partition predicates: b.`year` = 2010
+   HDFS partitions=12/24 files=12 size=239.77KB
+   predicates: b.int_col = 0, b.string_col = '0'
+   runtime filters: RF000 -> b.id
+   row-size=21B cardinality=365 (from HBO)
+====
+---- QUERY
+# Different partition conjuncts but same input size (numRows)
+EXPLAIN select count(*) from functional.alltypes a, functional.alltypes b
+where a.id = b.id
+and a.year = 2009 and a.month = 10 and b.year = 2009
+and a.int_col = 0 and b.int_col = 0 and b.string_col = '0'
+---- PLAN
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=2
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: b.id = a.id
+|  runtime filters: RF000 <- a.id
+|  row-size=29B cardinality=2
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [functional.alltypes a]
+|     partition predicates: a.`year` = 2009, a.`month` = 10
+|     HDFS partitions=1/24 files=1 size=20.36KB
+|     predicates: a.int_col = 0
+|     row-size=8B cardinality=31 (from HBO)
+|
+01:SCAN HDFS [functional.alltypes b]
+   partition predicates: b.`year` = 2009
+   HDFS partitions=12/24 files=12 size=238.68KB
+   predicates: b.int_col = 0, b.string_col = '0'
+   runtime filters: RF000 -> b.id
+   row-size=21B cardinality=365 (from HBO)
+====
+---- QUERY
+# Different statement but same ScanNodes
+EXPLAIN select * from functional.alltypes a
+where year = 2010 and month = 1 and int_col = 0
+union all
+select * from functional.alltypes b
+where year = 2010 and int_col = 0 and string_col = '0'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=89B cardinality=396
+|
+|--02:SCAN HDFS [functional.alltypes b]
+|     partition predicates: `year` = 2010
+|     HDFS partitions=12/24 files=12 size=239.77KB
+|     predicates: int_col = 0, string_col = '0'
+|     row-size=89B cardinality=365 (from HBO)
+|
+01:SCAN HDFS [functional.alltypes a]
+   partition predicates: `year` = 2010, `month` = 1
+   HDFS partitions=1/24 files=1 size=20.36KB
+   predicates: int_col = 0
+   row-size=89B cardinality=31 (from HBO)
+====

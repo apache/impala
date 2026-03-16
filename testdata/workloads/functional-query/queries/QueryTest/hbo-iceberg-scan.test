@@ -1,0 +1,116 @@
+====
+---- QUERY
+EXPLAIN select count(id) from functional_parquet.iceberg_partitioned where id > 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(id)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(id)
+|  row-size=8B cardinality=3
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=3/3 files=20 size=22.90KB
+   predicates: id > 10
+   Iceberg snapshot id: 8270633197658268308
+   row-size=4B cardinality=10 (from HBO)
+====
+---- QUERY
+EXPLAIN select max(id) from functional_parquet.iceberg_partitioned where id > 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: max:merge(id)
+|  row-size=4B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: max(id)
+|  row-size=4B cardinality=3
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=3/3 files=20 size=22.90KB
+   predicates: id > 10
+   Iceberg snapshot id: 8270633197658268308
+   row-size=4B cardinality=10 (from HBO)
+====
+---- QUERY
+EXPLAIN select count(id) from functional_parquet.iceberg_partitioned where id > 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(id)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(id)
+|  row-size=8B cardinality=3
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=3/3 files=20 size=22.90KB
+   predicates: id > 10
+   Iceberg snapshot id: 8270633197658268308
+   row-size=4B cardinality=10 (from HBO)
+====
+---- QUERY
+EXPLAIN select count(distinct user) from functional_parquet.iceberg_partitioned where id > 10
+---- PLAN
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(`user`)
+|  row-size=8B cardinality=1
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(`user`)
+|  row-size=8B cardinality=1
+|
+04:AGGREGATE
+|  group by: `user`
+|  row-size=12B cardinality=10
+|
+03:EXCHANGE [HASH(`user`)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: `user`
+|  row-size=12B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=3/3 files=20 size=22.90KB
+   predicates: id > 10
+   Iceberg snapshot id: 8270633197658268308
+   row-size=16B cardinality=10 (from HBO)
+====
+---- QUERY
+EXPLAIN select min(event_time) from functional_parquet.iceberg_partitioned where id > 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: min:merge(event_time)
+|  row-size=16B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: min(event_time)
+|  row-size=16B cardinality=3
+|
+00:SCAN HDFS [functional_parquet.iceberg_partitioned]
+   HDFS partitions=3/3 files=20 size=22.90KB
+   predicates: id > 10
+   Iceberg snapshot id: 8270633197658268308
+   row-size=20B cardinality=10 (from HBO)
+====

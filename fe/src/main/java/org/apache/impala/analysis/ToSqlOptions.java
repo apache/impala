@@ -24,12 +24,12 @@ public enum ToSqlOptions {
   /**
    * The default way of displaying the original SQL query without rewrites.
    */
-  DEFAULT(false, false),
+  DEFAULT(false, false, false),
 
   /**
    * Show rewritten query if it exists
    */
-  REWRITTEN(true, false),
+  REWRITTEN(true, false, false),
 
   /**
    * Show Implicit Casts.
@@ -38,11 +38,18 @@ public enum ToSqlOptions {
    * to parse if resubmitted as, for example, EXISTS queries that are rewritten as
    * semi-joins are not legal SQL.
    */
-  SHOW_IMPLICIT_CASTS(true, true);
+  SHOW_IMPLICIT_CASTS(true, true, false),
+
+  /**
+   * Used for HBO to create the canonicalized strings.
+   */
+  FOR_HBO(false, false, true);
 
   private boolean rewritten_;
 
   private boolean implictCasts_;
+
+  private boolean for_hbo_;
 
   /**
    * Show rewritten form of Sql
@@ -54,8 +61,11 @@ public enum ToSqlOptions {
    */
   public boolean showImplictCasts() { return implictCasts_; }
 
-  ToSqlOptions(boolean rewritten, boolean implictCasts) {
+  public boolean showForHbo() { return for_hbo_; }
+
+  ToSqlOptions(boolean rewritten, boolean implictCasts, boolean for_hbo) {
     rewritten_ = rewritten;
     implictCasts_ = implictCasts;
+    for_hbo_ = for_hbo;
   }
 }

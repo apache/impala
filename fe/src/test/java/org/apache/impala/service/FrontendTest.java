@@ -149,9 +149,9 @@ public class FrontendTest extends FrontendTestBase {
     req.get_tables_req.setTableTypes(Arrays.asList("TABLE"));
     TResultSet resp = execMetadataOp(req);
     // HiveServer2 GetTables has 5 columns.
-    assertEquals(5, resp.schema.columns.size());
-    assertEquals(5, resp.rows.get(0).colVals.size());
-    assertEquals(6, resp.rows.size());
+    assertEquals("Resp: " + resp, 5, resp.schema.columns.size());
+    assertEquals("Resp: " + resp, 5, resp.rows.get(0).colVals.size());
+    assertEquals("Resp: " + resp, 7, resp.rows.size());
     assertEquals("alltypes_datasource",
         resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
     assertEquals("alltypes_date_partition",
@@ -162,8 +162,10 @@ public class FrontendTest extends FrontendTestBase {
         resp.rows.get(3).colVals.get(2).string_val.toLowerCase());
     assertEquals("alltypes_jdbc_datasource_2",
         resp.rows.get(4).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypes_with_date",
+    assertEquals("alltypes_nonpartitioned",
         resp.rows.get(5).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_with_date",
+        resp.rows.get(6).colVals.get(2).string_val.toLowerCase());
   }
 
   @Test

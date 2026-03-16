@@ -36,7 +36,8 @@ ${COMPUTE_STATS_SCRIPT} --db_names=functional\
     --table_names="alltypes,alltypesagg,alltypesaggmultifilesnopart,alltypesaggnonulls,
     alltypessmall,alltypestiny,jointbl,dimtbl,stringpartitionkey,nulltable,nullrows,
     date_tbl,chars_medium,part_strings_with_quotes,alltypes_date_partition,
-    alltypes_date_partition_2,mv1_alltypes_jointbl,binary_tbl,binary_tbl_big"
+    alltypes_date_partition_2,mv1_alltypes_jointbl,binary_tbl,binary_tbl_big,
+    alltypes_nonpartitioned"
 ${COMPUTE_STATS_SCRIPT} --db_names=functional_parquet \
     --table_names="unique_with_nulls"
 

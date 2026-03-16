@@ -57,6 +57,7 @@ set(SRC_FILES
   Exprs_types.cpp
   ExternalDataSource_types.cpp
   Frontend_types.cpp
+  HBO_types.cpp
   hive_metastore_constants.cpp
   hive_metastore_types.cpp
   JniCatalog_constants.cpp

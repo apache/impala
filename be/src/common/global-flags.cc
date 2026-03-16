@@ -226,6 +226,19 @@ DEFINE_bool(enable_stats_extrapolation, false,
     "If true, uses table statistics computed with COMPUTE STATS "
     "to extrapolate the row counts of partitions.");
 
+DEFINE_double(hbo_similarity_threshold, 0.1,
+    "Threshold in [0, 1] for comparing scan input rows in Historical Based Optimization. "
+    "Two runs are considered similar if the relative difference is within this threshold."
+    " Default is 0.1 (10% tolerance).");
+
+DEFINE_int32(hbo_max_runs_per_key, 100,
+    "Maximum number of historical runs to retain per hash key in the HBO cache. "
+    "When exceeded, the oldest run is evicted.");
+
+DEFINE_int64(hbo_in_memory_backend_cache_size_bytes, 1024LL * 1024 * 1024,
+    "Maximum size in bytes of the HBO in-memory backend (InMemoryCacheBackend). "
+    "Default is 1GB. The in-memory backend is mainly used for testing.");
+
 DEFINE_string(log_filename, "",
     "Prefix of log filename - "
     "full path is <log_dir>/<log_filename>.[INFO|WARN|ERROR|FATAL]");

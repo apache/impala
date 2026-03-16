@@ -1277,6 +1277,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Random `impala::TUniqueID` generator. Use wherever a new `TUniqueId` is needed.
   TUniqueId RandomUniqueID();
 
+  /// Stores the execution stats for the given query into the HBO cache.
+  Status StoreExecutionStats(const QueryHandle& query_handle);
+
   /// Logger for writing encoded query profiles, one per line with the following format:
   /// <ms-since-epoch> <query-id> <thrift query profile URL encoded and gzipped>
   boost::scoped_ptr<SimpleLogger> profile_logger_;

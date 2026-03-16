@@ -17,6 +17,7 @@
 
 #include <condition_variable>
 #include <memory>
+#include <set>
 #include <utility>
 #include <vector>
 #include <boost/thread/shared_mutex.hpp>
@@ -75,6 +76,12 @@ class Coordinator::FilterState {
   InListFilterPB& in_list_filter() { return in_list_filter_; }
   std::vector<FilterTarget>* targets() { return &targets_; }
   const std::vector<FilterTarget>& targets() const { return targets_; }
+  std::set<TPlanNodeId>* effective_target_node_ids() {
+    return &effective_target_node_ids_;
+  }
+  const std::set<TPlanNodeId>& effective_target_node_ids() const {
+    return effective_target_node_ids_;
+  }
   int64_t first_arrival_time() const { return first_arrival_time_; }
   bool has_first_arrival_time() const { return first_arrival_time_ > -1; }
   int64_t completion_time() const { return completion_time_; }
@@ -146,6 +153,10 @@ class Coordinator::FilterState {
   TRuntimeFilterDesc desc_;
 
   std::vector<FilterTarget> targets_;
+
+  /// Target node IDs where this filter actually rejected data. Populated by
+  /// Coordinator::ComputeEffectiveFilterTargets() from the query profile.
+  std::set<TPlanNodeId> effective_target_node_ids_;
 
   /// Number of remaining backends to hear from before filter is complete.
   int pending_count_ = 0;

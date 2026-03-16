@@ -820,6 +820,12 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   202: optional bool enable_explain_calcite = false;
+
+  // See comment in ImpalaService.thrift
+  203: optional bool use_hbo_stats = false
+
+  // See comment in ImpalaService.thrift
+  204: optional bool store_hbo_stats = false
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

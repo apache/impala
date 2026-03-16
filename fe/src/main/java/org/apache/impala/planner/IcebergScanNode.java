@@ -199,6 +199,7 @@ public class IcebergScanNode extends HdfsScanNode {
       inputCardinality_ = fileDescs_.size();
       cardinality_ = fileDescs_.size();
     }
+    tryUpdateCardinalityFromHbo(analyzer);
     if (LOG.isTraceEnabled()) {
       LOG.trace("IcebergScanNode: cardinality_=" + Long.toString(cardinality_));
     }
@@ -257,6 +258,13 @@ public class IcebergScanNode extends HdfsScanNode {
           ((IcebergFileDescriptor)fd).getFbFileMetadata().icebergMetadata().partId());
     }
     return selectedPartitions.cardinality();
+  }
+
+  @Override
+  public long getNumInputRows() {
+    return fileDescs_.stream()
+        .mapToLong(fd -> fd.getFbFileMetadata().icebergMetadata().recordCount())
+        .sum();
   }
 
   // Returns the number of partitions in the current snapshot, cached by catalog after

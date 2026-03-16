@@ -640,4 +640,20 @@ public class BackendConfig {
   public boolean isOtelTraceEnabled() {
     return backendCfg_.otel_trace_enabled;
   }
+
+  public double getHboSimilarityThreshold() {
+    return backendCfg_.hbo_similarity_threshold;
+  }
+
+  public int getHboMaxRunsPerKey() {
+    return backendCfg_.hbo_max_runs_per_key;
+  }
+
+  public long getHboInMemoryBackendCacheSizeBytes() {
+    return backendCfg_.hbo_in_memory_backend_cache_size_bytes;
+  }
+
+  public int getUnregistrationThreadPoolSize() {
+    return backendCfg_.unregistration_thread_pool_size;
+  }
 }

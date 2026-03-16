@@ -197,6 +197,7 @@ set (SRC_FILES
   Frontend.thrift
   Exprs.thrift
   ExternalDataSource.thrift
+  HBO.thrift
   ImpalaInternalService.thrift
   ImpalaService.thrift
   JniCatalog.thrift

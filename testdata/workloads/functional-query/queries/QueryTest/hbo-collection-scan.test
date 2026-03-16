@@ -1,0 +1,515 @@
+====
+---- QUERY
+EXPLAIN SELECT count(*) FROM functional_parquet.complextypestbl.int_array
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=0B cardinality=10 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(pos) FROM functional_parquet.complextypestbl.int_array
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(pos)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(pos)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=8B cardinality=10 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(item) FROM functional_parquet.complextypestbl.int_array
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(item)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(item)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=4B cardinality=10 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT max(item) FROM functional_parquet.complextypestbl.int_array
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: max:merge(item)
+|  row-size=4B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: max(item)
+|  row-size=4B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=4B cardinality=10 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT pos FROM functional_parquet.complextypestbl.int_array
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=8B cardinality=10 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT item FROM functional_parquet.complextypestbl.int_array
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=4B cardinality=10 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(*) FROM functional_parquet.complextypestbl.int_array WHERE pos = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos = 0
+   row-size=8B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(pos) FROM functional_parquet.complextypestbl.int_array WHERE pos = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(pos)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(pos)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos = 0
+   row-size=8B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(item) FROM functional_parquet.complextypestbl.int_array WHERE pos = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(item)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(item)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos = 0
+   row-size=12B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT max(item) FROM functional_parquet.complextypestbl.int_array WHERE pos = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: max:merge(item)
+|  row-size=4B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: max(item)
+|  row-size=4B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos = 0
+   row-size=12B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT pos FROM functional_parquet.complextypestbl.int_array WHERE pos = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos = 0
+   row-size=8B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT item FROM functional_parquet.complextypestbl.int_array WHERE pos = 0
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos = 0
+   row-size=12B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(*) FROM functional_parquet.complextypestbl.int_array WHERE pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos > 1
+   row-size=8B cardinality=5 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(pos) FROM functional_parquet.complextypestbl.int_array WHERE pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(pos)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(pos)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos > 1
+   row-size=8B cardinality=5 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(item) FROM functional_parquet.complextypestbl.int_array WHERE pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(item)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(item)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos > 1
+   row-size=12B cardinality=5 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT max(item) FROM functional_parquet.complextypestbl.int_array WHERE pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: max:merge(item)
+|  row-size=4B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: max(item)
+|  row-size=4B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos > 1
+   row-size=12B cardinality=5 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT pos FROM functional_parquet.complextypestbl.int_array WHERE pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos > 1
+   row-size=8B cardinality=5 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT item FROM functional_parquet.complextypestbl.int_array WHERE pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: pos > 1
+   row-size=12B cardinality=5 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(*) FROM functional_parquet.complextypestbl.int_array WHERE item > 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0
+   row-size=4B cardinality=6 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(pos) FROM functional_parquet.complextypestbl.int_array WHERE item > 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(pos)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(pos)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0
+   row-size=12B cardinality=6 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(item) FROM functional_parquet.complextypestbl.int_array WHERE item > 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(item)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(item)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0
+   row-size=4B cardinality=6 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT max(item) FROM functional_parquet.complextypestbl.int_array WHERE item > 0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: max:merge(item)
+|  row-size=4B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: max(item)
+|  row-size=4B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0
+   row-size=4B cardinality=6 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT pos FROM functional_parquet.complextypestbl.int_array WHERE item > 0
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0
+   row-size=12B cardinality=6 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT item FROM functional_parquet.complextypestbl.int_array WHERE item > 0
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0
+   row-size=4B cardinality=6 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(*) FROM functional_parquet.complextypestbl.int_array WHERE item > 0 and pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0, pos > 1
+   row-size=12B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(pos) FROM functional_parquet.complextypestbl.int_array WHERE item > 0 and pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(pos)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(pos)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0, pos > 1
+   row-size=12B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT count(item) FROM functional_parquet.complextypestbl.int_array WHERE item > 0 and pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(item)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(item)
+|  row-size=8B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0, pos > 1
+   row-size=12B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT max(item) FROM functional_parquet.complextypestbl.int_array WHERE item > 0 and pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: max:merge(item)
+|  row-size=4B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: max(item)
+|  row-size=4B cardinality=2
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0, pos > 1
+   row-size=12B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT pos FROM functional_parquet.complextypestbl.int_array WHERE item > 0 and pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0, pos > 1
+   row-size=12B cardinality=3 (from HBO)
+====
+---- QUERY
+EXPLAIN SELECT item FROM functional_parquet.complextypestbl.int_array WHERE item > 0 and pos > 1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_parquet.complextypestbl.int_array]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: item > 0, pos > 1
+   row-size=12B cardinality=3 (from HBO)
+====

@@ -40,6 +40,7 @@ import org.apache.impala.thrift.TSlotRef;
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 
 public class SlotRef extends Expr {
   protected List<String> rawPath_;
@@ -313,6 +314,11 @@ public class SlotRef extends Expr {
 
   @Override
   public String toSqlImpl(ToSqlOptions options) {
+    if (options.showForHbo()) {
+      Preconditions.checkState(label_ != null || rawPath_ != null);
+      if (rawPath_ == null) return label_;
+      return ToSqlUtils.getIdentSql(Iterables.getLast(rawPath_));
+    }
     if (label_ != null) return label_;
     if (rawPath_ != null) return ToSqlUtils.getPathSql(rawPath_);
     return "<slot " + Integer.toString(desc_.getId().asInt()) + ">";

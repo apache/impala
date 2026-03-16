@@ -649,11 +649,11 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     return result;
   }
 
-  public TPlanFragment toThrift() {
+  public TPlanFragment toThrift(TQueryOptions queryOptions) {
     validateResourceProfiles();
     TPlanFragment result = new TPlanFragment();
     result.setDisplay_name(fragmentId_.toString());
-    if (planRoot_ != null) result.setPlan(planRoot_.treeToThrift());
+    if (planRoot_ != null) result.setPlan(planRoot_.treeToThrift(queryOptions));
     if (sink_ != null) result.setOutput_sink(sink_.toThrift());
     result.setPartition(dataPartition_.toThrift());
 
@@ -678,16 +678,16 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     return result;
   }
 
-  public TPlanFragmentTree treeToThrift() {
+  public TPlanFragmentTree treeToThrift(TQueryOptions queryOptions) {
     TPlanFragmentTree result = new TPlanFragmentTree();
-    treeToThriftHelper(result);
+    treeToThriftHelper(result, queryOptions);
     return result;
   }
 
-  private void treeToThriftHelper(TPlanFragmentTree plan) {
-    plan.addToFragments(toThrift());
+  private void treeToThriftHelper(TPlanFragmentTree plan, TQueryOptions queryOptions) {
+    plan.addToFragments(toThrift(queryOptions));
     for (PlanFragment child: children_) {
-      child.treeToThriftHelper(plan);
+      child.treeToThriftHelper(plan, queryOptions);
     }
   }
 

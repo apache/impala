@@ -1093,6 +1093,12 @@ enum TImpalaQueryOptions {
   // The flag has no effect when CALCITE is not in use.
   // default is false
   ENABLE_EXPLAIN_CALCITE = 201
+
+  // When true, try to use historical execution stats in query planning.
+  USE_HBO_STATS = 202
+
+  // When true, store historical execution stats asynchronously after the query finishes.
+  STORE_HBO_STATS = 203
 }
 
 // The summary of a DML statement.

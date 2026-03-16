@@ -22,13 +22,14 @@ import org.apache.impala.analysis.TupleId;
 import org.apache.impala.planner.TupleCacheInfo;
 import org.apache.impala.planner.TupleCacheInfo.IneligibilityReason;
 import org.apache.impala.planner.HdfsScanNode;
+import org.apache.impala.thrift.TQueryOptions;
 
 /**
  * The Thrift serialization functions need to adjust output based on whether the
- * Thrift serialization is happening for tuple caching or not. This context is
- * passed to Thrift serialization functions like initThrift() or toThrift().
- * The context currently provides a way to determine whether serialization is happening
- * for tuple caching.
+ * Thrift serialization is happening for tuple caching or not, or if store_hbo_stats is
+ * enabled. This context is passed to Thrift serialization functions like initThrift() or
+ * toThrift(). The context currently provides a way to determine whether serialization is
+ * happening for tuple caching, and provides the query options.
  *
  * It also provides several functions that adjust their behavior based on whether
  * this is for tuple caching or not (e.g. translateTupleId()). This allows
@@ -47,12 +48,14 @@ import org.apache.impala.planner.HdfsScanNode;
  */
 public class ThriftSerializationCtx {
   private TupleCacheInfo tupleCacheInfo_;
+  private TQueryOptions queryOptions_;
 
   /**
    * Constructor for tuple caching serialization
    */
   public ThriftSerializationCtx(TupleCacheInfo tupleCacheInfo) {
     tupleCacheInfo_ = tupleCacheInfo;
+    queryOptions_ = null;
   }
 
   /**
@@ -60,6 +63,22 @@ public class ThriftSerializationCtx {
    */
   public ThriftSerializationCtx() {
     tupleCacheInfo_ = null;
+    queryOptions_ = null;
+  }
+
+  /**
+   * Constructor for normal serialization with query options.
+   */
+  public ThriftSerializationCtx(TQueryOptions queryOptions) {
+    tupleCacheInfo_ = null;
+    queryOptions_ = queryOptions;
+  }
+
+  /**
+   * Returns the query options for this serialization, or null if not set.
+   */
+  public TQueryOptions getQueryOptions() {
+    return queryOptions_;
   }
 
   /**
