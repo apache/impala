@@ -83,6 +83,7 @@ public class IcebergColumn extends Column {
     return fieldId_;
   }
 
+  @Override
   public boolean isNullable() { return isNullable_; }
 
   @Override

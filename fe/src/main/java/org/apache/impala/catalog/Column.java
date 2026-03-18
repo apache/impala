@@ -69,6 +69,7 @@ public class Column {
   public int getPosition() { return position_; }
   public void setPosition(int position) { this.position_ = position; }
   public ColumnStats getStats() { return stats_; }
+  public boolean isNullable() { return true; }
   public boolean isVirtual() { return false; }
 
   /**
@@ -155,7 +156,9 @@ public class Column {
   }
 
   public TColumnDescriptor toDescriptor() {
-    return new TColumnDescriptor(getName(), getType().toThrift());
+    TColumnDescriptor ret = new TColumnDescriptor(getName(), getType().toThrift());
+    if (!isNullable()) ret.setIsNullable(false);
+    return ret;
   }
 
   public static List<FieldSchema> toFieldSchemas(List<Column> columns) {

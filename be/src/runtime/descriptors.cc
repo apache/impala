@@ -172,6 +172,7 @@ inline bool SlotDescriptor::IsChildOfStruct() const {
 ColumnDescriptor::ColumnDescriptor(const TColumnDescriptor& tdesc)
   : name_(tdesc.name),
     type_(ColumnType::FromThrift(tdesc.type)) {
+  is_nullable_ = tdesc.__isset.isNullable ? tdesc.isNullable : true;
   if (tdesc.__isset.icebergFieldId) {
     field_id_ = tdesc.icebergFieldId;
     // Get key and value field_id for Iceberg table column with Map type.

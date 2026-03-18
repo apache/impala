@@ -197,12 +197,8 @@ public class SlotDescriptor {
     label_ = Joiner.on(".").join(path.getRawPath());
 
     // Set nullability based on column type.
-    if (path_.destColumn() instanceof KuduColumn) {
-      KuduColumn kuduColumn = (KuduColumn)path_.destColumn();
-      isNullable_ = kuduColumn.isNullable();
-    } else if (path_.destColumn() instanceof IcebergColumn) {
-      IcebergColumn icebergColumn = (IcebergColumn)path_.destColumn();
-      isNullable_ = icebergColumn.isNullable();
+    if (path_.destColumn() != null) {
+      isNullable_ = path_.destColumn().isNullable();
     }
   }
 

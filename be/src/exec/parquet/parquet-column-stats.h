@@ -121,6 +121,8 @@ class ColumnStatsBase {
   /// Resets the state of this object.
   void Reset();
 
+  int64_t NullCount() const { return null_count_; }
+
   /// Update the statistics by incrementing the null_count. It is called each time a null
   /// value is appended to the column or the statistics are merged.
   void IncrementNullCount(int64_t count) { null_count_ += count; }

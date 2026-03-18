@@ -154,6 +154,7 @@ public class KuduColumn extends Column {
   public String getKuduName() { return kuduName_; }
   public boolean isKey() { return isKey_; }
   public boolean isPrimaryKeyUnique() { return isPrimaryKeyUnique_; }
+  @Override
   public boolean isNullable() { return isNullable_; }
   public boolean isAutoIncrementing() { return isAutoIncrementing_; }
   public Encoding getEncoding() { return encoding_; }

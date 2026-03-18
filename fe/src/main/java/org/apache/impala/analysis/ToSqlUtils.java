@@ -1062,8 +1062,7 @@ public class ToSqlUtils {
     if (col.getType() != null) sb.append(" " + col.getType().toSql());
     if (col instanceof KuduColumn) {
       KuduColumn kuduCol = (KuduColumn) col;
-      Boolean isNullable = kuduCol.isNullable();
-      if (isNullable != null) sb.append(isNullable ? " NULL" : " NOT NULL");
+      sb.append(kuduCol.isNullable() ? " NULL" : " NOT NULL");
       if (kuduCol.getEncoding() != null) sb.append(" ENCODING " + kuduCol.getEncoding());
       if (kuduCol.getCompression() != null) {
         sb.append(" COMPRESSION " + kuduCol.getCompression());
@@ -1075,9 +1074,7 @@ public class ToSqlUtils {
         sb.append(String.format(" BLOCK_SIZE %d", kuduCol.getBlockSize()));
       }
     } else if (col instanceof IcebergColumn) {
-      IcebergColumn icebergCol = (IcebergColumn) col;
-      Boolean isNullable = icebergCol.isNullable();
-      if (isNullable != null) sb.append(isNullable ? " NULL" : " NOT NULL");
+      sb.append(col.isNullable() ? " NULL" : " NOT NULL");
     }
     if (!Strings.isNullOrEmpty(col.getComment())) {
       sb.append(String.format(" COMMENT '%s'", col.getComment()));

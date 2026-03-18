@@ -392,6 +392,18 @@ DESCRIBE iceberg_nullable_test;
 STRING,STRING,STRING,STRING
 ====
 ---- QUERY
+INSERT INTO iceberg_nullable_test VALUES (NULL, NULL, NULL);
+---- CATCH
+Column 'level' is not nullable but during writing a Parquet page we found 1 null values.
+====
+---- QUERY
+INSERT INTO iceberg_nullable_test SELECT NULL, timestamp_col, CURRENT_DATE()
+FROM functional_parquet.alltypestiny
+WHERE month = 1;
+---- CATCH
+Column 'level' is not nullable but during writing a Parquet page we found 2 null values.
+====
+---- QUERY
 CREATE TABLE iceberg_old_style_partitions (
   register_time DATE,
   message STRING,

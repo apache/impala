@@ -343,6 +343,7 @@ class ColumnDescriptor {
   int field_map_key_id() const { return field_map_key_id_; }
   int field_map_value_id() const { return field_map_value_id_; }
   const std::string& initial_default() const { return initial_default_; }
+  bool is_nullable() const { return is_nullable_; }
 
   std::string DebugString() const;
 
@@ -354,6 +355,7 @@ class ColumnDescriptor {
   int field_map_key_id_ = -1;
   int field_map_value_id_ = -1;
   std::string initial_default_;
+  bool is_nullable_ = true;
 };
 
 /// Base class for table descriptors.

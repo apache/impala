@@ -46,6 +46,7 @@ public class PaimonColumn extends Column {
 
   public int getFieldId() { return fieldId_; }
 
+  @Override
   public boolean isNullable() { return isNullable_; }
 
   @Override

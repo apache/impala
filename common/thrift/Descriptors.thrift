@@ -76,6 +76,7 @@ struct TColumnDescriptor {
   5: optional i32 icebergFieldMapValueId
   // Iceberg V3 default value fields
   6: optional string icebergInitialDefault
+  7: optional bool isNullable
 }
 
 // "Union" of all table types.
