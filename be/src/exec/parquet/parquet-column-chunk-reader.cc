@@ -344,6 +344,9 @@ Status ParquetColumnChunkReader::ReadDataPageData(DataPageInfo* page_info) {
   }
 
   const bool has_slot_desc = value_mem_type_ != ValueMemoryType::NO_SLOT_DESC;
+  const parquet::Encoding::type data_encoding = is_v2 ?
+      header.data_page_header_v2.encoding :
+      header.data_page_header.encoding;
 
   int data_size = uncompressed_size;
   uint8_t* data = nullptr;
@@ -385,7 +388,7 @@ Status ParquetColumnChunkReader::ReadDataPageData(DataPageInfo* page_info) {
     // If data page is dict encoded, strings will point to the dictionary instead of
     // the data buffer, so there is no need to make a copy of page data.
     const bool copy_buffer = (value_mem_type_ == ValueMemoryType::VAR_LEN_STR) &&
-        !IsDictionaryEncoding(page_info->data_encoding);
+        !IsDictionaryEncoding(data_encoding);
 
     if (copy_buffer) {
       // In this case returned batches will have pointers into the data page itself.
@@ -415,8 +418,7 @@ Status ParquetColumnChunkReader::ReadDataPageData(DataPageInfo* page_info) {
         &data, &data_size));
   }
 
-  page_info->data_encoding = is_v2 ? header.data_page_header_v2.encoding
-                                   : header.data_page_header.encoding;
+  page_info->data_encoding = data_encoding;
   page_info->data_ptr = data;
   page_info->data_size = data_size;
   page_info->is_valid = true;
