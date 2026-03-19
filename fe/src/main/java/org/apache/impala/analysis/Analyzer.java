@@ -644,6 +644,9 @@ public class Analyzer {
     // which is the maximum memory limit of destination request pool for this query in
     // bytes. Value 0 or less means unknown.
     private long poolMaxMemLimit_ = -1;
+    // Value of impala.admission-control.max-mem-resources.<pool_name>,
+    // which is the total memory cap for the pool across all backends, in bytes.
+    private long poolMaxMemResources_ = -1;
 
     // Cache of KuduTables opened for this query. (map from table name to kudu table)
     // This cache prevent multiple openTable calls for a given table in the same query.
@@ -799,6 +802,11 @@ public class Analyzer {
       // No MEM_LIMIT* option is set and max-query-mem-limit is set.
       // Return the max-query-mem-limit regardless of clamp-mem-limit-query-option value.
       return globalState_.poolMaxMemLimit_;
+    } else if (globalState_.poolMaxMemResources_ > 0) {
+      // No MEM_LIMIT* option is set and max-query-mem-limit is not set, but
+      // max-mem-resources is set. So return the maximum memory that can be admitted to
+      // this pool per executor.
+      return globalState_.poolMaxMemResources_ / Math.max(numExecutorsForPlanning(), 1);
     } else if (opts.isSetMax_mem_estimate_for_admission()
         && opts.getMax_mem_estimate_for_admission() > 0) {
       // MAX_MEM_ESTIMATE_FOR_ADMISSION
@@ -828,6 +836,9 @@ public class Analyzer {
       }
       if (poolConfig.isSetMax_query_mem_limit()) {
         globalState_.poolMaxMemLimit_ = poolConfig.getMax_query_mem_limit();
+      }
+      if (poolConfig.isSetMax_mem_resources() && poolConfig.getMax_mem_resources() > 0) {
+        globalState_.poolMaxMemResources_ = poolConfig.getMax_mem_resources();
       }
     }
   }

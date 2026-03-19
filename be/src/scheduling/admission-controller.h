@@ -190,10 +190,10 @@ class AdmissionExecRequestCompressed : public AdmissionExecRequest {
 /// memory limit and a lower bound is enforced on it based on the largest initial
 /// reservation of the query. The final memory limit used is also clamped by the max/min
 /// memory limits configured for the pool with an option to not enforce these limits on
-/// the MEM_LIMIT query option (If both these max/min limits are not configured, then the
-/// estimates from planning are not used as a memory limit and are only used for making
-/// admission decisions. Moreover the estimates will no longer have a lower bound based on
-/// the largest initial reservation).
+/// the MEM_LIMIT query option (If no max_mem_resources, and no min/max limits are
+/// configured for the pool, then the estimates from planning are not used as a memory
+/// limit and are only used for making admission decisions. Moreover, the estimates will
+/// no longer have a lower bound based on the largest initial reservation).
 /// The following four conditions must hold in order for the request to be admitted:
 ///  1) The current pool configuration is valid.
 ///  2) There must be enough memory resources available in this resource pool for the
@@ -1215,7 +1215,7 @@ class AdmissionController {
   /// enough memory resources available for the query. Caller owns not_admitted_reason and
   /// not_admitted_details. Must hold admission_ctrl_lock_.
   bool CanAdmitRequest(const ScheduleState& state, const TPoolConfig& pool_cfg,
-      const TPoolConfig& root_cfg, bool admit_from_queue, string* not_admitted_reason,
+      bool admit_from_queue, string* not_admitted_reason,
       string* not_admitted_details, bool& coordinator_resource_limited);
 
   /// Returns true if User Quotas allow the schedule to be admitted to the pool with
@@ -1485,6 +1485,7 @@ class AdmissionController {
   FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestMemory);
   FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestSlots);
   FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestSlotsDefault);
+  FRIEND_TEST(AdmissionControllerTest, CanAdmitWhenOnlyMaxMemResourcesSet);
   FRIEND_TEST(AdmissionControllerTest, DedicatedCoordAdmissionChecks);
   FRIEND_TEST(AdmissionControllerTest, DedicatedCoordScheduleState);
   FRIEND_TEST(AdmissionControllerTest, DequeueLoop);

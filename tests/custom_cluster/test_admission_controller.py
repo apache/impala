@@ -566,8 +566,9 @@ class TestAdmissionController(TestAdmissionControllerBase):
                       from functional_parquet.alltypes""".format(target_tbl),
                       "Rejected query from pool")
     insert_fail = unique_database + ".insert_fail"
+    # Use DDL to create the table so it is not subject to admission control.
     self.execute_query_expect_success(self.client,
-        """create table {0} as select 100000""".format(insert_fail))
+        """create table {0} (id int)""".format(insert_fail))
     verify_json_plan("""insert into {0} select id from functional_parquet.alltypes"""
         .format(insert_fail),
         "Rejected query from pool")

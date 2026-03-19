@@ -298,11 +298,14 @@ void ScheduleState::CompareMinCoordinatorMemToAdmit(
 // Please update Analyzer.getMaxMemLimitPerHost() in Analyzer.java if updating this.
 void ScheduleState::UpdateMemoryRequirements(const TPoolConfig& pool_cfg,
     int64_t coord_mem_limit_admission, int64_t executor_mem_limit_admission) {
-  // If the min_query_mem_limit and max_query_mem_limit are not set in the pool config
-  // then it falls back to traditional(old) behavior, which means that, it sets the
-  // mem_limit if it is set in the query options, else sets it to -1 (no limit).
+  // If the max_mem_resources, min_query_mem_limit, and max_query_mem_limit are not set
+  // in the pool config then it falls back to traditional(old) behavior, which means
+  // that, it sets the mem_limit if it is set in the query options, else sets it to
+  // -1 (no limit).
   const bool mimic_old_behaviour =
-      pool_cfg.min_query_mem_limit == 0 && pool_cfg.max_query_mem_limit == 0;
+      pool_cfg.max_mem_resources <= 0 &&
+      pool_cfg.min_query_mem_limit == 0 &&
+      pool_cfg.max_query_mem_limit == 0;
   const bool use_dedicated_coord_estimates = UseDedicatedCoordEstimates();
 
   query_schedule_pb_->set_per_backend_mem_to_admit(0);

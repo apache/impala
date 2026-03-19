@@ -1382,9 +1382,8 @@ bool AdmissionController::CanAdmitTrivialRequest(const ScheduleState& state) {
 }
 
 bool AdmissionController::CanAdmitRequest(const ScheduleState& state,
-    const TPoolConfig& pool_cfg, const TPoolConfig& root_cfg, bool admit_from_queue,
-    string* not_admitted_reason, string* not_admitted_details,
-    bool& coordinator_resource_limited) {
+    const TPoolConfig& pool_cfg, bool admit_from_queue, string* not_admitted_reason,
+    string* not_admitted_details, bool& coordinator_resource_limited) {
   // Can't admit if:
   //  (a) There are already queued requests (and this is not admitting from the queue).
   //  (b) The resource pool is already at the maximum number of requests.
@@ -2552,7 +2551,7 @@ bool AdmissionController::FindGroupToAdmitOrReject(
       queue_node->not_admitted_reason = rejection_reason;
       return false;
     }
-    if (CanAdmitRequest(*state, pool_config, root_cfg, admit_from_queue,
+    if (CanAdmitRequest(*state, pool_config, admit_from_queue,
             &queue_node->not_admitted_reason, &queue_node->not_admitted_details,
             coordinator_resource_limited)) {
       queue_node->admitted_schedule = std::move(group_state.state);

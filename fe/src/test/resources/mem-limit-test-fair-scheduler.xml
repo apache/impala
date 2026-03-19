@@ -23,7 +23,6 @@
     </queue>
     <queue name="poolNoMemLimits">
       <aclSubmitApps>*</aclSubmitApps>
-      <maxResources>2500 mb, 0 vcores</maxResources>
     </queue>
     <queue name="maxLessThanMinLimit">
       <aclSubmitApps>*</aclSubmitApps>
