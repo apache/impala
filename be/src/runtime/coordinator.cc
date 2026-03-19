@@ -64,6 +64,7 @@
 #include "util/in-list-filter.h"
 #include "util/min-max-filter.h"
 #include "util/pretty-printer.h"
+#include "util/summary-util.h"
 #include "util/table-printer.h"
 #include "util/uid-util.h"
 
@@ -309,7 +310,7 @@ void Coordinator::ExecSummary::Init(const QueryExecParams& exec_params) {
       // Note that some clients like impala-shell depend on many of these fields being
       // set, even if they are optional in the thrift.
       TPlanNodeExecSummary& node_summary = thrift_exec_summary.nodes.back();
-      node_summary.__set_node_id(-1);
+      node_summary.__set_node_id(SINK_NODE_ID);
       node_summary.__set_fragment_idx(fragment.idx);
       node_summary.__set_label(output_sink.label);
       node_summary.__set_label_detail("");
@@ -1813,9 +1814,38 @@ string Coordinator::FilterState::DebugString() const {
   return ss.str();
 }
 
+void Coordinator::MarkCancelledNodes(TExecSummary* exec_summary) {
+  if (!exec_summary->__isset.nodes) return;
+
+  for (TPlanNodeExecSummary& node : exec_summary->nodes) {
+    if (!node.__isset.exec_stats || node.exec_stats.empty()) continue;
+    // Skip data sinks
+    if (node.node_id == SINK_NODE_ID) continue;
+
+    // Check if any instance didn't complete execution
+    bool has_cancelled_instance = false;
+    for (const TExecStats& stat : node.exec_stats) {
+      if (stat.__isset.last_batch_returned && !stat.last_batch_returned) {
+        has_cancelled_instance = true;
+        break;
+      }
+    }
+    // Append a "CANCELLED" marker which will be shown in the Detail column in the
+    // ExecSummary table.
+    if (has_cancelled_instance) {
+      if (node.label_detail.empty()) {
+        node.label_detail = "CANCELLED";
+      } else {
+        node.label_detail += ", CANCELLED";
+      }
+    }
+  }
+}
+
 void Coordinator::GetTExecSummary(TExecSummary* exec_summary) {
   lock_guard<SpinLock> l(exec_summary_.lock);
   *exec_summary = exec_summary_.thrift_exec_summary;
+  if (!IsExecuting()) MarkCancelledNodes(exec_summary);
 }
 
 MemTracker* Coordinator::query_mem_tracker() const {

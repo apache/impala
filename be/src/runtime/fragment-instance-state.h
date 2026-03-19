@@ -181,6 +181,7 @@ class FragmentInstanceState {
   /// in Prepare().
   ExecNode* exec_tree_ = nullptr; // lives in obj_pool()
   RuntimeState* runtime_state_ = nullptr;  // lives in obj_pool()
+  std::unordered_map<TPlanNodeId, ExecNode*> exec_node_map_;
 
   /// A 'fake mutex' to detect any race condition in accessing 'report_seq_no_' below.
   /// There should be only one thread doing status report at the same time.
@@ -337,6 +338,10 @@ class FragmentInstanceState {
 
   /// Print stats about scan ranges for each volumeId in params to info log.
   void PrintVolumeIds();
+
+  /// Sets last_batch_returned on 'summary_data' for plan node 'node_id'.
+  void SetLastBatchReturnedForPlanNode(
+      TPlanNodeId node_id, ExecSummaryDataPB* summary_data);
 };
 
 }

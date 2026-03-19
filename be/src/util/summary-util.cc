@@ -77,7 +77,7 @@ void PrintExecSummary(const TExecSummary& exec_summary, int indent_level,
   row.push_back(lexical_cast<string>(node.exec_stats.size())); // Num instances
   row.push_back(PrettyPrinter::Print(avg_time, TUnit::TIME_NS));
   row.push_back(PrettyPrinter::Print(max_stats.latency_ns, TUnit::TIME_NS));
-  if (node.node_id == -1) {
+  if (node.node_id == SINK_NODE_ID) {
     // Cardinality stats are not valid for sinks.
     row.push_back("");
     row.push_back("");

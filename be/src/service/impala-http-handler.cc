@@ -1083,9 +1083,6 @@ void ImpalaHttpHandler::CatalogObjectsHandler(const Webserver::WebRequest& req,
 
 namespace {
 
-// Summary is stored with -1 as id if it is for a data sink at the root of a fragment.
-constexpr int SINK_ID = -1;
-
 void ExecStatsToJsonHelper(
     const TPlanNodeExecSummary& summary, rapidjson::Document* document, Value* value) {
   int64_t cardinality = 0;
@@ -1184,7 +1181,7 @@ void SinkToJsonHelper(const TDataSink& sink,
   value->AddMember("label_detail", label_detail, document->GetAllocator());
 
   map<TPlanNodeId, TPlanNodeExecSummary>::const_iterator summary_it =
-      summaries.find(SINK_ID);
+      summaries.find(SINK_NODE_ID);
   if (summary_it != summaries.end()) {
     // Sometimes we don't have a summary for the sink, e.g.:
     // - Query was rejected by admission control

@@ -524,6 +524,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Return the string representation of 'state'.
   static const char* ExecStateToString(const ExecState state);
 
+  /// Appends "CANCELLED" to label_detail for any nodes where at least one fragment
+  /// instance didn't complete execution, e.g., due to parent node reaches limit.
+  static void MarkCancelledNodes(TExecSummary* exec_summary);
+
   // For DCHECK_EQ, etc of ExecState values.
   friend std::ostream& operator<<(std::ostream& o, const ExecState s) {
     return o << ExecStateToString(s);

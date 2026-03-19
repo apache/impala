@@ -162,6 +162,185 @@ class TestObservability(ImpalaTestSuite):
     assert result.exec_summary[0]['peak_mem'] >= 0
     assert result.exec_summary[0]['est_peak_mem'] >= 0
 
+  def test_cancelled_nodes_in_exec_summary(self):
+    """Test nodes that don't complete are marked as cancelled"""
+    # UNION operands are cancelled when UNION reaches the limit.
+    query = """
+        with l as (select 1 from tpch.lineitem UNION ALL select 1 from tpch.customer)
+        select * from l LIMIT 10"""
+    result = self.client.execute(query, fetch_exec_summary=True)
+    # ExecSummary:
+    # Operator              #Rows  Est. #Rows  Detail
+    # ------------------------------------------------------------------
+    # F03:ROOT
+    # 03:EXCHANGE              10          10  UNPARTITIONED
+    # F02:EXCHANGE SENDER
+    # 00:UNION                 30          10
+    # |--02:SCAN HDFS           0     150.00K  tpch.customer, CANCELLED
+    # 01:SCAN HDFS          3.07K       6.00M  tpch.lineitem, CANCELLED
+    assert result.exec_summary[4]['operator'] == '02:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[4]['detail'] == 'tpch.customer, CANCELLED', \
+        result.runtime_profile
+    assert result.exec_summary[5]['operator'] == '01:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[5]['detail'] == 'tpch.lineitem, CANCELLED', \
+        result.runtime_profile
+
+    # A more complex case with completed and cancelled nodes.
+    query = """
+        with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+        select STRAIGHT_JOIN count(*) from
+          (select * from tpch.lineitem a LIMIT 1) a
+        join
+          (select * from l LIMIT 125000) b
+        on a.l_orderkey = -b.l_orderkey"""
+    result = self.client.execute(query, fetch_exec_summary=True)
+    # ExecSummary:
+    # Operator                   #Rows  Est. #Rows  Detail
+    # -----------------------------------------------------------------------
+    # F01:ROOT
+    # 05:AGGREGATE                   1           1  FINALIZE
+    # 04:HASH JOIN                   0           1  INNER JOIN, BROADCAST
+    # |--08:EXCHANGE           125.00K     125.00K  UNPARTITIONED
+    # |  F05:EXCHANGE SENDER
+    # |  07:EXCHANGE           125.00K     125.00K  UNPARTITIONED
+    # |  F04:EXCHANGE SENDER
+    # |  01:UNION              375.00K     125.00K
+    # |  |--03:SCAN HDFS             0       6.00M  tpch.lineitem, CANCELLED
+    # |  02:SCAN HDFS          377.86K       6.00M  tpch.lineitem, CANCELLED
+    # 06:EXCHANGE                    1           1  UNPARTITIONED
+    # F00:EXCHANGE SENDER
+    # 00:SCAN HDFS                   3           1  tpch.lineitem a
+    assert result.exec_summary[8]['operator'] == '03:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[8]['detail'] == 'tpch.lineitem, CANCELLED', \
+        result.runtime_profile
+    assert result.exec_summary[9]['operator'] == '02:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[9]['detail'] == 'tpch.lineitem, CANCELLED', \
+        result.runtime_profile
+    assert result.exec_summary[12]['operator'] == '00:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[12]['detail'] == 'tpch.lineitem a', result.runtime_profile
+
+    # Test on other node types
+    query = """
+        with l as (
+          select row_number() over(order by l_orderkey) from tpch.lineitem
+          UNION ALL select 1 from tpch.customer)
+        select * from l LIMIT 10"""
+    result = self.client.execute(query, fetch_exec_summary=True)
+    # ExecSummary:
+    # Operator                #Rows  Est. #Rows  Detail
+    # --------------------------------------------------------------------
+    # F04:ROOT
+    # 07:EXCHANGE                10          10  UNPARTITIONED
+    # F03:EXCHANGE SENDER
+    # 00:UNION                   20          10
+    # |--04:SCAN HDFS             0     150.00K  tpch.customer, CANCELLED
+    # 06:EXCHANGE             2.05K       6.00M  RANDOM, CANCELLED
+    # F01:EXCHANGE SENDER
+    # 03:ANALYTIC            29.70K       6.00M  CANCELLED
+    # 05:MERGING-EXCHANGE    30.72K       6.00M  UNPARTITIONED, CANCELLED
+    # F00:EXCHANGE SENDER
+    # 02:SORT               661.05K       6.00M  CANCELLED
+    # 01:SCAN HDFS            6.00M       6.00M  tpch.lineitem
+    assert result.exec_summary[4]['operator'] == '04:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[4]['detail'] == 'tpch.customer, CANCELLED', \
+        result.runtime_profile
+    assert result.exec_summary[5]['operator'] == '06:EXCHANGE', result.runtime_profile
+    assert result.exec_summary[5]['detail'] == 'RANDOM, CANCELLED', result.runtime_profile
+    assert result.exec_summary[7]['operator'] == '03:ANALYTIC', result.runtime_profile
+    assert result.exec_summary[7]['detail'] == 'CANCELLED', result.runtime_profile
+    assert result.exec_summary[8]['operator'] == '05:MERGING-EXCHANGE', \
+        result.runtime_profile
+    assert result.exec_summary[8]['detail'] == 'UNPARTITIONED, CANCELLED', \
+        result.runtime_profile
+    assert result.exec_summary[10]['operator'] == '02:SORT', result.runtime_profile
+    assert result.exec_summary[10]['detail'] == 'CANCELLED', result.runtime_profile
+    assert result.exec_summary[11]['operator'] == '01:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[11]['detail'] == 'tpch.lineitem', result.runtime_profile
+
+    # Test limit on Subplan. As the SubplanNode reaches its limit, it finishes as expected
+    # and shouldn't be marked as CANCELLED.
+    query = """
+        select c.c_custkey, arr.o_orderkey
+        from tpch_nested_parquet.customer c, c.c_orders arr
+        limit 10"""
+    # Set num_nodes to 1 to ensure only one fragment instance is created. By default the
+    # query has 3 fragment instances. Some might be cancelled by the coordinator when it
+    # receives enough rows. Using one fragment instance ensures that when coordinator
+    # reaches the limit, the only SubplanNode has finished (also reached its limit).
+    self.client.set_configuration_option("num_nodes", 1)
+    result = self.client.execute(query, fetch_exec_summary=True)
+    self.client.clear_configuration()
+    # ExecSummary:
+    # Operator                 #Rows  Est. #Rows  Detail
+    # ------------------------------------------------------------------------------------
+    # F00:ROOT
+    # 01:SUBPLAN                 10          10
+    # |--04:NESTED LOOP JOIN      7          10  CROSS JOIN
+    # |  |--02:SINGULAR ROW SRC   0           1
+    # |  03:UNNEST                7          10  c.c_orders arr
+    # 00:SCAN HDFS                6     150.00K  tpch_nested_parquet.customer c, CANCELLED
+    assert result.exec_summary[1]['operator'] == '01:SUBPLAN', result.runtime_profile
+    assert result.exec_summary[1]['detail'] == '', result.runtime_profile
+    assert result.exec_summary[2]['operator'] == '04:NESTED LOOP JOIN', \
+        result.runtime_profile
+    assert result.exec_summary[2]['detail'] == 'CROSS JOIN', result.runtime_profile
+    assert result.exec_summary[3]['operator'] == '02:SINGULAR ROW SRC', \
+        result.runtime_profile
+    assert result.exec_summary[3]['detail'] == '', result.runtime_profile
+    assert result.exec_summary[4]['operator'] == '03:UNNEST', result.runtime_profile
+    assert result.exec_summary[4]['detail'] == 'c.c_orders arr', result.runtime_profile
+    assert result.exec_summary[5]['operator'] == '00:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[5]['detail'] == \
+        'tpch_nested_parquet.customer c, CANCELLED', result.runtime_profile
+
+    # Test limit on parent (UnionNode) of SubplanNode. All nodes in the SubplanNode should
+    # be marked as CANCELLED.
+    query = """
+        with l as (
+          select 1, 2
+          union all
+          select c.c_custkey, arr.o_orderkey
+            from tpch_nested_orc_def.customer c, c.c_orders arr
+        ) select * from l limit 10"""
+    result = self.client.execute(query, fetch_exec_summary=True)
+    # Operator                  #Rows  Est. #Rows  Detail
+    # ------------------------------------------------------------------------------------
+    # F02:ROOT
+    # 06:EXCHANGE                  10        10  UNPARTITIONED
+    # F01:EXCHANGE SENDER
+    # 00:UNION                     20        10  CANCELLED
+    # 02:SUBPLAN                1.02K     1.50M  CANCELLED
+    # |--05:NESTED LOOP JOIN       21        10  CROSS JOIN, CANCELLED
+    # |  |--03:SINGULAR ROW SRC     0         1  CANCELLED
+    # |  04:UNNEST                 22        10  c.c_orders arr, CANCELLED
+    # 01:SCAN HDFS              1.03K   150.00K  tpch_nested_orc_def.customer c, CANCELLED
+    assert result.exec_summary[4]['operator'] == '02:SUBPLAN', result.runtime_profile
+    assert result.exec_summary[4]['detail'] == 'CANCELLED', result.runtime_profile
+    assert result.exec_summary[5]['operator'] == '05:NESTED LOOP JOIN', \
+        result.runtime_profile
+    assert result.exec_summary[5]['detail'] == 'CROSS JOIN, CANCELLED', \
+        result.runtime_profile
+    assert result.exec_summary[6]['operator'] == '03:SINGULAR ROW SRC', \
+        result.runtime_profile
+    assert result.exec_summary[6]['detail'] == 'CANCELLED', result.runtime_profile
+    assert result.exec_summary[7]['operator'] == '04:UNNEST', result.runtime_profile
+    assert result.exec_summary[7]['detail'] == 'c.c_orders arr, CANCELLED', \
+        result.runtime_profile
+    assert result.exec_summary[8]['operator'] == '01:SCAN HDFS', result.runtime_profile
+    assert result.exec_summary[8]['detail'] == \
+        'tpch_nested_orc_def.customer c, CANCELLED', result.runtime_profile
+
+  def test_cancelled_markers_in_running_query(self):
+    """Test that the CANCELLED markers are not added to the summary for running queries"""
+    query = "select count(*) from functional.alltypestiny where id = sleep(1000)"
+    handle = self.execute_query_async(query)
+    while not self.client.is_finished(handle):
+      exec_summary = self.client.get_exec_summary_table(handle)
+      for row in exec_summary:
+        assert 'CANCELLED' not in row['detail'], \
+            "CANCELLED marker found in running query: " + str(row)
+      sleep(0.5)
+
   def test_query_options(self):
     """Test that the query profile shows expected non-default query options, both set
     explicitly through client and those set by planner"""

@@ -33,6 +33,7 @@
 #include "exec/partitioned-hash-join-builder.h"
 #include "exec/plan-root-sink.h"
 #include "exec/scan-node.h"
+#include "exec/subplan-node.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "kudu/rpc/rpc_context.h"
 #include "runtime/client-cache.h"
@@ -208,6 +209,13 @@ Status FragmentInstanceState::Prepare() {
   if (instance_ctx_.__isset.debug_options) {
     ExecNode::SetDebugOptions(instance_ctx_.debug_options, exec_tree_);
   }
+  std::function<void(ExecNode*)> build_node_map = [&](ExecNode* node) {
+    exec_node_map_[node->id()] = node;
+    for (int i = 0; i < node->num_children(); ++i) {
+      build_node_map(node->child(i));
+    }
+  };
+  build_node_map(exec_tree_);
 
   // set #senders of exchange nodes before calling Prepare()
   vector<ExecNode*> exch_nodes;
@@ -276,6 +284,25 @@ Status FragmentInstanceState::Prepare() {
   return Status::OK();
 }
 
+void FragmentInstanceState::SetLastBatchReturnedForPlanNode(
+    TPlanNodeId node_id, ExecSummaryDataPB* summary_data) {
+  auto it = exec_node_map_.find(node_id);
+  if (it == exec_node_map_.end()) {
+    DCHECK(false) << "Unknown plan node " << node_id << " in profile";
+    LOG(ERROR) << "Unknown plan node " << node_id << " in profile";
+    return;
+  }
+  ExecNode* exec_node = it->second;
+  while (exec_node->IsInSubplan()) {
+    // Nodes inside subplans don't track last_batch_returned_ (events_ is null).
+    // Walk up the containing_subplan_ chain to find the outermost SubplanNode
+    // that has events_ initialized (i.e. is not itself in a subplan).
+    exec_node = exec_node->get_containing_subplan();
+    DCHECK(exec_node != nullptr);
+  }
+  summary_data->set_last_batch_returned(exec_node->last_batch_returned());
+}
+
 void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instance_status,
     TRuntimeProfileTree* unagg_profile, AggregatedRuntimeProfile* agg_profile,
     const Status& overall_status) {
@@ -341,7 +368,9 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
     if (is_plan_node || is_data_sink) {
       ExecSummaryDataPB* summary_data = instance_status->add_exec_summary_data();
       if (is_plan_node) {
-        summary_data->set_plan_node_id(node->metadata().plan_node_id);
+        TPlanNodeId node_id = node->metadata().plan_node_id;
+        summary_data->set_plan_node_id(node_id);
+        SetLastBatchReturnedForPlanNode(node_id, summary_data);
       } else {
         summary_data->set_data_sink_id(node->metadata().data_sink_id);
       }

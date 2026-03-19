@@ -55,6 +55,9 @@ struct TExecStats {
 
   // Peak memory used (in bytes).
   4: optional i64 memory_used
+
+  // True if this instance completed execution.
+  5: optional bool last_batch_returned
 }
 
 // Summary for a single plan node or data sink. This includes labels for how to display

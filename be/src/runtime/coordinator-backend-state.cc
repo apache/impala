@@ -884,6 +884,9 @@ void Coordinator::BackendState::InstanceStats::Update(
     }
     DCHECK(exec_summary_entry.has_local_time_ns());
     instance_stats.__set_latency_ns(exec_summary_entry.local_time_ns());
+    if (exec_summary_entry.has_last_batch_returned()) {
+      instance_stats.__set_last_batch_returned(exec_summary_entry.last_batch_returned());
+    }
     node_exec_summary.__isset.exec_stats = true;
   }
 

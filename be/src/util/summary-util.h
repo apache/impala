@@ -22,6 +22,9 @@
 
 namespace impala {
 
+// Plan node ID for the fragment root data sink.
+constexpr int32_t SINK_NODE_ID = -1;
+
 /// Print the exec summary as a formatted table.
 std::string PrintExecSummary(const TExecSummary& exec_summary);
 

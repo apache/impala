@@ -175,6 +175,9 @@ message ExecSummaryDataPB {
 
   // Local time in nanoseconds spent in this plan node.
   optional int64 local_time_ns = 5;
+
+  // True if this plan node instance completed execution.
+  optional bool last_batch_returned = 6;
 }
 
 // RPC error metadata that can be associated with a AuxErrorInfoPB object. Created if a
