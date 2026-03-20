@@ -25,6 +25,11 @@ from tests.util.query_profile_util import verify_profile_node_lifecycle_events
 
 
 class TestObservability(CustomClusterTestSuite):
+
+  @classmethod
+  def get_workload(self):
+    return 'tpch'
+
   @pytest.mark.execute_serially
   def test_host_profile_jvm_gc_metrics(self, unique_database):
     self.execute_query_expect_success(self.client,
@@ -90,3 +95,9 @@ class TestObservability(CustomClusterTestSuite):
     runtime_profile = self.execute_query(query).runtime_profile
     assert "SYSTEM_TABLE_SCAN_NODE" in runtime_profile
     verify_profile_node_lifecycle_events(runtime_profile)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args('--gen_experimental_profile=true')
+  def test_effective_runtime_filter(self, vector):
+    """Verify the runtime filter table shows ineffective filters."""
+    self.run_test_case('effective-runtime-filter', vector)

@@ -627,6 +627,17 @@ void QueryState::ConstructReport(bool instances_started,
       MergeMapValues(fis->per_join_rows_produced(), &per_join_rows_produced);
     }
 
+    // Aggregate effective filter targets across instances. Do this after
+    // GetStatusReport() since it updates the effective filter targets.
+    for (const auto& entry : fis_map_) {
+      FragmentInstanceState* fis = entry.second;
+      for (const auto& [filter_id, scan_node_id] : fis->per_scan_effective_filters()) {
+        auto* target = report->add_effective_filter_targets();
+        target->set_filter_id(filter_id);
+        target->set_scan_node_id(scan_node_id);
+      }
+    }
+
     // Construct the per-fragment status reports, including runtime profiles.
     for (const auto& entry : agg_profiles) {
       int fragment_idx = entry.first;

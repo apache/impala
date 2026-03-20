@@ -196,6 +196,12 @@ Status ScanNode::Open(RuntimeState* state) {
 
 void ScanNode::Close(RuntimeState* state) {
   if (is_closed()) return;
+  // Compute effective filters by checking if any rows were rejected.
+  for (const auto& filter_ctx : filter_ctxs_) {
+    if (filter_ctx.stats != nullptr && filter_ctx.stats->HasRejectedRows()) {
+      effective_filter_ids_.push_back(filter_ctx.filter->id());
+    }
+  }
   // Close filter
   for (auto& filter_ctx : filter_ctxs_) {
     if (filter_ctx.expr_eval != nullptr) filter_ctx.expr_eval->Close(state);

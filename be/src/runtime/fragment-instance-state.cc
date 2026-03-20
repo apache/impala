@@ -395,6 +395,18 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
   total_bytes_sent_  = total_bytes_sent;
   per_join_rows_produced_ = per_join_rows_produced;
 
+  // Aggregate effective filter targets from scan nodes.
+  if (exec_tree_ != nullptr) {
+    vector<ExecNode*> scan_nodes;
+    exec_tree_->CollectScanNodes(&scan_nodes);
+    for (ExecNode* node : scan_nodes) {
+      ScanNode* scan_node = static_cast<ScanNode*>(node);
+      for (int32_t filter_id : scan_node->effective_filter_ids()) {
+        per_scan_effective_filters_.insert({filter_id, scan_node->id()});
+      }
+    }
+  }
+
   // Send the DML stats if this is the final report.
   if (done) {
     runtime_state()->dml_exec_state()->ToProto(

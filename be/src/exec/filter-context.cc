@@ -66,6 +66,15 @@ void FilterStats::RegisterCounterGroup(const string& key) {
   counters[key] = counter;
 }
 
+bool FilterStats::HasRejectedRows() const {
+  for (const auto& entry : counters) {
+    if (entry.second.rejected->value() > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 Status FilterContext::CloneFrom(const FilterContext& from, ObjectPool* pool,
     RuntimeState* state, MemPool* expr_perm_pool, MemPool* expr_results_pool) {
   filter = from.filter;

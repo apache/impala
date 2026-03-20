@@ -1,0 +1,71 @@
+====
+---- QUERY
+# Verify the runtime filter table for TPCH-Q5 where some filters are ineffective.
+# The query is modified to use a fix join order.
+use tpch_parquet;
+set runtime_filter_wait_time_ms=10000;
+select STRAIGHT_JOIN
+  n_name,
+  sum(l_extendedprice * (1 - l_discount)) as revenue
+from
+  lineitem,
+  orders,
+  customer,
+  supplier,
+  nation,
+  region
+where
+  c_custkey = o_custkey
+  and l_orderkey = o_orderkey
+  and l_suppkey = s_suppkey
+  and c_nationkey = s_nationkey
+  and s_nationkey = n_nationkey
+  and n_regionkey = r_regionkey
+  and r_name = 'ASIA'
+  and o_orderdate >= '1994-01-01'
+  and o_orderdate < '1995-01-01'
+group by
+  n_name
+order by
+  revenue desc
+---- RESULTS
+'INDONESIA',55502041.1697
+'VIETNAM',55295086.9967
+'CHINA',53724494.2566
+'INDIA',52035512.0002
+'JAPAN',45410175.6954
+---- TYPES
+string, decimal
+---- RUNTIME_PROFILE
+# Verify Final filter table:
+#  ID  Src. Node  Tgt. Node(s)  Eff. Tgt. Node(s)     Target type  ...
+# --------------------------------------------------------------------
+#   8          7             1                  1          REMOTE  ...
+#   4          8             2                  N          REMOTE  ...
+#   2          9          2, 3               2, 3  REMOTE, REMOTE  ...
+#   0         10             4                  4          REMOTE  ...
+#  10          6             0                  0           LOCAL  ...
+#   5          8             0                  0           LOCAL  ...
+row_regex: 8\s+7\s+1\s+1\s+REMOTE
+row_regex: 4\s+8\s+2\s+N\s+REMOTE
+row_regex: 2\s+9\s+2,\ 3\s+2,\ 3\s+REMOTE,\s*REMOTE
+row_regex: 0\s+10\s+4\s+4\s+REMOTE
+row_regex: 10\s+6\s+0\s+0\s+LOCAL
+row_regex: 5\s+8\s+0\s+0\s+LOCAL
+---- CALCITE_PLANNER_RUNTIME_PROFILE
+# Verify Final filter table:
+#  ID  Src. Node  Tgt. Node(s)  Eff. Tgt. Node(s)     Target type  ...
+# --------------------------------------------------------------------
+#  10          2             0                  0           LOCAL  ...
+#   8          4             1                  1          REMOTE  ...
+#   5          6             0                  0           LOCAL  ...
+#   4          6             3                  N          REMOTE  ...
+#   2          8          3, 5               3, 5  REMOTE, REMOTE  ...
+#   0         10             7                  7          REMOTE  ...
+row_regex: 10\s+2\s+0\s+0\s+LOCAL
+row_regex: 8\s+4\s+1\s+1\s+REMOTE
+row_regex: 5\s+6\s+0\s+0\s+LOCAL
+row_regex: 4\s+6\s+3\s+N\s+REMOTE
+row_regex: 2\s+8\s+3,\ 5\s+3,\ 5\s+REMOTE,\ REMOTE
+row_regex: 0\s+10\s+7\s+7\s+REMOTE
+====

@@ -18,7 +18,9 @@
 #pragma once
 
 #include <list>
+#include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 #include <utility>
@@ -516,6 +518,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Contains all the state about filters being handled by this coordinator.
   std::unique_ptr<FilterRoutingTable> filter_routing_table_;
+
+  /// Cached map from filter ID to target node IDs where the filter rejected data.
+  /// Populated by BackendState::ApplyExecStatusReport().
+  std::map<int32_t, std::set<TPlanNodeId>> effective_filter_targets_;
 
   /// True if the first row has been fetched, false otherwise.
   bool first_row_fetched_ = false;

@@ -234,6 +234,14 @@ message FragmentExecStatusPB {
   optional int32 min_per_fragment_instance_idx = 2;
 }
 
+message EffectiveFilterTargetPB {
+  // The runtime filter id.
+  optional int32 filter_id = 1;
+
+  // The scan node id where this runtime filter rejected data.
+  optional int32 scan_node_id = 2;
+}
+
 message ReportExecStatusRequestPB {
   // The query id which this report is for.
   optional UniqueIdPB query_id = 1;
@@ -293,6 +301,10 @@ message ReportExecStatusRequestPB {
   // If true, the executor failed to execute query fragments due to local disk IO
   // fatal error, like local storage devices for spilling are corrupted.
   optional bool local_disk_faulty = 17 [default = false];
+
+  // List of (filter_id, scan_node_id) pairs representing which runtime filters were
+  // effective (rejected rows) at which scan nodes.
+  repeated EffectiveFilterTargetPB effective_filter_targets = 18;
 }
 
 message ReportExecStatusResponsePB {

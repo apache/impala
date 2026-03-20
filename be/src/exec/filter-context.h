@@ -73,6 +73,10 @@ class FilterStats {
   /// Adds a new counter group with key 'key'. Not thread safe.
   void RegisterCounterGroup(const std::string& key);
 
+  /// Returns true if any of the filter's rejection counters have a value > 0.
+  /// This indicates the filter was effective at rejecting rows.
+  bool HasRejectedRows() const;
+
  private:
   /// Map from some key to statistics for that key.
   typedef boost::unordered_map<std::string, CounterGroup> CountersMap;

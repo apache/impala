@@ -133,6 +133,14 @@ class Coordinator::FilterState {
   // Display a FilterState object without creating an MinMaxFilter first.
   std::string DebugString() const;
 
+  /// Sorts the targets_ vector by node_id in ascending order.
+  void SortTargets() {
+    std::sort(targets_.begin(), targets_.end(),
+        [](const FilterTarget& a, const FilterTarget& b) {
+          return a.node_id < b.node_id;
+        });
+  }
+
  private:
   /// Contains the specification of the runtime filter.
   TRuntimeFilterDesc desc_;

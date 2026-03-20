@@ -141,6 +141,10 @@ class ScanNode : public ExecNode {
 
   const std::vector<FilterContext>& filter_ctxs() const { return filter_ctxs_; }
 
+  const std::vector<int32_t>& effective_filter_ids() const {
+    return effective_filter_ids_;
+  }
+
  protected:
   RuntimeState* runtime_state_ = nullptr;
 
@@ -182,6 +186,10 @@ class ScanNode : public ExecNode {
   /// cloned by individual scanners to be used in multi-threaded contexts, passed through
   /// the per-scanner ScannerContext. Correspond to exprs in 'filter_exprs_'.
   std::vector<FilterContext> filter_ctxs_;
+
+  /// Filter IDs that were effective (rejected rows) at this scan node.
+  /// Populated in Close().
+  std::vector<int32_t> effective_filter_ids_;
 
   /// Initializes 'bytes_read_counter_', 'bytes_read_timeseries_counter_' and
   /// 'total_throughput_counter_'
