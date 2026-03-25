@@ -18,7 +18,7 @@
 from __future__ import absolute_import, division, print_function
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import ImpalaTestClusterProperties
-from tests.common.skip import SkipIf
+from tests.common.skip import SkipIf, IS_OZONE
 import pytest
 
 
@@ -131,10 +131,10 @@ class TestFileMetadataStats(CustomClusterTestSuite):
     self.assert_catalogd_log_contains("INFO", hosts_regex, expected_count=-1,
         timeout_s=15)
 
-    # For HDFS tables with disk IDs available (non-EC), host:disk pair stats are logged
-    # With erasure coding, disk IDs may not be available, so skip this check
+    # For HDFS tables with disk IDs available, host:disk pair stats are logged
+    # With erasure coding or Ozone, disk IDs may not be available, so skip this check
     cluster_properties = ImpalaTestClusterProperties.get_instance()
-    if not cluster_properties.is_erasure_coding_enabled():
+    if not (cluster_properties.is_erasure_coding_enabled() or IS_OZONE):
       host_disk_regex = r"Host:Disk pairs: \d+"
       self.assert_catalogd_log_contains("INFO", host_disk_regex, expected_count=-1,
           timeout_s=15)
