@@ -1314,11 +1314,18 @@ class TestRanger(CustomClusterTestSuite):
       table_loaded_log = "Loaded metadata for: functional.alltypestiny"
       self.assert_catalogd_log_contains("INFO", table_loaded_log, expected_count=0)
 
-      # Run a query to trigger metadata loading on the table
+      # Run REFRESH PARTITION to trigger metadata loading on the table. Use sync_ddl=true
+      # to make sure coordinators have processed the statestore update.
+      # TODO: use a single DESCRIBE when IMPALA-14856 is resolved.
       self.execute_query_expect_success(
-        non_admin_client, "describe functional.alltypestiny")
+          non_admin_client,
+          "refresh functional.alltypestiny partition(year=2009, month=1)",
+          query_options={'sync_ddl': True})
       # Verify catalogd loads metadata of this table
       self.assert_catalogd_log_contains("INFO", table_loaded_log, expected_count=1)
+      # Run DESCRIBE to make sure the metadata is loaded in coordinator side.
+      self.execute_query_expect_success(
+          non_admin_client, "describe functional.alltypestiny")
 
       # INVALIDATE METADATA <table> is allowed since 'user' is detected as the owner.
       self.execute_query_expect_success(
