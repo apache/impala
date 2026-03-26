@@ -181,18 +181,26 @@ Status ParquetColumnChunkReader::ReadDictionaryData(ScopedBuffer* uncompressed_b
       // the last row batch.
       dict_page_pool_.reset(new MemPool(parent_->scan_node_->mem_tracker()));
       *dict_values = dict_page_pool_->TryAllocate(buffer_size); // case 1.
-    } else if (uncompressed_buffer->TryAllocate(buffer_size)) {
-      *dict_values = uncompressed_buffer->buffer(); // case 2
-    }
-    if (UNLIKELY(*dict_values == nullptr)) {
-      string details = Substitute(PARQUET_PAGE_MEM_LIMIT_EXCEEDED, "InitDictionary",
-          buffer_size, "dictionary");
-      return dict_page_pool_->mem_tracker()->MemLimitExceeded(
+      if (UNLIKELY(*dict_values == nullptr)) {
+        string details = Substitute(PARQUET_PAGE_MEM_LIMIT_EXCEEDED, "InitDictionary",
+            buffer_size, "dictionary");
+        return dict_page_pool_->mem_tracker()->MemLimitExceeded(
+            parent_->state_, details, buffer_size);
+      }
+    } else {
+      if (LIKELY(uncompressed_buffer->TryAllocate(buffer_size))) {
+        *dict_values = uncompressed_buffer->buffer(); // case 2
+      } else {
+        string details = Substitute(PARQUET_PAGE_MEM_LIMIT_EXCEEDED, "InitDictionary",
+            buffer_size, "uncompressed dictionary");
+        return parent_->dictionary_pool_->mem_tracker()->MemLimitExceeded(
                parent_->state_, details, buffer_size);
+      }
     }
   } else {
     *dict_values = data; // case 3.
   }
+  DCHECK(*dict_values != nullptr);
 
   if (decompressor_.get() != nullptr) {
     int uncompressed_size = current_page_header.uncompressed_page_size;
