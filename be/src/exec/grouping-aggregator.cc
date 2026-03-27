@@ -132,6 +132,8 @@ void GroupingAggregatorConfig::Close() {
 static const int STREAMING_HT_MIN_REDUCTION_SIZE =
     sizeof(STREAMING_HT_MIN_REDUCTION) / sizeof(STREAMING_HT_MIN_REDUCTION[0]);
 
+const char* GroupingAggregator::LLVM_CLASS_NAME = "class.impala::GroupingAggregator";
+
 GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
     const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality)
   : Aggregator(exec_node, pool, config,
@@ -526,51 +528,6 @@ Status GroupingAggregator::InputDone() {
   return MoveHashPartitions(num_input_rows_);
 }
 
-Tuple* GroupingAggregator::ConstructIntermediateTuple(
-    const vector<AggFnEvaluator*>& agg_fn_evals, MemPool* pool, Status* status) noexcept {
-  const int fixed_size = intermediate_tuple_desc_->byte_size();
-  const int varlen_size = GroupingExprsVarlenSize();
-  const int tuple_data_size = fixed_size + varlen_size;
-  uint8_t* tuple_data = pool->TryAllocate(tuple_data_size);
-  if (UNLIKELY(tuple_data == nullptr)) {
-    string details = Substitute("Cannot perform aggregation at aggregator with id $0. "
-                                "Failed to allocate $1 bytes for intermediate tuple.",
-        id_, tuple_data_size);
-    *status = pool->mem_tracker()->MemLimitExceeded(state_, details, tuple_data_size);
-    return nullptr;
-  }
-  memset(tuple_data, 0, fixed_size);
-  Tuple* intermediate_tuple = reinterpret_cast<Tuple*>(tuple_data);
-  uint8_t* varlen_data = tuple_data + fixed_size;
-  CopyGroupingValues(intermediate_tuple, varlen_data, varlen_size);
-  InitAggSlots(agg_fn_evals, intermediate_tuple);
-  return intermediate_tuple;
-}
-
-Tuple* GroupingAggregator::ConstructIntermediateTuple(
-    const vector<AggFnEvaluator*>& agg_fn_evals, BufferedTupleStream* stream,
-    Status* status) noexcept {
-  DCHECK(stream != nullptr && status != nullptr);
-  // Allocate space for the entire tuple in the stream.
-  const int fixed_size = intermediate_tuple_desc_->byte_size();
-  const int varlen_size = GroupingExprsVarlenSize();
-  const int tuple_size = fixed_size + varlen_size;
-  uint8_t* tuple_data = stream->AddRowCustomBegin(tuple_size, status);
-  if (UNLIKELY(tuple_data == nullptr)) {
-    // If we failed to allocate and did not hit an error (indicated by a non-ok status),
-    // the caller of this function can try to free some space, e.g. through spilling, and
-    // re-attempt to allocate space for this row.
-    return nullptr;
-  }
-  Tuple* tuple = reinterpret_cast<Tuple*>(tuple_data);
-  tuple->Init(fixed_size);
-  uint8_t* varlen_buffer = tuple_data + fixed_size;
-  CopyGroupingValues(tuple, varlen_buffer, varlen_size);
-  InitAggSlots(agg_fn_evals, tuple);
-  stream->AddRowCustomEnd(tuple_size);
-  return tuple;
-}
-
 int GroupingAggregator::GroupingExprsVarlenSize() {
   int varlen_size = 0;
   // TODO: The hash table could compute this as it hashes.
@@ -582,32 +539,21 @@ int GroupingAggregator::GroupingExprsVarlenSize() {
   return varlen_size;
 }
 
-// TODO: codegen this function.
 void GroupingAggregator::CopyGroupingValues(
-    Tuple* intermediate_tuple, uint8_t* buffer, int varlen_size) {
+    Tuple* intermediate_tuple, uint8_t* buffer) noexcept {
   // Copy over all grouping slots (the variable length data is copied below).
   for (int i = 0; i < grouping_exprs_.size(); ++i) {
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[i];
-    if (ht_ctx_->ExprValueNull(i)) {
-      intermediate_tuple->SetNull(slot_desc->null_indicator_offset());
-    } else {
-      void* src = ht_ctx_->ExprValue(i);
-      void* dst = intermediate_tuple->GetSlot(slot_desc->tuple_offset());
-      memcpy(dst, src, slot_desc->slot_size());
-    }
+    CopyGroupingValuesFixedLenSlot(intermediate_tuple, i,
+        slot_desc->null_indicator_offset(), slot_desc->tuple_offset(),
+        slot_desc->slot_size());
   }
 
   for (int expr_idx : string_grouping_exprs_) {
-    if (ht_ctx_->ExprValueNull(expr_idx)) continue;
-
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[expr_idx];
-    // ptr and len were already copied to the fixed-len part of string value
-    StringValue* sv = reinterpret_cast<StringValue*>(
-        intermediate_tuple->GetSlot(slot_desc->tuple_offset()));
-    if (sv->IsSmall()) continue;
-    memcpy(buffer, sv->Ptr(), sv->Len());
-    sv->SetPtr(reinterpret_cast<char*>(buffer));
-    buffer += sv->Len();
+    int bytes_copied = CopyGroupingValuesStringSlot(intermediate_tuple, expr_idx,
+        slot_desc->tuple_offset(), buffer);
+    buffer += bytes_copied;
   }
 }
 
@@ -1177,6 +1123,9 @@ Status GroupingAggregatorConfig::CodegenAddBatchImpl(
   llvm::Function* update_tuple_fn;
   RETURN_IF_ERROR(CodegenUpdateTuple(codegen, &update_tuple_fn));
 
+  llvm::Function* copy_grouping_values_fn;
+  RETURN_IF_ERROR(CodegenCopyGroupingValues(codegen, &copy_grouping_values_fn));
+
   // Get the cross compiled update row batch function
   IRFunction::Type ir_fn = IRFunction::GROUPING_AGG_ADD_BATCH_IMPL;
   llvm::Function* add_batch_impl_fn = codegen->GetFunction(ir_fn, true);
@@ -1214,6 +1163,10 @@ Status GroupingAggregatorConfig::CodegenAddBatchImpl(
   DCHECK_REPLACE_COUNT(replaced, 1);
 
   replaced = codegen->ReplaceCallSites(add_batch_impl_fn, build_equals_fn, "Equals");
+  DCHECK_REPLACE_COUNT(replaced, 1);
+
+  replaced = codegen->ReplaceCallSites(add_batch_impl_fn, copy_grouping_values_fn,
+      "CopyGroupingValues");
   DCHECK_REPLACE_COUNT(replaced, 1);
 
   HashTableCtx::HashTableReplacedConstants replaced_constants;
@@ -1262,6 +1215,9 @@ Status GroupingAggregatorConfig::CodegenAddBatchStreamingImpl(
   llvm::Function* update_tuple_fn;
   RETURN_IF_ERROR(CodegenUpdateTuple(codegen, &update_tuple_fn));
 
+  llvm::Function* copy_grouping_values_fn;
+  RETURN_IF_ERROR(CodegenCopyGroupingValues(codegen, &copy_grouping_values_fn));
+
   // We only use the top-level hash function for streaming aggregations.
   llvm::Function* hash_fn;
   RETURN_IF_ERROR(
@@ -1292,6 +1248,10 @@ Status GroupingAggregatorConfig::CodegenAddBatchStreamingImpl(
   replaced = codegen->ReplaceCallSites(add_batch_streaming_impl_fn, equals_fn, "Equals");
   DCHECK_REPLACE_COUNT(replaced, 1);
 
+  replaced = codegen->ReplaceCallSites(add_batch_streaming_impl_fn,
+      copy_grouping_values_fn, "CopyGroupingValues");
+  DCHECK_REPLACE_COUNT(replaced, 2);
+
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = false;
   RETURN_IF_ERROR(
@@ -1311,6 +1271,92 @@ Status GroupingAggregatorConfig::CodegenAddBatchStreamingImpl(
   }
 
   codegen->AddFunctionToJit(add_batch_streaming_impl_fn, &add_batch_streaming_impl_fn_);
+  return Status::OK();
+}
+
+// Codegen for CopyGroupingValues
+// Example IR for (group by int_col, string_col):
+// (mangled function names have been shortened)
+//
+// define void @CopyGroupingValues(%"class.impala::GroupingAggregator"* %this_ptr,
+//     %"class.impala::Tuple"* %intermediate_tuple, i8* %buffer) {
+// entry:
+//   call void @_ZN6impala18GroupingAggregator30CopyGroupingValuesFixedLenSlot...
+//       (%"class.impala::GroupingAggregator"* %this_ptr,
+//        %"class.impala::Tuple"* %intermediate_tuple, i32 0, i64 8589934612,
+//        i32 12, i32 8)
+//   call void @_ZN6impala18GroupingAggregator30CopyGroupingValuesFixedLenSlot...
+//       (%"class.impala::GroupingAggregator"* %this_ptr,
+//        %"class.impala::Tuple"* %intermediate_tuple, i32 1, i64 4294967316,
+//        i32 0, i32 12)
+ //  %bytes_copied = call i32
+ //      @_ZN6impala18GroupingAggregator28CopyGroupingValuesStringSlotEPNS_5TupleEiiPh
+ //          (%"class.impala::GroupingAggregator"* %this_ptr, %
+ //           "class.impala::Tuple"* %intermediate_tuple, i32 1, i32 0, i8* %buffer)
+ //   %buffer1 = getelementptr i8, i8* %buffer, i32 %bytes_copied
+ //   ret void
+ // }
+Status GroupingAggregatorConfig::CodegenCopyGroupingValues(LlvmCodeGen* codegen,
+      llvm::Function** fn) {
+  llvm::PointerType* this_ptr_type = codegen->GetStructPtrType<GroupingAggregator>();
+  llvm::PointerType* tuple_ptr_type = codegen->GetStructPtrType<Tuple>();
+  LlvmCodeGen::FnPrototype prototype(codegen, "CopyGroupingValues",
+      codegen->void_type());
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
+  prototype.AddArgument(
+      LlvmCodeGen::NamedVariable("intermediate_tuple", tuple_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("buffer", codegen->ptr_type()));
+
+  llvm::LLVMContext& context = codegen->context();
+  LlvmBuilder builder(context);
+  llvm::Value* args[3];
+  *fn = prototype.GeneratePrototype(&builder, args);
+
+  llvm::Value* this_ptr = args[0];
+  llvm::Value* intermediate_tuple = args[1];
+  llvm::Value* buffer = args[2];
+
+  // Copy fixed len slots
+  for (int i = 0; i < grouping_exprs_.size(); ++i) {
+    // Get relevant data from slot desc as consts
+    SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[i];
+    llvm::Value* idx = codegen->GetI32Constant(i);
+    llvm::Value* tuple_offset = codegen->GetI32Constant(slot_desc->tuple_offset());
+    llvm::Value* slot_size = codegen->GetI32Constant(slot_desc->slot_size());
+
+    llvm::Value* null_indicator_offset =
+        slot_desc->null_indicator_offset().ToIRPacked(codegen);
+
+    // call CopyGroupingValuesFixedLenSlot
+    codegen->CodegenCallFunction(&builder,
+        IRFunction::GROUPING_AGG_COPY_GROUPING_VALUES_FIXED_LEN_SLOT,
+        {this_ptr, intermediate_tuple, idx, null_indicator_offset, tuple_offset,
+         slot_size});
+  }
+
+  // Copy var len string data
+  for (int expr_idx : string_grouping_exprs_) {
+    // Get relevant data from slot desc as consts
+    SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[expr_idx];
+    llvm::Value* tuple_offset = codegen->GetI32Constant(slot_desc->tuple_offset());
+    llvm::Value* idx = codegen->GetI32Constant(expr_idx);
+
+    // call CopyGroupingValuesStringSlot
+    llvm::Value* bytes_copied = codegen->CodegenCallFunction(&builder,
+        IRFunction::GROUPING_AGG_COPY_GROUPING_VALUES_STRING_SLOT,
+        {this_ptr, intermediate_tuple, idx, tuple_offset, buffer}, "bytes_copied");
+
+    // increase buffer by bytes copied
+    buffer = builder.CreateGEP(buffer, bytes_copied, "buffer");
+  }
+
+  builder.CreateRetVoid();
+
+  *fn = codegen->FinalizeFunction(*fn);
+  if (*fn == nullptr) {
+    return Status("Codegen'd GroupingAggregator::CopyGroupingValues failed verification"
+                  ", see log");
+  }
   return Status::OK();
 }
 

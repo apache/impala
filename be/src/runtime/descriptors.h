@@ -108,6 +108,11 @@ struct NullIndicatorOffset {
   // this struct changes.
   llvm::Constant* ToIR(LlvmCodeGen* codegen) const;
 
+  // Generates a packed i64 constant of this offset. This can be used when passing a
+  // constant offset to a function which expects it as a packed i64. Needs to be updated
+  // if the layout of this struct changes.
+  llvm::Constant* ToIRPacked(LlvmCodeGen* codegen) const;
+
   static const char* LLVM_CLASS_NAME;
 };
 

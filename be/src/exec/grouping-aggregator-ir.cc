@@ -19,7 +19,9 @@
 
 #include "exec/hash-table.inline.h"
 #include "exprs/agg-fn-evaluator.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/row-batch.h"
+#include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 
 using namespace impala;
@@ -259,6 +261,77 @@ bool GroupingAggregator::TryAddToHashTable(HashTableCtx* __restrict__ ht_ctx,
 
   UpdateTuple(partition->agg_fn_evals.data(), intermediate_tuple, in_row);
   return true;
+}
+
+Tuple* GroupingAggregator::ConstructIntermediateTuple(
+    const vector<AggFnEvaluator*>& agg_fn_evals, MemPool* pool, Status* status) noexcept {
+  const int fixed_size = intermediate_tuple_desc_->byte_size();
+  const int varlen_size = GroupingExprsVarlenSize();
+  const int64_t tuple_data_size = static_cast<int64_t>(fixed_size) + varlen_size;
+  uint8_t* tuple_data = pool->TryAllocate(tuple_data_size);
+  if (UNLIKELY(tuple_data == nullptr)) {
+    string details = strings::Substitute(
+        "Cannot perform aggregation at aggregator with id $0. "
+        "Failed to allocate $1 bytes for intermediate tuple.",
+        id_, tuple_data_size);
+    *status = pool->mem_tracker()->MemLimitExceeded(state_, details, tuple_data_size);
+    return nullptr;
+  }
+  memset(tuple_data, 0, fixed_size);
+  Tuple* intermediate_tuple = reinterpret_cast<Tuple*>(tuple_data);
+  uint8_t* varlen_data = tuple_data + fixed_size;
+  CopyGroupingValues(intermediate_tuple, varlen_data);
+  InitAggSlots(agg_fn_evals, intermediate_tuple);
+  return intermediate_tuple;
+}
+
+Tuple* GroupingAggregator::ConstructIntermediateTuple(
+    const vector<AggFnEvaluator*>& agg_fn_evals, BufferedTupleStream* stream,
+    Status* status) noexcept {
+  DCHECK(stream != nullptr && status != nullptr);
+  // Allocate space for the entire tuple in the stream.
+  const int fixed_size = intermediate_tuple_desc_->byte_size();
+  const int varlen_size = GroupingExprsVarlenSize();
+  const int64_t tuple_size = static_cast<int64_t>(fixed_size) + varlen_size;
+  uint8_t* tuple_data = stream->AddRowCustomBegin(tuple_size, status);
+  if (UNLIKELY(tuple_data == nullptr)) {
+    // If we failed to allocate and did not hit an error (indicated by a non-ok status),
+    // the caller of this function can try to free some space, e.g. through spilling, and
+    // re-attempt to allocate space for this row.
+    return nullptr;
+  }
+  Tuple* tuple = reinterpret_cast<Tuple*>(tuple_data);
+  tuple->Init(fixed_size);
+  uint8_t* varlen_buffer = tuple_data + fixed_size;
+  CopyGroupingValues(tuple, varlen_buffer);
+  InitAggSlots(agg_fn_evals, tuple);
+  stream->AddRowCustomEnd(tuple_size);
+  return tuple;
+}
+
+void GroupingAggregator::CopyGroupingValuesFixedLenSlot(Tuple* intermediate_tuple,
+    int idx, NullIndicatorOffset null_indicator_offset, int tuple_offset,
+    int slot_size) noexcept {
+  if (ht_ctx_->ExprValueNull(idx)) {
+    intermediate_tuple->SetNull(null_indicator_offset);
+  } else {
+    void* src = ht_ctx_->ExprValue(idx);
+    void* dst = intermediate_tuple->GetSlot(tuple_offset);
+    memcpy(dst, src, slot_size);
+  }
+}
+
+int GroupingAggregator::CopyGroupingValuesStringSlot(Tuple* intermediate_tuple,
+    int idx, int tuple_offset, uint8_t* buffer) noexcept {
+  if (ht_ctx_->ExprValueNull(idx)) return 0;
+
+  // ptr and len were already copied to the fixed-len part of string value
+  StringValue* sv = reinterpret_cast<StringValue*>(
+      intermediate_tuple->GetSlot(tuple_offset));
+  if (sv->IsSmall()) return 0;
+  memcpy(buffer, sv->Ptr(), sv->Len());
+  sv->SetPtr(reinterpret_cast<char*>(buffer));
+  return sv->Len();
 }
 
 // Instantiate required templates.

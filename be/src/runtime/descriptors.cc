@@ -95,6 +95,11 @@ llvm::Constant* NullIndicatorOffset::ToIR(LlvmCodeGen* codegen) const {
           zeroes->getStructElement(2)});
 }
 
+llvm::Constant* NullIndicatorOffset::ToIRPacked(LlvmCodeGen* codegen) const {
+  uint64_t packed = ((uint64_t)bit_mask << 32) | ((uint64_t)byte_offset);
+  return codegen->GetI64Constant(packed);
+}
+
 ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {
   os << null_indicator.DebugString();
   return os;

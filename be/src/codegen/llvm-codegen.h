@@ -633,8 +633,10 @@ class LlvmCodeGen {
 
   /// Codegens IR to call the function corresponding to 'ir_type' with argument 'args'
   /// and returns the value.
+  /// 'name' is an optional IR name for the returned value.
+  /// If the function returns void, 'name' has to be left empty.
   llvm::Value* CodegenCallFunction(LlvmBuilder* builder, IRFunction::Type ir_type,
-      llvm::ArrayRef<llvm::Value*> args, const char* name);
+      llvm::ArrayRef<llvm::Value*> args, const char* name = "");
 
   /// If there are more than this number of expr trees (or functions that evaluate
   /// expressions), avoid inlining avoid inlining for the exprs exceeding this threshold.

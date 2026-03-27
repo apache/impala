@@ -187,6 +187,12 @@ class GroupingAggregatorConfig : public AggregatorConfig {
   /// 'add_batch_streaming_impl_fn_' will be updated with the codegened function.
   Status CodegenAddBatchStreamingImpl(
       LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
+
+  /// Create codegen'd version CopyGroupingValues(). Function signature is the same
+  /// as CopyGroupingValues(). The codegen'd version calls CopyGroupingValuesFixedLenSlot
+  /// and CopyGroupingValuesStringSlot with the appropriate constants for each slot.
+  Status CodegenCopyGroupingValues(LlvmCodeGen* codegen, llvm::Function** fn)
+        WARN_UNUSED_RESULT;
 };
 
 class GroupingAggregator : public Aggregator {
@@ -213,6 +219,8 @@ class GroupingAggregator : public Aggregator {
   virtual void DebugString(int indentation_level, std::stringstream* out) const override;
 
   virtual int64_t GetNumKeys() const override;
+
+  static const char* LLVM_CLASS_NAME;
 
  private:
   struct Partition;
@@ -515,23 +523,40 @@ class GroupingAggregator : public Aggregator {
   /// grouping exprs from stream. Var-len data for aggregate exprs is allocated from the
   /// FunctionContexts, so is stored outside the stream. If stream's small buffers get
   /// full, it will attempt to switch to IO-buffers.
-  Tuple* ConstructIntermediateTuple(const std::vector<AggFnEvaluator*>& agg_fn_evals,
-      BufferedTupleStream* stream, Status* status) noexcept;
+  Tuple* IR_ALWAYS_INLINE ConstructIntermediateTuple(
+      const std::vector<AggFnEvaluator*>& agg_fn_evals, BufferedTupleStream* stream,
+      Status* status) noexcept;
 
   /// Constructs intermediate tuple, allocating memory from pool instead of the stream.
   /// Returns NULL and sets status if there is not enough memory to allocate the tuple.
-  Tuple* ConstructIntermediateTuple(const std::vector<AggFnEvaluator*>& agg_fn_evals,
-      MemPool* pool, Status* status) noexcept;
+  Tuple* IR_ALWAYS_INLINE ConstructIntermediateTuple(
+      const std::vector<AggFnEvaluator*>& agg_fn_evals, MemPool* pool, Status* status)
+      noexcept;
 
   /// Returns the number of bytes of variable-length data for the grouping values stored
   /// in 'ht_ctx_'.
   int GroupingExprsVarlenSize();
 
-  /// Initializes intermediate tuple by copying grouping values stored in 'ht_ctx_' that
+  /// Initializes intermediate tuple by copying grouping values stored in 'ht_ctx_'
   /// that were computed over 'current_row_' using 'grouping_expr_evals_'. Writes the
   /// var-len data into buffer. 'buffer' points to the start of a buffer of at least the
   /// size of the variable-length data: 'varlen_size'.
-  void CopyGroupingValues(Tuple* intermediate_tuple, uint8_t* buffer, int varlen_size);
+  void IR_NO_INLINE CopyGroupingValues(Tuple* intermediate_tuple, uint8_t* buffer)
+      noexcept;
+
+  /// Copies grouping values stored in 'ht_ctx_' into a single slot of intermediate_tuple.
+  /// Only copies fixed length part of the tuple slot. For var len slots,
+  /// CopyGroupingValuesStringSlot below has to also be called.
+  /// Function is separated so it can be called per-slot for codegen.
+  void IR_ALWAYS_INLINE CopyGroupingValuesFixedLenSlot(Tuple* intermediate_tuple, int idx,
+      NullIndicatorOffset null_indicator_offset, int tuple_offset, int slot_size)
+      noexcept;
+
+  /// Copies var-len data of a single string slot into buffer. Needs to be called only for
+  /// string slots. Returns number of bytes copied.
+  /// Function is separated so it can be called per-slot for codegen.
+  int IR_ALWAYS_INLINE CopyGroupingValuesStringSlot(Tuple* intermediate_tuple, int idx,
+      int tuple_offset, uint8_t* buffer) noexcept;
 
   /// Processes a batch of rows. This is the core function of the algorithm. We partition
   /// the rows into hash_partitions_, spilling as necessary.
