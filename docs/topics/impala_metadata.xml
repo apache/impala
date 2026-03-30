@@ -69,7 +69,7 @@ under the License.
       </p>
 
       <p>
-        This feature is disabled by default.
+        This feature is enabled by default.
       </p>
 
       <p>
@@ -118,9 +118,9 @@ under the License.
             </dd>
 
             <dd>
-              Set the following on <codeph>impalad</codeph> coordinators with metdadata
+              Set the following on <codeph>impalad</codeph> coordinators with metadata
               on-demand:
-<codeblock>--use_local_catalog=true </codeblock>
+<codeblock>--use_local_catalog=true</codeblock>
             </dd>
           </dlentry>
           <dlentry>
@@ -160,6 +160,14 @@ under the License.
           </dlentry>
         </dl>
       </p>
+
+      <p>
+        To return to the legacy catalog mode (disable local catalog mode), start
+        <codeph>impalad</codeph> with <codeph>--use_local_catalog=false</codeph> and start
+        <codeph>catalogd</codeph> with <codeph>--catalog_topic_mode=full</codeph>. Note
+        that this mode can cause higher memory pressure on the coordinator(s).
+      </p>
+
     </conbody>
 
   </concept>
@@ -342,9 +350,9 @@ under the License.
       </ul>
 
       <p>
-        This feature is turned off by default with the
+        This feature is enabled by default with the
         <codeph>&#8209;&#8209;hms_event_polling_interval_s</codeph> flag set to
-        <codeph>0</codeph>.
+        <codeph>0.5</codeph>.
       </p>
 
     </conbody>
@@ -369,7 +377,7 @@ under the License.
   &lt;/property>
   &lt;property>
     &lt;name>hive.metastore.dml.events&lt;/name>
-    &lt;value>true&lt;/true>
+    &lt;value>true&lt;/value>
   &lt;/property></codeblock>
           </li>
 
@@ -407,11 +415,12 @@ under the License.
 
       <conbody>
 
-        <p>When the <codeph>‑‑hms_event_polling_interval_s</codeph> flag is set to a non-zero value
-          for your <codeph>catalogd</codeph>, the event-based automatic invalidation is enabled for
-          all databases and tables by default. If you wish to have the fine-grained control on which
-          tables or databases need to be synced using events, you can use the
-            <codeph>impala.disableHmsSync</codeph> property to disable the event processing at the
+        <p>
+          When the <codeph>‑‑hms_event_polling_interval_s</codeph> flag is set to a non-zero
+          value for your <codeph>catalogd</codeph>, the event-based automatic invalidation is
+          enabled for all databases and tables by default. If you wish to have the fine-grained
+          control on which tables or databases need to be synced using events, you can use the
+          <codeph>impala.disableHmsSync</codeph> property to disable the event processing at the
           table or database level.
         </p>
         <p id="IMPALA-14131">The <parmname>disable_hms_sync_by_default</parmname> flag controls the
@@ -425,6 +434,7 @@ under the License.
           </ul><note type="note">HMS notification events polling remains independent and is not
             affected by this flag. </note>
         </p>
+
         <p>
           When you add the <codeph>DBPROPERTIES</codeph> or <codeph>TBLPROPERTIES</codeph> with
           the <codeph>impala.disableHmsSync</codeph> key, the HMS event based sync is turned on
