@@ -75,6 +75,11 @@ class KrpcDataStreamSenderConfig : public DataSinkConfig {
   typedef Status (*HashAndAddRowsFn)(KrpcDataStreamSender*, RowBatch* row);
   CodegenFnPtr<HashAndAddRowsFn> hash_and_add_rows_fn_;
 
+  typedef Status (*SerializeBatchFn)(RowBatch*, OutboundRowBatch* output_batch,
+      TrackedString* compression_scratch);
+
+  CodegenFnPtr<SerializeBatchFn> serialize_batch_fn_;
+
   ~KrpcDataStreamSenderConfig() override {}
 
  protected:
@@ -331,6 +336,8 @@ class KrpcDataStreamSender : public DataSink {
   /// Pointer for the codegen'd HashAndAddRows() function.
   /// NULL if codegen is disabled or failed.
   const CodegenFnPtr<KrpcDataStreamSenderConfig::HashAndAddRowsFn>& hash_and_add_rows_fn_;
+
+  const CodegenFnPtr<KrpcDataStreamSenderConfig::SerializeBatchFn>& serialize_batch_fn_;
 
   /// Mapping to store which data file is read on which hosts.
   const std::unordered_map<std::string, std::vector<NetworkAddressPB>>&

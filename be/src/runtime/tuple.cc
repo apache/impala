@@ -559,6 +559,97 @@ Status Tuple::CodegenCopyStrings(
   return Status::OK();
 }
 
+Status Tuple::CodegenTryDeepCopy(LlvmCodeGen* codegen, const TupleDescriptor* tuple_desc,
+    llvm::Function** fn) {
+  llvm::Type* this_ptr_type = codegen->GetStructPtrType<Tuple>();
+  llvm::Type* tuple_descriptor_type = codegen->GetStructPtrType<TupleDescriptor>();
+
+  LlvmCodeGen::FnPrototype prototype(codegen, "TryDeepCopy", codegen->bool_type());
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("data",
+      codegen->GetPtrType(codegen->ptr_type())));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("data_end", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("offset", codegen->i32_ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("desc", tuple_descriptor_type));
+
+  llvm::LLVMContext& context = codegen->context();
+  LlvmBuilder builder(context);
+  llvm::Value* args[5];
+  *fn = prototype.GeneratePrototype(&builder, args);
+  llvm::Value* this_ptr = args[0];
+  llvm::Value* data = args[1];
+  llvm::Value* data_end = args[2];
+  llvm::Value* offset = args[3];
+  llvm::Value* desc = args[4];
+
+  // Save current value of data and offset, so it can be reset if running out of memory
+  llvm::Value* data_start = builder.CreateLoad(data, "data_start");
+  llvm::Value* offset_start = builder.CreateLoad(offset, "offset_start");
+
+  llvm::Value* dst_tuple = builder.CreateBitCast(data_start, this_ptr_type);
+
+  llvm::BasicBlock* return_block = llvm::BasicBlock::Create(context, "return", *fn);
+
+  // copy fixed length part of tuple
+  llvm::Constant* desc_byte_size = codegen->GetI32Constant(tuple_desc->byte_size());
+  llvm::Value* fixed_size_copy_result = codegen->CodegenCallFunction(&builder,
+      IRFunction::TUPLE_TRY_DEEP_COPY_FIXED_SIZE,
+      {this_ptr, data, data_end, offset, desc_byte_size}, "fixed_size_copy_result");
+
+  // return if didn't succeed, meaning copied data would exceed "data_end"
+  llvm::BasicBlock* continue_block = llvm::BasicBlock::Create(context, "continue", *fn);
+  builder.CreateCondBr(fixed_size_copy_result, continue_block, return_block);
+  builder.SetInsertPoint(continue_block);
+
+  // copy strings
+  for (SlotDescriptor* slot : tuple_desc->string_slots()) {
+    DCHECK(slot->type().IsVarLenStringType());
+
+    // call TryDeepCopyStringSlot
+    llvm::Value* null_indicator_offset =
+        slot->null_indicator_offset().ToIRPacked(codegen);
+    llvm::Constant* tuple_offset = codegen->GetI32Constant(slot->tuple_offset());
+    llvm::Value* string_copy_result = codegen->CodegenCallFunction(&builder,
+        IRFunction::TUPLE_TRY_DEEP_COPY_STRING_SLOT,
+        {dst_tuple, data, data_end, offset, null_indicator_offset, tuple_offset},
+        "string_copy_result");
+
+    // return if didn't succeed
+    continue_block = llvm::BasicBlock::Create(context, "continue", *fn);
+    builder.CreateCondBr(string_copy_result, continue_block, return_block);
+    builder.SetInsertPoint(continue_block);
+  }
+
+  // TODO: consider proper codegen for collection slots
+  if (tuple_desc->collection_slots().size() > 0) {
+    // call interpreted function to copy collection slots
+    llvm::Value* collections_copy_result = codegen->CodegenCallFunction(&builder,
+        IRFunction::TUPLE_TRY_DEEP_COPY_COLLECTIONS,
+        {dst_tuple, data, data_end, offset, desc}, "collections_copy_result");
+
+    // return if didn't succeed
+    continue_block = llvm::BasicBlock::Create(context, "continue", *fn);
+    builder.CreateCondBr(collections_copy_result, continue_block, return_block);
+    builder.SetInsertPoint(continue_block);
+  }
+
+  // copy succeded: return true
+  builder.CreateRet(codegen->true_value());
+
+  // return block: reset data and offset to starting value, and return false
+  builder.SetInsertPoint(return_block);
+  builder.CreateStore(data_start, data);
+  builder.CreateStore(offset_start, offset);
+  builder.CreateRet(codegen->false_value());
+
+  *fn = codegen->FinalizeFunction(*fn);
+  if (*fn == nullptr) {
+    return Status("Codegen'd Tuple::TryDeepCopy() function failed verification, see log");
+  }
+
+  return Status::OK();
+}
+
 llvm::Constant* SlotOffsets::ToIR(LlvmCodeGen* codegen) const {
   return llvm::ConstantStruct::get(
       codegen->GetStructType<SlotOffsets>(),

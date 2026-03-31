@@ -75,6 +75,7 @@ const int RowDescriptor::INVALID_IDX;
 
 const char* TupleDescriptor::LLVM_CLASS_NAME = "class.impala::TupleDescriptor";
 const char* NullIndicatorOffset::LLVM_CLASS_NAME = "struct.impala::NullIndicatorOffset";
+const char* RowDescriptor::LLVM_CLASS_NAME = "class.impala::RowDescriptor";
 
 string NullIndicatorOffset::DebugString() const {
   stringstream out;

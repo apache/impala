@@ -24,10 +24,16 @@
 #include "gen-cpp/row_batch.pb.h"
 #include "kudu/util/slice.h"
 #include "runtime/mem-tracker.h"
+#include "util/fixed-size-hash-table.h"
+
+namespace llvm {
+    class Function;
+}
 
 namespace impala {
 
 template <typename K, typename V> class FixedSizeHashTable;
+class LlvmCodeGen;
 class MemTracker;
 class RowBatchSerializeTest;
 class RowDescriptor;
@@ -40,6 +46,8 @@ class TupleRow;
 /// for holding the tuple offsets and tuple data.
 class OutboundRowBatch {
  public:
+  static const char* LLVM_CLASS_NAME;
+
   OutboundRowBatch(const CharMemTrackerAllocator& allocator) : tuple_data_(allocator) {}
 
   const RowBatchHeaderPB* header() const { return &header_; }
@@ -83,15 +91,49 @@ class OutboundRowBatch {
   inline Status IR_ALWAYS_INLINE AppendRow(
       const TupleRow* row, const RowDescriptor* row_desc);
 
+  class DedupMap : public FixedSizeHashTable<Tuple*, int> {
+   public:
+    static const char* LLVM_CLASS_NAME;
+  };
+
+  // Append tuple/row with deduplication:
+  // -nullptr tuples will be encoded as -1 in tuple_offsets_
+  // -as a fast deduplication for adjacent rows, if the tuple points to the same memory
+  //  as the previous row's corresponding tuple, its offset will be duplicated in
+  //  tuple_offsets_, and the call to AppendTuple will be spared
+  // -optionally, if a DedupMap is provided in distinct_tuples, the tuple's hash will be
+  //  compared against all previous tuples, and upon a match, the offset in tuple_offsets_
+  //  will be duplicated, sparing an AppendTuple call
+  Status IR_ALWAYS_INLINE AppendTupleWithDedup(const TupleRow* row,
+      const TupleRow* prev_row, int tuple_idx, DedupMap* distinct_tuples,
+      TupleDescriptor* desc, int byte_size, int num_tuples);
+
+  Status IR_NO_INLINE AppendRowWithDedup(
+      const TupleRow* row, const TupleRow* prev_row, DedupMap* distinct_tuples,
+      const RowDescriptor* row_desc) noexcept;
+
   // Returns true if the size limit (also used by RowBatch) is reached.
   // Only used if the batch is serialized with AppendRow().
   inline bool ReachedSizeLimit();
 
+  int64_t GetDeserializedSize() const {
+    return header_.uncompressed_size() + tuple_offsets_.size() * sizeof(Tuple*);
+  }
+
+  int64_t GetSerializedSize() const {
+    return tuple_data_.size() + tuple_offsets_.size() * sizeof(int32_t);
+  }
+
+  // Create a codegen'd version of AppendRowWithDedup based on a RowDescriptor
+  static Status CodegenAppendRowWithDedup(LlvmCodeGen* codegen,
+      const RowDescriptor* row_desc, llvm::Function** fn);
+
  private:
   friend class IcebergPositionDeleteCollector;
-  friend class RowBatch;
   friend class RowBatchSerializeBaseline;
 
+  inline Status IR_ALWAYS_INLINE AppendTuple(
+      const Tuple* tuple, const TupleDescriptor* desc);
   inline bool IR_ALWAYS_INLINE TryAppendTuple(
       const Tuple* tuple, const TupleDescriptor* desc);
 

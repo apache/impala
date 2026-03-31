@@ -521,7 +521,7 @@ void KrpcDataStreamSender::Channel::TransmitDataCompleteCb() {
     // 'receiver_latency_ns' is calculated with MonoTime, so it must be non-negative.
     DCHECK_GE(resp_.receiver_latency_ns(), 0);
     DCHECK_GE(total_time, resp_.receiver_latency_ns());
-    int64_t row_batch_size = RowBatch::GetSerializedSize(*rpc_in_flight_batch_);
+    int64_t row_batch_size = rpc_in_flight_batch_->GetSerializedSize();
     int64_t network_time = total_time - resp_.receiver_latency_ns();
     COUNTER_ADD(parent_->bytes_sent_counter_, row_batch_size);
     if (LIKELY(network_time > 0)) {
@@ -770,7 +770,7 @@ class KrpcDataStreamSender::IcebergPositionDeleteChannel {
       bool compress = !channel_->IsLocal();
       RETURN_IF_ERROR(dest->PrepareForSend(NUM_TUPLES_PER_ROW,
           compress ? parent_->compression_scratch_.get(): nullptr));
-      int64_t uncompressed_bytes = RowBatch::GetDeserializedSize(*dest);
+      int64_t uncompressed_bytes = dest->GetDeserializedSize();
       COUNTER_ADD(parent_->uncompressed_bytes_counter_, uncompressed_bytes);
     }
     return Status::OK();
@@ -796,6 +796,7 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
     next_unknown_partition_(0),
     exchange_hash_seed_(sink_config.exchange_hash_seed_),
     hash_and_add_rows_fn_(sink_config.hash_and_add_rows_fn_),
+    serialize_batch_fn_(sink_config.serialize_batch_fn_),
     filepath_to_hosts_(sink_config.filepath_to_hosts_) {
   DCHECK_GT(destinations.size(), 0);
   DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
@@ -1055,7 +1056,67 @@ void KrpcDataStreamSenderConfig::Codegen(FragmentState* state) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
   const string sender_name = PartitionTypeName() + " Sender";
-  if (partition_type_ != TPartitionType::HASH_PARTITIONED) {
+  Status codegen_status = Status::OK();
+  if (partition_type_ == TPartitionType::HASH_PARTITIONED) {
+    llvm::Function* hash_row_fn;
+    codegen_status = CodegenHashRow(codegen, &hash_row_fn);
+    if (codegen_status.ok()) {
+      llvm::Function* hash_and_add_rows_fn =
+          codegen->GetFunction(IRFunction::KRPC_DSS_HASH_AND_ADD_ROWS, true);
+      DCHECK(hash_and_add_rows_fn != nullptr);
+
+      int num_replaced;
+      // Replace GetNumChannels() with a constant.
+      num_replaced = codegen->ReplaceCallSitesWithValue(hash_and_add_rows_fn,
+          codegen->GetI32Constant(num_channels_), "GetNumChannels");
+      DCHECK_EQ(num_replaced, 1);
+
+      num_replaced = codegen->ReplaceCallSitesWithValue(hash_and_add_rows_fn,
+          codegen->GetI32Constant(input_row_desc_->num_tuples_no_inline()),
+          "num_tuples_no_inline");
+      DCHECK_EQ(num_replaced, 1);
+
+      // Replace HashRow() with the handcrafted IR function.
+      num_replaced = codegen->ReplaceCallSites(hash_and_add_rows_fn,
+          hash_row_fn, KrpcDataStreamSender::HASH_ROW_SYMBOL);
+      DCHECK_EQ(num_replaced, 1);
+
+      hash_and_add_rows_fn = codegen->FinalizeFunction(hash_and_add_rows_fn);
+      if (hash_and_add_rows_fn == nullptr) {
+        codegen_status =
+            Status("Codegen'd HashAndAddRows() failed verification. See log");
+      } else {
+        codegen->AddFunctionToJit(hash_and_add_rows_fn, &hash_and_add_rows_fn_);
+      }
+    }
+  } else if (partition_type_ == TPartitionType::UNPARTITIONED) {
+    llvm::Function* append_row_fn = nullptr;
+    codegen_status = OutboundRowBatch::CodegenAppendRowWithDedup(codegen,
+        input_row_desc_, &append_row_fn);
+    DCHECK(append_row_fn != nullptr);
+
+    if (codegen_status.ok()) {
+      llvm::Function* serialize_batch_fn =
+          codegen->GetFunction(IRFunction::ROW_BATCH_SERIALIZE, true);
+      int num_replaced;
+      num_replaced = codegen->ReplaceCallSites(serialize_batch_fn,
+          append_row_fn, "AppendRowWithDedup");
+      DCHECK_EQ(num_replaced, 1);
+
+      bool use_full_dedup = RowBatch::UseFullDedup(input_row_desc_);
+      num_replaced = codegen->ReplaceCallSitesWithValue(serialize_batch_fn,
+          codegen->GetBoolConstant(use_full_dedup), "UseFullDedup");
+      DCHECK_EQ(num_replaced, 1);
+      serialize_batch_fn = codegen->FinalizeFunction(serialize_batch_fn);
+
+      if (serialize_batch_fn == nullptr) {
+        codegen_status =
+          Status("Codegen'd SerializeBatch() failed verification. See log");
+      } else {
+        codegen->AddFunctionToJit(serialize_batch_fn, &serialize_batch_fn_);
+      }
+    }
+  } else {
     const string& msg = Substitute("not $0",
         partition_type_ == TPartitionType::KUDU ? "supported" : "needed");
     codegen_status_msgs_.emplace_back(
@@ -1063,37 +1124,6 @@ void KrpcDataStreamSenderConfig::Codegen(FragmentState* state) {
     return;
   }
 
-  llvm::Function* hash_row_fn;
-  Status codegen_status = CodegenHashRow(codegen, &hash_row_fn);
-  if (codegen_status.ok()) {
-    llvm::Function* hash_and_add_rows_fn =
-        codegen->GetFunction(IRFunction::KRPC_DSS_HASH_AND_ADD_ROWS, true);
-    DCHECK(hash_and_add_rows_fn != nullptr);
-
-    int num_replaced;
-    // Replace GetNumChannels() with a constant.
-    num_replaced = codegen->ReplaceCallSitesWithValue(hash_and_add_rows_fn,
-        codegen->GetI32Constant(num_channels_), "GetNumChannels");
-    DCHECK_EQ(num_replaced, 1);
-
-    num_replaced = codegen->ReplaceCallSitesWithValue(hash_and_add_rows_fn,
-        codegen->GetI32Constant(input_row_desc_->num_tuples_no_inline()),
-        "num_tuples_no_inline");
-    DCHECK_EQ(num_replaced, 1);
-
-    // Replace HashRow() with the handcrafted IR function.
-    num_replaced = codegen->ReplaceCallSites(hash_and_add_rows_fn,
-        hash_row_fn, KrpcDataStreamSender::HASH_ROW_SYMBOL);
-    DCHECK_EQ(num_replaced, 1);
-
-    hash_and_add_rows_fn = codegen->FinalizeFunction(hash_and_add_rows_fn);
-    if (hash_and_add_rows_fn == nullptr) {
-      codegen_status =
-          Status("Codegen'd HashAndAddRows() failed verification. See log");
-    } else {
-      codegen->AddFunctionToJit(hash_and_add_rows_fn, &hash_and_add_rows_fn_);
-    }
-  }
   AddCodegenStatus(codegen_status, sender_name);
 }
 
@@ -1324,9 +1354,16 @@ Status KrpcDataStreamSender::SerializeBatch(
   VLOG_ROW << "serializing " << src->num_rows() << " rows";
   {
     SCOPED_TIMER(serialize_batch_timer_);
-    RETURN_IF_ERROR(
-        src->Serialize(dest, compress ? compression_scratch_.get() : nullptr));
-    int64_t uncompressed_bytes = RowBatch::GetDeserializedSize(*dest);
+    const KrpcDataStreamSenderConfig::SerializeBatchFn serialize_batch_fn =
+        serialize_batch_fn_.load();
+    if (serialize_batch_fn != nullptr) {
+      RETURN_IF_ERROR(serialize_batch_fn(src, dest,
+          compress ? compression_scratch_.get() : nullptr));
+    } else {
+      RETURN_IF_ERROR(src->Serialize(dest,
+          compress ? compression_scratch_.get() : nullptr));
+    }
+    int64_t uncompressed_bytes = dest->GetDeserializedSize();
     COUNTER_ADD(uncompressed_bytes_counter_, uncompressed_bytes * num_receivers);
   }
   return Status::OK();
@@ -1339,7 +1376,7 @@ Status KrpcDataStreamSender::PrepareBatchForSend(
   SCOPED_TIMER(serialize_batch_timer_);
   RETURN_IF_ERROR(batch->PrepareForSend(row_desc_->tuple_descriptors().size(),
       compress ? compression_scratch_.get() : nullptr, true));
-  int64_t uncompressed_bytes = RowBatch::GetDeserializedSize(*batch);
+  int64_t uncompressed_bytes = batch->GetDeserializedSize();
   COUNTER_ADD(uncompressed_bytes_counter_, uncompressed_bytes);
   return Status::OK();
 }

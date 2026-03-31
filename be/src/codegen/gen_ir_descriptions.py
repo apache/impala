@@ -202,6 +202,14 @@ ir_functions = [
    "_ZNK6impala13RuntimeFilter4EvalEPvRKNS_10ColumnTypeE"],
   ["TUPLE_COPY_STRINGS",
    "_ZN6impala5Tuple11CopyStringsEPKcPNS_12RuntimeStateEPKNS_11SlotOffsetsEiPNS_7MemPoolEPNS_6StatusE"],
+  ["TUPLE_TRY_DEEP_COPY", "_ZNK6impala5Tuple11TryDeepCopyEPPhPKhPiRKNS_15TupleDescriptorE"],
+  ["TUPLE_TRY_DEEP_COPY_FIXED_SIZE", "_ZNK6impala5Tuple20TryDeepCopyFixedSizeEPPhPKhPii"],
+  ["TUPLE_TRY_DEEP_COPY_STRING_SLOT", "_ZN6impala5Tuple21TryDeepCopyStringSlotEPPhPKhPiNS_19NullIndicatorOffsetEi"],
+  ["TUPLE_TRY_DEEP_COPY_COLLECTIONS", "_ZN6impala5Tuple22TryDeepCopyCollectionsEPPhPKhPiRKNS_15TupleDescriptorE"],
+  ["OUTBOUND_ROW_BATCH_APPEND_TUPLE_WITH_DEDUP",
+   "_ZN6impala16OutboundRowBatch20AppendTupleWithDedupEPKNS_8TupleRowES3_iPNS0_8DedupMapEPNS_15TupleDescriptorEii"],
+  ["ROW_DESCRIPTOR_GET_TUPLE_DESC", "_ZN6impala13RowDescriptor12GetTupleDescEi"],
+  ["STATUS_OK", "_ZN6impala8StatusOKEPNS_6StatusE"],
   ["UNION_MATERIALIZE_BATCH",
   "_ZN6impala9UnionNode16MaterializeBatchEPNS_8RowBatchEPPh"],
   ["BLOOM_FILTER_INSERT", "_ZN6impala11BloomFilter8IrInsertEj"],
@@ -263,6 +271,8 @@ ir_functions = [
   ["BUFFERED_TUPLE_STREAM_ADD_ROW", "_ZN6impala19BufferedTupleStream6AddRowEPNS_8TupleRowEPNS_6StatusE"],
 
   ["TUPLE_ROW_GET_TUPLE", "_ZNK6impala8TupleRow10GetTupleIREi"],
+
+  ["ROW_BATCH_SERIALIZE", "_ZN6impala8RowBatch9SerializeEPNS_16OutboundRowBatchEPNSt7__cxx1112basic_stringIcSt11char_traitsIcENS_19MemTrackerAllocatorIcSaIcEEEEE"],
 
   ["BOOL_MIN_MAX_FILTER_ALWAYSTRUE", "_ZNK6impala16BoolMinMaxFilter10AlwaysTrueEv"],
   ["TINYINT_MIN_MAX_FILTER_ALWAYSTRUE", "_ZNK6impala19TinyIntMinMaxFilter10AlwaysTrueEv"],

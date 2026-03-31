@@ -909,6 +909,10 @@ class RowDescriptor {
 
   std::string DebugString() const;
 
+  TupleDescriptor* IR_ALWAYS_INLINE GetTupleDesc(int tuple_idx) noexcept;
+
+  static const char* LLVM_CLASS_NAME;
+
  private:
   /// Initializes tupleIdxMap during c'tor using the tuple_desc_map_.
   void InitTupleIdxMap();

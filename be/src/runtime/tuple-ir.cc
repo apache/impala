@@ -56,18 +56,26 @@ bool TryMemCopy(uint8_t* dst, const uint8_t* dst_end, int size, const T* src) {
   return true;
 }
 
+bool Tuple::TryDeepCopyFixedSize(uint8_t** data, const uint8_t* data_end,
+    int* offset, int byte_size) const {
+  if (!TryMemCopy(*data, data_end, byte_size, this)) return false;
+  *data += byte_size;
+  *offset += byte_size;
+  return true;
+}
+
 bool Tuple::TryDeepCopy(uint8_t** dst_start, const uint8_t* dst_end, int* offset_start,
-    const TupleDescriptor& desc, bool convert_ptrs) const {
+    const TupleDescriptor& desc) const {
   uint8_t* dst = *dst_start;
   int offset = *offset_start;
-  if (!TryMemCopy(dst, dst_end, desc.byte_size(), this)) return false;
   Tuple* dst_tuple = reinterpret_cast<Tuple*>(dst);
-  dst += desc.byte_size();
-  offset += desc.byte_size();
-  if (!dst_tuple->TryDeepCopyStrings(&dst, dst_end, &offset, desc, convert_ptrs)) {
+  if (!TryDeepCopyFixedSize(&dst, dst_end, &offset, desc.byte_size())) {
     return false;
   }
-  if (!dst_tuple->TryDeepCopyCollections(&dst, dst_end, &offset, desc, convert_ptrs)) {
+  if (!dst_tuple->TryDeepCopyStrings(&dst, dst_end, &offset, desc)) {
+    return false;
+  }
+  if (!dst_tuple->TryDeepCopyCollections(&dst, dst_end, &offset, desc)) {
     return false;
   }
   *dst_start = dst;
@@ -75,31 +83,37 @@ bool Tuple::TryDeepCopy(uint8_t** dst_start, const uint8_t* dst_end, int* offset
   return true;
 }
 
+bool Tuple::TryDeepCopyStringSlot(uint8_t** data, const uint8_t* data_end, int* offset,
+    NullIndicatorOffset null_indicator_offset, int tuple_offset) {
+  if (IsNull(null_indicator_offset)) return true;
+
+  StringValue* string_v = GetStringSlot(tuple_offset);
+  // It is safe to smallify at this point as DeepCopyVarlenData is called on the new
+  // tuple which can be modified.
+  if (string_v->Smallify()) return true;
+  int len = string_v->Len();
+  DCHECK_GT(len, 0); // Size 0 should be handled by "smallify" case.
+  if (!TryMemCopy(*data, data_end, len, string_v->Ptr())) return false;
+  char* new_ptr = reinterpret_cast<char*>(*offset);
+  string_v->SetPtr(new_ptr);
+  *data += len;
+  *offset += len;
+  return true;
+}
+
 bool Tuple::TryDeepCopyStrings(uint8_t** data, const uint8_t* data_end, int* offset,
-   const TupleDescriptor& desc, bool convert_ptrs) {
+   const TupleDescriptor& desc) {
   vector<SlotDescriptor*>::const_iterator slot = desc.string_slots().begin();
   for (; slot != desc.string_slots().end(); ++slot) {
     DCHECK((*slot)->type().IsVarLenStringType());
-    if (IsNull((*slot)->null_indicator_offset())) continue;
-
-    StringValue* string_v = GetStringSlot((*slot)->tuple_offset());
-    // It is safe to smallify at this point as DeepCopyVarlenData is called on the new
-    // tuple which can be modified.
-    if (string_v->Smallify()) continue;
-    int len = string_v->Len();
-    DCHECK_GT(len, 0); // Size 0 should be handled by "smallify" case.
-    if (!TryMemCopy(*data, data_end, len, string_v->Ptr())) return false;
-    char* new_ptr = convert_ptrs ? reinterpret_cast<char*>(*offset) :
-                                   reinterpret_cast<char*>(*data);
-    string_v->SetPtr(new_ptr);
-    *data += len;
-    *offset += len;
+    if (!TryDeepCopyStringSlot(data, data_end, offset, (*slot)->null_indicator_offset(),
+        (*slot)->tuple_offset())) return false;
   }
   return true;
 }
 
 bool Tuple::TryDeepCopyCollections(uint8_t** data, const uint8_t* data_end, int* offset,
-    const TupleDescriptor& desc, bool convert_ptrs) {
+    const TupleDescriptor& desc) {
   vector<SlotDescriptor*>::const_iterator slot = desc.collection_slots().begin();
   for (; slot != desc.collection_slots().end(); ++slot) {
     DCHECK((*slot)->type().IsCollectionType());
@@ -111,7 +125,7 @@ bool Tuple::TryDeepCopyCollections(uint8_t** data, const uint8_t* data_end, int*
     if (!TryMemCopy(*data, data_end, coll_byte_size, coll_value->ptr)) return false;
     uint8_t* coll_data = reinterpret_cast<uint8_t*>(*data);
 
-    coll_value->ptr = convert_ptrs ? reinterpret_cast<uint8_t*>(*offset) : coll_data;
+    coll_value->ptr = reinterpret_cast<uint8_t*>(*offset);
 
     *data += coll_byte_size;
     *offset += coll_byte_size;
@@ -120,11 +134,11 @@ bool Tuple::TryDeepCopyCollections(uint8_t** data, const uint8_t* data_end, int*
     if (!item_desc.HasVarlenSlots()) continue;
     for (int i = 0; i < coll_value->num_tuples; ++i) {
       Tuple* dst_item = reinterpret_cast<Tuple*>(coll_data);
-      if(!dst_item->TryDeepCopyStrings(data, data_end, offset, item_desc, convert_ptrs)) {
+      if(!dst_item->TryDeepCopyStrings(data, data_end, offset, item_desc)) {
         return false;
       }
       if(!dst_item->TryDeepCopyCollections(
-          data, data_end, offset, item_desc, convert_ptrs)) {
+          data, data_end, offset, item_desc)) {
         return false;
       }
       coll_data += item_desc.byte_size();

@@ -157,8 +157,8 @@ class Tuple {
   /// ('*data' would pass 'data_end') instead of assuming that the tuple fits to buffer.
   /// If it fails, 'data' will be the same as before the call, but the buffer
   /// can be modified (between before '*data' and 'data_end').
-  bool TryDeepCopy(uint8_t** data, const uint8_t* data_end, int* offset,
-      const TupleDescriptor& desc, bool convert_ptrs) const;
+  bool IR_NO_INLINE TryDeepCopy(uint8_t** data, const uint8_t* data_end, int* offset,
+      const TupleDescriptor& desc) const;
 
   /// This function should only be called on tuples created by DeepCopy() with
   /// 'convert_ptrs' = true. It takes all pointers contained in this tuple (i.e. in
@@ -269,6 +269,10 @@ class Tuple {
   static Status CodegenCopyStrings(LlvmCodeGen* codegen,
       const TupleDescriptor& desc, llvm::Function** materialize_strings_fn);
 
+  /// Create a codegen'd version of TryDeepCopy based on TupleDescriptor
+  static Status CodegenTryDeepCopy(LlvmCodeGen* codegen, const TupleDescriptor* desc,
+      llvm::Function** fn);
+
   /// Turn null indicator bit on. For non-nullable slots, the mask will be 0 and
   /// this is a no-op (but we don't have to branch to check is slots are nullable).
   void SetNull(const NullIndicatorOffset& offset) {
@@ -361,10 +365,16 @@ class Tuple {
   void DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
       bool convert_ptrs);
 
+  bool TryDeepCopyFixedSize(uint8_t** data, const uint8_t* data_end, int* offset,
+      int byte_size) const;
+
+  bool TryDeepCopyStringSlot(uint8_t** data, const uint8_t* data_end, int* offset,
+    NullIndicatorOffset null_indicator_offset, int tuple_offset);
   bool TryDeepCopyStrings(uint8_t** data, const uint8_t* data_end, int* offset,
-      const TupleDescriptor& desc, bool convert_ptrs);
+      const TupleDescriptor& desc);
+
   bool TryDeepCopyCollections(uint8_t** data, const uint8_t* data_end, int* offset,
-      const TupleDescriptor& desc, bool convert_ptrs);
+      const TupleDescriptor& desc);
 
   /// During the construction of hand-crafted codegen'd functions, types cannot generally
   /// be looked up by name. In our own types we use the static 'LLVM_CLASS_NAME' member to

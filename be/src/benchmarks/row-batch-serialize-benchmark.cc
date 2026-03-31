@@ -135,7 +135,7 @@ class RowBatchSerializeBaseline {
                << ", compressed size: " << compressed_size;
     }
 
-    return RowBatch::GetDeserializedSize(*output_batch);
+    return output_batch->GetDeserializedSize();
   }
 
   // Copy of baseline version without dedup logic

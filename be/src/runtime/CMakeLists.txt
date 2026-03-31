@@ -37,6 +37,9 @@ add_library(RuntimeIr
   buffered-tuple-stream-ir.cc
   tuple-row-ir.cc
   tuple-ir.cc
+  descriptors-ir.cc
+  row-batch-ir.cc
+  outbound-row-batch-ir.cc
 )
 add_dependencies(RuntimeIr gen-deps)
 

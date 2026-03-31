@@ -38,7 +38,6 @@ class Slice;
 
 namespace impala {
 
-template <typename K, typename V> class FixedSizeHashTable;
 class MemTracker;
 class OutboundRowBatch;
 class RowBatchHeaderPB;
@@ -359,13 +358,12 @@ class RowBatch {
   /// larger than the uncompressed data. Use output_batch.compression_type to determine
   /// whether tuple_data is compressed. If an in-flight row is present in this row batch,
   /// it is ignored. This function does not Reset().
-  Status Serialize(OutboundRowBatch* output_batch, TrackedString* compression_scratch);
+  Status IR_NO_INLINE Serialize(OutboundRowBatch* output_batch,
+      TrackedString* compression_scratch);
 
   /// Utility function: returns total byte size of a batch in either serialized or
   /// deserialized form. If a row batch is compressed, its serialized size can be much
   /// less than the deserialized size.
-  static int64_t GetSerializedSize(const OutboundRowBatch& batch);
-  static int64_t GetDeserializedSize(const OutboundRowBatch& batch);
   static int64_t GetDeserializedSize(const RowBatchHeaderPB& header);
 
   int ALWAYS_INLINE num_rows() const { return num_rows_; }
@@ -410,6 +408,8 @@ class RowBatch {
   /// string to prepend to the log message.
   void VLogRows(const std::string& context);
 
+  static bool UseFullDedup(const RowDescriptor* row_desc);
+
  private:
   friend class RowBatchSerializeBaseline;
   friend class RowBatchSerializeBenchmark;
@@ -435,13 +435,11 @@ class RowBatch {
   /// Decide whether to do full tuple deduplication based on row composition. Full
   /// deduplication is enabled only when there is risk of the serialized size being
   /// much larger than in-memory size due to non-adjacent duplicate tuples.
-  bool UseFullDedup();
+  IR_NO_INLINE bool UseFullDedup() { return RowBatch::UseFullDedup(row_desc_); }
 
   /// Overload for testing that allows the test to force the deduplication level.
-  Status Serialize(OutboundRowBatch* output_batch, bool full_dedup,
+  Status IR_ALWAYS_INLINE Serialize(OutboundRowBatch* output_batch, bool full_dedup,
       TrackedString* compression_scratch);
-
-  typedef FixedSizeHashTable<Tuple*, int> DedupMap;
 
   /// Implementation for protobuf to serialize this row batch.
   ///
@@ -462,8 +460,6 @@ class RowBatch {
   /// 'size': Expected size of serialized row batch data.
   ///
   /// Returns error status if serialization failed. Returns OK otherwise.
-  Status Serialize(DedupMap* distinct_tuples, OutboundRowBatch* output_batch,
-      bool* is_compressed, int64_t size, TrackedString* compression_scratch);
 
   /// Implementation for protobuf to deserialize a row batch.
   ///
@@ -487,10 +483,9 @@ class RowBatch {
   /// gaps in the auxiliary and deduplicated tuples (i.e. the smallest footprint for the
   /// row batch). If the distinct_tuples argument is non-null, full deduplication is
   /// enabled. The distinct_tuples map must be empty.
-  int64_t TotalByteSize(DedupMap* distinct_tuples);
 
-  Status SerializeInternal(int64_t size, DedupMap* distinct_tuples,
-      vector<int32_t>* tuple_offsets, char* tuple_data);
+  Status IR_ALWAYS_INLINE SerializeInternal(bool full_dedup,
+      OutboundRowBatch* output_batch);
 
   /// All members below need to be handled in RowBatch::AcquireState()
 
